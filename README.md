@@ -24,7 +24,8 @@ Clone the repository and install the dependencies:
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd Figma_V2
+cd sprintstart-frontend
+
 
 # Install dependencies
 npm install
