@@ -1,0 +1,151 @@
+{
+  "nav": {
+    "chat": "Chat",
+    "onboarding": "My Onboarding",
+    "knowledge": "Knowledge Base",
+    "profile": "Profile",
+    "team_dashboard": "Team Dashboard",
+    "knowledge_quality": "Knowledge Quality",
+    "handover": "Handover Management",
+    "global_onboarding": "Global Onboarding",
+    "skill_gaps": "Skill Gaps",
+    "statistics": "Statistics",
+    "access_management": "Access Management",
+    "data_ingestion": "Data Ingestion",
+    "system_logs": "System Logs"
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "german": "German",
+    "you": "You",
+    "ai_assistant": "Project Assistant",
+    "querying_sources": "Querying across {{count}} connected data sources",
+    "placeholder_description": "The {{module}} module is part of the SprintStart Enterprise suite. It is currently being optimized for your team's specific onboarding workflows and data sources."
+  },
+  "chat": {
+    "placeholder": "Ask anything about the project...",
+    "press_enter": "Press Enter to send",
+    "ai_warning": "AI can make mistakes. Verify critical info.",
+    "filters": {
+      "all": "All Sources",
+      "docs": "Documentation",
+      "tickets": "Jira Tickets",
+      "repos": "GitHub Repos",
+      "slack": "Slack"
+    },
+    "initial_messages": [
+      {
+        "role": "user",
+        "content": "How do I deploy the backend to our production cluster?"
+      },
+      {
+        "role": "assistant",
+        "content": "To deploy the backend to the production cluster, follow these steps according to our standard operating procedure:\n\n1. **Environment Setup**: Ensure your AWS CLI is configured with the `production-admin` profile.\n2. **Build & Tag**: Run the build script and tag it with the current semantic version.\n   ```bash\n   pnpm build && docker build -t backend:v2.4.0 .\n   ```\n3. **Push to ECR**: Authenticate with Docker to our private registry and push the image.\n4. **ECS Update**: Use the `aws ecs update-service` command to trigger a rolling deployment.\n\nAlways verify the health check status in the CloudWatch dashboard after deployment.",
+        "citations": [
+          { "id": "rb-01", "title": "Backend Deployment Guide", "type": "Runbook" },
+          { "id": "doc-42", "title": "AWS Cluster Configuration", "type": "Documentation" },
+          { "id": "adr-12", "title": "Containerization Strategy", "type": "ADR" }
+        ]
+      }
+    ],
+    "response_prefix": "Based on our {{source}} records, you'll need to update the following environment variables for the production environment:",
+    "response_body": "- `DB_HOST`: Should point to the RDS Aurora cluster.\n- `REDIS_URL`: Use the ElastiCache primary endpoint.\n- `STRIPE_KEY`: Retrieve from AWS Secrets Manager path `/prod/payments/stripe`.\n\nMake sure to never log these values in plain text.",
+    "citations": {
+      "env_config": "Production Environment Config",
+      "secrets_policy": "Secrets Management Policy"
+    }
+  },
+  "onboarding": {
+    "journey_title": "Onboarding Journey",
+    "journey_subtitle": "Your structured path to becoming a productive team member",
+    "overall_progress": "Overall Progress",
+    "items_completed": "{{completed}} of {{total}} items completed",
+    "status": {
+      "complete": "Complete",
+      "active": "Active",
+      "start": "Start"
+    },
+    "next_step_title": "Recommended Next Step",
+    "next_step_desc": "Complete \"Watch: CI/CD Pipeline Tutorial\" to continue your Week 1 progress",
+    "phases": {
+      "day1": {
+        "title": "Day 1: Welcome & Setup",
+        "description": "Essential setup and orientation",
+        "period": "Day 1",
+        "items": {
+          "hr_paperwork": {
+            "title": "Complete HR paperwork",
+            "description": "Fill out all required employment forms"
+          },
+          "company_overview": {
+            "title": "Watch: Company Overview",
+            "description": "Introduction to company culture and values"
+          },
+          "handbook": {
+            "title": "Read: Engineering Handbook",
+            "description": "Core engineering principles and practices"
+          },
+          "dev_env": {
+            "title": "Setup development environment",
+            "description": "Install required tools and configure your workspace"
+          },
+          "buddy": {
+            "title": "Meet your onboarding buddy",
+            "description": "Introduction meeting with assigned mentor"
+          }
+        }
+      },
+      "week1": {
+        "title": "Week 1: Foundation",
+        "description": "Learn core systems and processes",
+        "period": "Week 1",
+        "items": {
+          "architecture": {
+            "title": "Architecture Overview",
+            "description": "Understanding the system architecture"
+          },
+          "first_feature": {
+            "title": "Deploy your first feature",
+            "description": "Complete a guided first deployment"
+          },
+          "cicd": {
+            "title": "Watch: CI/CD Pipeline Tutorial",
+            "description": "Learn our deployment and testing processes"
+          },
+          "code_review": {
+            "title": "Code review best practices",
+            "description": "Learn how we review and merge code"
+          },
+          "standup": {
+            "title": "Join team standup meetings",
+            "description": "Participate in daily team sync-ups"
+          }
+        }
+      },
+      "month1": {
+        "title": "Month 1: Integration",
+        "description": "Take ownership and contribute independently",
+        "period": "Month 1",
+        "items": {
+          "lead_feature": {
+            "title": "Lead a feature from start to finish",
+            "description": "Own the entire development lifecycle"
+          },
+          "database": {
+            "title": "Database schema and migrations",
+            "description": "Understanding data models and versioning"
+          },
+          "security": {
+            "title": "Security best practices",
+            "description": "Learn our security protocols and standards"
+          },
+          "presentation": {
+            "title": "Present at engineering all-hands",
+            "description": "Share your work with the broader team"
+          }
+        }
+      }
+    }
+  }
+}
