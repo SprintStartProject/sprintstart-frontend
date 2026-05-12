@@ -147,5 +147,49 @@
         }
       }
     }
+  },
+  "knowledge": {
+    "title": "Wissens-Explorer",
+    "subtitle": "Durchsuche Dokumentationen und Team-Artefakte",
+    "search_placeholder": "Wissensdatenbank durchsuchen...",
+    "search_button": "Suchen",
+    "results_count": "{{count}} Ergebnis",
+    "results_count_plural": "{{count}} Ergebnisse",
+    "no_results": "Keine Einträge für Ihre Suchkriterien gefunden",
+    "clear_filters": "Alle Filter zurücksetzen",
+    "filters": {
+      "type": "Typ",
+      "freshness": "Aktualität",
+      "owner": "Besitzer",
+      "all": "Alle",
+      "all_types": "Alle Typen",
+      "all_owners": "Alle Besitzer"
+    },
+    "types": {
+      "Documentation": "Dokumentation",
+      "ADR": "ADR",
+      "Runbook": "Runbook",
+      "Guide": "Leitfaden"
+    },
+    "freshness": {
+      "current": "Aktuell",
+      "stale": "Veraltet",
+      "outdated": "Abgelaufen"
+    },
+    "metadata": {
+      "owner": "Besitzer",
+      "last_updated": "Zuletzt aktualisiert",
+      "canonical": "Kanonisch",
+      "tags": "Tags",
+      "preview": "Vorschau",
+      "ai_summary": "KI-Einblick"
+    },
+    "actions": {
+      "open": "Dokument öffnen",
+      "ask_ai": "KI dazu befragen",
+      "share": "Teilen",
+      "request_update": "Update anfordern",
+      "summarize": "KI-Zusammenfassung"
+    }
   }
 }

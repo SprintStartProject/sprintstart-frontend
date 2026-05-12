@@ -147,5 +147,49 @@
         }
       }
     }
+  },
+  "knowledge": {
+    "title": "Knowledge Explorer",
+    "subtitle": "Search and browse team documentation and artifacts",
+    "search_placeholder": "Search knowledge base...",
+    "search_button": "Search",
+    "results_count": "{{count}} result",
+    "results_count_plural": "{{count}} results",
+    "no_results": "No items found matching your criteria",
+    "clear_filters": "Clear all filters",
+    "filters": {
+      "type": "Type",
+      "freshness": "Freshness",
+      "owner": "Owner",
+      "all": "All",
+      "all_types": "All Types",
+      "all_owners": "All Owners"
+    },
+    "types": {
+      "Documentation": "Documentation",
+      "ADR": "ADR",
+      "Runbook": "Runbook",
+      "Guide": "Guide"
+    },
+    "freshness": {
+      "current": "Current",
+      "stale": "Stale",
+      "outdated": "Outdated"
+    },
+    "metadata": {
+      "owner": "Owner",
+      "last_updated": "Last Updated",
+      "canonical": "Canonical",
+      "tags": "Tags",
+      "preview": "Preview",
+      "ai_summary": "AI Insight"
+    },
+    "actions": {
+      "open": "Open Full Document",
+      "ask_ai": "Ask AI about this",
+      "share": "Share",
+      "request_update": "Request Update",
+      "summarize": "AI Summary"
+    }
   }
 }
