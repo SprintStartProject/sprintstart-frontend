@@ -12,13 +12,14 @@ import {
   Settings,
   Database,
   FileText,
+  LucideIcon,
 } from 'lucide-react';
 import { UserRole } from '../../context/RoleContext';
 
 export interface NavItem {
   id: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   path: string;
   roles: UserRole[];
   section: 'base' | 'project-manager' | 'hr' | 'admin';

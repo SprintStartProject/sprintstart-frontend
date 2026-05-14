@@ -23,138 +23,141 @@ interface OnboardingPhase {
 export function Onboarding() {
   const { t } = useTranslation();
 
-  const phases: OnboardingPhase[] = useMemo(() => [
-    {
-      id: 'day1',
-      title: t('onboarding.phases.day1.title'),
-      description: t('onboarding.phases.day1.description'),
-      period: t('onboarding.phases.day1.period'),
-      items: [
-        {
-          id: '1',
-          title: t('onboarding.phases.day1.items.hr_paperwork.title'),
-          description: t('onboarding.phases.day1.items.hr_paperwork.description'),
-          type: 'task',
-          completed: true,
-        },
-        {
-          id: '2',
-          title: t('onboarding.phases.day1.items.company_overview.title'),
-          description: t('onboarding.phases.day1.items.company_overview.description'),
-          type: 'video',
-          completed: true,
-          duration: '15 min',
-        },
-        {
-          id: '3',
-          title: t('onboarding.phases.day1.items.handbook.title'),
-          description: t('onboarding.phases.day1.items.handbook.description'),
-          type: 'document',
-          completed: true,
-          duration: '30 min',
-        },
-        {
-          id: '4',
-          title: t('onboarding.phases.day1.items.dev_env.title'),
-          description: t('onboarding.phases.day1.items.dev_env.description'),
-          type: 'task',
-          completed: true,
-        },
-        {
-          id: '5',
-          title: t('onboarding.phases.day1.items.buddy.title'),
-          description: t('onboarding.phases.day1.items.buddy.description'),
-          type: 'task',
-          completed: true,
-          duration: '30 min',
-        },
-      ],
-    },
-    {
-      id: 'week1',
-      title: t('onboarding.phases.week1.title'),
-      description: t('onboarding.phases.week1.description'),
-      period: t('onboarding.phases.week1.period'),
-      items: [
-        {
-          id: '6',
-          title: t('onboarding.phases.week1.items.architecture.title'),
-          description: t('onboarding.phases.week1.items.architecture.description'),
-          type: 'document',
-          completed: true,
-          duration: '45 min',
-        },
-        {
-          id: '7',
-          title: t('onboarding.phases.week1.items.first_feature.title'),
-          description: t('onboarding.phases.week1.items.first_feature.description'),
-          type: 'task',
-          completed: true,
-        },
-        {
-          id: '8',
-          title: t('onboarding.phases.week1.items.cicd.title'),
-          description: t('onboarding.phases.week1.items.cicd.description'),
-          type: 'video',
-          completed: false,
-          duration: '20 min',
-        },
-        {
-          id: '9',
-          title: t('onboarding.phases.week1.items.code_review.title'),
-          description: t('onboarding.phases.week1.items.code_review.description'),
-          type: 'document',
-          completed: false,
-          duration: '15 min',
-        },
-        {
-          id: '10',
-          title: t('onboarding.phases.week1.items.standup.title'),
-          description: t('onboarding.phases.week1.items.standup.description'),
-          type: 'task',
-          completed: false,
-        },
-      ],
-    },
-    {
-      id: 'month1',
-      title: t('onboarding.phases.month1.title'),
-      description: t('onboarding.phases.month1.description'),
-      period: t('onboarding.phases.month1.period'),
-      items: [
-        {
-          id: '11',
-          title: t('onboarding.phases.month1.items.lead_feature.title'),
-          description: t('onboarding.phases.month1.items.lead_feature.description'),
-          type: 'task',
-          completed: false,
-        },
-        {
-          id: '12',
-          title: t('onboarding.phases.month1.items.database.title'),
-          description: t('onboarding.phases.month1.items.database.description'),
-          type: 'document',
-          completed: false,
-          duration: '40 min',
-        },
-        {
-          id: '13',
-          title: t('onboarding.phases.month1.items.security.title'),
-          description: t('onboarding.phases.month1.items.security.description'),
-          type: 'document',
-          completed: false,
-          duration: '25 min',
-        },
-        {
-          id: '14',
-          title: t('onboarding.phases.month1.items.presentation.title'),
-          description: t('onboarding.phases.month1.items.presentation.description'),
-          type: 'task',
-          completed: false,
-        },
-      ],
-    },
-  ], [t]);
+  const phases: OnboardingPhase[] = useMemo(
+    () => [
+      {
+        id: 'day1',
+        title: t('onboarding.phases.day1.title'),
+        description: t('onboarding.phases.day1.description'),
+        period: t('onboarding.phases.day1.period'),
+        items: [
+          {
+            id: '1',
+            title: t('onboarding.phases.day1.items.hr_paperwork.title'),
+            description: t('onboarding.phases.day1.items.hr_paperwork.description'),
+            type: 'task',
+            completed: true,
+          },
+          {
+            id: '2',
+            title: t('onboarding.phases.day1.items.company_overview.title'),
+            description: t('onboarding.phases.day1.items.company_overview.description'),
+            type: 'video',
+            completed: true,
+            duration: '15 min',
+          },
+          {
+            id: '3',
+            title: t('onboarding.phases.day1.items.handbook.title'),
+            description: t('onboarding.phases.day1.items.handbook.description'),
+            type: 'document',
+            completed: true,
+            duration: '30 min',
+          },
+          {
+            id: '4',
+            title: t('onboarding.phases.day1.items.dev_env.title'),
+            description: t('onboarding.phases.day1.items.dev_env.description'),
+            type: 'task',
+            completed: true,
+          },
+          {
+            id: '5',
+            title: t('onboarding.phases.day1.items.buddy.title'),
+            description: t('onboarding.phases.day1.items.buddy.description'),
+            type: 'task',
+            completed: true,
+            duration: '30 min',
+          },
+        ],
+      },
+      {
+        id: 'week1',
+        title: t('onboarding.phases.week1.title'),
+        description: t('onboarding.phases.week1.description'),
+        period: t('onboarding.phases.week1.period'),
+        items: [
+          {
+            id: '6',
+            title: t('onboarding.phases.week1.items.architecture.title'),
+            description: t('onboarding.phases.week1.items.architecture.description'),
+            type: 'document',
+            completed: true,
+            duration: '45 min',
+          },
+          {
+            id: '7',
+            title: t('onboarding.phases.week1.items.first_feature.title'),
+            description: t('onboarding.phases.week1.items.first_feature.description'),
+            type: 'task',
+            completed: true,
+          },
+          {
+            id: '8',
+            title: t('onboarding.phases.week1.items.cicd.title'),
+            description: t('onboarding.phases.week1.items.cicd.description'),
+            type: 'video',
+            completed: false,
+            duration: '20 min',
+          },
+          {
+            id: '9',
+            title: t('onboarding.phases.week1.items.code_review.title'),
+            description: t('onboarding.phases.week1.items.code_review.description'),
+            type: 'document',
+            completed: false,
+            duration: '15 min',
+          },
+          {
+            id: '10',
+            title: t('onboarding.phases.week1.items.standup.title'),
+            description: t('onboarding.phases.week1.items.standup.description'),
+            type: 'task',
+            completed: false,
+          },
+        ],
+      },
+      {
+        id: 'month1',
+        title: t('onboarding.phases.month1.title'),
+        description: t('onboarding.phases.month1.description'),
+        period: t('onboarding.phases.month1.period'),
+        items: [
+          {
+            id: '11',
+            title: t('onboarding.phases.month1.items.lead_feature.title'),
+            description: t('onboarding.phases.month1.items.lead_feature.description'),
+            type: 'task',
+            completed: false,
+          },
+          {
+            id: '12',
+            title: t('onboarding.phases.month1.items.database.title'),
+            description: t('onboarding.phases.month1.items.database.description'),
+            type: 'document',
+            completed: false,
+            duration: '40 min',
+          },
+          {
+            id: '13',
+            title: t('onboarding.phases.month1.items.security.title'),
+            description: t('onboarding.phases.month1.items.security.description'),
+            type: 'document',
+            completed: false,
+            duration: '25 min',
+          },
+          {
+            id: '14',
+            title: t('onboarding.phases.month1.items.presentation.title'),
+            description: t('onboarding.phases.month1.items.presentation.description'),
+            type: 'task',
+            completed: false,
+          },
+        ],
+      },
+    ],
+    [t],
+  );
 
   const getIcon = (type: OnboardingItem['type']) => {
     switch (type) {
@@ -190,7 +193,9 @@ export function Onboarding() {
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('onboarding.journey_title')}</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {t('onboarding.journey_title')}
+        </h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           {t('onboarding.journey_subtitle')}
         </p>
@@ -200,13 +205,21 @@ export function Onboarding() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">{t('onboarding.overall_progress')}</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+              {t('onboarding.overall_progress')}
+            </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('onboarding.items_completed', { completed: totalProgress.completed, total: totalProgress.total })}
+              {t('onboarding.items_completed', {
+                completed: totalProgress.completed,
+                total: totalProgress.total,
+              })}
             </p>
           </div>
           <div className="text-3xl font-semibold text-blue-600 dark:text-blue-400">
-            {totalProgress.total > 0 ? Math.round((totalProgress.completed / totalProgress.total) * 100) : 0}%
+            {totalProgress.total > 0
+              ? Math.round((totalProgress.completed / totalProgress.total) * 100)
+              : 0}
+            %
           </div>
         </div>
         <ProgressBar value={totalProgress.completed} max={totalProgress.total} size="lg" />
@@ -343,9 +356,7 @@ export function Onboarding() {
         <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
           {t('onboarding.next_step_title')}
         </h3>
-        <p className="text-sm text-blue-800 dark:text-blue-400">
-          {t('onboarding.next_step_desc')}
-        </p>
+        <p className="text-sm text-blue-800 dark:text-blue-400">{t('onboarding.next_step_desc')}</p>
       </div>
     </div>
   );

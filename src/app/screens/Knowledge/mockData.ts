@@ -22,7 +22,8 @@ export const mockKnowledgeItems: KnowledgeItem[] = [
     canonical: true,
     tags: ['authentication', 'api', 'security'],
     excerpt: 'Complete guide to implementing authentication in our API using JWT tokens...',
-    aiSummary: 'This document details the transition to JWT-based authentication. Key requirements include token rotation and secure storage in HttpOnly cookies.',
+    aiSummary:
+      'This document details the transition to JWT-based authentication. Key requirements include token rotation and secure storage in HttpOnly cookies.',
   },
   {
     id: '2',
@@ -35,7 +36,8 @@ export const mockKnowledgeItems: KnowledgeItem[] = [
     tags: ['architecture', 'frontend', 'decision'],
     excerpt:
       'Architecture decision record for selecting React as our primary frontend framework...',
-    aiSummary: 'ADR-004: Standardizing on React for its robust ecosystem and component-driven architecture, enabling better code sharing across teams.',
+    aiSummary:
+      'ADR-004: Standardizing on React for its robust ecosystem and component-driven architecture, enabling better code sharing across teams.',
   },
   {
     id: '3',
@@ -47,7 +49,8 @@ export const mockKnowledgeItems: KnowledgeItem[] = [
     canonical: true,
     tags: ['database', 'operations', 'migration'],
     excerpt: 'Step-by-step process for safely executing database schema migrations...',
-    aiSummary: 'A critical operational guide for Zero-Downtime migrations. Includes rollback procedures and pre-migration health check scripts.',
+    aiSummary:
+      'A critical operational guide for Zero-Downtime migrations. Includes rollback procedures and pre-migration health check scripts.',
   },
   {
     id: '4',
@@ -59,7 +62,8 @@ export const mockKnowledgeItems: KnowledgeItem[] = [
     canonical: false,
     tags: ['ci-cd', 'deployment', 'automation'],
     excerpt: 'Guide for setting up continuous integration and deployment pipelines...',
-    aiSummary: 'Overview of the GitHub Actions workflow. Note: This document requires an update for the new staging environment cluster.',
+    aiSummary:
+      'Overview of the GitHub Actions workflow. Note: This document requires an update for the new staging environment cluster.',
   },
   {
     id: '5',
@@ -71,7 +75,8 @@ export const mockKnowledgeItems: KnowledgeItem[] = [
     canonical: false,
     tags: ['deployment', 'legacy'],
     excerpt: 'Documentation for the old deployment process (deprecated)...',
-    aiSummary: 'DEPRECATED: Historic reference of the Jenkins-based deployment. Not for use in active projects.',
+    aiSummary:
+      'DEPRECATED: Historic reference of the Jenkins-based deployment. Not for use in active projects.',
   },
   {
     id: '6',
@@ -83,6 +88,7 @@ export const mockKnowledgeItems: KnowledgeItem[] = [
     canonical: true,
     tags: ['error-handling', 'best-practices'],
     excerpt: 'Guidelines for implementing consistent error handling across services...',
-    aiSummary: 'Standards for global error types, logging severity levels, and client-side error boundaries for a consistent user experience.',
+    aiSummary:
+      'Standards for global error types, logging severity levels, and client-side error boundaries for a consistent user experience.',
   },
 ];

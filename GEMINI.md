@@ -41,6 +41,7 @@ SprintStart is a visually-driven React prototype designed to streamline team onb
 ## Internationalization (i18n)
 
 The project uses `i18next` and `react-i18next` for translations.
+
 - **Language Switcher:** Located in the Sidebar footer.
 - **Translation Files:** Found in `src/locales/`.
 - **Default Language:** English (EN).

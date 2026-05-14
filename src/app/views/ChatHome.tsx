@@ -33,21 +33,27 @@ const FILTERS = [
 
 export function ChatHome() {
   const { t } = useTranslation();
-  
+
   // Use a state to store the base time to ensure purity during render
   const [baseTime] = useState(() => Date.now());
-  
+
   // Initialize messages from translations
   const initialMessages: Message[] = useMemo(() => {
-    return (t('chat.initial_messages', { returnObjects: true }) as any[]).map((msg, index) => ({
-      ...msg,
-      id: `initial-${index}`,
-      timestamp: new Date(baseTime - (300000 - index * 60000)),
-    }));
+    const messagesObj = t('chat.initial_messages', { returnObjects: true });
+    const messagesArray = Array.isArray(messagesObj) ? messagesObj : [];
+
+    return messagesArray.map((msg: unknown, index: number) => {
+      const m = msg as Omit<Message, 'id' | 'timestamp'>;
+      return {
+        ...m,
+        id: `initial-${index}`,
+        timestamp: new Date(baseTime - (300000 - index * 60000)),
+      };
+    });
   }, [t, baseTime]);
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  
+
   // Track the last seen initialMessages to detect changes without cascading renders
   const [lastInitialMessages, setLastInitialMessages] = useState(initialMessages);
 
@@ -250,7 +256,9 @@ export function ChatHome() {
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
-                  <span className="uppercase tracking-widest">{t(`chat.filters.${filter.key}`)}</span>
+                  <span className="uppercase tracking-widest">
+                    {t(`chat.filters.${filter.key}`)}
+                  </span>
                 </button>
               );
             })}

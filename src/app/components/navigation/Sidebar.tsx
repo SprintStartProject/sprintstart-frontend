@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate, Location } from 'react-router';
 import { Moon, Sun, ChevronDown, Menu, X, Rocket, Languages } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { useRole, UserRole } from '../../context/RoleContext';
@@ -47,7 +47,7 @@ interface SidebarContentProps {
   role: UserRole;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
-  location: any;
+  location: Location;
   sections: Record<string, NavItem[]>;
   isRoleMenuOpen: boolean;
   setIsRoleMenuOpen: (open: boolean) => void;
@@ -137,9 +137,17 @@ function SidebarContent({
             <span>{i18n.language === 'en' ? 'English' : 'Deutsch'}</span>
           </div>
           <div className="flex gap-1">
-            <span className={`text-[10px] ${i18n.language === 'en' ? 'font-bold text-blue-600' : 'text-gray-400'}`}>EN</span>
+            <span
+              className={`text-[10px] ${i18n.language === 'en' ? 'font-bold text-blue-600' : 'text-gray-400'}`}
+            >
+              EN
+            </span>
             <span className="text-[10px] text-gray-300">/</span>
-            <span className={`text-[10px] ${i18n.language === 'de' ? 'font-bold text-blue-600' : 'text-gray-400'}`}>DE</span>
+            <span
+              className={`text-[10px] ${i18n.language === 'de' ? 'font-bold text-blue-600' : 'text-gray-400'}`}
+            >
+              DE
+            </span>
           </div>
         </button>
 

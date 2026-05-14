@@ -129,7 +129,7 @@ export default function SystemLogs() {
             {['all', 'info', 'warn', 'error', 'security'].map((l) => (
               <button
                 key={l}
-                onClick={() => setFilter(l as any)}
+                onClick={() => setFilter(l as typeof filter)}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                   filter === l
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-600'

@@ -6,6 +6,7 @@ import { ChatHome } from './views/ChatHome';
 import { PlaceholderView } from './views/PlaceholderView';
 import { navigationItems, NavItem } from './components/navigation/NavigationConfig';
 import { useTranslation } from 'react-i18next';
+import { ComponentType } from 'react';
 
 // Import existing screens
 import { Admin } from './screens/Admin';
@@ -35,7 +36,7 @@ function AppLayout() {
 }
 
 // Map paths to specific screen components
-const SCREEN_MAP: Record<string, any> = {
+const SCREEN_MAP: Record<string, ComponentType> = {
   '/onboarding': Onboarding,
   '/knowledge': Knowledge,
   '/team-dashboard': Dashboard,
@@ -77,11 +78,7 @@ const router = createBrowserRouter([
           const ScreenComponent = SCREEN_MAP[item.path];
           return {
             path: item.path.startsWith('/') ? item.path.substring(1) : item.path,
-            element: ScreenComponent ? (
-              <ScreenComponent />
-            ) : (
-              <TranslatedPlaceholder item={item} />
-            ),
+            element: ScreenComponent ? <ScreenComponent /> : <TranslatedPlaceholder item={item} />,
           };
         }),
     ],
