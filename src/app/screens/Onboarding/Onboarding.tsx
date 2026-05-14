@@ -268,7 +268,7 @@ export function Onboarding() {
     const Icon = getIcon(activeStep.type);
 
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black p-8">
+      <div className="min-h-screen bg-white dark:bg-gray-950 p-8">
         <div className="max-w-5xl mx-auto">
           {/* BACK */}
           <button
@@ -481,7 +481,7 @@ export function Onboarding() {
           </div>
 
           {/* FEEDBACK */}
-          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
+          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden mb-24">
             <button
               onClick={() => setFeedbackOpen((prev) => !prev)}
               className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all"
@@ -520,6 +520,11 @@ export function Onboarding() {
             )}
           </div>
         </div>
+        <div>
+             <br></br> 
+             <br></br> 
+
+        </div>
       </div>
     );
   }
@@ -529,9 +534,9 @@ export function Onboarding() {
   // --------------------------------------------------------------------------
 
 return (
-  <div className="min-h-screen bg-gray-50 dark:bg-black">
+  <div className="min-h-screen bg-white dark:bg-gray-950">
     {/* TOP HEADER */}
-    <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-xl">
+    <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-8 py-5">
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -608,7 +613,7 @@ return (
     </div>
 
     {/* MAIN CONTENT — list view only; detail view is handled by the early return above */}
-    <main className="max-w-7xl mx-auto px-8 py-8">
+    <main className="max-w-7xl mx-auto px-8 py-8 pb-24">
       {/* HERO */}
       <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
@@ -634,7 +639,7 @@ return (
       </div>
 
       {/* TASKS */}
-      <div className="space-y-4 pb-12">
+      <div className="space-y-4">
         {currentPhase.items.map((item) => {
           const Icon = getIcon(item.type);
 
