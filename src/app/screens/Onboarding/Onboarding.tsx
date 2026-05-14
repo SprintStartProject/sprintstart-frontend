@@ -11,6 +11,10 @@ import {
   Trophy,
   PlayCircle,
   Target,
+  ArrowLeft,
+  MessageSquare,
+  BookOpen,
+  ExternalLink,
 } from 'lucide-react';
 
 import { ProgressBar } from '../../components/ProgressBar';
@@ -38,6 +42,9 @@ export function Onboarding() {
 
   const [selectedPhase, setSelectedPhase] = useState(0);
 
+  // NEW
+  const [activeStep, setActiveStep] = useState<OnboardingItem | null>(null);
+
   const phases: OnboardingPhase[] = useMemo(
     () => [
       {
@@ -49,14 +56,20 @@ export function Onboarding() {
           {
             id: '1',
             title: t('onboarding.phases.day1.items.hr_paperwork.title'),
-            description: t('onboarding.phases.day1.items.hr_paperwork.description'),
+            description: t(
+              'onboarding.phases.day1.items.hr_paperwork.description',
+            ),
             type: 'task',
             completed: true,
           },
           {
             id: '2',
-            title: t('onboarding.phases.day1.items.company_overview.title'),
-            description: t('onboarding.phases.day1.items.company_overview.description'),
+            title: t(
+              'onboarding.phases.day1.items.company_overview.title',
+            ),
+            description: t(
+              'onboarding.phases.day1.items.company_overview.description',
+            ),
             type: 'video',
             completed: true,
             duration: '15 min',
@@ -64,7 +77,9 @@ export function Onboarding() {
           {
             id: '3',
             title: t('onboarding.phases.day1.items.handbook.title'),
-            description: t('onboarding.phases.day1.items.handbook.description'),
+            description: t(
+              'onboarding.phases.day1.items.handbook.description',
+            ),
             type: 'document',
             completed: true,
             duration: '30 min',
@@ -72,7 +87,9 @@ export function Onboarding() {
           {
             id: '4',
             title: t('onboarding.phases.day1.items.dev_env.title'),
-            description: t('onboarding.phases.day1.items.dev_env.description'),
+            description: t(
+              'onboarding.phases.day1.items.dev_env.description',
+            ),
             type: 'task',
             completed: true,
           },
@@ -95,7 +112,9 @@ export function Onboarding() {
           {
             id: '6',
             title: t('onboarding.phases.week1.items.architecture.title'),
-            description: t('onboarding.phases.week1.items.architecture.description'),
+            description: t(
+              'onboarding.phases.week1.items.architecture.description',
+            ),
             type: 'document',
             completed: true,
             duration: '45 min',
@@ -103,7 +122,9 @@ export function Onboarding() {
           {
             id: '7',
             title: t('onboarding.phases.week1.items.first_feature.title'),
-            description: t('onboarding.phases.week1.items.first_feature.description'),
+            description: t(
+              'onboarding.phases.week1.items.first_feature.description',
+            ),
             type: 'task',
             completed: true,
           },
@@ -118,7 +139,9 @@ export function Onboarding() {
           {
             id: '9',
             title: t('onboarding.phases.week1.items.code_review.title'),
-            description: t('onboarding.phases.week1.items.code_review.description'),
+            description: t(
+              'onboarding.phases.week1.items.code_review.description',
+            ),
             type: 'document',
             completed: false,
             duration: '15 min',
@@ -126,7 +149,9 @@ export function Onboarding() {
           {
             id: '10',
             title: t('onboarding.phases.week1.items.standup.title'),
-            description: t('onboarding.phases.week1.items.standup.description'),
+            description: t(
+              'onboarding.phases.week1.items.standup.description',
+            ),
             type: 'task',
             completed: false,
           },
@@ -141,14 +166,18 @@ export function Onboarding() {
           {
             id: '11',
             title: t('onboarding.phases.month1.items.lead_feature.title'),
-            description: t('onboarding.phases.month1.items.lead_feature.description'),
+            description: t(
+              'onboarding.phases.month1.items.lead_feature.description',
+            ),
             type: 'task',
             completed: false,
           },
           {
             id: '12',
             title: t('onboarding.phases.month1.items.database.title'),
-            description: t('onboarding.phases.month1.items.database.description'),
+            description: t(
+              'onboarding.phases.month1.items.database.description',
+            ),
             type: 'document',
             completed: false,
             duration: '40 min',
@@ -156,7 +185,9 @@ export function Onboarding() {
           {
             id: '13',
             title: t('onboarding.phases.month1.items.security.title'),
-            description: t('onboarding.phases.month1.items.security.description'),
+            description: t(
+              'onboarding.phases.month1.items.security.description',
+            ),
             type: 'document',
             completed: false,
             duration: '25 min',
@@ -164,7 +195,9 @@ export function Onboarding() {
           {
             id: '14',
             title: t('onboarding.phases.month1.items.presentation.title'),
-            description: t('onboarding.phases.month1.items.presentation.description'),
+            description: t(
+              'onboarding.phases.month1.items.presentation.description',
+            ),
             type: 'task',
             completed: false,
           },
@@ -216,6 +249,239 @@ export function Onboarding() {
       .flatMap((phase) => phase.items)
       .find((item) => !item.completed) ?? null;
 
+  // --------------------------------------------------------------------------
+  // STEP DETAIL VIEW
+  // --------------------------------------------------------------------------
+
+  if (activeStep) {
+    const Icon = getIcon(activeStep.type);
+
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black p-8">
+        <div className="max-w-5xl mx-auto">
+          {/* BACK */}
+          <button
+            onClick={() => setActiveStep(null)}
+            className="mb-6 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to onboarding
+          </button>
+
+          {/* HERO */}
+          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 blur-3xl rounded-full" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
+                    <Icon className="w-3.5 h-3.5" />
+                    Mock Learning Experience
+                  </div>
+
+                  <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                    {activeStep.title}
+                  </h1>
+
+                  <p className="text-gray-600 dark:text-gray-400 mt-4 max-w-3xl">
+                    {activeStep.description}
+                  </p>
+                </div>
+
+                {activeStep.duration && (
+                  <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-900 text-sm text-gray-600 dark:text-gray-400">
+                    <Clock3 className="w-4 h-4" />
+                    {activeStep.duration}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* OUTCOME */}
+          <div className="grid lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Sparkles className="w-5 h-5 text-blue-500" />
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  After this step you can...
+                </h2>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  'Understand the internal workflow and tooling',
+                  'Navigate the project architecture confidently',
+                  'Collaborate better with your team',
+                  'Complete related onboarding tasks independently',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-start gap-3 rounded-2xl bg-gray-50 dark:bg-gray-900 p-4"
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
+
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {item}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* KNOWLEDGE BASE */}
+            <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <BookOpen className="w-5 h-5 text-indigo-500" />
+
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Knowledge Base
+                </h2>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  'Architecture Overview',
+                  'Engineering Handbook',
+                  'CI/CD Docs',
+                  'Security Best Practices',
+                ].map((article) => (
+                  <button
+                    key={article}
+                    className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 p-4 hover:border-blue-300 dark:hover:border-blue-700 transition-all text-left group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {article}
+                        </div>
+
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Internal article
+                        </div>
+                      </div>
+
+                      <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  window.location.href = '/knowledge';
+                }}
+                className="w-full mt-5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white py-3 text-sm font-medium transition-all flex items-center justify-center gap-2"
+              >
+                Open Knowledge Base
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* STEP BY STEP */}
+          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-6 mb-8">
+            <div className="flex items-center gap-2 mb-6">
+              <Target className="w-5 h-5 text-orange-500" />
+
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Step-by-step Tasks
+              </h2>
+            </div>
+
+            <div className="space-y-5">
+              {[
+                'Read the onboarding material',
+                'Watch the introduction walkthrough',
+                'Complete the interactive checklist',
+                'Review best practices',
+              ].map((todo, index) => (
+                <div
+                  key={todo}
+                  className="flex items-start gap-4 pb-5 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0"
+                >
+                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 flex items-center justify-center text-sm font-semibold shrink-0">
+                    {index + 1}
+                  </div>
+
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {todo}
+                    </div>
+
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Dummy explanation text for this onboarding action.
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* FINAL TASK */}
+          <div className="rounded-3xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20 p-6 mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <Trophy className="w-6 h-6 text-green-600 dark:text-green-400" />
+
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Final Task
+                </h2>
+
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Complete this task to finish the onboarding step.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white dark:bg-black border border-green-200 dark:border-green-900 p-5">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                Create your first onboarding summary
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                Write a short summary about what you learned and share it with
+                your onboarding buddy.
+              </p>
+
+              <button className="mt-5 px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-all flex items-center gap-2">
+                Complete Task
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* FEEDBACK */}
+          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <MessageSquare className="w-5 h-5 text-pink-500" />
+
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Feedback
+              </h2>
+            </div>
+
+            <textarea
+              placeholder="Leave feedback for this onboarding step..."
+              className="w-full min-h-[140px] rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+
+            <div className="flex justify-end mt-4">
+              <button className="px-5 py-3 rounded-xl bg-gray-900 dark:bg-white dark:text-black text-white text-sm font-medium hover:opacity-90 transition-all">
+                Submit Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // DEFAULT VIEW
+  // --------------------------------------------------------------------------
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="grid grid-cols-[300px_minmax(0,1fr)]">
@@ -224,6 +490,7 @@ export function Onboarding() {
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-5 h-5 text-blue-500" />
+
               <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
                 {t('onboarding.journey_title')}
               </h1>
@@ -234,7 +501,6 @@ export function Onboarding() {
             </p>
           </div>
 
-          {/* Overall Card */}
           <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-white mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -265,13 +531,8 @@ export function Onboarding() {
                 }}
               />
             </div>
-
-            <div className="text-xs mt-3 opacity-80">
-              {totalProgress.completed} / {totalProgress.total} completed
-            </div>
           </div>
 
-          {/* Phase Navigation */}
           <div className="space-y-3">
             {phases.map((phase, index) => {
               const progress = calculateProgress(phase.items);
@@ -324,7 +585,7 @@ export function Onboarding() {
 
         {/* MAIN */}
         <main className="p-8">
-          {/* Hero */}
+          {/* HERO */}
           <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
 
@@ -343,16 +604,6 @@ export function Onboarding() {
                   <p className="text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
                     {currentPhase.description}
                   </p>
-                </div>
-
-                <div className="hidden lg:flex flex-col items-end">
-                  <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">
-                    {calculateProgress(currentPhase.items).percentage}%
-                  </div>
-
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    completed
-                  </div>
                 </div>
               </div>
 
@@ -389,7 +640,10 @@ export function Onboarding() {
                 </div>
               </div>
 
-              <button className="shrink-0 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2">
+              <button
+                onClick={() => setActiveStep(nextTask)}
+                className="shrink-0 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
+              >
                 Start
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -440,6 +694,7 @@ export function Onboarding() {
                             <div className="flex flex-wrap items-center gap-4 mt-4">
                               <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
                                 <Icon className="w-4 h-4" />
+
                                 <span className="text-xs capitalize">
                                   {item.type}
                                 </span>
@@ -448,6 +703,7 @@ export function Onboarding() {
                               {item.duration && (
                                 <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
                                   <Clock3 className="w-4 h-4" />
+
                                   <span className="text-xs">
                                     {item.duration}
                                   </span>
@@ -456,12 +712,14 @@ export function Onboarding() {
                             </div>
                           </div>
 
-                          {!item.completed && (
-                            <button className="shrink-0 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all text-sm font-medium flex items-center gap-2">
-                              Start
-                              <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setActiveStep(item)}
+                            className="shrink-0 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all text-sm font-medium flex items-center gap-2"
+                          >
+                            Start
+
+                            <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                          </button>
                         </div>
                       </div>
                     </div>
