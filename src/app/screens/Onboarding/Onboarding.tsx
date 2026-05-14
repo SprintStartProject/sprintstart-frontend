@@ -45,6 +45,17 @@ export function Onboarding() {
   // NEW
   const [activeStep, setActiveStep] = useState<OnboardingItem | null>(null);
 
+  const [completedSubtasks, setCompletedSubtasks] = useState<string[]>([]);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  const toggleSubtask = (task: string) => {
+    setCompletedSubtasks((prev) =>
+      prev.includes(task)
+        ? prev.filter((t) => t !== task)
+        : [...prev, task],
+    );
+  };
+
   const phases: OnboardingPhase[] = useMemo(
     () => [
       {
@@ -390,32 +401,49 @@ export function Onboarding() {
               </h2>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               {[
                 'Read the onboarding material',
                 'Watch the introduction walkthrough',
                 'Complete the interactive checklist',
                 'Review best practices',
-              ].map((todo, index) => (
-                <div
-                  key={todo}
-                  className="flex items-start gap-4 pb-5 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0"
-                >
-                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 flex items-center justify-center text-sm font-semibold shrink-0">
-                    {index + 1}
-                  </div>
+              ].map((todo, index) => {
+                const checked = completedSubtasks.includes(todo);
 
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white">
-                      {todo}
+                return (
+                  <button
+                    key={todo}
+                    onClick={() => toggleSubtask(todo)}
+                    className={`w-full text-left flex items-start gap-4 rounded-2xl border transition-all p-4 ${checked
+                        ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
+                        : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
+                      }`}
+                  >
+                    <div className="pt-0.5">
+                      {checked ? (
+                        <CheckCircle2 className="w-6 h-6 text-green-500" />
+                      ) : (
+                        <Circle className="w-6 h-6 text-gray-400" />
+                      )}
                     </div>
 
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Dummy explanation text for this onboarding action.
+                    <div className="flex-1">
+                      <div
+                        className={`font-medium ${checked
+                            ? 'text-green-700 dark:text-green-400 line-through'
+                            : 'text-gray-900 dark:text-white'
+                          }`}
+                      >
+                        {index + 1}. {todo}
+                      </div>
+
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Dummy explanation text for this onboarding action.
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -453,25 +481,43 @@ export function Onboarding() {
           </div>
 
           {/* FEEDBACK */}
-          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <MessageSquare className="w-5 h-5 text-pink-500" />
+          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
+            <button
+              onClick={() => setFeedbackOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-pink-500" />
 
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Feedback
-              </h2>
-            </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Feedback
+                </h2>
+              </div>
 
-            <textarea
-              placeholder="Leave feedback for this onboarding step..."
-              className="w-full min-h-[140px] rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
+              <ChevronRight
+                className={`w-5 h-5 text-gray-400 transition-transform ${feedbackOpen ? 'rotate-90' : ''
+                  }`}
+              />
+            </button>
 
-            <div className="flex justify-end mt-4">
-              <button className="px-5 py-3 rounded-xl bg-gray-900 dark:bg-white dark:text-black text-white text-sm font-medium hover:opacity-90 transition-all">
-                Submit Feedback
-              </button>
-            </div>
+            {feedbackOpen && (
+              <div className="px-6 pb-6">
+                <div className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                  Optional: leave feedback for this onboarding step.
+                </div>
+
+                <textarea
+                  placeholder="Leave feedback for this onboarding step..."
+                  className="w-full min-h-[140px] rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+
+                <div className="flex justify-end mt-4">
+                  <button className="px-5 py-3 rounded-xl bg-gray-900 dark:bg-white dark:text-black text-white text-sm font-medium hover:opacity-90 transition-all">
+                    Submit Feedback
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -483,47 +529,44 @@ export function Onboarding() {
   // --------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="flex flex-col">
       <div className="grid grid-cols-[300px_minmax(0,1fr)]">
-        {/* SIDEBAR */}
-        <aside className="border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-6">
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-blue-500" />
-
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {t('onboarding.journey_title')}
-              </h1>
-            </div>
-
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('onboarding.journey_subtitle')}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-white mb-6">
-            <div className="flex items-center justify-between mb-4">
+        {/* TOP PROGRESS BAR */}
+        <div className="sticky top-0 z-30 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-xl">
+          <div className="px-8 py-5">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <div className="text-sm opacity-80">
-                  {t('onboarding.overall_progress')}
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="w-5 h-5 text-blue-500" />
+
+                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {t('onboarding.journey_title')}
+                  </h1>
                 </div>
 
-                <div className="text-3xl font-bold mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t('onboarding.journey_subtitle')}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                   {Math.round(
                     (totalProgress.completed / totalProgress.total) * 100,
                   )}
                   %
                 </div>
-              </div>
 
-              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                <Trophy className="w-6 h-6" />
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  overall progress
+                </div>
               </div>
             </div>
 
-            <div className="bg-white/20 rounded-full h-2 overflow-hidden">
+            {/* GLOBAL PROGRESS */}
+            <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-3 overflow-hidden mb-5">
               <div
-                className="h-full bg-white rounded-full transition-all"
+                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all"
                 style={{
                   width: `${Math.round(
                     (totalProgress.completed / totalProgress.total) * 100,
@@ -531,57 +574,54 @@ export function Onboarding() {
                 }}
               />
             </div>
-          </div>
 
-          <div className="space-y-3">
-            {phases.map((phase, index) => {
-              const progress = calculateProgress(phase.items);
+            {/* PHASES */}
+            <div className="grid grid-cols-3 gap-4">
+              {phases.map((phase, index) => {
+                const progress = calculateProgress(phase.items);
 
-              const isSelected = selectedPhase === index;
+                const isSelected = selectedPhase === index;
 
-              return (
-                <button
-                  key={phase.id}
-                  onClick={() => setSelectedPhase(index)}
-                  className={`w-full text-left rounded-2xl border transition-all p-4 ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-500'
-                      : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {phase.title}
-                      </div>
-
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {phase.period}
-                      </div>
-                    </div>
-
-                    <div
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        progress.percentage === 100
-                          ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
-                          : isSelected
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                return (
+                  <button
+                    key={phase.id}
+                    onClick={() => setSelectedPhase(index)}
+                    className={`rounded-2xl border p-4 transition-all text-left ${isSelected
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                        : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
                       }`}
-                    >
-                      {progress.percentage}%
-                    </div>
-                  </div>
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          {phase.title}
+                        </div>
 
-                  <ProgressBar
-                    value={progress.completed}
-                    max={progress.total}
-                  />
-                </button>
-              );
-            })}
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {phase.period}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`text-xs px-2 py-1 rounded-full ${progress.percentage === 100
+                            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}
+                      >
+                        {progress.percentage}%
+                      </div>
+                    </div>
+
+                    <ProgressBar
+                      value={progress.completed}
+                      max={progress.total}
+                    />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </aside>
+        </div>
 
         {/* MAIN */}
         <main className="p-8">
@@ -658,11 +698,10 @@ export function Onboarding() {
               return (
                 <div
                   key={item.id}
-                  className={`group rounded-2xl border transition-all ${
-                    item.completed
+                  className={`group rounded-2xl border transition-all ${item.completed
                       ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 opacity-70'
                       : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-900 hover:shadow-lg'
-                  }`}
+                    }`}
                 >
                   <div className="p-5">
                     <div className="flex gap-4">
@@ -678,11 +717,10 @@ export function Onboarding() {
                         <div className="flex items-start justify-between gap-6">
                           <div>
                             <h3
-                              className={`font-semibold text-base ${
-                                item.completed
+                              className={`font-semibold text-base ${item.completed
                                   ? 'line-through text-gray-500 dark:text-gray-500'
                                   : 'text-gray-900 dark:text-white'
-                              }`}
+                                }`}
                             >
                               {item.title}
                             </h3>
