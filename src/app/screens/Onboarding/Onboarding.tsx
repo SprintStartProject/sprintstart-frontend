@@ -528,246 +528,180 @@ export function Onboarding() {
   // DEFAULT VIEW
   // --------------------------------------------------------------------------
 
-  return (
-    <div className="flex flex-col">
-      <div className="grid grid-cols-[300px_minmax(0,1fr)]">
-        {/* TOP PROGRESS BAR */}
-        <div className="sticky top-0 z-30 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-xl">
-          <div className="px-8 py-5">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="w-5 h-5 text-blue-500" />
-
-                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {t('onboarding.journey_title')}
-                  </h1>
-                </div>
-
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t('onboarding.journey_subtitle')}
-                </p>
-              </div>
-
-              <div className="text-right">
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                  {Math.round(
-                    (totalProgress.completed / totalProgress.total) * 100,
-                  )}
-                  %
-                </div>
-
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  overall progress
-                </div>
-              </div>
+return (
+  <div className="min-h-screen bg-gray-50 dark:bg-black">
+    {/* TOP HEADER */}
+    <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-xl">
+      <div className="max-w-7xl mx-auto px-8 py-5">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-5 h-5 text-blue-500" />
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {t('onboarding.journey_title')}
+              </h1>
             </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('onboarding.journey_subtitle')}
+            </p>
+          </div>
 
-            {/* GLOBAL PROGRESS */}
-            <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-3 overflow-hidden mb-5">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all"
-                style={{
-                  width: `${Math.round(
-                    (totalProgress.completed / totalProgress.total) * 100,
-                  )}%`,
-                }}
-              />
+          <div className="text-right">
+            <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+              {Math.round((totalProgress.completed / totalProgress.total) * 100)}%
             </div>
-
-            {/* PHASES */}
-            <div className="grid grid-cols-3 gap-4">
-              {phases.map((phase, index) => {
-                const progress = calculateProgress(phase.items);
-
-                const isSelected = selectedPhase === index;
-
-                return (
-                  <button
-                    key={phase.id}
-                    onClick={() => setSelectedPhase(index)}
-                    className={`rounded-2xl border p-4 transition-all text-left ${isSelected
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                        : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white">
-                          {phase.title}
-                        </div>
-
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {phase.period}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`text-xs px-2 py-1 rounded-full ${progress.percentage === 100
-                            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                          }`}
-                      >
-                        {progress.percentage}%
-                      </div>
-                    </div>
-
-                    <ProgressBar
-                      value={progress.completed}
-                      max={progress.total}
-                    />
-                  </button>
-                );
-              })}
-            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">overall progress</div>
           </div>
         </div>
 
-        {/* MAIN */}
-        <main className="p-8">
-          {/* HERO */}
-          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
+        {/* GLOBAL BAR */}
+        <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-3 overflow-hidden mb-5">
+          <div
+            className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all"
+            style={{
+              width: `${Math.round((totalProgress.completed / totalProgress.total) * 100)}%`,
+            }}
+          />
+        </div>
 
-            <div className="relative z-10">
-              <div className="flex items-center justify-between gap-6">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Current Phase
-                  </div>
+        {/* PHASES */}
+        <div className="grid grid-cols-3 gap-4">
+          {phases.map((phase, index) => {
+            const progress = calculateProgress(phase.items);
+            const isSelected = selectedPhase === index;
 
-                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {currentPhase.title}
-                  </h2>
-
-                  <p className="text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
-                    {currentPhase.description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <ProgressBar
-                  value={calculateProgress(currentPhase.items).completed}
-                  max={calculateProgress(currentPhase.items).total}
-                  size="lg"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* NEXT TASK */}
-          {nextTask && (
-            <div className="mb-8 rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-5 flex items-center justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <PlayCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-blue-700 dark:text-blue-400 font-semibold mb-1">
-                    Next Recommended Step
-                  </div>
-
-                  <div className="font-semibold text-gray-900 dark:text-white">
-                    {nextTask.title}
-                  </div>
-
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {nextTask.description}
-                  </div>
-                </div>
-              </div>
-
+            return (
               <button
-                onClick={() => setActiveStep(nextTask)}
-                className="shrink-0 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
+                key={phase.id}
+                onClick={() => setSelectedPhase(index)}
+                className={`rounded-2xl border p-4 transition-all text-left ${
+                  isSelected
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
+                }`}
               >
-                Start
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {/* TASKS */}
-          <div className="space-y-4">
-            {currentPhase.items.map((item) => {
-              const Icon = getIcon(item.type);
-
-              return (
-                <div
-                  key={item.id}
-                  className={`group rounded-2xl border transition-all ${item.completed
-                      ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 opacity-70'
-                      : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-900 hover:shadow-lg'
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {phase.title}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {phase.period}
+                    </div>
+                  </div>
+                  <div
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      progress.percentage === 100
+                        ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                     }`}
-                >
-                  <div className="p-5">
-                    <div className="flex gap-4">
-                      <div className="pt-1">
-                        {item.completed ? (
-                          <CheckCircle2 className="w-6 h-6 text-green-500" />
-                        ) : (
-                          <Circle className="w-6 h-6 text-blue-500" />
-                        )}
-                      </div>
+                  >
+                    {progress.percentage}%
+                  </div>
+                </div>
+                <ProgressBar value={progress.completed} max={progress.total} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-6">
-                          <div>
-                            <h3
-                              className={`font-semibold text-base ${item.completed
-                                  ? 'line-through text-gray-500 dark:text-gray-500'
-                                  : 'text-gray-900 dark:text-white'
-                                }`}
-                            >
-                              {item.title}
-                            </h3>
+    {/* MAIN CONTENT — list view only; detail view is handled by the early return above */}
+    <main className="max-w-7xl mx-auto px-8 py-8">
+      {/* HERO */}
+      <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
+            <Sparkles className="w-3.5 h-3.5" />
+            Current Phase
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {currentPhase.title}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
+            {currentPhase.description}
+          </p>
+          <div className="mt-6">
+            <ProgressBar
+              value={calculateProgress(currentPhase.items).completed}
+              max={calculateProgress(currentPhase.items).total}
+              size="lg"
+            />
+          </div>
+        </div>
+      </div>
 
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
-                              {item.description}
-                            </p>
+      {/* TASKS */}
+      <div className="space-y-4 pb-12">
+        {currentPhase.items.map((item) => {
+          const Icon = getIcon(item.type);
 
-                            <div className="flex flex-wrap items-center gap-4 mt-4">
-                              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                                <Icon className="w-4 h-4" />
+          return (
+            <div
+              key={item.id}
+              className={`group rounded-2xl border transition-all ${
+                item.completed
+                  ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 opacity-70'
+                  : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-900 hover:shadow-lg'
+              }`}
+            >
+              <div className="p-5">
+                <div className="flex gap-4">
+                  <div className="pt-1">
+                    {item.completed ? (
+                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    ) : (
+                      <Circle className="w-6 h-6 text-blue-500" />
+                    )}
+                  </div>
 
-                                <span className="text-xs capitalize">
-                                  {item.type}
-                                </span>
-                              </div>
-
-                              {item.duration && (
-                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                                  <Clock3 className="w-4 h-4" />
-
-                                  <span className="text-xs">
-                                    {item.duration}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-6">
+                      <div>
+                        <h3
+                          className={`font-semibold text-base ${
+                            item.completed
+                              ? 'line-through text-gray-500 dark:text-gray-500'
+                              : 'text-gray-900 dark:text-white'
+                          }`}
+                        >
+                          {item.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
+                          {item.description}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-4 mt-4">
+                          <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                            <Icon className="w-4 h-4" />
+                            <span className="text-xs capitalize">{item.type}</span>
                           </div>
-
-                          <button
-                            onClick={() => setActiveStep(item)}
-                            className="shrink-0 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all text-sm font-medium flex items-center gap-2"
-                          >
-                            Start
-
-                            <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                          </button>
+                          {item.duration && (
+                            <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                              <Clock3 className="w-4 h-4" />
+                              <span className="text-xs">{item.duration}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      <button
+                        onClick={() => setActiveStep(item)}
+                        className="shrink-0 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all text-sm font-medium flex items-center gap-2"
+                      >
+                        Start
+                        <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </main>
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>
-  );
+    </main>
+  </div>
+);
 }
