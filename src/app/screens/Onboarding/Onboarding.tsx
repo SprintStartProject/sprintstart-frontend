@@ -615,28 +615,50 @@ return (
     {/* MAIN CONTENT — list view only; detail view is handled by the early return above */}
     <main className="max-w-7xl mx-auto px-8 py-8 pb-24">
       {/* HERO */}
-      <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
-            <Sparkles className="w-3.5 h-3.5" />
-            Current Phase
+      {nextTask && (() => {
+        const NextIcon = getIcon(nextTask.type);
+        return (
+          <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
+                <PlayCircle className="w-3.5 h-3.5" />
+                Up Next
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {nextTask.title}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
+                {nextTask.description}
+              </p>
+              <div className="flex items-center gap-4 mt-6">
+                <button
+                  onClick={() => setActiveStep(nextTask)}
+                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
+                >
+                  Start Now
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1.5">
+                    <NextIcon className="w-4 h-4" />
+                    <span className="capitalize">{nextTask.type}</span>
+                  </div>
+                  {nextTask.duration && (
+                    <>
+                      <span>·</span>
+                      <div className="flex items-center gap-1.5">
+                        <Clock3 className="w-4 h-4" />
+                        {nextTask.duration}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-            {currentPhase.title}
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
-            {currentPhase.description}
-          </p>
-          <div className="mt-6">
-            <ProgressBar
-              value={calculateProgress(currentPhase.items).completed}
-              max={calculateProgress(currentPhase.items).total}
-              size="lg"
-            />
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* TASKS */}
       <div className="space-y-4">
