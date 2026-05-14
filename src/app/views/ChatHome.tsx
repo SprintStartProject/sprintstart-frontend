@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 
 interface Message {
   id: string;
@@ -33,6 +34,7 @@ const FILTERS = [
 
 export function ChatHome() {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Use a state to store the base time to ensure purity during render
   const [baseTime] = useState(() => Date.now());
@@ -60,6 +62,8 @@ export function ChatHome() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const lastPrefilledQuestionRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -68,6 +72,22 @@ export function ChatHome() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const prefilled = searchParams.get('question');
+    if (!prefilled) return;
+
+    const trimmed = prefilled.trim();
+    if (!trimmed || lastPrefilledQuestionRef.current === trimmed) return;
+
+    lastPrefilledQuestionRef.current = trimmed;
+    setInput(trimmed);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('question');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -262,6 +282,7 @@ export function ChatHome() {
               <Paperclip className="w-5 h-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
             </div>
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
