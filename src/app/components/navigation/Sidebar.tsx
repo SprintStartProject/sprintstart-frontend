@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Moon, Sun, ChevronDown, Menu, X, Rocket, Languages } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { useRole, UserRole } from '../../context/RoleContext';
@@ -66,7 +66,13 @@ function SidebarContent({
   handleRoleChange,
   setIsMobileMenuOpen,
 }: SidebarContentProps) {
-  const roles: UserRole[] = ['Project Member', 'Project Manager', 'HR', 'Admin'];
+  const roles: UserRole[] = [
+    'New Project Member',
+    'Existing Project Member',
+    'Project Manager',
+    'HR',
+    'Admin',
+  ];
   const { i18n } = useTranslation();
 
   const toggleLanguage = () => {
@@ -222,6 +228,7 @@ function SidebarContent({
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { role, setRole } = useRole();
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
@@ -240,6 +247,7 @@ export function Sidebar() {
   const handleRoleChange = (newRole: UserRole) => {
     setRole(newRole);
     setIsRoleMenuOpen(false);
+    navigate('/');
   };
 
   // Close mobile menu on resize if above breakpoint

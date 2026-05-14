@@ -25,13 +25,13 @@ export interface NavItem {
 }
 
 export const navigationItems: NavItem[] = [
-  // Base Zone - Always visible
+  // Base Zone - Always visible (except onboarding)
   {
     id: 'chat',
     label: 'Chat',
     icon: MessageSquare,
     path: '/',
-    roles: ['Project Member', 'Project Manager', 'HR', 'Admin'],
+    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
     section: 'base',
   },
   {
@@ -39,7 +39,7 @@ export const navigationItems: NavItem[] = [
     label: 'My Onboarding',
     icon: Rocket,
     path: '/onboarding',
-    roles: ['Project Member', 'Project Manager', 'HR', 'Admin'],
+    roles: ['New Project Member'],
     section: 'base',
   },
   {
@@ -47,7 +47,7 @@ export const navigationItems: NavItem[] = [
     label: 'Knowledge Base',
     icon: BookOpen,
     path: '/knowledge',
-    roles: ['Project Member', 'Project Manager', 'HR', 'Admin'],
+    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
     section: 'base',
   },
   {
@@ -55,7 +55,7 @@ export const navigationItems: NavItem[] = [
     label: 'Profile',
     icon: User,
     path: '/profile',
-    roles: ['Project Member', 'Project Manager', 'HR', 'Admin'],
+    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
     section: 'base',
   },
 
@@ -65,7 +65,7 @@ export const navigationItems: NavItem[] = [
     label: 'Team Dashboard',
     icon: BarChart3,
     path: '/team-dashboard',
-    roles: ['Project Manager', 'Admin'],
+    roles: ['Project Manager'],
     section: 'project-manager',
   },
   {
@@ -73,7 +73,7 @@ export const navigationItems: NavItem[] = [
     label: 'Knowledge Quality',
     icon: TrendingUp,
     path: '/knowledge-quality',
-    roles: ['Project Manager', 'Admin'],
+    roles: ['Project Manager'],
     section: 'project-manager',
   },
   {
@@ -81,7 +81,7 @@ export const navigationItems: NavItem[] = [
     label: 'Handover Management',
     icon: HandshakeIcon,
     path: '/handover',
-    roles: ['Project Manager', 'Admin'],
+    roles: ['Project Manager'],
     section: 'project-manager',
   },
 
@@ -91,7 +91,7 @@ export const navigationItems: NavItem[] = [
     label: 'Global Onboarding',
     icon: Globe,
     path: '/global-onboarding',
-    roles: ['HR', 'Admin'],
+    roles: ['HR'],
     section: 'hr',
   },
   {
@@ -99,7 +99,7 @@ export const navigationItems: NavItem[] = [
     label: 'Skill Gaps',
     icon: Target,
     path: '/skill-gaps',
-    roles: ['HR', 'Admin'],
+    roles: ['HR'],
     section: 'hr',
   },
   {
@@ -107,7 +107,7 @@ export const navigationItems: NavItem[] = [
     label: 'Statistics',
     icon: Activity,
     path: '/statistics',
-    roles: ['HR', 'Admin'],
+    roles: ['HR'],
     section: 'hr',
   },
 

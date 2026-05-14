@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Search, UserPlus, MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { UserRole } from '../../context/RoleContext';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Project Manager' | 'Project Member' | 'HR';
+  role: UserRole;
   projects: string[];
   status: 'active' | 'pending' | 'inactive';
   joinDate: string;
@@ -39,7 +40,7 @@ export function Admin() {
       id: '3',
       name: 'Emma Wilson',
       email: 'emma.wilson@company.com',
-      role: 'Project Member',
+      role: 'Existing Project Member',
       projects: ['Backend Services'],
       status: 'active',
       joinDate: '2025-11-10',
@@ -48,7 +49,7 @@ export function Admin() {
       id: '4',
       name: 'David Park',
       email: 'david.park@company.com',
-      role: 'Project Member',
+      role: 'New Project Member',
       projects: ['Platform', 'Infrastructure'],
       status: 'pending',
       joinDate: '2026-05-01',
@@ -66,14 +67,21 @@ export function Admin() {
       id: '6',
       name: 'Alex Kim',
       email: 'alex.kim@company.com',
-      role: 'Project Member',
+      role: 'Existing Project Member',
       projects: ['API Gateway'],
       status: 'inactive',
       joinDate: '2024-06-01',
     },
   ];
 
-  const roles = ['all', 'Admin', 'Project Manager', 'Project Member', 'HR'];
+  const roles = [
+    'all',
+    'Admin',
+    'Project Manager',
+    'New Project Member',
+    'Existing Project Member',
+    'HR',
+  ];
   const statuses = ['all', 'active', 'pending', 'inactive'];
 
   const filteredUsers = users.filter((user) => {
