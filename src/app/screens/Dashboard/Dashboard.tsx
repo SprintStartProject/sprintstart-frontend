@@ -1,203 +1,1136 @@
-import { MetricCard } from '../../components/MetricCard';
-import { ProgressBar } from '../../components/ProgressBar';
-import {
-  Users,
-  BookOpen,
-  AlertCircle,
-  TrendingUp,
-  CheckCircle,
-  Clock,
-  FileText,
-  Activity,
-} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../components/ThemeProvider';
+
+type SortOption = 'progress' | 'startDate';
+type Severity = 'critical' | 'medium';
 
 export function Dashboard() {
-  const metrics = [
+  const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const { theme } = useTheme();
+
+  const [activeFilter, setActiveFilter] = useState(0);
+  const [activeSrc, setActiveSrc] = useState(0);
+  const [activeTopic, setActiveTopic] = useState(0);
+  const [quickQuestion, setQuickQuestion] = useState('');
+  const [onboardingSort, setOnboardingSort] = useState<SortOption>('progress');
+
+  const isGerman = i18n.language.startsWith('de');
+  const isDark = theme === 'dark';
+
+  const copy = isGerman
+    ? {
+        filters: ['Alle Projekte', 'Backend Core', 'Mobile App', 'Infrastructure'],
+        srcFilters: ['Alle', 'Confluence', 'Jira', 'GitHub'],
+        metrics: [
+          { label: 'Ingested', value: '4.821', sub: 'Artefakte', color: '#22C55E' },
+          { label: 'Updated', value: '312', sub: 'Letzter Lauf', color: '#3B82F6' },
+          { label: 'Failed', value: '14', sub: 'Quellen', color: '#EF4444' },
+          { label: 'Sources', value: '5 / 5', sub: 'Verbunden', color: '#14B8A6' },
+          { label: 'Runtime', value: '23m', sub: 'vorher', color: '#8B5CF6' },
+        ],
+        sections: {
+          gaps: 'Knowledge Gaps',
+          actions: 'Action List',
+          actionsBadge: 'empfohlene Verbesserungen',
+          topTopics: 'Top Topics',
+          usage: 'Usage Signals',
+          freshness: 'Freshness',
+          freshnessChart: 'Verteilung letzter Updates',
+          onboarding: 'Onboarding Progress',
+          quickChatTitle: 'Schnellfrage an den Chat',
+          quickChatSubtitle: 'Frage direkt hier – der Text ist im Chat bereits vorgefüllt.',
+        },
+        labels: {
+          severityCritical: 'kritisch',
+          severityMedium: 'mittel',
+          kbShort: '→',
+          highPriority: '⬆ Hohe Priorität',
+          mediumPriority: '⬇ Mittlere Priorität',
+          askInChat: 'Im Chat fragen',
+          openArtifact: '→',
+          promptButton: 'Frage senden',
+          promptPlaceholder: 'z. B. Was ist der nächste Schritt für Jan?',
+          sortBy: 'Sortierung',
+          sortProgress: 'nach Progress',
+          sortStartDate: 'nach Startdatum',
+          sinceDays: 'seit',
+          days: 'Tagen',
+          started: 'Start',
+          step: 'Step',
+          total: 'Gesamt',
+          detailView: '→ Detailansicht',
+        },
+        quickPrompts: [
+          'Was blockiert den Abschluss von Kickoff-Schritten?',
+          'Welche Artefakte sind für neue Teammitglieder kritisch?',
+          'Was sind häufige Blocker in den ersten 30 Tagen?',
+          'Welche Knowledge Gaps haben den größten Einfluss auf den Onboarding-Fortschritt?',
+        ],
+        usage: [
+          { label: 'Wie deploye ich auf Staging?', count: 47, pct: 90 },
+          { label: 'Welche Envs gibt es?', count: 38, pct: 72 },
+          { label: 'Wer ist Owner von X?', count: 21, pct: 40 },
+        ],
+      }
+    : {
+        filters: ['All Projects', 'Backend Core', 'Mobile App', 'Infrastructure'],
+        srcFilters: ['All', 'Confluence', 'Jira', 'GitHub'],
+        metrics: [
+          { label: 'Ingested', value: '4,821', sub: 'Artifacts', color: '#22C55E' },
+          { label: 'Updated', value: '312', sub: 'Last Run', color: '#3B82F6' },
+          { label: 'Failed', value: '14', sub: 'Sources', color: '#EF4444' },
+          { label: 'Sources', value: '5 / 5', sub: 'Connected', color: '#14B8A6' },
+          { label: 'Runtime', value: '23m', sub: 'ago', color: '#8B5CF6' },
+        ],
+        sections: {
+          gaps: 'Knowledge Gaps',
+          actions: 'Action List',
+          actionsBadge: 'recommended improvements',
+          topTopics: 'Top Topics',
+          usage: 'Usage Signals',
+          freshness: 'Freshness',
+          freshnessChart: 'Last Updated Distribution',
+          onboarding: 'Onboarding Progress',
+          quickChatTitle: 'Quick chat entry',
+          quickChatSubtitle: 'Ask here and land in chat with the question prefilled.',
+        },
+        labels: {
+          severityCritical: 'critical',
+          severityMedium: 'medium',
+          kbShort: '→',
+          highPriority: '⬆ High priority',
+          mediumPriority: '⬇ Medium priority',
+          askInChat: 'Ask in chat',
+          openArtifact: '→',
+          promptButton: 'Send question',
+          promptPlaceholder: 'e.g. What is Jan blocked by right now?',
+          sortBy: 'Sort',
+          sortProgress: 'by progress',
+          sortStartDate: 'by start date',
+          sinceDays: 'for',
+          days: 'days',
+          started: 'Start',
+          step: 'Step',
+          total: 'Overall',
+          detailView: '→ Open details',
+        },
+        quickPrompts: [
+          'What is blocking completion of kickoff steps?',
+          'Which artifacts are critical for new team members?',
+          'What are common blockers in the first 30 days?',
+          'Which knowledge gaps most impact onboarding progress?',
+        ],
+        usage: [
+          { label: 'How do I deploy to staging?', count: 47, pct: 90 },
+          { label: 'What environments do we have?', count: 38, pct: 72 },
+          { label: 'Who owns service X?', count: 21, pct: 40 },
+        ],
+      };
+
+  const gaps = [
     {
-      title: 'Active Users',
-      value: '247',
-      change: '+12% from last month',
-      trend: 'up' as const,
-      icon: Users,
+      name: 'Payment Service',
+      sub: isGerman ? 'kein Runbook vorhanden' : 'missing runbook',
+      severity: 'critical' as Severity,
+      link: '/knowledge?artifact=payment-service-runbook',
     },
     {
-      title: 'Knowledge Items',
-      value: '1,849',
-      change: '+156 this week',
-      trend: 'up' as const,
-      icon: BookOpen,
+      name: 'Auth Module',
+      sub: isGerman ? 'ADR fehlt' : 'ADR missing',
+      severity: 'critical' as Severity,
+      link: '/knowledge?artifact=auth-adr',
     },
     {
-      title: 'Open Gaps',
-      value: '23',
-      change: '5 critical',
-      trend: 'down' as const,
-      icon: AlertCircle,
+      name: 'CI/CD Pipeline',
+      sub: isGerman ? 'Runbook veraltet' : 'runbook outdated',
+      severity: 'medium' as Severity,
+      link: '/knowledge?artifact=cicd-runbook',
     },
     {
-      title: 'Completion Rate',
-      value: '87%',
-      change: '+5% improvement',
-      trend: 'up' as const,
-      icon: TrendingUp,
+      name: 'Notification Service',
+      sub: isGerman ? 'kein Owner' : 'no owner assigned',
+      severity: 'medium' as Severity,
+      link: '/knowledge?artifact=notification-service',
     },
   ];
 
-  const recentActivity = [
-    { user: 'Sarah Chen', action: 'completed', item: 'Week 1 Onboarding', time: '5 minutes ago' },
+  const actions = [
     {
-      user: 'Marcus Johnson',
-      action: 'asked',
-      item: 'How do we handle API authentication?',
-      time: '12 minutes ago',
+      text: isGerman
+        ? 'Runbook für Payment Service erstellen'
+        : 'Create runbook for Payment Service',
+      high: true,
+      chatQuestion: isGerman
+        ? 'Kannst du ein Runbook-Gerüst für den Payment Service vorbereiten?'
+        : 'Can you draft a runbook template for the Payment Service?',
+      artifactLink: '/knowledge?artifact=payment-service-runbook',
     },
     {
-      user: 'Emma Wilson',
-      action: 'uploaded',
-      item: 'Q1 Architecture Decision Record',
-      time: '1 hour ago',
+      text: isGerman ? 'Owner für Auth Module eintragen' : 'Assign owner for Auth Module',
+      high: true,
+      chatQuestion: isGerman
+        ? 'Wer sollte Owner für das Auth Module sein und warum?'
+        : 'Who should own the Auth Module and why?',
+      artifactLink: '/knowledge?artifact=auth-ownership',
     },
     {
-      user: 'David Park',
-      action: 'started',
-      item: 'Backend Development Path',
-      time: '2 hours ago',
+      text: isGerman ? 'CI/CD Runbook aktualisieren' : 'Refresh CI/CD runbook',
+      high: false,
+      chatQuestion: isGerman
+        ? 'Welche Schritte im CI/CD Runbook sind vermutlich veraltet?'
+        : 'Which CI/CD runbook steps are likely outdated?',
+      artifactLink: '/knowledge?artifact=cicd-runbook',
     },
   ];
 
-  const onboardingProgress = [
-    { name: 'Day 1 Essentials', completed: 45, total: 45, status: 'complete' },
-    { name: 'Week 1 Foundation', completed: 28, total: 32, status: 'active' },
-    { name: 'Month 1 Integration', completed: 8, total: 24, status: 'upcoming' },
+  const topics = [
+    { label: 'Auth & Security', count: 84, color: '#3B82F6' },
+    { label: 'Deployment', count: 61, color: '#22C55E' },
+    { label: 'CI/CD', count: 47, color: '#8B5CF6' },
+    { label: 'API Design', count: 39, color: '#14B8A6' },
+    { label: 'Monitoring', count: 28, color: '#F59E0B' },
   ];
 
-  const knowledgeGaps = [
-    { area: 'Deployment Pipeline', severity: 'critical', affected: 12 },
-    { area: 'Authentication Flow', severity: 'high', affected: 8 },
-    { area: 'Database Schema', severity: 'medium', affected: 5 },
-    { area: 'Error Handling', severity: 'low', affected: 3 },
+  const stale = [
+    {
+      name: 'CI/CD Runbook',
+      age: isGerman ? '8 Monate' : '8 months',
+      link: '/knowledge?artifact=cicd-runbook',
+    },
+    {
+      name: 'Deployment Guide v2',
+      age: isGerman ? '6 Monate' : '6 months',
+      link: '/knowledge?artifact=deployment-guide-v2',
+    },
+    {
+      name: isGerman ? 'Onboarding Checkliste' : 'Onboarding Checklist',
+      age: isGerman ? '4 Monate' : '4 months',
+      link: '/knowledge?artifact=onboarding-checklist',
+    },
   ];
+
+  const onboardingSteps = isGerman
+    ? ['Kickoff', 'Docs lesen', 'Erstes PR', 'Code Review', 'Abschluss']
+    : ['Kickoff', 'Read docs', 'First PR', 'Code review', 'Wrap-up'];
+
+  const members = [
+    {
+      initials: 'LM',
+      name: 'Lisa Müller',
+      role: isGerman ? 'Frontend Entwicklerin' : 'Frontend Engineer',
+      pct: 35,
+      color: '#3B82F6',
+      step: 1,
+      daysSince: 12,
+      startDate: '2026-05-02',
+      link: '/onboarding',
+    },
+    {
+      initials: 'TK',
+      name: 'Tom Koch',
+      role: isGerman ? 'Backend Entwickler' : 'Backend Engineer',
+      pct: 72,
+      color: '#14B8A6',
+      step: 3,
+      daysSince: 8,
+      startDate: '2026-05-06',
+      link: '/onboarding',
+    },
+    {
+      initials: 'SR',
+      name: 'Sara Ruiz',
+      role: 'PM',
+      pct: 58,
+      color: '#8B5CF6',
+      step: 2,
+      daysSince: 5,
+      startDate: '2026-05-09',
+      link: '/onboarding',
+    },
+    {
+      initials: 'JB',
+      name: 'Jan Berger',
+      role: 'DevOps',
+      pct: 12,
+      color: '#F59E0B',
+      step: 0,
+      daysSince: 3,
+      startDate: '2026-05-11',
+      link: '/onboarding',
+    },
+  ];
+
+  const C = isDark
+    ? {
+        bg: '#000000',
+        surface: '#0D1117',
+        surface2: '#111827',
+        surface3: '#0A0F1A',
+        border: '#1F2937',
+        text: '#F9FAFB',
+        sub: '#9CA3AF',
+        blue: '#3B82F6',
+        blueSoft: 'rgba(59,130,246,0.12)',
+        green: '#22C55E',
+        amber: '#F59E0B',
+        red: '#EF4444',
+        purple: '#8B5CF6',
+        teal: '#14B8A6',
+        hoverCard: '#161f2e',
+      }
+    : {
+        bg: '#F3F7FC',
+        surface: '#FFFFFF',
+        surface2: '#F8FAFC',
+        surface3: '#E2E8F0',
+        border: '#DCE5F1',
+        text: '#0F172A',
+        sub: '#64748B',
+        blue: '#2563EB',
+        blueSoft: 'rgba(37,99,235,0.1)',
+        green: '#16A34A',
+        amber: '#D97706',
+        red: '#DC2626',
+        purple: '#7C3AED',
+        teal: '#0F766E',
+        hoverCard: '#EEF4FF',
+      };
+
+  const openChatWithQuestion = (question: string) => {
+    const encoded = encodeURIComponent(question.trim());
+    if (!encoded) return;
+    navigate(`/?question=${encoded}`);
+  };
+
+  const submitQuickQuestion = () => {
+    openChatWithQuestion(quickQuestion);
+  };
+
+  const sortedMembers = useMemo(() => {
+    return [...members].sort((a, b) => {
+      if (onboardingSort === 'progress') {
+        return b.pct - a.pct;
+      }
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    });
+  }, [onboardingSort, isGerman]);
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Overview of team onboarding and knowledge status
-        </p>
+    <div
+      style={{
+        background: C.bg,
+        minHeight: '100vh',
+        padding: '28px 32px 64px',
+        fontFamily: '"DM Sans", Inter, sans-serif',
+        color: C.text,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        position: 'relative',
+      }}
+    >
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: isDark
+            ? 'radial-gradient(circle at top left, rgba(59,130,246,0.10), transparent 30%), radial-gradient(circle at top right, rgba(139,92,246,0.08), transparent 30%)'
+            : 'radial-gradient(circle at top left, rgba(59,130,246,0.14), transparent 35%), radial-gradient(circle at top right, rgba(124,58,237,0.1), transparent 35%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16,
+          marginBottom: 20,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {copy.filters.map((f, i) => (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(i)}
+              style={{
+                padding: '7px 14px',
+                borderRadius: 999,
+                fontSize: 12,
+                cursor: 'pointer',
+                border: `1px solid ${i === activeFilter ? 'rgba(59,130,246,0.4)' : C.border}`,
+                background: i === activeFilter ? C.blueSoft : C.surface,
+                color: i === activeFilter ? (isDark ? '#93C5FD' : '#2563EB') : C.sub,
+                transition: 'all 0.2s',
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {copy.srcFilters.map((f, i) => (
+            <button
+              key={f}
+              onClick={() => setActiveSrc(i)}
+              style={{
+                padding: '7px 14px',
+                borderRadius: 999,
+                fontSize: 12,
+                cursor: 'pointer',
+                border: `1px solid ${i === activeSrc ? 'rgba(20,184,166,0.4)' : C.border}`,
+                background: i === activeSrc ? 'rgba(20,184,166,0.1)' : C.surface,
+                color: i === activeSrc ? '#0EA5A4' : C.sub,
+                transition: 'all 0.2s',
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {metrics.map((metric) => (
-          <MetricCard key={metric.title} {...metric} />
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))',
+          gap: 14,
+          marginBottom: 20,
+        }}
+      >
+        {copy.metrics.map((m) => (
+          <div
+            key={m.label}
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 22,
+              padding: '18px 18px 16px',
+              minHeight: 88,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: -30,
+                right: -30,
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                background: m.color,
+                opacity: 0.12,
+                filter: 'blur(45px)',
+              }}
+            />
+            <div
+              style={{
+                fontSize: 10,
+                color: C.sub,
+                marginBottom: 7,
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+              }}
+            >
+              {m.label}
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{m.value}</div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>{m.sub}</div>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Onboarding Progress */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Onboarding Progress
-            </h2>
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          display: 'grid',
+          gridTemplateColumns: '0.85fr 1fr 1.2fr 1fr',
+          gap: 18,
+          marginBottom: 20,
+          alignItems: 'start',
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 28,
+            padding: 20,
+            boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: -60,
+              right: -60,
+              width: 150,
+              height: 150,
+              borderRadius: '50%',
+              background: 'rgba(239,68,68,0.07)',
+              filter: 'blur(60px)',
+            }}
+          />
+          <div style={{ position: 'relative', zIndex: 2, fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
+            {copy.sections.gaps}
           </div>
-          <div className="space-y-6">
-            {onboardingProgress.map((phase) => (
-              <div key={phase.name}>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {phase.name}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        phase.status === 'complete'
-                          ? 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400'
-                          : phase.status === 'active'
-                            ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                      }`}
-                    >
-                      {phase.status}
-                    </span>
-                  </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {phase.completed}/{phase.total}
-                  </span>
+          {gaps.map((g) => (
+            <a
+              key={g.name}
+              href={g.link}
+              style={{
+                display: 'block',
+                textDecoration: 'none',
+                color: 'inherit',
+                padding: '11px 10px',
+                marginBottom: 4,
+                borderRadius: 12,
+                background: 'transparent',
+                border: '1px solid transparent',
+                transition: 'all 0.18s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.06)';
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.18)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 3 }}>{g.name}</div>
+                  <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.4 }}>{g.sub}</div>
                 </div>
-                <ProgressBar value={phase.completed} max={phase.total} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <div
+                    style={{
+                      background:
+                        g.severity === 'critical' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                      color: g.severity === 'critical' ? '#FCA5A5' : '#FCD34D',
+                      fontSize: 10,
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {g.severity === 'critical'
+                      ? copy.labels.severityCritical
+                      : copy.labels.severityMedium}
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 10, color: C.blue, opacity: 0.85 }}>
+                    {copy.labels.kbShort}
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
+            </a>
+          ))}
         </div>
 
-        {/* Knowledge Gaps */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Knowledge Gaps</h2>
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 28,
+            padding: 20,
+            boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: -60,
+              right: -60,
+              width: 150,
+              height: 150,
+              borderRadius: '50%',
+              background: 'rgba(59,130,246,0.07)',
+              filter: 'blur(60px)',
+            }}
+          />
+          <div style={{ position: 'relative', zIndex: 2, fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
+            {copy.sections.actions}
           </div>
-          <div className="space-y-4">
-            {knowledgeGaps.map((gap) => (
-              <div
-                key={gap.area}
-                className="p-3 rounded-lg border border-gray-200 dark:border-gray-800"
-              >
-                <div className="flex items-start justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {gap.area}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      gap.severity === 'critical'
-                        ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400'
-                        : gap.severity === 'high'
-                          ? 'bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400'
-                          : gap.severity === 'medium'
-                            ? 'bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}
-                  >
-                    {gap.severity}
-                  </span>
+
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              background: 'rgba(139,92,246,0.12)',
+              border: '1px solid rgba(139,92,246,0.25)',
+              borderRadius: 999,
+              padding: '4px 10px',
+              marginBottom: 16,
+            }}
+          >
+            <span style={{ fontSize: 10 }}>✦</span>
+            <span style={{ fontSize: 11, color: '#C4B5FD', fontWeight: 500 }}>{copy.sections.actionsBadge}</span>
+          </div>
+
+          {actions.map((a, i) => (
+            <div
+              key={a.text}
+              style={{
+                padding: '11px 0',
+                borderBottom: i < actions.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#E9EFF8'}` : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    marginTop: 3,
+                    flexShrink: 0,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: a.high ? C.red : C.amber,
+                    boxShadow: `0 0 6px ${a.high ? C.red : C.amber}`,
+                  }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, lineHeight: 1.5 }}>{a.text}</div>
+                  <div style={{ fontSize: 10, color: C.sub, marginTop: 3 }}>
+                    {a.high ? copy.labels.highPriority : copy.labels.mediumPriority}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  {gap.affected} users affected
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
+                  <a
+                    href={a.artifactLink}
+                    style={{
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 10,
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      color: C.sub,
+                      textDecoration: 'none',
+                      background: C.surface,
+                    }}
+                  >
+                    {copy.labels.openArtifact}
+                  </a>
+                  <button
+                    onClick={() => openChatWithQuestion(a.chatQuestion)}
+                    style={{
+                      border: `1px solid ${C.blue}`,
+                      borderRadius: 10,
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      color: C.blue,
+                      background: 'transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {copy.labels.askInChat}
+                  </button>
+                </div>
               </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 28,
+            padding: 20,
+            boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: -60,
+              right: -60,
+              width: 150,
+              height: 150,
+              borderRadius: '50%',
+              background: 'rgba(59,130,246,0.07)',
+              filter: 'blur(60px)',
+            }}
+          />
+
+          <div style={{ position: 'relative', zIndex: 2, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>
+            {copy.sections.topTopics}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {topics.map((t, i) => (
+              <button
+                key={t.label}
+                onClick={() => setActiveTopic(i)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  borderRadius: 999,
+                  border: `1px solid ${i === activeTopic ? `${t.color}66` : C.border}`,
+                  background: i === activeTopic ? `${t.color}12` : C.surface,
+                  padding: '5px 10px 5px 6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = `0 0 0 1px ${t.color}40, 0 0 14px ${t.color}33`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: `${t.color}22`,
+                    color: t.color,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {t.count}
+                </span>
+                <span style={{ fontSize: 11, color: i === activeTopic ? C.text : C.sub }}>{t.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div
+            style={{
+              borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : '#E9EFF8'}`,
+              marginBottom: 18,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span
+              style={{
+                position: 'relative',
+                top: -1,
+                padding: '0 8px',
+                fontSize: 10,
+                color: C.sub,
+                background: C.surface,
+                marginTop: -1,
+              }}
+            >
+              {copy.sections.usage}
+            </span>
+          </div>
+
+          {copy.usage.map((u) => (
+            <div key={u.label} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
+                <span style={{ color: C.text }}>{u.label}</span>
+                <span
+                  style={{
+                    background: 'rgba(59,130,246,0.12)',
+                    color: isDark ? '#93C5FD' : '#2563EB',
+                    fontSize: 10,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                  }}
+                >
+                  {u.count}×
+                </span>
+              </div>
+              <div style={{ height: 5, background: isDark ? '#111827' : '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${u.pct}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 28,
+            padding: 20,
+            boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: -60,
+              right: -60,
+              width: 150,
+              height: 150,
+              borderRadius: '50%',
+              background: 'rgba(245,158,11,0.07)',
+              filter: 'blur(60px)',
+            }}
+          />
+          <div style={{ position: 'relative', zIndex: 2, fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
+            {copy.sections.freshness}
+          </div>
+          {stale.map((r, i) => (
+            <a
+              key={r.name}
+              href={r.link}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 0',
+                textDecoration: 'none',
+                color: 'inherit',
+                borderBottom: i < stale.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#E9EFF8'}` : 'none',
+              }}
+            >
+              <span style={{ fontSize: 12 }}>{r.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: '#FCA5A5', flexShrink: 0 }}>{r.age}</span>
+                <span style={{ fontSize: 10, color: C.blue }}>{copy.labels.openArtifact}</span>
+              </div>
+            </a>
+          ))}
+          <div style={{ marginTop: 22 }}>
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{copy.sections.freshnessChart}</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 72 }}>
+              {[
+                { h: 35, color: '#22C55E' },
+                { h: 60, color: '#3B82F6' },
+                { h: 90, color: '#F59E0B' },
+                { h: 55, color: '#EF4444' },
+              ].map((b, i) => (
+                <div
+                  key={i}
+                  style={{
+                    flex: 1,
+                    height: `${b.h}%`,
+                    borderRadius: '6px 6px 0 0',
+                    background: b.color,
+                    opacity: 0.85,
+                  }}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, fontSize: 10, color: C.sub }}>
+              {['<1M', '1-3M', '3-6M', '>6M'].map((l) => (
+                <span key={l} style={{ flex: 1 }}>
+                  {l}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          overflow: 'hidden',
+          background: isDark
+            ? 'linear-gradient(135deg, #111827 0%, #0f172a 100%)'
+            : 'linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%)',
+          border: `1px solid ${isDark ? '#1e293b' : '#dbeafe'}`,
+          borderRadius: 22,
+          padding: 18,
+          marginBottom: 14,
+          boxShadow: isDark ? '0 12px 30px rgba(2,6,23,0.45)' : '0 12px 28px rgba(37,99,235,0.12)',
+        }}
+      >
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: `${C.blue}20`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+              }}
+            >
+              ✦
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{copy.sections.quickChatTitle}</div>
+          </div>
+          <div style={{ fontSize: 11, color: C.sub, marginBottom: 12 }}>{copy.sections.quickChatSubtitle}</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input
+              value={quickQuestion}
+              onChange={(e) => setQuickQuestion(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitQuickQuestion()}
+              placeholder={copy.labels.promptPlaceholder}
+              style={{
+                flex: 1,
+                borderRadius: 12,
+                border: `1px solid ${isDark ? '#334155' : '#bfdbfe'}`,
+                background: isDark ? '#0B1220' : '#FFFFFF',
+                color: C.text,
+                fontSize: 12,
+                padding: '10px 12px',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={submitQuickQuestion}
+              style={{
+                borderRadius: 12,
+                border: 'none',
+                background: C.blue,
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                padding: '10px 14px',
+                boxShadow: '0 6px 14px rgba(37,99,235,0.35)',
+              }}
+            >
+              {copy.labels.promptButton}
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {copy.quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => openChatWithQuestion(prompt)}
+                style={{
+                  border: `1px solid ${isDark ? '#334155' : '#bfdbfe'}`,
+                  background: isDark ? '#111827' : '#ffffff',
+                  color: C.sub,
+                  borderRadius: 999,
+                  fontSize: 10,
+                  padding: '5px 11px',
+                  cursor: 'pointer',
+                }}
+              >
+                {prompt}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Recent Activity</h2>
-        </div>
-        <div className="space-y-4">
-          {recentActivity.map((activity, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-800 last:border-0 last:pb-0"
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          overflow: 'hidden',
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 28,
+          padding: 22,
+          boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: -60,
+            right: -60,
+            width: 200,
+            height: 200,
+            borderRadius: '50%',
+            background: 'rgba(59,130,246,0.07)',
+            filter: 'blur(80px)',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 20,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{copy.sections.onboarding}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: C.sub }}>{copy.labels.sortBy}</span>
+            <button
+              onClick={() => setOnboardingSort('progress')}
+              style={{
+                border: `1px solid ${onboardingSort === 'progress' ? `${C.blue}66` : C.border}`,
+                borderRadius: 999,
+                background: onboardingSort === 'progress' ? C.blueSoft : C.surface,
+                color: onboardingSort === 'progress' ? C.blue : C.sub,
+                fontSize: 11,
+                padding: '5px 10px',
+                cursor: 'pointer',
+              }}
             >
-              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full">
-                <FileText className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900 dark:text-white">
-                  <span className="font-medium">{activity.user}</span> {activity.action}{' '}
-                  <span className="font-medium">{activity.item}</span>
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Clock className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{activity.time}</span>
+              {copy.labels.sortProgress}
+            </button>
+            <button
+              onClick={() => setOnboardingSort('startDate')}
+              style={{
+                border: `1px solid ${onboardingSort === 'startDate' ? `${C.blue}66` : C.border}`,
+                borderRadius: 999,
+                background: onboardingSort === 'startDate' ? C.blueSoft : C.surface,
+                color: onboardingSort === 'startDate' ? C.blue : C.sub,
+                fontSize: 11,
+                padding: '5px 10px',
+                cursor: 'pointer',
+              }}
+            >
+              {copy.labels.sortStartDate}
+            </button>
+          </div>
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 14,
+          }}
+        >
+          {sortedMembers.map((m) => (
+            <a key={m.name} href={m.link} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <div
+                style={{
+                  background: C.surface2,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 22,
+                  padding: 18,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = `${m.color}55`;
+                  e.currentTarget.style.background = C.hoverCard;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.background = C.surface2;
+                }}
+              >
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      background: `${m.color}22`,
+                      color: m.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      border: `1.5px solid ${m.color}44`,
+                    }}
+                  >
+                    {m.initials}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: C.sub }}>{m.role}</div>
+                  </div>
                 </div>
+
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
+                    borderRadius: 999,
+                    padding: '3px 9px',
+                    fontSize: 10,
+                    color: C.sub,
+                    marginBottom: 14,
+                  }}
+                >
+                  <span style={{ opacity: 0.6 }}>⏱</span> {copy.labels.sinceDays} {m.daysSince} {copy.labels.days} •{' '}
+                  {copy.labels.started}{' '}
+                  {new Date(m.startDate).toLocaleDateString(isGerman ? 'de-DE' : 'en-US', {
+                    day: '2-digit',
+                    month: 'short',
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                  {onboardingSteps.map((step, si) => (
+                    <div
+                      key={step}
+                      title={step}
+                      style={{
+                        flex: 1,
+                        height: 5,
+                        borderRadius: 999,
+                        background:
+                          si < m.step
+                            ? m.color
+                            : si === m.step
+                              ? `${m.color}99`
+                              : isDark
+                                ? 'rgba(255,255,255,0.07)'
+                                : '#DDE6F2',
+                        transition: 'background 0.2s',
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div style={{ fontSize: 10, color: C.sub, marginBottom: 10 }}>
+                  {copy.labels.step} {m.step + 1}/5: <span style={{ color: m.color }}>{onboardingSteps[m.step]}</span>
+                </div>
+
+                <div style={{ height: 5, background: isDark ? '#0A0F1A' : '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${m.pct}%`,
+                      height: '100%',
+                      background: `linear-gradient(90deg, ${m.color}, ${m.color}BB)`,
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 10, color: C.sub }}>
+                  <span>{copy.labels.total}</span>
+                  <span style={{ color: m.color }}>{m.pct}%</span>
+                </div>
+
+                <div style={{ marginTop: 12, fontSize: 10, color: C.blue, opacity: 0.8 }}>{copy.labels.detailView}</div>
               </div>
-            </div>
+            </a>
           ))}
         </div>
       </div>
