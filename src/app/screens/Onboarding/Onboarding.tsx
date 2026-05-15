@@ -40,22 +40,6 @@ interface OnboardingPhase {
 export function Onboarding() {
   const { t } = useTranslation();
 
-  const [selectedPhase, setSelectedPhase] = useState(0);
-
-  // NEW
-  const [activeStep, setActiveStep] = useState<OnboardingItem | null>(null);
-
-  const [completedSubtasks, setCompletedSubtasks] = useState<string[]>([]);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-
-  const toggleSubtask = (task: string) => {
-    setCompletedSubtasks((prev) =>
-      prev.includes(task)
-        ? prev.filter((t) => t !== task)
-        : [...prev, task],
-    );
-  };
-
   const phases: OnboardingPhase[] = useMemo(
     () => [
       {
@@ -67,20 +51,14 @@ export function Onboarding() {
           {
             id: '1',
             title: t('onboarding.phases.day1.items.hr_paperwork.title'),
-            description: t(
-              'onboarding.phases.day1.items.hr_paperwork.description',
-            ),
+            description: t('onboarding.phases.day1.items.hr_paperwork.description'),
             type: 'task',
             completed: true,
           },
           {
             id: '2',
-            title: t(
-              'onboarding.phases.day1.items.company_overview.title',
-            ),
-            description: t(
-              'onboarding.phases.day1.items.company_overview.description',
-            ),
+            title: t('onboarding.phases.day1.items.company_overview.title'),
+            description: t('onboarding.phases.day1.items.company_overview.description'),
             type: 'video',
             completed: true,
             duration: '15 min',
@@ -88,9 +66,7 @@ export function Onboarding() {
           {
             id: '3',
             title: t('onboarding.phases.day1.items.handbook.title'),
-            description: t(
-              'onboarding.phases.day1.items.handbook.description',
-            ),
+            description: t('onboarding.phases.day1.items.handbook.description'),
             type: 'document',
             completed: true,
             duration: '30 min',
@@ -98,9 +74,7 @@ export function Onboarding() {
           {
             id: '4',
             title: t('onboarding.phases.day1.items.dev_env.title'),
-            description: t(
-              'onboarding.phases.day1.items.dev_env.description',
-            ),
+            description: t('onboarding.phases.day1.items.dev_env.description'),
             type: 'task',
             completed: true,
           },
@@ -123,9 +97,7 @@ export function Onboarding() {
           {
             id: '6',
             title: t('onboarding.phases.week1.items.architecture.title'),
-            description: t(
-              'onboarding.phases.week1.items.architecture.description',
-            ),
+            description: t('onboarding.phases.week1.items.architecture.description'),
             type: 'document',
             completed: true,
             duration: '45 min',
@@ -133,9 +105,7 @@ export function Onboarding() {
           {
             id: '7',
             title: t('onboarding.phases.week1.items.first_feature.title'),
-            description: t(
-              'onboarding.phases.week1.items.first_feature.description',
-            ),
+            description: t('onboarding.phases.week1.items.first_feature.description'),
             type: 'task',
             completed: true,
           },
@@ -150,9 +120,7 @@ export function Onboarding() {
           {
             id: '9',
             title: t('onboarding.phases.week1.items.code_review.title'),
-            description: t(
-              'onboarding.phases.week1.items.code_review.description',
-            ),
+            description: t('onboarding.phases.week1.items.code_review.description'),
             type: 'document',
             completed: false,
             duration: '15 min',
@@ -160,9 +128,7 @@ export function Onboarding() {
           {
             id: '10',
             title: t('onboarding.phases.week1.items.standup.title'),
-            description: t(
-              'onboarding.phases.week1.items.standup.description',
-            ),
+            description: t('onboarding.phases.week1.items.standup.description'),
             type: 'task',
             completed: false,
           },
@@ -177,18 +143,14 @@ export function Onboarding() {
           {
             id: '11',
             title: t('onboarding.phases.month1.items.lead_feature.title'),
-            description: t(
-              'onboarding.phases.month1.items.lead_feature.description',
-            ),
+            description: t('onboarding.phases.month1.items.lead_feature.description'),
             type: 'task',
             completed: false,
           },
           {
             id: '12',
             title: t('onboarding.phases.month1.items.database.title'),
-            description: t(
-              'onboarding.phases.month1.items.database.description',
-            ),
+            description: t('onboarding.phases.month1.items.database.description'),
             type: 'document',
             completed: false,
             duration: '40 min',
@@ -196,9 +158,7 @@ export function Onboarding() {
           {
             id: '13',
             title: t('onboarding.phases.month1.items.security.title'),
-            description: t(
-              'onboarding.phases.month1.items.security.description',
-            ),
+            description: t('onboarding.phases.month1.items.security.description'),
             type: 'document',
             completed: false,
             duration: '25 min',
@@ -206,9 +166,7 @@ export function Onboarding() {
           {
             id: '14',
             title: t('onboarding.phases.month1.items.presentation.title'),
-            description: t(
-              'onboarding.phases.month1.items.presentation.description',
-            ),
+            description: t('onboarding.phases.month1.items.presentation.description'),
             type: 'task',
             completed: false,
           },
@@ -473,58 +431,15 @@ export function Onboarding() {
                 your onboarding buddy.
               </p>
 
-              <button className="mt-5 px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-all flex items-center gap-2">
-                Complete Task
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* FEEDBACK */}
-          <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden mb-24">
-            <button
-              onClick={() => setFeedbackOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all"
-            >
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-pink-500" />
-
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Feedback
-                </h2>
-              </div>
-
-              <ChevronRight
-                className={`w-5 h-5 text-gray-400 transition-transform ${feedbackOpen ? 'rotate-90' : ''
-                  }`}
-              />
-            </button>
-
-            {feedbackOpen && (
-              <div className="px-6 pb-6">
-                <div className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-                  Optional: leave feedback for this onboarding step.
-                </div>
-
-                <textarea
-                  placeholder="Leave feedback for this onboarding step..."
-                  className="w-full min-h-[140px] rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-
-                <div className="flex justify-end mt-4">
-                  <button className="px-5 py-3 rounded-xl bg-gray-900 dark:bg-white dark:text-black text-white text-sm font-medium hover:opacity-90 transition-all">
-                    Submit Feedback
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        <div>
-             <br></br> 
-             <br></br> 
-
-        </div>
+  return (
+    <div className="p-8 max-w-5xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {t('onboarding.journey_title')}
+        </h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          {t('onboarding.journey_subtitle')}
+        </p>
       </div>
     );
   }
@@ -540,22 +455,21 @@ return (
       <div className="max-w-7xl mx-auto px-8 py-5">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-5 h-5 text-blue-500" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {t('onboarding.journey_title')}
-              </h1>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('onboarding.journey_subtitle')}
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+              {t('onboarding.overall_progress')}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {t('onboarding.items_completed', {
+                completed: totalProgress.completed,
+                total: totalProgress.total,
+              })}
             </p>
           </div>
-
-          <div className="text-right">
-            <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
-              {Math.round((totalProgress.completed / totalProgress.total) * 100)}%
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">overall progress</div>
+          <div className="text-3xl font-semibold text-blue-600 dark:text-blue-400">
+            {totalProgress.total > 0
+              ? Math.round((totalProgress.completed / totalProgress.total) * 100)
+              : 0}
+            %
           </div>
         </div>
 
@@ -728,7 +642,14 @@ return (
           );
         })}
       </div>
-    </main>
-  </div>
-);
+
+      {/* Next Steps */}
+      <div className="mt-8 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+          {t('onboarding.next_step_title')}
+        </h3>
+        <p className="text-sm text-blue-800 dark:text-blue-400">{t('onboarding.next_step_desc')}</p>
+      </div>
+    </div>
+  );
 }

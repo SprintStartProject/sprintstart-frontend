@@ -228,18 +228,32 @@ export default function SystemLogs() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto p-8">
-            <div className="max-w-7xl mx-auto w-full space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl flex items-center justify-center">
-                    <ShieldAlert className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">0{errors24h}</p>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Errors</p>
-                  </div>
-                </div>
+        {/* Log Viewer Control */}
+        <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex gap-2 p-1 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-x-auto w-full md:w-auto">
+            {['all', 'info', 'warn', 'error', 'security'].map((l) => (
+              <button
+                key={l}
+                onClick={() => setFilter(l as typeof filter)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  filter === l
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search logs (e.g. IP, User, Service)..."
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-blue-600 rounded-xl text-sm outline-none transition-all"
+            />
+          </div>
+        </div>
 
                 <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4">
                   <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-xl flex items-center justify-center">

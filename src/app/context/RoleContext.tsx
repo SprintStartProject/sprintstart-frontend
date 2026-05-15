@@ -1,6 +1,11 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type UserRole = 'Project Member' | 'Project Manager' | 'HR' | 'Admin';
+export type UserRole =
+  | 'New Project Member'
+  | 'Existing Project Member'
+  | 'Project Manager'
+  | 'HR'
+  | 'Admin';
 
 interface RoleContextType {
   role: UserRole;
@@ -10,7 +15,7 @@ interface RoleContextType {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole>('Project Member');
+  const [role, setRole] = useState<UserRole>('New Project Member');
 
   return <RoleContext.Provider value={{ role, setRole }}>{children}</RoleContext.Provider>;
 }

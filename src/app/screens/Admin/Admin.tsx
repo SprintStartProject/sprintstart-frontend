@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import {Pencil, Trash2, ChevronRight, Plus, X, FileText, Settings} from 'lucide-react';
+import { Search, UserPlus, MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { UserRole } from '../../context/RoleContext';
 
 interface User {
   id: string;
   username: string;
   email: string;
-  primaryRole: string;
-  secondaryRoles: string[];
+  role: UserRole;
   projects: string[];
 }
 
@@ -69,22 +69,72 @@ const mockProjects: Project[] = [
   },
 ];
 
-const roleColors: Record<string, string> = {
-  'Admin': 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400',
-  'Project Manager': 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400',
-  'Member': 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400',
-  'HR': 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400',
-  'New Member': 'bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400',
-};
+  const users: User[] = [
+    {
+      id: '1',
+      name: 'Sarah Chen',
+      email: 'sarah.chen@company.com',
+      role: 'Admin',
+      projects: ['Platform', 'API Gateway'],
+      status: 'active',
+      joinDate: '2025-01-15',
+    },
+    {
+      id: '2',
+      name: 'Marcus Johnson',
+      email: 'marcus.j@company.com',
+      role: 'Project Manager',
+      projects: ['Mobile App', 'Frontend'],
+      status: 'active',
+      joinDate: '2025-03-20',
+    },
+    {
+      id: '3',
+      name: 'Emma Wilson',
+      email: 'emma.wilson@company.com',
+      role: 'Existing Project Member',
+      projects: ['Backend Services'],
+      status: 'active',
+      joinDate: '2025-11-10',
+    },
+    {
+      id: '4',
+      name: 'David Park',
+      email: 'david.park@company.com',
+      role: 'New Project Member',
+      projects: ['Platform', 'Infrastructure'],
+      status: 'pending',
+      joinDate: '2026-05-01',
+    },
+    {
+      id: '5',
+      name: 'Lisa Rodriguez',
+      email: 'lisa.r@company.com',
+      role: 'HR',
+      projects: [],
+      status: 'active',
+      joinDate: '2024-08-15',
+    },
+    {
+      id: '6',
+      name: 'Alex Kim',
+      email: 'alex.kim@company.com',
+      role: 'Existing Project Member',
+      projects: ['API Gateway'],
+      status: 'inactive',
+      joinDate: '2024-06-01',
+    },
+  ];
 
-const tagColors = [
-  'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400',
-  'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400',
-  'bg-pink-100 dark:bg-pink-950 text-pink-700 dark:text-pink-400',
-  'bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400',
-  'bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400',
-  'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400',
-];
+  const roles = [
+    'all',
+    'Admin',
+    'Project Manager',
+    'New Project Member',
+    'Existing Project Member',
+    'HR',
+  ];
+  const statuses = ['all', 'active', 'pending', 'inactive'];
 
 const getTagColor = (index: number) => tagColors[index % tagColors.length];
 
