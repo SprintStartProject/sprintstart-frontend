@@ -4,12 +4,10 @@
     "onboarding": "My Onboarding",
     "knowledge": "Knowledge Base",
     "profile": "Profile",
-    "team_dashboard": "Team Dashboard",
+    "dashboard": "Dashboard",
     "knowledge_quality": "Knowledge Quality",
     "handover": "Handover Management",
-    "global_onboarding": "Global Onboarding",
     "skill_gaps": "Skill Gaps",
-    "statistics": "Statistics",
     "access_management": "Access Management",
     "data_ingestion": "Data Ingestion",
     "system_logs": "System Logs"
