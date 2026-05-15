@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Send,
-  Paperclip,
-  Bot,
-  User,
-  FileText,
-  ExternalLink,
-  Sparkles,
-  Slack,
-  Github,
-  Info,
-  Search,
+    Send,
+    Paperclip,
+    Bot,
+    User,
+    FileText,
+    ExternalLink,
+    Sparkles,
+    Slack,
+    Github,
+    Info,
+    Search, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +32,13 @@ const FILTERS = [
   { id: 'slack', label: 'Slack', icon: Slack, key: 'slack' },
 ];
 
+const TIMEFILTERS = [
+    {id: 'latest', label: 'latest', key: 'latest'},
+    {id: 'last month', label: 'last month', key: 'last month'},
+    {id: 'last 6 months', label: 'last 6 months', key: 'last 6 months'},
+    {id: 'last year', label: 'last year', key: 'last year'}
+];
+
 export function ChatHome() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,7 +56,7 @@ export function ChatHome() {
   }, [t, baseTime]);
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  
+
   // Track the last seen initialMessages to detect changes without cascading renders
   const [lastInitialMessages, setLastInitialMessages] = useState(initialMessages);
 
@@ -60,6 +67,7 @@ export function ChatHome() {
 
   const [input, setInput] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [activeTimeFilter, setActiveTimeFilter] = useState('latest')
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -207,9 +215,13 @@ export function ChatHome() {
                   </div>
                 )}
 
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 flex items-center">
                   {message.role === 'assistant' ? 'SprintStart AI' : t('common.you')} •{' '}
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {message.role === 'assistant' && <div className="flex gap-3 ml-3">
+                          <ThumbsUp className="text-blue-500"></ThumbsUp>
+                          <ThumbsDown className="text-blue-500"></ThumbsDown>
+                      </div>}
                 </span>
               </div>
             </motion.div>
@@ -253,9 +265,9 @@ export function ChatHome() {
 
       {/* Input Area */}
       <div className="p-4 md:p-8 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 sticky bottom-0">
-        <div className="max-w-4xl mx-auto space-y-4">
+        <div className="max-w-4xl mx-auto space-y-3">
           {/* Filter Chips */}
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex gap-2 overflow-x-auto pb-0 no-scrollbar">
             {FILTERS.map((filter) => {
               const Icon = filter.icon;
               const isActive = activeFilter === filter.id;
@@ -263,7 +275,7 @@ export function ChatHome() {
                 <button
                   key={filter.id}
                   onClick={() => setActiveFilter(filter.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  className={`flex items-center gap-2 px-4 py-0 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                     isActive
                       ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none'
                       : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
@@ -275,6 +287,24 @@ export function ChatHome() {
               );
             })}
           </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {TIMEFILTERS.map((filter) => {
+                    const isActive = activeTimeFilter === filter.id;
+                    return (
+                        <button
+                            key={filter.id}
+                            onClick={() => setActiveTimeFilter(filter.id)}
+                            className={`flex items-center gap-2 px-4 py-0 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                                isActive
+                                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none'
+                                    : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
+                            }`}
+                        >
+                            <span className="uppercase tracking-widest">{t(`${filter.key}`)}</span>
+                        </button>
+                    );
+                })}
+            </div>
 
           {/* Input Box */}
           <div className="relative group">

@@ -1,262 +1,193 @@
-import { Save, User, Briefcase, Award, BookOpen } from 'lucide-react';
+import {User, Edit2, ThumbsUp, Check, X, ThumbsDown, Stars, Settings} from 'lucide-react';
+import {useState} from "react";
+import {ProgressBar} from "@/app/components/ProgressBar.tsx";
 
 export function Profile() {
+
+    const [selectedRole, setSelectedRole] = useState("primary");
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Profile & Settings</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Manage your personal information and preferences
-        </p>
-      </div>
+        <div className="mb-8">
+            <h1 className="font-semibold text-white">Profile & Personalization</h1>
+        </div>
 
       <div className="space-y-6">
         {/* Personal Information */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Personal Information
-            </h2>
-          </div>
+            <div className=" flex flex-row gap-5">
+                <div className="w-35 h-35 border-orange-400 dark:border-blue-500 flex items-center justify-center border-7 rounded-full">
+                    <User className="w-25 h-25 text-orange-400 dark:text-blue-500"></User>
+                </div>
+                <div className=" flex flex-col justify-center">
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
+                        @username
+                    </p>
+                </div>
+            </div>
+
+            <hr className="my-8 border-gray-300" />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                defaultValue="Sarah Chen"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                defaultValue="sarah.chen@company.com"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Job Title
-              </label>
-              <input
-                type="text"
-                defaultValue="Senior Software Engineer"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Department
-              </label>
-              <input
-                type="text"
-                defaultValue="Engineering"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Role & Experience */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Briefcase className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Role & Experience</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Seniority Level
-              </label>
-              <select className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>Senior</option>
-                <option>Mid-Level</option>
-                <option>Junior</option>
-                <option>Lead</option>
-                <option>Principal</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Years of Experience
-              </label>
-              <input
-                type="number"
-                defaultValue="8"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Team / Project Assignment
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {['Platform', 'API Gateway', 'Infrastructure'].map((project) => (
-                  <span
-                    key={project}
-                    className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-sm rounded-lg"
-                  >
-                    {project}
-                  </span>
-                ))}
-                <button className="px-3 py-1.5 border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  + Add Project
-                </button>
+              <h2 className="font-semibold">Name:</h2>
+              <h2>Prename Surname</h2>
+              <h2 className="font-semibold">Roles:</h2>
+              <div className="flex flex-row gap-4">
+                  <div className="rounded-2xl border-5 border-cyan-500 text-cyan-500 pl-2 pr-2 font-bold">
+                      ROLE 1
+                  </div>
+                  <div className="rounded-2xl border-5 border-teal-500 text-teal-500 pl-2 pr-2 font-bold">
+                      ROLE 2
+                  </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Skills & Expertise */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Award className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Skills & Expertise
-            </h2>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Technical Skills
-            </label>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {[
-                'React',
-                'TypeScript',
-                'Node.js',
-                'PostgreSQL',
-                'Docker',
-                'Kubernetes',
-                'AWS',
-                'GraphQL',
-              ].map((skill) => (
-                <span
-                  key={skill}
-                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-lg"
-                >
+              <h2 className="font-semibold">Level:</h2>
+              <h2 className="font-bold">Intermediate</h2>
+              <h2 className="font-semibold">Skills:</h2>
+              <div className="grid-flow-row grid gap-3 grid-cols-3">
+                  {[
+                      'React',
+                      'TypeScript',
+                      'Node.js',
+                      'PostgreSQL',
+                      'Docker',
+                      'Kubernetes',
+                      'AWS',
+                      'GraphQL',
+                  ].map((skill) => (
+                      <div
+                          key={skill}
+                          className="flex justify-center px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-lg"
+                      >
                   {skill}
-                </span>
-              ))}
-              <button className="px-3 py-1.5 border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                + Add Skill
+                </div>
+                  ))}
+              </div>
+              <div className="flex flex-row justify-end col-start-2">
+              <button className="h-12 w-12 bg-orange-600 hover:bg-orange-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-full text-sm transition-colors flex items-center justify-center gap-2">
+                  <Edit2 className="w-5 h-5" />
               </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Areas of Interest
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {['System Architecture', 'DevOps', 'Performance Optimization', 'Mentoring'].map(
-                (interest) => (
-                  <span
-                    key={interest}
-                    className="px-3 py-1.5 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400 text-sm rounded-lg"
-                  >
-                    {interest}
-                  </span>
-                ),
-              )}
-              <button className="px-3 py-1.5 border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                + Add Interest
-              </button>
-            </div>
+              </div>
           </div>
         </div>
 
-        {/* Learning Preferences */}
+        {/* Skill Gaps */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+            <h1 className="font-bold">Skill Gaps</h1>
+
+            <div className="inline-flex p-1 gap-1 mt-3 bg-gray-100 dark:bg-gray-800 rounded-3xl">
+                <button
+                    className={`px-5 rounded-3xl transition-all duration-200 font-medium ${
+                        selectedRole === "primary"
+                            ? "bg-white dark:bg-gray-700 shadow text-black dark:text-white"
+                            : "text-gray-500 dark:text-gray-400"
+                    }`}
+                    onClick={() => setSelectedRole("primary")}
+                >
+                    Primary Role
+                </button>
+
+                <button
+                    className={`px-5 rounded-3xl transition-all duration-200 font-medium ${
+                        selectedRole === "secondary"
+                            ? "bg-white dark:bg-gray-700 shadow text-black dark:text-white"
+                            : "text-gray-500 dark:text-gray-400"
+                    }`}
+                    onClick={() => setSelectedRole("secondary")}
+                >
+                    Secondary Role
+                </button>
+            </div>
+
+            <div className="flex flex-row gap-3 items-center mt-5">
+                <span>Evaluation for role</span>
+                <div className="rounded-2xl border-5 border-cyan-500 text-cyan-500 pl-2 pr-2 font-bold">
+                    ROLE 1
+                </div>
+                <span>:</span>
+            </div>
+
+            <div className="flex flex-row gap-5 items-center mt-1">
+                <ProgressBar value={60} max={100} size="lg" />
+                <span className="text-3xl font-bold text-blue-400">60%</span>
+            </div>
+
+            <p className="mt-5">Skill requirements:</p>
+            <div className="grid grid-cols-6 mt-3">
+                <div className="grid grid-cols-6 gap-5 col-start-1 col-span-5">
+                    {[
+                        'React',
+                        'TypeScript',
+                        'Node.js'
+                    ].map((skill) => (
+                        <div
+                            key={skill}
+                            className="flex justify-center px-3 py-1.5 bg-green-200 text-green-700 text-sm rounded-lg"
+                        >
+                            {skill}
+                        </div>
+                    ))}
+                </div>
+                <div className="col-start-6 col-span-1 text-green-700 font-semibold flex items-center text-lg">
+                    <Check></Check> 3/5
+                </div>
+            </div>
+
+            <div className="grid grid-cols-6 mt-3">
+                <div className="grid grid-cols-6 gap-5 col-start-1 col-span-5">
+                    {[
+                        'HTML',
+                        'CSS'
+                    ].map((skill) => (
+                        <div
+                            key={skill}
+                            className="flex justify-center px-3 py-1.5 bg-red-200 text-red-700 text-sm rounded-lg"
+                        >
+                            {skill}
+                        </div>
+                    ))}
+                </div>
+                <div className="col-start-6 col-span-1 text-red-700 font-semibold flex items-center text-lg">
+                    <X></X> 2/5
+                </div>
+            </div>
+
+            <hr className="my-8 border-gray-300" />
+
+            <div className="flex flex-row gap-2 items-center">
+                <Stars className="size-6"></Stars>
+                <span>Recommended Ressources:</span>
+            </div>
+            <div className="grid gap-3 mt-5">
+                    {[
+                        'Advanced Kubernetes Patterns',
+                        'Microservices Architecture Best Practices',
+                        'Performance Tuning in Node.js',
+                    ].map((item) => (
+                        <div
+                            key={item}
+                            className="p-3 pt-2 pb-2 bg-gray-100 dark:bg-gray-800 rounded-xl text-sm text-gray-900 dark:text-white flex flex-row justify-between items-center"
+                        >
+                            <div>{item}</div>
+                            <div className="flex flex-row gap-3">
+                                <ThumbsUp className="text-blue-500"></ThumbsUp>
+                                <ThumbsDown className="text-blue-500"></ThumbsDown>
+                            </div>
+                        </div>
+                    ))}
+            </div>
+        </div>
+
+        {/* Configurations */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
           <div className="flex items-center gap-2 mb-6">
-            <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Learning Preferences
+            <Settings></Settings>
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+                Configurations
             </h2>
           </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Preferred Content Types
-              </label>
-              <div className="space-y-2">
-                {[
-                  { label: 'Documentation', checked: true },
-                  { label: 'Video Tutorials', checked: true },
-                  { label: 'Interactive Exercises', checked: false },
-                  { label: 'Podcasts', checked: false },
-                ].map((item) => (
-                  <label key={item.label} className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      defaultChecked={item.checked}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{item.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Daily Learning Time Goal
-              </label>
-              <select className="w-full md:w-64 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>30 minutes</option>
-                <option>1 hour</option>
-                <option>2 hours</option>
-                <option>Custom</option>
-              </select>
-            </div>
-          </div>
         </div>
 
-        {/* Recommended Content */}
-        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-3">
-            Recommended Content Based on Your Profile
-          </h3>
-          <div className="space-y-2">
-            {[
-              'Advanced Kubernetes Patterns',
-              'Microservices Architecture Best Practices',
-              'Performance Tuning in Node.js',
-            ].map((item) => (
-              <div
-                key={item}
-                className="p-3 bg-white dark:bg-gray-900 rounded-lg text-sm text-gray-900 dark:text-white"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3">
-          <button className="px-6 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            Cancel
-          </button>
-          <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors flex items-center gap-2">
-            <Save className="w-4 h-4" />
-            Save Changes
-          </button>
-        </div>
       </div>
     </div>
   );
