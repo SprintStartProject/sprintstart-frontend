@@ -72,6 +72,7 @@ function SidebarContent({
     'Project Manager',
     'HR',
     'Admin',
+    'Show all',
   ];
   const { i18n } = useTranslation();
 
@@ -178,10 +179,12 @@ function SidebarContent({
           >
             <div className="relative">
               <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-200 dark:shadow-none ring-2 ring-white dark:ring-gray-900">
-                {role
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')}
+                {role === 'Show all'
+                  ? 'SA'
+                  : role
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')}
               </div>
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full" />
             </div>
@@ -190,7 +193,7 @@ function SidebarContent({
                 {role}
               </p>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">
-                Organization Admin
+                {role === 'Show all' ? 'All Modules Enabled' : 'Organization Admin'}
               </p>
             </div>
             <ChevronDown
@@ -287,7 +290,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 z-40 px-4 flex items-center justify-between shadow-sm">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 z-50 px-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <Rocket className="w-5 h-5 text-white" />
@@ -313,7 +316,7 @@ export function Sidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-40"
+              className="lg:hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50"
               onClick={() => setIsMobileMenuOpen(false)}
             />
             <motion.aside
@@ -321,7 +324,7 @@ export function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="lg:hidden fixed top-0 left-0 bottom-0 w-72 bg-white dark:bg-gray-950 z-50 flex flex-col"
+              className="lg:hidden fixed top-0 left-0 bottom-0 w-72 bg-white dark:bg-gray-950 z-[60] flex flex-col"
             >
               <SidebarContent {...contentProps} />
             </motion.aside>

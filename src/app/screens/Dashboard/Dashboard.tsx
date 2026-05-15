@@ -21,7 +21,7 @@ export function Dashboard() {
 
   const isGerman = i18n.language.startsWith('de');
   const isDark = theme === 'dark';
-  const isManagerView = role === 'Project Manager';
+  const isManagerView = role === 'Project Manager' || role === 'Show all';
 
   const copy = isGerman
     ? {

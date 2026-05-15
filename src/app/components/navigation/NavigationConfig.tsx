@@ -122,5 +122,6 @@ export const navigationItems: NavItem[] = [
 ];
 
 export function getVisibleNavItems(role: UserRole): NavItem[] {
+  if (role === 'Show all') return navigationItems;
   return navigationItems.filter((item) => item.roles.includes(role));
 }
