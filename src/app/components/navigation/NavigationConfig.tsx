@@ -36,6 +36,14 @@ export const navigationItems: NavItem[] = [
     section: 'base',
   },
   {
+    id: 'team-dashboard',
+    label: 'Dashboard',
+    icon: BarChart3,
+    path: '/team-dashboard',
+    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
+    section: 'base',
+  },
+  {
     id: 'onboarding',
     label: 'My Onboarding',
     icon: Rocket,
@@ -61,14 +69,6 @@ export const navigationItems: NavItem[] = [
   },
 
   // Project Manager Zone
-  {
-    id: 'team-dashboard',
-    label: 'Team Dashboard',
-    icon: BarChart3,
-    path: '/team-dashboard',
-    roles: ['Project Manager'],
-    section: 'project-manager',
-  },
   {
     id: 'knowledge-quality',
     label: 'Knowledge Quality',
