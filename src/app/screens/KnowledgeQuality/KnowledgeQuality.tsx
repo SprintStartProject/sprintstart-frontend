@@ -161,7 +161,7 @@ export default function KnowledgeQuality() {
             {['all', 'Healthy', 'Stale', 'Critical'].map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f as any)}
+                onClick={() => setFilter(f as typeof filter)}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                   filter === f
                     ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm border border-gray-200 dark:border-gray-600'

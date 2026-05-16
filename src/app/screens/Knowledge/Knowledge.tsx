@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
-  Filter,
   FileText,
   Calendar,
   User,
@@ -75,9 +74,7 @@ export function Knowledge() {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
             {t('knowledge.title')}
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {t('knowledge.subtitle')}
-          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('knowledge.subtitle')}</p>
         </div>
 
         {/* Search & Filters */}
@@ -114,7 +111,9 @@ export function Knowledge() {
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                   >
-                    {type === 'all' ? t('knowledge.filters.all_types') : t(`knowledge.types.${type}`)}
+                    {type === 'all'
+                      ? t('knowledge.filters.all_types')
+                      : t(`knowledge.types.${type}`)}
                   </button>
                 ))}
               </div>
@@ -165,11 +164,16 @@ export function Knowledge() {
           <div className="mb-4 flex justify-between items-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {t(
-                filteredItems.length === 1 ? 'knowledge.results_count' : 'knowledge.results_count_plural',
-                { count: filteredItems.length }
+                filteredItems.length === 1
+                  ? 'knowledge.results_count'
+                  : 'knowledge.results_count_plural',
+                { count: filteredItems.length },
               )}
             </p>
-            {(selectedType !== 'all' || selectedFreshness !== 'all' || selectedOwner !== 'all' || searchQuery !== '') && (
+            {(selectedType !== 'all' ||
+              selectedFreshness !== 'all' ||
+              selectedOwner !== 'all' ||
+              searchQuery !== '') && (
               <button
                 onClick={clearFilters}
                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -198,7 +202,9 @@ export function Knowledge() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-start gap-3 flex-1">
-                        <div className={`p-2 rounded-lg ${selectedItem?.id === item.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 group-hover:text-blue-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors'}`}>
+                        <div
+                          className={`p-2 rounded-lg ${selectedItem?.id === item.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 group-hover:text-blue-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors'}`}
+                        >
                           <FileText className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -234,7 +240,9 @@ export function Knowledge() {
                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] font-bold uppercase tracking-tighter rounded">
                           {t(`knowledge.types.${item.type}`)}
                         </span>
-                        <ChevronRight className={`w-5 h-5 text-gray-300 transition-transform ${selectedItem?.id === item.id ? 'translate-x-1 text-blue-500' : 'group-hover:translate-x-1 group-hover:text-gray-400'}`} />
+                        <ChevronRight
+                          className={`w-5 h-5 text-gray-300 transition-transform ${selectedItem?.id === item.id ? 'translate-x-1 text-blue-500' : 'group-hover:translate-x-1 group-hover:text-gray-400'}`}
+                        />
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
@@ -292,7 +300,7 @@ export function Knowledge() {
                     {selectedItem.title}
                   </h3>
                 </div>
-                <button 
+                <button
                   onClick={() => setSelectedItem(null)}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                 >
@@ -343,7 +351,7 @@ export function Knowledge() {
                   </h4>
                 </div>
                 <p className="text-sm text-blue-800/80 dark:text-blue-200/80 leading-relaxed italic">
-                  "{selectedItem.aiSummary}"
+                  &quot;{selectedItem.aiSummary}&quot;
                 </p>
                 <button className="mt-4 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                   <RefreshCw className="w-3 h-3" />
@@ -357,11 +365,18 @@ export function Knowledge() {
                 </h4>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold">
-                    {selectedItem.owner.split(' ').map(n => n[0]).join('')}
+                    {selectedItem.owner
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">{selectedItem.owner}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('knowledge.metadata.last_updated')}: {selectedItem.lastUpdated}</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                      {selectedItem.owner}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('knowledge.metadata.last_updated')}: {selectedItem.lastUpdated}
+                    </p>
                   </div>
                 </div>
               </div>
