@@ -6,8 +6,8 @@ interface User {
   username: string;
   email: string;
   primaryRole: string;
-  secondaryRoles: string[];
-  projects: string[];
+  secondaryRole: string;
+  project: string;
 }
 
 interface Project {
@@ -24,24 +24,24 @@ const mockUsers: User[] = [
     username: 'Max Mustermann',
     email: 'max.mustermann@example.com',
     primaryRole: 'Admin',
-    secondaryRoles: ['Project Manager'],
-    projects: ['Project Alpha', 'Project Beta'],
+    secondaryRole: 'Project Manager',
+    project: 'Project Alpha',
   },
   {
     id: '2',
     username: 'Anna Schmidt',
     email: 'anna.schmidt@example.com',
     primaryRole: 'Project Manager',
-    secondaryRoles: ['Member'],
-    projects: ['Project Gamma'],
+    secondaryRole: 'Member',
+    project: 'Project Gamma',
   },
   {
     id: '3',
     username: 'Tom Weber',
     email: 'tom.weber@example.com',
     primaryRole: 'Member',
-    secondaryRoles: [],
-    projects: ['Project Alpha', 'Project Delta'],
+    secondaryRole: '',
+    project: 'Project Alpha',
   },
 ];
 
@@ -227,8 +227,8 @@ export function Admin() {
                             />
                           </div>
                           <div className="text-gray-600 dark:text-gray-400 uppercase tracking-wide">User</div>
-                          <div className="text-gray-600 dark:text-gray-400 uppercase tracking-wide">Role</div>
-                          <div className="text-gray-600 dark:text-gray-400 uppercase tracking-wide">Projects</div>
+                          <div className="text-gray-600 dark:text-gray-400 uppercase tracking-wide">Roles</div>
+                          <div className="text-gray-600 dark:text-gray-400 uppercase tracking-wide">Project</div>
                           <div className="text-gray-600 dark:text-gray-400 text-right uppercase tracking-wide">Actions</div>
                         </div>
 
@@ -256,30 +256,25 @@ export function Admin() {
                                 </button>
                               </div>
                               <div className="flex flex-col justify-center gap-2">
-                      <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full w-fit ${roleColors[user.primaryRole] || roleColors['Member']}`}
-                      >
-                        {user.primaryRole}
-                      </span>
-                                {user.secondaryRoles && user.secondaryRoles.length > 0 && (
-                                    <div className="flex gap-2 flex-wrap">
-                                      {user.secondaryRoles.map((role, idx) => (
-                                          <span
-                                              key={idx}
-                                              className={`inline-flex items-center px-3 py-1 rounded-full ${roleColors[role] || roleColors['Member']}`}
-                                          >
-                              {role}
+                                <div className="flex gap-2 flex-wrap">
+                            <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full ${roleColors[user.primaryRole] || roleColors['Member']}`}
+                            >
+                              {user.primaryRole}
                             </span>
-                                      ))}
-                                    </div>
-                                )}
+                                  {user.secondaryRole && user.secondaryRole.trim() !== '' && (
+                                      <span
+                                          className={`inline-flex items-center px-3 py-1 rounded-full ${roleColors[user.secondaryRole] || roleColors['Member']}`}
+                                      >
+                                {user.secondaryRole}
+                              </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex flex-col justify-center gap-1">
-                                {user.projects && user.projects.map((project, idx) => (
-                                    <span key={idx} className="text-gray-900 dark:text-white">
-                          {project}
-                        </span>
-                                ))}
+                              <div className="flex items-center">
+                          <span className="text-gray-900 dark:text-white">
+                            {user.project && user.project.trim() !== '' ? user.project : 'No project'}
+                          </span>
                               </div>
                               <div className="flex items-center justify-end gap-2">
                                 <button
@@ -317,8 +312,8 @@ export function Admin() {
                                             key={idx}
                                             className={`px-4 py-1.5 rounded-full ${getTagColor(idx)}`}
                                         >
-                              {tag}
-                            </span>
+                                  {tag}
+                                </span>
                                     ))}
                                   </div>
                                   <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{project.description}</p>
@@ -422,37 +417,43 @@ export function Admin() {
                   )}
                 </div>
                 <div>
-                  <label className="block mb-3 text-gray-600 dark:text-gray-400 uppercase tracking-wide">Secondary Roles</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {userPanel.user.secondaryRoles && userPanel.user.secondaryRoles.map((role, idx) => (
-                        <span
-                            key={idx}
-                            className={`inline-flex items-center px-4 py-1.5 rounded-full ${roleColors[role] || roleColors['Member']}`}
-                        >
-                    {role}
-                  </span>
-                    ))}
-                    {userPanel.isEditing && (
-                        <button className="px-4 py-1.5 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors">
-                          + Add
-                        </button>
-                    )}
-                  </div>
+                  <label className="block mb-3 text-gray-600 dark:text-gray-400 uppercase tracking-wide">Secondary Role</label>
+                  {userPanel.isEditing ? (
+                      <select
+                          defaultValue={userPanel.user.secondaryRole}
+                          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        <option value="">None</option>
+                        <option>Admin</option>
+                        <option>Project Manager</option>
+                        <option>Member</option>
+                        <option>HR</option>
+                        <option>New Member</option>
+                      </select>
+                  ) : (
+                      <span
+                          className={`inline-flex items-center px-4 py-1.5 rounded-full ${userPanel.user.secondaryRole ? roleColors[userPanel.user.secondaryRole] || roleColors['Member'] : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
+                      >
+                  {userPanel.user.secondaryRole || 'None'}
+                </span>
+                  )}
                 </div>
                 <div>
-                  <label className="block mb-3 text-gray-600 dark:text-gray-400 uppercase tracking-wide">Projects</label>
-                  <div className="space-y-2">
-                    {userPanel.user.projects && userPanel.user.projects.map((project, idx) => (
-                        <div key={idx} className="px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white">
-                          {project}
-                        </div>
-                    ))}
-                    {userPanel.isEditing && (
-                        <button className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors">
-                          + Assign Project
-                        </button>
-                    )}
-                  </div>
+                  <label className="block mb-3 text-gray-600 dark:text-gray-400 uppercase tracking-wide">Project</label>
+                  {userPanel.isEditing ? (
+                      <select
+                          defaultValue={userPanel.user.project}
+                          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        <option value="">None</option>
+                        <option>Project Alpha</option>
+                        <option>Project Beta</option>
+                        <option>Project Gamma</option>
+                        <option>Project Delta</option>
+                      </select>
+                  ) : (
+                      <div className="text-gray-900 dark:text-white px-1">{userPanel.user.project || 'None'}</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -542,7 +543,7 @@ export function Admin() {
                   )}
                 </div>
                 <div>
-                  <label className="block mb-3 text-gray-600 dark:text-gray-400 uppercase tracking-wide">Artifacts & Sources</label>
+                  <label className="block mb-3 text-gray-600 dark:text-gray-400 uppercase tracking-wide">Sources</label>
                   <div className="space-y-2">
                     {projectPanel.project.artifacts && projectPanel.project.artifacts.map((artifact, idx) => (
                         <button
@@ -557,7 +558,7 @@ export function Admin() {
                     {projectPanel.isEditing && (
                         <button className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors flex items-center justify-center gap-2">
                           <Plus size={18} />
-                          <span>Add Artifact</span>
+                          <span>Add Source</span>
                         </button>
                     )}
                   </div>
