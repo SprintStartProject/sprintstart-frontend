@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 
 interface Message {
   id: string;
@@ -40,6 +41,7 @@ const TIMEFILTERS = [
 
 export function ChatHome() {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Use a state to store the base time to ensure purity during render
   const [baseTime] = useState(() => Date.now());

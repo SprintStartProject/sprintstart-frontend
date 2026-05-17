@@ -360,6 +360,7 @@ export default function SystemLogs() {
                   Trace user actions, source changes, exports, and security-relevant events
                 </p>
               </div>
+            </div>
 
               <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 lg:w-auto">
                 <select
@@ -450,6 +451,8 @@ export default function SystemLogs() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
               <div className="bg-white dark:bg-gray-900 p-3 sm:p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex gap-2 p-1 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-x-auto w-full xl:w-auto">
@@ -488,6 +491,8 @@ export default function SystemLogs() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
               <div className="bg-[#0d1117] rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
                 <div className="bg-[#161b22] px-4 sm:px-6 py-3 border-b border-gray-800 flex items-center justify-between gap-3">
@@ -530,22 +535,22 @@ export default function SystemLogs() {
                           actor={log.actor}; source={log.source}; result={log.result}; id={log.id}
                         </span>
                       </span>
-                        </div>
-                      </button>
-                  ))}
+                    </span>
+                  </div>
+                </button>
+              ))}
 
-                  <motion.div
-                      animate={{ opacity: [1, 0.4, 1] }}
-                      transition={{ repeat: Infinity, duration: 1 }}
-                      className="flex gap-4 px-2"
-                  >
-                    <span className="text-blue-500">_</span>
-                  </motion.div>
-                </div>
-              </div>
+              <motion.div
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ repeat: Infinity, duration: 1 }}
+                className="flex gap-4 px-2"
+              >
+                <span className="text-blue-500">_</span>
+              </motion.div>
             </div>
-          </main>
-        </div>
+          </div>
+        </main>
+      </div>
 
         {selectedLog && (
             <>

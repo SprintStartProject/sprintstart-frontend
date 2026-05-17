@@ -1,3 +1,4 @@
+import { useRole } from '../../context/RoleContext';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
   const { theme } = useTheme();
+  const { role } = useRole();
 
   const [activeFilter, setActiveFilter] = useState(0);
   const [activeSrc, setActiveSrc] = useState(0);
@@ -19,6 +21,7 @@ export function Dashboard() {
 
   const isGerman = i18n.language.startsWith('de');
   const isDark = theme === 'dark';
+  const isManagerView = role === 'Project Manager' || role === 'Show all';
 
   const copy = isGerman
     ? {
@@ -216,52 +219,55 @@ export function Dashboard() {
     ? ['Kickoff', 'Docs lesen', 'Erstes PR', 'Code Review', 'Abschluss']
     : ['Kickoff', 'Read docs', 'First PR', 'Code review', 'Wrap-up'];
 
-  const members = [
-    {
-      initials: 'LM',
-      name: 'Lisa Müller',
-      role: isGerman ? 'Frontend Entwicklerin' : 'Frontend Engineer',
-      pct: 35,
-      color: '#3B82F6',
-      step: 1,
-      daysSince: 12,
-      startDate: '2026-05-02',
-      link: '/onboarding',
-    },
-    {
-      initials: 'TK',
-      name: 'Tom Koch',
-      role: isGerman ? 'Backend Entwickler' : 'Backend Engineer',
-      pct: 72,
-      color: '#14B8A6',
-      step: 3,
-      daysSince: 8,
-      startDate: '2026-05-06',
-      link: '/onboarding',
-    },
-    {
-      initials: 'SR',
-      name: 'Sara Ruiz',
-      role: 'PM',
-      pct: 58,
-      color: '#8B5CF6',
-      step: 2,
-      daysSince: 5,
-      startDate: '2026-05-09',
-      link: '/onboarding',
-    },
-    {
-      initials: 'JB',
-      name: 'Jan Berger',
-      role: 'DevOps',
-      pct: 12,
-      color: '#F59E0B',
-      step: 0,
-      daysSince: 3,
-      startDate: '2026-05-11',
-      link: '/onboarding',
-    },
-  ];
+  const members = useMemo(
+    () => [
+      {
+        initials: 'LM',
+        name: 'Lisa Müller',
+        role: isGerman ? 'Frontend Entwicklerin' : 'Frontend Engineer',
+        pct: 35,
+        color: '#3B82F6',
+        step: 1,
+        daysSince: 12,
+        startDate: '2026-05-02',
+        link: '/onboarding',
+      },
+      {
+        initials: 'TK',
+        name: 'Tom Koch',
+        role: isGerman ? 'Backend Entwickler' : 'Backend Engineer',
+        pct: 72,
+        color: '#14B8A6',
+        step: 3,
+        daysSince: 8,
+        startDate: '2026-05-06',
+        link: '/onboarding',
+      },
+      {
+        initials: 'SR',
+        name: 'Sara Ruiz',
+        role: 'PM',
+        pct: 58,
+        color: '#8B5CF6',
+        step: 2,
+        daysSince: 5,
+        startDate: '2026-05-09',
+        link: '/onboarding',
+      },
+      {
+        initials: 'JB',
+        name: 'Jan Berger',
+        role: 'DevOps',
+        pct: 12,
+        color: '#F59E0B',
+        step: 0,
+        daysSince: 3,
+        startDate: '2026-05-11',
+        link: '/onboarding',
+      },
+    ],
+    [isGerman],
+  );
 
   const C = isDark
     ? {
@@ -316,7 +322,7 @@ export function Dashboard() {
       }
       return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
-  }, [onboardingSort, isGerman]);
+  }, [onboardingSort, members]);
 
   return (
     <div
@@ -944,196 +950,216 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 2,
-          overflow: 'hidden',
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          borderRadius: 28,
-          padding: 22,
-          boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: -60,
-            right: -60,
-            width: 200,
-            height: 200,
-            borderRadius: '50%',
-            background: 'rgba(59,130,246,0.07)',
-            filter: 'blur(80px)',
-          }}
-        />
-
+      {isManagerView && (
         <div
           style={{
             position: 'relative',
             zIndex: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            marginBottom: 20,
-            flexWrap: 'wrap',
+            overflow: 'hidden',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 28,
+            padding: 22,
+            boxShadow: isDark ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : '0 8px 25px rgba(15,23,42,0.05)',
           }}
         >
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{copy.sections.onboarding}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: C.sub }}>{copy.labels.sortBy}</span>
-            <button
-              onClick={() => setOnboardingSort('progress')}
-              style={{
-                border: `1px solid ${onboardingSort === 'progress' ? `${C.blue}66` : C.border}`,
-                borderRadius: 999,
-                background: onboardingSort === 'progress' ? C.blueSoft : C.surface,
-                color: onboardingSort === 'progress' ? C.blue : C.sub,
-                fontSize: 11,
-                padding: '5px 10px',
-                cursor: 'pointer',
-              }}
-            >
-              {copy.labels.sortProgress}
-            </button>
-            <button
-              onClick={() => setOnboardingSort('startDate')}
-              style={{
-                border: `1px solid ${onboardingSort === 'startDate' ? `${C.blue}66` : C.border}`,
-                borderRadius: 999,
-                background: onboardingSort === 'startDate' ? C.blueSoft : C.surface,
-                color: onboardingSort === 'startDate' ? C.blue : C.sub,
-                fontSize: 11,
-                padding: '5px 10px',
-                cursor: 'pointer',
-              }}
-            >
-              {copy.labels.sortStartDate}
-            </button>
-          </div>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 14,
-          }}
-        >
-          {sortedMembers.map((m) => (
-            <a key={m.name} href={m.link} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div
+          <div
+            style={{
+              position: 'absolute',
+              top: -60,
+              right: -60,
+              width: 200,
+              height: 200,
+              borderRadius: '50%',
+              background: 'rgba(59,130,246,0.07)',
+              filter: 'blur(80px)',
+            }}
+          />
+
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 20,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{copy.sections.onboarding}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: C.sub }}>{copy.labels.sortBy}</span>
+              <button
+                onClick={() => setOnboardingSort('progress')}
                 style={{
-                  background: C.surface2,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 22,
-                  padding: 18,
+                  border: `1px solid ${onboardingSort === 'progress' ? `${C.blue}66` : C.border}`,
+                  borderRadius: 999,
+                  background: onboardingSort === 'progress' ? C.blueSoft : C.surface,
+                  color: onboardingSort === 'progress' ? C.blue : C.sub,
+                  fontSize: 11,
+                  padding: '5px 10px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = `${m.color}55`;
-                  e.currentTarget.style.background = C.hoverCard;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = C.border;
-                  e.currentTarget.style.background = C.surface2;
                 }}
               >
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '50%',
-                      flexShrink: 0,
-                      background: `${m.color}22`,
-                      color: m.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      border: `1.5px solid ${m.color}44`,
-                    }}
-                  >
-                    {m.initials}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: C.sub }}>{m.role}</div>
-                  </div>
-                </div>
-
+                {copy.labels.sortProgress}
+              </button>
+              <button
+                onClick={() => setOnboardingSort('startDate')}
+                style={{
+                  border: `1px solid ${onboardingSort === 'startDate' ? `${C.blue}66` : C.border}`,
+                  borderRadius: 999,
+                  background: onboardingSort === 'startDate' ? C.blueSoft : C.surface,
+                  color: onboardingSort === 'startDate' ? C.blue : C.sub,
+                  fontSize: 11,
+                  padding: '5px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                {copy.labels.sortStartDate}
+              </button>
+            </div>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 14,
+            }}
+          >
+            {sortedMembers.map((m) => (
+              <a key={m.name} href={m.link} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
-                    borderRadius: 999,
-                    padding: '3px 9px',
-                    fontSize: 10,
-                    color: C.sub,
-                    marginBottom: 14,
+                    background: C.surface2,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 22,
+                    padding: 18,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = `${m.color}55`;
+                    e.currentTarget.style.background = C.hoverCard;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.background = C.surface2;
                   }}
                 >
-                  <span style={{ opacity: 0.6 }}>⏱</span> {copy.labels.sinceDays} {m.daysSince} {copy.labels.days} •{' '}
-                  {copy.labels.started}{' '}
-                  {new Date(m.startDate).toLocaleDateString(isGerman ? 'de-DE' : 'en-US', {
-                    day: '2-digit',
-                    month: 'short',
-                  })}
-                </div>
-
-                <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-                  {onboardingSteps.map((step, si) => (
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
                     <div
-                      key={step}
-                      title={step}
                       style={{
-                        flex: 1,
-                        height: 5,
-                        borderRadius: 999,
-                        background:
-                          si < m.step
-                            ? m.color
-                            : si === m.step
-                              ? `${m.color}99`
-                              : isDark
-                                ? 'rgba(255,255,255,0.07)'
-                                : '#DDE6F2',
-                        transition: 'background 0.2s',
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        background: `${m.color}22`,
+                        color: m.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        border: `1.5px solid ${m.color}44`,
                       }}
-                    />
-                  ))}
-                </div>
+                    >
+                      {m.initials}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: C.sub }}>{m.role}</div>
+                    </div>
+                  </div>
 
-                <div style={{ fontSize: 10, color: C.sub, marginBottom: 10 }}>
-                  {copy.labels.step} {m.step + 1}/5: <span style={{ color: m.color }}>{onboardingSteps[m.step]}</span>
-                </div>
-
-                <div style={{ height: 5, background: isDark ? '#0A0F1A' : '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
                   <div
                     style={{
-                      width: `${m.pct}%`,
-                      height: '100%',
-                      background: `linear-gradient(90deg, ${m.color}, ${m.color}BB)`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
+                      borderRadius: 999,
+                      padding: '3px 9px',
+                      fontSize: 10,
+                      color: C.sub,
+                      marginBottom: 14,
                     }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 10, color: C.sub }}>
-                  <span>{copy.labels.total}</span>
-                  <span style={{ color: m.color }}>{m.pct}%</span>
-                </div>
+                  >
+                    <span style={{ opacity: 0.6 }}>⏱</span> {copy.labels.sinceDays} {m.daysSince} {copy.labels.days} •{' '}
+                    {copy.labels.started}{' '}
+                    {new Date(m.startDate).toLocaleDateString(isGerman ? 'de-DE' : 'en-US', {
+                      day: '2-digit',
+                      month: 'short',
+                    })}
+                  </div>
 
-                <div style={{ marginTop: 12, fontSize: 10, color: C.blue, opacity: 0.8 }}>{copy.labels.detailView}</div>
-              </div>
-            </a>
-          ))}
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                    {onboardingSteps.map((step, si) => (
+                      <div
+                        key={step}
+                        title={step}
+                        style={{
+                          flex: 1,
+                          height: 5,
+                          borderRadius: 999,
+                          background:
+                            si < m.step
+                              ? m.color
+                              : si === m.step
+                                ? `${m.color}99`
+                                : isDark
+                                  ? 'rgba(255,255,255,0.07)'
+                                  : '#DDE6F2',
+                          transition: 'background 0.2s',
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: 10, color: C.sub, marginBottom: 10 }}>
+                    {copy.labels.step} {m.step + 1}/5:{' '}
+                    <span style={{ color: m.color }}>{onboardingSteps[m.step]}</span>
+                  </div>
+
+                  <div
+                    style={{
+                      height: 5,
+                      background: isDark ? '#0A0F1A' : '#E2E8F0',
+                      borderRadius: 999,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${m.pct}%`,
+                        height: '100%',
+                        background: `linear-gradient(90deg, ${m.color}, ${m.color}BB)`,
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: 5,
+                      fontSize: 10,
+                      color: C.sub,
+                    }}
+                  >
+                    <span>{copy.labels.total}</span>
+                    <span style={{ color: m.color }}>{m.pct}%</span>
+                  </div>
+
+                  <div style={{ marginTop: 12, fontSize: 10, color: C.blue, opacity: 0.8 }}>
+                    {copy.labels.detailView}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

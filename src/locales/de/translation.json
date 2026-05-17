@@ -4,12 +4,10 @@
     "onboarding": "Mein Onboarding",
     "knowledge": "Wissensdatenbank",
     "profile": "Profil",
-    "team_dashboard": "Team-Dashboard",
+    "dashboard": "Dashboard",
     "knowledge_quality": "Wissensqualität",
     "handover": "Übergabemanagement",
-    "global_onboarding": "Globales Onboarding",
     "skill_gaps": "Kompetenzlücken",
-    "statistics": "Statistiken",
     "access_management": "Zugriffsverwaltung",
     "data_ingestion": "Datenaufnahme",
     "system_logs": "Systemprotokolle"
@@ -41,7 +39,7 @@
       },
       {
         "role": "assistant",
-        "content": "Um das Backend im Production-Cluster zu deployen, folge diesen Schritten gemäß unserer Standard Operating Procedure:\n\n1. **Environment Setup**: Stelle sicher, dass deine AWS CLI mit dem Profil `production-admin` konfiguriert ist.\n2. **Build & Tag**: Führe das Build-Skript aus und tagge es mit der aktuellen semantischen Version.\n   ```bash\n   pnpm build && docker build -t backend:v2.4.0 .\n   ```\n3. **Push to ECR**: Authentifiziere dich bei Docker für unsere private Registry und pushe das Image.\n4. **ECS Update**: Nutze den Befehl `aws ecs update-service`, um ein Rolling Deployment auszulösen.\n\nVerifiziere nach dem Deployment immer den Health-Check-Status im CloudWatch Dashboard.",
+        "content": "Um das Backend im Production-Cluster zu deployen, folge diesen Schritten gemäß unserer Standard Operating Procedure:\n\n1. **Environment Setup**: Stelle sicher, dass deine AWS CLI mit dem Profil `production-admin` konfiguriert ist.\n2. **Build & Tag**: Führe das Build-Skript aus und tagge es mit der aktuellen semantischen Version.\n   ```bash\n   pnpm build && docker build -t backend:v2.4.0 .\n   ```\n3. **Push to ECR**: Authentiziere dich bei Docker für unsere private Registry und pushe das Image.\n4. **ECS Update**: Nutze den Befehl `aws ecs update-service`, um ein Rolling Deployment auszulösen.\n\nVerifiziere nach dem Deployment immer den Health-Check-Status im CloudWatch Dashboard.",
         "citations": [
           { "id": "rb-01", "title": "Backend Deployment Guide", "type": "Runbook" },
           { "id": "doc-42", "title": "AWS Cluster Konfiguration", "type": "Dokumentation" },
@@ -190,6 +188,68 @@
       "share": "Teilen",
       "request_update": "Update anfordern",
       "summarize": "KI-Zusammenfassung"
+    }
+  },
+  "handover": {
+    "title": "Übergabe & Wissenssicherung",
+    "subtitle": "Kritisches Wissen, Runbooks und Ownership-Dokumentation",
+    "export_button": "Übergabepaket exportieren",
+    "critical_alert": "Kritische Übergabe erforderlich",
+    "items_need_attention": "{{count}} Eintrag benötigt sofortige Aufmerksamkeit.",
+    "items_need_attention_plural": "{{count}} Einträge benötigen sofortige Aufmerksamkeit.",
+    "stats": {
+      "total": "Gesamtanzahl",
+      "current": "Aktuell",
+      "stale": "Veraltet",
+      "critical": "Kritisch"
+    },
+    "filters": {
+      "all": "Alle Einträge"
+    },
+    "types": {
+      "Runbook": "Runbook",
+      "ADR": "ADR",
+      "Ownership Doc": "Ownership-Dok.",
+      "Process Guide": "Prozessleitfaden"
+    },
+    "status": {
+      "current": "Aktuell",
+      "stale": "Veraltet",
+      "critical": "Kritisch"
+    },
+    "actions": {
+      "view": "Ansehen",
+      "view_document": "Dokument ansehen"
+    }
+  },
+  "skill_gaps": {
+    "title": "Kompetenzlücken-Analyse",
+    "subtitle": "Identifizierung und Überbrückung von Lücken zwischen aktuellen und Ziel-Teamfähigkeiten",
+    "priority_title": "Priorität: {{skill}} Training",
+    "priority_desc": "{{count}} Teammitglieder liegen derzeit unter der erforderlichen Kompetenz für unsere bevorstehende Migration.",
+    "actions": {
+      "start_training": "Trainingspfad starten",
+      "view_curriculums": "Lehrpläne ansehen",
+      "mitigate": "Maßnahmen ergreifen"
+    },
+    "stats": {
+      "org_proficiency": "Org-Kompetenz"
+    },
+    "table": {
+      "skill_category": "Kompetenz & Kategorie",
+      "proficiency_gap": "Kompetenzlücke",
+      "affected_users": "Betroffene Nutzer",
+      "status": "Status",
+      "action": "Aktion",
+      "current": "Aktuell",
+      "target": "Ziel",
+      "current_progress": "Aktueller Fortschritt",
+      "members_affected": "{{count}} Mitglieder betroffen"
+    },
+    "status": {
+      "Critical": "Kritisch",
+      "Warning": "Warnung",
+      "Stable": "Stabil"
     }
   }
 }
