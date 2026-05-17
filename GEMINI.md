@@ -6,10 +6,11 @@ SprintStart is a visually-driven React prototype designed to streamline team onb
 
 - **Purpose:** A centralized hub for team onboarding (Day 1, Week 1, Month 1), knowledge base access, and role-specific dashboards.
 - **Key Features:**
+  - **Knowledge Explorer:** Advanced document management with AI-generated summaries, freshness tracking (Current/Stale/Outdated), and smooth animated previews.
   - **AI Assistant:** Chat-based interface for querying internal documentation, runbooks, and ADRs.
   - **Multi-language Support (i18n):** Full support for English (Default) and German (DE) across the interface and mock content.
-  - **Role-Based Views:** Tailored experiences for Project Members, Project Managers, HR, and Admins.
-  - **Onboarding Tracking:** Progress monitoring through personalized milestones.
+  - **Role-Based Views:** Tailored experiences for New Project Members, Existing Project Members, Project Managers, HR, and Admins.
+  - **Onboarding Tracking:** Progress monitoring through personalized milestones, exclusive to New Project Members.
   - **Knowledge Quality:** Analytics on content freshness and engagement.
   - **Handover Management:** Tools for smooth knowledge transfers during transitions.
 - **Tech Stack:**
@@ -40,6 +41,7 @@ SprintStart is a visually-driven React prototype designed to streamline team onb
 ## Internationalization (i18n)
 
 The project uses `i18next` and `react-i18next` for translations.
+
 - **Language Switcher:** Located in the Sidebar footer.
 - **Translation Files:** Found in `src/locales/`.
 - **Default Language:** English (EN).
@@ -66,7 +68,13 @@ The project uses `i18next` and `react-i18next` for translations.
 - **Styling:** Utility-first CSS using Tailwind.
 - **Icons:** Use `lucide-react` for all system icons.
 - **Routing:** Centralized routing in `src/app/App.tsx` using `createBrowserRouter`.
-- **Role Simulation:** The application uses `RoleContext` to simulate different user perspectives (Project Member, Manager, HR, Admin).
+- **Role Simulation:** The application uses `RoleContext` to simulate different user perspectives. Switching roles via the Sidebar resets the navigation to the main Chat screen (`/`).
+- **Role Permissions:**
+  - **New Project Member**: Access to Base Zone + Onboarding.
+  - **Existing Project Member**: Access to Base Zone only.
+  - **Project Manager**: Access to Base Zone + PM Zone.
+  - **HR**: Access to Base Zone + HR Zone.
+  - **Admin**: Access to Base Zone + Admin Zone.
 - **AI UI:** The `ChatHome` component follows a specific layout for messages, citations, and filtering.
 
 ## Design Resources
