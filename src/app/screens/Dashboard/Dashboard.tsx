@@ -9,13 +9,14 @@ type Severity = 'critical' | 'medium';
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+    typeof window !== 'undefined'
+      ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches
+      : false
   );
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
-    setIsMobile(mq.matches);
     return () => mq.removeEventListener('change', handler);
   }, [breakpoint]);
   return isMobile;
@@ -188,12 +189,12 @@ export function Dashboard() {
     ? ['Kickoff', 'Docs lesen', 'Erstes PR', 'Code Review', 'Abschluss']
     : ['Kickoff', 'Read docs', 'First PR', 'Code review', 'Wrap-up'];
 
-  const members = [
+  const members = useMemo(() => [
     { initials: 'LM', name: 'Lisa Müller', role: isGerman ? 'Frontend Entwicklerin' : 'Frontend Engineer', pct: 35, color: '#3B82F6', step: 1, daysSince: 12, startDate: '2026-05-02', link: '/onboarding' },
     { initials: 'TK', name: 'Tom Koch', role: isGerman ? 'Backend Entwickler' : 'Backend Engineer', pct: 72, color: '#14B8A6', step: 3, daysSince: 8, startDate: '2026-05-06', link: '/onboarding' },
     { initials: 'SR', name: 'Sara Ruiz', role: 'PM', pct: 58, color: '#8B5CF6', step: 2, daysSince: 5, startDate: '2026-05-09', link: '/onboarding' },
     { initials: 'JB', name: 'Jan Berger', role: 'DevOps', pct: 12, color: '#F59E0B', step: 0, daysSince: 3, startDate: '2026-05-11', link: '/onboarding' },
-  ];
+  ], [isGerman]);
 
   const C = isDark
     ? { bg: '#000000', surface: '#0D1117', surface2: '#111827', surface3: '#0A0F1A', border: '#1F2937', text: '#F9FAFB', sub: '#9CA3AF', blue: '#3B82F6', blueSoft: 'rgba(59,130,246,0.12)', green: '#22C55E', amber: '#F59E0B', red: '#EF4444', purple: '#8B5CF6', teal: '#14B8A6', hoverCard: '#161f2e' }

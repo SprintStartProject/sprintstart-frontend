@@ -34,10 +34,10 @@ export const navigationItems: NavItem[] = [
     section: 'base',
   },
   {
-    id: 'team-dashboard',
+    id: 'dashboard',
     label: 'Dashboard',
     icon: BarChart3,
-    path: '/team-dashboard',
+    path: '/dashboard',
     roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
     section: 'base',
   },
@@ -47,14 +47,6 @@ export const navigationItems: NavItem[] = [
     icon: Rocket,
     path: '/onboarding',
     roles: ['New Project Member'],
-    section: 'base',
-  },
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: BarChart3,
-    path: '/dashboard',
-    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
     section: 'base',
   },
   {
