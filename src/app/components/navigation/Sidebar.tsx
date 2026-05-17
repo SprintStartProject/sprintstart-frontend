@@ -91,9 +91,6 @@ function SidebarContent({
           <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight leading-none">
             SprintStart
           </h1>
-          <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 tracking-widest mt-1">
-            AI OS for Teams
-          </p>
         </div>
       </div>
 
