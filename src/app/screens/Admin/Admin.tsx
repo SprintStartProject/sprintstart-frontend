@@ -27,23 +27,6 @@ interface Project {
   artifacts: string[];
 }
 
-const roleColors: Record<string, string> = {
-  'Admin': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  'Project Manager': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  'HR': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  'Member': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  'New Member': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-};
-
-const tagColors = [
-  'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-  'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-  'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-  'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-  'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-];
-
 const mockUsers: User[] = [
   {
     id: '1',
