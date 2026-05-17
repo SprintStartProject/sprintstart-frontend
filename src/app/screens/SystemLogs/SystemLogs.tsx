@@ -33,118 +33,238 @@ interface AuditEntry {
   fields: string[];
 }
 
-const MOCK_AUDIT_LOGS: AuditEntry[] = [
+interface ProjectLogs {
+  id: string;
+  name: string;
+  logs: AuditEntry[];
+}
+
+const PROJECT_LOGS: ProjectLogs[] = [
   {
-    id: 'AUD-10492',
-    timestamp: '2026-05-10 14:21:08',
-    level: 'info',
-    service: 'INGESTION',
-    action: 'Manual ingestion run started',
-    actor: 'Max Mustermann',
-    role: 'Admin',
-    source: 'GitHub',
-    target: 'Frontend GitHub Repository',
-    result: 'Completed',
-    ipAddress: '192.168.178.24',
-    message: 'GitHub source synced successfully. 8 artifacts created, 34 updated, 0 failed.',
-    details: 'The repository scope was fetched, content was extracted, metadata was enriched and the artifacts were indexed for chatbot retrieval.',
-    fields: ['createdArtifacts', 'updatedArtifacts', 'lastSync', 'indexVersion'],
+    id: 'project-alpha',
+    name: 'Project Alpha',
+    logs: [
+      {
+        id: 'ALPHA-10492',
+        timestamp: '2026-05-10 14:21:08',
+        level: 'info',
+        service: 'INGESTION',
+        action: 'Manual ingestion run started',
+        actor: 'Max Mustermann',
+        role: 'Admin',
+        source: 'GitHub',
+        target: 'Frontend GitHub Repository',
+        result: 'Completed',
+        ipAddress: '192.168.178.24',
+        message: 'GitHub source synced successfully. 8 artifacts created, 34 updated, 0 failed.',
+        details: 'The repository scope was fetched, content was extracted, metadata was enriched and the artifacts were indexed for chatbot retrieval.',
+        fields: ['createdArtifacts', 'updatedArtifacts', 'lastSync', 'indexVersion'],
+      },
+      {
+        id: 'ALPHA-10491',
+        timestamp: '2026-05-10 14:08:42',
+        level: 'info',
+        service: 'EXPORT',
+        action: 'Ingestion report exported',
+        actor: 'Anna Schmidt',
+        role: 'Project Manager',
+        source: 'All Sources',
+        target: 'Monthly Source Quality Report',
+        result: 'Completed',
+        ipAddress: '192.168.178.31',
+        message: 'CSV export generated for source quality metrics from 2026-04-01 to 2026-05-10.',
+        details: 'The export contains source status, artifact counts, sync errors, stale artifacts and failed ingestion runs.',
+        fields: ['reportType', 'dateRange', 'exportFormat'],
+      },
+      {
+        id: 'ALPHA-10490',
+        timestamp: '2026-05-10 13:55:17',
+        level: 'warn',
+        service: 'CONFIG',
+        action: 'Source scope changed',
+        actor: 'Max Mustermann',
+        role: 'Admin',
+        source: 'Jira',
+        target: 'Jira Project Board',
+        result: 'Allowed',
+        ipAddress: '192.168.178.24',
+        message: 'Scope changed from SPRINT tickets to SPRINT, ONB and FE tickets.',
+        details: 'This affects which Jira issues, comments and sprint metadata become available to the chatbot and onboarding path generator.',
+        fields: ['allowedProjects', 'issueTypes', 'commentsIncluded'],
+      },
+      {
+        id: 'ALPHA-10489',
+        timestamp: '2026-05-10 13:49:03',
+        level: 'error',
+        service: 'INGESTION',
+        action: 'Scheduled ingestion failed',
+        actor: 'System',
+        role: 'Service Account',
+        source: 'SonarQube',
+        target: 'SonarQube Quality Reports',
+        result: 'Failed',
+        ipAddress: 'system',
+        message: 'Access token expired. Quality reports could not be indexed for the current run.',
+        details: 'Quality gates, code smells, vulnerabilities and coverage metrics are currently stale until the token is renewed.',
+        fields: ['tokenStatus', 'failedArtifacts', 'lastError'],
+      },
+      {
+        id: 'ALPHA-10488',
+        timestamp: '2026-05-10 13:41:29',
+        level: 'security',
+        service: 'SECURITY',
+        action: 'Restricted artifact access blocked',
+        actor: 'Tom Weber',
+        role: 'Member',
+        source: 'Confluence',
+        target: 'Security Incident Runbook',
+        result: 'Blocked',
+        ipAddress: '192.168.178.44',
+        message: 'User attempted to open an artifact outside of assigned project scope.',
+        details: 'The request was blocked because the artifact requires Security Team or Admin access. No data was exposed to the user.',
+        fields: ['artifactId', 'requiredRole', 'userRole', 'projectScope'],
+      },
+    ],
   },
   {
-    id: 'AUD-10491',
-    timestamp: '2026-05-10 14:08:42',
-    level: 'info',
-    service: 'EXPORT',
-    action: 'Ingestion report exported',
-    actor: 'Anna Schmidt',
-    role: 'Project Manager',
-    source: 'All Sources',
-    target: 'Monthly Source Quality Report',
-    result: 'Completed',
-    ipAddress: '192.168.178.31',
-    message: 'CSV export generated for source quality metrics from 2026-04-01 to 2026-05-10.',
-    details: 'The export contains source status, artifact counts, sync errors, stale artifacts and failed ingestion runs.',
-    fields: ['reportType', 'dateRange', 'exportFormat'],
+    id: 'project-beta',
+    name: 'Project Beta',
+    logs: [
+      {
+        id: 'BETA-8821',
+        timestamp: '2026-05-10 15:04:33',
+        level: 'info',
+        service: 'INGESTION',
+        action: 'Scheduled sync completed',
+        actor: 'System',
+        role: 'Service Account',
+        source: 'SharePoint',
+        target: 'Product SharePoint Docs',
+        result: 'Completed',
+        ipAddress: 'system',
+        message: 'Product documentation synced. 5 artifacts created, 18 updated, 0 failed.',
+        details: 'Product docs, support playbooks, customer FAQs and release notes were refreshed and indexed.',
+        fields: ['createdArtifacts', 'updatedArtifacts', 'lastSync'],
+      },
+      {
+        id: 'BETA-8820',
+        timestamp: '2026-05-10 14:52:19',
+        level: 'warn',
+        service: 'ACCESS',
+        action: 'High request volume detected',
+        actor: 'System',
+        role: 'Service Account',
+        source: 'Gateway',
+        target: 'Customer Portal Chat Endpoint',
+        result: 'Allowed',
+        ipAddress: 'system',
+        message: 'Request volume exceeded usual baseline but remained below rate limit threshold.',
+        details: 'The system observed increased chatbot traffic for customer portal onboarding questions.',
+        fields: ['requestRate', 'baseline', 'threshold'],
+      },
+      {
+        id: 'BETA-8819',
+        timestamp: '2026-05-10 14:39:07',
+        level: 'info',
+        service: 'CONFIG',
+        action: 'Artifact freshness threshold updated',
+        actor: 'Nina Bauer',
+        role: 'Project Manager',
+        source: 'System',
+        target: 'Customer Portal Knowledge Settings',
+        result: 'Allowed',
+        ipAddress: '192.168.178.51',
+        message: 'Stale artifact threshold changed from 180 days to 120 days.',
+        details: 'Artifacts older than 120 days are now highlighted in dashboards and onboarding recommendations.',
+        fields: ['freshnessThreshold', 'knowledgeQualityRules'],
+      },
+      {
+        id: 'BETA-8818',
+        timestamp: '2026-05-10 14:12:44',
+        level: 'security',
+        service: 'SECURITY',
+        action: 'Export permission denied',
+        actor: 'Chris Klein',
+        role: 'Member',
+        source: 'All Sources',
+        target: 'Customer Portal Report Export',
+        result: 'Blocked',
+        ipAddress: '192.168.178.62',
+        message: 'User attempted to export a report without sufficient permissions.',
+        details: 'Only Admin and Project Manager roles may export cross-source reports for this project.',
+        fields: ['requiredRole', 'userRole', 'exportType'],
+      },
+    ],
   },
   {
-    id: 'AUD-10490',
-    timestamp: '2026-05-10 13:55:17',
-    level: 'warn',
-    service: 'CONFIG',
-    action: 'Source scope changed',
-    actor: 'Max Mustermann',
-    role: 'Admin',
-    source: 'Jira',
-    target: 'Jira Project Board',
-    result: 'Allowed',
-    ipAddress: '192.168.178.24',
-    message: 'Scope changed from SPRINT tickets to SPRINT, ONB and FE tickets.',
-    details: 'This affects which Jira issues, comments and sprint metadata become available to the chatbot and onboarding path generator.',
-    fields: ['allowedProjects', 'issueTypes', 'commentsIncluded'],
-  },
-  {
-    id: 'AUD-10489',
-    timestamp: '2026-05-10 13:49:03',
-    level: 'error',
-    service: 'INGESTION',
-    action: 'Scheduled ingestion failed',
-    actor: 'System',
-    role: 'Service Account',
-    source: 'SonarQube',
-    target: 'SonarQube Quality Reports',
-    result: 'Failed',
-    ipAddress: 'system',
-    message: 'Access token expired. Quality reports could not be indexed for the current run.',
-    details: 'Quality gates, code smells, vulnerabilities and coverage metrics are currently stale until the token is renewed.',
-    fields: ['tokenStatus', 'failedArtifacts', 'lastError'],
-  },
-  {
-    id: 'AUD-10488',
-    timestamp: '2026-05-10 13:41:29',
-    level: 'security',
-    service: 'SECURITY',
-    action: 'Restricted artifact access blocked',
-    actor: 'Tom Weber',
-    role: 'Member',
-    source: 'Confluence',
-    target: 'Security Incident Runbook',
-    result: 'Blocked',
-    ipAddress: '192.168.178.44',
-    message: 'User attempted to open an artifact outside of assigned project scope.',
-    details: 'The request was blocked because the artifact requires Security Team or Admin access. No data was exposed to the user.',
-    fields: ['artifactId', 'requiredRole', 'userRole', 'projectScope'],
-  },
-  {
-    id: 'AUD-10487',
-    timestamp: '2026-05-10 13:30:12',
-    level: 'info',
-    service: 'CONFIG',
-    action: 'Source schedule updated',
-    actor: 'Max Mustermann',
-    role: 'Admin',
-    source: 'Confluence',
-    target: 'Engineering Docs',
-    result: 'Allowed',
-    ipAddress: '192.168.178.24',
-    message: 'Scheduled ingestion interval changed from every 6 hours to every 2 hours.',
-    details: 'Documentation pages, ADRs, runbooks and attachments will now be refreshed more frequently.',
-    fields: ['scheduleInterval', 'nextSync', 'timezone'],
-  },
-  {
-    id: 'AUD-10486',
-    timestamp: '2026-05-10 13:22:40',
-    level: 'info',
-    service: 'SYSTEM',
-    action: 'Internal indexing key rotated',
-    actor: 'System',
-    role: 'Service Account',
-    source: 'System',
-    target: 'Vector Index',
-    result: 'Completed',
-    ipAddress: 'system',
-    message: 'Internal indexing key rotated by scheduled maintenance job.',
-    details: 'No user action required. New indexing key is active and previous key was invalidated.',
-    fields: ['keyId', 'rotationDate', 'previousKeyStatus'],
+    id: 'project-gamma',
+    name: 'Project Gamma',
+    logs: [
+      {
+        id: 'GAMMA-5514',
+        timestamp: '2026-05-10 16:18:02',
+        level: 'error',
+        service: 'INGESTION',
+        action: 'Repository sync partially failed',
+        actor: 'System',
+        role: 'Service Account',
+        source: 'GitHub',
+        target: 'Legacy Migration Repository',
+        result: 'Failed',
+        ipAddress: 'system',
+        message: 'Could not read 5 archived branches because repository permissions changed.',
+        details: 'The latest ingestion run indexed the default branch, but archived branches were skipped due to missing read permissions.',
+        fields: ['branchPermissions', 'failedBranches', 'lastError'],
+      },
+      {
+        id: 'GAMMA-5513',
+        timestamp: '2026-05-10 16:02:27',
+        level: 'warn',
+        service: 'CONFIG',
+        action: 'Legacy source marked as high risk',
+        actor: 'Lea Hoffmann',
+        role: 'Admin',
+        source: 'Confluence',
+        target: 'Legacy Architecture Wiki',
+        result: 'Allowed',
+        ipAddress: '192.168.178.77',
+        message: 'Critical architecture pages are older than the configured freshness threshold.',
+        details: 'Several migration ADRs and rollback runbooks require review before they should be used as onboarding references.',
+        fields: ['riskLevel', 'staleArtifacts', 'owner'],
+      },
+      {
+        id: 'GAMMA-5512',
+        timestamp: '2026-05-10 15:44:16',
+        level: 'info',
+        service: 'EXPORT',
+        action: 'Knowledge risk report exported',
+        actor: 'Lea Hoffmann',
+        role: 'Admin',
+        source: 'All Sources',
+        target: 'Legacy Modernization Risk Report',
+        result: 'Completed',
+        ipAddress: '192.168.178.77',
+        message: 'PDF export generated for stale artifacts and missing owners.',
+        details: 'The report includes stale runbooks, missing ADR owners, failed syncs and migration-specific knowledge gaps.',
+        fields: ['reportType', 'exportFormat', 'includedSections'],
+      },
+      {
+        id: 'GAMMA-5511',
+        timestamp: '2026-05-10 15:21:38',
+        level: 'info',
+        service: 'SYSTEM',
+        action: 'Vector index compacted',
+        actor: 'System',
+        role: 'Service Account',
+        source: 'System',
+        target: 'Legacy Modernization Vector Index',
+        result: 'Completed',
+        ipAddress: 'system',
+        message: 'Index compaction finished successfully. Search latency reduced by 18%.',
+        details: 'The maintenance job compacted obsolete chunks and rebuilt metadata references for migration artifacts.',
+        fields: ['indexSize', 'latency', 'removedChunks'],
+      },
+    ],
   },
 ];
 
@@ -172,14 +292,24 @@ const SERVICE_BADGES: Record<AuditEntry['service'], string> = {
 };
 
 export default function SystemLogs() {
+  const [selectedProjectId, setSelectedProjectId] = useState(PROJECT_LOGS[0].id);
   const [filter, setFilter] = useState<'all' | 'info' | 'warn' | 'error' | 'security'>('all');
   const [search, setSearch] = useState('');
   const [selectedLog, setSelectedLog] = useState<AuditEntry | null>(null);
 
+  const selectedProject = PROJECT_LOGS.find((project) => project.id === selectedProjectId) || PROJECT_LOGS[0];
+  const projectLogs = selectedProject.logs;
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedLog(null);
+    setSearch('');
+  };
+
   const filteredLogs = useMemo(() => {
     const query = search.toLowerCase().trim();
 
-    return MOCK_AUDIT_LOGS.filter((log) => {
+    return projectLogs.filter((log) => {
       const matchesLevel = filter === 'all' || log.level === filter;
       const matchesSearch =
           !query ||
@@ -193,18 +323,18 @@ export default function SystemLogs() {
 
       return matchesLevel && matchesSearch;
     });
-  }, [filter, search]);
+  }, [filter, search, projectLogs]);
 
-  const errors24h = MOCK_AUDIT_LOGS.filter((log) => log.level === 'error').length;
-  const warnings24h = MOCK_AUDIT_LOGS.filter((log) => log.level === 'warn').length;
-  const securityEvents = MOCK_AUDIT_LOGS.filter((log) => log.level === 'security').length;
-  const exports24h = MOCK_AUDIT_LOGS.filter((log) => log.service === 'EXPORT').length;
+  const errors24h = projectLogs.filter((log) => log.level === 'error').length;
+  const warnings24h = projectLogs.filter((log) => log.level === 'warn').length;
+  const securityEvents = projectLogs.filter((log) => log.level === 'security').length;
+  const exports24h = projectLogs.filter((log) => log.service === 'EXPORT').length;
 
   return (
       <div className="size-full flex bg-background">
         <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
           <header className="px-8 py-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-6">
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <Terminal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -215,7 +345,19 @@ export default function SystemLogs() {
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex items-center gap-3">
+                <select
+                    value={selectedProjectId}
+                    onChange={(event) => handleProjectChange(event.target.value)}
+                    className="min-w-52 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                >
+                  {PROJECT_LOGS.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                  ))}
+                </select>
+
                 <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700">
                   <Trash2 className="w-4 h-4" />
                   Clear View
@@ -316,7 +458,7 @@ export default function SystemLogs() {
                     <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
                   </div>
                   <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest font-bold">
-                  Audit Stream - Connected
+                  Audit Stream - {selectedProject.name}
                 </span>
                 </div>
 
