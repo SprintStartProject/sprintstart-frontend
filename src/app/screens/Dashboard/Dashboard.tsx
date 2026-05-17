@@ -212,7 +212,7 @@ export function Dashboard() {
       if (onboardingSort === 'progress') return b.pct - a.pct;
       return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
-  }, [onboardingSort, isGerman]);
+  }, [onboardingSort, members]);
 
   // ─── Shared card style helper ───────────────────────────────────────────────
   const card = (extra?: React.CSSProperties): React.CSSProperties => ({

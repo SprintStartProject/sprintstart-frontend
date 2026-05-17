@@ -7,9 +7,7 @@
     "team_dashboard": "Dashboard",
     "knowledge_quality": "Knowledge Quality",
     "handover": "Handover Management",
-    "global_onboarding": "Global Onboarding",
     "skill_gaps": "Skill Gaps",
-    "statistics": "Statistics",
     "access_management": "Access Management",
     "data_ingestion": "Data Ingestion",
     "system_logs": "System Logs"
@@ -190,6 +188,68 @@
       "share": "Share",
       "request_update": "Request Update",
       "summarize": "AI Summary"
+    }
+  },
+  "handover": {
+    "title": "Handover & Knowledge Retention",
+    "subtitle": "Critical knowledge, runbooks, and ownership documentation",
+    "export_button": "Export Handover Pack",
+    "critical_alert": "Critical Handover Required",
+    "items_need_attention": "{{count}} item needs immediate attention.",
+    "items_need_attention_plural": "{{count}} items need immediate attention.",
+    "stats": {
+      "total": "Total Items",
+      "current": "Current",
+      "stale": "Stale",
+      "critical": "Critical"
+    },
+    "filters": {
+      "all": "All Items"
+    },
+    "types": {
+      "Runbook": "Runbook",
+      "ADR": "ADR",
+      "Ownership Doc": "Ownership Doc",
+      "Process Guide": "Process Guide"
+    },
+    "status": {
+      "current": "Current",
+      "stale": "Stale",
+      "critical": "Critical"
+    },
+    "actions": {
+      "view": "View",
+      "view_document": "View Document"
+    }
+  },
+  "skill_gaps": {
+    "title": "Skill Gaps Analysis",
+    "subtitle": "Identifying and bridging the gap between current and target team capabilities",
+    "priority_title": "Priority: {{skill}} Training",
+    "priority_desc": "{{count}} team members are currently below the required proficiency for our upcoming migration.",
+    "actions": {
+      "start_training": "Start Training Path",
+      "view_curriculums": "View Curriculums",
+      "mitigate": "Mitigate"
+    },
+    "stats": {
+      "org_proficiency": "Org Proficiency"
+    },
+    "table": {
+      "skill_category": "Skill & Category",
+      "proficiency_gap": "Proficiency Gap",
+      "affected_users": "Affected Users",
+      "status": "Status",
+      "action": "Action",
+      "current": "Current",
+      "target": "Target",
+      "current_progress": "Current Progress",
+      "members_affected": "{{count}} Members Affected"
+    },
+    "status": {
+      "Critical": "Critical",
+      "Warning": "Warning",
+      "Stable": "Stable"
     }
   }
 }
