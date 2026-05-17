@@ -34,6 +34,14 @@ export const navigationItems: NavItem[] = [
     section: 'base',
   },
   {
+    id: 'team-dashboard',
+    label: 'Dashboard',
+    icon: BarChart3,
+    path: '/team-dashboard',
+    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
+    section: 'base',
+  },
+  {
     id: 'onboarding',
     label: 'My Onboarding',
     icon: Rocket,
