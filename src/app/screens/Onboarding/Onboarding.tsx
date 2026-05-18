@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Circle,
@@ -47,6 +47,7 @@ export function Onboarding() {
 
   const [completedSubtasks, setCompletedSubtasks] = useState<string[]>([]);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const tasksRef = useRef<HTMLDivElement | null>(null);
 
   const toggleSubtask = (task: string) => {
     setCompletedSubtasks((prev) =>
@@ -578,10 +579,19 @@ export function Onboarding() {
               return (
                 <button
                   key={phase.id}
-                  onClick={() => setSelectedPhase(index)}
+                  onClick={() => {
+                    setSelectedPhase(index);
+
+                    setTimeout(() => {
+                      tasksRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      });
+                    }, 50);
+                  }}
                   className={`flex-1 rounded-2xl border p-4 transition-all text-left ${isSelected
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
                     }`}
                 >
                   {/* TITLE */}
@@ -669,11 +679,14 @@ export function Onboarding() {
                   </div>
                 </div>
             );
-          })()}
+        })()}
 
-          {/* TASKS */}
-          <div className="space-y-4">
-            {currentPhase.items.map((item) => {
+        {/* TASKS */}
+        <div
+          ref={tasksRef}
+          className="space-y-4"
+        >
+          {currentPhase.items.map((item) => {
               const Icon = getIcon(item.type);
 
               return (
