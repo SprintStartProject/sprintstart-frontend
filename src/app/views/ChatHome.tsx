@@ -29,7 +29,10 @@ export function ChatHome() {
 
   // Initialize messages from translations
   const initialMessages: Message[] = useMemo(() => {
-    return (t('chat.initial_messages', { returnObjects: true }) as any[]).map((msg, index) => ({
+    const rawMessages = t('chat.initial_messages', { returnObjects: true });
+    if (!Array.isArray(rawMessages)) return [];
+    
+    return rawMessages.map((msg: any, index: number) => ({
       ...msg,
       id: `initial-${index}`,
       timestamp: new Date(baseTime - (300000 - index * 60000)),

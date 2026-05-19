@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Circle,
@@ -37,6 +37,19 @@ interface OnboardingPhase {
   items: OnboardingItem[];
 }
 
+function OnboardingIcon({ type, className }: { type: OnboardingItem['type']; className?: string }) {
+  switch (type) {
+    case 'document':
+      return <FileText className={className} />;
+    case 'video':
+      return <Video className={className} />;
+    case 'link':
+      return <Link2 className={className} />;
+    default:
+      return <Target className={className} />;
+  }
+}
+
 export function Onboarding() {
   const { t } = useTranslation();
 
@@ -47,6 +60,7 @@ export function Onboarding() {
 
   const [completedSubtasks, setCompletedSubtasks] = useState<string[]>([]);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const tasksRef = useRef<HTMLDivElement | null>(null);
 
   const toggleSubtask = (task: string) => {
     setCompletedSubtasks((prev) =>
@@ -218,19 +232,6 @@ export function Onboarding() {
       [t],
   );
 
-  const getIcon = (type: OnboardingItem['type']) => {
-    switch (type) {
-      case 'document':
-        return FileText;
-      case 'video':
-        return Video;
-      case 'link':
-        return Link2;
-      default:
-        return Target;
-    }
-  };
-
   const calculateProgress = (items: OnboardingItem[]) => {
     const completed = items.filter((item) => item.completed).length;
 
@@ -265,8 +266,6 @@ export function Onboarding() {
   // --------------------------------------------------------------------------
 
   if (activeStep) {
-    const Icon = getIcon(activeStep.type);
-
     return (
         <div className="min-h-screen bg-white dark:bg-gray-950 p-8">
           <div className="max-w-5xl mx-auto">
@@ -284,10 +283,10 @@ export function Onboarding() {
               <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 blur-3xl rounded-full" />
 
               <div className="relative z-10">
-                <div className="flex items-start justify-between gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div>
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
-                      <Icon className="w-3.5 h-3.5" />
+                      <OnboardingIcon type={activeStep.type} className="w-3.5 h-3.5" />
                       Mock Learning Experience
                     </div>
 
@@ -329,7 +328,7 @@ export function Onboarding() {
                   ].map((item) => (
                       <div
                           key={item}
-                          className="flex items-start gap-3 rounded-2xl bg-gray-50 dark:bg-gray-900 p-4"
+                          className="flex items-start gap-3 rounded-2xl bg-gray-50 dark:bg-gray-900 p-4"        
                       >
                         <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
 
@@ -415,7 +414,7 @@ export function Onboarding() {
                           key={todo}
                           onClick={() => toggleSubtask(todo)}
                           className={`w-full text-left flex items-start gap-4 rounded-2xl border transition-all p-4 ${checked
-                              ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
+                              ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'       
                               : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
                           }`}
                       >
@@ -495,7 +494,7 @@ export function Onboarding() {
                 </div>
 
                 <ChevronRight
-                    className={`w-5 h-5 text-gray-400 transition-transform ${feedbackOpen ? 'rotate-90' : ''
+                    className={`w-5 h-5 text-gray-400 transition-transform ${feedbackOpen ? 'rotate-90' : ''    
                     }`}
                 />
               </button>
@@ -536,8 +535,8 @@ export function Onboarding() {
   return (
       <div className="min-h-screen bg-white dark:bg-gray-950">
         {/* TOP HEADER */}
-        <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-8 py-5">
+        <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -562,70 +561,88 @@ export function Onboarding() {
             {/* GLOBAL BAR */}
             <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-3 overflow-hidden mb-5">
               <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all"
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all"   
                   style={{
                     width: `${Math.round((totalProgress.completed / totalProgress.total) * 100)}%`,
+              }}
+            />
+          </div>
+
+          {/* PHASES */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {phases.map((phase, index) => {
+              const progress = calculateProgress(phase.items);
+              const isSelected = selectedPhase === index;
+
+              return (
+                <button
+                  key={phase.id}
+                  onClick={() => {
+                    setSelectedPhase(index);
+
+                    setTimeout(() => {
+                      tasksRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      });
+                    }, 50);
                   }}
-              />
-            </div>
+                  className={`flex-1 rounded-2xl border p-4 transition-all text-left ${isSelected
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
+                    }`}
+                >
+                  {/* TITLE */}
+                  <div className="mb-4">
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {phase.title}
+                    </div>
 
-            {/* PHASES */}
-            <div className="grid grid-cols-3 gap-4">
-              {phases.map((phase, index) => {
-                const progress = calculateProgress(phase.items);
-                const isSelected = selectedPhase === index;
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {phase.period}
+                    </div>
+                  </div>
 
-                return (
-                    <button
-                        key={phase.id}
-                        onClick={() => setSelectedPhase(index)}
-                        className={`rounded-2xl border p-4 transition-all text-left ${
-                            isSelected
-                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                                : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700'
+                  {/* BAR */}
+                  <ProgressBar
+                    value={progress.completed}
+                    max={progress.total}
+                  />
+
+                  {/* FOOTER */}
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {progress.completed}/{progress.total} tasks
+                    </div>
+
+                    <div
+                      className={`text-xs px-2 py-1 rounded-full ${progress.percentage === 100
+                          ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                         }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            {phase.title}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {phase.period}
-                          </div>
-                        </div>
-                        <div
-                            className={`text-xs px-2 py-1 rounded-full ${
-                                progress.percentage === 100
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                            }`}
-                        >
-                          {progress.percentage}%
-                        </div>
-                      </div>
-                      <ProgressBar value={progress.completed} max={progress.total} />
-                    </button>
-                );
-              })}
-            </div>
+                      {progress.percentage}%
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
+        </div>
         </div>
 
         {/* MAIN CONTENT — list view only; detail view is handled by the early return above */}
-        <main className="max-w-7xl mx-auto px-8 py-8 pb-24">
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
           {/* HERO */}
-          {nextTask && (() => {
-            const NextIcon = getIcon(nextTask.type);
-            return (
-                <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-950 p-8 mb-8 overflow-hidden relative">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />
+          {nextTask && (
+                <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-950 p-5 sm:p-8 mb-6 overflow-hidden relative">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full" />     
                   <div className="relative z-10">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
                       <PlayCircle className="w-3.5 h-3.5" />
                       Up Next
                     </div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                       {nextTask.title}
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
@@ -639,9 +656,9 @@ export function Onboarding() {
                         Start Now
                         <ChevronRight className="w-4 h-4" />
                       </button>
-                      <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">        
                         <div className="flex items-center gap-1.5">
-                          <NextIcon className="w-4 h-4" />
+                          <OnboardingIcon type={nextTask.type} className="w-4 h-4" />
                           <span className="capitalize">{nextTask.type}</span>
                         </div>
                         {nextTask.duration && (
@@ -657,20 +674,19 @@ export function Onboarding() {
                     </div>
                   </div>
                 </div>
-            );
-          })()}
+            )}
 
-          {/* TASKS */}
-          <div className="space-y-4">
-            {currentPhase.items.map((item) => {
-              const Icon = getIcon(item.type);
-
-              return (
+        {/* TASKS */}
+        <div
+          ref={tasksRef}
+          className="space-y-4"
+        >
+          {currentPhase.items.map((item) => (
                   <div
                       key={item.id}
                       className={`group rounded-2xl border transition-all ${
                           item.completed
-                              ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 opacity-70'
+                              ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 opacity-70'     
                               : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-900 hover:shadow-lg'
                       }`}
                   >
@@ -685,7 +701,7 @@ export function Onboarding() {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-6">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">   
                             <div>
                               <h3
                                   className={`font-semibold text-base ${
@@ -696,12 +712,12 @@ export function Onboarding() {
                               >
                                 {item.title}
                               </h3>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">     
                                 {item.description}
                               </p>
                               <div className="flex flex-wrap items-center gap-4 mt-4">
-                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                                  <Icon className="w-4 h-4" />
+                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">    
+                                  <OnboardingIcon type={item.type} className="w-4 h-4" />
                                   <span className="text-xs capitalize">{item.type}</span>
                                 </div>
                                 {item.duration && (
@@ -725,8 +741,7 @@ export function Onboarding() {
                       </div>
                     </div>
                   </div>
-              );
-            })}
+              ))}
           </div>
         </main>
       </div>

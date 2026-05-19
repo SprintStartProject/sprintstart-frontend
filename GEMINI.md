@@ -6,7 +6,7 @@ SprintStart is a visually-driven React prototype designed to streamline team onb
 
 - **Purpose:** A centralized hub for team onboarding (Day 1, Week 1, Month 1), knowledge base access, and role-specific dashboards.
 - **Key Features:**
-  - **Knowledge Explorer:** Advanced document management with AI-generated summaries, freshness tracking (Current/Stale/Outdated), and smooth animated previews.
+  - **Knowledge Explorer:** Advanced document management with AI-generated summaries, freshness tracking (Current/Stale/Outdated), and smooth animated previews. Features a mobile-optimized UI with toggleable search and side-by-side dropdown filters.
   - **AI Assistant:** Chat-based interface for querying internal documentation, runbooks, and ADRs.
   - **Multi-language Support (i18n):** Full support for English (Default) and German (DE) across the interface and mock content.
   - **Role-Based Views:** Tailored experiences for New Project Members, Existing Project Members, Project Managers, HR, and Admins.
@@ -75,6 +75,7 @@ The project uses `i18next` and `react-i18next` for translations.
   - **Project Manager**: Access to Base Zone + PM Zone.
   - **HR**: Access to Base Zone + HR Zone.
   - **Admin**: Access to Base Zone + Admin Zone.
+  - **Show all**: Comprehensive access to all Zones simultaneously for development and demo purposes.
 - **AI UI:** The `ChatHome` component follows a specific layout for messages, citations, and filtering.
 
 ## Design Resources

@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Outlet } from 'react-router';
+import { createBrowserRouter, RouterProvider, Outlet, Navigate } from 'react-router';
 import { ThemeProvider } from './components/ThemeProvider';
 import { RoleProvider } from './context/RoleContext';
 import { Sidebar } from './components/navigation/Sidebar';
@@ -18,7 +18,6 @@ import { Profile } from './screens/Profile';
 
 // Import newly implemented high-fidelity screens
 import KnowledgeQuality from './screens/KnowledgeQuality';
-import Statistics from './screens/Statistics';
 import SkillGaps from './screens/SkillGaps';
 import SystemLogs from './screens/SystemLogs';
 import DataIngestion from './screens/DataIngestion';
@@ -39,12 +38,11 @@ function AppLayout() {
 const SCREEN_MAP: Record<string, ComponentType> = {
   '/onboarding': Onboarding,
   '/knowledge': Knowledge,
-  '/team-dashboard': Dashboard,
+  '/dashboard': Dashboard,
   '/handover': Handover,
   '/access-management': Admin,
   '/profile': Profile,
   '/knowledge-quality': KnowledgeQuality,
-  '/statistics': Statistics,
   '/skill-gaps': SkillGaps,
   '/system-logs': SystemLogs,
   '/data-ingestion': DataIngestion,
@@ -81,6 +79,10 @@ const router = createBrowserRouter([
             element: ScreenComponent ? <ScreenComponent /> : <TranslatedPlaceholder item={item} />,
           };
         }),
+      {
+        path: '*',
+        element: <Navigate to="/" replace />,
+      },
     ],
   },
 ]);
