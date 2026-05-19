@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
 
 interface Message {
   id: string;
@@ -41,14 +40,16 @@ const TIMEFILTERS = [
 
 export function ChatHome() {
   const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   // Use a state to store the base time to ensure purity during render
   const [baseTime] = useState(() => Date.now());
 
   // Initialize messages from translations
   const initialMessages: Message[] = useMemo(() => {
-    return (t('chat.initial_messages', { returnObjects: true }) as any[]).map((msg, index) => ({
+    const rawMessages = t('chat.initial_messages', { returnObjects: true });
+    if (!Array.isArray(rawMessages)) return [];
+    
+    return rawMessages.map((msg: any, index: number) => ({
       ...msg,
       id: `initial-${index}`,
       timestamp: new Date(baseTime - (300000 - index * 60000)),
