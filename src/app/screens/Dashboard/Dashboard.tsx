@@ -230,7 +230,7 @@ export function Dashboard() {
   // ─── MOBILE RENDER ───────────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', fontFamily: '"DM Sans", Inter, sans-serif', color: C.text, overflowX: 'hidden' }}>
+      <div style={{ background: "bg-color-gray-950", minHeight: '100dvh', fontFamily: '"DM Sans", Inter, sans-serif', color: C.text, overflowX: 'hidden' }}>
         <div style={{ padding: '14px 14px 40px' }}>
 
           {/* ── Compact metric chips — single scrollable row ── */}
@@ -397,7 +397,7 @@ export function Dashboard() {
   return (
     <div
       style={{
-        background: C.bg,
+        background: "bg-color-gray-950",
         minHeight: '100vh',
         padding: '28px 32px 64px',
         fontFamily: '"DM Sans", Inter, sans-serif',
@@ -411,9 +411,7 @@ export function Dashboard() {
         style={{
           position: 'fixed',
           inset: 0,
-          background: isDark
-            ? 'radial-gradient(circle at top left, rgba(59,130,246,0.10), transparent 30%), radial-gradient(circle at top right, rgba(139,92,246,0.08), transparent 30%)'
-            : 'radial-gradient(circle at top left, rgba(59,130,246,0.14), transparent 35%), radial-gradient(circle at top right, rgba(124,58,237,0.1), transparent 35%)',
+          background: "bg-color-gray-950",
           pointerEvents: 'none',
           zIndex: 0,
         }}

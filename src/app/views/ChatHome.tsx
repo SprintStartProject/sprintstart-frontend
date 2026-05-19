@@ -94,19 +94,6 @@ export function ChatHome() {
               {t('common.querying_sources', { count: 12 })}
             </p>
           </div>
-          <div className="flex -space-x-2">
-            {[1, 2, 3, 4].map((i) => (
-                <div
-                    key={i}
-                    className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-900 bg-gray-100 dark:bg-gray-800 flex items-center justify-center"
-                >
-                  <User className="w-4 h-4 text-gray-400" />
-                </div>
-            ))}
-            <div className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-900 bg-blue-600 flex items-center justify-center text-[10px] text-white font-bold">
-              +5
-            </div>
-          </div>
         </header>
 
         {/* Messages Area */}
