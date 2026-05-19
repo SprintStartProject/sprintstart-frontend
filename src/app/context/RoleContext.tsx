@@ -5,7 +5,8 @@ export type UserRole =
   | 'Existing Project Member'
   | 'Project Manager'
   | 'HR'
-  | 'Admin';
+  | 'Admin'
+  | 'Show all';
 
 interface RoleContextType {
   role: UserRole;

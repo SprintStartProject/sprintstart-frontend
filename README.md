@@ -7,7 +7,7 @@ An enterprise-grade React prototype for streamlined team onboarding, knowledge p
 - **Knowledge Explorer:** Advanced document browsing with AI-generated insights, freshness tracking, and interactive metadata filters.
 - **AI Assistant:** Chat-based interface for querying internal documentation, runbooks, and ADRs.
 - **Multi-language Support:** Full localization for English (Default) and German (DE).
-- **Role-Based Perspectives:** Simulated views for New/Existing Project Members, Managers, HR, and Admins.
+- **Role-Based Perspectives:** Simulated views for New/Existing Project Members, Managers, HR, and Admins. Includes a special "Show all" mode for comprehensive module access.
 - **Onboarding Tracking:** Visual progress monitoring through personalized milestones (New Project Member exclusive).
 - **Modern Tech Stack:** Built with React 18, Vite, Tailwind CSS v4, and Framer Motion.
 

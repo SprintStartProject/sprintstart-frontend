@@ -6,9 +6,7 @@ import {
   BarChart3,
   TrendingUp,
   HandshakeIcon,
-  Globe,
   Target,
-  Activity,
   Settings,
   Database,
   FileText,
@@ -32,6 +30,14 @@ export const navigationItems: NavItem[] = [
     label: 'Chat',
     icon: MessageSquare,
     path: '/',
+    roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
+    section: 'base',
+  },
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: BarChart3,
+    path: '/dashboard',
     roles: ['New Project Member', 'Existing Project Member', 'Project Manager', 'HR', 'Admin'],
     section: 'base',
   },
@@ -62,14 +68,6 @@ export const navigationItems: NavItem[] = [
 
   // Project Manager Zone
   {
-    id: 'team-dashboard',
-    label: 'Team Dashboard',
-    icon: BarChart3,
-    path: '/team-dashboard',
-    roles: ['Project Manager'],
-    section: 'project-manager',
-  },
-  {
     id: 'knowledge-quality',
     label: 'Knowledge Quality',
     icon: TrendingUp,
@@ -77,21 +75,13 @@ export const navigationItems: NavItem[] = [
     roles: ['Project Manager'],
     section: 'project-manager',
   },
+
+  // HR Zone
   {
     id: 'handover',
     label: 'Handover Management',
     icon: HandshakeIcon,
     path: '/handover',
-    roles: ['Project Manager'],
-    section: 'project-manager',
-  },
-
-  // HR Zone
-  {
-    id: 'global-onboarding',
-    label: 'Global Onboarding',
-    icon: Globe,
-    path: '/global-onboarding',
     roles: ['HR'],
     section: 'hr',
   },
@@ -100,14 +90,6 @@ export const navigationItems: NavItem[] = [
     label: 'Skill Gaps',
     icon: Target,
     path: '/skill-gaps',
-    roles: ['HR'],
-    section: 'hr',
-  },
-  {
-    id: 'statistics',
-    label: 'Statistics',
-    icon: Activity,
-    path: '/statistics',
     roles: ['HR'],
     section: 'hr',
   },
@@ -140,5 +122,6 @@ export const navigationItems: NavItem[] = [
 ];
 
 export function getVisibleNavItems(role: UserRole): NavItem[] {
+  if (role === 'Show all') return navigationItems;
   return navigationItems.filter((item) => item.roles.includes(role));
 }
