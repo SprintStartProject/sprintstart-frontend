@@ -7,10 +7,8 @@ import {
   FileText,
   ExternalLink,
   Sparkles,
-  Slack,
-  Github,
-  Info,
-  Search, ThumbsUp, ThumbsDown,
+  ThumbsUp,
+    ThumbsDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
@@ -22,21 +20,6 @@ interface Message {
   citations?: Array<{ title: string; type: string; id: string }>;
   timestamp: Date;
 }
-
-const FILTERS = [
-  { id: 'all', label: 'All Sources', icon: Search, key: 'all' },
-  { id: 'docs', label: 'Documentation', icon: FileText, key: 'docs' },
-  { id: 'tickets', label: 'Jira Tickets', icon: Info, key: 'tickets' },
-  { id: 'repos', label: 'GitHub Repos', icon: Github, key: 'repos' },
-  { id: 'slack', label: 'Slack', icon: Slack, key: 'slack' },
-];
-
-const TIMEFILTERS = [
-  {id: 'latest', label: 'latest', key: 'latest'},
-  {id: 'last month', label: 'last month', key: 'last month'},
-  {id: 'last 6 months', label: 'last 6 months', key: 'last 6 months'},
-  {id: 'last year', label: 'last year', key: 'last year'}
-];
 
 export function ChatHome() {
   const { t } = useTranslation();
@@ -64,8 +47,6 @@ export function ChatHome() {
   }
 
   const [input, setInput] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [activeTimeFilter, setActiveTimeFilter] = useState('latest')
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +57,10 @@ export function ChatHome() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  const [responseStyle, setResponseStyle] = useState("short");
+    const [sourceFilter, setSourceFilter] = useState("all");
+    const [timeFilter, setTimeFilter] = useState("latest");
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -91,22 +76,6 @@ export function ChatHome() {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI Latency
-    setTimeout(() => {
-      const sourceLabel = t(`chat.filters.${activeFilter}`);
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `${t('chat.response_prefix', { source: sourceLabel })}\n\n${t('chat.response_body')}`,
-        citations: [
-          { id: 'cfg-09', title: t('chat.citations.env_config'), type: 'Documentation' },
-          { id: 'sec-01', title: t('chat.citations.secrets_policy'), type: 'Security' },
-        ],
-        timestamp: new Date(),
-      };
-      setIsTyping(false);
-      setMessages((prev) => [...prev, assistantMessage]);
-    }, 2000);
   };
 
   return (
@@ -246,45 +215,38 @@ export function ChatHome() {
         {/* Input Area */}
         <div className="p-4 md:p-8 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 sticky bottom-0">
           <div className="max-w-4xl mx-auto space-y-3">
-            {/* Filter Chips */}
-            <div className="flex gap-2 overflow-x-auto pb-0 no-scrollbar">
-              {FILTERS.map((filter) => {
-                const Icon = filter.icon;
-                const isActive = activeFilter === filter.id;
-                return (
-                    <button
-                        key={filter.id}
-                        onClick={() => setActiveFilter(filter.id)}
-                        className={`flex items-center gap-2 px-4 py-0 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                            isActive
-                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none'
-                                : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span className="uppercase tracking-widest">{t(`chat.filters.${filter.key}`)}</span>
-                    </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              {TIMEFILTERS.map((filter) => {
-                const isActive = activeTimeFilter === filter.id;
-                return (
-                    <button
-                        key={filter.id}
-                        onClick={() => setActiveTimeFilter(filter.id)}
-                        className={`flex items-center gap-2 px-4 py-0 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                            isActive
-                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none'
-                                : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                    >
-                      <span className="uppercase tracking-widest">{t(`${filter.key}`)}</span>
-                    </button>
-                );
-              })}
-            </div>
+              <div className="md:flex gap-3 grid grid-cols-2">
+                  <select
+                      value={sourceFilter}
+                      onChange={(e) => setSourceFilter(e.target.value)}
+                      className="px-4 py-2 border bg-white dark:bg-gray-800 rounded-xl text-xs font-bold uppercase tracking-widest"
+                  >
+                      <option value="all">All Sources</option>
+                      <option value="docs">Documentation</option>
+                      <option value="tickets">Jira Tickets</option>
+                      <option value="repo">Repository</option>
+                      <option value="slack">Slack</option>
+                  </select>
+                  <select
+                      value={timeFilter}
+                      onChange={(e) => setTimeFilter(e.target.value)}
+                      className="px-4 py-2 border bg-white dark:bg-gray-800 rounded-xl text-xs font-bold uppercase tracking-widest"
+                  >
+                      <option value="latest">Latest</option>
+                      <option value="month">Last Month</option>
+                      <option value="6months">Last 6 Months</option>
+                      <option value="year">Last Year</option>
+                  </select>
+                  <select
+                      className="px-4 py-2 border bg-white dark:bg-gray-800 rounded-xl text-xs font-bold uppercase tracking-widest"
+                      value={responseStyle}
+                      onChange={(e) => setResponseStyle(e.target.value)}
+                  >
+                      <option value="short">Short</option>
+                      <option value="detailed">Detailed</option>
+                      <option value="step-by-step">Step by Step</option>
+                  </select>
+              </div>
 
             {/* Input Box */}
             <div className="relative group">

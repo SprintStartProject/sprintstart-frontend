@@ -16,12 +16,12 @@ export function Profile() {
         {/* Personal Information */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
             <div className=" flex flex-row gap-5">
-                <div className="w-35 h-35 border-orange-400 dark:border-blue-500 flex items-center justify-center border-7 rounded-full">
-                    <User className="w-25 h-25 text-orange-400 dark:text-blue-500"></User>
+                <div className="w-20 h-20 md:w-35 md:h-35 border-blue-500 flex items-center justify-center border-4 md:border-7 rounded-full">
+                    <User className="w-12 h-12 md:w-25 md:h-25 text-blue-500"></User>
                 </div>
                 <div className=" flex flex-col justify-center">
-                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
+                    <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+                    <p className="text-lg md:text-2xl font-semibold text-gray-900 dark:text-white mt-1 md:mt-2">
                         @username
                     </p>
                 </div>
@@ -29,11 +29,11 @@ export function Profile() {
 
             <hr className="my-8 border-gray-300" />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-2 md:gap-6">
               <h2 className="font-semibold">Name:</h2>
-              <h2>Prename Surname</h2>
-              <h2 className="font-semibold">Roles:</h2>
-              <div className="flex flex-row gap-4">
+              <h2 className="text-lg flex justify-end md:justify-start">Prename Surname</h2>
+              <h2 className="font-semibold md:row-start-2">Roles:</h2>
+              <div className="flex flex-row gap-2 md:gap-4 justify-end md:justify-start">
                   <div className="rounded-2xl border-5 border-cyan-500 text-cyan-500 pl-2 pr-2 font-bold">
                       ROLE 1
                   </div>
@@ -41,8 +41,8 @@ export function Profile() {
                       ROLE 2
                   </div>
               </div>
-              <h2 className="font-semibold">Level:</h2>
-              <h2 className="font-bold">Intermediate</h2>
+              <h2 className="font-semibold" >Level:</h2>
+              <h2 className="font-bold flex justify-end md:justify-start text-lg">Intermediate</h2>
               <h2 className="font-semibold">Skills:</h2>
               <div className="grid-flow-row grid gap-3 grid-cols-3">
                   {[
@@ -63,10 +63,10 @@ export function Profile() {
                 </div>
                   ))}
               </div>
-              <div className="flex flex-row justify-end col-start-2">
-              <button className="h-12 w-12 bg-orange-600 hover:bg-orange-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-full text-sm transition-colors flex items-center justify-center gap-2">
-                  <Edit2 className="w-5 h-5" />
-              </button>
+              <div className="flex flex-row justify-end md:col-start-2">
+                  <button className="h-12 w-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm transition-colors flex items-center justify-center gap-2">
+                      <Edit2 className="w-5 h-5" />
+                  </button>
               </div>
           </div>
         </div>
@@ -113,42 +113,45 @@ export function Profile() {
             </div>
 
             <p className="mt-5">Skill requirements:</p>
-            <div className="grid grid-cols-6 mt-3">
-                <div className="grid grid-cols-6 gap-5 col-start-1 col-span-5">
-                    {[
-                        'React',
-                        'TypeScript',
-                        'Node.js'
-                    ].map((skill) => (
-                        <div
-                            key={skill}
-                            className="flex justify-center px-3 py-1.5 bg-green-200 text-green-700 text-sm rounded-lg"
-                        >
-                            {skill}
-                        </div>
-                    ))}
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-0">
+                <div className="grid md:grid-cols-6 mt-3">
+                    <div className="grid md:grid-cols-6 gap-2 md:gap-5 md:col-start-1 md:col-span-5">
+                        {[
+                            'React',
+                            'TypeScript',
+                            'Node.js'
+                        ].map((skill) => (
+                            <div
+                                key={skill}
+                                className="h-8 flex justify-center px-3 py-1.5 bg-green-200 text-green-700 text-sm rounded-lg"
+                            >
+                                {skill}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="md:col-start-6 md:col-span-1 text-green-700 font-semibold flex items-center justify-center text-lg mt-3 md:mt-0">
+                        <Check></Check> 3/5
+                    </div>
                 </div>
-                <div className="col-start-6 col-span-1 text-green-700 font-semibold flex items-center text-lg">
-                    <Check></Check> 3/5
-                </div>
-            </div>
 
-            <div className="grid grid-cols-6 mt-3">
-                <div className="grid grid-cols-6 gap-5 col-start-1 col-span-5">
-                    {[
-                        'HTML',
-                        'CSS'
-                    ].map((skill) => (
-                        <div
-                            key={skill}
-                            className="flex justify-center px-3 py-1.5 bg-red-200 text-red-700 text-sm rounded-lg"
-                        >
-                            {skill}
-                        </div>
-                    ))}
-                </div>
-                <div className="col-start-6 col-span-1 text-red-700 font-semibold flex items-center text-lg">
-                    <X></X> 2/5
+                <div className="grid md:grid-cols-6 mt-3">
+                    <div className="grid md:grid-cols-6 gap-2 md:gap-5 md:col-start-1 md:col-span-5">
+                        {[
+                            'HTML',
+                            'CSS',
+                        ].map((skill) => (
+                            <div
+                                key={skill}
+                                className="h-8 flex justify-center px-3 py-1.5 bg-red-200 text-red-700 text-sm rounded-lg"
+                            >
+                                {skill}
+                            </div>
+                        ))}
+                        <div className="h-8"></div>
+                    </div>
+                    <div className="md:col-start-6 md:col-span-1 text-red-700 font-semibold flex items-center justify-center text-lg mt-3 md:mt-0">
+                        <X></X> 2/5
+                    </div>
                 </div>
             </div>
 
