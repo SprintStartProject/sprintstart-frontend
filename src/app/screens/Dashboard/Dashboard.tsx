@@ -38,7 +38,7 @@ export function Dashboard() {
 
   const isGerman = i18n.language.startsWith('de');
   const isDark = theme === 'dark';
-  const showOnboardingProgress = role === 'Project Manager';
+  const showOnboardingProgress = role === 'Project Manager'|| role === 'Show all';
 
   const copy = isGerman
     ? {
