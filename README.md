@@ -26,3 +26,12 @@ To start the local development server, run:
 ```bash
 npm run dev
 ```
+
+
+### One Command Start
+
+To start the local deployment via docker compose in command, run:
+
+```bash
+docker compose up --build
+```
