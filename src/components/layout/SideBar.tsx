@@ -106,9 +106,8 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                                 {profile.username}
                             </span>
                             <span className="truncate text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                                {profile.email}
-                            </span>
-                        </div>
+                                {profile.workingArea.replace('_', ' ')}
+                            </span>                        </div>
                     </div>
                 )}
 

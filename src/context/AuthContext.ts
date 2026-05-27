@@ -6,7 +6,7 @@ export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated';
 export interface AuthContextType {
     status: AuthStatus;
     profile: UserProfile | null;
-    login: (username: string, email: string) => Promise<void>;
+    login: (username: string, firstname: string, lastname: string) => Promise<void>;
     logout: () => Promise<void>;
 }
 

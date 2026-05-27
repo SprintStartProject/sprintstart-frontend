@@ -27,10 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void initAuth();
     }, []);
 
-    const login = async (username: string, email: string) => {
+    const login = async (username: string, firstname: string, lastname: string) => {
         setStatus('loading');
         try {
-            const user = await apiService.login(username, email);
+            const user = await apiService.login(username, firstname, lastname);
             setProfile(user);
             setStatus('authenticated');
         } catch (error) {

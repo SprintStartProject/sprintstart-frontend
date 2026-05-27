@@ -4,13 +4,14 @@ import { Rocket } from 'lucide-react';
 
 export function LoginPage() {
     const [username, setUsername] = useState('');
-    const [email, setEmail] = useState('');
+    const [firstname, setFirstname] = useState('');
+    const [lastname, setLastname] = useState('');
     const { login, status } = useAuth();
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (username.trim() && email.trim()) {
-            void login(username.trim(), email.trim());
+        if (username.trim() && firstname.trim() && lastname.trim()) {
+            void login(username.trim(), firstname.trim(), lastname.trim());
         }
     };
 
@@ -40,22 +41,38 @@ export function LoginPage() {
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                placeholder="Enter your username"
+                                placeholder="e.g. jdoe"
                             />
                         </div>
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
-                                Email (Mock)
-                            </label>
-                            <input
-                                id="email"
-                                type="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                placeholder="name@company.com"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="firstname" className="block text-sm font-medium text-slate-300 mb-1.5">
+                                    First Name
+                                </label>
+                                <input
+                                    id="firstname"
+                                    type="text"
+                                    required
+                                    value={firstname}
+                                    onChange={(e) => setFirstname(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder="John"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="lastname" className="block text-sm font-medium text-slate-300 mb-1.5">
+                                    Last Name
+                                </label>
+                                <input
+                                    id="lastname"
+                                    type="text"
+                                    required
+                                    value={lastname}
+                                    onChange={(e) => setLastname(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder="Doe"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -69,7 +86,7 @@ export function LoginPage() {
                 </form>
 
                 <div className="text-center text-xs text-slate-500 pt-2">
-                    Tip: Use any username. New usernames will trigger the onboarding wizard.
+                    Tip: Use any username. New usernames will be registered automatically.
                 </div>
             </div>
         </div>
