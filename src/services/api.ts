@@ -32,7 +32,7 @@ export const apiService = {
         const response = await fetch('/api/v1/users');
         if (!response.ok) throw new Error('Failed to fetch users');
         
-        const users: UserProfile[] = await response.json();
+        const users = await response.json() as UserProfile[];
         const existingUser = users.find(u => u.username === username);
 
         if (existingUser) {
@@ -54,7 +54,7 @@ export const apiService = {
 
         if (!createResponse.ok) throw new Error('Failed to create user');
         
-        const newUser: UserProfile = await createResponse.json();
+        const newUser = await createResponse.json() as UserProfile;
         localStorage.setItem(SESSION_KEY, newUser.id);
         return newUser;
     },
@@ -72,7 +72,7 @@ export const apiService = {
                 }
                 throw new Error('Failed to fetch profile');
             }
-            return await response.json();
+            return await response.json() as UserProfile;
         } catch (error) {
             console.error('API Error:', error);
             return null;
@@ -90,7 +90,7 @@ export const apiService = {
         });
 
         if (!response.ok) throw new Error('Failed to update profile');
-        return await response.json();
+        return await response.json() as UserProfile;
     },
 
     async resetProfile(): Promise<void> {
@@ -103,7 +103,8 @@ export const apiService = {
         });
     },
 
-    async logout(): Promise<void> {
+    logout(): Promise<void> {
         localStorage.removeItem(SESSION_KEY);
+        return Promise.resolve();
     }
 };
