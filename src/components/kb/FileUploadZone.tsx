@@ -1,0 +1,142 @@
+import { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, FileCode, Loader2, AlertCircle } from 'lucide-react';
+
+interface Props {
+    onUpload: (files: File[]) => void;
+    isUploading: boolean;
+}
+
+export function FileUploadZone({ onUpload, isUploading }: Props) {
+    const [isDragActive, setIsDragActive] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const validateFiles = (files: FileList | File[]): File[] => {
+        const validFiles: File[] = [];
+        let hasError = false;
+
+        Array.from(files).forEach(file => {
+            const isMd = file.name.toLowerCase().endsWith('.md');
+            if (!isMd) {
+                setError(`Unsupported file: ${file.name}. Please upload Markdown (.md) files only.`);
+                hasError = true;
+            } else if (file.size > 10 * 1024 * 1024) { // 10MB
+                setError(`File too large: ${file.name} (Max 10MB)`);
+                hasError = true;
+            } else {
+                validFiles.push(file);
+            }
+        });
+
+        if (!hasError) setError(null);
+        return validFiles;
+    };
+
+    const handleDrag = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setIsDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setIsDragActive(false);
+        }
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragActive(false);
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const validFiles = validateFiles(files);
+            if (validFiles.length > 0) {
+                onUpload(validFiles);
+            }
+        }
+    }, [onUpload]);
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const validFiles = validateFiles(files);
+            if (validFiles.length > 0) {
+                onUpload(validFiles);
+            }
+        }
+    };
+
+    return (
+        <div className="w-full">
+            <motion.div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                animate={{
+                    borderColor: isDragActive ? '#2563eb' : '#1e293b',
+                    backgroundColor: isDragActive ? 'rgba(37, 99, 235, 0.05)' : 'rgba(15, 23, 42, 0.5)',
+                    scale: isDragActive ? 1.01 : 1
+                }}
+                className={`
+                    relative border-2 border-dashed rounded-2xl p-10 
+                    flex flex-col items-center justify-center gap-5
+                    transition-all duration-200 cursor-pointer group
+                    ${isUploading ? 'opacity-50 pointer-events-none' : ''}
+                `}
+                onClick={() => document.getElementById('fileInput')?.click()}
+            >
+                <input
+                    id="fileInput"
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileInput}
+                    accept=".md"
+                    multiple
+                />
+
+                <div className={`
+                    w-16 h-16 rounded-2xl flex items-center justify-center
+                    ${isDragActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 text-slate-400 group-hover:text-blue-400 group-hover:bg-slate-700'}
+                    transition-all duration-300
+                `}>
+                    {isUploading ? (
+                        <Loader2 className="w-8 h-8 animate-spin" />
+                    ) : (
+                        <Upload className="w-8 h-8" />
+                    )}
+                </div>
+
+                <div className="text-center space-y-1">
+                    <p className="text-lg font-semibold text-white">
+                        {isUploading ? 'Processing documents...' : 'Drop Markdown files'}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                        {isUploading ? 'Ingesting your knowledge...' : 'Drag & drop .md files or click to browse'}
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600/10 border border-blue-600/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                        <FileCode className="w-3 h-3" />
+                        Markdown Only
+                    </div>
+                </div>
+            </motion.div>
+
+            <AnimatePresence>
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="mt-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-center gap-3"
+                    >
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        {error}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
