@@ -24,7 +24,8 @@ export enum DocumentStatus {
 export type DocumentMetadata = {
     id: string;
     name: string;
-    size: number;
+    mime: string;
+    size?: number;
     status: DocumentStatus;
     uploadDate: string;
 };

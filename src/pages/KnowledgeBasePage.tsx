@@ -18,22 +18,36 @@ export function KnowledgeBasePage() {
         errors: string[];
     } | null>(null);
 
-    const loadDocuments = useCallback(async () => {
-        setIsLoading(true);
+    const loadDocuments = useCallback(async (isMounted = true) => {
+        if (!profile) return;
+        
         try {
-            const docs = await knowledgeService.fetchDocuments();
-            setDocuments(docs);
+            const docs = await knowledgeService.fetchDocuments(profile.id);
+            if (isMounted) setDocuments(docs);
         } catch (error) {
             console.error('Failed to load documents:', error);
         } finally {
-            setIsLoading(false);
+            if (isMounted) setIsLoading(false);
         }
-    }, []);
+    }, [profile]);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadDocuments();
-    }, [loadDocuments]);
+        let isMounted = true;
+
+        const initialize = async () => {
+            if (profile) {
+                await loadDocuments(isMounted);
+            } else {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        void initialize();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [profile, loadDocuments]);
 
     const handleUpload = async (files: File[]) => {
         if (!profile) return;
@@ -56,6 +70,7 @@ export function KnowledgeBasePage() {
                     newDocs.push({
                         id: r.id,
                         name: r.filename,
+                        mime: originalFile?.type || 'application/octet-stream',
                         size: originalFile?.size || 0,
                         status: DocumentStatus.PENDING,
                         uploadDate: new Date().toISOString()

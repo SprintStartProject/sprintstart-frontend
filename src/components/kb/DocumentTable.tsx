@@ -9,12 +9,6 @@ interface Props {
 }
 
 export function DocumentTable({ documents, onDelete }: Props) {
-    const formatSize = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
     const getStatusBadge = (status: DocumentStatus) => {
         switch (status) {
             case DocumentStatus.COMPLETED:
@@ -56,7 +50,6 @@ export function DocumentTable({ documents, onDelete }: Props) {
                         <tr className="bg-slate-900/50 border-b border-slate-800">
                             <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Document</th>
                             <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell">Size</th>
                             <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest hidden lg:table-cell">Ingested At</th>
                             <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
                         </tr>
@@ -91,9 +84,6 @@ export function DocumentTable({ documents, onDelete }: Props) {
                                     <td className="px-4 sm:px-6 py-4">
                                         {getStatusBadge(doc.status)}
                                     </td>
-                                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-slate-400 hidden md:table-cell">
-                                        {formatSize(doc.size)}
-                                    </td>
                                     <td className="px-4 sm:px-6 py-4 text-sm font-medium text-slate-400 hidden lg:table-cell">
                                         {new Date(doc.uploadDate).toLocaleDateString(undefined, {
                                             month: 'short',
@@ -115,7 +105,7 @@ export function DocumentTable({ documents, onDelete }: Props) {
                         </AnimatePresence>
                         {documents.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-6 py-20 text-center">
+                                <td colSpan={4} className="px-6 py-20 text-center">
                                     <div className="flex flex-col items-center gap-4 max-w-sm mx-auto">
                                         <div className="p-4 bg-slate-800/50 rounded-full">
                                             <FileCode className="w-10 h-10 text-slate-600" />

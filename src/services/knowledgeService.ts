@@ -1,14 +1,27 @@
 import { DocumentStatus, type DocumentMetadata, type UploadResult } from './types';
 
 export const knowledgeService = {
-    async fetchDocuments(): Promise<DocumentMetadata[]> {
-        // Currently still mocked as there is no GET /v1/uploads endpoint yet
-        await new Promise(resolve => setTimeout(resolve, 800));
-        return [
-            { id: '1', name: 'Project_Overview.md', size: 1024 * 85, status: DocumentStatus.COMPLETED, uploadDate: new Date(Date.now() - 86400000).toISOString() },
-            { id: '2', name: 'Backend_API_Specs.md', size: 1024 * 45, status: DocumentStatus.PROCESSING, uploadDate: new Date(Date.now() - 3600000).toISOString() },
-            { id: '3', name: 'Frontend_Architecture.md', size: 1024 * 120, status: DocumentStatus.COMPLETED, uploadDate: new Date(Date.now() - 7200000).toISOString() },
-        ];
+    async fetchDocuments(uploaderId: string): Promise<DocumentMetadata[]> {
+        const response = await fetch(`/v1/uploads?uploaderId=${uploaderId}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch documents');
+        }
+
+        const data = await response.json() as Array<{
+            id: string;
+            filename: string;
+            mime: string;
+            uploadedAt: string;
+        }>;
+
+        return data.map(item => ({
+            id: item.id,
+            name: item.filename,
+            mime: item.mime,
+            status: DocumentStatus.COMPLETED, // Logic for processing status will be added with AI integration
+            uploadDate: item.uploadedAt
+        }));
     },
 
     async uploadDocuments(files: File[], uploaderId: string): Promise<UploadResult[]> {
