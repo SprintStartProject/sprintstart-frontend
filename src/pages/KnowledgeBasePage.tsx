@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiService, type DocumentMetadata, DocumentStatus } from '../services/api';
+import { knowledgeService } from '../services/knowledgeService';
+import { type DocumentMetadata, DocumentStatus } from '../services/types';
 import { FileUploadZone } from '../components/kb/FileUploadZone';
 import { DocumentTable } from '../components/kb/DocumentTable';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,7 +19,7 @@ export function KnowledgeBasePage() {
     const loadDocuments = useCallback(async () => {
         setIsLoading(true);
         try {
-            const docs = await apiService.fetchDocuments();
+            const docs = await knowledgeService.fetchDocuments();
             setDocuments(docs);
         } catch (error) {
             console.error('Failed to load documents:', error);
@@ -36,7 +37,7 @@ export function KnowledgeBasePage() {
         setIsUploading(true);
         setBatchResult(null);
         try {
-            const results = await apiService.uploadDocuments(files);
+            const results = await knowledgeService.uploadDocuments(files);
             
             const successfulResults = results.filter(r => r.status === 'ok');
             const failedResults = results.filter(r => r.status === 'failed');
@@ -76,7 +77,7 @@ export function KnowledgeBasePage() {
 
     const handleDelete = async (id: string) => {
         try {
-            await apiService.deleteDocument(id);
+            await knowledgeService.deleteDocument(id);
             setDocuments(prev => prev.filter(doc => doc.id !== id));
         } catch (error) {
             console.error('Delete failed:', error);
@@ -84,8 +85,8 @@ export function KnowledgeBasePage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-950 p-6 lg:p-10 text-white">
-            <div className="max-w-6xl mx-auto space-y-10">
+        <div className="min-h-screen bg-gray-950 p-4 sm:p-6 lg:p-10 text-white">
+            <div className="max-w-6xl mx-auto space-y-8 sm:space-y-10">
                 {/* Header */}
                 <header className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
@@ -95,7 +96,7 @@ export function KnowledgeBasePage() {
                         <motion.h1 
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="text-3xl font-bold tracking-tight"
+                            className="text-2xl sm:text-3xl font-bold tracking-tight"
                         >
                             Knowledge Base
                         </motion.h1>
@@ -104,7 +105,7 @@ export function KnowledgeBasePage() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="text-slate-400 max-w-2xl text-lg leading-relaxed"
+                        className="text-slate-400 max-w-2xl text-base sm:text-lg leading-relaxed"
                     >
                         Ingest project documentation. Upload Markdown files to provide the system with the necessary context for your workspace.
                     </motion.p>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { apiService, type UserProfile } from '../services/api';
+import { userService } from '../services/userService';
+import type { UserProfile } from '../services/types';
 import { AuthContext, type AuthStatus } from './AuthContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -10,7 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const initAuth = async () => {
             try {
-                const data = await apiService.getProfile();
+                const data = await userService.getProfile();
                 
                 if (!data) {
                     setStatus('unauthenticated');
@@ -30,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const login = async (username: string, firstname: string, lastname: string) => {
         setStatus('loading');
         try {
-            const user = await apiService.login(username, firstname, lastname);
+            const user = await userService.login(username, firstname, lastname);
             setProfile(user);
             setStatus('authenticated');
         } catch (error) {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const logout = async () => {
         setStatus('loading');
-        await apiService.logout();
+        await userService.logout();
         setProfile(null);
         setStatus('unauthenticated');
     };

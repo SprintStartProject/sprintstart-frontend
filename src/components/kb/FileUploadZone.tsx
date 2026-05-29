@@ -79,7 +79,7 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                     scale: isDragActive ? 1.01 : 1
                 }}
                 className={`
-                    relative border-2 border-dashed rounded-2xl p-10 
+                    relative border-2 border-dashed rounded-2xl p-6 sm:p-10 
                     flex flex-col items-center justify-center gap-5
                     transition-all duration-200 cursor-pointer group
                     ${isUploading ? 'opacity-50 pointer-events-none' : ''}
@@ -96,22 +96,22 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                 />
 
                 <div className={`
-                    w-16 h-16 rounded-2xl flex items-center justify-center
+                    w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center
                     ${isDragActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 text-slate-400 group-hover:text-blue-400 group-hover:bg-slate-700'}
                     transition-all duration-300
                 `}>
                     {isUploading ? (
-                        <Loader2 className="w-8 h-8 animate-spin" />
+                        <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin" />
                     ) : (
-                        <Upload className="w-8 h-8" />
+                        <Upload className="w-6 h-6 sm:w-8 sm:h-8" />
                     )}
                 </div>
 
                 <div className="text-center space-y-1">
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-base sm:text-lg font-semibold text-white">
                         {isUploading ? 'Processing documents...' : 'Drop Markdown files'}
                     </p>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-xs sm:text-sm text-slate-400 px-4">
                         {isUploading ? 'Ingesting your knowledge...' : 'Drag & drop .md files or click to browse'}
                     </p>
                 </div>

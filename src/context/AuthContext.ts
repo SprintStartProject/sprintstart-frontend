@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { UserProfile } from '../services/api';
+import type { UserProfile } from '../services/types';
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated';
 

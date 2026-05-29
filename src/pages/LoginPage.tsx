@@ -16,14 +16,14 @@ export function LoginPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-950 p-6">
-            <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-10 backdrop-blur-sm">
+        <div className="flex min-h-screen items-center justify-center bg-gray-950 p-4 sm:p-6">
+            <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-6 sm:p-10 backdrop-blur-sm">
                 <div className="flex flex-col items-center space-y-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-900/40">
                         <Rocket className="h-7 w-7 text-white" />
                     </div>
                     <div className="space-y-1 text-center">
-                        <h2 className="text-3xl font-bold tracking-tight text-white">SprintStart</h2>
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">SprintStart</h2>
                         <p className="text-slate-400 text-sm">Sign in to your account to continue</p>
                     </div>
                 </div>
@@ -44,7 +44,7 @@ export function LoginPage() {
                                 placeholder="e.g. jdoe"
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="firstname" className="block text-sm font-medium text-slate-300 mb-1.5">
                                     First Name
