@@ -1,7 +1,7 @@
 import type { DocumentMetadata } from '../../services/types';
 import { DocumentStatus } from '../../services/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileCode, Trash2, CheckCircle2, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { FileCode, Trash2, CheckCircle2, Clock, AlertCircle, Loader2, ImageIcon } from 'lucide-react';
 
 interface Props {
     documents: DocumentMetadata[];
@@ -75,7 +75,11 @@ export function DocumentTable({ documents, onDelete }: Props) {
                                     <td className="px-4 sm:px-6 py-4">
                                         <div className="flex items-center gap-3 sm:gap-4">
                                             <div className="p-2 sm:p-2.5 bg-slate-800 text-slate-400 rounded-xl group-hover:text-blue-400 group-hover:bg-blue-400/10 transition-colors">
-                                                <FileCode className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                {doc.name.toLowerCase().match(/\.(png|jpg|jpeg|webp)$/) ? (
+                                                    <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                ) : (
+                                                    <FileCode className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                )}
                                             </div>
                                             <div className="flex flex-col min-w-0">
                                                 <span className="font-semibold text-white truncate max-w-[120px] sm:max-w-[240px]" title={doc.name}>

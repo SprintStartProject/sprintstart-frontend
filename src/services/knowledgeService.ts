@@ -2,6 +2,7 @@ import { DocumentStatus, type DocumentMetadata, type UploadResult } from './type
 
 export const knowledgeService = {
     async fetchDocuments(): Promise<DocumentMetadata[]> {
+        // Currently still mocked as there is no GET /v1/uploads endpoint yet
         await new Promise(resolve => setTimeout(resolve, 800));
         return [
             { id: '1', name: 'Project_Overview.md', size: 1024 * 85, status: DocumentStatus.COMPLETED, uploadDate: new Date(Date.now() - 86400000).toISOString() },
@@ -10,29 +11,28 @@ export const knowledgeService = {
         ];
     },
 
-    async uploadDocuments(files: File[]): Promise<UploadResult[]> {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        return files.map(file => {
-            // Simulate a corrupt file failure if the filename contains "corrupt"
-            if (file.name.toLowerCase().includes('corrupt')) {
-                return {
-                    id: '',
-                    filename: file.name,
-                    status: 'failed',
-                    error: 'File appears to be corrupt or invalid'
-                };
-            }
-
-            return {
-                id: Math.random().toString(36).substring(7),
-                filename: file.name,
-                status: 'ok'
-            };
+    async uploadDocuments(files: File[], uploaderId: string): Promise<UploadResult[]> {
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('files', file);
         });
+
+        const response = await fetch(`/v1/uploads?uploaderId=${uploaderId}`, {
+            method: 'POST',
+            body: formData,
+            // Note: Don't set Content-Type header; fetch will set it automatically for FormData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Upload failed: ${errorText || response.statusText}`);
+        }
+
+        return await response.json() as UploadResult[];
     },
 
     async deleteDocument(_id: string): Promise<void> {
+        // Mocked until DELETE endpoint is available
         await new Promise(resolve => setTimeout(resolve, 500));
     }
 };

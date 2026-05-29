@@ -3,10 +3,12 @@ import { knowledgeService } from '../services/knowledgeService';
 import { type DocumentMetadata, DocumentStatus } from '../services/types';
 import { FileUploadZone } from '../components/kb/FileUploadZone';
 import { DocumentTable } from '../components/kb/DocumentTable';
+import { useAuth } from '../context/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, RefreshCw, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 
 export function KnowledgeBasePage() {
+    const { profile } = useAuth();
     const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
@@ -34,27 +36,36 @@ export function KnowledgeBasePage() {
     }, [loadDocuments]);
 
     const handleUpload = async (files: File[]) => {
+        if (!profile) return;
+
         setIsUploading(true);
         setBatchResult(null);
         try {
-            const results = await knowledgeService.uploadDocuments(files);
+            const results = await knowledgeService.uploadDocuments(files, profile.id);
             
             const successfulResults = results.filter(r => r.status === 'ok');
             const failedResults = results.filter(r => r.status === 'failed');
 
             // Add successful uploads to the table immediately as "PENDING"
-            const newDocs: DocumentMetadata[] = successfulResults.map(r => {
-                const originalFile = files.find(f => f.name === r.filename);
-                return {
-                    id: r.id,
-                    name: r.filename,
-                    size: originalFile?.size || 0,
-                    status: DocumentStatus.PENDING,
-                    uploadDate: new Date().toISOString()
-                };
+            // Filter out duplicates (if file already exists in current list or multiple times in batch)
+            const newDocs: DocumentMetadata[] = [];
+            successfulResults.forEach(r => {
+                const isDuplicate = documents.some(d => d.id === r.id) || newDocs.some(d => d.id === r.id);
+                if (!isDuplicate) {
+                    const originalFile = files.find(f => f.name === r.filename);
+                    newDocs.push({
+                        id: r.id,
+                        name: r.filename,
+                        size: originalFile?.size || 0,
+                        status: DocumentStatus.PENDING,
+                        uploadDate: new Date().toISOString()
+                    });
+                }
             });
 
-            setDocuments(prev => [...newDocs, ...prev]);
+            if (newDocs.length > 0) {
+                setDocuments(prev => [...newDocs, ...prev]);
+            }
 
             // Set batch feedback
             setBatchResult({

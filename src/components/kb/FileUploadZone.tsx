@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileCode, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, FileCode, Loader2, AlertCircle, ImageIcon } from 'lucide-react';
 
 interface Props {
     onUpload: (files: File[]) => void;
@@ -12,16 +12,25 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
     const [error, setError] = useState<string | null>(null);
 
     const validateFiles = (files: FileList | File[]): File[] => {
+        const allowedTypes = [
+            'application/pdf', 
+            'text/markdown', 
+            'text/plain',
+            'image/png',
+            'image/jpeg',
+            'image/webp'
+        ];
+        const maxSize = 10 * 1024 * 1024; // 10MB
         const validFiles: File[] = [];
         let hasError = false;
 
         Array.from(files).forEach(file => {
             const isMd = file.name.toLowerCase().endsWith('.md');
-            if (!isMd) {
-                setError(`Unsupported file: ${file.name}. Please upload Markdown (.md) files only.`);
+            if (!allowedTypes.includes(file.type) && !isMd) {
+                setError(`File type not supported: ${file.name}. Only PDF, MD, TXT, PNG, JPG, and WEBP are allowed.`);
                 hasError = true;
-            } else if (file.size > 10 * 1024 * 1024) { // 10MB
-                setError(`File too large: ${file.name} (Max 10MB)`);
+            } else if (file.size > maxSize) {
+                setError(`File too large: ${file.name}. Max size is 10MB.`);
                 hasError = true;
             } else {
                 validFiles.push(file);
@@ -91,7 +100,7 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                     type="file"
                     className="hidden"
                     onChange={handleFileInput}
-                    accept=".md"
+                    accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
                     multiple
                 />
 
@@ -109,17 +118,21 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
                 <div className="text-center space-y-1">
                     <p className="text-base sm:text-lg font-semibold text-white">
-                        {isUploading ? 'Processing documents...' : 'Drop Markdown files'}
+                        {isUploading ? 'Processing artifacts...' : 'Drop multiple artifacts here'}
                     </p>
                     <p className="text-xs sm:text-sm text-slate-400 px-4">
-                        {isUploading ? 'Ingesting your knowledge...' : 'Drag & drop .md files or click to browse'}
+                        {isUploading ? 'Ingesting your knowledge...' : 'Drag & drop Markdown or Images'}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex flex-wrap justify-center gap-2 mt-2">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600/10 border border-blue-600/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider">
                         <FileCode className="w-3 h-3" />
-                        Markdown Only
+                        Docs (.md, .pdf)
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 text-[10px] font-bold uppercase tracking-wider">
+                        <ImageIcon className="w-3 h-3" />
+                        Images (.png, .webp)
                     </div>
                 </div>
             </motion.div>
