@@ -1,4 +1,4 @@
-import type { OnBoardingPath, OnBoardingPhase, OnBoardingItem, OnBoardingTask, OnBoardingStep } from '../../types/onboarding';
+import type { OnBoardingPath, OnBoardingItem, OnBoardingTask, OnBoardingStep } from '../../types/onboarding';
 import mockData from '../../mocks/onboardingMock.json';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
@@ -23,9 +23,9 @@ const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
 function OnBoardingIcon({ type, className }: { type: OnBoardingItem['type']; className?: string }) {
   switch (type) {
     case 'document': return <FileText className={className} />;
-    case 'video':    return <Video className={className} />;
-    case 'link':     return <Link2 className={className} />;
-    default:         return <Target className={className} />;
+    case 'video': return <Video className={className} />;
+    case 'link': return <Link2 className={className} />;
+    default: return <Target className={className} />;
   }
 }
 
@@ -182,21 +182,19 @@ export function OnBoardingItemPage() {
                       <button
                         key={step.id}
                         onClick={() => toggleStep(step.id)}
-                        className={`w-full text-left flex items-center gap-4 rounded-xl border p-4 transition-all ${
-                          isDone
+                        className={`w-full text-left flex items-center gap-4 rounded-xl border p-4 transition-all ${isDone
                             ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
                             : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
-                        }`}
+                          }`}
                       >
                         {isDone
                           ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
                           : <Circle className="w-5 h-5 text-gray-400 shrink-0" />
                         }
-                        <span className={`text-sm font-medium ${
-                          isDone
+                        <span className={`text-sm font-medium ${isDone
                             ? 'line-through text-gray-400 dark:text-gray-500'
                             : 'text-gray-900 dark:text-white'
-                        }`}>
+                          }`}>
                           {index + 1}. {step.title}
                         </span>
                       </button>
@@ -252,11 +250,10 @@ export function OnBoardingItemPage() {
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
                 Status
               </h3>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${
-                myItem.completed
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${myItem.completed
                   ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-              }`}>
+                }`}>
                 {myItem.completed
                   ? <CheckCircle2 className="w-4 h-4" />
                   : <Circle className="w-4 h-4" />
