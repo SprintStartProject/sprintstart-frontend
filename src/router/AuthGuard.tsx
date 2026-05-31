@@ -13,7 +13,7 @@ interface LocationState {
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
-    const { status } = useAuth();
+    const { status, profile } = useAuth();
     const location = useLocation();
 
     if (status === 'loading') {
@@ -34,6 +34,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
         const state = location.state as LocationState;
         const from = state?.from?.pathname || '/';
         return <Navigate to={from} replace />;
+    }
+
+    // 3. No role yet → wizard (but don't redirect if already there)
+   if (
+    status === "authenticated" &&
+    profile?.workingArea === "NO_WORKING_AREA" &&
+    location.pathname !== "/selection-wizard"
+    ) {
+    return <Navigate to="/selection-wizard" replace />;
     }
 
     return <>{children}</>;
