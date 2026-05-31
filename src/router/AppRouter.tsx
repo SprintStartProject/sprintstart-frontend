@@ -3,6 +3,7 @@ import { ChatPage } from '../pages/ChatPage';
 import { HomePage } from '../pages/HomePage';
 import { KnowledgeBasePage } from '../pages/KnowledgeBasePage';
 import { OnBoardingPage } from '../pages/OnBoardingPage';
+import { OnBoardingItemPage } from '../components/onboarding/OnBoardingItemPage';
 
 export function AppRouter() {
     return (
@@ -11,6 +12,7 @@ export function AppRouter() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+            <Route path="/onboarding/:itemId" element={<OnBoardingItemPage />} />
         </Routes>
     );
 }

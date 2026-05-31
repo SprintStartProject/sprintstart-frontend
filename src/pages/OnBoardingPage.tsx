@@ -23,6 +23,23 @@ import {
 // Interfaces
 
 // Todo: adapt to real Endpoints of Backend
+
+export interface OnBoardingItemStep {
+    id: string;
+    title: string;
+    completed: boolean;
+}
+
+export interface OnBoardingTask {
+    id: string;
+    title: string;
+    description: string;
+    motivation: string[];
+    steps: OnBoardingItemStep[];
+    finalTask: string;
+    artifactUrl?: string;
+}
+
 export interface OnBoardingItem {
   id: string;
   title: string;
@@ -31,6 +48,7 @@ export interface OnBoardingItem {
   completed: boolean;
   duration?: string;
   artifactUrl?: string;
+  task: OnBoardingTask;
 }
 
 export interface OnBoardingPhase {
@@ -104,94 +122,229 @@ const MOCK_OnBoarding_PATH: OnBoardingPath = {
     {
       id: 'day1',
       title: 'Day 1',
-      description: 'Ankommen und Basics einrichten',
+      description: 'Ankommen und Grundlagen schaffen',
       period: 'Day 1',
       items: [
         {
           id: 'item-1',
-          title: 'HR Paperwork abschließen',
-          description: 'Verträge unterschreiben und HR-Formulare ausfüllen.',
-          type: 'task',
+          title: 'Willkommensvideo ansehen',
+          description: 'Lerne das Unternehmen und das Produkt kennen.',
+          type: 'video',
           completed: true,
+          duration: '10 min',
+          artifactUrl: '/videos/company-intro',
+          task: {
+            id: 'task-1',
+            title: 'Unternehmen kennenlernen',
+            description: 'Schaue das Einführungsvideo vollständig an.',
+            motivation: [
+              'Verstehe die Mission des Unternehmens',
+              'Bekomme einen Überblick über Produkt und Team',
+            ],
+            steps: [
+              {
+                id: 'step-1',
+                title: 'Video öffnen',
+                completed: true,
+              },
+              {
+                id: 'step-2',
+                title: 'Video vollständig ansehen',
+                completed: true,
+              },
+            ],
+            finalTask: 'Die wichtigsten Erkenntnisse notieren',
+            artifactUrl: '/videos/company-intro',
+          },
         },
         {
           id: 'item-2',
-          title: 'Company Overview Video',
-          description: 'Schau dir das Intro-Video an um einen Überblick über SprintStart zu bekommen.',
-          type: 'video',
-          completed: true,
-          duration: '15 min',
-        },
-        {
-          id: 'item-3',
-          title: 'Developer Handbook lesen',
-          description: 'Das Handbook erklärt unsere Prozesse, Tools und Coding Standards.',
-          type: 'document',
-          completed: false,
-          duration: '30 min',
-          artifactUrl: '/knowledge/handbook',
-        },
-        {
-          id: 'item-4',
-          title: 'Dev Environment aufsetzen',
-          description: 'Repo klonen, Dependencies installieren, local Stack zum Laufen bringen.',
+          title: 'Entwicklungsumgebung einrichten',
+          description: 'Repository klonen und Anwendung lokal starten.',
           type: 'task',
           completed: false,
+          task: {
+            id: 'task-2',
+            title: 'Setup abschließen',
+            description: 'Richte deine lokale Entwicklungsumgebung ein.',
+            motivation: [
+              'Du kannst anschließend selbst entwickeln',
+              'Du lernst die wichtigsten Tools kennen',
+            ],
+            steps: [
+              {
+                id: 'step-1',
+                title: 'Repository klonen',
+                completed: true,
+              },
+              {
+                id: 'step-2',
+                title: 'Abhängigkeiten installieren',
+                completed: true,
+              },
+              {
+                id: 'step-3',
+                title: 'Backend starten',
+                completed: false,
+              },
+            ],
+            finalTask: 'Anwendung lokal erfolgreich starten',
+          },
         },
       ],
     },
+
     {
       id: 'week1',
       title: 'Week 1',
-      description: 'Codebase und Prozesse kennenlernen',
+      description: 'Codebase und Prozesse verstehen',
       period: 'Week 1',
       items: [
         {
-          id: 'item-5',
-          title: 'Architecture Overview',
-          description: 'Verstehe wie Frontend, Backend und AI-Layer zusammenspielen.',
+          id: 'item-3',
+          title: 'Architektur-Dokumentation lesen',
+          description: 'Verstehe die wichtigsten Systemkomponenten.',
           type: 'document',
           completed: false,
-          duration: '45 min',
+          duration: '30 min',
           artifactUrl: '/knowledge/architecture',
+          task: {
+            id: 'task-3',
+            title: 'Architektur verstehen',
+            description: 'Arbeite dich in die Systemarchitektur ein.',
+            motivation: [
+              'Besseres Verständnis der Codebase',
+              'Einfacherer Einstieg in neue Features',
+            ],
+            steps: [
+              {
+                id: 'step-1',
+                title: 'Dokument öffnen',
+                completed: true,
+              },
+              {
+                id: 'step-2',
+                title: 'Frontend-Bereich lesen',
+                completed: false,
+              },
+              {
+                id: 'step-3',
+                title: 'Backend-Bereich lesen',
+                completed: false,
+              },
+            ],
+            finalTask: 'Architekturdiagramm erklären können',
+            artifactUrl: '/knowledge/architecture',
+          },
         },
         {
-          id: 'item-6',
-          title: 'Erstes Feature implementieren',
-          description: 'Nimm ein gutes First-Issue und schließe deinen ersten PR ab.',
+          id: 'item-4',
+          title: 'Erstes GitHub Issue bearbeiten',
+          description: 'Implementiere ein kleines Feature oder einen Bugfix.',
           type: 'task',
           completed: false,
-        },
-        {
-          id: 'item-7',
-          title: 'CI/CD Pipeline verstehen',
-          description: 'Wie läuft unser CI ab? Was prüft es?',
-          type: 'video',
-          completed: false,
-          duration: '20 min',
+          task: {
+            id: 'task-4',
+            title: 'Ersten Pull Request erstellen',
+            description: 'Durchlaufe den kompletten Entwicklungsprozess.',
+            motivation: [
+              'Praktischer Einstieg in die Codebase',
+              'Lerne den Review-Prozess kennen',
+            ],
+            steps: [
+              {
+                id: 'step-1',
+                title: 'Issue auswählen',
+                completed: false,
+              },
+              {
+                id: 'step-2',
+                title: 'Lösung implementieren',
+                completed: false,
+              },
+              {
+                id: 'step-3',
+                title: 'Pull Request erstellen',
+                completed: false,
+              },
+            ],
+            finalTask: 'Pull Request erfolgreich mergen',
+          },
         },
       ],
     },
+
     {
       id: 'month1',
       title: 'Month 1',
-      description: 'Eigenständig arbeiten',
+      description: 'Eigenständig Verantwortung übernehmen',
       period: 'Month 1',
       items: [
         {
-          id: 'item-8',
-          title: 'Feature selbst leaden',
-          description: 'Übernimm ein Feature von Design bis Deployment.',
-          type: 'task',
-          completed: false,
-        },
-        {
-          id: 'item-9',
-          title: 'Security Guidelines',
-          description: 'Lies unsere Security-Docs durch bevor du an Auth-relevantem Code arbeitest.',
+          id: 'item-5',
+          title: 'Security Guidelines durcharbeiten',
+          description: 'Lerne die wichtigsten Sicherheitsrichtlinien kennen.',
           type: 'document',
           completed: false,
-          duration: '25 min',
+          duration: '20 min',
+          artifactUrl: '/knowledge/security',
+          task: {
+            id: 'task-5',
+            title: 'Security Grundlagen verstehen',
+            description: 'Arbeite die Security-Dokumentation durch.',
+            motivation: [
+              'Vermeide Sicherheitslücken',
+              'Arbeite sicher an produktivem Code',
+            ],
+            steps: [
+              {
+                id: 'step-1',
+                title: 'Authentifizierung lesen',
+                completed: false,
+              },
+              {
+                id: 'step-2',
+                title: 'Berechtigungskonzept lesen',
+                completed: false,
+              },
+            ],
+            finalTask: 'Security Quiz bestehen',
+            artifactUrl: '/knowledge/security',
+          },
+        },
+        {
+          id: 'item-6',
+          title: 'Feature eigenständig liefern',
+          description: 'Plane und implementiere ein kleines Feature.',
+          type: 'task',
+          completed: false,
+          task: {
+            id: 'task-6',
+            title: 'Feature Ownership übernehmen',
+            description: 'Von Anforderung bis Deployment.',
+            motivation: [
+              'Eigenverantwortung übernehmen',
+              'Produktverständnis vertiefen',
+            ],
+            steps: [
+              {
+                id: 'step-1',
+                title: 'Anforderungen analysieren',
+                completed: false,
+              },
+              {
+                id: 'step-2',
+                title: 'Implementieren',
+                completed: false,
+              },
+              {
+                id: 'step-3',
+                title: 'Deployment begleiten',
+                completed: false,
+              },
+            ],
+            finalTask: 'Feature erfolgreich in Produktion bringen',
+          },
         },
       ],
     },
@@ -356,7 +509,7 @@ export function OnBoardingPage() {
     <div className="min-h-screen bg-white dark:bg-gray-950">
 
       {/* ── HEADER ───────────────────────────────────────── */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl sticky top-0 z-10">
+      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
           {/* Titel + Gesamt-Prozent */}
@@ -428,10 +581,9 @@ export function OnBoardingPage() {
 
 
       {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
 
         {/* "Up Next" Banner — nur wenn es einen nächsten Task gibt */}
-        {/* [CONCEPT] {nextTask && (...)} = render nur wenn nextTask nicht null/undefined */}
         {nextTask && (
           <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-950 p-6 sm:p-8 mb-6 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full pointer-events-none" />
@@ -481,9 +633,6 @@ export function OnBoardingPage() {
 
         {/* Task-Liste */}
         <div className="space-y-4">
-          {/* [CONCEPT] .map() über ein Array um JSX-Elemente zu erzeugen.
-              Für jedes Item in currentPhase.items wird ein <div> gerendert.
-              key={item.id} ist Pflicht — React nutzt es intern. */}
           {currentPhase.items.map((item) => (
             <div
               key={item.id}
