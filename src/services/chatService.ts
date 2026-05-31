@@ -9,9 +9,14 @@ export type Chat = {
 export type ChatMessage = {
     id: string;
     role: 'AI' | 'USER' | 'SYSTEM' | 'ORCHESTRATOR';
-    chat: Chat;
     content: string;
-    createdAt: string;
+    citations?: Citation[]
+}
+
+export type Citation = {
+    chunk_id: string,
+    filename: string,
+    section_path: string
 }
 
 export async function getChats() {
@@ -38,7 +43,7 @@ export async function createChat(userId: string) {
 }
 
 export async function getMessages(chatId: string) {
-    const res = await fetch(`/api/chats/${chatId}`, {
+    const res = await fetch(`/api/v1/chats/${chatId}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -48,14 +53,72 @@ export async function getMessages(chatId: string) {
     return res.json() as Promise<Chat>
 }
 
-export async function sendMessage(chatId: string, msg: string) {
-    const res = await fetch(`api/chats/prompt`, {
+export type StreamHandlers = {
+    onToken: (token: string) => void;
+    onCitation: (citation: Citation) => void;
+    onDone: () => void;
+    onError?: (message: string) => void;
+};
+
+export async function streamMessage(
+    chatId: string,
+    text: string,
+    handlers: StreamHandlers
+): Promise<void> {
+    const res = await fetch(`/api/v1/chats/prompt`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json"
+        },
         body: JSON.stringify({
             chatId,
-            msg
+            text
         })
     });
-    return res.json() as Promise<ChatMessage[]>;
+
+    const reader = res.body?.getReader();
+
+    if (!reader) {
+        throw new Error("No response stream");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+        const { value, done } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+
+            const event = JSON.parse(
+                line.replace("data:", "").trim()
+            );
+
+            switch (event.type) {
+                case "token":
+                    handlers.onToken(event.content);
+                    break;
+
+                case "citation":
+                    handlers.onCitation(event);
+                    break;
+
+                case "done":
+                    handlers.onDone();
+                    return;
+
+                case "error":
+                    handlers.onError?.(event.message);
+                    return;
+            }
+        }
+    }
 }
