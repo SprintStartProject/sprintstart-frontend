@@ -1,12 +1,21 @@
 import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
-import { Rocket } from 'lucide-react';
+import { Rocket, ShieldAlert } from 'lucide-react';
 
 export function LoginPage() {
     const [username, setUsername] = useState('');
     const [firstname, setFirstname] = useState('');
     const [lastname, setLastname] = useState('');
+    const [isOfflineMode, setIsOfflineMode] = useState(() => 
+        localStorage.getItem('sprintstart_offline_mode') === 'true'
+    );
     const { login, status } = useAuth();
+
+    const handleToggleOffline = () => {
+        const newValue = !isOfflineMode;
+        setIsOfflineMode(newValue);
+        localStorage.setItem('sprintstart_offline_mode', newValue.toString());
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -17,6 +26,21 @@ export function LoginPage() {
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-950 p-4 sm:p-6">
+            {/* Offline Mode Toggle (Bottom Left) */}
+            <div className="fixed bottom-6 left-6 flex flex-col gap-2">
+                <button
+                    onClick={handleToggleOffline}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
+                        isOfflineMode 
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
+                            : 'bg-slate-900 text-slate-500 border-slate-800'
+                    }`}
+                >
+                    <ShieldAlert className={`w-3.5 h-3.5 ${isOfflineMode ? 'text-emerald-400' : 'text-slate-500'}`} />
+                    Offline Mode: {isOfflineMode ? 'ON' : 'OFF'}
+                </button>
+            </div>
+
             <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-6 sm:p-10 backdrop-blur-sm">
                 <div className="flex flex-col items-center space-y-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-900/40">

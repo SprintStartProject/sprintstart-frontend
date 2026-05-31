@@ -1,9 +1,29 @@
 import { Role, WorkingArea, type UserProfile } from './types';
 
 const SESSION_KEY = 'sprintstart_session_id';
+const OFFLINE_MODE_KEY = 'sprintstart_offline_mode';
+
+const isOfflineMode = () => localStorage.getItem(OFFLINE_MODE_KEY) === 'true';
+
+const MOCK_USER: UserProfile = {
+    id: 'mock-user-123',
+    username: 'demo_user',
+    firstname: 'Demo',
+    lastname: 'User',
+    primaryRole: Role.NO_ROLE,
+    secondaryRole: Role.NO_ROLE,
+    workingArea: WorkingArea.NO_WORKING_AREA
+};
 
 export const userService = {
     async login(username: string, firstname: string, lastname: string): Promise<UserProfile> {
+        if (isOfflineMode()) {
+            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network
+            const mockUser = { ...MOCK_USER, username, firstname, lastname };
+            localStorage.setItem(SESSION_KEY, mockUser.id);
+            return mockUser;
+        }
+
         // 1. Fetch all users to see if we match the username
         const response = await fetch('/api/v1/users');
         if (!response.ok) throw new Error('Failed to fetch users');
@@ -39,6 +59,10 @@ export const userService = {
         const userId = localStorage.getItem(SESSION_KEY);
         if (!userId) return null;
 
+        if (isOfflineMode()) {
+            return { ...MOCK_USER, id: userId };
+        }
+
         try {
             const response = await fetch(`/api/v1/users/${userId}`);
             if (!response.ok) {
@@ -58,6 +82,12 @@ export const userService = {
     async updateProfile(profile: Partial<UserProfile>): Promise<UserProfile> {
         const userId = localStorage.getItem(SESSION_KEY);
         if (!userId) throw new Error('Not authenticated');
+
+        if (isOfflineMode()) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            // In offline mode, we just pretend the update succeeded. 
+            return { ...MOCK_USER, ...profile };
+        }
 
         const response = await fetch(`/api/v1/users/${userId}`, {
             method: 'PATCH',
