@@ -2,9 +2,7 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
   gitleaks:
@@ -20,7 +18,7 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Scan repository
-        run: gitleaks detect
+        run: gitleaks detect --verbose
 
   build:
     runs-on: ubuntu-latest
