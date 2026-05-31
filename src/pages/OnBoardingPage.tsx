@@ -69,10 +69,11 @@ function ProgressBar({ value, max }: ProgressBarProps) {
 
 
 // ─────────────────────────────────────────────────────────────
-// MOCK-DATEN (temporär, bis Backend fertig ist)
+// MOCK-DATEN (temporär, bis Backend fertig ist) - auch imported
 // ─────────────────────────────────────────────────────────────
 
 const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
+
 
 
 // ─────────────────────────────────────────────────────────────
