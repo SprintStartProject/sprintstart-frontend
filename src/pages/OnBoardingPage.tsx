@@ -1,3 +1,7 @@
 export function OnBoardingPage() {
-    return <div />;
+  return (
+    <div>
+      <h1>Hello Onboarding</h1>
+    </div>
+  );
 }
