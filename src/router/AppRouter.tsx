@@ -9,6 +9,7 @@ export function AppRouter() {
         <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:id" element={<ChatPage />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
         </Routes>
