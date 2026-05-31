@@ -22,7 +22,7 @@ jobs:
         run: ./gitleaks version
 
       - name: Scan repository
-        run: ./gitleaks detect --verbose
+        run: ./gitleaks detect --verbose --redact
 
   build:
     runs-on: ubuntu-latest
