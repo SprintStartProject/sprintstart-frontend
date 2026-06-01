@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import type { OnBoardingItem, OnBoardingPath, OnBoardingPhase } from '../types/onboarding';
+import type { OnboardingPathEndpoint } from '../types/onboarding';
 import mockData from '../mocks/onboardingMock.json';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,7 +27,7 @@ import {
 // Interfaces - imported
 // Todo: adapt to real Endpoints of Backend
 
-
+const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 
@@ -68,6 +69,17 @@ function ProgressBar({ value, max }: ProgressBarProps) {
     );
 }
 
+function fetchPath(userId: string): Promise<OnBoardingPath> {
+    return fetch(`${BASE_API_URL}/onboarding/${userId}/path`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Fehler beim Laden des OnBoarding Paths: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => data as OnBoardingPath);
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // MOCK-DATEN (temporär, bis Backend fertig ist) - auch imported
@@ -104,24 +116,23 @@ export function OnBoardingPage() {
     useEffect(() => {
         const loadOnBoardingPath = async () => {
             setLoadingState('loading');
-
             try {
-                // ── [TODO] HIER KOMMT DER ECHTE API-CALL ────────────
-                // Wenn Backend-Endpoint bekannt, ersetze den Mock-Code:
-                //
-                //   const response = await fetch('/api/OnBoarding/path');
-                //
-                //   if (!response.ok) {
-                //     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                //   }
-                //
-                //   const data: OnBoardingPath = await response.json();
-                //   setOnBoardingPath(data);
-                //
-                // ── AKTUELL: Mock-Daten mit simuliertem Delay ────────
+                // find USER
+                const usersRes = await fetch(`${BASE_API_URL}/users`);
+                if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
+                const users = await usersRes.json();
+                const userId: string = users[0]?.id;
+                if (!userId) throw new Error('Kein User gefunden.');
+                console.log('Gefundener User ID:', userId);
+
+                // fetch PATH
+                const path = await fetchPath(userId);
+                console.log('Geladener OnBoarding Path:', path);
+
+                
                 await new Promise(resolve => setTimeout(resolve, 800));
                 setOnBoardingPath(MOCK_OnBoarding_PATH);
-                // ─────────────────────────────────────────────────────
+
 
                 setLoadingState('success');
             } catch (err) {
