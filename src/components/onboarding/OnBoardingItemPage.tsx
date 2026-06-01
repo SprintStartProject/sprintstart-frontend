@@ -1,7 +1,8 @@
 import type { OnBoardingPath, OnBoardingItem, OnBoardingTask, OnBoardingStep } from '../../types/onboarding';
+import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint, OnboardingTaskEndpoint, OnboardingStepEndpoint, OnboardingResourceEndpoint, OnboardingStepDetail, StepStatus} from '../types/onboarding';
 import mockData from '../../mocks/onboardingMock.json';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -10,39 +11,118 @@ import {
   Sparkles,
   Trophy,
   Target,
-  FileText,
-  Video,
-  Link2,
   ExternalLink,
   MessageSquareCheck,
   ChevronRight,
 } from 'lucide-react';
 
-const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
+//const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
 
-// ── HELPER: Icon (gleich wie in OnBoardingPage) ──────────────
-function OnBoardingIcon({ type, className }: { type: OnBoardingItem['type']; className?: string }) {
-  switch (type) {
-    case 'document': return <FileText className={className} />;
-    case 'video': return <Video className={className} />;
-    case 'link': return <Link2 className={className} />;
-    default: return <Target className={className} />;
-  }
+const BASE_API_URL = 'http://localhost:8080/api/v1';
+type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+
+function fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
+    return fetch(`${BASE_API_URL}/onboarding/${userId}/path`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Fehler beim Laden des OnBoarding Paths: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => data as OnboardingPathEndpoint);
+}
+
+function fetchAllTasksOfStep(stepId: string): Promise<OnboardingTaskEndpoint[]> {
+    return fetch(`${BASE_API_URL}/onboarding/steps/${stepId}/tasks`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Fehler beim Laden der Tasks: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => data as OnboardingTaskEndpoint[]);
+}
+
+function fetchStep(stepId: string): Promise<OnboardingStepEndpoint> {
+    return fetch(`${BASE_API_URL}/onboarding/steps/${stepId}`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Fehler beim Laden der Steps für Phase ${stepId}: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => data as OnboardingStepEndpoint);
+}
+
+function fetchStepDetail(stepId: string): Promise<OnboardingStepDetail> {
+    return fetch(`${BASE_API_URL}/onboarding/steps/${stepId}`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Fehler beim Laden der Step-Details: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => data as OnboardingStepDetail);
 }
 
 // ── HAUPT-KOMPONENTE ─────────────────────────────────────────
 export function OnBoardingItemPage() {
-  const { itemId } = useParams();
+
+      // Selected Phase
+      const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(1);
+  
+      // OnBoarding-Daten (null = noch nicht geladen)
+      const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
+  
+      // Loading State: 'idle' (vor dem Laden), 'loading' (während Laden), 'success' (geladen), 'error' (Fehler)
+      const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  
+      // Fehlermeldung für den Error-State
+      const [errorMessage, setErrorMessage] = useState<string>('');
+  
+          useEffect(() => {
+        const loadOnBoardingPath = async () => {
+            setLoadingState('loading');
+            try {
+                // find USER
+                const usersRes = await fetch(`${BASE_API_URL}/users`);
+                if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
+                const users = await usersRes.json();
+                const userId: string = users[0]?.id;
+                if (!userId) throw new Error('Kein User gefunden.');
+                console.log('Gefundener User ID:', userId);
+
+                // fetch PATH
+                const path = await fetchPath(userId);
+                console.log('Geladener OnBoarding Path:', path);
+
+                setOnBoardingPath(path);
+
+
+                setLoadingState('success');
+            } catch (err) {
+                setLoadingState('error');
+                setErrorMessage(err instanceof Error ? err.message : 'Unbekannter Fehler');
+            }
+        };
+
+        loadOnBoardingPath();
+    }, []);
+
+
+  const { stepId: stepId } = useParams();
   const navigate = useNavigate();
+  
+  const myStep = fetchStep(stepId!).catch((err) => {
+    console.error('Fehler beim Laden der Step-Daten:', err);
+    return null; // Rückfall auf null, damit die Seite nicht komplett crasht
+  });
 
   // [CONCEPT] useState für die Step-Checkboxen auf dieser Page.
   // Wir speichern welche Steps der User lokal abgehakt hat.
   // TODO: später mit Backend synchronisieren
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
-
-  // Item aus Mock heraussuchen
-  const allItems = MOCK_OnBoarding_PATH.phases.flatMap((phase) => phase.items);
-  const myItem: OnBoardingItem | undefined = allItems.find((item) => item.id === itemId);
 
   // Step toggle — gleiche Immutability-Logik wie in OnBoardingPage
   const toggleStep = (stepId: string) => {
@@ -54,7 +134,7 @@ export function OnBoardingItemPage() {
   };
 
   // ── EMPTY STATE ──────────────────────────────────────────
-  if (!myItem) {
+  if (!myStep) {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
@@ -70,14 +150,14 @@ export function OnBoardingItemPage() {
     );
   }
 
-  const task: OnBoardingTask | undefined = myItem.task;
+  const tasksOfStep = fetchAllTasksOfStep(stepId!);
 
   // Fortschritt der Steps berechnen
-  const totalSteps = task?.steps.length ?? 0;
-  const doneSteps = task?.steps.filter(
-    (s) => s.completed || completedSteps.includes(s.id)
+  const totalTasks = (await tasksOfStep)?.length ?? 0;
+  const doneSteps = (await tasksOfStep)?.filter(
+    (s) => s.finished || completedSteps.includes(s.id)
   ).length ?? 0;
-  const stepPercentage = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 0;
+  const stepPercentage = totalTasks > 0 ? Math.round((doneSteps / totalTasks) * 100) : 0;
 
   // ── RENDER ───────────────────────────────────────────────
   return (
@@ -100,22 +180,21 @@ export function OnBoardingItemPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-3">
-                <OnBoardingIcon type={myItem.type} className="w-3.5 h-3.5" />
-                <span className="capitalize">{myItem.type}</span>
+                <span className="capitalize">{myStep.type}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                {myItem.title}
+                {myStep.title}
               </h1>
               <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">
-                {myItem.description}
+                {myStep.description}
               </p>
             </div>
 
             {/* Dauer */}
-            {myItem.duration && (
+            {myStep.duration && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-900 text-sm text-gray-600 dark:text-gray-400 shrink-0">
                 <Clock3 className="w-4 h-4" />
-                {myItem.duration}
+                {myStep.duration}
               </div>
             )}
           </div>
@@ -130,7 +209,7 @@ export function OnBoardingItemPage() {
           <div className="lg:col-span-2 space-y-6">
 
             {/* MOTIVATION */}
-            {task?.motivation && task.motivation.length > 0 && (
+            {tasksOfStep?.motivation && tasksOfStep.motivation.length > 0 && (
               <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-blue-500" />
@@ -138,22 +217,11 @@ export function OnBoardingItemPage() {
                     Nach diesem Schritt kannst du...
                   </h2>
                 </div>
-                <div className="space-y-3">
-                  {task.motivation.map((point, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 p-3"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{point}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
             {/* STEP BY STEP */}
-            {task?.steps && task.steps.length > 0 && (
+            {tasksOfStep?.steps && tasksOfStep.steps.length > 0 && (
               <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -164,7 +232,7 @@ export function OnBoardingItemPage() {
                   </div>
                   {/* Mini-Fortschritt */}
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {doneSteps}/{totalSteps} erledigt
+                    {doneSteps}/{totalTasks} erledigt
                   </span>
                 </div>
 
@@ -177,8 +245,8 @@ export function OnBoardingItemPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {task.steps.map((step: OnBoardingStep, index: number) => {
-                    const isDone = step.completed || completedSteps.includes(step.id);
+                  {tasksOfStep.steps.map((step: OnboardingStepEndpoint, index: number) => {
+                    const isDone = step.finished || completedSteps.includes(step.id);
                     return (
                       <button
                         key={step.id}
@@ -206,7 +274,7 @@ export function OnBoardingItemPage() {
             )}
 
             {/* FINAL TASK */}
-            {task?.finalTask && (
+            {tasksOfStep?.finalTask && (
               <div className="rounded-2xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20 p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Trophy className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -215,7 +283,7 @@ export function OnBoardingItemPage() {
                   </h2>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                  {task.finalTask}
+                  {tasksOfStep.finalTask}
                 </p>
                 <button className="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-all flex items-center gap-2">
                   Als abgeschlossen markieren
@@ -229,13 +297,13 @@ export function OnBoardingItemPage() {
           <div className="space-y-6">
 
             {/* ARTIFACT LINK */}
-            {myItem.artifactUrl && (
+            {myStep.artifactUrl && (
               <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
                   Zugehöriges Artifact
                 </h3>
                 <a
-                  href={myItem.artifactUrl}
+                  href={myStep.artifactUrl}
                   className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
                 >
                   <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -251,15 +319,15 @@ export function OnBoardingItemPage() {
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
                 Status
               </h3>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${myItem.completed
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${myStep.finished
                   ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
                 }`}>
-                {myItem.completed
+                {myStep.finished
                   ? <CheckCircle2 className="w-4 h-4" />
                   : <Circle className="w-4 h-4" />
                 }
-                {myItem.completed ? 'Abgeschlossen' : 'Offen'}
+                {myStep.finished ? 'Abgeschlossen' : 'Offen'}
               </div>
             </div>
             {/* FEEDBACK */}

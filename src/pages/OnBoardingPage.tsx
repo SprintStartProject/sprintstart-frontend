@@ -3,26 +3,18 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import type { OnBoardingItem, OnBoardingPath, OnBoardingPhase } from '../types/onboarding';
-import type { OnboardingPathEndpoint } from '../types/onboarding';
-import mockData from '../mocks/onboardingMock.json';
+import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint, OnboardingTaskEndpoint, OnboardingStepEndpoint, OnboardingResourceEndpoint, StepStatus} from '../types/onboarding';
 import { useNavigate } from 'react-router-dom';
 
 import {
     CheckCircle2,
     Circle,
-    Clock3,
-    FileText,
-    Video,
-    Link2,
     ChevronRight,
     Sparkles,
     PlayCircle,
-    Target,
     Loader2,
     AlertCircle,
 } from 'lucide-react';
-
 
 // Interfaces - imported
 // Todo: adapt to real Endpoints of Backend
@@ -31,21 +23,6 @@ const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 
-// Helper
-
-interface OnBoardingIconProps {
-    type: OnBoardingItem['type'];
-    className?: string;
-}
-
-function OnBoardingIcon({ type, className }: OnBoardingIconProps) {
-    switch (type) {
-        case 'document': return <FileText className={className} />;
-        case 'video': return <Video className={className} />;
-        case 'link': return <Link2 className={className} />;
-        default: return <Target className={className} />;
-    }
-}
 
 // ─────────────────────────────────────────────────────────────
 // HELPER-KOMPONENTE: ProgressBar
@@ -69,7 +46,7 @@ function ProgressBar({ value, max }: ProgressBarProps) {
     );
 }
 
-function fetchPath(userId: string): Promise<OnBoardingPath> {
+function fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
     return fetch(`${BASE_API_URL}/onboarding/${userId}/path`)
         .then(res => {
             if (!res.ok) {
@@ -77,7 +54,7 @@ function fetchPath(userId: string): Promise<OnBoardingPath> {
             }
             return res.json();
         })
-        .then(data => data as OnBoardingPath);
+        .then(data => data as OnboardingPathEndpoint);
 }
 
 
@@ -85,7 +62,7 @@ function fetchPath(userId: string): Promise<OnBoardingPath> {
 // MOCK-DATEN (temporär, bis Backend fertig ist) - auch imported
 // ─────────────────────────────────────────────────────────────
 
-const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
+//const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
 
 
 
@@ -97,10 +74,10 @@ const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
 export function OnBoardingPage() {
 
     // Selected Phase
-    const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
+    const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(1);
 
     // OnBoarding-Daten (null = noch nicht geladen)
-    const [OnBoardingPath, setOnBoardingPath] = useState<OnBoardingPath | null>(null);
+    const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
 
     // Loading State: 'idle' (vor dem Laden), 'loading' (während Laden), 'success' (geladen), 'error' (Fehler)
     const [loadingState, setLoadingState] = useState<LoadingState>('idle');
@@ -129,9 +106,7 @@ export function OnBoardingPage() {
                 const path = await fetchPath(userId);
                 console.log('Geladener OnBoarding Path:', path);
 
-                
-                await new Promise(resolve => setTimeout(resolve, 800));
-                setOnBoardingPath(MOCK_OnBoarding_PATH);
+                setOnBoardingPath(path);
 
 
                 setLoadingState('success');
@@ -146,22 +121,22 @@ export function OnBoardingPage() {
 
 
 
-    const currentPhase = OnBoardingPath?.phases[selectedPhaseIndex] ?? null;
+    const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
     // Hilfsfunktion für Fortschritt einer Phase
-    const getPhaseProgress = (phase: OnBoardingPhase) => {
-        const completed = phase.items.filter(item => item.completed).length;
+    const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
+        const completed = phase.steps.filter(step => step.status === 'DONE').length;
         return {
             completed,
-            total: phase.items.length,
-            percentage: phase.items.length > 0
-                ? Math.round((completed / phase.items.length) * 100)
+            total: phase.steps.length,
+            percentage: phase.steps.length > 0
+                ? Math.round((completed / phase.steps.length) * 100)
                 : 0,
         };
     };
 
     // Gesamtfortschritt über alle Phasen
-    const totalProgress = OnBoardingPath?.phases.reduce(
+    const totalProgress = OnBoardingPathEndpoint?.phases.reduce(
         (acc, phase) => {
             const p = getPhaseProgress(phase);
             return { completed: acc.completed + p.completed, total: acc.total + p.total };
@@ -174,23 +149,23 @@ export function OnBoardingPage() {
         : 0;
 
     // Nächste unerledigte Task (über alle Phasen)
-    const nextTask = OnBoardingPath?.phases
-        .flatMap(phase => phase.items)
-        .find(item => !item.completed) ?? null;
+    const nextTask = OnBoardingPathEndpoint?.phases
+        .flatMap(phase => phase.steps)
+        .find(step => step.status !== 'DONE') ?? null;
 
     // Task als erledigt markieren (lokal, bis Backend-Patch-Endpoint fertig ist)
-    // [TODO] Später durch API-Call ersetzen: PATCH /api/OnBoarding/items/:id
+    // [TODO] Später durch API-Call ersetzen: PATCH /api/OnBoarding/steps/:id
     const toggleItemCompleted = (itemId: string) => {
-        if (!OnBoardingPath) return;
+        if (!OnBoardingPathEndpoint) return;
 
         setOnBoardingPath({
-            ...OnBoardingPath,
-            phases: OnBoardingPath.phases.map(phase => ({
+            ...OnBoardingPathEndpoint,
+            phases: OnBoardingPathEndpoint.phases.map(phase => ({
                 ...phase,
-                items: phase.items.map(item =>
-                    item.id === itemId
-                        ? { ...item, completed: !item.completed } // toggle
-                        : item
+                steps: phase.steps.map(step =>
+                    step.id === itemId
+                        ? { ...step, status: step.status === 'DONE' ? 'TODO' : 'DONE' } // toggle
+                        : step
                 ),
             })),
         });
@@ -231,7 +206,7 @@ export function OnBoardingPage() {
     }
 
     // ── RENDER: EMPTY STATE ────────────────────────────────────
-    if (!OnBoardingPath || !currentPhase) {
+    if (!OnBoardingPathEndpoint || !currentPhase) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -259,9 +234,6 @@ export function OnBoardingPage() {
                                     Dein OnBoarding Journey
                                 </h1>
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Rolle: {OnBoardingPath.role}
-                            </p>
                         </div>
 
                         <div className="text-right">
@@ -277,7 +249,7 @@ export function OnBoardingPage() {
 
                     {/* Phasen-Tabs */}
                     <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                        {OnBoardingPath.phases.map((phase, index) => {
+                        {OnBoardingPathEndpoint.phases.map((phase, index) => {
                             const progress = getPhaseProgress(phase);
                             const isSelected = selectedPhaseIndex === index;
 
@@ -292,9 +264,6 @@ export function OnBoardingPage() {
                                 >
                                     <div className="font-semibold text-gray-900 dark:text-white text-sm mb-1">
                                         {phase.title}
-                                    </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                                        {phase.period}
                                     </div>
                                     <ProgressBar value={progress.completed} max={progress.total} />
                                     <div className="flex justify-between mt-2">
@@ -342,16 +311,6 @@ export function OnBoardingPage() {
                                     Jetzt starten
                                     <ChevronRight className="w-4 h-4" />
                                 </button>
-                                <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                    <OnBoardingIcon type={nextTask.type} className="w-4 h-4" />
-                                    <span className="capitalize">{nextTask.type}</span>
-                                </div>
-                                {nextTask.duration && (
-                                    <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                        <Clock3 className="w-4 h-4" />
-                                        {nextTask.duration}
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -369,10 +328,10 @@ export function OnBoardingPage() {
 
                 {/* Task-Liste */}
                 <div className="space-y-4">
-                    {currentPhase.items.map((item) => (
+                    {currentPhase.steps.map((step) => (
                         <div
-                            key={item.id}
-                            className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${item.completed
+                            key={step.id}
+                            className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${step.status === 'DONE'
                                 ? 'border-gray-200 dark:border-gray-800 opacity-60'
                                 : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg'
                                 }`}
@@ -382,11 +341,11 @@ export function OnBoardingPage() {
 
                                     {/* Checkbox-Button */}
                                     <button
-                                        onClick={() => toggleItemCompleted(item.id)}
+                                        onClick={() => toggleItemCompleted(step.id)}
                                         className="pt-0.5 shrink-0 transition-transform hover:scale-110"
-                                        aria-label={item.completed ? 'Als unerledigt markieren' : 'Als erledigt markieren'}
+                                        aria-label={step.status === 'DONE' ? 'Als unerledigt markieren' : 'Als erledigt markieren'}
                                     >
-                                        {item.completed
+                                        {step.status === 'DONE'
                                             ? <CheckCircle2 className="w-6 h-6 text-green-500" />
                                             : <Circle className="w-6 h-6 text-blue-400" />
                                         }
@@ -398,32 +357,20 @@ export function OnBoardingPage() {
 
                                             {/* Text */}
                                             <div>
-                                                <h3 className={`font-semibold text-base ${item.completed
+                                                <h3 className={`font-semibold text-base ${step.status === 'DONE'
                                                     ? 'line-through text-gray-400 dark:text-gray-500'
                                                     : 'text-gray-900 dark:text-white'
                                                     }`}>
-                                                    {item.title}
+                                                    {step.title}
                                                 </h3>
                                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
-                                                    {item.description}
+                                                    {step.description}
                                                 </p>
                                                 {/* Meta-Infos */}
-                                                <div className="flex flex-wrap items-center gap-4 mt-3">
-                                                    <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                                                        <OnBoardingIcon type={item.type} className="w-4 h-4" />
-                                                        <span className="text-xs capitalize">{item.type}</span>
-                                                    </div>
-                                                    {item.duration && (
-                                                        <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                                                            <Clock3 className="w-4 h-4" />
-                                                            <span className="text-xs">{item.duration}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
                                             </div>
 
                                             <button
-                                                onClick={() => navigate(`/onboarding/${item.id}`)}
+                                                onClick={() => navigate(`/onboarding/${step.id}`)}
                                                 className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
                                             >
                                                 Jetzt starten
