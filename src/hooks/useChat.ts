@@ -15,7 +15,7 @@ export function useChat() {
     useEffect(() => {
         const loadChats = async () => {
             const data = await getChats();
-            setChats(data);
+            setChats(data.chats);
         };
 
         void loadChats();
@@ -72,7 +72,7 @@ export function useChat() {
                             ...chat.messages,
                             {
                                 id: assistantId,
-                                role: "AI",
+                                role: "ASSISTANT",
                                 content: ""
                             }
                         ]

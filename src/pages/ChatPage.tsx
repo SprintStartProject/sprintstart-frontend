@@ -4,7 +4,7 @@ import {NavLink} from "react-router-dom";
 
 export function ChatPage() {
 
-    const { chat, chats, handleSubmit, isThinking, newRequest, setNewRequest} = useChat();
+    const { chat, chatId, chats, handleSubmit, isThinking, newRequest, setNewRequest} = useChat();
 
     return (
         <div className="h-screen flex">
@@ -22,14 +22,14 @@ export function ChatPage() {
                             Chats:
                         </p>
 
-                        {chats?.map((chat, index) => {
+                        {chats.map((chat, index) => {
                             return (
                                 <NavLink
                                     key={index}
-                                    to={'chat/' + chat.id}
-                                    className="hover:bg-gray-800 hover:rounded-full flex justify-start text-xs truncate hover:cursor-pointer px-2 py-1 text-white transition"
+                                    to={`/chat/${chat.id}`}
+                                    className={`hover:bg-gray-700 hover:rounded-full flex justify-start text-xs truncate hover:cursor-pointer px-2 py-1 text-white transition ${chat.id === chatId ? "bg-gray-700 rounded-full" : "bg-none"}`}
                                 >
-                                    {chat.title}
+                                    {chat.id} {/* TODO: Replace with chat.title once backend is ready */}
                                 </NavLink>
                             );
                         })}
@@ -44,7 +44,7 @@ export function ChatPage() {
                     <h1 className="font-bold dark:text-white text-xl">Chat</h1>
                 </header>
 
-                { (chat?.messages.length === 0 || chats?.length === 0) && (
+                { (chat?.messages.length === 0 || chats?.length === 0 || !chatId) && (
                     <div className={`flex flex-col justify-center items-center h-full ${chats?.length === 0 ? "pr-0" : "pr-55"}`}>
                         <div className="flex gap-4 items-center justify-center">
                             <Bot className="text-blue-600 size-20"></Bot>

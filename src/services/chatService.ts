@@ -8,7 +8,7 @@ export type Chat = {
 
 export type ChatMessage = {
     id: string;
-    role: 'AI' | 'USER' | 'SYSTEM' | 'ORCHESTRATOR';
+    role: 'ASSISTANT' | 'USER' | 'SYSTEM' | 'ORCHESTRATOR';
     content: string;
     citations?: Citation[]
 }
@@ -23,9 +23,6 @@ export async function getChats() {
     const res = await fetch(`api/v1/chats`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            "limit": null
-        })
     });
     if (!res.ok) throw new Error("Failed to load chats");
     return res.json() as Promise<Chat[]>;
@@ -45,10 +42,7 @@ export async function createChat(userId: string) {
 export async function getMessages(chatId: string) {
     const res = await fetch(`/api/v1/chats/${chatId}`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            "limit": null
-        })
+        headers: { "Content-Type": "application/json" }
     })
     return res.json() as Promise<Chat>
 }
