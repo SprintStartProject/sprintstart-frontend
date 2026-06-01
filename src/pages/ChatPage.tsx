@@ -4,7 +4,7 @@ import {NavLink} from "react-router-dom";
 
 export function ChatPage() {
 
-    const {chatId, messages, chats, handleSubmit, isThinking, newRequest, setNewRequest} = useChat();
+    const {chatId, messages, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
 
     return (
         <div className="h-screen flex">
@@ -73,6 +73,31 @@ export function ChatPage() {
                                     `}
                                 >
                                     {message.content}
+
+                                    {message.citations?.map((citation, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => setSelectedCitation(citation)}
+                                            className="text-blue-500 ml-1"
+                                        >
+                                            [{index + 1}]
+                                        </button>
+                                    ))}
+
+                                    {message.citations && message.citations.length > 1 && (
+                                        <div className="mt-2 text-xs">
+                                            Sources:
+                                            {message.citations?.map((citation, index) => (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => setSelectedCitation(citation)}
+                                                    className="block"
+                                                >
+                                                    [{index + 1}] {citation.filename}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 {isRequest && (
                                     <User className="dark:text-blue-600 mt-1.5"></User>
@@ -80,6 +105,17 @@ export function ChatPage() {
                             </div>
                         );
                     })}
+
+                    {selectedCitation && (
+                        <div className="fixed right-4 top-20 w-96 rounded-lg bg-gray-900 p-4 shadow-xl z-50">
+                            <button onClick={() => setSelectedCitation(null)}>
+                                ×
+                            </button>
+
+                            <h2>{selectedCitation.filename}</h2>
+                            <p>{selectedCitation.section_path}</p>
+                        </div>
+                    )}
 
                     {isThinking && (
                         <div

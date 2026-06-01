@@ -11,6 +11,7 @@ export function useChat() {
     const [isThinking, setIsThinking] = useState(false);
     const [chats, setChats] = useState<Chat[]>([]);
     const [newRequest, setNewRequest] = useState('');
+    const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null)
 
     useEffect(() => {
         const loadChats = async () => {
@@ -152,6 +153,8 @@ export function useChat() {
         isThinking,
         newRequest,
         setNewRequest,
-        messages
+        messages,
+        selectedCitation,
+        setSelectedCitation
     };
 }
