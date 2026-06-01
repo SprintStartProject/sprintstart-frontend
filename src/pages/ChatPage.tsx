@@ -4,7 +4,7 @@ import {NavLink} from "react-router-dom";
 
 export function ChatPage() {
 
-    const { chat, chatId, chats, handleSubmit, isThinking, newRequest, setNewRequest} = useChat();
+    const {chatId, messages, chats, handleSubmit, isThinking, newRequest, setNewRequest} = useChat();
 
     return (
         <div className="h-screen flex">
@@ -44,7 +44,7 @@ export function ChatPage() {
                     <h1 className="font-bold dark:text-white text-xl">Chat</h1>
                 </header>
 
-                { (chat?.messages.length === 0 || chats?.length === 0 || !chatId) && (
+                { (messages.length === 0 || chats?.length === 0 || !chatId) && (
                     <div className={`flex flex-col justify-center items-center h-full ${chats?.length === 0 ? "pr-0" : "pr-55"}`}>
                         <div className="flex gap-4 items-center justify-center">
                             <Bot className="text-blue-600 size-20"></Bot>
@@ -56,7 +56,7 @@ export function ChatPage() {
 
                 <div className={`flex flex-1 overflow-y-auto flex-col gap-3 px-3 py-5 ${chats?.length === 0 ? "pr-3" : "pr-58"}`}>
 
-                    {chat?.messages.map((message, index) => {
+                    {messages.map((message, index) => {
                         const isRequest = message.role === "USER";
 
                         return (

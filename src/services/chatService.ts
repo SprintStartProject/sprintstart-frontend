@@ -3,12 +3,12 @@ export type Chat = {
     title: string;
     userId: string;
     createdAt: string;
-    messages: ChatMessage[];
 };
 
 export type ChatMessage = {
     id: string;
     role: 'ASSISTANT' | 'USER' | 'SYSTEM' | 'ORCHESTRATOR';
+    chatId: string,
     content: string;
     citations?: Citation[]
 }
@@ -65,8 +65,8 @@ export async function streamMessage(
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            chatId,
-            text
+            "chatId": chatId,
+            "msg": text
         })
     });
 

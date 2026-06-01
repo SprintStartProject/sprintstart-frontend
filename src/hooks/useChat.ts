@@ -7,7 +7,7 @@ export function useChat() {
     const { id: chatId } = useParams();
     const navigate = useNavigate();
 
-    const [chat, setChat] = useState<Chat | null>(null);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isThinking, setIsThinking] = useState(false);
     const [chats, setChats] = useState<Chat[]>([]);
     const [newRequest, setNewRequest] = useState('');
@@ -24,7 +24,12 @@ export function useChat() {
     useEffect(() => {
         if (!chatId) return;
 
-        getMessages(chatId).then(setChat).catch(console.error);
+        const loadMessages = async () => {
+            const data = await getMessages(chatId);
+            setMessages(data.messages)
+        }
+
+         void loadMessages();
     }, [chatId]);
 
     const addMessage = async (text: string) => {
@@ -44,42 +49,22 @@ export function useChat() {
         const userMessage: ChatMessage = {
             id: crypto.randomUUID(),
             role: "USER",
+            chatId: currentChatId,
             content: text
         }
 
-        setChats(prev => {
-            if (!prev) return [];
-
-            return prev.map(chat =>
-                chat.id === currentChatId
-                    ? {
-                        ...chat,
-                        messages: [...chat.messages, userMessage]
-                    }
-                    : chat
-            );
-        });
+        setMessages(prev => [...prev, userMessage]);
 
         const assistantId = crypto.randomUUID();
 
-        setChats(prev =>
+        const assistantMessage: ChatMessage = {
+            id: assistantId,
+            role: "ASSISTANT",
+            chatId: currentChatId,
+            content: ""
+        }
 
-            (prev ?? []).map(chat =>
-                chat.id === currentChatId
-                    ? {
-                        ...chat,
-                        messages: [
-                            ...chat.messages,
-                            {
-                                id: assistantId,
-                                role: "ASSISTANT",
-                                content: ""
-                            }
-                        ]
-                    }
-                    : chat
-            )
-        );
+        setMessages(prev => [...prev, assistantMessage]);
 
         setIsThinking(true);
 
@@ -87,13 +72,13 @@ export function useChat() {
         try {
             await streamMessage(currentChatId, text, {
                 onToken: token =>
-                    appendToken(currentChatId!, assistantId, token),
+                    appendToken(assistantId, token),
 
                 onCitation: citation =>
-                    attachCitation(currentChatId!, assistantId, citation),
+                    attachCitation(assistantId, citation),
 
                 onDone: () =>
-                    finalizeMessage(currentChatId!, assistantId),
+                    finalizeMessage(assistantId),
 
                 onError: message => {
                     console.error(message);
@@ -106,71 +91,46 @@ export function useChat() {
         }
     };
 
-    const appendToken = (chatId: string, messageId: string, token: string) => {
-        setChats(prev =>
-            prev.map(chat =>
-                chat.id === chatId
-                    ? {
-                        ...chat,
-                        messages: chat.messages.map(m =>
-                            m.id === messageId
-                                ? {
-                                    ...m,
-                                    content: m.content + token
-                                }
-                                : m
-                        )
-                    }
-                    : chat
+    const appendToken = (messageId: string, token: string) => {
+        setMessages(prev =>
+            prev.map(m =>
+                m.id === messageId
+                    ? { ...m, content: m.content + token }
+                    : m
             )
         );
     };
 
     const attachCitation = (
-        chatId: string,
         messageId: string,
         citation: Citation
     ) => {
-        setChats(prev =>
-            prev.map(chat =>
-                chat.id === chatId
+        setMessages(prev =>
+            prev.map(m =>
+                m.id === messageId
                     ? {
-                        ...chat,
-                        messages: chat.messages.map(m =>
-                            m.id === messageId
-                                ? {
-                                    ...m,
-                                    citations: [
-                                        ...(m.citations ?? []),
-                                        citation
-                                    ]
-                                }
-                                : m
-                        )
+                        ...m,
+                        citations: [
+                            ...(m.citations ?? []),
+                            citation
+                        ]
                     }
-                    : chat
+                    : m
             )
         );
     };
 
-    const finalizeMessage = (chatId: string, messageId: string) => {
+    const finalizeMessage = (messageId: string) => {
         setIsThinking(false);
 
-        setChats(prev =>
-            prev.map(chat =>
-                chat.id === chatId
+        setMessages(prev =>
+            prev.map(m =>
+                m.id === messageId
                     ? {
-                        ...chat,
-                        messages: chat.messages.map(m =>
-                            m.id === messageId
-                                ? {
-                                    ...m,
-                                    isStreaming: false
-                                }
-                                : m
-                        )
+                        ...m,
+                        isStreaming: false
                     }
-                    : chat
+                    : m
             )
         );
     };
@@ -186,12 +146,12 @@ export function useChat() {
     };
 
     return {
-        chat,
         chatId,
         chats,
         handleSubmit,
         isThinking,
         newRequest,
-        setNewRequest
+        setNewRequest,
+        messages
     };
 }
