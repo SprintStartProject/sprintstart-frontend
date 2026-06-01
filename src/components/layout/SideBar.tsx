@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
     BookOpen,
-    Home,
+    ChartColumn,
     LogOut,
     Menu,
     MessageSquare,
@@ -26,9 +26,9 @@ type SidebarContentProps = {
 
 const navItems: SidebarNavItem[] = [
     {
-        label: 'Home',
+        label: 'Dashboard',
         path: '/',
-        icon: <Home className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: <ChartColumn className="h-[18px] w-[18px] shrink-0 transition-colors" />,
     },
     {
         label: 'Chat',
