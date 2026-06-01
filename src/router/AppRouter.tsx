@@ -12,7 +12,7 @@ export function AppRouter() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-            <Route path="/onboarding/:itemId" element={<OnBoardingItemPage />} />
+            <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
         </Routes>
     );
 }
