@@ -8,6 +8,7 @@ export interface AuthContextType {
     profile: UserProfile | null;
     login: (username: string, firstname: string, lastname: string) => Promise<void>;
     logout: () => Promise<void>;
+    refetchProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

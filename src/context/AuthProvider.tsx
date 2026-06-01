@@ -46,9 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setStatus('unauthenticated');
     };
+    
+    const refetchProfile = async () => {
+        const data = await userService.getProfile();
+        if (data) setProfile(data);
+    };
+
+    
 
     return (
-        <AuthContext.Provider value={{ status, profile, login, logout }}>
+        <AuthContext.Provider value={{ status, profile, login, logout, refetchProfile }}>
             {children}
         </AuthContext.Provider>
     );
