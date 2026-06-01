@@ -156,10 +156,10 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
         {step === 1 && (
           <div style={{ position: "relative", zIndex: 2 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 4 }}>
-              What's your primary role?
+              What&apos;s your primary role?
             </div>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 18 }}>
-              We'll tailor your onboarding path to fit how you actually work.
+              We&apos;ll tailor your onboarding path to fit how you actually work.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {ROLES.map((r) => {
@@ -262,7 +262,11 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
 
           {step === 1 ? (
             <button
-              onClick={handleContinue}
+                onClick={() => {
+                  void (async () => {
+                    await handleContinue();
+                  })();
+                }}
               disabled={!canProceed1 || loading}
               style={{
                 marginLeft: "auto", padding: "10px 22px", borderRadius: 12, border: "none",

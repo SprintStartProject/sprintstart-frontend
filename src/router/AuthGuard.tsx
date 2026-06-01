@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/useAuth';
+import type {ReactNode} from 'react';
+import {Navigate, useLocation} from 'react-router-dom';
+import {useAuth} from '../context/useAuth';
+import {WorkingArea} from "../services/types.ts";
 
 interface AuthGuardProps {
     children: ReactNode;
@@ -39,7 +40,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // 3. No role yet → wizard (but don't redirect if already there)
    if (
     status === "authenticated" &&
-    profile?.workingArea === "NO_WORKING_AREA" &&
+    profile?.workingArea === WorkingArea.NO_WORKING_AREA &&
     location.pathname !== "/selection-wizard"
     ) {
     return <Navigate to="/selection-wizard" replace />;
