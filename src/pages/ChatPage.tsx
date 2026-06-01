@@ -44,7 +44,7 @@ export function ChatPage() {
                     <h1 className="font-bold dark:text-white text-xl">Chat</h1>
                 </header>
 
-                { (messages.length === 0 || chats?.length === 0 || !chatId) && (
+                { (messages.length === 0) && (
                     <div className={`flex flex-col justify-center items-center h-full ${chats?.length === 0 ? "pr-0" : "pr-55"}`}>
                         <div className="flex gap-4 items-center justify-center">
                             <Bot className="text-blue-600 size-20"></Bot>
