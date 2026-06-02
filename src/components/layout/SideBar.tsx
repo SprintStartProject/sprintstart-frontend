@@ -8,7 +8,6 @@ import {
     Menu,
     MessageSquare,
     Rocket,
-    Sun,
     User,
     X,
 } from 'lucide-react';
