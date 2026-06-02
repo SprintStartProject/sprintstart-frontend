@@ -9,7 +9,11 @@ import { BookOpen, RefreshCw, AlertTriangle, CheckCircle2, X } from 'lucide-reac
 
 export function KnowledgeBasePage() {
     const { profile } = useAuth();
-    const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
+    const [documents, setDocuments] = useState<DocumentMetadata[]>(() => {
+        // Hydrate from sessionStorage on initial load
+        const saved = sessionStorage.getItem(`kb_docs_${profile?.id || 'guest'}`);
+        return saved ? JSON.parse(saved) as DocumentMetadata[] : [];
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const [batchResult, setBatchResult] = useState<{
@@ -18,12 +22,32 @@ export function KnowledgeBasePage() {
         errors: string[];
     } | null>(null);
 
+    // Save to sessionStorage whenever documents change
+    useEffect(() => {
+        if (profile) {
+            sessionStorage.setItem(`kb_docs_${profile.id}`, JSON.stringify(documents));
+        }
+    }, [documents, profile]);
+
     const loadDocuments = useCallback(async (isMounted = true) => {
         if (!profile) return;
         
         try {
             const docs = await knowledgeService.fetchDocuments(profile.id);
-            if (isMounted) setDocuments(docs);
+            if (isMounted) {
+                setDocuments(prev => {
+                    // Create a map of existing pending documents to preserve them
+                    const pendingDocs = prev.filter(d => d.status === DocumentStatus.PENDING);
+                    
+                    // Filter out any docs that the server just returned (to avoid duplicates)
+                    const filteredPending = pendingDocs.filter(
+                        p => !docs.some(d => d.id === p.id)
+                    );
+
+                    // Combine server docs with remaining local pending docs
+                    return [...docs, ...filteredPending];
+                });
+            }
         } catch (error) {
             console.error('Failed to load documents:', error);
         } finally {
