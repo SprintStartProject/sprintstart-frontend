@@ -8,6 +8,7 @@ import type {
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
   OnboardingResourceEndpoint,
+  StepStatus
 } from '../types/onboarding';
 
 import {
@@ -20,6 +21,7 @@ import {
   MessageSquareCheck,
   Loader2,
   AlertCircle,
+  Trophy,
 } from 'lucide-react';
 
 const BASE_API_URL = 'http://localhost:8080/api/v1';
@@ -55,6 +57,82 @@ export function OnBoardingItemPage() {
   // Lokaler Zustand für Task-Checkboxen (bis PUT-Endpoint verfügbar)
   // [TODO] Ersetzen durch: PUT /api/v1/onboarding/tasks/{taskId}  mit { finished: true }
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
+
+  // PUT /api/v1/onboarding/steps/{stepId}
+  const updateStepStatus = async (newStatus: StepStatus) => {
+    if (!stepDetail) return;
+
+        const body = {
+        position: stepDetail.position,
+        title: stepDetail.title,
+        description: stepDetail.description,
+        type: stepDetail.type ?? 'TASK',
+        estimatedMinutes: stepDetail.estimatedMinutes,
+        expectedOutcome: stepDetail.expectedOutcome ?? '',
+        status: newStatus,
+        skipReason: stepDetail.skipReason ?? '',
+    };
+
+    console.log('PUT body:', JSON.stringify(body, null, 2)); // ← neu
+
+    try {
+      const res = await fetch(`${BASE_API_URL}/onboarding/steps/${stepDetail.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          position: stepDetail.position,
+          title: stepDetail.title,
+          description: stepDetail.description,
+          type: stepDetail.type ?? 'TASK',      // ← Fallback weil GET es nicht zurückgibt
+          estimatedMinutes: stepDetail.estimatedMinutes,
+          expectedOutcome: stepDetail.expectedOutcome ?? '',
+          status: newStatus,
+          skipReason: stepDetail.skipReason ?? '',
+        }),
+      });
+
+      
+
+      if (!res.ok) throw new Error(`Step Update: HTTP ${res.status}`);
+      setStepDetail((prev: OnboardingStepDetail | null) => {
+        if (!prev) return prev;
+        return { ...prev, status: newStatus };
+      });
+    } catch (err) {
+      console.error('Fehler beim Step-Update:', err);
+    }
+  };
+
+  // PUT /api/v1/onboarding/tasks/{taskId}
+  const updateTaskFinished = async (taskId: string, finished: boolean) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    try {
+      const res = await fetch(`${BASE_API_URL}/onboarding/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          position: task.position,
+          title: task.title,
+          description: task.description,
+          finished,
+        }),
+      });
+      if (!res.ok) throw new Error(`Task Update: HTTP ${res.status}`);
+      // Lokal updaten
+      setTasks(prev => prev.map(t =>
+        t.id === taskId ? { ...t, finished } : t
+      ));
+      // localFinished synchron halten
+      setLocalFinished(prev => {
+        const next = new Set(prev);
+        finished ? next.add(taskId) : next.delete(taskId);
+        return next;
+      });
+    } catch (err) {
+      console.error('Fehler beim Task-Update:', err);
+    }
+  };
 
   // ── DATA FETCHING ─────────────────────────────────────────
   useEffect(() => {
@@ -104,21 +182,16 @@ export function OnBoardingItemPage() {
   }, [stepId]);
 
   // ── TOGGLE TASK ───────────────────────────────────────────
+  // Nachher:
   const toggleTask = (taskId: string) => {
-    setLocalFinished(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
-      }
-      return next;
-    });
+    const isCurrentlyDone = localFinished.has(taskId);
+    updateTaskFinished(taskId, !isCurrentlyDone);
   };
 
   // ── DERIVED ───────────────────────────────────────────────
   const sortedTasks = [...tasks].sort((a, b) => a.position - b.position);
   const doneTasks = sortedTasks.filter(t => localFinished.has(t.id)).length;
+  const allTasksDone = sortedTasks.length === 0 || doneTasks === sortedTasks.length;
   const taskPercentage = sortedTasks.length > 0
     ? Math.round((doneTasks / sortedTasks.length) * 100)
     : 0;
@@ -192,12 +265,12 @@ export function OnBoardingItemPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               {/* Status-Badge */}
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${stepDetail.status === 'DONE' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' :
-                  stepDetail.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400' :
-                    stepDetail.status === 'SKIPPED' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
-                      'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${stepDetail.status === 'FINISHED' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' :
+                stepDetail.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400' :
+                  stepDetail.status === 'SKIPPED' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
+                    'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
                 }`}>
-                {stepDetail.status === 'DONE' ? 'Erledigt' :
+                {stepDetail.status === 'FINISHED' ? 'Erledigt' :
                   stepDetail.status === 'IN_PROGRESS' ? 'In Bearbeitung' :
                     stepDetail.status === 'SKIPPED' ? 'Übersprungen' : 'Offen'}
               </div>
@@ -258,8 +331,8 @@ export function OnBoardingItemPage() {
                         key={task.id}
                         onClick={() => toggleTask(task.id)}
                         className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${isDone
-                            ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
-                            : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
+                          ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
                           }`}
                       >
                         {isDone
@@ -268,8 +341,8 @@ export function OnBoardingItemPage() {
                         }
                         <div>
                           <span className={`text-sm font-medium ${isDone
-                              ? 'line-through text-gray-400 dark:text-gray-500'
-                              : 'text-gray-900 dark:text-white'
+                            ? 'line-through text-gray-400 dark:text-gray-500'
+                            : 'text-gray-900 dark:text-white'
                             }`}>
                             {index + 1}. {task.title}
                           </span>
@@ -285,7 +358,46 @@ export function OnBoardingItemPage() {
                 </div>
               </div>
             )}
+
+
+            {/* mark step as done */}
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
+                Schritt abschließen
+              </h3>
+              <button
+                onClick={() => updateStepStatus(
+                  stepDetail.status === 'FINISHED' ? 'WAITING' : 'FINISHED'
+                )}
+                disabled={!allTasksDone && stepDetail.status !== 'FINISHED'}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${stepDetail.status === 'FINISHED'
+                    ? 'border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50'
+                    : allTasksDone
+                      ? 'border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
+                      : 'border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                  }`}
+              >
+                {stepDetail.status === 'FINISHED'
+                  ? <Trophy className="w-5 h-5 shrink-0" />
+                  : <Circle className="w-5 h-5 shrink-0" />
+                }
+                <span className="text-sm font-medium flex-1 text-left">
+                  {stepDetail.status === 'FINISHED'
+                    ? 'Erledigt!'
+                    : allTasksDone
+                      ? 'Als erledigt markieren'
+                      : `Noch ${sortedTasks.length - doneTasks} Aufgabe${sortedTasks.length - doneTasks === 1 ? '' : 'n'} offen`
+                  }
+                </span>
+                {stepDetail.status === 'FINISHED' && (
+                  <span className="text-xs opacity-60">rückgängig</span>
+                )}
+              </button>
+            </div>
           </div>
+
+
+          
 
           {/* RECHTE SPALTE */}
           <div className="space-y-6">
@@ -295,15 +407,15 @@ export function OnBoardingItemPage() {
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
                 Status
               </h3>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${stepDetail.status === 'DONE'
-                  ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${stepDetail.status === 'FINISHED'
+                ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
                 }`}>
-                {stepDetail.status === 'DONE'
+                {stepDetail.status === 'FINISHED'
                   ? <CheckCircle2 className="w-4 h-4" />
                   : <Circle className="w-4 h-4" />
                 }
-                {stepDetail.status === 'DONE' ? 'Erledigt' :
+                {stepDetail.status === 'FINISHED' ? 'Erledigt' :
                   stepDetail.status === 'IN_PROGRESS' ? 'In Bearbeitung' :
                     stepDetail.status === 'SKIPPED' ? 'Übersprungen' : 'Offen'}
               </div>

@@ -74,7 +74,7 @@ function fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
 export function OnBoardingPage() {
 
     // Selected Phase
-    const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(1);
+    const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
 
     // OnBoarding-Daten (null = noch nicht geladen)
     const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
@@ -125,7 +125,7 @@ export function OnBoardingPage() {
 
     // Hilfsfunktion für Fortschritt einer Phase
     const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
-        const completed = phase.steps.filter(step => step.status === 'DONE').length;
+        const completed = phase.steps.filter(step => step.status === 'FINISHED').length;
         return {
             completed,
             total: phase.steps.length,
@@ -151,7 +151,7 @@ export function OnBoardingPage() {
     // Nächste unerledigte Task (über alle Phasen)
     const nextTask = OnBoardingPathEndpoint?.phases
         .flatMap(phase => phase.steps)
-        .find(step => step.status !== 'DONE') ?? null;
+        .find(step => step.status !== 'FINISHED') ?? null;
 
     // Task als erledigt markieren (lokal, bis Backend-Patch-Endpoint fertig ist)
     // [TODO] Später durch API-Call ersetzen: PATCH /api/OnBoarding/steps/:id
@@ -164,7 +164,7 @@ export function OnBoardingPage() {
                 ...phase,
                 steps: phase.steps.map(step =>
                     step.id === itemId
-                        ? { ...step, status: step.status === 'DONE' ? 'TODO' : 'DONE' } // toggle
+                        ? { ...step, status: step.status === 'FINISHED' ? 'TODO' : 'DONE' } // toggle
                         : step
                 ),
             })),
@@ -331,7 +331,7 @@ export function OnBoardingPage() {
                     {currentPhase.steps.map((step) => (
                         <div
                             key={step.id}
-                            className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${step.status === 'DONE'
+                            className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${step.status === 'FINISHED'
                                 ? 'border-gray-200 dark:border-gray-800 opacity-60'
                                 : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg'
                                 }`}
@@ -339,17 +339,12 @@ export function OnBoardingPage() {
                             <div className="p-5">
                                 <div className="flex gap-4">
 
-                                    {/* Checkbox-Button */}
-                                    <button
-                                        onClick={() => toggleItemCompleted(step.id)}
-                                        className="pt-0.5 shrink-0 transition-transform hover:scale-110"
-                                        aria-label={step.status === 'DONE' ? 'Als unerledigt markieren' : 'Als erledigt markieren'}
-                                    >
-                                        {step.status === 'DONE'
+                                    <div className="pt-0.5 shrink-0">
+                                        {step.status === 'FINISHED'
                                             ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                                            : <Circle className="w-6 h-6 text-blue-400" />
+                                            : <Circle className="w-6 h-6 text-gray-300 dark:text-gray-600" />
                                         }
-                                    </button>
+                                    </div>
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
@@ -357,7 +352,7 @@ export function OnBoardingPage() {
 
                                             {/* Text */}
                                             <div>
-                                                <h3 className={`font-semibold text-base ${step.status === 'DONE'
+                                                <h3 className={`font-semibold text-base ${step.status === 'FINISHED'
                                                     ? 'line-through text-gray-400 dark:text-gray-500'
                                                     : 'text-gray-900 dark:text-white'
                                                     }`}>
