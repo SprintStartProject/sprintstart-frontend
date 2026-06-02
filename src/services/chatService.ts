@@ -54,6 +54,15 @@ export type StreamHandlers = {
     onError?: (message: string) => void;
 };
 
+interface ChatEvent {
+    type: "token" | "citation" | "done" | "error";
+    content?: string;
+    message?: string;
+    chunk_id?: string;
+    filename?: string;
+    section_path?: string;
+}
+
 export async function streamMessage(
     chatId: string,
     text: string,
@@ -94,15 +103,23 @@ export async function streamMessage(
 
             const event = JSON.parse(
                 line.replace("data:", "").trim()
-            );
+            ) as ChatEvent;
 
             switch (event.type) {
                 case "token":
-                    handlers.onToken(event.content);
+                    if (event.content !== undefined) {
+                        handlers.onToken(event.content);
+                    }
                     break;
 
                 case "citation":
-                    handlers.onCitation(event);
+                    if (event.chunk_id && event.filename) {
+                        handlers.onCitation({
+                            chunk_id: event.chunk_id,
+                            filename: event.filename,
+                            section_path: event.section_path ?? ""
+                        });
+                    }
                     break;
 
                 case "done":
@@ -110,7 +127,7 @@ export async function streamMessage(
                     return;
 
                 case "error":
-                    handlers.onError?.(event.message);
+                    handlers.onError?.(event.message ?? "Unknown error");
                     return;
             }
         }

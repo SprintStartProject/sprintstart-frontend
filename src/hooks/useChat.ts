@@ -24,13 +24,13 @@ export function useChat() {
 
     useEffect(() => {
         if (!chatId) {
-            setMessages([]);
             return;
         }
 
         // Only load from server if we don't already have the messages for this chat in state
         // This prevents overwriting locally streaming messages when the URL changes after chat creation
-        if (messages.length > 0 && messages.some(m => m.chatId === chatId)) {
+        const hasMessages = messages.length > 0 && messages.some(m => m.chatId === chatId);
+        if (hasMessages) {
             return;
         }
 
@@ -40,7 +40,8 @@ export function useChat() {
         }
 
          void loadMessages();
-    }, [chatId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chatId]); // messages intentionally omitted to avoid reload loop, checked via local variable logic
 
     const addMessage = async (text: string) => {
         if (!text.trim()) return;

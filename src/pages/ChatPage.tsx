@@ -4,7 +4,7 @@ import {NavLink} from "react-router-dom";
 
 export function ChatPage() {
 
-    const {chatId, messages, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
+    const {messages, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
 
     return (
         <div className="h-screen flex overflow-hidden bg-gray-900">
@@ -61,7 +61,7 @@ export function ChatPage() {
                             </div>
                             <h1 className="text-white font-bold text-2xl mb-2">How can I help you today?</h1>
                             <p className="text-gray-400 max-w-md text-sm">
-                                Ask anything about your project's codebase, documentation, or onboarding process.
+                                Ask anything about your project&apos;s codebase, documentation, or onboarding process.
                             </p>
                         </div>
                     ) : (
