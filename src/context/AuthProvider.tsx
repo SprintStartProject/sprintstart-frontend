@@ -4,6 +4,18 @@ import { userService } from '../services/userService';
 import type { UserProfile } from '../services/types';
 import { AuthContext, type AuthStatus } from './AuthContext';
 
+const BASE_API_URL = 'http://localhost:8080/api/v1';
+
+const seedOnboardingPath = async (userId: string) => {
+    const res = await fetch(`${BASE_API_URL}/onboarding/${userId}/seeding`, {
+        method: 'POST',
+    });
+
+    if (!res.ok) {
+        throw new Error(`Onboarding seeding failed: HTTP ${res.status}`);
+    }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [status, setStatus] = useState<AuthStatus>('loading');
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -12,10 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const initAuth = async () => {
             try {
                 const data = await userService.getProfile();
-                
+
                 if (!data) {
                     setStatus('unauthenticated');
                 } else {
+                    await seedOnboardingPath(data.id);
                     setProfile(data);
                     setStatus('authenticated');
                 }
@@ -32,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('loading');
         try {
             const user = await userService.login(username, firstname, lastname);
+            await seedOnboardingPath(user.id);
             setProfile(user);
             setStatus('authenticated');
         } catch (error) {
