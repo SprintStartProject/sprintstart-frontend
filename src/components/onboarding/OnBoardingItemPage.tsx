@@ -59,8 +59,6 @@ export function OnBoardingItemPage() {
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Lokaler Zustand für Task-Checkboxen (bis PUT-Endpoint verfügbar)
-  // [TODO] Ersetzen durch: PUT /api/v1/onboarding/tasks/{taskId}  mit { finished: true }
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
 
   // PUT /api/v1/onboarding/steps/{stepId}

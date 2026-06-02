@@ -16,10 +16,14 @@ import {
     AlertCircle,
 } from 'lucide-react';
 import type {UserProfile} from "../services/types.ts";
+//import { useAuth } from '../context/useAuth.ts';
 
 const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
+//const { profile, status } = useAuth();
+//const userLoading = status === 'loading';
+//const userError = status === 'unauthenticated' ? 'Nicht eingeloggt.' : null;
 
 
 // ─────────────────────────────────────────────────────────────
@@ -56,13 +60,6 @@ function fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
 }
 
 
-// ─────────────────────────────────────────────────────────────
-// MOCK-DATEN (temporär, bis Backend fertig ist) - auch imported
-// ─────────────────────────────────────────────────────────────
-
-//const MOCK_OnBoarding_PATH: OnBoardingPath = mockData as OnBoardingPath;
-
-
 
 // ─────────────────────────────────────────────────────────────
 // HAUPT-KOMPONENTE: OnBoardingPage
@@ -96,7 +93,9 @@ export function OnBoardingPage() {
                 const usersRes = await fetch(`${BASE_API_URL}/users`);
                 if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
                 const users = (await usersRes.json()) as UserProfile[];
-                const userId: string = users[0]?.id;
+
+                // ToDo: Statt einfach den 2. User zu nehmen, sollte hier die Logik rein, um den aktuell eingeloggten User zu identifizieren (z.B. über Context oder Auth Hook)
+                const userId: string = users[1]?.id;
                 if (!userId) throw new Error('Kein User gefunden.');
                 //console.log('Gefundener User ID:', userId);
 
