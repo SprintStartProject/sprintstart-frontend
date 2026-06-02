@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint, OnboardingTaskEndpoint, OnboardingStepEndpoint, OnboardingResourceEndpoint, StepStatus} from '../types/onboarding';
+import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../types/onboarding';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -15,6 +15,7 @@ import {
     Loader2,
     AlertCircle,
 } from 'lucide-react';
+import type {UserProfile} from "../services/types.ts";
 
 const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
@@ -94,14 +95,14 @@ export function OnBoardingPage() {
                 // find USER
                 const usersRes = await fetch(`${BASE_API_URL}/users`);
                 if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
-                const users = await usersRes.json();
+                const users = (await usersRes.json()) as UserProfile[];
                 const userId: string = users[0]?.id;
                 if (!userId) throw new Error('Kein User gefunden.');
-                console.log('Gefundener User ID:', userId);
+                //console.log('Gefundener User ID:', userId);
 
                 // fetch PATH
                 const path = await fetchPath(userId);
-                console.log('Geladener OnBoarding Path:', path);
+                //console.log('Geladener OnBoarding Path:', path);
 
                 setOnBoardingPath(path);
 
@@ -113,7 +114,7 @@ export function OnBoardingPage() {
             }
         };
 
-        loadOnBoardingPath();
+        void loadOnBoardingPath();
     }, []);
 
 
@@ -284,7 +285,7 @@ export function OnBoardingPage() {
                             </p>
                             <div className="flex flex-wrap items-center gap-4 mt-6">
                                 <button
-                                    onClick={() => navigate(`/onboarding/${nextTask.id}`)}
+                                    onClick={() => void navigate(`/onboarding/${nextTask.id}`)}
                                     className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
                                 >
                                     Jetzt starten
@@ -344,7 +345,7 @@ export function OnBoardingPage() {
                                             </div>
 
                                             <button
-                                                onClick={() => navigate(`/onboarding/${step.id}`)}
+                                                onClick={() => void navigate(`/onboarding/${step.id}`)}
                                                 className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
                                             >
                                                 Jetzt starten

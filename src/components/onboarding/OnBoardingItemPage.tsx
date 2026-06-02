@@ -9,7 +9,7 @@ import type {
   OnboardingTaskEndpoint,
   OnboardingResourceEndpoint,
   StepStatus
-} from '../types/onboarding';
+} from '../../types/onboarding';
 
 import {
   ArrowLeft,
@@ -30,6 +30,11 @@ type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 // ─────────────────────────────────────────────────────────────
 // HELPER
 // ─────────────────────────────────────────────────────────────
+
+async function readJson<T>(response: Response): Promise<T> {
+  const data: unknown = await response.json();
+  return data as T;
+}
 
 function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -73,7 +78,7 @@ export function OnBoardingItemPage() {
         skipReason: stepDetail.skipReason ?? '',
     };
 
-    console.log('PUT body:', JSON.stringify(body, null, 2)); // ← neu
+    console.warn('PUT body:', JSON.stringify(body, null, 2)); // ← neu
 
     try {
       const res = await fetch(`${BASE_API_URL}/onboarding/steps/${stepDetail.id}`, {
@@ -91,7 +96,7 @@ export function OnBoardingItemPage() {
         }),
       });
 
-      
+
 
       if (!res.ok) throw new Error(`Step Update: HTTP ${res.status}`);
       setStepDetail((prev: OnboardingStepDetail | null) => {
@@ -126,7 +131,11 @@ export function OnBoardingItemPage() {
       // localFinished synchron halten
       setLocalFinished(prev => {
         const next = new Set(prev);
-        finished ? next.add(taskId) : next.delete(taskId);
+        if (finished) {
+          next.add(taskId);
+        } else {
+          next.delete(taskId);
+        }
         return next;
       });
     } catch (err) {
@@ -136,39 +145,29 @@ export function OnBoardingItemPage() {
 
   // ── DATA FETCHING ─────────────────────────────────────────
   useEffect(() => {
-    if (!stepId) {
-      setLoadingState('error');
-      setErrorMessage('Keine Step-ID in der URL gefunden.');
-      return;
-    }
+    if (!stepId) return;
 
-    const load = async () => {
+    const load = async (): Promise<void> => {
       setLoadingState('loading');
+      setErrorMessage('');
+
       try {
-        // 1. Step-Detail holen (enthält bereits tasks[] und resources[] laut Interface)
         const stepRes = await fetch(`${BASE_API_URL}/onboarding/steps/${stepId}`);
         if (!stepRes.ok) throw new Error(`Step: HTTP ${stepRes.status}`);
-        const step: OnboardingStepDetail = await stepRes.json();
+        const step = await readJson<OnboardingStepDetail>(stepRes);
         setStepDetail(step);
 
-        // 2. Tasks separat holen (falls step.tasks leer oder nicht befüllt)
-        //    GET /onboarding/steps/{stepId}/tasks
         const tasksRes = await fetch(`${BASE_API_URL}/onboarding/steps/${stepId}/tasks`);
         if (!tasksRes.ok) throw new Error(`Tasks: HTTP ${tasksRes.status}`);
-        const fetchedTasks: OnboardingTaskEndpoint[] = await tasksRes.json();
+        const fetchedTasks = await readJson<OnboardingTaskEndpoint[]>(tasksRes);
         setTasks(fetchedTasks);
 
-        // 3. Resources separat holen
-        //    GET /onboarding/steps/{stepId}/resources
         const resourcesRes = await fetch(`${BASE_API_URL}/onboarding/steps/${stepId}/resources`);
         if (!resourcesRes.ok) throw new Error(`Resources: HTTP ${resourcesRes.status}`);
-        const fetchedResources: OnboardingResourceEndpoint[] = await resourcesRes.json();
+        const fetchedResources = await readJson<OnboardingResourceEndpoint[]>(resourcesRes);
         setResources(fetchedResources);
 
-        // Bereits als finished markierte Tasks in den lokalen State übernehmen
-        const alreadyDone = new Set(
-          fetchedTasks.filter(t => t.finished).map(t => t.id)
-        );
+        const alreadyDone = new Set(fetchedTasks.filter(task => task.finished).map(task => task.id));
         setLocalFinished(alreadyDone);
 
         setLoadingState('success');
@@ -178,14 +177,14 @@ export function OnBoardingItemPage() {
       }
     };
 
-    load();
+    void load();
   }, [stepId]);
 
   // ── TOGGLE TASK ───────────────────────────────────────────
   // Nachher:
-  const toggleTask = (taskId: string) => {
+  const toggleTask = (taskId: string): void => {
     const isCurrentlyDone = localFinished.has(taskId);
-    updateTaskFinished(taskId, !isCurrentlyDone);
+    void updateTaskFinished(taskId, !isCurrentlyDone);
   };
 
   // ── DERIVED ───────────────────────────────────────────────
@@ -219,7 +218,7 @@ export function OnBoardingItemPage() {
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
           <button
-            onClick={() => navigate('/onboarding')}
+            onClick={() => void navigate('/onboarding')}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
           >
             Zurück zum Onboarding
@@ -236,7 +235,7 @@ export function OnBoardingItemPage() {
         <div className="text-center">
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Step nicht gefunden.</p>
           <button
-            onClick={() => navigate('/onboarding')}
+            onClick={() => void navigate('/onboarding')}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
           >
             Zurück zum Onboarding
@@ -255,7 +254,7 @@ export function OnBoardingItemPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
           <button
-            onClick={() => navigate('/onboarding')}
+            onClick={() => void navigate('/onboarding')}
             className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -366,7 +365,7 @@ export function OnBoardingItemPage() {
                 Schritt abschließen
               </h3>
               <button
-                onClick={() => updateStepStatus(
+                onClick={() => void updateStepStatus(
                   stepDetail.status === 'FINISHED' ? 'WAITING' : 'FINISHED'
                 )}
                 disabled={!allTasksDone && stepDetail.status !== 'FINISHED'}
@@ -397,7 +396,7 @@ export function OnBoardingItemPage() {
           </div>
 
 
-          
+
 
           {/* RECHTE SPALTE */}
           <div className="space-y-6">
