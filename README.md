@@ -26,6 +26,7 @@ To start the local development server, run:
 ```bash
 npm run dev
 ```
+The application will be accessible in your browser at: **http://localhost:5173/**
 
 
 ### One Command Start
@@ -35,3 +36,4 @@ To start the local deployment via docker compose in command, run:
 ```bash
 docker compose up --build
 ```
+The application will be accessible in your browser at: **http://localhost:3000/**
