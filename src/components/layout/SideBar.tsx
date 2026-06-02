@@ -8,7 +8,6 @@ import {
     Menu,
     MessageSquare,
     Rocket,
-    Sun,
     User,
     X,
 } from 'lucide-react';
@@ -110,20 +109,6 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                             </span>                        </div>
                     </div>
                 )}
-
-                <button
-                    type="button"
-                    className="flex h-[40px] w-full items-center justify-between rounded-[8px] px-[12px] text-[14px] font-medium leading-none text-slate-300 transition-colors hover:bg-slate-900 hover:text-white"
-                >
-          <span className="flex items-center gap-[12px]">
-            <Sun className="h-[16px] w-[16px] text-slate-400" />
-            Light Mode
-          </span>
-
-                    <span className="flex h-[16px] w-[32px] items-center justify-end rounded-full bg-blue-600 p-[4px]">
-            <span className="h-[8px] w-[8px] rounded-full bg-white" />
-          </span>
-                </button>
 
                 <button
                     type="button"
