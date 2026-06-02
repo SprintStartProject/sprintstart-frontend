@@ -16,9 +16,6 @@ import {
     AlertCircle,
 } from 'lucide-react';
 
-// Interfaces - imported
-// Todo: adapt to real Endpoints of Backend
-
 const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
@@ -152,24 +149,6 @@ export function OnBoardingPage() {
     const nextTask = OnBoardingPathEndpoint?.phases
         .flatMap(phase => phase.steps)
         .find(step => step.status !== 'FINISHED') ?? null;
-
-    // Task als erledigt markieren (lokal, bis Backend-Patch-Endpoint fertig ist)
-    // [TODO] Später durch API-Call ersetzen: PATCH /api/OnBoarding/steps/:id
-    const toggleItemCompleted = (itemId: string) => {
-        if (!OnBoardingPathEndpoint) return;
-
-        setOnBoardingPath({
-            ...OnBoardingPathEndpoint,
-            phases: OnBoardingPathEndpoint.phases.map(phase => ({
-                ...phase,
-                steps: phase.steps.map(step =>
-                    step.id === itemId
-                        ? { ...step, status: step.status === 'FINISHED' ? 'TODO' : 'DONE' } // toggle
-                        : step
-                ),
-            })),
-        });
-    };
 
 
     // ── RENDER: LOADING STATE ──────────────────────────────────
