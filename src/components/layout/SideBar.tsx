@@ -3,14 +3,16 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
     BookOpen,
-    Home,
-    Languages,
+    ChartColumn,
+    LogOut,
     Menu,
     MessageSquare,
     Rocket,
     Sun,
+    User,
     X,
 } from 'lucide-react';
+import { useAuth } from '../../context/useAuth';
 
 type SidebarNavItem = {
     label: string;
@@ -24,9 +26,9 @@ type SidebarContentProps = {
 
 const navItems: SidebarNavItem[] = [
     {
-        label: 'Home',
+        label: 'Dashboard',
         path: '/',
-        icon: <Home className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: <ChartColumn className="h-[18px] w-[18px] shrink-0 transition-colors" />,
     },
     {
         label: 'Chat',
@@ -55,6 +57,8 @@ function getNavLinkClass(isActive: boolean): string {
 }
 
 function SidebarContent({ onNavigate }: SidebarContentProps) {
+    const { profile, logout, status } = useAuth();
+
     return (
         <div className="flex h-full flex-col bg-gray-950">
             <div className="flex items-center gap-3 px-[24px] py-[24px]">
@@ -92,19 +96,20 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
             </nav>
 
             <div className="space-y-[12px] border-t border-slate-800 bg-slate-900/50 p-[16px]">
-                <button
-                    type="button"
-                    className="flex h-[40px] w-full items-center justify-between rounded-[8px] px-[12px] text-[14px] font-medium leading-none text-slate-300 transition-colors hover:bg-slate-900 hover:text-white"
-                >
-          <span className="flex items-center gap-[12px]">
-            <Languages className="h-[16px] w-[16px] text-slate-400" />
-            English
-          </span>
-
-                    <span className="text-[10px] font-bold text-blue-500">
-            EN <span className="text-slate-500">/ DE</span>
-          </span>
-                </button>
+                {profile && (
+                    <div className="mb-4 flex items-center gap-3 px-3 py-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-400">
+                            <User className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                            <span className="truncate text-sm font-semibold text-white">
+                                {profile.username}
+                            </span>
+                            <span className="truncate text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                                {profile.workingArea.replace('_', ' ')}
+                            </span>                        </div>
+                    </div>
+                )}
 
                 <button
                     type="button"
@@ -118,6 +123,16 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                     <span className="flex h-[16px] w-[32px] items-center justify-end rounded-full bg-blue-600 p-[4px]">
             <span className="h-[8px] w-[8px] rounded-full bg-white" />
           </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => { void logout(); }}
+                    disabled={status === 'loading'}
+                    className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-lg bg-red-950/20 text-sm font-medium text-red-400 transition-colors hover:bg-red-950/40 disabled:opacity-50"
+                >
+                    <LogOut className="h-[16px] w-[16px]" />
+                    Logout
                 </button>
             </div>
         </div>
