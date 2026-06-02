@@ -2,7 +2,7 @@ import { DocumentStatus, type DocumentMetadata, type UploadResult } from './type
 
 export const knowledgeService = {
     async fetchDocuments(uploaderId: string): Promise<DocumentMetadata[]> {
-        const response = await fetch(`/v1/uploads?uploaderId=${uploaderId}`);
+        const response = await fetch(`/api/v1/uploads?uploaderId=${uploaderId}`);
         
         if (!response.ok) {
             throw new Error('Failed to fetch documents');
@@ -30,7 +30,7 @@ export const knowledgeService = {
             formData.append('files', file);
         });
 
-        const response = await fetch(`/v1/uploads?uploaderId=${uploaderId}`, {
+        const response = await fetch(`/api/v1/uploads?uploaderId=${uploaderId}`, {
             method: 'POST',
             body: formData,
             // Note: Don't set Content-Type header; fetch will set it automatically for FormData
@@ -44,8 +44,14 @@ export const knowledgeService = {
         return await response.json() as UploadResult[];
     },
 
-    async deleteDocument(_id: string): Promise<void> {
-        // Mocked until DELETE endpoint is available
-        await new Promise(resolve => setTimeout(resolve, 500));
+    async deleteDocument(id: string): Promise<void> {
+        const response = await fetch(`/api/v1/uploads/${id}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Delete failed: ${errorText || response.statusText}`);
+        }
     }
 };
