@@ -7,144 +7,139 @@ export function ChatPage() {
     const {chatId, messages, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
 
     return (
-        <div className="h-screen flex">
+        <div className="h-screen flex overflow-hidden bg-gray-900">
 
             { chats?.length !== 0 && (
-                <aside className="fixed right-0 top-0 h-screen w-55 py-23 bg-gray-950 border-l-2 border-gray-800 overflow-y-auto">
-                    <div className="flex flex-col gap-1 px-1">
+                <aside className="w-64 bg-gray-950 border-r border-gray-800 flex flex-col shrink-0">
+                    <div className="flex flex-col gap-4 p-4 overflow-y-auto">
 
-                        <NavLink to={'/chat'} className="bg-blue-600 rounded-full hover:bg-blue-700 flex justify-center gap-1 items-center text-sm font-semibold truncate hover:cursor-pointer p-2 mx-2 text-white transition">
-                            <Plus></Plus>
+                        <NavLink
+                            to="/chat"
+                            className="bg-blue-600 rounded-lg hover:bg-blue-700 flex justify-center gap-2 items-center text-sm font-semibold p-2.5 text-white transition shadow-sm"
+                        >
+                            <Plus size={18} />
                             New Chat
                         </NavLink>
 
-                        <p className="text-white p-2 pb-0 text-sm font-semibold">
-                            Chats:
-                        </p>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-gray-400 px-2 py-1 text-xs font-bold uppercase tracking-wider">
+                                Recent Chats
+                            </p>
 
-                        {chats.map((chat, index) => {
-                            return (
+                            {chats.map((chat) => (
                                 <NavLink
-                                    key={index}
+                                    key={chat.id}
                                     to={`/chat/${chat.id}`}
-                                    className={`hover:bg-gray-700 hover:rounded-full flex justify-start text-xs truncate hover:cursor-pointer px-2 py-1 text-white transition ${chat.id === chatId ? "bg-gray-700 rounded-full" : "bg-none"}`}
+                                    className={({ isActive }) => `
+                                        group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
+                                        ${isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"}
+                                    `}
                                 >
-                                    {chat.id} {/* TODO: Replace with chat.title once backend is ready */}
+                                    <div className="truncate flex-1">
+                                        {chat.title || "Untitled Chat"}
+                                    </div>
                                 </NavLink>
-                            );
-                        })}
-
+                            ))}
+                        </div>
                     </div>
                 </aside>
             )}
 
-            <div className="flex flex-col flex-1">
-                <header className="top-0 right-0 w-full p-5 h-20 dark:bg-gray-900 sticky flex gap-2 items-center">
-                    <Sparkles className="text-blue-500"></Sparkles>
-                    <h1 className="font-bold dark:text-white text-xl">Chat</h1>
+            <div className="flex flex-col flex-1 min-w-0">
+                <header className="h-16 border-b border-gray-800 flex items-center px-6 shrink-0 bg-gray-900/50 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                        <Sparkles className="text-blue-500" size={20} />
+                        <h1 className="font-bold text-white text-lg">AI Assistant</h1>
+                    </div>
                 </header>
 
-                { (messages.length === 0) && (
-                    <div className={`flex flex-col justify-center items-center h-full ${chats?.length === 0 ? "pr-0" : "pr-55"}`}>
-                        <div className="flex gap-4 items-center justify-center">
-                            <Bot className="text-blue-600 size-20"></Bot>
-                            <h1 className="text-white font-bold text-2xl">Nice to meet you!</h1>
+                <div className="flex-1 overflow-y-auto flex flex-col">
+                    {messages.length === 0 ? (
+                        <div className="flex-1 flex flex-col justify-center items-center p-8 text-center">
+                            <div className="bg-blue-600/10 p-4 rounded-3xl mb-4">
+                                <Bot className="text-blue-500 size-12" />
+                            </div>
+                            <h1 className="text-white font-bold text-2xl mb-2">How can I help you today?</h1>
+                            <p className="text-gray-400 max-w-md text-sm">
+                                Ask anything about your project's codebase, documentation, or onboarding process.
+                            </p>
                         </div>
-                        <p className="text-white">I will help you getting started on your project. Just ask me! :)</p>
-                    </div>
-                )}
+                    ) : (
+                        <div className="max-w-4xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
+                            {messages.map((message, index) => {
+                                const isRequest = message.role === "USER";
 
-                <div className={`flex flex-1 overflow-y-auto flex-col gap-3 px-3 py-5 ${chats?.length === 0 ? "pr-3" : "pr-58"}`}>
-
-                    {messages.map((message, index) => {
-                        const isRequest = message.role === "USER";
-
-                        return (
-                            <div
-                                key={index}
-                                className={`flex w-full gap-2 ${isRequest ? "justify-end" : "justify-start"}`}
-                            >
-                                {!isRequest && (
-                                    <Bot className="dark:text-blue-600 mt-1.5"></Bot>
-                                )}
-                                <div
-                                    className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm text-white
-                                        ${isRequest ? "bg-blue-600" : "bg-gray-800"}
-                                    `}
-                                >
-                                    {message.content}
-
-                                    {message.citations?.map((citation, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => setSelectedCitation(citation)}
-                                            className="text-blue-500 ml-1"
-                                        >
-                                            [{index + 1}]
-                                        </button>
-                                    ))}
-
-                                    {message.citations && message.citations.length > 1 && (
-                                        <div className="mt-2 text-xs">
-                                            Sources:
-                                            {message.citations?.map((citation, index) => (
-                                                <button
-                                                    key={index}
-                                                    onClick={() => setSelectedCitation(citation)}
-                                                    className="block"
-                                                >
-                                                    [{index + 1}] {citation.filename}
-                                                </button>
-                                            ))}
+                                return (
+                                    <div
+                                        key={index}
+                                        className={`flex w-full gap-4 ${isRequest ? "flex-row-reverse" : "flex-row"}`}
+                                    >
+                                        <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isRequest ? "bg-blue-600" : "bg-gray-800"}`}>
+                                            {isRequest ? <User size={16} className="text-white" /> : <Bot size={16} className="text-blue-400" />}
                                         </div>
-                                    )}
-                                </div>
-                                {isRequest && (
-                                    <User className="dark:text-blue-600 mt-1.5"></User>
-                                )}
-                            </div>
-                        );
-                    })}
 
-                    {selectedCitation && (
-                        <div className="fixed right-4 top-20 w-96 rounded-lg bg-gray-900 p-4 shadow-xl z-50">
-                            <button onClick={() => setSelectedCitation(null)}>
-                                ×
-                            </button>
+                                        <div className={`flex flex-col max-w-[85%] ${isRequest ? "items-end" : "items-start"}`}>
+                                            <div
+                                                className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed
+                                                    ${isRequest ? "bg-blue-600 text-white rounded-tr-none" : "bg-gray-800 text-gray-200 rounded-tl-none"}
+                                                `}
+                                            >
+                                                {message.content}
 
-                            <h2>{selectedCitation.filename}</h2>
-                            <p>{selectedCitation.section_path}</p>
-                        </div>
-                    )}
+                                                {message.citations && message.citations.length > 0 && (
+                                                    <div className="mt-3 pt-3 border-t border-gray-700/50 flex flex-wrap gap-1.5">
+                                                        {message.citations.map((citation, cIdx) => (
+                                                            <button
+                                                                key={cIdx}
+                                                                onClick={() => setSelectedCitation(citation)}
+                                                                className="text-[10px] bg-gray-900/50 hover:bg-gray-900 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 transition-colors"
+                                                            >
+                                                                [{cIdx + 1}] {citation.filename}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
 
-                    {isThinking && (
-                        <div
-                            className="flex w-full gap-2 justify-start"
-                        >
-                            <Bot className="dark:text-blue-600 mt-1.5"></Bot>
-                            <div className="max-w-[70%] px-4 py-2 rounded-2xl text-sm text-white bg-gray-800">
-                                ...
-                            </div>
+                            {/* Thinking state removed as requested */}
                         </div>
                     )}
                 </div>
 
-                <footer className="bottom-0 right-0 w-full p-5 h-20 dark:bg-gray-900 sticky flex justify-center">
-                    <form onSubmit={handleSubmit} className="flex gap-3 w-full">
+                {selectedCitation && (
+                    <div className="absolute right-6 bottom-24 w-80 rounded-xl bg-gray-800 border border-gray-700 p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="flex justify-between items-start mb-2">
+                            <h3 className="text-sm font-bold text-white truncate pr-4">{selectedCitation.filename}</h3>
+                            <button onClick={() => setSelectedCitation(null)} className="text-gray-400 hover:text-white transition-colors">
+                                <Plus size={18} className="rotate-45" />
+                            </button>
+                        </div>
+                        <div className="text-xs text-gray-400 line-clamp-4 leading-relaxed">
+                            {selectedCitation.section_path}
+                        </div>
+                    </div>
+                )}
+
+                <footer className="p-4 bg-gray-900 border-t border-gray-800">
+                    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-3">
                         <input
                             type="text"
                             placeholder="Ask anything about the project..."
-                            className="flex-1 px-4 rounded-full text-white text-sm dark:bg-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm bg-gray-800 border border-gray-700 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                             value={newRequest}
                             onChange={e => setNewRequest(e.currentTarget.value)}
                         />
 
                         <button
                             type="submit"
-                            disabled={isThinking}
-                            className="px-2 py-2 bg-blue-600 text-white rounded-full hover:cursor-pointer hover:bg-blue-700"
+                            disabled={isThinking || !newRequest.trim()}
+                            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <Send></Send>
+                            <Send size={18} />
                         </button>
                     </form>
                 </footer>

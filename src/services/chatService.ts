@@ -25,7 +25,7 @@ export async function getChats() {
         headers: { "Content-Type": "application/json" },
     });
     if (!res.ok) throw new Error("Failed to load chats");
-    return res.json() as Promise<Chat[]>;
+    return res.json() as Promise<{ chats: Chat[] }>;
 }
 
 export async function createChat(userId: string) {
@@ -44,7 +44,7 @@ export async function getMessages(chatId: string) {
         method: "GET",
         headers: { "Content-Type": "application/json" }
     })
-    return res.json() as Promise<Chat>
+    return res.json() as Promise<{ messages: ChatMessage[] }>
 }
 
 export type StreamHandlers = {
@@ -115,4 +115,7 @@ export async function streamMessage(
             }
         }
     }
+
+    // Fallback: Ensure onDone is called when the stream ends naturally
+    handlers.onDone();
 }

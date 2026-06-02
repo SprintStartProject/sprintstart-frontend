@@ -16,6 +16,7 @@ export function AppRouter() {
                 <Route path="/selection-wizard" element={<SelectionWizardPage />} />
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/chat" element={<ChatPage />} />
+                <Route path="/chat/:id" element={<ChatPage />} />
                 <Route path="/onboarding" element={<OnBoardingPage />} />
                 <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
                 <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />

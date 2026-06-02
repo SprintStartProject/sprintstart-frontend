@@ -23,7 +23,16 @@ export function useChat() {
     }, []);
 
     useEffect(() => {
-        if (!chatId) return;
+        if (!chatId) {
+            setMessages([]);
+            return;
+        }
+
+        // Only load from server if we don't already have the messages for this chat in state
+        // This prevents overwriting locally streaming messages when the URL changes after chat creation
+        if (messages.length > 0 && messages.some(m => m.chatId === chatId)) {
+            return;
+        }
 
         const loadMessages = async () => {
             const data = await getMessages(chatId);
