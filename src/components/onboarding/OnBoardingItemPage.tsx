@@ -86,7 +86,7 @@ export function OnBoardingItemPage() {
           position: stepDetail.position,
           title: stepDetail.title,
           description: stepDetail.description,
-          type: stepDetail.type ?? 'TASK',      // ← Fallback weil GET es nicht zurückgibt
+          type: stepDetail.type,
           estimatedMinutes: stepDetail.estimatedMinutes,
           expectedOutcome: stepDetail.expectedOutcome ?? '',
           status: newStatus,

@@ -25,6 +25,7 @@ export interface OnboardingPathSummaryEndpoint {
 // ─── Full Path (GET /onboarding/{userId}/path) ───────────────────────────────
 
 export type StepStatus = "WAITING" | "IN_PROGRESS" | "FINISHED" | "SKIPPED";
+export type StepType = "VIDEO" | "DOCUMENT" | "TASK" | "LINK";
 
 export interface OnboardingStepEndpoint {
   id: string;
@@ -32,6 +33,7 @@ export interface OnboardingStepEndpoint {
   position: number;
   title: string;
   description: string;
+  type: StepType;
   estimatedMinutes: number;
   status: StepStatus;
   completedAt: string | null;
@@ -73,10 +75,7 @@ export interface OnboardingResourceEndpoint {
   url: string;
 }
 
-export type StepType = "VIDEO" | "DOCUMENT" | "TASK" | "LINK";
-
 export interface OnboardingStepDetail extends OnboardingStepEndpoint {
-    type?: StepType;        // ← kommt nicht vom GET zurück, daher optional
     expectedOutcome?: string;
     tasks: OnboardingTaskEndpoint[];
     resources: OnboardingResourceEndpoint[];
