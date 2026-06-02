@@ -25,23 +25,42 @@ export const knowledgeService = {
     },
 
     async uploadDocuments(files: File[], uploaderId: string): Promise<UploadResult[]> {
-        const formData = new FormData();
-        files.forEach(file => {
+        const results: UploadResult[] = [];
+        
+        for (const file of files) {
+            const formData = new FormData();
             formData.append('files', file);
-        });
 
-        const response = await fetch(`/api/v1/uploads?uploaderId=${uploaderId}`, {
-            method: 'POST',
-            body: formData,
-            // Note: Don't set Content-Type header; fetch will set it automatically for FormData
-        });
+            try {
+                const response = await fetch(`/api/v1/uploads?uploaderId=${uploaderId}`, {
+                    method: 'POST',
+                    body: formData,
+                });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Upload failed: ${errorText || response.statusText}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    results.push({
+                        id: '',
+                        filename: file.name,
+                        status: 'failed',
+                        error: errorText || response.statusText
+                    });
+                    continue;
+                }
+
+                const uploadResults = await response.json() as UploadResult[];
+                results.push(...uploadResults);
+            } catch (error) {
+                results.push({
+                    id: '',
+                    filename: file.name,
+                    status: 'failed',
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+            }
         }
 
-        return await response.json() as UploadResult[];
+        return results;
     },
 
     async deleteDocument(id: string): Promise<void> {

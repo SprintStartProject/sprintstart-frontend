@@ -49,8 +49,8 @@ export function DocumentTable({ documents, onDelete }: Props) {
                     <thead>
                         <tr className="bg-slate-900/50 border-b border-slate-800">
                             <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Document</th>
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest hidden lg:table-cell">Ingested At</th>
+                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
+                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell">Ingested At</th>
                             <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
                         </tr>
                     </thead>
@@ -66,25 +66,25 @@ export function DocumentTable({ documents, onDelete }: Props) {
                                     className="hover:bg-slate-800/30 transition-colors group"
                                 >
                                     <td className="px-4 sm:px-6 py-4">
-                                        <div className="flex items-center gap-3 sm:gap-4">
-                                            <div className="p-2 sm:p-2.5 bg-slate-800 text-slate-400 rounded-xl group-hover:text-blue-400 group-hover:bg-blue-400/10 transition-colors">
+                                        <div className="flex items-center gap-2 sm:gap-4">
+                                            <div className="p-1.5 sm:p-2.5 bg-slate-800 text-slate-400 rounded-lg sm:rounded-xl group-hover:text-blue-400 group-hover:bg-blue-400/10 transition-colors shrink-0">
                                                 {doc.name.toLowerCase().match(/\.(png|jpg|jpeg|webp)$/) ? (
-                                                    <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                    <ImageIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                                                 ) : (
-                                                    <FileCode className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                    <FileCode className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                                                 )}
                                             </div>
                                             <div className="flex flex-col min-w-0">
-                                                <span className="font-semibold text-white truncate max-w-[120px] sm:max-w-[240px]" title={doc.name}>
+                                                <span className="font-semibold text-white truncate max-w-[100px] sm:max-w-[300px]" title={doc.name}>
                                                     {doc.name}
                                                 </span>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-4 sm:px-6 py-4">
+                                    <td className="px-4 sm:px-6 py-4 text-center">
                                         {getStatusBadge(doc.status)}
                                     </td>
-                                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-slate-400 hidden lg:table-cell">
+                                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-slate-400 hidden md:table-cell">
                                         {new Date(doc.uploadDate).toLocaleDateString(undefined, {
                                             month: 'short',
                                             day: 'numeric',

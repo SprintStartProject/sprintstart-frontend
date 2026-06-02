@@ -111,18 +111,18 @@ export function KnowledgeBasePage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-950 p-4 sm:p-6 lg:p-10 text-white">
-            <div className="max-w-6xl mx-auto space-y-8 sm:space-y-10">
+        <div className="min-h-screen bg-gray-950 p-3 sm:p-6 lg:p-10 text-white">
+            <div className="max-w-6xl mx-auto space-y-6 sm:space-y-10">
                 {/* Header */}
-                <header className="flex flex-col gap-3">
+                <header className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-600/20 rounded-lg">
-                            <BookOpen className="w-6 h-6 text-blue-500" />
+                        <div className="p-1.5 sm:p-2 bg-blue-600/20 rounded-lg">
+                            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
                         </div>
                         <motion.h1 
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="text-2xl sm:text-3xl font-bold tracking-tight"
+                            className="text-xl sm:text-3xl font-bold tracking-tight"
                         >
                             Knowledge Base
                         </motion.h1>
@@ -131,9 +131,9 @@ export function KnowledgeBasePage() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="text-slate-400 max-w-2xl text-base sm:text-lg leading-relaxed"
+                        className="text-slate-400 max-w-2xl text-sm sm:text-lg leading-relaxed"
                     >
-                        Ingest project documentation. Upload Markdown files to provide the system with the necessary context for your workspace.
+                        Ingest project documentation. Upload Markdown files to provide context for your workspace.
                     </motion.p>
                 </header>
 
