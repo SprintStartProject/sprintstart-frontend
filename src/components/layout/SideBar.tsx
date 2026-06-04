@@ -48,7 +48,7 @@ const navItems: SidebarNavItem[] = [
 
 function getNavLinkClass(isActive: boolean): string {
     return [
-        'group flex h-[40px] items-center gap-[12px] rounded-[8px] px-[12px] text-[14px] font-medium leading-none transition-all duration-200',
+        'group flex h-[40px] items-center gap-[12px] rounded-[8px] px-[12px] text-[14px] font-medium leading-none transition-all duration-200 focus-visible:focus-outline outline-none',
         isActive
             ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30 [&>svg]:text-white'
             : 'text-slate-300 hover:bg-slate-900 hover:text-white [&>svg]:text-slate-400 hover:[&>svg]:text-white',
@@ -104,7 +104,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                             <span className="truncate text-sm font-semibold text-white">
                                 {profile.username}
                             </span>
-                            <span className="truncate text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                            <span className="truncate text-[10px] font-medium text-slate-400 uppercase tracking-wider">
                                 {profile.workingArea.replace('_', ' ')}
                             </span>                        </div>
                     </div>
@@ -114,7 +114,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                     type="button"
                     onClick={() => { void logout(); }}
                     disabled={status === 'loading'}
-                    className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-lg bg-red-950/20 text-sm font-medium text-red-400 transition-colors hover:bg-red-950/40 disabled:opacity-50"
+                    className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-lg bg-red-950/20 text-sm font-medium text-red-400 transition-colors hover:bg-red-950/40 disabled:opacity-50 focus-visible:focus-outline outline-none"
                 >
                     <LogOut className="h-[16px] w-[16px]" />
                     Logout
@@ -153,7 +153,7 @@ export function SideBar() {
                     aria-label={isMobileSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
                     aria-expanded={isMobileSidebarOpen}
                     onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
-                    className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-slate-300 transition-colors hover:bg-slate-900 hover:text-white"
+                    className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-slate-300 transition-colors hover:bg-slate-900 hover:text-white focus-visible:focus-outline outline-none"
                 >
                     {isMobileSidebarOpen ? (
                         <X className="h-[22px] w-[22px]" />

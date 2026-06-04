@@ -168,6 +168,8 @@ export function KnowledgeBasePage() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
+                            role="status"
+                            aria-live="polite"
                             className={`p-4 rounded-xl border flex flex-col gap-2 ${
                                 batchResult.failed > 0 
                                     ? 'bg-amber-500/10 border-amber-500/50 text-amber-200' 
@@ -185,7 +187,8 @@ export function KnowledgeBasePage() {
                                 </span>
                                 <button 
                                     onClick={() => setBatchResult(null)}
-                                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                                    className="p-1 hover:bg-white/10 rounded-lg transition-colors focus-visible:focus-outline outline-none"
+                                    aria-label="Close notification"
                                 >
                                     <X className="w-4 h-4 text-slate-400" />
                                 </button>
@@ -242,7 +245,7 @@ export function KnowledgeBasePage() {
                             </h2>
                             <button 
                                 onClick={() => { void loadDocuments(); }}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all focus-visible:focus-outline outline-none"
                             >
                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                 Refresh
@@ -253,7 +256,7 @@ export function KnowledgeBasePage() {
                             <div className="h-64 flex items-center justify-center bg-slate-900 rounded-2xl border border-slate-800">
                                 <div className="flex flex-col items-center gap-4">
                                     <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-slate-500 text-sm font-medium animate-pulse">Syncing repository...</p>
+                                    <p className="text-slate-400 text-sm font-medium animate-pulse">Syncing repository...</p>
                                 </div>
                             </div>
                         ) : (

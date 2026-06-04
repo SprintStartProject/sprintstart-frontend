@@ -55,7 +55,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
+    --text: #cbd5e1; /* slate-300 for better contrast */
     --text-h: #f3f4f6;
     --bg: #16171d;
     --border: #2e303a;
@@ -72,6 +72,11 @@
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
+}
+
+@utility focus-outline {
+  outline: 2px solid var(--color-blue-500);
+  outline-offset: 2px;
 }
 
 html,

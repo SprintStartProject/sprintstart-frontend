@@ -48,10 +48,10 @@ export function DocumentTable({ documents, onDelete }: Props) {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-900/50 border-b border-slate-800">
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Document</th>
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell">Ingested At</th>
-                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Document</th>
+                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
+                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Ingested At</th>
+                            <th className="px-4 sm:px-6 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
@@ -94,8 +94,9 @@ export function DocumentTable({ documents, onDelete }: Props) {
                                     <td className="px-4 sm:px-6 py-4 text-right">
                                         <button
                                             onClick={() => onDelete(doc.id)}
-                                            className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all focus-visible:focus-outline outline-none"
                                             title="Remove document"
+                                            aria-label={`Remove document: ${doc.name}`}
                                         >
                                             <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                                         </button>
@@ -112,7 +113,7 @@ export function DocumentTable({ documents, onDelete }: Props) {
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-white font-semibold">No documents indexed</p>
-                                            <p className="text-slate-500 text-sm">Upload Markdown documentation to populate your project&apos;s knowledge base.</p>
+                                            <p className="text-slate-400 text-sm">Upload Markdown documentation to populate your project&apos;s knowledge base.</p>
                                         </div>
                                     </div>
                                 </td>

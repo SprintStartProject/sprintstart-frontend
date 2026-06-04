@@ -175,7 +175,7 @@ export function OnBoardingPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
                     <button
                         onClick={() => window.location.reload()}
-                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all focus-visible:focus-outline outline-none"
                     >
                         Nochmal versuchen
                     </button>
@@ -236,7 +236,7 @@ export function OnBoardingPage() {
                                 <button
                                     key={phase.id}
                                     onClick={() => setSelectedPhaseIndex(index)}
-                                    className={`flex-1 rounded-2xl border p-4 transition-all text-left ${isSelected
+                                    className={`flex-1 rounded-2xl border p-4 transition-all text-left focus-visible:focus-outline outline-none ${isSelected
                                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
                                         : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-950'
                                         }`}
@@ -285,7 +285,7 @@ export function OnBoardingPage() {
                             <div className="flex flex-wrap items-center gap-4 mt-6">
                                 <button
                                     onClick={() => void navigate(`/onboarding/${nextTask.id}`)}
-                                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
+                                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2 focus-visible:focus-outline outline-none"
                                 >
                                     Jetzt starten
                                     <ChevronRight className="w-4 h-4" />
@@ -345,7 +345,7 @@ export function OnBoardingPage() {
 
                                             <button
                                                 onClick={() => void navigate(`/onboarding/${step.id}`)}
-                                                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
+                                                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2 focus-visible:focus-outline outline-none"
                                             >
                                                 Jetzt starten
                                                 <ChevronRight className="w-4 h-4" />

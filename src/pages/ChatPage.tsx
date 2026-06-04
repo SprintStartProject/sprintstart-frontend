@@ -15,7 +15,7 @@ export function ChatPage() {
 
                         <NavLink
                             to="/chat"
-                            className="bg-blue-600 rounded-lg hover:bg-blue-700 flex justify-center gap-2 items-center text-sm font-semibold p-2.5 text-white transition shadow-sm"
+                            className="bg-blue-600 rounded-lg hover:bg-blue-700 flex justify-center gap-2 items-center text-sm font-semibold p-2.5 text-white transition shadow-sm focus-visible:focus-outline outline-none"
                         >
                             <Plus size={18} />
                             New Chat
@@ -31,7 +31,7 @@ export function ChatPage() {
                                     key={chat.id}
                                     to={`/chat/${chat.id}`}
                                     className={({ isActive }) => `
-                                        group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
+                                        group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors focus-visible:focus-outline outline-none
                                         ${isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"}
                                     `}
                                 >
@@ -92,7 +92,8 @@ export function ChatPage() {
                                                             <button
                                                                 key={cIdx}
                                                                 onClick={() => setSelectedCitation(citation)}
-                                                                className="text-[10px] bg-gray-900/50 hover:bg-gray-900 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 transition-colors"
+                                                                className="text-[10px] bg-gray-900/50 hover:bg-gray-900 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 transition-colors focus-visible:focus-outline outline-none"
+                                                                aria-label={`View citation ${cIdx + 1}: ${citation.filename}`}
                                                             >
                                                                 [{cIdx + 1}] {citation.filename}
                                                             </button>
@@ -114,7 +115,11 @@ export function ChatPage() {
                     <div className="absolute right-6 bottom-24 w-80 rounded-xl bg-gray-800 border border-gray-700 p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4">
                         <div className="flex justify-between items-start mb-2">
                             <h3 className="text-sm font-bold text-white truncate pr-4">{selectedCitation.filename}</h3>
-                            <button onClick={() => setSelectedCitation(null)} className="text-gray-400 hover:text-white transition-colors">
+                            <button 
+                                onClick={() => setSelectedCitation(null)} 
+                                className="text-gray-400 hover:text-white transition-colors focus-visible:focus-outline outline-none rounded-md"
+                                aria-label="Close citation detail"
+                            >
                                 <Plus size={18} className="rotate-45" />
                             </button>
                         </div>
@@ -129,7 +134,7 @@ export function ChatPage() {
                         <input
                             type="text"
                             placeholder="Ask anything about the project..."
-                            className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm bg-gray-800 border border-gray-700 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                            className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm bg-gray-800 border border-gray-700 placeholder:text-gray-500 outline-none focus-visible:focus-outline transition-all"
                             value={newRequest}
                             onChange={e => setNewRequest(e.currentTarget.value)}
                         />
@@ -137,7 +142,8 @@ export function ChatPage() {
                         <button
                             type="submit"
                             disabled={isThinking || !newRequest.trim()}
-                            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:focus-outline outline-none"
+                            aria-label="Send message"
                         >
                             <Send size={18} />
                         </button>

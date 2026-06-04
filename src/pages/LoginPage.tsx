@@ -40,7 +40,7 @@ export function LoginPage() {
                                 required
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus-visible:focus-outline outline-none"
                                 placeholder="e.g. jdoe"
                             />
                         </div>
@@ -55,7 +55,7 @@ export function LoginPage() {
                                     required
                                     value={firstname}
                                     onChange={(e) => setFirstname(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus-visible:focus-outline outline-none"
                                     placeholder="John"
                                 />
                             </div>
@@ -69,7 +69,7 @@ export function LoginPage() {
                                     required
                                     value={lastname}
                                     onChange={(e) => setLastname(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus-visible:focus-outline outline-none"
                                     placeholder="Doe"
                                 />
                             </div>
@@ -85,7 +85,7 @@ export function LoginPage() {
                     </button>
                 </form>
 
-                <div className="text-center text-xs text-slate-500 pt-2">
+                <div className="text-center text-xs text-slate-400 pt-2">
                     Tip: Use any username. New usernames will be registered automatically.
                 </div>
             </div>

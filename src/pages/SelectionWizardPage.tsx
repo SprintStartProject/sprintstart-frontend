@@ -168,6 +168,7 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
                   <button
                     key={r.value}
                     onClick={() => setWizard((w) => ({ ...w, workingArea: r.value }))}
+                    className="focus-visible:focus-outline outline-none"
                     style={{
                       display: "flex", alignItems: "flex-start", gap: 10, padding: "12px",
                       borderRadius: 16,
@@ -205,6 +206,7 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
                   <button
                     key={l.value}
                     onClick={() => setWizard((w) => ({ ...w, level: l.value }))}
+                    className="focus-visible:focus-outline outline-none"
                     style={{
                       display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
                       borderRadius: 16,
@@ -252,6 +254,7 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
           {step === 2 ? (
             <button
               onClick={() => setStep(1)}
+              className="focus-visible:focus-outline outline-none rounded-md"
               style={{ fontSize: 12, fontWeight: 500, color: C.sub, background: "transparent", border: "none", cursor: "pointer", padding: "8px 4px", transition: "color 0.2s" }}
               onMouseEnter={(e) => { e.currentTarget.style.color = C.text; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = C.sub; }}
@@ -268,6 +271,7 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
                   })();
                 }}
               disabled={!canProceed1 || loading}
+              className="focus-visible:focus-outline outline-none"
               style={{
                 marginLeft: "auto", padding: "10px 22px", borderRadius: 12, border: "none",
                 fontSize: 12, fontWeight: 700,
@@ -294,6 +298,7 @@ export function SelectionWizardPage({ open = true }: { open?: boolean } = {}) {
             <button
               onClick={handleFinish}
               disabled={!canFinish}
+              className="focus-visible:focus-outline outline-none"
               style={{
                 marginLeft: "auto", padding: "10px 22px", borderRadius: 12, border: "none",
                 fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",

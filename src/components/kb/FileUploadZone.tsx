@@ -77,7 +77,8 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
     return (
         <div className="w-full">
-            <motion.div
+            <motion.label
+                htmlFor="fileInput"
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
                 onDragLeave={handleDrag}
@@ -91,14 +92,14 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                     relative border-2 border-dashed rounded-2xl p-6 sm:p-10 
                     flex flex-col items-center justify-center gap-5
                     transition-all duration-200 cursor-pointer group
+                    focus-visible:focus-outline outline-none
                     ${isUploading ? 'opacity-50 pointer-events-none' : ''}
                 `}
-                onClick={() => document.getElementById('fileInput')?.click()}
             >
                 <input
                     id="fileInput"
                     type="file"
-                    className="hidden"
+                    className="sr-only"
                     onChange={handleFileInput}
                     accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
                     multiple
@@ -135,7 +136,7 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                         Images (.png, .webp)
                     </div>
                 </div>
-            </motion.div>
+            </motion.label>
 
             <AnimatePresence>
                 {error && (

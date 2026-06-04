@@ -217,7 +217,7 @@ export function OnBoardingItemPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
           <button
             onClick={() => void navigate('/onboarding')}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all focus-visible:focus-outline outline-none"
           >
             Zurück zum Onboarding
           </button>
@@ -234,7 +234,7 @@ export function OnBoardingItemPage() {
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Step nicht gefunden.</p>
           <button
             onClick={() => void navigate('/onboarding')}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all focus-visible:focus-outline outline-none"
           >
             Zurück zum Onboarding
           </button>
@@ -253,7 +253,7 @@ export function OnBoardingItemPage() {
 
           <button
             onClick={() => void navigate('/onboarding')}
-            className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4"
+            className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4 focus-visible:focus-outline outline-none rounded-md"
           >
             <ArrowLeft className="w-4 h-4" />
             Zurück zum Onboarding
@@ -327,10 +327,11 @@ export function OnBoardingItemPage() {
                       <button
                         key={task.id}
                         onClick={() => toggleTask(task.id)}
-                        className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${isDone
+                        className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all focus-visible:focus-outline outline-none ${isDone
                           ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
                           : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
                           }`}
+                        aria-label={`${isDone ? 'Unmark' : 'Mark'} task as done: ${task.title}`}
                       >
                         {isDone
                           ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
@@ -367,7 +368,7 @@ export function OnBoardingItemPage() {
                   stepDetail.status === 'FINISHED' ? 'WAITING' : 'FINISHED'
                 )}
                 disabled={!allTasksDone && stepDetail.status !== 'FINISHED'}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${stepDetail.status === 'FINISHED'
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 focus-visible:focus-outline outline-none ${stepDetail.status === 'FINISHED'
                     ? 'border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50'
                     : allTasksDone
                       ? 'border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
@@ -431,7 +432,7 @@ export function OnBoardingItemPage() {
                       href={resource.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
+                      className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all group focus-visible:focus-outline outline-none"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
@@ -458,9 +459,9 @@ export function OnBoardingItemPage() {
               </h3>
               <textarea
                 placeholder="Dein Feedback zu diesem Schritt..."
-                className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus-visible:focus-outline transition-all resize-none"
               />
-              <button className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all">
+              <button className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all focus-visible:focus-outline outline-none">
                 Feedback absenden
               </button>
             </div>
