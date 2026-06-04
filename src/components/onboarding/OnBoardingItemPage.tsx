@@ -196,202 +196,229 @@ export function OnBoardingItemPage() {
   // ── LOADING ───────────────────────────────────────────────
   if (loadingState === 'loading' || loadingState === 'idle') {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          <p className="text-sm">Step wird geladen...</p>
+        <div className="flex min-h-screen items-center justify-center bg-app-bg">
+          <div className="flex flex-col items-center gap-4 text-app-text-subtle">
+            <Loader2 className="h-8 w-8 animate-spin text-app-brand-text" />
+            <p className="text-sm">Step wird geladen...</p>
+          </div>
         </div>
-      </div>
     );
   }
 
   // ── ERROR ─────────────────────────────────────────────────
   if (loadingState === 'error') {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Step konnte nicht geladen werden
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
-          <button
-            onClick={() => void navigate('/onboarding')}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
-          >
-            Zurück zum Onboarding
-          </button>
+        <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
+          <div className="max-w-md text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-text" />
+
+            <h2 className="mb-2 text-xl font-semibold text-app-text">
+              Step konnte nicht geladen werden
+            </h2>
+
+            <p className="mb-6 text-sm text-app-text-subtle">
+              {errorMessage}
+            </p>
+
+            <button
+                onClick={() => void navigate('/onboarding')}
+                className="rounded-xl bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+            >
+              Zurück zum Onboarding
+            </button>
+          </div>
         </div>
-      </div>
     );
   }
 
   // ── EMPTY ─────────────────────────────────────────────────
   if (!stepDetail) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Step nicht gefunden.</p>
-          <button
-            onClick={() => void navigate('/onboarding')}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
-          >
-            Zurück zum Onboarding
-          </button>
+        <div className="flex min-h-screen items-center justify-center bg-app-bg">
+          <div className="text-center">
+            <p className="mb-4 text-sm text-app-text-subtle">
+              Step nicht gefunden.
+            </p>
+
+            <button
+                onClick={() => void navigate('/onboarding')}
+                className="rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+            >
+              Zurück zum Onboarding
+            </button>
+          </div>
         </div>
-      </div>
     );
   }
 
   // ── RENDER ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+      <div className="min-h-screen bg-app-bg text-app-text">
+        {/* HEADER */}
+        <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+          <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 lg:px-8">
+            <button
+                onClick={() => void navigate('/onboarding')}
+                className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-subtle transition-all hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Zurück zum Onboarding
+            </button>
 
-      {/* HEADER */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div
+                    className={`mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
+                        stepDetail.status === 'FINISHED'
+                            ? 'bg-app-success-bg text-app-success-text'
+                            : stepDetail.status === 'IN_PROGRESS'
+                                ? 'bg-app-warning-bg text-app-warning-text'
+                                : stepDetail.status === 'SKIPPED'
+                                    ? 'bg-app-neutral-bg text-app-neutral-text'
+                                    : 'bg-app-brand-soft text-app-brand-text'
+                    }`}
+                >
+                  {stepDetail.status === 'FINISHED'
+                      ? 'Erledigt'
+                      : stepDetail.status === 'IN_PROGRESS'
+                          ? 'In Bearbeitung'
+                          : stepDetail.status === 'SKIPPED'
+                              ? 'Übersprungen'
+                              : 'Offen'}
+                </div>
 
-          <button
-            onClick={() => void navigate('/onboarding')}
-            className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Zurück zum Onboarding
-          </button>
+                <h1 className="text-2xl font-bold text-app-text sm:text-3xl">
+                  {stepDetail.title}
+                </h1>
 
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              {/* Status-Badge */}
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${stepDetail.status === 'FINISHED' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' :
-                stepDetail.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400' :
-                  stepDetail.status === 'SKIPPED' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
-                    'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
-                }`}>
-                {stepDetail.status === 'FINISHED' ? 'Erledigt' :
-                  stepDetail.status === 'IN_PROGRESS' ? 'In Bearbeitung' :
-                    stepDetail.status === 'SKIPPED' ? 'Übersprungen' : 'Offen'}
+                <p className="mt-2 text-sm text-app-text-subtle">
+                  {stepDetail.description}
+                </p>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                {stepDetail.title}
-              </h1>
-              <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">
-                {stepDetail.description}
-              </p>
+              {stepDetail.estimatedMinutes > 0 && (
+                  <div className="hidden shrink-0 items-center gap-2 rounded-xl bg-app-surface px-3 py-2 text-sm text-app-text-muted sm:flex">
+                    <Clock3 className="h-4 w-4" />
+                    {formatMinutes(stepDetail.estimatedMinutes)}
+                  </div>
+              )}
             </div>
-
-            {stepDetail.estimatedMinutes > 0 && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-900 text-sm text-gray-600 dark:text-gray-400 shrink-0">
-                <Clock3 className="w-4 h-4" />
-                {formatMinutes(stepDetail.estimatedMinutes)}
-              </div>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* MAIN CONTENT */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
-        <div className="grid lg:grid-cols-3 gap-6">
+        {/* MAIN CONTENT */}
+        <main className="mx-auto max-w-5xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* LINKE SPALTE */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* TASKS */}
+              {sortedTasks.length > 0 && (
+                  <div className="rounded-2xl border border-app-border bg-app-surface p-6">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-app-warning-solid" />
 
-          {/* LINKE SPALTE */}
-          <div className="lg:col-span-2 space-y-6">
+                        <h2 className="font-semibold text-app-text">
+                          Aufgaben
+                        </h2>
+                      </div>
 
-            {/* TASKS (Step by Step) */}
-            {sortedTasks.length > 0 && (
-              <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-orange-500" />
-                    <h2 className="font-semibold text-gray-900 dark:text-white">
-                      Aufgaben
-                    </h2>
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-app-text-subtle">
                     {doneTasks}/{sortedTasks.length} erledigt
                   </span>
-                </div>
+                    </div>
 
-                {/* Fortschrittsbalken */}
-                <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-1.5 mb-5 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
-                    style={{ width: `${taskPercentage}%` }}
-                  />
-                </div>
+                    {/* Fortschrittsbalken */}
+                    <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-app-progress-track">
+                      <div
+                          className="h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-all duration-500"
+                          style={{ width: `${taskPercentage}%` }}
+                      />
+                    </div>
 
-                <div className="space-y-3">
-                  {sortedTasks.map((task, index) => {
-                    const isDone = localFinished.has(task.id);
-                    return (
-                      <button
-                        key={task.id}
-                        onClick={() => toggleTask(task.id)}
-                        className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${isDone
-                          ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
-                          }`}
-                      >
-                        {isDone
-                          ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                          : <Circle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                        }
-                        <div>
-                          <span className={`text-sm font-medium ${isDone
-                            ? 'line-through text-gray-400 dark:text-gray-500'
-                            : 'text-gray-900 dark:text-white'
-                            }`}>
+                    <div className="space-y-3">
+                      {sortedTasks.map((task, index) => {
+                        const isDone = localFinished.has(task.id);
+
+                        return (
+                            <button
+                                key={task.id}
+                                onClick={() => toggleTask(task.id)}
+                                className={`flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
+                                    isDone
+                                        ? 'border-app-success-border bg-app-success-bg'
+                                        : 'border-app-border hover:border-app-brand-border'
+                                }`}
+                            >
+                              {isDone ? (
+                                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-app-success-text" />
+                              ) : (
+                                  <Circle className="mt-0.5 h-5 w-5 shrink-0 text-app-text-disabled" />
+                              )}
+
+                              <div>
+                          <span
+                              className={`text-sm font-medium ${
+                                  isDone
+                                      ? 'text-app-text-disabled line-through'
+                                      : 'text-app-text'
+                              }`}
+                          >
                             {index + 1}. {task.title}
                           </span>
-                          {task.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                                {task.description && (
+                                    <p className="mt-0.5 text-xs text-app-text-subtle">
+                                      {task.description}
+                                    </p>
+                                )}
+                              </div>
+                            </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+              )}
 
+              {/* MARK STEP AS DONE */}
+              <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+                <h3 className="mb-3 text-sm font-semibold text-app-text">
+                  Schritt abschließen
+                </h3>
+                <button
+                    onClick={() => void updateStepStatus(
+                        stepDetail.status === 'FINISHED' ? 'WAITING' : 'FINISHED'
+                    )}
+                    disabled={!allTasksDone && stepDetail.status !== 'FINISHED'}
+                    className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
+                        stepDetail.status === 'FINISHED'
+                            ? 'border-app-success-border bg-app-success-bg text-app-success-text'
+                            : allTasksDone
+                                ? 'border-dashed border-app-border-strong text-app-text-subtle hover:border-app-brand-border-strong hover:text-app-brand-text'
+                                : 'cursor-not-allowed border-dashed border-app-border text-app-text-disabled'
+                    }`}
+                >
+                  {stepDetail.status === 'FINISHED' ? (
+                      <Trophy className="h-5 w-5 shrink-0" />
+                  ) : (
+                      <Circle className="h-5 w-5 shrink-0" />
+                  )}
 
-            {/* mark step as done */}
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                Schritt abschließen
-              </h3>
-              <button
-                onClick={() => void updateStepStatus(
-                  stepDetail.status === 'FINISHED' ? 'WAITING' : 'FINISHED'
-                )}
-                disabled={!allTasksDone && stepDetail.status !== 'FINISHED'}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${stepDetail.status === 'FINISHED'
-                    ? 'border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50'
-                    : allTasksDone
-                      ? 'border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
-                      : 'border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed'
-                  }`}
-              >
-                {stepDetail.status === 'FINISHED'
-                  ? <Trophy className="w-5 h-5 shrink-0" />
-                  : <Circle className="w-5 h-5 shrink-0" />
-                }
-                <span className="text-sm font-medium flex-1 text-left">
+                  <span className="flex-1 text-left text-sm font-medium">
                   {stepDetail.status === 'FINISHED'
-                    ? 'Erledigt!'
-                    : allTasksDone
-                      ? 'Als erledigt markieren'
-                      : `Noch ${sortedTasks.length - doneTasks} Aufgabe${sortedTasks.length - doneTasks === 1 ? '' : 'n'} offen`
-                  }
+                      ? 'Erledigt!'
+                      : allTasksDone
+                          ? 'Als erledigt markieren'
+                          : `Noch ${sortedTasks.length - doneTasks} Aufgabe${
+                              sortedTasks.length - doneTasks === 1 ? '' : 'n'
+                          } offen`}
                 </span>
-                {stepDetail.status === 'FINISHED' && (
-                  <span className="text-xs opacity-60">rückgängig</span>
-                )}
-              </button>
+
+                  {stepDetail.status === 'FINISHED' && (
+                      <span className="text-xs opacity-60">rückgängig</span>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
 
 
 
@@ -418,55 +445,60 @@ export function OnBoardingItemPage() {
               </div>
             </div>
 
-            {/* RESOURCES */}
-            {resources.length > 0 && (
-              <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                  Ressourcen
-                </h3>
-                <div className="space-y-2">
-                  {resources.map(resource => (
-                    <a
-                      key={resource.id}
-                      href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                          {resource.title}
-                        </p>
-                        {resource.description && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
-                            {resource.description}
-                          </p>
-                        )}
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-all shrink-0 ml-2" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+              {/* RESOURCES */}
+              {resources.length > 0 && (
+                  <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+                    <h3 className="mb-3 text-sm font-semibold text-app-text">
+                      Ressourcen
+                    </h3>
 
-            {/* FEEDBACK */}
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                <MessageSquareCheck className="w-4 h-4 text-blue-500" />
-                Feedback
-              </h3>
-              <textarea
-                placeholder="Dein Feedback zu diesem Schritt..."
-                className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-              />
-              <button className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all">
-                Feedback absenden
-              </button>
+                    <div className="space-y-2">
+                      {resources.map(resource => (
+                          <a
+                              key={resource.id}
+                              href={resource.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group flex items-center justify-between rounded-xl border border-app-border p-3 transition-all hover:border-app-brand-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-app-text-muted">
+                                {resource.title}
+                              </p>
+
+                              {resource.description && (
+                                  <p className="mt-0.5 truncate text-xs text-app-text-subtle">
+                                    {resource.description}
+                                  </p>
+                              )}
+                            </div>
+
+                            <ExternalLink className="ml-2 h-4 w-4 shrink-0 text-app-text-subtle transition-all group-hover:text-app-brand-text" />
+                          </a>
+                      ))}
+                    </div>
+                  </div>
+              )}
+
+              {/* FEEDBACK */}
+              <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
+                  <MessageSquareCheck className="h-4 w-4 text-app-brand-text" />
+                  Feedback
+                </h3>
+
+                <textarea
+                    placeholder="Dein Feedback zu diesem Schritt..."
+                    className="h-24 w-full resize-none rounded-xl border border-app-border bg-app-bg p-3 text-sm text-app-text transition-all placeholder:text-app-text-disabled focus:outline-none focus:ring-2 focus:ring-app-focus"
+                />
+
+                <button className="mt-3 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus">
+                  Feedback absenden
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
   );
 }
