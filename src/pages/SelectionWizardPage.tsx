@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { userService } from "../services/userService";
+import { userService } from "../features/onboarding/api/userService";
 import { WorkingArea } from "../services/types";
 import { useAuth } from "../context/useAuth";
 

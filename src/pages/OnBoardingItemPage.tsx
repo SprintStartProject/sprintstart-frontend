@@ -9,7 +9,7 @@ import type {
   OnboardingTaskEndpoint,
   OnboardingResourceEndpoint,
   StepStatus
-} from '../../types/onboarding';
+} from '../features/onboarding/types';
 
 import {
   ArrowLeft,

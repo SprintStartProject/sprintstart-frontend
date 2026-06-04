@@ -1,5 +1,5 @@
-import type { DocumentMetadata } from '../../services/types';
-import { DocumentStatus } from '../../services/types';
+import type { DocumentMetadata } from '../../../services/types';
+import { DocumentStatus } from '../../../services/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileCode, Trash2, CheckCircle2, Clock, AlertCircle, Loader2, ImageIcon } from 'lucide-react';
 

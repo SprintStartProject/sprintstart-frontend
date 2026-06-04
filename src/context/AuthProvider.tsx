@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { userService } from '../services/userService';
+import { userService } from '../features/onboarding/api/userService';
 import type { UserProfile } from '../services/types';
 import { AuthContext, type AuthStatus } from './AuthContext';
 

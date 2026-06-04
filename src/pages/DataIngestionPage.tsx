@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { knowledgeService } from '../services/knowledgeService';
+import { knowledgeService } from '../features/data-ingestion/api/knowledgeService';
 import { type DocumentMetadata, DocumentStatus } from '../services/types';
-import { FileUploadZone } from '../components/kb/FileUploadZone';
-import { DocumentTable } from '../components/kb/DocumentTable';
+import { FileUploadZone } from '../features/data-ingestion/components/FileUploadZone';
+import { DocumentTable } from '../features/data-ingestion/components/DocumentTable';
 import { useAuth } from '../context/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, RefreshCw, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 
-export function KnowledgeBasePage() {
+export function DataIngestionPage() {
     const { profile } = useAuth();
     const [documents, setDocuments] = useState<DocumentMetadata[]>(() => {
         // Hydrate from sessionStorage on initial load

@@ -1,4 +1,4 @@
-import { DocumentStatus, type DocumentMetadata, type UploadResult } from './types';
+import { DocumentStatus, type DocumentMetadata, type UploadResult } from '../../../services/types';
 
 export const knowledgeService = {
     async fetchDocuments(uploaderId: string): Promise<DocumentMetadata[]> {

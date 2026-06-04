@@ -1,8 +1,8 @@
 import {Bot, Plus, Send, Sparkles, User} from "lucide-react";
-import { useChat } from "../hooks/useChat.ts"
+import { useChat } from "../features/chatbot/hooks/useChat"
 import {NavLink} from "react-router-dom";
 
-export function ChatPage() {
+export function ChatbotPage() {
 
     const {messages, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
 

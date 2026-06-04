@@ -1,4 +1,4 @@
-import { Role, WorkingArea, type UserProfile } from './types';
+import { Role, WorkingArea, type UserProfile } from '../../../services/types';
 
 const SESSION_KEY = 'sprintstart_session_id';
 

@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../types/onboarding';
+import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../features/onboarding/types';
 import { useNavigate } from 'react-router-dom';
 
 import {

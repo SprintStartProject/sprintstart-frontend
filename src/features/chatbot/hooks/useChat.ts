@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import {type Citation, createChat, getChats, getMessages, streamMessage} from "../services/chatService";
-import type {Chat, ChatMessage} from "../services/chatService";
+import {type Citation, createChat, getChats, getMessages, streamMessage} from "../api/chatService";
+import type {Chat, ChatMessage} from "../api/chatService";
 
 export function useChat() {
     const { id: chatId } = useParams();
