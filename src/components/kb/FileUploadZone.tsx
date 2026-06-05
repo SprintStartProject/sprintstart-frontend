@@ -13,21 +13,25 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
     const validateFiles = (files: FileList | File[]): File[] => {
         const allowedTypes = [
-            'application/pdf', 
-            'text/markdown', 
+            'application/pdf',
+            'text/markdown',
             'text/plain',
             'image/png',
             'image/jpeg',
-            'image/webp'
+            'image/webp',
         ];
-        const maxSize = 10 * 1024 * 1024; // 10MB
+
+        const maxSize = 10 * 1024 * 1024;
         const validFiles: File[] = [];
         let hasError = false;
 
         Array.from(files).forEach(file => {
             const isMd = file.name.toLowerCase().endsWith('.md');
+
             if (!allowedTypes.includes(file.type) && !isMd) {
-                setError(`File type not supported: ${file.name}. Only PDF, MD, TXT, PNG, JPG, and WEBP are allowed.`);
+                setError(
+                    `File type not supported: ${file.name}. Only PDF, MD, TXT, PNG, JPG, and WEBP are allowed.`,
+                );
                 hasError = true;
             } else if (file.size > maxSize) {
                 setError(`File too large: ${file.name}. Max size is 10MB.`);
@@ -37,13 +41,17 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
             }
         });
 
-        if (!hasError) setError(null);
+        if (!hasError) {
+            setError(null);
+        }
+
         return validFiles;
     };
 
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
+
         if (e.type === 'dragenter' || e.type === 'dragover') {
             setIsDragActive(true);
         } else if (e.type === 'dragleave') {
@@ -57,8 +65,10 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
         setIsDragActive(false);
 
         const files = e.dataTransfer.files;
+
         if (files && files.length > 0) {
             const validFiles = validateFiles(files);
+
             if (validFiles.length > 0) {
                 onUpload(validFiles);
             }
@@ -67,8 +77,10 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
     const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
+
         if (files && files.length > 0) {
             const validFiles = validateFiles(files);
+
             if (validFiles.length > 0) {
                 onUpload(validFiles);
             }
@@ -77,24 +89,32 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
     return (
         <div className="w-full">
-            <motion.label
-                htmlFor="fileInput"
+            <motion.div
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
-                animate={{
-                    borderColor: isDragActive ? '#2563eb' : '#1e293b',
-                    backgroundColor: isDragActive ? 'rgba(37, 99, 235, 0.05)' : 'rgba(15, 23, 42, 0.5)',
-                    scale: isDragActive ? 1.01 : 1
+                tabIndex={0}
+                role="button"
+                aria-label="Upload documentation or images"
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        document.getElementById('fileInput')?.click();
+                    }
                 }}
-                className={`
-                    relative border-2 border-dashed rounded-2xl p-6 sm:p-10 
-                    flex flex-col items-center justify-center gap-5
-                    transition-all duration-200 cursor-pointer group
-                    focus-visible:focus-outline outline-none
-                    ${isUploading ? 'opacity-50 pointer-events-none' : ''}
-                `}
+                animate={{
+                    scale: isDragActive ? 1.01 : 1,
+                }}
+                className={[
+                    'relative flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200 group sm:p-10',
+                    'focus:outline-none focus:ring-2 focus:ring-app-focus',
+                    isDragActive
+                        ? 'border-app-brand-border-strong bg-app-brand-soft'
+                        : 'border-app-border-muted bg-app-bg hover:border-app-brand-border hover:bg-app-surface-hover',
+                    isUploading ? 'pointer-events-none opacity-50' : '',
+                ].join(' ')}
+                onClick={() => document.getElementById('fileInput')?.click()}
             >
                 <input
                     id="fileInput"
@@ -105,38 +125,43 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                     multiple
                 />
 
-                <div className={`
-                    w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center
-                    ${isDragActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 text-slate-400 group-hover:text-blue-400 group-hover:bg-slate-700'}
-                    transition-all duration-300
-                `}>
+                <div
+                    className={[
+                        'flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-300 sm:h-16 sm:w-16',
+                        isDragActive
+                            ? 'bg-app-brand text-white shadow-lg'
+                            : 'bg-app-surface-muted text-app-text-muted group-hover:bg-app-brand-soft group-hover:text-app-brand-text',
+                    ].join(' ')}
+                >
                     {isUploading ? (
-                        <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin" />
+                        <Loader2 className="h-6 w-6 animate-spin sm:h-8 sm:w-8" />
                     ) : (
-                        <Upload className="w-6 h-6 sm:w-8 sm:h-8" />
+                        <Upload className="h-6 w-6 sm:h-8 sm:w-8" />
                     )}
                 </div>
 
-                <div className="text-center space-y-1">
-                    <p className="text-base sm:text-lg font-semibold text-white">
+                <div className="space-y-1 text-center">
+                    <p className="text-base font-semibold text-app-text sm:text-lg">
                         {isUploading ? 'Processing artifacts...' : 'Drop multiple artifacts here'}
                     </p>
-                    <p className="text-xs sm:text-sm text-slate-400 px-4">
+
+                    <p className="px-4 text-xs text-app-text-muted sm:text-sm">
                         {isUploading ? 'Ingesting your knowledge...' : 'Drag & drop Markdown or Images'}
                     </p>
                 </div>
 
-                <div className="flex flex-wrap justify-center gap-2 mt-2">
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600/10 border border-blue-600/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider">
-                        <FileCode className="w-3 h-3" />
+                <div className="mt-2 flex flex-wrap justify-center gap-2">
+                    <div className="flex items-center gap-1.5 rounded-md border border-app-brand-border bg-app-brand-soft px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-app-brand-text">
+                        <FileCode className="h-3 w-3" />
                         Docs (.md, .pdf)
                     </div>
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 text-[10px] font-bold uppercase tracking-wider">
-                        <ImageIcon className="w-3 h-3" />
+
+                    <div className="flex items-center gap-1.5 rounded-md border border-app-neutral-border bg-app-neutral-bg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-app-neutral-text">
+                        <ImageIcon className="h-3 w-3" />
                         Images (.png, .webp)
                     </div>
                 </div>
-            </motion.label>
+            </motion.div>
 
             <AnimatePresence>
                 {error && (
@@ -144,9 +169,9 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="mt-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-center gap-3"
+                        className="mt-4 flex items-center gap-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-4 text-sm text-app-danger-text"
                     >
-                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        <AlertCircle className="h-5 w-5 shrink-0" />
                         {error}
                     </motion.div>
                 )}

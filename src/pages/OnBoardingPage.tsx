@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../types/onboarding';
+import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from '../types/onboarding';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -19,6 +19,7 @@ import type {UserProfile} from "../services/types.ts";
 //import { useAuth } from '../context/useAuth.ts';
 
 const BASE_API_URL = 'http://localhost:8080/api/v1';
+
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 //const { profile, status } = useAuth();
@@ -39,9 +40,9 @@ function ProgressBar({ value, max }: ProgressBarProps) {
     const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
 
     return (
-        <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+        <div className="h-2 overflow-hidden rounded-full bg-app-progress-track">
             <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-all duration-500"
                 style={{ width: `${percentage}%` }}
             />
         </div>
@@ -154,9 +155,9 @@ export function OnBoardingPage() {
     // ── RENDER: LOADING STATE ──────────────────────────────────
     if (loadingState === 'loading' || loadingState === 'idle') {
         return (
-            <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <div className="flex min-h-screen items-center justify-center bg-app-bg">
+                <div className="flex flex-col items-center gap-4 text-app-text-muted">
+                    <Loader2 className="h-8 w-8 animate-spin text-app-brand-text" />
                     <p className="text-sm">OnBoarding Path wird geladen...</p>
                 </div>
             </div>
@@ -166,16 +167,21 @@ export function OnBoardingPage() {
     // ── RENDER: ERROR STATE ────────────────────────────────────
     if (loadingState === 'error') {
         return (
-            <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-8">
+            <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
                 <div className="max-w-md text-center">
-                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-text" />
+
+                    <h2 className="mb-2 text-xl font-semibold text-app-text">
                         OnBoarding konnte nicht geladen werden
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
+
+                    <p className="mb-6 text-sm text-app-text-muted">
+                        {errorMessage}
+                    </p>
+
                     <button
                         onClick={() => window.location.reload()}
-                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all focus-visible:focus-outline outline-none"
+                        className="rounded-xl bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                     >
                         Nochmal versuchen
                     </button>
@@ -187,8 +193,8 @@ export function OnBoardingPage() {
     // ── RENDER: EMPTY STATE ────────────────────────────────────
     if (!OnBoardingPathEndpoint || !currentPhase) {
         return (
-            <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
+            <div className="flex min-h-screen items-center justify-center bg-app-bg">
+                <p className="text-sm text-app-text-muted">
                     Kein OnBoarding Path gefunden.
                 </p>
             </div>
@@ -198,36 +204,35 @@ export function OnBoardingPage() {
 
     // ── RENDER: SUCCESS STATE ──────────────────────────────────
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-950">
-
-            {/* ── HEADER ───────────────────────────────────────── */}
-            <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-
-                    {/* Titel + Gesamt-Prozent */}
-                    <div className="flex items-center justify-between mb-4">
+        <div className="min-h-screen bg-app-bg text-app-text">
+            <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+                <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+                    <div className="mb-4 flex items-center justify-between">
                         <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <Sparkles className="w-5 h-5 text-blue-500" />
-                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            <div className="mb-1 flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-app-brand-text" />
+
+                                <h1 className="text-2xl font-bold text-app-text">
                                     Dein OnBoarding Journey
                                 </h1>
                             </div>
                         </div>
 
                         <div className="text-right">
-                            <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+                            <div className="text-4xl font-bold text-app-brand-text">
                                 {totalPercentage}%
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">gesamt</div>
+
+                            <div className="text-xs text-app-text-muted">
+                                gesamt
+                            </div>
                         </div>
                     </div>
 
                     {/* Gesamt-Progressbar */}
                     <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
 
-                    {/* Phasen-Tabs */}
-                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                         {OnBoardingPathEndpoint.phases.map((phase, index) => {
                             const progress = getPhaseProgress(phase);
                             const isSelected = selectedPhaseIndex === index;
@@ -236,23 +241,29 @@ export function OnBoardingPage() {
                                 <button
                                     key={phase.id}
                                     onClick={() => setSelectedPhaseIndex(index)}
-                                    className={`flex-1 rounded-2xl border p-4 transition-all text-left focus-visible:focus-outline outline-none ${isSelected
-                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                                        : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-950'
-                                        }`}
+                                    className={`flex-1 rounded-2xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
+                                        isSelected
+                                            ? 'border-app-brand-border bg-app-brand-soft'
+                                            : 'border-app-border bg-app-surface hover:border-app-border-strong hover:bg-app-surface-hover'
+                                    }`}
                                 >
-                                    <div className="font-semibold text-gray-900 dark:text-white text-sm mb-1">
+                                    <div className="mb-1 text-sm font-semibold text-app-text">
                                         {phase.title}
                                     </div>
                                     <ProgressBar value={progress.completed} max={progress.total} />
-                                    <div className="flex justify-between mt-2">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+
+                                    <div className="mt-2 flex justify-between">
+                                        <span className="text-xs text-app-text-muted">
                                             {progress.completed}/{progress.total} Tasks
                                         </span>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${progress.percentage === 100
-                                            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                                            }`}>
+
+                                        <span
+                                            className={`rounded-full px-2 py-0.5 text-xs ${
+                                                progress.percentage === 100
+                                                    ? 'bg-app-success-bg text-app-success-text'
+                                                    : 'bg-app-neutral-bg text-app-neutral-text'
+                                            }`}
+                                        >
                                             {progress.percentage}%
                                         </span>
                                     </div>
@@ -263,32 +274,32 @@ export function OnBoardingPage() {
                 </div>
             </div>
 
-
-            {/* ── MAIN CONTENT ─────────────────────────────────── */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
-
-                {/* "Up Next" Banner — nur wenn es einen nächsten Task gibt */}
+            <main className="mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
                 {nextTask && (
-                    <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-950 p-6 sm:p-8 mb-6 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full pointer-events-none" />
+                    <div className="relative mb-6 overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8">
+                        <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
+
                         <div className="relative z-10">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
-                                <PlayCircle className="w-3.5 h-3.5" />
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text">
+                                <PlayCircle className="h-3.5 w-3.5" />
                                 Up Next
                             </div>
-                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+
+                            <h2 className="text-2xl font-bold text-app-text sm:text-3xl">
                                 {nextTask.title}
                             </h2>
-                            <p className="text-gray-600 dark:text-gray-400 mt-2 max-w-2xl">
+
+                            <p className="mt-2 max-w-2xl text-app-text-muted">
                                 {nextTask.description}
                             </p>
-                            <div className="flex flex-wrap items-center gap-4 mt-6">
+
+                            <div className="mt-6 flex flex-wrap items-center gap-4">
                                 <button
                                     onClick={() => void navigate(`/onboarding/${nextTask.id}`)}
-                                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2 focus-visible:focus-outline outline-none"
+                                    className="flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-medium text-white transition-all hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                                 >
                                     Jetzt starten
-                                    <ChevronRight className="w-4 h-4" />
+                                    <ChevronRight className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
@@ -297,10 +308,11 @@ export function OnBoardingPage() {
 
                 {/* Phase-Beschreibung */}
                 <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h2 className="text-lg font-semibold text-app-text">
                         {currentPhase.title}
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+
+                    <p className="mt-1 text-sm text-app-text-muted">
                         {currentPhase.description}
                     </p>
                 </div>
@@ -310,34 +322,36 @@ export function OnBoardingPage() {
                     {currentPhase.steps.map((step) => (
                         <div
                             key={step.id}
-                            className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${step.status === 'FINISHED'
-                                ? 'border-gray-200 dark:border-gray-800 opacity-60'
-                                : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg'
-                                }`}
+                            className={`group rounded-2xl border bg-app-surface transition-all ${
+                                step.status === 'FINISHED'
+                                    ? 'border-app-border opacity-60'
+                                    : 'border-app-border hover:border-app-brand-border hover:shadow-lg'
+                            }`}
                         >
                             <div className="p-5">
                                 <div className="flex gap-4">
-
-                                    <div className="pt-0.5 shrink-0">
-                                        {step.status === 'FINISHED'
-                                            ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                                            : <Circle className="w-6 h-6 text-gray-300 dark:text-gray-600" />
-                                        }
+                                    <div className="shrink-0 pt-0.5">
+                                        {step.status === 'FINISHED' ? (
+                                            <CheckCircle2 className="h-6 w-6 text-app-success-text" />
+                                        ) : (
+                                            <Circle className="h-6 w-6 text-app-text-disabled" />
+                                        )}
                                     </div>
 
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-
-                                            {/* Text */}
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                             <div>
-                                                <h3 className={`font-semibold text-base ${step.status === 'FINISHED'
-                                                    ? 'line-through text-gray-400 dark:text-gray-500'
-                                                    : 'text-gray-900 dark:text-white'
-                                                    }`}>
+                                                <h3
+                                                    className={`text-base font-semibold ${
+                                                        step.status === 'FINISHED'
+                                                            ? 'text-app-text-disabled line-through'
+                                                            : 'text-app-text'
+                                                    }`}
+                                                >
                                                     {step.title}
                                                 </h3>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+
+                                                <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
                                                     {step.description}
                                                 </p>
                                                 {/* Meta-Infos */}
@@ -345,10 +359,10 @@ export function OnBoardingPage() {
 
                                             <button
                                                 onClick={() => void navigate(`/onboarding/${step.id}`)}
-                                                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2 focus-visible:focus-outline outline-none"
+                                                className="flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-medium text-white transition-all hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                                             >
                                                 Jetzt starten
-                                                <ChevronRight className="w-4 h-4" />
+                                                <ChevronRight className="h-4 w-4" />
                                             </button>
                                         </div>
                                     </div>

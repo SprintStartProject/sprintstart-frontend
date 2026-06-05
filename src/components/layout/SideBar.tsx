@@ -12,6 +12,7 @@ import {
     X,
 } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
+import { ThemeToggle } from '../common/ThemeToggle';
 
 type SidebarNavItem = {
     label: string;
@@ -48,10 +49,11 @@ const navItems: SidebarNavItem[] = [
 
 function getNavLinkClass(isActive: boolean): string {
     return [
-        'group flex h-[40px] items-center gap-[12px] rounded-[8px] px-[12px] text-[14px] font-medium leading-none transition-all duration-200 focus-visible:focus-outline outline-none',
+        'group flex h-[40px] items-center gap-[12px] rounded-[8px] px-[12px] text-[14px] font-medium leading-none transition-all duration-200',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus',
         isActive
-            ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30 [&>svg]:text-white'
-            : 'text-slate-300 hover:bg-slate-900 hover:text-white [&>svg]:text-slate-400 hover:[&>svg]:text-white',
+            ? 'bg-app-brand text-white shadow-lg [&>svg]:text-white'
+            : 'text-app-text-muted hover:bg-app-surface-hover hover:text-app-text [&>svg]:text-app-text-muted hover:[&>svg]:text-app-text',
     ].join(' ');
 }
 
@@ -59,13 +61,13 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
     const { profile, logout, status } = useAuth();
 
     return (
-        <div className="flex h-full flex-col bg-gray-950">
+        <div className="flex h-full flex-col bg-app-bg text-app-text">
             <div className="flex items-center gap-3 px-[24px] py-[24px]">
-                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-blue-600 shadow-lg shadow-blue-950/40">
+                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
                     <Rocket className="h-[18px] w-[18px] text-white" />
                 </div>
 
-                <h1 className="text-lg font-bold leading-none tracking-tight text-white">
+                <h1 className="text-lg font-bold leading-none tracking-tight text-app-text">
                     SprintStart
                 </h1>
             </div>
@@ -94,27 +96,34 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                 ))}
             </nav>
 
-            <div className="space-y-[12px] border-t border-slate-800 bg-slate-900/50 p-[16px]">
+            <div className="space-y-[12px] border-t border-app-border bg-app-surface p-[16px]">
                 {profile && (
                     <div className="mb-4 flex items-center gap-3 px-3 py-2">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-400">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted text-app-text-muted">
                             <User className="h-4 w-4" />
                         </div>
+
                         <div className="flex flex-col overflow-hidden">
-                            <span className="truncate text-sm font-semibold text-white">
+                            <span className="truncate text-sm font-semibold text-app-text">
                                 {profile.username}
                             </span>
-                            <span className="truncate text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+
+                            <span className="truncate text-[10px] font-medium uppercase tracking-wider text-app-text-muted">
                                 {profile.workingArea.replace('_', ' ')}
-                            </span>                        </div>
+                            </span>
+                        </div>
                     </div>
                 )}
 
+                <ThemeToggle className="w-full" />
+
                 <button
                     type="button"
-                    onClick={() => { void logout(); }}
+                    onClick={() => {
+                        void logout();
+                    }}
                     disabled={status === 'loading'}
-                    className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-lg bg-red-950/20 text-sm font-medium text-red-400 transition-colors hover:bg-red-950/40 disabled:opacity-50 focus-visible:focus-outline outline-none"
+                    className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-lg bg-app-danger-bg text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                 >
                     <LogOut className="h-[16px] w-[16px]" />
                     Logout
@@ -133,19 +142,19 @@ export function SideBar() {
 
     return (
         <>
-            <aside className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-slate-800 bg-gray-950 lg:flex">
+            <aside className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex">
                 <SidebarContent />
             </aside>
 
-            <header className="fixed left-0 right-0 top-0 z-40 flex h-[64px] items-center justify-between border-b border-slate-800 bg-gray-950 px-[16px] lg:hidden">
+            <header className="fixed left-0 right-0 top-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-blue-600 shadow-lg shadow-blue-950/40">
+                    <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
                         <Rocket className="h-[18px] w-[18px] text-white" />
                     </div>
 
-                    <span className="text-[16px] font-bold leading-none tracking-tight text-white">
-            SprintStart
-          </span>
+                    <span className="text-[16px] font-bold leading-none tracking-tight text-app-text">
+                        SprintStart
+                    </span>
                 </div>
 
                 <button
@@ -153,7 +162,7 @@ export function SideBar() {
                     aria-label={isMobileSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
                     aria-expanded={isMobileSidebarOpen}
                     onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
-                    className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-slate-300 transition-colors hover:bg-slate-900 hover:text-white focus-visible:focus-outline outline-none"
+                    className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                 >
                     {isMobileSidebarOpen ? (
                         <X className="h-[22px] w-[22px]" />
@@ -168,13 +177,13 @@ export function SideBar() {
                     type="button"
                     aria-label="Close sidebar overlay"
                     onClick={closeMobileSidebar}
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
+                    className="fixed inset-0 z-50 bg-app-overlay backdrop-blur-sm lg:hidden"
                 />
             ) : null}
 
             <aside
                 className={[
-                    'fixed bottom-0 left-0 top-0 z-[60] flex w-[286px] flex-col border-r border-slate-800 bg-gray-950 transition-transform duration-300 ease-out lg:hidden',
+                    'fixed bottom-0 left-0 top-0 z-[60] flex w-[286px] flex-col border-r border-app-border bg-app-bg transition-transform duration-300 ease-out lg:hidden',
                     isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
                 ].join(' ')}
             >
