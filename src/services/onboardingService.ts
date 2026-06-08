@@ -1,46 +1,80 @@
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../types/onboarding';
-import { userService } from './userService';
+// ============================================================
+// services/onboardingService.ts
+// ============================================================
+
+import type {
+    OnboardingPathEndpoint,
+    OnboardingStepDetail,
+    OnboardingTaskEndpoint,
+    OnboardingResourceEndpoint,
+    StepStatus,
+} from '../types/onboarding';
+
+const BASE_URL = '/api/v1';
 
 export const onboardingService = {
-    async fetchOnboardingPath(userId: string): Promise<OnboardingPathEndpoint> {
-        const response = await fetch(`/api/v1/onboarding/${userId}/path`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch onboarding path');
-        }
-        return await response.json() as OnboardingPathEndpoint;
+
+    // ── PATH ─────────────────────────────────────────────────
+
+    async fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
+        const res = await fetch(`${BASE_URL}/onboarding/${userId}/path`);
+        if (!res.ok) throw new Error(`Fehler beim Laden des OnBoarding Paths: ${res.statusText}`);
+        return res.json() as Promise<OnboardingPathEndpoint>;
     },
 
-    async getUserId(): Promise<string> {
-        const userId = localStorage.getItem('sprintstart_session_id');
-        if (!userId) {
-            const profile = await userService.getProfile();
-            if (!profile) {
-                throw new Error('User not authenticated');
-            }
-            return profile.id;
-        }
-        return userId;
+    // ── STEP ─────────────────────────────────────────────────
+
+    async fetchStep(stepId: string): Promise<OnboardingStepDetail> {
+        const res = await fetch(`${BASE_URL}/onboarding/steps/${stepId}`);
+        if (!res.ok) throw new Error(`Step: HTTP ${res.status}`);
+        return res.json() as Promise<OnboardingStepDetail>;
     },
 
-    async markStepAsCompleted(stepId: string): Promise<void> {
-        const response = await fetch(`/api/v1/onboarding/steps/${stepId}/complete`, {
-            method: 'POST'
+    async updateStepStatus(step: OnboardingStepDetail, newStatus: StepStatus): Promise<void> {
+        const res = await fetch(`${BASE_URL}/onboarding/steps/${step.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                position: step.position,
+                title: step.title,
+                description: step.description,
+                type: step.type ?? 'TASK',
+                estimatedMinutes: step.estimatedMinutes,
+                expectedOutcome: step.expectedOutcome ?? '',
+                status: newStatus,
+                skipReason: step.skipReason ?? '',
+            }),
         });
-        if (!response.ok) {
-            throw new Error('Failed to mark step as completed');
-        }
+        if (!res.ok) throw new Error(`Step Update: HTTP ${res.status}`);
     },
 
-    async skipStep(stepId: string, reason: string): Promise<void> {     
-        const response = await fetch(`/api/v1/onboarding/steps/${stepId}/skip`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ reason })
+    // ── TASKS ─────────────────────────────────────────────────
+
+    async fetchTasks(stepId: string): Promise<OnboardingTaskEndpoint[]> {
+        const res = await fetch(`${BASE_URL}/onboarding/steps/${stepId}/tasks`);
+        if (!res.ok) throw new Error(`Tasks: HTTP ${res.status}`);
+        return res.json() as Promise<OnboardingTaskEndpoint[]>;
+    },
+
+    async updateTask(task: OnboardingTaskEndpoint, finished: boolean): Promise<void> {
+        const res = await fetch(`${BASE_URL}/onboarding/tasks/${task.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                position: task.position,
+                title: task.title,
+                description: task.description,
+                finished,
+            }),
         });
-        if (!response.ok) {
-            throw new Error('Failed to skip step');
-        }
-    }   
+        if (!res.ok) throw new Error(`Task Update: HTTP ${res.status}`);
+    },
+
+    // ── RESOURCES ─────────────────────────────────────────────
+
+    async fetchResources(stepId: string): Promise<OnboardingResourceEndpoint[]> {
+        const res = await fetch(`${BASE_URL}/onboarding/steps/${stepId}/resources`);
+        if (!res.ok) throw new Error(`Resources: HTTP ${res.status}`);
+        return res.json() as Promise<OnboardingResourceEndpoint[]>;
+    },
 };

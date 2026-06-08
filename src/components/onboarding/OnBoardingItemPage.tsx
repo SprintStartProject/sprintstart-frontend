@@ -10,6 +10,7 @@ import type {
   OnboardingResourceEndpoint,
   StepStatus
 } from '../../types/onboarding';
+import { onboardingService } from '../../services/onboardingService';
 
 import {
   ArrowLeft,
@@ -24,17 +25,11 @@ import {
   Trophy,
 } from 'lucide-react';
 
-const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 // ─────────────────────────────────────────────────────────────
 // HELPER
 // ─────────────────────────────────────────────────────────────
-
-async function readJson<T>(response: Response): Promise<T> {
-  const data: unknown = await response.json();
-  return data as T;
-}
 
 function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -64,43 +59,9 @@ export function OnBoardingItemPage() {
   // PUT /api/v1/onboarding/steps/{stepId}
   const updateStepStatus = async (newStatus: StepStatus) => {
     if (!stepDetail) return;
-
-        const body = {
-        position: stepDetail.position,
-        title: stepDetail.title,
-        description: stepDetail.description,
-        type: stepDetail.type ?? 'TASK',
-        estimatedMinutes: stepDetail.estimatedMinutes,
-        expectedOutcome: stepDetail.expectedOutcome ?? '',
-        status: newStatus,
-        skipReason: stepDetail.skipReason ?? '',
-    };
-
-    console.warn('PUT body:', JSON.stringify(body, null, 2)); // ← neu
-
     try {
-      const res = await fetch(`${BASE_API_URL}/onboarding/steps/${stepDetail.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          position: stepDetail.position,
-          title: stepDetail.title,
-          description: stepDetail.description,
-          type: stepDetail.type,
-          estimatedMinutes: stepDetail.estimatedMinutes,
-          expectedOutcome: stepDetail.expectedOutcome ?? '',
-          status: newStatus,
-          skipReason: stepDetail.skipReason ?? '',
-        }),
-      });
-
-
-
-      if (!res.ok) throw new Error(`Step Update: HTTP ${res.status}`);
-      setStepDetail((prev: OnboardingStepDetail | null) => {
-        if (!prev) return prev;
-        return { ...prev, status: newStatus };
-      });
+      await onboardingService.updateStepStatus(stepDetail, newStatus);
+      setStepDetail(prev => prev ? { ...prev, status: newStatus } : prev);
     } catch (err) {
       console.error('Fehler beim Step-Update:', err);
     }
@@ -111,22 +72,8 @@ export function OnBoardingItemPage() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     try {
-      const res = await fetch(`${BASE_API_URL}/onboarding/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          position: task.position,
-          title: task.title,
-          description: task.description,
-          finished,
-        }),
-      });
-      if (!res.ok) throw new Error(`Task Update: HTTP ${res.status}`);
-      // Lokal updaten
-      setTasks(prev => prev.map(t =>
-        t.id === taskId ? { ...t, finished } : t
-      ));
-      // localFinished synchron halten
+      await onboardingService.updateTask(task, finished);
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, finished } : t));
       setLocalFinished(prev => {
         const next = new Set(prev);
         if (finished) {
@@ -150,19 +97,13 @@ export function OnBoardingItemPage() {
       setErrorMessage('');
 
       try {
-        const stepRes = await fetch(`${BASE_API_URL}/onboarding/steps/${stepId}`);
-        if (!stepRes.ok) throw new Error(`Step: HTTP ${stepRes.status}`);
-        const step = await readJson<OnboardingStepDetail>(stepRes);
+        const step = await onboardingService.fetchStep(stepId);
         setStepDetail(step);
 
-        const tasksRes = await fetch(`${BASE_API_URL}/onboarding/steps/${stepId}/tasks`);
-        if (!tasksRes.ok) throw new Error(`Tasks: HTTP ${tasksRes.status}`);
-        const fetchedTasks = await readJson<OnboardingTaskEndpoint[]>(tasksRes);
+        const fetchedTasks = await onboardingService.fetchTasks(stepId);
         setTasks(fetchedTasks);
 
-        const resourcesRes = await fetch(`${BASE_API_URL}/onboarding/steps/${stepId}/resources`);
-        if (!resourcesRes.ok) throw new Error(`Resources: HTTP ${resourcesRes.status}`);
-        const fetchedResources = await readJson<OnboardingResourceEndpoint[]>(resourcesRes);
+        const fetchedResources = await onboardingService.fetchResources(stepId);
         setResources(fetchedResources);
 
         const alreadyDone = new Set(fetchedTasks.filter(task => task.finished).map(task => task.id));

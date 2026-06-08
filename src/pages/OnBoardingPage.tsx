@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react';
 import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../types/onboarding';
 import { useNavigate } from 'react-router-dom';
+import { onboardingService } from '../services/onboardingService';
+import { userService } from '../services/userService';
 
 import {
     CheckCircle2,
@@ -15,10 +17,8 @@ import {
     Loader2,
     AlertCircle,
 } from 'lucide-react';
-import type {UserProfile} from "../services/types.ts";
-//import { useAuth } from '../context/useAuth.ts';
+//import type {UserProfile} from "../services/types.ts";
 
-const BASE_API_URL = 'http://localhost:8080/api/v1';
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 //const { profile, status } = useAuth();
@@ -47,18 +47,6 @@ function ProgressBar({ value, max }: ProgressBarProps) {
         </div>
     );
 }
-
-function fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
-    return fetch(`${BASE_API_URL}/onboarding/${userId}/path`)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`Fehler beim Laden des OnBoarding Paths: ${res.statusText}`);
-            }
-            return res.json();
-        })
-        .then(data => data as OnboardingPathEndpoint);
-}
-
 
 
 // ─────────────────────────────────────────────────────────────
@@ -89,30 +77,17 @@ export function OnBoardingPage() {
         const loadOnBoardingPath = async () => {
             setLoadingState('loading');
             try {
-                // find USER
-                const usersRes = await fetch(`${BASE_API_URL}/users`);
-                if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
-                const users = (await usersRes.json()) as UserProfile[];
+                const profile = await userService.getProfile();
+                if (!profile?.id) throw new Error('Kein User gefunden.');
 
-                // ToDo: Statt einfach den 2. User zu nehmen, sollte hier die Logik rein, um den aktuell eingeloggten User zu identifizieren (z.B. über Context oder Auth Hook)
-                const userId: string = users[1]?.id;
-                if (!userId) throw new Error('Kein User gefunden.');
-                //console.log('Gefundener User ID:', userId);
-
-                // fetch PATH
-                const path = await fetchPath(userId);
-                //console.log('Geladener OnBoarding Path:', path);
-
+                const path = await onboardingService.fetchPath(profile.id);
                 setOnBoardingPath(path);
-
-
                 setLoadingState('success');
             } catch (err) {
                 setLoadingState('error');
                 setErrorMessage(err instanceof Error ? err.message : 'Unbekannter Fehler');
             }
         };
-
         void loadOnBoardingPath();
     }, []);
 
