@@ -9,7 +9,7 @@ export function ChatPage() {
     return (
         <div className="h-screen flex overflow-hidden bg-gray-900">
 
-            { chats?.length !== 0 && (
+            { chats.length !== 0 && (
                 <aside className="w-64 bg-gray-950 border-r border-gray-800 flex flex-col shrink-0">
                     <div className="flex flex-col gap-4 p-4 overflow-y-auto">
 
@@ -104,8 +104,6 @@ export function ChatPage() {
                                     </div>
                                 );
                             })}
-
-                            {/* Thinking state removed as requested */}
                         </div>
                     )}
                 </div>

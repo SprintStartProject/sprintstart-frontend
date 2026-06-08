@@ -1,23 +1,4 @@
-export type Chat = {
-    id: string;
-    title: string;
-    userId: string;
-    createdAt: string;
-};
-
-export type ChatMessage = {
-    id: string;
-    role: 'ASSISTANT' | 'USER' | 'SYSTEM' | 'ORCHESTRATOR';
-    chatId: string,
-    content: string;
-    citations?: Citation[]
-}
-
-export type Citation = {
-    chunk_id: string,
-    filename: string,
-    section_path: string
-}
+import type {Chat, ChatMessage, Citation} from "../types/chatTypes.ts";
 
 export async function getChats() {
     const res = await fetch(`api/v1/chats`, {

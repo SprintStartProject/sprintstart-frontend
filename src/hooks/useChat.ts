@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import {type Citation, createChat, getChats, getMessages, streamMessage} from "../services/chatService";
-import type {Chat, ChatMessage} from "../services/chatService";
+import {createChat, getChats, getMessages, streamMessage} from "../services/chatService";
+import type {Chat, ChatMessage, Citation} from "../types/chatTypes";
 
 export function useChat() {
     const { id: chatId } = useParams();
@@ -24,12 +24,13 @@ export function useChat() {
 
     useEffect(() => {
         if (!chatId) {
+            setMessages([]);
             return;
         }
 
         // Only load from server if we don't already have the messages for this chat in state
         // This prevents overwriting locally streaming messages when the URL changes after chat creation
-        const hasMessages = messages.length > 0 && messages.some(m => m.chatId === chatId);
+        const hasMessages = messages.length > 0 && messages.some(m => m.chat?.id === chatId);
         if (hasMessages) {
             return;
         }
@@ -60,7 +61,7 @@ export function useChat() {
         const userMessage: ChatMessage = {
             id: crypto.randomUUID(),
             role: "USER",
-            chatId: currentChatId,
+            chat: chats.find(chat => chat.id === currentChatId),
             content: text
         }
 
@@ -71,7 +72,7 @@ export function useChat() {
         const assistantMessage: ChatMessage = {
             id: assistantId,
             role: "ASSISTANT",
-            chatId: currentChatId,
+            chat: chats.find(chat => chat.id === currentChatId),
             content: ""
         }
 
