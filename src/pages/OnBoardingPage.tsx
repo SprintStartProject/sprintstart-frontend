@@ -97,7 +97,7 @@ export function OnBoardingPage() {
   // Helper function for phase progress
   const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
     const completed = phase.steps.filter(
-      (step) => step.status === "FINISHED",
+      (step) => step.status === "FINISHED" || step.status === "SKIPPED",
     ).length;
     return {
       completed,
@@ -130,7 +130,7 @@ export function OnBoardingPage() {
       ? Math.round((totalProgress.completed / totalProgress.total) * 100)
       : 0;
 
-  // Next pending task (across all phases)  
+  // Next pending task (across all phases)
   const nextTask =
     OnBoardingPathEndpoint?.phases
       .flatMap((phase) => phase.steps)
