@@ -23,6 +23,7 @@ import {
   Loader2,
   AlertCircle,
   Trophy,
+  CircleArrowRight,
 } from 'lucide-react';
 
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
@@ -52,6 +53,8 @@ export function OnBoardingItemPage() {
 
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [skipReason, setSkipReason] = useState<string>('');
+  const [skipLoading, setSkipLoading] = useState<boolean>(false);
 
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
 
@@ -96,6 +99,7 @@ export function OnBoardingItemPage() {
       try {
         const step = await onboardingService.fetchStep(stepId);
         setStepDetail(step);
+        setSkipReason(step.skipReason ?? '');
 
         const fetchedTasks = await onboardingService.fetchTasks(stepId);
         setTasks(fetchedTasks);
@@ -117,6 +121,22 @@ export function OnBoardingItemPage() {
   }, [stepId]);
 
   // ── TOGGLE TASK ───────────────────────────────────────────
+  const skipCurrentStep = async (): Promise<void> => {
+    if (!stepDetail) return;
+    const reason = skipReason.trim();
+    if (!reason) return;
+
+    setSkipLoading(true);
+    try {
+      await onboardingService.skipStep(stepDetail, reason);
+      setStepDetail(prev => prev ? { ...prev, status: 'SKIPPED', skipReason: reason } : prev);
+    } catch (err) {
+      console.error('Error skipping step:', err);
+    } finally {
+      setSkipLoading(false);
+    }
+  };
+
   const toggleTask = (taskId: string): void => {
     const isCurrentlyDone = localFinished.has(taskId);
     void updateTaskFinished(taskId, !isCurrentlyDone);
@@ -307,9 +327,9 @@ export function OnBoardingItemPage() {
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${stepDetail.status === 'FINISHED'
                     ? 'border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50'
                     : allTasksDone
-                      ? 'border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
-                      : 'border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed'
-                  }`}
+                        ? 'border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
+                        : 'border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                    }`}
               >
                 {stepDetail.status === 'FINISHED'
                   ? <Trophy className="w-5 h-5 shrink-0" />
@@ -319,8 +339,8 @@ export function OnBoardingItemPage() {
                   {stepDetail.status === 'FINISHED'
                     ? 'Finished!'
                     : allTasksDone
-                      ? 'Mark as Completed'
-                      : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? '' : 's'} pending`
+                        ? 'Mark as Completed'
+                        : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? '' : 's'} pending`
                   }
                 </span>
                 {stepDetail.status === 'FINISHED' && (
@@ -343,12 +363,17 @@ export function OnBoardingItemPage() {
               </h3>
               <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${stepDetail.status === 'FINISHED'
                 ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                : stepDetail.status === 'SKIPPED' 
+                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400' 
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
                 }`}>
                 {stepDetail.status === 'FINISHED'
                   ? <CheckCircle2 className="w-4 h-4" />
-                  : <Circle className="w-4 h-4" />
-                }
+                  : stepDetail.status === 'SKIPPED' ? (
+                    <CircleArrowRight className="w-4 h-4" />
+                  ) : (
+                    <Circle className="w-4 h-4" />
+                  )}
                 {stepDetail.status === 'FINISHED' ? 'Finished' :
                   stepDetail.status === 'IN_PROGRESS' ? 'In Progress' :
                     stepDetail.status === 'SKIPPED' ? 'Skipped' : 'Open'}
@@ -386,6 +411,29 @@ export function OnBoardingItemPage() {
                 </div>
               </div>
             )}
+
+
+            {/*SKIP STEP */}
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+              <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white text-sm mb-3">
+                <CircleArrowRight className="w-4 h-4 text-red-500" />
+                Skip Step
+              </h3>
+              <textarea
+                value={skipReason}
+                onChange={event => setSkipReason(event.target.value)}
+                placeholder="Reason for skipping..."
+                className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                disabled={skipLoading || stepDetail.status === 'SKIPPED'}
+              />
+              <button
+                className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-gray-400"
+                onClick={() => void skipCurrentStep()}
+                disabled={skipLoading || !skipReason.trim() || stepDetail.status === 'SKIPPED'}
+              >
+                {skipLoading ? 'Skipping...' : stepDetail.status === 'SKIPPED' ? 'Step Skipped' : 'Skip Step'}
+              </button>
+            </div>
 
             {/* FEEDBACK */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">

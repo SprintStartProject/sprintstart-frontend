@@ -48,6 +48,24 @@ export const onboardingService = {
         if (!res.ok) throw new Error(`Step Update: HTTP ${res.status}`);
     },
 
+    async skipStep(step: OnboardingStepDetail, reason: string): Promise<void> {
+        const res = await fetch(`${BASE_URL}/onboarding/steps/${step.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                position: step.position,
+                title: step.title,
+                description: step.description,
+                type: step.type ?? 'TASK',
+                estimatedMinutes: step.estimatedMinutes,
+                expectedOutcome: step.expectedOutcome ?? '',
+                status: 'SKIPPED',
+                skipReason: reason,
+            }),
+        });
+        if (!res.ok) throw new Error(`Step Skip: HTTP ${res.status}`);
+    },
+
     // ── TASKS ─────────────────────────────────────────────────
 
     async fetchTasks(stepId: string): Promise<OnboardingTaskEndpoint[]> {

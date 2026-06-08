@@ -19,6 +19,7 @@ import {
   PlayCircle,
   Loader2,
   AlertCircle,
+  CircleArrowRight,
 } from "lucide-react";
 //import type {UserProfile} from "../services/types.ts";
 
@@ -309,9 +310,11 @@ export function OnBoardingPage() {
                 <div className="flex gap-4">
                   <div className="pt-0.5 shrink-0">
                     {step.status === "FINISHED" ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    ) : step.status === "SKIPPED" ? (
+                      <CircleArrowRight className="w-5 h-5 text-red-500" />
                     ) : (
-                      <Circle className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+                      <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600" />
                     )}
                   </div>
 
@@ -322,7 +325,7 @@ export function OnBoardingPage() {
                       <div>
                         <h3
                           className={`font-semibold text-base ${
-                            step.status === "FINISHED"
+                            step.status === "FINISHED" || step.status === "SKIPPED"
                               ? "line-through text-gray-400 dark:text-gray-500"
                               : "text-gray-900 dark:text-white"
                           }`}
