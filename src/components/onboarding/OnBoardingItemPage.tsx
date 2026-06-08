@@ -39,14 +39,13 @@ function formatMinutes(minutes: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// HAUPT-KOMPONENTE
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 
 export function OnBoardingItemPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const navigate = useNavigate();
 
-  // Step-Detail (enthält tasks + resources direkt vom GET /steps/{id} Endpoint)
   const [stepDetail, setStepDetail] = useState<OnboardingStepDetail | null>(null);
   const [tasks, setTasks] = useState<OnboardingTaskEndpoint[]>([]);
   const [resources, setResources] = useState<OnboardingResourceEndpoint[]>([]);
@@ -56,18 +55,16 @@ export function OnBoardingItemPage() {
 
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
 
-  // PUT /api/v1/onboarding/steps/{stepId}
   const updateStepStatus = async (newStatus: StepStatus) => {
     if (!stepDetail) return;
     try {
       await onboardingService.updateStepStatus(stepDetail, newStatus);
       setStepDetail(prev => prev ? { ...prev, status: newStatus } : prev);
     } catch (err) {
-      console.error('Fehler beim Step-Update:', err);
+      console.error('Error updating step:', err);
     }
   };
 
-  // PUT /api/v1/onboarding/tasks/{taskId}
   const updateTaskFinished = async (taskId: string, finished: boolean) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -84,7 +81,7 @@ export function OnBoardingItemPage() {
         return next;
       });
     } catch (err) {
-      console.error('Fehler beim Task-Update:', err);
+      console.error('Error updating task:', err);
     }
   };
 
@@ -112,7 +109,7 @@ export function OnBoardingItemPage() {
         setLoadingState('success');
       } catch (err) {
         setLoadingState('error');
-        setErrorMessage(err instanceof Error ? err.message : 'Unbekannter Fehler');
+        setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
       }
     };
 
@@ -120,7 +117,6 @@ export function OnBoardingItemPage() {
   }, [stepId]);
 
   // ── TOGGLE TASK ───────────────────────────────────────────
-  // Nachher:
   const toggleTask = (taskId: string): void => {
     const isCurrentlyDone = localFinished.has(taskId);
     void updateTaskFinished(taskId, !isCurrentlyDone);
@@ -140,7 +136,7 @@ export function OnBoardingItemPage() {
       <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          <p className="text-sm">Step wird geladen...</p>
+          <p className="text-sm">Loading step...</p>
         </div>
       </div>
     );
@@ -153,14 +149,14 @@ export function OnBoardingItemPage() {
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Step konnte nicht geladen werden
+            Could not load step
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
           <button
             onClick={() => void navigate('/onboarding')}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
           >
-            Zurück zum Onboarding
+            Back to Onboarding Overview
           </button>
         </div>
       </div>
@@ -172,12 +168,12 @@ export function OnBoardingItemPage() {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Step nicht gefunden.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Step not found.</p>
           <button
             onClick={() => void navigate('/onboarding')}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
           >
-            Zurück zum Onboarding
+            Back to Onboarding Overview
           </button>
         </div>
       </div>
@@ -197,7 +193,7 @@ export function OnBoardingItemPage() {
             className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Zurück zum Onboarding
+            Back to Onboarding Overview
           </button>
 
           <div className="flex items-start justify-between gap-4">
@@ -208,9 +204,9 @@ export function OnBoardingItemPage() {
                   stepDetail.status === 'SKIPPED' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
                     'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
                 }`}>
-                {stepDetail.status === 'FINISHED' ? 'Erledigt' :
-                  stepDetail.status === 'IN_PROGRESS' ? 'In Bearbeitung' :
-                    stepDetail.status === 'SKIPPED' ? 'Übersprungen' : 'Offen'}
+                {stepDetail.status === 'FINISHED' ? 'Finished' :
+                  stepDetail.status === 'IN_PROGRESS' ? 'In Progress' :
+                    stepDetail.status === 'SKIPPED' ? 'Skipped' : 'Open'}
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
@@ -235,7 +231,7 @@ export function OnBoardingItemPage() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
         <div className="grid lg:grid-cols-3 gap-6">
 
-          {/* LINKE SPALTE */}
+          {/* LEFT COLUMN */}
           <div className="lg:col-span-2 space-y-6">
 
             {/* TASKS (Step by Step) */}
@@ -245,15 +241,15 @@ export function OnBoardingItemPage() {
                   <div className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-orange-500" />
                     <h2 className="font-semibold text-gray-900 dark:text-white">
-                      Aufgaben
+                      Tasks
                     </h2>
                   </div>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {doneTasks}/{sortedTasks.length} erledigt
+                    {doneTasks}/{sortedTasks.length} completed
                   </span>
                 </div>
 
-                {/* Fortschrittsbalken */}
+                {/* Progress Bar */}
                 <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-1.5 mb-5 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
@@ -301,7 +297,7 @@ export function OnBoardingItemPage() {
             {/* mark step as done */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                Schritt abschließen
+                Complete Step
               </h3>
               <button
                 onClick={() => void updateStepStatus(
@@ -321,14 +317,14 @@ export function OnBoardingItemPage() {
                 }
                 <span className="text-sm font-medium flex-1 text-left">
                   {stepDetail.status === 'FINISHED'
-                    ? 'Erledigt!'
+                    ? 'Finished!'
                     : allTasksDone
-                      ? 'Als erledigt markieren'
-                      : `Noch ${sortedTasks.length - doneTasks} Aufgabe${sortedTasks.length - doneTasks === 1 ? '' : 'n'} offen`
+                      ? 'Mark as Completed'
+                      : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? '' : 's'} pending`
                   }
                 </span>
                 {stepDetail.status === 'FINISHED' && (
-                  <span className="text-xs opacity-60">rückgängig</span>
+                  <span className="text-xs opacity-60">undo</span>
                 )}
               </button>
             </div>
@@ -337,7 +333,7 @@ export function OnBoardingItemPage() {
 
 
 
-          {/* RECHTE SPALTE */}
+          {/* RIGHT COLUMN */}
           <div className="space-y-6">
 
             {/* STATUS */}
@@ -353,9 +349,9 @@ export function OnBoardingItemPage() {
                   ? <CheckCircle2 className="w-4 h-4" />
                   : <Circle className="w-4 h-4" />
                 }
-                {stepDetail.status === 'FINISHED' ? 'Erledigt' :
-                  stepDetail.status === 'IN_PROGRESS' ? 'In Bearbeitung' :
-                    stepDetail.status === 'SKIPPED' ? 'Übersprungen' : 'Offen'}
+                {stepDetail.status === 'FINISHED' ? 'Finished' :
+                  stepDetail.status === 'IN_PROGRESS' ? 'In Progress' :
+                    stepDetail.status === 'SKIPPED' ? 'Skipped' : 'Open'}
               </div>
             </div>
 
@@ -363,7 +359,7 @@ export function OnBoardingItemPage() {
             {resources.length > 0 && (
               <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                  Ressourcen
+                  Resources
                 </h3>
                 <div className="space-y-2">
                   {resources.map(resource => (
@@ -398,11 +394,11 @@ export function OnBoardingItemPage() {
                 Feedback
               </h3>
               <textarea
-                placeholder="Dein Feedback zu diesem Schritt..."
+                placeholder="Your feedback about this step..."
                 className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
               />
               <button className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all">
-                Feedback absenden
+                Submit feedback
               </button>
             </div>
           </div>

@@ -23,16 +23,16 @@ type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 //const { profile, status } = useAuth();
 //const userLoading = status === 'loading';
-//const userError = status === 'unauthenticated' ? 'Nicht eingeloggt.' : null;
+//const userError = status === 'unauthenticated' ? 'Not logged in.' : null;
 
 
 // ─────────────────────────────────────────────────────────────
-// HELPER-KOMPONENTE: ProgressBar
+// HELPER COMPONENT: ProgressBar
 // ─────────────────────────────────────────────────────────────
 
 interface ProgressBarProps {
-    value: number;  // z.B. 3 (erledigte Tasks)
-    max: number;    // z.B. 5 (gesamt Tasks)
+    value: number;  // e.g. 3 (completed tasks)
+    max: number;    // e.g. 5 (total tasks)
 }
 
 function ProgressBar({ value, max }: ProgressBarProps) {
@@ -50,22 +50,22 @@ function ProgressBar({ value, max }: ProgressBarProps) {
 
 
 // ─────────────────────────────────────────────────────────────
-// HAUPT-KOMPONENTE: OnBoardingPage
+// MAIN COMPONENT: OnBoardingPage
 // ─────────────────────────────────────────────────────────────
 
 
 export function OnBoardingPage() {
 
-    // Selected Phase
+    // Selected phase index
     const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
 
-    // OnBoarding-Daten (null = noch nicht geladen)
+    // Onboarding data (null = not loaded yet)
     const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
 
-    // Loading State: 'idle' (vor dem Laden), 'loading' (während Laden), 'success' (geladen), 'error' (Fehler)
+    // Loading state: 'idle' (before load), 'loading' (while loading), 'success' (loaded), 'error' (error)
     const [loadingState, setLoadingState] = useState<LoadingState>('idle');
 
-    // Fehlermeldung für den Error-State
+    // Error message for error state
     const [errorMessage, setErrorMessage] = useState<string>('');
 
     const navigate = useNavigate();
@@ -78,14 +78,14 @@ export function OnBoardingPage() {
             setLoadingState('loading');
             try {
                 const profile = await userService.getProfile();
-                if (!profile?.id) throw new Error('Kein User gefunden.');
+                if (!profile?.id) throw new Error('No user found.');
 
                 const path = await onboardingService.fetchPath(profile.id);
                 setOnBoardingPath(path);
                 setLoadingState('success');
             } catch (err) {
                 setLoadingState('error');
-                setErrorMessage(err instanceof Error ? err.message : 'Unbekannter Fehler');
+                setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
             }
         };
         void loadOnBoardingPath();
@@ -95,7 +95,7 @@ export function OnBoardingPage() {
 
     const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
-    // Hilfsfunktion für Fortschritt einer Phase
+    // Helper function for phase progress
     const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
         const completed = phase.steps.filter(step => step.status === 'FINISHED').length;
         return {
@@ -107,7 +107,7 @@ export function OnBoardingPage() {
         };
     };
 
-    // Gesamtfortschritt über alle Phasen
+    // Total progress across all phases
     const totalProgress = OnBoardingPathEndpoint?.phases.reduce(
         (acc, phase) => {
             const p = getPhaseProgress(phase);
@@ -120,7 +120,7 @@ export function OnBoardingPage() {
         ? Math.round((totalProgress.completed / totalProgress.total) * 100)
         : 0;
 
-    // Nächste unerledigte Task (über alle Phasen)
+    // Next pending task (across all phases)
     const nextTask = OnBoardingPathEndpoint?.phases
         .flatMap(phase => phase.steps)
         .find(step => step.status !== 'FINISHED') ?? null;
@@ -132,7 +132,7 @@ export function OnBoardingPage() {
             <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
                     <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                    <p className="text-sm">OnBoarding Path wird geladen...</p>
+                    <p className="text-sm">Loading onboarding path...</p>
                 </div>
             </div>
         );
@@ -145,14 +145,14 @@ export function OnBoardingPage() {
                 <div className="max-w-md text-center">
                     <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                        OnBoarding konnte nicht geladen werden
+                        Onboarding could not be loaded
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
                     <button
                         onClick={() => window.location.reload()}
                         className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
                     >
-                        Nochmal versuchen
+                        Try again
                     </button>
                 </div>
             </div>
@@ -164,7 +164,7 @@ export function OnBoardingPage() {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
-                    Kein OnBoarding Path gefunden.
+                    No onboarding path found.
                 </p>
             </div>
         );
@@ -179,13 +179,13 @@ export function OnBoardingPage() {
             <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
-                    {/* Titel + Gesamt-Prozent */}
+                    {/* Title + overall percent */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <Sparkles className="w-5 h-5 text-blue-500" />
                                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    Dein OnBoarding Journey
+                                    Your onboarding journey
                                 </h1>
                             </div>
                         </div>
@@ -194,14 +194,14 @@ export function OnBoardingPage() {
                             <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
                                 {totalPercentage}%
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">gesamt</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">overall</div>
                         </div>
                     </div>
 
-                    {/* Gesamt-Progressbar */}
+                    {/* Total progress bar */}
                     <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
 
-                    {/* Phasen-Tabs */}
+                    {/* Phase tabs */}
                     <div className="flex flex-col sm:flex-row gap-3 mt-4">
                         {OnBoardingPathEndpoint.phases.map((phase, index) => {
                             const progress = getPhaseProgress(phase);
@@ -262,7 +262,7 @@ export function OnBoardingPage() {
                                     onClick={() => void navigate(`/onboarding/${nextTask.id}`)}
                                     className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
                                 >
-                                    Jetzt starten
+                                    Start now
                                     <ChevronRight className="w-4 h-4" />
                                 </button>
                             </div>
@@ -270,7 +270,7 @@ export function OnBoardingPage() {
                     </div>
                 )}
 
-                {/* Phase-Beschreibung */}
+                {/* Phase description */}
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                         {currentPhase.title}
@@ -280,7 +280,7 @@ export function OnBoardingPage() {
                     </p>
                 </div>
 
-                {/* Task-Liste */}
+                {/* Task list */}
                 <div className="space-y-4">
                     {currentPhase.steps.map((step) => (
                         <div
@@ -322,7 +322,7 @@ export function OnBoardingPage() {
                                                 onClick={() => void navigate(`/onboarding/${step.id}`)}
                                                 className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
                                             >
-                                                Jetzt starten
+                                                Start now
                                                 <ChevronRight className="w-4 h-4" />
                                             </button>
                                         </div>

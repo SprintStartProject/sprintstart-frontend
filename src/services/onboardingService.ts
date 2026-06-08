@@ -18,7 +18,7 @@ export const onboardingService = {
 
     async fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
         const res = await fetch(`${BASE_URL}/onboarding/${userId}/path`);
-        if (!res.ok) throw new Error(`Fehler beim Laden des OnBoarding Paths: ${res.statusText}`);
+        if (!res.ok) throw new Error(`Error loading onboarding path: ${res.statusText}`);
         return res.json() as Promise<OnboardingPathEndpoint>;
     },
 
