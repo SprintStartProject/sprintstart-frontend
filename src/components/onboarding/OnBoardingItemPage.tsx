@@ -2,15 +2,15 @@
 // OnBoardingItemPage.tsx
 // ============================================================
 
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import type {
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
   OnboardingResourceEndpoint,
-  StepStatus
-} from '../../types/onboarding';
-import { onboardingService } from '../../services/onboardingService';
+  StepStatus,
+} from "../../types/onboarding";
+import { onboardingService } from "../../services/onboardingService";
 
 import {
   ArrowLeft,
@@ -24,9 +24,9 @@ import {
   AlertCircle,
   Trophy,
   CircleArrowRight,
-} from 'lucide-react';
+} from "lucide-react";
 
-type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+type LoadingState = "idle" | "loading" | "success" | "error";
 
 // ─────────────────────────────────────────────────────────────
 // HELPER
@@ -47,13 +47,15 @@ export function OnBoardingItemPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const navigate = useNavigate();
 
-  const [stepDetail, setStepDetail] = useState<OnboardingStepDetail | null>(null);
+  const [stepDetail, setStepDetail] = useState<OnboardingStepDetail | null>(
+    null,
+  );
   const [tasks, setTasks] = useState<OnboardingTaskEndpoint[]>([]);
   const [resources, setResources] = useState<OnboardingResourceEndpoint[]>([]);
 
-  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [skipReason, setSkipReason] = useState<string>('');
+  const [loadingState, setLoadingState] = useState<LoadingState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [skipReason, setSkipReason] = useState<string>("");
   const [skipLoading, setSkipLoading] = useState<boolean>(false);
 
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
@@ -62,19 +64,21 @@ export function OnBoardingItemPage() {
     if (!stepDetail) return;
     try {
       await onboardingService.updateStepStatus(stepDetail, newStatus);
-      setStepDetail(prev => prev ? { ...prev, status: newStatus } : prev);
+      setStepDetail((prev) => (prev ? { ...prev, status: newStatus } : prev));
     } catch (err) {
-      console.error('Error updating step:', err);
+      console.error("Error updating step:", err);
     }
   };
 
   const updateTaskFinished = async (taskId: string, finished: boolean) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
     try {
       await onboardingService.updateTask(task, finished);
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, finished } : t));
-      setLocalFinished(prev => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, finished } : t)),
+      );
+      setLocalFinished((prev) => {
         const next = new Set(prev);
         if (finished) {
           next.add(taskId);
@@ -84,7 +88,7 @@ export function OnBoardingItemPage() {
         return next;
       });
     } catch (err) {
-      console.error('Error updating task:', err);
+      console.error("Error updating task:", err);
     }
   };
 
@@ -93,13 +97,13 @@ export function OnBoardingItemPage() {
     if (!stepId) return;
 
     const load = async (): Promise<void> => {
-      setLoadingState('loading');
-      setErrorMessage('');
+      setLoadingState("loading");
+      setErrorMessage("");
 
       try {
         const step = await onboardingService.fetchStep(stepId);
         setStepDetail(step);
-        setSkipReason(step.skipReason ?? '');
+        setSkipReason(step.skipReason ?? "");
 
         const fetchedTasks = await onboardingService.fetchTasks(stepId);
         setTasks(fetchedTasks);
@@ -107,13 +111,15 @@ export function OnBoardingItemPage() {
         const fetchedResources = await onboardingService.fetchResources(stepId);
         setResources(fetchedResources);
 
-        const alreadyDone = new Set(fetchedTasks.filter(task => task.finished).map(task => task.id));
+        const alreadyDone = new Set(
+          fetchedTasks.filter((task) => task.finished).map((task) => task.id),
+        );
         setLocalFinished(alreadyDone);
 
-        setLoadingState('success');
+        setLoadingState("success");
       } catch (err) {
-        setLoadingState('error');
-        setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
+        setLoadingState("error");
+        setErrorMessage(err instanceof Error ? err.message : "Unknown error");
       }
     };
 
@@ -129,9 +135,11 @@ export function OnBoardingItemPage() {
     setSkipLoading(true);
     try {
       await onboardingService.skipStep(stepDetail, reason);
-      setStepDetail(prev => prev ? { ...prev, status: 'SKIPPED', skipReason: reason } : prev);
+      setStepDetail((prev) =>
+        prev ? { ...prev, status: "SKIPPED", skipReason: reason } : prev,
+      );
     } catch (err) {
-      console.error('Error skipping step:', err);
+      console.error("Error skipping step:", err);
     } finally {
       setSkipLoading(false);
     }
@@ -144,14 +152,16 @@ export function OnBoardingItemPage() {
 
   // ── DERIVED ───────────────────────────────────────────────
   const sortedTasks = [...tasks].sort((a, b) => a.position - b.position);
-  const doneTasks = sortedTasks.filter(t => localFinished.has(t.id)).length;
-  const allTasksDone = sortedTasks.length === 0 || doneTasks === sortedTasks.length;
-  const taskPercentage = sortedTasks.length > 0
-    ? Math.round((doneTasks / sortedTasks.length) * 100)
-    : 0;
+  const doneTasks = sortedTasks.filter((t) => localFinished.has(t.id)).length;
+  const allTasksDone =
+    sortedTasks.length === 0 || doneTasks === sortedTasks.length;
+  const taskPercentage =
+    sortedTasks.length > 0
+      ? Math.round((doneTasks / sortedTasks.length) * 100)
+      : 0;
 
   // ── LOADING ───────────────────────────────────────────────
-  if (loadingState === 'loading' || loadingState === 'idle') {
+  if (loadingState === "loading" || loadingState === "idle") {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
@@ -163,7 +173,7 @@ export function OnBoardingItemPage() {
   }
 
   // ── ERROR ─────────────────────────────────────────────────
-  if (loadingState === 'error') {
+  if (loadingState === "error") {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-8">
         <div className="max-w-md text-center">
@@ -171,9 +181,11 @@ export function OnBoardingItemPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Could not load step
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            {errorMessage}
+          </p>
           <button
-            onClick={() => void navigate('/onboarding')}
+            onClick={() => void navigate("/onboarding")}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
           >
             Back to Onboarding Overview
@@ -188,9 +200,11 @@ export function OnBoardingItemPage() {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Step not found.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+            Step not found.
+          </p>
           <button
-            onClick={() => void navigate('/onboarding')}
+            onClick={() => void navigate("/onboarding")}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
           >
             Back to Onboarding Overview
@@ -203,13 +217,11 @@ export function OnBoardingItemPage() {
   // ── RENDER ────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
-
       {/* HEADER */}
       <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-
           <button
-            onClick={() => void navigate('/onboarding')}
+            onClick={() => void navigate("/onboarding")}
             className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -219,14 +231,24 @@ export function OnBoardingItemPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               {/* Status-Badge */}
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${stepDetail.status === 'FINISHED' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' :
-                stepDetail.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400' :
-                  stepDetail.status === 'SKIPPED' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
-                    'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
-                }`}>
-                {stepDetail.status === 'FINISHED' ? 'Finished' :
-                  stepDetail.status === 'IN_PROGRESS' ? 'In Progress' :
-                    stepDetail.status === 'SKIPPED' ? 'Skipped' : 'Open'}
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${
+                  stepDetail.status === "FINISHED"
+                    ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400"
+                    : stepDetail.status === "IN_PROGRESS"
+                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400"
+                      : stepDetail.status === "SKIPPED"
+                        ? "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
+                }`}
+              >
+                {stepDetail.status === "FINISHED"
+                  ? "Finished"
+                  : stepDetail.status === "IN_PROGRESS"
+                    ? "In Progress"
+                    : stepDetail.status === "SKIPPED"
+                      ? "Skipped"
+                      : "Open"}
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
@@ -250,10 +272,8 @@ export function OnBoardingItemPage() {
       {/* MAIN CONTENT */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
         <div className="grid lg:grid-cols-3 gap-6">
-
           {/* LEFT COLUMN */}
           <div className="lg:col-span-2 space-y-6">
-
             {/* TASKS (Step by Step) */}
             {sortedTasks.length > 0 && (
               <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
@@ -284,20 +304,25 @@ export function OnBoardingItemPage() {
                       <button
                         key={task.id}
                         onClick={() => toggleTask(task.id)}
-                        className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${isDone
-                          ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
-                          }`}
+                        className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${
+                          isDone
+                            ? "border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
+                            : "border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700"
+                        }`}
                       >
-                        {isDone
-                          ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                          : <Circle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                        }
+                        {isDone ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                        )}
                         <div>
-                          <span className={`text-sm font-medium ${isDone
-                            ? 'line-through text-gray-400 dark:text-gray-500'
-                            : 'text-gray-900 dark:text-white'
-                            }`}>
+                          <span
+                            className={`text-sm font-medium ${
+                              isDone
+                                ? "line-through text-gray-400 dark:text-gray-500"
+                                : "text-gray-900 dark:text-white"
+                            }`}
+                          >
                             {index + 1}. {task.title}
                           </span>
                           {task.description && (
@@ -313,71 +338,85 @@ export function OnBoardingItemPage() {
               </div>
             )}
 
-
             {/* mark step as done */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
                 Complete Step
               </h3>
               <button
-                onClick={() => void updateStepStatus(
-                  stepDetail.status === 'FINISHED' ? 'WAITING' : 'FINISHED'
-                )}
-                disabled={!allTasksDone && stepDetail.status !== 'FINISHED'}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${stepDetail.status === 'FINISHED'
-                    ? 'border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50'
-                    : allTasksDone
-                        ? 'border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
-                        : 'border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed'
-                    }`}
-              >
-                {stepDetail.status === 'FINISHED'
-                  ? <Trophy className="w-5 h-5 shrink-0" />
-                  : <Circle className="w-5 h-5 shrink-0" />
+                onClick={() =>
+                  void updateStepStatus(
+                    stepDetail.status === "FINISHED" ? "WAITING" : "FINISHED",
+                  )
                 }
-                <span className="text-sm font-medium flex-1 text-left">
-                  {stepDetail.status === 'FINISHED'
-                    ? 'Finished!'
+                disabled={!allTasksDone && stepDetail.status !== "FINISHED"}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
+                  stepDetail.status === "FINISHED"
+                    ? "border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50"
                     : allTasksDone
-                        ? 'Mark as Completed'
-                        : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? '' : 's'} pending`
-                  }
+                      ? "border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                      : "border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                }`}
+              >
+                {stepDetail.status === "FINISHED" ? (
+                  <Trophy className="w-5 h-5 shrink-0" />
+                ) : (
+                  <Circle className="w-5 h-5 shrink-0" />
+                )}
+                <span className="text-sm font-medium flex-1 text-left">
+                  {stepDetail.status === "FINISHED"
+                    ? "Finished!"
+                    : allTasksDone
+                      ? "Mark as Completed"
+                      : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? "" : "s"} pending`}
                 </span>
-                {stepDetail.status === 'FINISHED' && (
+                {stepDetail.status === "FINISHED" && (
                   <span className="text-xs opacity-60">undo</span>
                 )}
               </button>
             </div>
           </div>
 
-
-
-
           {/* RIGHT COLUMN */}
           <div className="space-y-6">
-
             {/* STATUS */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
                 Status
               </h3>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${stepDetail.status === 'FINISHED'
-                ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                : stepDetail.status === 'SKIPPED' 
-                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400' 
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                }`}>
-                {stepDetail.status === 'FINISHED'
-                  ? <CheckCircle2 className="w-4 h-4" />
-                  : stepDetail.status === 'SKIPPED' ? (
-                    <CircleArrowRight className="w-4 h-4" />
-                  ) : (
-                    <Circle className="w-4 h-4" />
-                  )}
-                {stepDetail.status === 'FINISHED' ? 'Finished' :
-                  stepDetail.status === 'IN_PROGRESS' ? 'In Progress' :
-                    stepDetail.status === 'SKIPPED' ? 'Skipped' : 'Open'}
+              <div
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${
+                  stepDetail.status === "FINISHED"
+                    ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                    : stepDetail.status === "SKIPPED"
+                      ? "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                {stepDetail.status === "FINISHED" ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : stepDetail.status === "SKIPPED" ? (
+                  <CircleArrowRight className="w-4 h-4" />
+                ) : (
+                  <Circle className="w-4 h-4" />
+                )}
+                {stepDetail.status === "FINISHED"
+                  ? "Finished"
+                  : stepDetail.status === "IN_PROGRESS"
+                    ? "In Progress"
+                    : stepDetail.status === "SKIPPED"
+                      ? "Skipped"
+                      : "Open"}
               </div>
+              {stepDetail.status === "FINISHED" && stepDetail.completedAt && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                  Completed on{" "}
+                  {new Date(stepDetail.completedAt).toLocaleDateString(
+                    "en-US",
+                    { year: "numeric", month: "short", day: "numeric" },
+                  )}
+                </p>
+              )}
             </div>
 
             {/* RESOURCES */}
@@ -387,7 +426,7 @@ export function OnBoardingItemPage() {
                   Resources
                 </h3>
                 <div className="space-y-2">
-                  {resources.map(resource => (
+                  {resources.map((resource) => (
                     <a
                       key={resource.id}
                       href={resource.url}
@@ -412,7 +451,6 @@ export function OnBoardingItemPage() {
               </div>
             )}
 
-
             {/*SKIP STEP */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
               <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white text-sm mb-3">
@@ -421,17 +459,25 @@ export function OnBoardingItemPage() {
               </h3>
               <textarea
                 value={skipReason}
-                onChange={event => setSkipReason(event.target.value)}
+                onChange={(event) => setSkipReason(event.target.value)}
                 placeholder="Reason for skipping..."
                 className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-                disabled={skipLoading || stepDetail.status === 'SKIPPED'}
+                disabled={skipLoading || stepDetail.status === "SKIPPED"}
               />
               <button
                 className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-gray-400"
                 onClick={() => void skipCurrentStep()}
-                disabled={skipLoading || !skipReason.trim() || stepDetail.status === 'SKIPPED'}
+                disabled={
+                  skipLoading ||
+                  !skipReason.trim() ||
+                  stepDetail.status === "SKIPPED"
+                }
               >
-                {skipLoading ? 'Skipping...' : stepDetail.status === 'SKIPPED' ? 'Step Skipped' : 'Skip Step'}
+                {skipLoading
+                  ? "Skipping..."
+                  : stepDetail.status === "SKIPPED"
+                    ? "Step Skipped"
+                    : "Skip Step"}
               </button>
             </div>
 

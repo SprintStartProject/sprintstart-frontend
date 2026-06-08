@@ -109,6 +109,10 @@ export function OnBoardingPage() {
     };
   };
 
+  const getStepButtonLabel = (stepStatus: string) => {
+    return stepStatus === "WAITING" ? "Start now" : "Configure";
+  };
+
   // Total progress across all phases
   const totalProgress = OnBoardingPathEndpoint?.phases.reduce(
     (acc, phase) => {
@@ -126,7 +130,7 @@ export function OnBoardingPage() {
       ? Math.round((totalProgress.completed / totalProgress.total) * 100)
       : 0;
 
-  // Next pending task (across all phases)
+  // Next pending task (across all phases)  
   const nextTask =
     OnBoardingPathEndpoint?.phases
       .flatMap((phase) => phase.steps)
@@ -301,7 +305,7 @@ export function OnBoardingPage() {
             <div
               key={step.id}
               className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${
-                step.status === "FINISHED"
+                step.status === "FINISHED" || step.status === "SKIPPED"
                   ? "border-gray-200 dark:border-gray-800 opacity-60"
                   : "border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg"
               }`}
@@ -325,7 +329,8 @@ export function OnBoardingPage() {
                       <div>
                         <h3
                           className={`font-semibold text-base ${
-                            step.status === "FINISHED" || step.status === "SKIPPED"
+                            step.status === "FINISHED" ||
+                            step.status === "SKIPPED"
                               ? "line-through text-gray-400 dark:text-gray-500"
                               : "text-gray-900 dark:text-white"
                           }`}
@@ -342,7 +347,7 @@ export function OnBoardingPage() {
                         onClick={() => void navigate(`/onboarding/${step.id}`)}
                         className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
                       >
-                        Start now
+                        {getStepButtonLabel(step.status)}
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
