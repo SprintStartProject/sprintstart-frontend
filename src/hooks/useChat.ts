@@ -16,7 +16,6 @@ export function useChat() {
     const navigate = useNavigate();
 
     const [chats, setChats] = useState<Chat[]>([]);
-    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [messagesByChat, setMessagesByChat] = useState<MessagesByChat>({});
     const [isThinking, setIsThinking] = useState(false);
     const [newRequest, setNewRequest] = useState("");
@@ -34,8 +33,6 @@ export function useChat() {
 
         if (messagesByChat[chatId]) return;
 
-        setIsLoadingMessages(true);
-
         void (async () => {
             const data = await getMessages(chatId);
 
@@ -43,8 +40,6 @@ export function useChat() {
                 ...prev,
                 [chatId]: data.messages
             }));
-
-            setIsLoadingMessages(false);
         })();
     }, [chatId]);
 
@@ -67,7 +62,7 @@ export function useChat() {
         if (!currentChatId) {
             const newChat = await createChat("00000000-0000-0000-0000-000000000001");
 
-            setChats(prev => [newChat, ...prev]);
+            // setChats(prev => [newChat, ...prev]); // TODO: ask team what they prefer
 
             currentChatId = newChat.id;
 
@@ -76,7 +71,7 @@ export function useChat() {
 
         setMessagesByChat(prev => ({
             ...prev,
-            [currentChatId]: []
+            [currentChatId]: prev[currentChatId] ?? []
         }));
 
         const userMessage: ChatMessage = {
@@ -181,8 +176,6 @@ export function useChat() {
         activeChat,
 
         messages,
-
-        isLoadingMessages,
 
         handleSubmit,
         addMessage,

@@ -1,10 +1,11 @@
 import {Bot, Plus, Send, Sparkles, User} from "lucide-react";
 import { useChat } from "../hooks/useChat.ts"
 import {NavLink} from "react-router-dom";
+import ReactMarkdown from "react-markdown"
 
 export function ChatPage() {
 
-    const {messages, isLoadingMessages, chatId, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
+    const {messages, chatId, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
 
     return (
         <div className="h-screen flex overflow-hidden bg-gray-900">
@@ -35,9 +36,15 @@ export function ChatPage() {
                                         ${isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"}
                                     `}
                                 >
-                                    <div className="truncate flex-1">
-                                        {chat.title || "Untitled Chat"}
-                                    </div>
+                                    {chat.title ?
+                                        <div className="truncate flex-1">
+                                            {chat.title}
+                                        </div> :
+                                        <div className="truncate flex-1 italic">
+                                            waiting for title...
+                                        </div>
+                                    }
+
                                 </NavLink>
                             ))}
                         </div>
@@ -55,60 +62,59 @@ export function ChatPage() {
 
                 <div className="flex-1 overflow-y-auto flex flex-col">
                     
-                    {!chatId && <div className="flex-1 flex flex-col justify-center items-center p-8 text-center">
-                        <div className="bg-blue-600/10 p-4 rounded-3xl mb-4">
-                            <Bot className="text-blue-500 size-12" />
-                        </div>
-                        <h1 className="text-white font-bold text-2xl mb-2">How can I help you today?</h1>
-                        <p className="text-gray-400 max-w-md text-sm">
-                            Ask anything about your project&apos;s codebase, documentation, or onboarding process.
-                        </p>
-                    </div>}
+                    {!chatId &&
+                        <div className="flex-1 flex flex-col justify-center items-center p-8 text-center">
+                            <div className="bg-blue-600/10 p-4 rounded-3xl mb-4">
+                                <Bot className="text-blue-500 size-12" />
+                            </div>
+                            <h1 className="text-white font-bold text-2xl mb-2">How can I help you today?</h1>
+                            <p className="text-gray-400 max-w-md text-sm">
+                                Ask anything about your project&apos;s codebase, documentation, or onboarding process.
+                            </p>
+                        </div>}
 
-                    {messages.length === 0 && isLoadingMessages ? (
-                        <div></div>
-                    ) : (
-                        <div className="max-w-4xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
-                            {messages.map((message, index) => {
-                                const isRequest = message.role === "USER";
+                    <div className="max-w-4xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
+                        {messages.map((message, index) => {
+                            const isRequest = message.role === "USER";
 
-                                return (
-                                    <div
-                                        key={index}
-                                        className={`flex w-full gap-4 ${isRequest ? "flex-row-reverse" : "flex-row"}`}
-                                    >
-                                        <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isRequest ? "bg-blue-600" : "bg-gray-800"}`}>
-                                            {isRequest ? <User size={16} className="text-white" /> : <Bot size={16} className="text-blue-400" />}
-                                        </div>
+                            return (
+                                <div
+                                    key={index}
+                                    className={`flex w-full gap-4 ${isRequest ? "flex-row-reverse" : "flex-row"}`}
+                                >
+                                    <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isRequest ? "bg-blue-600" : "bg-gray-800"}`}>
+                                        {isRequest ? <User size={16} className="text-white" /> : <Bot size={16} className="text-blue-400" />}
+                                    </div>
 
-                                        <div className={`flex flex-col max-w-[85%] ${isRequest ? "items-end" : "items-start"}`}>
-                                            <div
-                                                className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed
-                                                    ${isRequest ? "bg-blue-600 text-white rounded-tr-none" : "bg-gray-800 text-gray-200 rounded-tl-none"}
-                                                `}
-                                            >
+                                    <div className={`flex flex-col max-w-[85%] ${isRequest ? "items-end" : "items-start"}`}>
+                                        <div
+                                            className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed
+                                                ${isRequest ? "bg-blue-600 text-white rounded-tr-none" : "bg-gray-800 text-gray-200 rounded-tl-none"}
+                                            `}
+                                        >
+                                            <ReactMarkdown>
                                                 {message.content}
+                                            </ReactMarkdown>
 
-                                                {message.citations && message.citations.length > 0 && (
-                                                    <div className="mt-3 pt-3 border-t border-gray-700/50 flex flex-wrap gap-1.5">
-                                                        {message.citations.map((citation, cIdx) => (
-                                                            <button
-                                                                key={cIdx}
-                                                                onClick={() => setSelectedCitation(citation)}
-                                                                className="text-[10px] bg-gray-900/50 hover:bg-gray-900 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 transition-colors"
-                                                            >
-                                                                [{cIdx + 1}] {citation.filename}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            {message.citations && message.citations.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-gray-700/50 flex flex-wrap gap-1.5">
+                                                    {message.citations.map((citation, cIdx) => (
+                                                        <button
+                                                            key={cIdx}
+                                                            onClick={() => setSelectedCitation(citation)}
+                                                            className="text-[10px] bg-gray-900/50 hover:bg-gray-900 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 transition-colors"
+                                                        >
+                                                            [{cIdx + 1}] {citation.filename}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {selectedCitation && (
@@ -130,7 +136,7 @@ export function ChatPage() {
                         <input
                             type="text"
                             placeholder="Ask anything about the project..."
-                            className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm bg-gray-800 border border-gray-700 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                            className="flex-1 px-4 py-2.5 rounded-full text-white text-sm bg-gray-800 border border-gray-700 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                             value={newRequest}
                             onChange={e => setNewRequest(e.currentTarget.value)}
                         />
@@ -138,9 +144,9 @@ export function ChatPage() {
                         <button
                             type="submit"
                             disabled={isThinking || !newRequest.trim()}
-                            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <Send size={18} />
+                            <Send size={20} />
                         </button>
                     </form>
                 </footer>
