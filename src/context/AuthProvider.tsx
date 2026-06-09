@@ -7,6 +7,9 @@ import { AuthContext, type AuthStatus } from './AuthContext';
 const BASE_API_URL = 'http://localhost:8080/api/v1';
 
 const seedOnboardingPath = async (userId: string) => {
+    // --- TESTUSER BYPASS ---
+    if (userId === 'test-user-id') return;
+    // -----------------------
     const res = await fetch(`${BASE_API_URL}/onboarding/${userId}/seeding`, {
         method: 'POST',
     });
