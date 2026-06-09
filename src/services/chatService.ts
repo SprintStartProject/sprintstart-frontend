@@ -1,7 +1,7 @@
 import type {Chat, ChatMessage, Citation} from "../types/chatTypes.ts";
 
 export async function getChats() {
-    const res = await fetch(`api/v1/chats`, {
+    const res = await fetch(`/api/v1/chats`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
     });
@@ -10,7 +10,7 @@ export async function getChats() {
 }
 
 export async function createChat(userId: string) {
-    const res = await fetch(`api/v1/chats`, {
+    const res = await fetch(`/api/v1/chats`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

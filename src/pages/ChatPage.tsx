@@ -4,7 +4,7 @@ import {NavLink} from "react-router-dom";
 
 export function ChatPage() {
 
-    const {messages, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
+    const {messages, isLoadingMessages, chatId, chats, handleSubmit, isThinking, newRequest, setNewRequest, selectedCitation, setSelectedCitation} = useChat();
 
     return (
         <div className="h-screen flex overflow-hidden bg-gray-900">
@@ -54,16 +54,19 @@ export function ChatPage() {
                 </header>
 
                 <div className="flex-1 overflow-y-auto flex flex-col">
-                    {messages.length === 0 ? (
-                        <div className="flex-1 flex flex-col justify-center items-center p-8 text-center">
-                            <div className="bg-blue-600/10 p-4 rounded-3xl mb-4">
-                                <Bot className="text-blue-500 size-12" />
-                            </div>
-                            <h1 className="text-white font-bold text-2xl mb-2">How can I help you today?</h1>
-                            <p className="text-gray-400 max-w-md text-sm">
-                                Ask anything about your project&apos;s codebase, documentation, or onboarding process.
-                            </p>
+                    
+                    {!chatId && <div className="flex-1 flex flex-col justify-center items-center p-8 text-center">
+                        <div className="bg-blue-600/10 p-4 rounded-3xl mb-4">
+                            <Bot className="text-blue-500 size-12" />
                         </div>
+                        <h1 className="text-white font-bold text-2xl mb-2">How can I help you today?</h1>
+                        <p className="text-gray-400 max-w-md text-sm">
+                            Ask anything about your project&apos;s codebase, documentation, or onboarding process.
+                        </p>
+                    </div>}
+
+                    {messages.length === 0 && isLoadingMessages ? (
+                        <div></div>
                     ) : (
                         <div className="max-w-4xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
                             {messages.map((message, index) => {
