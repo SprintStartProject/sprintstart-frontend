@@ -55,7 +55,14 @@ export async function createChat(userId: string) {
 export async function getMessages(chatId: string) {
     // --- TESTUSER BYPASS ---
     if (chatId.startsWith('chat-')) {
-        return { messages: [{ id: 'msg-1', role: 'ASSISTANT', chatId, content: 'Hello! I am the mock assistant. How can I help you today?' }] };
+        return { 
+            messages: [{ 
+                id: 'msg-1', 
+                role: 'ASSISTANT' as const, 
+                chatId, 
+                content: 'Hello! I am the mock assistant. How can I help you today?' 
+            }] 
+        };
     }
     // -----------------------
     const res = await fetch(`/api/v1/chats/${chatId}`, {

@@ -90,35 +90,71 @@ export function OnBoardingPage() {
             setLoadingState('loading');
             try {
                 // find USER
-                const userId = localStorage.getItem('sprintstart_session_id');
+                let userId = localStorage.getItem('sprintstart_session_id');
                 
                 // --- TESTUSER BYPASS ---
                 if (userId === 'test-user-id') {
                     setOnBoardingPath({
                         id: 'test-path-id',
                         userId: 'test-user-id',
-                        title: 'Welcome to the Team!',
-                        description: 'A mock path for local UI testing.',
+                        createdAt: new Date().toISOString(),
                         phases: [
                             {
                                 id: 'phase-1',
+                                pathId: 'test-path-id',
+                                position: 1,
                                 title: 'Getting Started',
                                 description: 'First steps in the company.',
                                 steps: [
-                                    { id: 'step-1', title: 'Setup your Laptop', description: 'Install your OS and tools.', status: 'PENDING' },
-                                    { id: 'step-2', title: 'Meet the Team', description: 'Schedule a coffee chat.', status: 'FINISHED' }
+                                    { 
+                                        id: 'step-1', 
+                                        phaseId: 'phase-1',
+                                        position: 1,
+                                        title: 'Setup your Laptop', 
+                                        description: 'Install your OS and tools.', 
+                                        type: 'TASK',
+                                        estimatedMinutes: 30,
+                                        status: 'PENDING',
+                                        completedAt: null,
+                                        skipReason: null
+                                    },
+                                    { 
+                                        id: 'step-2', 
+                                        phaseId: 'phase-1',
+                                        position: 2,
+                                        title: 'Meet the Team', 
+                                        description: 'Schedule a coffee chat.', 
+                                        type: 'TASK',
+                                        estimatedMinutes: 15,
+                                        status: 'FINISHED',
+                                        completedAt: new Date().toISOString(),
+                                        skipReason: null
+                                    }
                                 ]
                             },
                             {
                                 id: 'phase-2',
+                                pathId: 'test-path-id',
+                                position: 2,
                                 title: 'Technical Onboarding',
                                 description: 'Learn about our stack.',
                                 steps: [
-                                    { id: 'step-3', title: 'Code Review Process', description: 'Learn how we do PRs.', status: 'PENDING' }
+                                    { 
+                                        id: 'step-3', 
+                                        phaseId: 'phase-2',
+                                        position: 1,
+                                        title: 'Code Review Process', 
+                                        description: 'Learn how we do PRs.', 
+                                        type: 'DOCUMENT',
+                                        estimatedMinutes: 45,
+                                        status: 'PENDING',
+                                        completedAt: null,
+                                        skipReason: null
+                                    }
                                 ]
                             }
                         ]
-                    } as any);
+                    } as OnboardingPathEndpoint);
                     setLoadingState('success');
                     return;
                 }
@@ -129,7 +165,7 @@ export function OnBoardingPage() {
                 const users = (await usersRes.json()) as UserProfile[];
 
                 // ToDo: Statt einfach den 2. User zu nehmen, sollte hier die Logik rein, um den aktuell eingeloggten User zu identifizieren (z.B. über Context oder Auth Hook)
-                const userId: string = users[1]?.id;
+                userId = users[1]?.id;
                 if (!userId) throw new Error('Kein User gefunden.');
                 //console.log('Gefundener User ID:', userId);
 
