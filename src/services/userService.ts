@@ -4,6 +4,21 @@ const SESSION_KEY = 'sprintstart_session_id';
 
 export const userService = {
     async login(username: string, firstname: string, lastname: string): Promise<UserProfile> {
+        // --- TESTUSER BYPASS ---
+        if (username.toLowerCase() === 'testuser') {
+            const mockUser: UserProfile = { 
+                id: 'test-user-id', 
+                username: 'testuser', 
+                firstname: firstname || 'Test', 
+                lastname: lastname || 'User', 
+                workingArea: WorkingArea.NO_WORKING_AREA,
+                primaryRole: Role.NO_ROLE,
+                secondaryRole: Role.NO_ROLE
+            };
+            localStorage.setItem(SESSION_KEY, mockUser.id);
+            return mockUser;
+        }
+        // -----------------------
         // 1. Fetch all users to see if we match the username
         const response = await fetch('/api/v1/users');
         if (!response.ok) throw new Error('Failed to fetch users');
@@ -38,6 +53,20 @@ export const userService = {
     async getProfile(): Promise<UserProfile | null> {
         const userId = localStorage.getItem(SESSION_KEY);
         if (!userId) return null;
+
+        // --- TESTUSER BYPASS ---
+        if (userId === 'test-user-id') {
+            return { 
+                id: 'test-user-id', 
+                username: 'testuser', 
+                firstname: 'Test', 
+                lastname: 'User', 
+                workingArea: WorkingArea.NO_WORKING_AREA,
+                primaryRole: Role.NO_ROLE,
+                secondaryRole: Role.NO_ROLE 
+            };
+        }
+        // -----------------------
 
         try {
             const response = await fetch(`/api/v1/users/${userId}`);
