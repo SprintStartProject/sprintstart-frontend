@@ -1,6 +1,7 @@
 import { Role, WorkingArea, type UserProfile } from './types';
 
 const SESSION_KEY = 'sprintstart_session_id';
+const MOCK_PROFILE_KEY = 'sprintstart_mock_profile';
 
 export const userService = {
     async login(username: string, firstname: string, lastname: string): Promise<UserProfile> {
@@ -16,6 +17,7 @@ export const userService = {
                 secondaryRole: Role.NO_ROLE
             };
             localStorage.setItem(SESSION_KEY, mockUser.id);
+            localStorage.setItem(MOCK_PROFILE_KEY, JSON.stringify(mockUser));
             return mockUser;
         }
         // -----------------------
@@ -56,6 +58,9 @@ export const userService = {
 
         // --- TESTUSER BYPASS ---
         if (userId === 'test-user-id') {
+            const stored = localStorage.getItem(MOCK_PROFILE_KEY);
+            if (stored) return JSON.parse(stored) as UserProfile;
+            
             return { 
                 id: 'test-user-id', 
                 username: 'testuser', 
@@ -90,16 +95,20 @@ export const userService = {
 
         // --- TESTUSER BYPASS ---
         if (userId === 'test-user-id') {
-            return {
+            const stored = localStorage.getItem(MOCK_PROFILE_KEY);
+            const current = stored ? JSON.parse(stored) as UserProfile : {
                 id: 'test-user-id',
                 username: 'testuser',
                 firstname: 'Test',
                 lastname: 'User',
-                workingArea: profile.workingArea || WorkingArea.NO_WORKING_AREA,
-                primaryRole: profile.primaryRole || Role.NO_ROLE,
-                secondaryRole: profile.secondaryRole || Role.NO_ROLE,
-                ...profile
+                workingArea: WorkingArea.NO_WORKING_AREA,
+                primaryRole: Role.NO_ROLE,
+                secondaryRole: Role.NO_ROLE
             };
+
+            const updated = { ...current, ...profile };
+            localStorage.setItem(MOCK_PROFILE_KEY, JSON.stringify(updated));
+            return updated;
         }
         // -----------------------
 

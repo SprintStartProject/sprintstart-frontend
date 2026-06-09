@@ -2,6 +2,14 @@ import { DocumentStatus, type DocumentMetadata, type UploadResult } from './type
 
 export const knowledgeService = {
     async fetchDocuments(uploaderId: string): Promise<DocumentMetadata[]> {
+        // --- TESTUSER BYPASS ---
+        if (uploaderId === 'test-user-id') {
+            return [
+                { id: 'doc-1', name: 'Welcome_Guide.pdf', mime: 'application/pdf', status: DocumentStatus.COMPLETED, uploadDate: new Date().toISOString() },
+                { id: 'doc-2', name: 'Architecture.png', mime: 'image/png', status: DocumentStatus.PROCESSING, uploadDate: new Date().toISOString() }
+            ];
+        }
+        // -----------------------
         const response = await fetch(`/api/v1/uploads?uploaderId=${uploaderId}`);
         
         if (!response.ok) {

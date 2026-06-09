@@ -90,6 +90,40 @@ export function OnBoardingPage() {
             setLoadingState('loading');
             try {
                 // find USER
+                const userId = localStorage.getItem('sprintstart_session_id');
+                
+                // --- TESTUSER BYPASS ---
+                if (userId === 'test-user-id') {
+                    setOnBoardingPath({
+                        id: 'test-path-id',
+                        userId: 'test-user-id',
+                        title: 'Welcome to the Team!',
+                        description: 'A mock path for local UI testing.',
+                        phases: [
+                            {
+                                id: 'phase-1',
+                                title: 'Getting Started',
+                                description: 'First steps in the company.',
+                                steps: [
+                                    { id: 'step-1', title: 'Setup your Laptop', description: 'Install your OS and tools.', status: 'PENDING' },
+                                    { id: 'step-2', title: 'Meet the Team', description: 'Schedule a coffee chat.', status: 'FINISHED' }
+                                ]
+                            },
+                            {
+                                id: 'phase-2',
+                                title: 'Technical Onboarding',
+                                description: 'Learn about our stack.',
+                                steps: [
+                                    { id: 'step-3', title: 'Code Review Process', description: 'Learn how we do PRs.', status: 'PENDING' }
+                                ]
+                            }
+                        ]
+                    } as any);
+                    setLoadingState('success');
+                    return;
+                }
+                // -----------------------
+
                 const usersRes = await fetch(`${BASE_API_URL}/users`);
                 if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
                 const users = (await usersRes.json()) as UserProfile[];
