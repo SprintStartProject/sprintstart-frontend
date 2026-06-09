@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/sprintstartproject/sprintstart-frontend:latest
+        image: ghcr.io/sprintstartproject/sprintstart-frontend:test
         ports:
         - containerPort: 80
         volumeMounts:
