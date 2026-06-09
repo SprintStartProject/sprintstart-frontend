@@ -6,6 +6,8 @@ ARG NODE_VERSION=24-alpine
 # Use a lightweight Node.js image for building (customizable via ARG)
 FROM node:${NODE_VERSION} AS builder
 
+LABEL org.opencontainers.image.source=https://github.com/SprintStartProject/sprintstart-frontend
+
 # Set the working directory inside the container
 WORKDIR /app
 
