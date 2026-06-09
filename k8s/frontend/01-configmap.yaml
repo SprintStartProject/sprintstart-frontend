@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-config
+  namespace: sprintstart
+data:
+  default.conf: |
+    server {
+        listen 80;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location /api/ {
+            proxy_pass http://sprintstart-backend:8080;
+        }
+
+        location /v1/ {
+            proxy_pass http://sprintstart-backend:8080;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
