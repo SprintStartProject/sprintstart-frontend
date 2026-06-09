@@ -163,9 +163,9 @@ export function OnBoardingItemPage() {
   // ── LOADING ───────────────────────────────────────────────
   if (loadingState === "loading" || loadingState === "idle") {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-app-text-muted">
+          <Loader2 className="w-8 h-8 animate-spin text-app-brand" />
           <p className="text-sm">Loading step...</p>
         </div>
       </div>
@@ -175,18 +175,18 @@ export function OnBoardingItemPage() {
   // ── ERROR ─────────────────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
         <div className="max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-app-text mb-2">
             Could not load step
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          <p className="text-sm text-app-text-muted mb-6">
             {errorMessage}
           </p>
           <button
             onClick={() => void navigate("/onboarding")}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
+            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
           >
             Back to Onboarding Overview
           </button>
@@ -198,14 +198,14 @@ export function OnBoardingItemPage() {
   // ── EMPTY ─────────────────────────────────────────────────
   if (!stepDetail) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+          <p className="text-app-text-muted text-sm mb-4">
             Step not found.
           </p>
           <button
             onClick={() => void navigate("/onboarding")}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
+            className="px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
           >
             Back to Onboarding Overview
           </button>
@@ -216,13 +216,13 @@ export function OnBoardingItemPage() {
 
   // ── RENDER ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-app-bg">
       {/* HEADER */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
+      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
             onClick={() => void navigate("/onboarding")}
-            className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all mb-4"
+            className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Onboarding Overview
@@ -234,12 +234,12 @@ export function OnBoardingItemPage() {
               <div
                 className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${
                   stepDetail.status === "FINISHED"
-                    ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400"
+                    ? "bg-app-success-bg text-app-success-text"
                     : stepDetail.status === "IN_PROGRESS"
-                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400"
+                      ? "bg-app-warning-bg text-app-warning-text"
                       : stepDetail.status === "SKIPPED"
-                        ? "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                        : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
+                        ? "bg-app-neutral-bg text-app-text-muted"
+                        : "bg-app-brand-soft text-app-brand-text"
                 }`}
               >
                 {stepDetail.status === "FINISHED"
@@ -251,16 +251,16 @@ export function OnBoardingItemPage() {
                       : "Open"}
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold text-app-text">
                 {stepDetail.title}
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">
+              <p className="text-app-text-muted mt-2 text-sm">
                 {stepDetail.description}
               </p>
             </div>
 
             {stepDetail.estimatedMinutes > 0 && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-900 text-sm text-gray-600 dark:text-gray-400 shrink-0">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-app-surface-muted text-sm text-app-text-muted shrink-0">
                 <Clock3 className="w-4 h-4" />
                 {formatMinutes(stepDetail.estimatedMinutes)}
               </div>
@@ -276,23 +276,23 @@ export function OnBoardingItemPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* TASKS (Step by Step) */}
             {sortedTasks.length > 0 && (
-              <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+              <div className="rounded-2xl border border-app-border bg-app-surface p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-orange-500" />
-                    <h2 className="font-semibold text-gray-900 dark:text-white">
+                    <Target className="w-5 h-5 text-app-warning-solid" />
+                    <h2 className="font-semibold text-app-text">
                       Tasks
                     </h2>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-xs text-app-text-muted">
                     {doneTasks}/{sortedTasks.length} completed
                   </span>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-1.5 mb-5 overflow-hidden">
+                <div className="bg-app-border-muted rounded-full h-1.5 mb-5 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-app-brand to-app-progress-fill-end rounded-full transition-all duration-500"
                     style={{ width: `${taskPercentage}%` }}
                   />
                 </div>
@@ -306,27 +306,27 @@ export function OnBoardingItemPage() {
                         onClick={() => toggleTask(task.id)}
                         className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${
                           isDone
-                            ? "border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
-                            : "border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700"
+                            ? "border-app-success-border bg-app-success-bg"
+                            : "border-app-border hover:border-app-brand-border-strong"
                         }`}
                       >
                         {isDone ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                          <CheckCircle2 className="w-5 h-5 text-app-success-solid shrink-0 mt-0.5" />
                         ) : (
-                          <Circle className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                          <Circle className="w-5 h-5 text-app-text-disabled shrink-0 mt-0.5" />
                         )}
                         <div>
                           <span
                             className={`text-sm font-medium ${
                               isDone
-                                ? "line-through text-gray-400 dark:text-gray-500"
-                                : "text-gray-900 dark:text-white"
+                                ? "line-through text-app-text-subtle"
+                                : "text-app-text"
                             }`}
                           >
                             {index + 1}. {task.title}
                           </span>
                           {task.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-app-text-muted mt-0.5">
                               {task.description}
                             </p>
                           )}
@@ -339,8 +339,8 @@ export function OnBoardingItemPage() {
             )}
 
             {/* mark step as done */}
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
+            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+              <h3 className="font-semibold text-app-text text-sm mb-3">
                 Complete Step
               </h3>
               <button
@@ -352,10 +352,10 @@ export function OnBoardingItemPage() {
                 disabled={!allTasksDone && stepDetail.status !== "FINISHED"}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
                   stepDetail.status === "FINISHED"
-                    ? "border-green-400 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50"
+                    ? "border-app-success-border bg-app-success-bg text-app-success-text hover:bg-app-success-bg"
                     : allTasksDone
-                      ? "border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                      : "border-dashed border-gray-200 dark:border-gray-800 text-gray-300 dark:text-gray-700 cursor-not-allowed"
+                      ? "border-dashed border-app-border-strong hover:border-app-brand-border-strong text-app-text-muted hover:text-app-brand"
+                      : "border-dashed border-app-border text-app-text-disabled cursor-not-allowed"
                 }`}
               >
                 {stepDetail.status === "FINISHED" ? (
@@ -380,17 +380,17 @@ export function OnBoardingItemPage() {
           {/* RIGHT COLUMN */}
           <div className="space-y-6">
             {/* STATUS */}
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
+            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+              <h3 className="font-semibold text-app-text text-sm mb-3">
                 Status
               </h3>
               <div
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${
                   stepDetail.status === "FINISHED"
-                    ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                    ? "bg-app-success-bg text-app-success-text"
                     : stepDetail.status === "SKIPPED"
-                      ? "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                      ? "bg-app-danger-bg text-app-danger-text"
+                      : "bg-app-surface-muted text-app-text-muted"
                 }`}
               >
                 {stepDetail.status === "FINISHED" ? (
@@ -409,7 +409,7 @@ export function OnBoardingItemPage() {
                       : "Open"}
               </div>
               {stepDetail.status === "FINISHED" && stepDetail.completedAt && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                <p className="text-xs text-app-text-muted mt-3">
                   Completed on{" "}
                   {new Date(stepDetail.completedAt).toLocaleDateString(
                     "en-US",
@@ -421,8 +421,8 @@ export function OnBoardingItemPage() {
 
             {/* RESOURCES */}
             {resources.length > 0 && (
-              <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
+              <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+                <h3 className="font-semibold text-app-text text-sm mb-3">
                   Resources
                 </h3>
                 <div className="space-y-2">
@@ -432,19 +432,19 @@ export function OnBoardingItemPage() {
                       href={resource.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
+                      className="flex items-center justify-between p-3 rounded-xl border border-app-border hover:border-app-brand-border-strong transition-all group"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                        <p className="text-sm font-medium text-app-text truncate">
                           {resource.title}
                         </p>
                         {resource.description && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                          <p className="text-xs text-app-text-subtle truncate mt-0.5">
                             {resource.description}
                           </p>
                         )}
                       </div>
-                      <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-all shrink-0 ml-2" />
+                      <ExternalLink className="w-4 h-4 text-app-text-subtle group-hover:text-app-brand transition-all shrink-0 ml-2" />
                     </a>
                   ))}
                 </div>
@@ -452,20 +452,20 @@ export function OnBoardingItemPage() {
             )}
 
             {/*SKIP STEP */}
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                <CircleArrowRight className="w-4 h-4 text-red-500" />
+            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+              <h3 className="flex items-center gap-2 font-semibold text-app-text text-sm mb-3">
+                <CircleArrowRight className="w-4 h-4 text-app-danger-solid" />
                 Skip Step
               </h3>
               <textarea
                 value={skipReason}
                 onChange={(event) => setSkipReason(event.target.value)}
                 placeholder="Reason for skipping..."
-                className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                className="w-full h-24 p-3 rounded-xl border border-app-border bg-app-surface text-sm text-app-text focus:outline-none focus:ring-2 focus:ring-app-focus transition-all resize-none"
                 disabled={skipLoading || stepDetail.status === "SKIPPED"}
               />
               <button
-                className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-gray-400"
+                className="mt-3 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-app-border"
                 onClick={() => void skipCurrentStep()}
                 disabled={
                   skipLoading ||
@@ -482,16 +482,16 @@ export function OnBoardingItemPage() {
             </div>
 
             {/* FEEDBACK */}
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                <MessageSquareCheck className="w-4 h-4 text-blue-500" />
+            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+              <h3 className="flex items-center gap-2 font-semibold text-app-text text-sm mb-3">
+                <MessageSquareCheck className="w-4 h-4 text-app-brand" />
                 Feedback
               </h3>
               <textarea
                 placeholder="Your feedback about this step..."
-                className="w-full h-24 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                className="w-full h-24 p-3 rounded-xl border border-app-border bg-app-surface text-sm text-app-text focus:outline-none focus:ring-2 focus:ring-app-focus transition-all resize-none"
               />
-              <button className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all">
+              <button className="mt-3 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all">
                 Submit feedback
               </button>
             </div>
