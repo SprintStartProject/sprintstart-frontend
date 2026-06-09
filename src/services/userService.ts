@@ -88,6 +88,21 @@ export const userService = {
         const userId = localStorage.getItem(SESSION_KEY);
         if (!userId) throw new Error('Not authenticated');
 
+        // --- TESTUSER BYPASS ---
+        if (userId === 'test-user-id') {
+            return {
+                id: 'test-user-id',
+                username: 'testuser',
+                firstname: 'Test',
+                lastname: 'User',
+                workingArea: profile.workingArea || WorkingArea.NO_WORKING_AREA,
+                primaryRole: profile.primaryRole || Role.NO_ROLE,
+                secondaryRole: profile.secondaryRole || Role.NO_ROLE,
+                ...profile
+            };
+        }
+        // -----------------------
+
         const response = await fetch(`/api/v1/users/${userId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
