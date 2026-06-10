@@ -2,432 +2,362 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect } from 'react';
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint} from '../types/onboarding';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingPhaseEndpoint,
+} from "../types/onboarding";
+import { useNavigate } from "react-router-dom";
+import { onboardingService } from "../services/onboardingService";
+import { userService } from "../services/userService";
 
 import {
-    CheckCircle2,
-    Circle,
-    ChevronRight,
-    Sparkles,
-    PlayCircle,
-    Loader2,
-    AlertCircle,
-} from 'lucide-react';
-import type {UserProfile} from "../services/types.ts";
-//import { useAuth } from '../context/useAuth.ts';
+  CheckCircle2,
+  Circle,
+  ChevronRight,
+  Sparkles,
+  PlayCircle,
+  Loader2,
+  AlertCircle,
+  CircleArrowRight,
+} from "lucide-react";
+//import type {UserProfile} from "../services/types.ts";
 
-const BASE_API_URL = 'http://localhost:8080/api/v1';
-type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+type LoadingState = "idle" | "loading" | "success" | "error";
 
 //const { profile, status } = useAuth();
 //const userLoading = status === 'loading';
-//const userError = status === 'unauthenticated' ? 'Nicht eingeloggt.' : null;
-
+//const userError = status === 'unauthenticated' ? 'Not logged in.' : null;
 
 // ─────────────────────────────────────────────────────────────
-// HELPER-KOMPONENTE: ProgressBar
+// HELPER COMPONENT: ProgressBar
 // ─────────────────────────────────────────────────────────────
 
 interface ProgressBarProps {
-    value: number;  // z.B. 3 (erledigte Tasks)
-    max: number;    // z.B. 5 (gesamt Tasks)
+  value: number; // e.g. 3 (completed tasks)
+  max: number; // e.g. 5 (total tasks)
 }
 
 function ProgressBar({ value, max }: ProgressBarProps) {
-    const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
+  const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
 
-    return (
-        <div className="bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
-            <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
-                style={{ width: `${percentage}%` }}
-            />
-        </div>
-    );
+  return (
+    <div className="bg-app-border-muted rounded-full h-2 overflow-hidden">
+      <div
+        className="h-full bg-gradient-to-r from-app-brand to-app-progress-fill-end rounded-full transition-all duration-500"
+        style={{ width: `${percentage}%` }}
+      />
+    </div>
+  );
 }
 
-function fetchPath(userId: string): Promise<OnboardingPathEndpoint> {
-    return fetch(`${BASE_API_URL}/onboarding/${userId}/path`)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`Fehler beim Laden des OnBoarding Paths: ${res.statusText}`);
-            }
-            return res.json();
-        })
-        .then(data => data as OnboardingPathEndpoint);
-}
-
-
-
 // ─────────────────────────────────────────────────────────────
-// HAUPT-KOMPONENTE: OnBoardingPage
+// MAIN COMPONENT: OnBoardingPage
 // ─────────────────────────────────────────────────────────────
-
 
 export function OnBoardingPage() {
+  // Selected phase index
+  const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
 
-    // Selected Phase
-    const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
+  // Onboarding data (null = not loaded yet)
+  const [OnBoardingPathEndpoint, setOnBoardingPath] =
+    useState<OnboardingPathEndpoint | null>(null);
 
-    // OnBoarding-Daten (null = noch nicht geladen)
-    const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
+  // Loading state: 'idle' (before load), 'loading' (while loading), 'success' (loaded), 'error' (error)
+  const [loadingState, setLoadingState] = useState<LoadingState>("idle");
 
-    // Loading State: 'idle' (vor dem Laden), 'loading' (während Laden), 'success' (geladen), 'error' (Fehler)
-    const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  // Error message for error state
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
-    // Fehlermeldung für den Error-State
-    const [errorMessage, setErrorMessage] = useState<string>('');
+  const navigate = useNavigate();
 
-    const navigate = useNavigate();
+  // ── DATA FETCHING using useEffect ─────────────────────────────
 
+  useEffect(() => {
+    const loadOnBoardingPath = async () => {
+      setLoadingState("loading");
+      try {
+        const profile = await userService.getProfile();
+        if (!profile?.id) throw new Error("No user found.");
 
-    // ── DATA FETCHING mit useEffect ─────────────────────────────
-
-    useEffect(() => {
-        const loadOnBoardingPath = async () => {
-            setLoadingState('loading');
-            try {
-                // find USER
-                let userId = localStorage.getItem('sprintstart_session_id');
-                
-                // --- TESTUSER BYPASS ---
-                if (userId === 'test-user-id') {
-                    setOnBoardingPath({
-                        id: 'test-path-id',
-                        userId: 'test-user-id',
-                        createdAt: new Date().toISOString(),
-                        phases: [
-                            {
-                                id: 'phase-1',
-                                pathId: 'test-path-id',
-                                position: 1,
-                                title: 'Getting Started',
-                                description: 'First steps in the company.',
-                                steps: [
-                                    { 
-                                        id: 'step-1', 
-                                        phaseId: 'phase-1',
-                                        position: 1,
-                                        title: 'Setup your Laptop', 
-                                        description: 'Install your OS and tools.', 
-                                        type: 'TASK',
-                                        estimatedMinutes: 30,
-                                        status: 'PENDING',
-                                        completedAt: null,
-                                        skipReason: null
-                                    },
-                                    { 
-                                        id: 'step-2', 
-                                        phaseId: 'phase-1',
-                                        position: 2,
-                                        title: 'Meet the Team', 
-                                        description: 'Schedule a coffee chat.', 
-                                        type: 'TASK',
-                                        estimatedMinutes: 15,
-                                        status: 'FINISHED',
-                                        completedAt: new Date().toISOString(),
-                                        skipReason: null
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'phase-2',
-                                pathId: 'test-path-id',
-                                position: 2,
-                                title: 'Technical Onboarding',
-                                description: 'Learn about our stack.',
-                                steps: [
-                                    { 
-                                        id: 'step-3', 
-                                        phaseId: 'phase-2',
-                                        position: 1,
-                                        title: 'Code Review Process', 
-                                        description: 'Learn how we do PRs.', 
-                                        type: 'DOCUMENT',
-                                        estimatedMinutes: 45,
-                                        status: 'PENDING',
-                                        completedAt: null,
-                                        skipReason: null
-                                    }
-                                ]
-                            }
-                        ]
-                    } as OnboardingPathEndpoint);
-                    setLoadingState('success');
-                    return;
-                }
-                // -----------------------
-
-                const usersRes = await fetch(`${BASE_API_URL}/users`);
-                if (!usersRes.ok) throw new Error(`Users: HTTP ${usersRes.status}`);
-                const users = (await usersRes.json()) as UserProfile[];
-
-                // ToDo: Statt einfach den 2. User zu nehmen, sollte hier die Logik rein, um den aktuell eingeloggten User zu identifizieren (z.B. über Context oder Auth Hook)
-                userId = users[1]?.id;
-                if (!userId) throw new Error('Kein User gefunden.');
-                //console.log('Gefundener User ID:', userId);
-
-                // fetch PATH
-                const path = await fetchPath(userId);
-                //console.log('Geladener OnBoarding Path:', path);
-
-                setOnBoardingPath(path);
-
-
-                setLoadingState('success');
-            } catch (err) {
-                setLoadingState('error');
-                setErrorMessage(err instanceof Error ? err.message : 'Unbekannter Fehler');
-            }
-        };
-
-        void loadOnBoardingPath();
-    }, []);
-
-
-
-    const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
-
-    // Hilfsfunktion für Fortschritt einer Phase
-    const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
-        const completed = phase.steps.filter(step => step.status === 'FINISHED').length;
-        return {
-            completed,
-            total: phase.steps.length,
-            percentage: phase.steps.length > 0
-                ? Math.round((completed / phase.steps.length) * 100)
-                : 0,
-        };
+        const path = await onboardingService.fetchPath(profile.id);
+        setOnBoardingPath(path);
+        setLoadingState("success");
+      } catch (err) {
+        setLoadingState("error");
+        setErrorMessage(err instanceof Error ? err.message : "Unknown error");
+      }
     };
+    void loadOnBoardingPath();
+  }, []);
 
-    // Gesamtfortschritt über alle Phasen
-    const totalProgress = OnBoardingPathEndpoint?.phases.reduce(
-        (acc, phase) => {
-            const p = getPhaseProgress(phase);
-            return { completed: acc.completed + p.completed, total: acc.total + p.total };
-        },
-        { completed: 0, total: 0 }
-    ) ?? { completed: 0, total: 0 };
+  const currentPhase =
+    OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
-    const totalPercentage = totalProgress.total > 0
-        ? Math.round((totalProgress.completed / totalProgress.total) * 100)
-        : 0;
+  // Helper function for phase progress
+  const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
+    const completed = phase.steps.filter(
+      (step) => step.status === "FINISHED" || step.status === "SKIPPED",
+    ).length;
+    return {
+      completed,
+      total: phase.steps.length,
+      percentage:
+        phase.steps.length > 0
+          ? Math.round((completed / phase.steps.length) * 100)
+          : 0,
+    };
+  };
 
-    // Nächste unerledigte Task (über alle Phasen)
-    const nextTask = OnBoardingPathEndpoint?.phases
-        .flatMap(phase => phase.steps)
-        .find(step => step.status !== 'FINISHED') ?? null;
+  const getStepButtonLabel = (stepStatus: string) => {
+    return stepStatus === "WAITING" ? "Start now" : "Configure";
+  };
 
+  // Total progress across all phases
+  const totalProgress = OnBoardingPathEndpoint?.phases.reduce(
+    (acc, phase) => {
+      const p = getPhaseProgress(phase);
+      return {
+        completed: acc.completed + p.completed,
+        total: acc.total + p.total,
+      };
+    },
+    { completed: 0, total: 0 },
+  ) ?? { completed: 0, total: 0 };
 
-    // ── RENDER: LOADING STATE ──────────────────────────────────
-    if (loadingState === 'loading' || loadingState === 'idle') {
-        return (
-            <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4 text-gray-500 dark:text-gray-400">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                    <p className="text-sm">OnBoarding Path wird geladen...</p>
-                </div>
-            </div>
-        );
-    }
+  const totalPercentage =
+    totalProgress.total > 0
+      ? Math.round((totalProgress.completed / totalProgress.total) * 100)
+      : 0;
 
-    // ── RENDER: ERROR STATE ────────────────────────────────────
-    if (loadingState === 'error') {
-        return (
-            <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-8">
-                <div className="max-w-md text-center">
-                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                        OnBoarding konnte nicht geladen werden
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{errorMessage}</p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all"
-                    >
-                        Nochmal versuchen
-                    </button>
-                </div>
-            </div>
-        );
-    }
+  // Next pending task (across all phases)
+  const nextTask =
+    OnBoardingPathEndpoint?.phases
+      .flatMap((phase) => phase.steps)
+      .find((step) => step.status !== "FINISHED") ?? null;
 
-    // ── RENDER: EMPTY STATE ────────────────────────────────────
-    if (!OnBoardingPathEndpoint || !currentPhase) {
-        return (
-            <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
-                    Kein OnBoarding Path gefunden.
-                </p>
-            </div>
-        );
-    }
-
-
-    // ── RENDER: SUCCESS STATE ──────────────────────────────────
+  // ── RENDER: LOADING STATE ──────────────────────────────────
+  if (loadingState === "loading" || loadingState === "idle") {
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-950">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-app-text-muted">
+          <Loader2 className="w-8 h-8 animate-spin text-app-brand" />
+          <p className="text-sm">Loading onboarding path...</p>
+        </div>
+      </div>
+    );
+  }
 
-            {/* ── HEADER ───────────────────────────────────────── */}
-            <div className="border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+  // ── RENDER: ERROR STATE ────────────────────────────────────
+  if (loadingState === "error") {
+    return (
+      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-app-text mb-2">
+            Onboarding could not be loaded
+          </h2>
+          <p className="text-sm text-app-text-muted mb-6">
+            {errorMessage}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-                    {/* Titel + Gesamt-Prozent */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <Sparkles className="w-5 h-5 text-blue-500" />
-                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    Dein OnBoarding Journey
-                                </h1>
-                            </div>
-                        </div>
+  // ── RENDER: EMPTY STATE ────────────────────────────────────
+  if (!OnBoardingPathEndpoint || !currentPhase) {
+    return (
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+        <p className="text-app-text-muted text-sm">
+          No onboarding path found.
+        </p>
+      </div>
+    );
+  }
 
-                        <div className="text-right">
-                            <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
-                                {totalPercentage}%
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">gesamt</div>
-                        </div>
-                    </div>
-
-                    {/* Gesamt-Progressbar */}
-                    <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
-
-                    {/* Phasen-Tabs */}
-                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                        {OnBoardingPathEndpoint.phases.map((phase, index) => {
-                            const progress = getPhaseProgress(phase);
-                            const isSelected = selectedPhaseIndex === index;
-
-                            return (
-                                <button
-                                    key={phase.id}
-                                    onClick={() => setSelectedPhaseIndex(index)}
-                                    className={`flex-1 rounded-2xl border p-4 transition-all text-left ${isSelected
-                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                                        : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-950'
-                                        }`}
-                                >
-                                    <div className="font-semibold text-gray-900 dark:text-white text-sm mb-1">
-                                        {phase.title}
-                                    </div>
-                                    <ProgressBar value={progress.completed} max={progress.total} />
-                                    <div className="flex justify-between mt-2">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {progress.completed}/{progress.total} Tasks
-                                        </span>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${progress.percentage === 100
-                                            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                                            }`}>
-                                            {progress.percentage}%
-                                        </span>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+  // ── RENDER: SUCCESS STATE ──────────────────────────────────
+  return (
+    <div className="min-h-screen bg-app-bg">
+      {/* ── HEADER ───────────────────────────────────────── */}
+      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          {/* Title + overall percent */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-5 h-5 text-app-brand" />
+                <h1 className="text-2xl font-bold text-app-text">
+                  Your onboarding journey
+                </h1>
+              </div>
             </div>
 
+            <div className="text-right">
+              <div className="text-4xl font-bold text-app-brand">
+                {totalPercentage}%
+              </div>
+              <div className="text-xs text-app-text-muted">
+                overall
+              </div>
+            </div>
+          </div>
 
-            {/* ── MAIN CONTENT ─────────────────────────────────── */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
+          {/* Total progress bar */}
+          <ProgressBar
+            value={totalProgress.completed}
+            max={totalProgress.total}
+          />
 
-                {/* "Up Next" Banner — nur wenn es einen nächsten Task gibt */}
-                {nextTask && (
-                    <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-950 p-6 sm:p-8 mb-6 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full pointer-events-none" />
-                        <div className="relative z-10">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-medium mb-4">
-                                <PlayCircle className="w-3.5 h-3.5" />
-                                Up Next
-                            </div>
-                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                                {nextTask.title}
-                            </h2>
-                            <p className="text-gray-600 dark:text-gray-400 mt-2 max-w-2xl">
-                                {nextTask.description}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-4 mt-6">
-                                <button
-                                    onClick={() => void navigate(`/onboarding/${nextTask.id}`)}
-                                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
-                                >
-                                    Jetzt starten
-                                    <ChevronRight className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+          {/* Phase tabs */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            {OnBoardingPathEndpoint.phases.map((phase, index) => {
+              const progress = getPhaseProgress(phase);
+              const isSelected = selectedPhaseIndex === index;
 
-                {/* Phase-Beschreibung */}
-                <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {currentPhase.title}
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {currentPhase.description}
-                    </p>
-                </div>
-
-                {/* Task-Liste */}
-                <div className="space-y-4">
-                    {currentPhase.steps.map((step) => (
-                        <div
-                            key={step.id}
-                            className={`group rounded-2xl border transition-all bg-white dark:bg-gray-900 ${step.status === 'FINISHED'
-                                ? 'border-gray-200 dark:border-gray-800 opacity-60'
-                                : 'border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg'
-                                }`}
-                        >
-                            <div className="p-5">
-                                <div className="flex gap-4">
-
-                                    <div className="pt-0.5 shrink-0">
-                                        {step.status === 'FINISHED'
-                                            ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                                            : <Circle className="w-6 h-6 text-gray-300 dark:text-gray-600" />
-                                        }
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-
-                                            {/* Text */}
-                                            <div>
-                                                <h3 className={`font-semibold text-base ${step.status === 'FINISHED'
-                                                    ? 'line-through text-gray-400 dark:text-gray-500'
-                                                    : 'text-gray-900 dark:text-white'
-                                                    }`}>
-                                                    {step.title}
-                                                </h3>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
-                                                    {step.description}
-                                                </p>
-                                                {/* Meta-Infos */}
-                                            </div>
-
-                                            <button
-                                                onClick={() => void navigate(`/onboarding/${step.id}`)}
-                                                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all flex items-center gap-2"
-                                            >
-                                                Jetzt starten
-                                                <ChevronRight className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </main>
+              return (
+                <button
+                  key={phase.id}
+                  onClick={() => setSelectedPhaseIndex(index)}
+                  className={`flex-1 rounded-2xl border p-4 transition-all text-left ${
+                    isSelected
+                      ? "border-app-brand bg-app-brand-soft"
+                      : "border-app-border hover:border-app-border-strong bg-app-surface"
+                  }`}
+                >
+                  <div className="font-semibold text-app-text text-sm mb-1">
+                    {phase.title}
+                  </div>
+                  <ProgressBar
+                    value={progress.completed}
+                    max={progress.total}
+                  />
+                  <div className="flex justify-between mt-2">
+                    <span className="text-xs text-app-text-muted">
+                      {progress.completed}/{progress.total} Tasks
+                    </span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        progress.percentage === 100
+                          ? "bg-app-success-bg text-app-success-text"
+                          : "bg-app-surface-muted text-app-text-muted"
+                      }`}
+                    >
+                      {progress.percentage}%
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-    );
+      </div>
+
+      {/* ── MAIN CONTENT ─────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
+        {/* "Up Next" Banner — nur wenn es einen nächsten Task gibt */}
+        {nextTask && (
+          <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-app-brand-soft text-app-brand-text text-xs font-medium mb-4">
+                <PlayCircle className="w-3.5 h-3.5" />
+                Up Next
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-app-text">
+                {nextTask.title}
+              </h2>
+              <p className="text-app-text-muted mt-2 max-w-2xl">
+                {nextTask.description}
+              </p>
+              <div className="flex flex-wrap items-center gap-4 mt-6">
+                <button
+                  onClick={() => void navigate(`/onboarding/${nextTask.id}`)}
+                  className="px-6 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center gap-2"
+                >
+                  Start now
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Phase description */}
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-app-text">
+            {currentPhase.title}
+          </h2>
+          <p className="text-sm text-app-text-muted mt-1">
+            {currentPhase.description}
+          </p>
+        </div>
+
+        {/* Task list */}
+        <div className="space-y-4">
+          {currentPhase.steps.map((step) => (
+            <div
+              key={step.id}
+              className={`group rounded-2xl border transition-all bg-app-surface ${
+                step.status === "FINISHED" || step.status === "SKIPPED"
+                  ? "border-app-border opacity-60"
+                  : "border-app-border hover:border-app-border-strong hover:shadow-lg"
+              }`}
+            >
+              <div className="p-5">
+                <div className="flex gap-4">
+                  <div className="pt-0.5 shrink-0">
+                    {step.status === "FINISHED" ? (
+                      <CheckCircle2 className="w-5 h-5 text-app-success-solid" />
+                    ) : step.status === "SKIPPED" ? (
+                      <CircleArrowRight className="w-5 h-5 text-app-danger-solid" />
+                    ) : (
+                      <Circle className="w-5 h-5 text-app-text-disabled" />
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      {/* Text */}
+                      <div>
+                        <h3
+                          className={`font-semibold text-base ${
+                            step.status === "FINISHED" ||
+                            step.status === "SKIPPED"
+                              ? "line-through text-app-text-subtle"
+                              : "text-app-text"
+                          }`}
+                        >
+                          {step.title}
+                        </h3>
+                        <p className="text-sm text-app-text-muted mt-1 leading-relaxed">
+                          {step.description}
+                        </p>
+                        {/* Meta info */}
+                      </div>
+
+                      <button
+                        onClick={() => void navigate(`/onboarding/${step.id}`)}
+                        className="px-6 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center gap-2"
+                      >
+                        {getStepButtonLabel(step.status)}
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
 }
