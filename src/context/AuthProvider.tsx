@@ -4,8 +4,14 @@ import { userService } from '../services/userService';
 import type { UserProfile } from '../services/types';
 import { AuthContext, type AuthStatus } from './AuthContext';
 
-const BASE_API_URL = 'http://localhost:8080/api/v1';
+const BASE_API_URL = '/api/v1';
 
+/**
+ * Triggers the backend onboarding path generation for a user.
+ * 
+ * @param userId - ID of the user to seed.
+ * @throws Error if seeding fails.
+ */
 const seedOnboardingPath = async (userId: string) => {
     // --- TESTUSER BYPASS ---
     if (userId === 'test-user-id') return;
@@ -19,11 +25,21 @@ const seedOnboardingPath = async (userId: string) => {
     }
 };
 
+/**
+ * Provider component that manages the global authentication state.
+ * 
+ * Handles initial session verification on mount, login/logout logic, 
+ * and automatic onboarding path seeding for new users.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [status, setStatus] = useState<AuthStatus>('loading');
     const [profile, setProfile] = useState<UserProfile | null>(null);
 
     useEffect(() => {
+        /**
+         * Verifies existing session tokens on mount.
+         * If a profile is found, it ensures the onboarding path is seeded.
+         */
         const initAuth = async () => {
             try {
                 const data = await userService.getProfile();
@@ -68,8 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await userService.getProfile();
         if (data) setProfile(data);
     };
-
-    
 
     return (
         <AuthContext.Provider value={{ status, profile, login, logout, refetchProfile }}>

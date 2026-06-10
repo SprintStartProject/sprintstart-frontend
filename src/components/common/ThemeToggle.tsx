@@ -1,11 +1,22 @@
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../context/useTheme';
 
+/**
+ * Configuration options for the ThemeToggle component.
+ */
 interface ThemeToggleProps {
+    /** Optional CSS class names for styling the outer button. */
     className?: string;
+    /** Whether to show the text label ("Dark Mode" / "Light Mode") next to the icon. */
     showLabel?: boolean;
 }
 
+/**
+ * A toggle switch component that allows users to alternate between light and dark themes.
+ * 
+ * Synchronizes with the global `ThemeContext` and provides visual feedback via 
+ * icons (Sun/Moon) and a toggle switch animation.
+ */
 export function ThemeToggle({ className = '', showLabel = true }: ThemeToggleProps) {
     const { isDarkMode, toggleTheme } = useTheme();
 

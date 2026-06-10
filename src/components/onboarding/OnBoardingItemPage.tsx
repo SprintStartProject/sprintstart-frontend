@@ -43,6 +43,15 @@ function formatMinutes(minutes: number): string {
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Detail view for a specific onboarding step.
+ * 
+ * This component is responsible for:
+ * - Fetching detailed step data, tasks, and resources on mount.
+ * - Managing local completion state for individual tasks.
+ * - Handling step skipping and feedback submission.
+ * - Synchronizing progress updates with the backend `onboardingService`.
+ */
 export function OnBoardingItemPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const navigate = useNavigate();
@@ -92,7 +101,10 @@ export function OnBoardingItemPage() {
     }
   };
 
-  // ── DATA FETCHING ─────────────────────────────────────────
+  /**
+   * Data Fetching Effect: Loads the full hierarchy of a step (details, tasks, resources).
+   * It also initializes the local 'finished' state for tasks based on the fetched data.
+   */
   useEffect(() => {
     if (!stepId) return;
 

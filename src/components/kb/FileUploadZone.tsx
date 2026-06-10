@@ -2,11 +2,23 @@ import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileCode, Loader2, AlertCircle, ImageIcon } from 'lucide-react';
 
+/**
+ * Props for the FileUploadZone component.
+ */
 interface Props {
+    /** Callback function triggered when one or more valid files are dropped or selected. */
     onUpload: (files: File[]) => void;
+    /** Disables interactions and shows a processing spinner when true. */
     isUploading: boolean;
 }
 
+/**
+ * An interactive drag-and-drop zone for uploading project artifacts.
+ * 
+ * Supports both manual file selection and drag-and-drop. It includes 
+ * client-side validation for file types (PDF, MD, TXT, PNG, JPG, WEBP) 
+ * and a 10MB size limit per file.
+ */
 export function FileUploadZone({ onUpload, isUploading }: Props) {
     const [isDragActive, setIsDragActive] = useState(false);
     const [error, setError] = useState<string | null>(null);

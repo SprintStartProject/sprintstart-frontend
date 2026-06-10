@@ -11,11 +11,25 @@ import {
     ImageIcon,
 } from 'lucide-react';
 
+/**
+ * Props for the DocumentTable component.
+ */
 interface Props {
+    /** List of document metadata objects to display in the table. */
     documents: DocumentMetadata[];
+    /** Callback function triggered when a user clicks the delete button for a specific document. */
     onDelete: (id: string) => void;
 }
 
+/**
+ * Displays a list of uploaded documents in a stylized table format.
+ * 
+ * Features:
+ * - Dynamic icons based on file type (image vs code/text).
+ * - Status badges indicating the current ingestion state (Ready, Indexing, Queued, Error).
+ * - Animated row transitions using Framer Motion.
+ * - Responsive layout with columns hiding on smaller screens.
+ */
 export function DocumentTable({ documents, onDelete }: Props) {
     const getStatusBadge = (status: DocumentStatus) => {
         switch (status) {

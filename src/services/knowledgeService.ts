@@ -1,6 +1,19 @@
 import { DocumentStatus, type DocumentMetadata, type UploadResult } from './types';
 
+/**
+ * Service responsible for managing the knowledge base, including file uploads,
+ * document retrieval, and deletion.
+ */
 export const knowledgeService = {
+    /**
+     * Fetches all documents uploaded by a specific user.
+     * 
+     * Includes a bypass for the 'test-user-id' to support offline/E2E testing.
+     * 
+     * @param uploaderId - The unique ID of the user who uploaded the files.
+     * @returns A promise resolving to an array of document metadata.
+     * @throws Error if the backend request fails.
+     */
     async fetchDocuments(uploaderId: string): Promise<DocumentMetadata[]> {
         // --- TESTUSER BYPASS ---
         if (uploaderId === 'test-user-id') {
@@ -32,6 +45,16 @@ export const knowledgeService = {
         }));
     },
 
+    /**
+     * Uploads one or more files to the knowledge base.
+     * 
+     * Files are uploaded sequentially to the backend. Each result indicates 
+     * success or contains an error message if the specific file failed.
+     * 
+     * @param files - Array of File objects to upload.
+     * @param uploaderId - The unique ID of the user performing the upload.
+     * @returns A promise resolving to an array of UploadResult objects.
+     */
     async uploadDocuments(files: File[], uploaderId: string): Promise<UploadResult[]> {
         const results: UploadResult[] = [];
         
@@ -71,6 +94,13 @@ export const knowledgeService = {
         return results;
     },
 
+    /**
+     * Deletes a specific document from the knowledge base by its ID.
+     * 
+     * @param id - The unique identifier of the document to delete.
+     * @returns A promise that resolves when the deletion is successful.
+     * @throws Error if the deletion fails.
+     */
     async deleteDocument(id: string): Promise<void> {
         const response = await fetch(`/api/v1/uploads/${id}`, {
             method: 'DELETE',

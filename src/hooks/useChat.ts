@@ -11,6 +11,17 @@ import type { Chat, ChatMessage, Citation } from "../types/chatTypes";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
+/**
+ * Custom hook for managing the chatbot state, message history, and streaming logic.
+ * 
+ * It handles:
+ * - Loading existing chat sessions from the backend on mount.
+ * - Synchronizing message history for the active chat ID.
+ * - Sequential streaming of AI responses with optimistic UI updates.
+ * - Navigation between different chat conversations.
+ * 
+ * @returns An object containing chat state, message history, and handlers for sending messages.
+ */
 export function useChat() {
     const { id: chatId } = useParams();
     const navigate = useNavigate();
@@ -21,6 +32,9 @@ export function useChat() {
     const [newRequest, setNewRequest] = useState("");
     const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
 
+    /**
+     * Initial data load: Fetches the list of all chat conversations for the user sidebar.
+     */
     useEffect(() => {
         void (async () => {
             const data = await getChats();
@@ -28,6 +42,10 @@ export function useChat() {
         })();
     }, []);
 
+    /**
+     * Synchronization effect: Loads messages for the current chatId if they haven't been fetched yet.
+     * Prevents redundant API calls by checking the local `messagesByChat` cache.
+     */
     useEffect(() => {
         if (!chatId) return;
 
@@ -41,17 +59,17 @@ export function useChat() {
                 [chatId]: data.messages
             }));
         })();
-    }, [chatId]);
+    }, [chatId, messagesByChat]);
 
     const messages = useMemo(() => {
         if (!chatId) return [];
         return messagesByChat[chatId] ?? [];
     }, [messagesByChat, chatId]);
 
-    const refreshChats = async () => {
+    const refreshChats = useCallback(async () => {
         const data = await getChats();
         setChats(data.chats);
-    };
+    }, []);
 
     const addMessage = useCallback(async (text: string) => {
         if (!text.trim()) return;
@@ -154,7 +172,7 @@ export function useChat() {
             console.error(e);
             setIsThinking(false);
         }
-    }, [chatId, navigate]);
+    }, [chatId, navigate, chats, refreshChats]);
 
     const handleSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
