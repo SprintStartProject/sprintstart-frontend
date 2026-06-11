@@ -29,15 +29,19 @@ type LoadingState = "idle" | "loading" | "success" | "error";
 //const userLoading = status === 'loading';
 //const userError = status === 'unauthenticated' ? 'Not logged in.' : null;
 
-// ─────────────────────────────────────────────────────────────
-// HELPER COMPONENT: ProgressBar
-// ─────────────────────────────────────────────────────────────
-
+/**
+ * Props for the progress bar used in the onboarding overview.
+ */
 interface ProgressBarProps {
   value: number; // e.g. 3 (completed tasks)
   max: number; // e.g. 5 (total tasks)
 }
 
+/**
+ * Renders a compact progress bar for completed onboarding steps.
+ *
+ * This helper is used by the onboarding page to visualize overall and phase-level progress.
+ */
 function ProgressBar({ value, max }: ProgressBarProps) {
   const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
 
@@ -51,10 +55,13 @@ function ProgressBar({ value, max }: ProgressBarProps) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// MAIN COMPONENT: OnBoardingPage
-// ─────────────────────────────────────────────────────────────
-
+/**
+ * Displays the personalized onboarding path for the authenticated user.
+ *
+ * The page loads the user's onboarding path from the backend using the
+ * current profile ID and renders a per-phase progress overview with a
+ * next-action preview.
+ */
 export function OnBoardingPage() {
   // Selected phase index
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
@@ -73,7 +80,13 @@ export function OnBoardingPage() {
 
   // ── DATA FETCHING using useEffect ─────────────────────────────
 
+
+  /**
+   * Loads the onboarding path once the authenticated user profile is available.
+   * The backend requires a valid user ID to return the personalized path.
+   */
   useEffect(() => {
+
     const loadOnBoardingPath = async () => {
       setLoadingState("loading");
       try {
@@ -95,6 +108,12 @@ export function OnBoardingPage() {
     OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
   // Helper function for phase progress
+  /**
+   * Calculates progress for a phase by counting steps that are finished or skipped.
+   *
+   * Skipped steps are treated as completed for the purpose of the overall
+   * onboarding progress indicator.
+   */
   const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
     const completed = phase.steps.filter(
       (step) => step.status === "FINISHED" || step.status === "SKIPPED",
