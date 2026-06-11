@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { ChatPage } from '../pages/ChatPage';
 import { DashboardPage } from '../pages/DashboardPage.tsx';
 import { KnowledgeBasePage } from '../pages/KnowledgeBasePage';
+import { DataIngestionPage } from '../pages/DataIngestionPage.tsx';
 import { OnBoardingPage } from '../pages/OnBoardingPage';
 import { OnBoardingItemPage } from '../components/onboarding/OnBoardingItemPage';
 import { LoginPage } from '../pages/LoginPage';
@@ -20,6 +21,7 @@ export function AppRouter() {
                 <Route path="/onboarding" element={<OnBoardingPage />} />
                 <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
                 <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
+                <Route path="/data-ingestion" element={<DataIngestionPage />} />
             </Routes>
         </AuthGuard>
     );
