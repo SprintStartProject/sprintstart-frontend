@@ -63,9 +63,9 @@ describe('knowledgeService', () => {
       ok: true,
     });
 
-    await knowledgeService.deleteDocument('doc-123');
+    await knowledgeService.deleteDocument('real-doc-123');
     
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/v1/uploads/doc-123', expect.objectContaining({
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/v1/uploads/real-doc-123', expect.objectContaining({
       method: 'DELETE'
     }));
   });

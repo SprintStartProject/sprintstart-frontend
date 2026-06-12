@@ -25,13 +25,13 @@
   --text-inverse: #ffffff;
 
   /* Brand */
-  --brand: #2563eb;
-  --brand-hover: #1d4ed8;
+  --brand: #1d4ed8;               /* blue-700 */
+  --brand-hover: #1e40af;         /* blue-800 */
   --brand-soft: #eff6ff;
   --brand-border: #bfdbfe;
   --brand-border-strong: #3b82f6;
   --brand-text: #1d4ed8;
-  --brand-glow: rgba(37, 99, 235, 0.1);
+  --brand-glow: rgba(29, 78, 216, 0.1);
 
   /* Success */
   --success-bg: #ecfdf5;

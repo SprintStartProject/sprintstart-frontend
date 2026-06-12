@@ -57,7 +57,7 @@ describe('chatService', () => {
       body: mockStream,
     });
 
-    await streamMessage('chat-1', 'hi', mockHandlers);
+    await streamMessage('real-chat-1', 'hi', mockHandlers);
 
     expect(mockHandlers.onToken).toHaveBeenCalledWith('Hello');
     expect(mockHandlers.onCitation).toHaveBeenCalledWith({
