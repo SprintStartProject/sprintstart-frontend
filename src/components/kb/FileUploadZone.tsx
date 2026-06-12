@@ -101,6 +101,17 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
     return (
         <div className="w-full">
+            <input
+                id="fileInput"
+                type="file"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label="File selection input"
+                onChange={handleFileInput}
+                accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
+                multiple
+            />
+
             <motion.div
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
@@ -128,15 +139,6 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                 ].join(' ')}
                 onClick={() => document.getElementById('fileInput')?.click()}
             >
-                <input
-                    id="fileInput"
-                    type="file"
-                    className="sr-only"
-                    onChange={handleFileInput}
-                    accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
-                    multiple
-                />
-
                 <div
                     className={[
                         'flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-300 sm:h-16 sm:w-16',

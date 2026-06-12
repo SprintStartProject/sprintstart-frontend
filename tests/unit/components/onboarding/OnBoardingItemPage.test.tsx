@@ -91,10 +91,17 @@ describe('OnBoardingItemPage', () => {
     const taskButton = screen.getByText('2. Clone Repo');
     fireEvent.click(taskButton);
 
-    expect(mockedService.updateTask).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'task-2' }),
-      true
-    );
+    await waitFor(() => {
+      expect(mockedService.updateTask).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'task-2' }),
+        true
+      );
+    });
+
+    // Wait for the UI to reflect the "finished" state (line-through class)
+    await waitFor(() => {
+      expect(screen.getByText('2. Clone Repo')).toHaveClass('line-through');
+    });
   });
 
   it('disables "Mark as Completed" if tasks are pending', async () => {
@@ -120,16 +127,23 @@ describe('OnBoardingItemPage', () => {
     await waitFor(() => screen.getByPlaceholderText(/Reason for skipping.../i));
     
     const textarea = screen.getByPlaceholderText(/Reason for skipping.../i);
-    // Find the button specifically, since the heading also says "Skip Step"
     const skipButton = screen.getByRole('button', { name: /^Skip Step$/i });
 
     fireEvent.change(textarea, { target: { value: 'Already familiar' } });
     fireEvent.click(skipButton);
 
-    expect(mockedService.skipStep).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'step-123' }),
-      'Already familiar'
-    );
+    await waitFor(() => {
+      expect(mockedService.skipStep).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'step-123' }),
+        'Already familiar'
+      );
+    });
+
+    // Wait for the status badge to update to "Skipped"
+    await waitFor(() => {
+      const skippedElements = screen.getAllByText(/^Skipped$/i);
+      expect(skippedElements.length).toBeGreaterThan(0);
+    });
   });
 
   it('displays error state when fetching fails', async () => {
