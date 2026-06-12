@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { ThemeToggle } from '../../../../src/components/common/ThemeToggle';
 import { useTheme } from '../../../../src/context/useTheme';
 
@@ -10,7 +10,7 @@ vi.mock('../../../../src/context/useTheme', () => ({
 
 describe('ThemeToggle', () => {
   it('renders correctly in light mode', () => {
-    (useTheme as any).mockReturnValue({
+    (useTheme as Mock).mockReturnValue({
       isDarkMode: false,
       toggleTheme: vi.fn(),
     });
@@ -22,7 +22,7 @@ describe('ThemeToggle', () => {
   });
 
   it('renders correctly in dark mode', () => {
-    (useTheme as any).mockReturnValue({
+    (useTheme as Mock).mockReturnValue({
       isDarkMode: true,
       toggleTheme: vi.fn(),
     });
@@ -35,7 +35,7 @@ describe('ThemeToggle', () => {
 
   it('calls toggleTheme when clicked', () => {
     const toggleTheme = vi.fn();
-    (useTheme as any).mockReturnValue({
+    (useTheme as Mock).mockReturnValue({
       isDarkMode: false,
       toggleTheme,
     });
@@ -49,7 +49,7 @@ describe('ThemeToggle', () => {
   });
 
   it('does not show label when showLabel is false', () => {
-    (useTheme as any).mockReturnValue({
+    (useTheme as Mock).mockReturnValue({
       isDarkMode: false,
       toggleTheme: vi.fn(),
     });
