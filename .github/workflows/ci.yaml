@@ -25,6 +25,7 @@ jobs:
         run: ./gitleaks detect --verbose --redact
 
   build:
+    needs: gitleaks
     runs-on: ubuntu-latest
 
     strategy:
@@ -40,8 +41,9 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - run: npm install
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: npm run lint
+      - run: npm run tests
       - run: npm run build
       - run: docker build -t sprintstart-frontend .
