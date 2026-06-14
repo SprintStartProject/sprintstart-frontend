@@ -22,7 +22,7 @@ export function ChatPage() {
                             New Chat
                         </NavLink>
 
-                        <div className="flex flex-col gap-1">
+                         className="flex flex-col gap-1">
                             <p className="text-gray-400 px-2 py-1 text-xs font-bold uppercase tracking-wider">
                                 Recent Chats
                             </p>
