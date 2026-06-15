@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { Rocket } from 'lucide-react';
+import { ThemeToggle } from '../components/common/ThemeToggle';
 
 export function LoginPage() {
     const [username, setUsername] = useState('');
@@ -10,66 +11,91 @@ export function LoginPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
         if (username.trim() && firstname.trim() && lastname.trim()) {
             void login(username.trim(), firstname.trim(), lastname.trim());
         }
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-950 p-4 sm:p-6">
-            <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-6 sm:p-10 backdrop-blur-sm">
+        <div className="relative flex min-h-screen items-center justify-center bg-app-bg p-4 text-app-text sm:p-6">
+            <div className="absolute right-4 top-4 sm:right-8 sm:top-8">
+                <ThemeToggle showLabel={false} className="bg-app-surface border border-app-border shadow-sm" />
+            </div>
+
+            <div className="w-full max-w-md space-y-8 rounded-2xl border border-app-border bg-app-surface p-6 shadow-2xl backdrop-blur-sm sm:p-10">
                 <div className="flex flex-col items-center space-y-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-900/40">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-app-brand shadow-lg">
                         <Rocket className="h-7 w-7 text-white" />
                     </div>
+
                     <div className="space-y-1 text-center">
-                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">SprintStart</h2>
-                        <p className="text-slate-400 text-sm">Sign in to your account to continue</p>
+                        <h2 className="text-2xl font-bold tracking-tight text-app-text sm:text-3xl">
+                            SprintStart
+                        </h2>
+
+                        <p className="text-sm text-app-text-muted">
+                            Sign in to your account to continue
+                        </p>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-4">
                         <div>
-                            <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-1.5">
+                            <label
+                                htmlFor="username"
+                                className="mb-1.5 block text-sm font-medium text-app-text-muted"
+                            >
                                 Username
                             </label>
+
                             <input
                                 id="username"
                                 type="text"
                                 required
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-app-border-muted bg-app-surface-muted px-4 py-3 text-app-text placeholder:text-app-text-disabled transition-colors focus:border-app-brand focus:outline-none focus:ring-1 focus:ring-app-focus"
                                 placeholder="e.g. jdoe"
                             />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <label htmlFor="firstname" className="block text-sm font-medium text-slate-300 mb-1.5">
+                                <label
+                                    htmlFor="firstname"
+                                    className="mb-1.5 block text-sm font-medium text-app-text-muted"
+                                >
                                     First Name
                                 </label>
+
                                 <input
                                     id="firstname"
                                     type="text"
                                     required
                                     value={firstname}
                                     onChange={(e) => setFirstname(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-xl border border-app-border-muted bg-app-surface-muted px-4 py-3 text-app-text placeholder:text-app-text-disabled transition-colors focus:border-app-brand focus:outline-none focus:ring-1 focus:ring-app-focus"
                                     placeholder="John"
                                 />
                             </div>
+
                             <div>
-                                <label htmlFor="lastname" className="block text-sm font-medium text-slate-300 mb-1.5">
+                                <label
+                                    htmlFor="lastname"
+                                    className="mb-1.5 block text-sm font-medium text-app-text-muted"
+                                >
                                     Last Name
                                 </label>
+
                                 <input
                                     id="lastname"
                                     type="text"
                                     required
                                     value={lastname}
                                     onChange={(e) => setLastname(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-xl border border-app-border-muted bg-app-surface-muted px-4 py-3 text-app-text placeholder:text-app-text-disabled transition-colors focus:border-app-brand focus:outline-none focus:ring-1 focus:ring-app-focus"
                                     placeholder="Doe"
                                 />
                             </div>
@@ -79,13 +105,13 @@ export function LoginPage() {
                     <button
                         type="submit"
                         disabled={status === 'loading'}
-                        className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-app-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {status === 'loading' ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
-                <div className="text-center text-xs text-slate-500 pt-2">
+                <div className="pt-2 text-center text-xs text-app-text-muted">
                     Tip: Use any username. New usernames will be registered automatically.
                 </div>
             </div>

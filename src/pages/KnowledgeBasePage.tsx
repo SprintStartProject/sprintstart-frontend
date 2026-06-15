@@ -5,24 +5,32 @@ import { FileUploadZone } from '../components/kb/FileUploadZone';
 import { DocumentTable } from '../components/kb/DocumentTable';
 import { useAuth } from '../context/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, RefreshCw, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import {
+    BookOpen,
+    RefreshCw,
+    AlertTriangle,
+    CheckCircle2,
+    X,
+} from 'lucide-react';
 
 export function KnowledgeBasePage() {
     const { profile } = useAuth();
+
     const [documents, setDocuments] = useState<DocumentMetadata[]>(() => {
-        // Hydrate from sessionStorage on initial load
         const saved = sessionStorage.getItem(`kb_docs_${profile?.id || 'guest'}`);
+
         return saved ? JSON.parse(saved) as DocumentMetadata[] : [];
     });
+
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
+
     const [batchResult, setBatchResult] = useState<{
         success: number;
         failed: number;
         errors: string[];
     } | null>(null);
 
-    // Save to sessionStorage whenever documents change
     useEffect(() => {
         if (profile) {
             sessionStorage.setItem(`kb_docs_${profile.id}`, JSON.stringify(documents));
@@ -31,20 +39,18 @@ export function KnowledgeBasePage() {
 
     const loadDocuments = useCallback(async (isMounted = true) => {
         if (!profile) return;
-        
+
         try {
             const docs = await knowledgeService.fetchDocuments(profile.id);
+
             if (isMounted) {
                 setDocuments(prev => {
-                    // Create a map of existing pending documents to preserve them
                     const pendingDocs = prev.filter(d => d.status === DocumentStatus.PENDING);
-                    
-                    // Filter out any docs that the server just returned (to avoid duplicates)
+
                     const filteredPending = pendingDocs.filter(
-                        p => !docs.some(d => d.id === p.id)
+                        p => !docs.some(d => d.id === p.id),
                     );
 
-                    // Combine server docs with remaining local pending docs
                     return [...docs, ...filteredPending];
                 });
             }
@@ -61,8 +67,8 @@ export function KnowledgeBasePage() {
         const initialize = async () => {
             if (profile) {
                 await loadDocuments(isMounted);
-            } else {
-                if (isMounted) setIsLoading(false);
+            } else if (isMounted) {
+                setIsLoading(false);
             }
         };
 
@@ -78,26 +84,30 @@ export function KnowledgeBasePage() {
 
         setIsUploading(true);
         setBatchResult(null);
+
         try {
             const results = await knowledgeService.uploadDocuments(files, profile.id);
-            
+
             const successfulResults = results.filter(r => r.status === 'ok');
             const failedResults = results.filter(r => r.status === 'failed');
 
-            // Add successful uploads to the table immediately as "PENDING"
-            // Filter out duplicates (if file already exists in current list or multiple times in batch)
             const newDocs: DocumentMetadata[] = [];
+
             successfulResults.forEach(r => {
-                const isDuplicate = documents.some(d => d.id === r.id) || newDocs.some(d => d.id === r.id);
+                const isDuplicate =
+                    documents.some(d => d.id === r.id) ||
+                    newDocs.some(d => d.id === r.id);
+
                 if (!isDuplicate) {
                     const originalFile = files.find(f => f.name === r.filename);
+
                     newDocs.push({
                         id: r.id,
                         name: r.filename,
                         mime: originalFile?.type || 'application/octet-stream',
                         size: originalFile?.size || 0,
                         status: DocumentStatus.PENDING,
-                        uploadDate: new Date().toISOString()
+                        uploadDate: new Date().toISOString(),
                     });
                 }
             });
@@ -106,18 +116,15 @@ export function KnowledgeBasePage() {
                 setDocuments(prev => [...newDocs, ...prev]);
             }
 
-            // Set batch feedback
             setBatchResult({
                 success: successfulResults.length,
                 failed: failedResults.length,
-                errors: failedResults.map(r => `${r.filename}: ${r.error}`)
+                errors: failedResults.map(r => `${r.filename}: ${r.error}`),
             });
 
-            // Auto-clear success notification after 5 seconds, keep errors
             if (failedResults.length === 0) {
                 setTimeout(() => setBatchResult(null), 5000);
             }
-
         } catch (error) {
             console.error('Upload failed:', error);
         } finally {
@@ -135,63 +142,67 @@ export function KnowledgeBasePage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-950 p-3 sm:p-6 lg:p-10 text-white">
-            <div className="max-w-6xl mx-auto space-y-6 sm:space-y-10">
-                {/* Header */}
+        <div className="min-h-screen bg-app-bg p-3 text-app-text sm:p-6 lg:p-10">
+            <div className="mx-auto max-w-6xl space-y-6 sm:space-y-10">
                 <header className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
-                        <div className="p-1.5 sm:p-2 bg-blue-600/20 rounded-lg">
-                            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
+                        <div className="rounded-lg bg-app-brand-soft p-1.5 sm:p-2">
+                            <BookOpen className="h-5 w-5 text-app-brand-text sm:h-6 sm:w-6" />
                         </div>
-                        <motion.h1 
+
+                        <motion.h1
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="text-xl sm:text-3xl font-bold tracking-tight"
+                            className="text-xl font-bold tracking-tight text-app-text sm:text-3xl"
                         >
                             Knowledge Base
                         </motion.h1>
                     </div>
-                    <motion.p 
+
+                    <motion.p
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="text-slate-400 max-w-2xl text-sm sm:text-lg leading-relaxed"
+                        className="max-w-2xl text-sm leading-relaxed text-app-text-subtle sm:text-lg"
                     >
                         Ingest project documentation. Upload Markdown files to provide context for your workspace.
                     </motion.p>
                 </header>
 
-                {/* Batch Feedback */}
                 <AnimatePresence>
                     {batchResult && (
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className={`p-4 rounded-xl border flex flex-col gap-2 ${
-                                batchResult.failed > 0 
-                                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-200' 
-                                    : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-200'
+                            className={`flex flex-col gap-2 rounded-xl border p-4 ${
+                                batchResult.failed > 0
+                                    ? 'border-app-warning-border bg-app-warning-bg text-app-warning-text'
+                                    : 'border-app-success-border bg-app-success-bg text-app-success-text'
                             }`}
                         >
-                            <div className="flex items-center justify-between">
-                                <span className="font-semibold flex items-center gap-3">
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="flex items-center gap-3 font-semibold">
                                     {batchResult.failed > 0 ? (
-                                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                                        <AlertTriangle className="h-5 w-5 text-app-warning-text" />
                                     ) : (
-                                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                        <CheckCircle2 className="h-5 w-5 text-app-success-text" />
                                     )}
+
                                     Upload Complete: {batchResult.success} documents ingested, {batchResult.failed} failed
                                 </span>
-                                <button 
+
+                                <button
+                                    type="button"
                                     onClick={() => setBatchResult(null)}
-                                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                                    className="rounded-lg p-1 text-app-text-subtle transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                                 >
-                                    <X className="w-4 h-4 text-slate-400" />
+                                    <X className="h-4 w-4" />
                                 </button>
                             </div>
+
                             {batchResult.errors.length > 0 && (
-                                <ul className="text-sm list-disc list-inside mt-2 space-y-1 pl-8 text-amber-200/80">
+                                <ul className="mt-2 list-inside list-disc space-y-1 pl-8 text-sm text-app-warning-text">
                                     {batchResult.errors.map((err, i) => (
                                         <li key={i}>{err}</li>
                                     ))}
@@ -202,64 +213,77 @@ export function KnowledgeBasePage() {
                 </AnimatePresence>
 
                 <div className="flex flex-col gap-10">
-                    {/* Top: Upload */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
                         className="w-full"
                     >
-                        <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl space-y-6">
+                        <div className="space-y-6 rounded-2xl border border-app-border bg-app-surface p-8 shadow-xl">
                             <div>
-                                <h2 className="text-xl font-semibold text-white">Ingest Documentation</h2>
-                                <p className="text-sm text-slate-400 mt-1">
+                                <h2 className="text-xl font-semibold text-app-text">
+                                    Ingest Documentation
+                                </h2>
+
+                                <p className="mt-1 text-sm text-app-text-subtle">
                                     Select .md files to add them to the knowledge base.
                                 </p>
                             </div>
-                            
-                            <FileUploadZone 
-                                onUpload={(files) => { void handleUpload(files); }} 
-                                isUploading={isUploading} 
+
+                            <FileUploadZone
+                                onUpload={(files) => {
+                                    void handleUpload(files);
+                                }}
+                                isUploading={isUploading}
                             />
                         </div>
                     </motion.div>
 
-                    {/* Bottom: List */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
                         className="space-y-6"
                     >
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-xl font-semibold text-white flex items-center gap-3">
+                            <h2 className="flex items-center gap-3 text-xl font-semibold text-app-text">
                                 Knowledge Repository
+
                                 {documents.length > 0 && (
-                                    <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                    <span className="rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                                         {documents.length} Docs
                                     </span>
                                 )}
                             </h2>
-                            <button 
-                                onClick={() => { void loadDocuments(); }}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void loadDocuments();
+                                }}
+                                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-app-text-subtle transition-all hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                             >
-                                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                                 Refresh
                             </button>
                         </div>
 
                         {isLoading ? (
-                            <div className="h-64 flex items-center justify-center bg-slate-900 rounded-2xl border border-slate-800">
+                            <div className="flex h-64 items-center justify-center rounded-2xl border border-app-border bg-app-surface">
                                 <div className="flex flex-col items-center gap-4">
-                                    <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-slate-500 text-sm font-medium animate-pulse">Syncing repository...</p>
+                                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-app-brand border-t-transparent" />
+
+                                    <p className="animate-pulse text-sm font-medium text-app-text-disabled">
+                                        Syncing repository...
+                                    </p>
                                 </div>
                             </div>
                         ) : (
-                            <DocumentTable 
-                                documents={documents} 
-                                onDelete={(id) => { void handleDelete(id); }} 
+                            <DocumentTable
+                                documents={documents}
+                                onDelete={(id) => {
+                                    void handleDelete(id);
+                                }}
                             />
                         )}
                     </motion.div>
