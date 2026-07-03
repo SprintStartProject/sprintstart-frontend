@@ -172,6 +172,34 @@ export function ChatPage() {
                                                             {children}
                                                         </td>
                                                     ),
+                                                    h1: ({ children }) => (
+                                                        <h1 className={`text-2xl font-semibold my-4 pb-1 border-b ${isRequest ? "border-app-brand-border" : "border-app-border"}`}>
+                                                            {children}
+                                                        </h1>
+                                                    ),
+
+                                                    h2: ({ children }) => (
+                                                        <h2 className={`text-xl font-semibold my-3 pb-1 border-b ${isRequest ? "border-app-brand-border" : "border-app-border"}`}>
+                                                            {children}
+                                                        </h2>
+                                                    ),
+
+                                                    h3: ({ children }) => (
+                                                        <h3 className="text-lg font-semibold my-2">
+                                                            {children}
+                                                        </h3>
+                                                    ),
+
+                                                    h4: ({ children }) => (
+                                                        <h4 className="text-md font-semibold my-1">
+                                                            {children}
+                                                        </h4>
+                                                    ),
+                                                    hr: () => (
+                                                        <hr
+                                                            className={`my-5 border-t border-3 ${isRequest ? "border-app-brand-border" : "border-app-border"}`}
+                                                        />
+                                                    ),
                                                     code({ children, className }: { children?: React.ReactNode; className?: string }) {
 
                                                         const isBlock = className?.startsWith("language-");
