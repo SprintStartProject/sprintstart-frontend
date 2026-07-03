@@ -148,7 +148,7 @@ export function ChatPage() {
                                             className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                                                 isRequest
                                                     ? "bg-app-brand text-white rounded-tr-none"
-                                                    : "bg-app-surface-muted text-app-text rounded-tl-none"
+                                                    : "bg-app-surface-muted border border-app-border-muted text-app-text rounded-tl-none"
                                             }`}
                                         >
                                             <ReactMarkdown
@@ -173,13 +173,13 @@ export function ChatPage() {
                                                         </td>
                                                     ),
                                                     h1: ({ children }) => (
-                                                        <h1 className={`text-2xl font-semibold my-4 pb-1 border-b ${isRequest ? "border-app-brand-border" : "border-app-border"}`}>
+                                                        <h1 className={`text-2xl font-semibold my-4 pb-1 border-b ${isRequest ? "border-app-brand-border" : "border-app-border-muted"}`}>
                                                             {children}
                                                         </h1>
                                                     ),
 
                                                     h2: ({ children }) => (
-                                                        <h2 className={`text-xl font-semibold my-3 pb-1 border-b ${isRequest ? "border-app-brand-border" : "border-app-border"}`}>
+                                                        <h2 className={`text-xl font-semibold my-3 pb-1 border-b ${isRequest ? "border-app-brand-border" : "border-app-border-muted"}`}>
                                                             {children}
                                                         </h2>
                                                     ),
@@ -197,7 +197,7 @@ export function ChatPage() {
                                                     ),
                                                     hr: () => (
                                                         <hr
-                                                            className={`my-5 border-t border-3 ${isRequest ? "border-app-brand-border" : "border-app-border"}`}
+                                                            className={`my-4 border-t border-3 ${isRequest ? "border-app-brand-border" : "border-app-border-muted"}`}
                                                         />
                                                     ),
                                                     code({ children, className }: { children?: React.ReactNode; className?: string }) {
