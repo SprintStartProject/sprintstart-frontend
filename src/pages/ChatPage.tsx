@@ -249,7 +249,26 @@ export function ChatPage() {
                                                                 {props.children}
                                                             </pre>
                                                         );
-                                                    }
+                                                    },
+                                                    a: ({ href, children }) => (
+                                                        <a
+                                                            href={href}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`
+                                                                underline
+                                                                underline-offset-2
+                                                                transition-colors
+                                                                ${
+                                                                    isRequest
+                                                                        ? "text-blue-200 hover:text-blue-100"
+                                                                        : "text-app-brand hover:text-app-brand-hover"
+                                                                }
+                                                            `}
+                                                        >
+                                                            {children}
+                                                        </a>
+                                                    )
                                                 }}>
                                                 {message.content}
                                             </ReactMarkdown>
@@ -294,6 +313,10 @@ export function ChatPage() {
 
                                             {thinkingState === "synthesis" && (
                                                 <span className="italic pl-2 animate-pulse">Synthesizing answer...</span>
+                                            )}
+
+                                            {thinkingState === "grep" && (
+                                                <span className="italic pl-2 animate-pulse">Scanning documents...</span>
                                             )}
                                         </div>
                                     </div>
