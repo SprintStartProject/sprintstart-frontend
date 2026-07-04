@@ -64,6 +64,12 @@ export type ChatSidebarProps = {
 };
 
 export type StreamHandlers = {
+
+    /**
+     * The function executed when the stream event describes a tool used for generating the answer.
+     */
+    onToolUse: (tool: string) => void;
+
     /**
      * The function executed when the stream event contains normal text.
      */

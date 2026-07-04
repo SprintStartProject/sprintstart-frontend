@@ -24,6 +24,8 @@ export function useChat() {
     const [isThinking, setIsThinking] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
 
+    const [thinkingState, setThinkingState] = useState<string | null>(null);
+
     const [showBrainrot, setShowBrainrot] = useState(false);
     const [timestamp, setTimestamp] = useState(0);
 
@@ -174,6 +176,10 @@ export function useChat() {
         try {
             await streamMessage(currentChatId, text, {
 
+                onToolUse: tool => {
+                    setThinkingState(tool);
+                },
+
                 // if the stream element is a normal text chunk, append it to the response message
                 onToken: token => {
                     setIsStreaming(true);
@@ -276,6 +282,8 @@ export function useChat() {
 
         isThinking,
         isStreaming,
+
+        thinkingState,
 
         selectedCitation,
         setSelectedCitation,

@@ -20,6 +20,7 @@ export function ChatPage() {
         handleSubmit,
         isThinking,
         isStreaming,
+        thinkingState,
         newRequest,
         setNewRequest,
         selectedCitation,
@@ -200,6 +201,21 @@ export function ChatPage() {
                                                             className={`my-4 border-t border-3 ${isRequest ? "border-app-brand-border" : "border-app-border-muted"}`}
                                                         />
                                                     ),
+                                                    ul: ({ children }) => (
+                                                        <ul className="list-disc pl-6 my-3 space-y-1">
+                                                            {children}
+                                                        </ul>
+                                                    ),
+
+                                                    ol: ({ children }) => (
+                                                        <ol className="list-decimal pl-6 my-3 space-y-1">
+                                                            {children}
+                                                        </ol>
+                                                    ),
+
+                                                    li: ({ children }) => (
+                                                        <li>{children}</li>
+                                                    ),
                                                     code({ children, className }: { children?: React.ReactNode; className?: string }) {
 
                                                         const isBlock = className?.startsWith("language-");
@@ -267,10 +283,18 @@ export function ChatPage() {
 
                                 <div className="flex flex-col items-start max-w-[85%]">
                                     <div className="px-4 py-2.5 rounded-2xl rounded-tl-none bg-app-surface-muted text-app-text">
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1 items-center">
                                             <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce" />
                                             <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:150ms]" />
                                             <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:300ms]" />
+
+                                            {thinkingState === "retrieve" && (
+                                                <span className="italic pl-2 animate-pulse">Searching knowledge base...</span>
+                                            )}
+
+                                            {thinkingState === "synthesis" && (
+                                                <span className="italic pl-2 animate-pulse">Synthesizing answer...</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

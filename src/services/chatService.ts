@@ -37,7 +37,8 @@ export async function getMessages(chatId: string) {
  * Generic stream event returned by the backend when sending a prompt.
  */
 interface ChatEvent {
-    type: "token" | "citation" | "done" | "error";
+    type: "tool_use" | "token" | "citation" | "done" | "error";
+    name?: string;
     content?: string;
     message?: string;
     chunk_id?: string;
@@ -112,6 +113,12 @@ export async function streamMessage(
             ) as ChatEvent;
 
             switch (event.type) {
+                case "tool_use":
+                    if (event.name) {
+                        handlers.onToolUse(event.name);
+                    }
+                    break;
+
                 case "token":
                     if (event.content !== undefined) {
                         handlers.onToken(event.content);
