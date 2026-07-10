@@ -8,7 +8,7 @@ import {
 } from "../../../services/chatService";
 import { userService } from "../../../services/userService.ts"
 
-import type { Chat, ChatMessage, Citation } from "../types";
+import type { Chat, ChatMessage } from "../types";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
@@ -29,16 +29,16 @@ export function useChat() {
     const [isThinking, setIsThinking] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
 
-    const [showBrainrot, setShowBrainrot] = useState(false);
-    const [timestamp, setTimestamp] = useState(0);
-
     const [newRequest, setNewRequest] = useState("");
 
-    const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    const prevChatIdRef = useRef<string | undefined>(undefined);
+    const prevMessageCountRef = useRef(0);
 
     useEffect(() => {
         /**
@@ -81,13 +81,47 @@ export function useChat() {
         return messagesByChat[chatId] ?? [];
     }, [messagesByChat, chatId]);
 
+    /**
+     * Chats sorted most-recent first, so the newest conversation sits at the top
+     * of the sidebar regardless of the order the backend returns them in.
+     */
+    const sortedChats = useMemo(
+        () =>
+            [...chats].sort(
+                (a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            ),
+        [chats]
+    );
+
     useEffect(() => {
         /**
-         * Automatically scrolls to the bottom of the current conversation when a new request is sent or when opening an old conversation.
+         * Scrolls to the bottom when opening a conversation or sending a new message.
+         * During token streaming it only follows along if the user is already near
+         * the bottom, so scrolling up to read older messages is never hijacked.
          */
-        bottomRef.current?.scrollIntoView({
-            behavior: "smooth"
-        });
+        const chatChanged = chatId !== prevChatIdRef.current;
+        const messageAdded = messages.length > prevMessageCountRef.current;
+
+        prevChatIdRef.current = chatId;
+        prevMessageCountRef.current = messages.length;
+
+        if (chatChanged || messageAdded) {
+            bottomRef.current?.scrollIntoView({
+                behavior: chatChanged ? "auto" : "smooth"
+            });
+            return;
+        }
+
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const distanceFromBottom =
+            container.scrollHeight - container.scrollTop - container.clientHeight;
+
+        if (distanceFromBottom < 120) {
+            bottomRef.current?.scrollIntoView();
+        }
     }, [chatId, messages]);
 
     /**
@@ -98,34 +132,6 @@ export function useChat() {
         const data = await getChats();
         setChats(data.chats.filter(chat => chat.userId === userId));
     }, [userId]);
-
-    useEffect(() => {
-        /**
-         * Shows Subway Surfers gameplay if the bot needs longer than 4 seconds to reply.
-         */
-        if (!isThinking) return;
-
-        const timer = setTimeout(() => {
-            setTimestamp(Math.floor(Math.random() * 1000));
-            setShowBrainrot(true);
-        }, 4000);
-
-        return () => {
-            clearTimeout(timer);
-            setShowBrainrot(false);
-        };
-    }, [isThinking]);
-
-    useEffect(() => {
-        /**
-         * Scrolls to the bottom when the gameplay video is shown.
-         */
-        if (!showBrainrot) return
-
-        bottomRef.current?.scrollIntoView({
-            behavior: "smooth"
-        });
-    }, [showBrainrot]);
 
     /**
      * Adds a new user message and the corresponding response to the current conversation.
@@ -256,6 +262,10 @@ export function useChat() {
 
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
+
+            // Release focus so keyboard shortcuts (e.g. the easter egg's
+            // spacebar trigger) are not swallowed by the textarea.
+            textareaRef.current.blur();
         }
     }, [newRequest, addMessage]);
 
@@ -268,7 +278,7 @@ export function useChat() {
     }, [chats, chatId]);
 
     return {
-        chats,
+        chats: sortedChats,
         chatId,
         activeChat,
 
@@ -286,13 +296,8 @@ export function useChat() {
         isThinking,
         isStreaming,
 
-        selectedCitation,
-        setSelectedCitation,
-
         textareaRef,
         bottomRef,
-
-        showBrainrot,
-        timestamp
+        scrollContainerRef
     };
 }
