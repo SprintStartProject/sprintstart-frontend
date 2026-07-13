@@ -8,7 +8,7 @@ import {
 } from "../../../services/chatService";
 import { userService } from "../../../services/userService.ts"
 
-import type { Chat, ChatMessage, Citation } from "../types";
+import {type Chat, type ChatMessage, type Citation, type SourceSystem} from "../types";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
@@ -36,6 +36,27 @@ export function useChat() {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+
+    const [showFilters, setShowFilters] = useState(false);
+
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
+
+    const [sourceSystems, setSourceSystems] = useState<SourceSystem[]>([]);
+
+    /**
+     * Adds a system to the list of source systems (GitHub, Jira, etc.) used by AI to generate responses or removes it
+     * from the list.
+     *
+     * @param source The system to add or remove.
+     */
+    const toggleSourceSystem = (source: SourceSystem) => {
+        setSourceSystems((current) =>
+            current.includes(source)
+                ? current.filter((s) => s !== source)
+                : [...current, source],
+        );
+    };
 
     useEffect(() => {
         /**
@@ -174,7 +195,7 @@ export function useChat() {
         setIsThinking(true);
 
         try {
-            await streamMessage(currentChatId, text, {
+            await streamMessage(currentChatId, text, sourceSystems, from, to, {
 
                 onToolUse: tool => {
                     setThinkingState(tool);
@@ -292,6 +313,19 @@ export function useChat() {
         bottomRef,
 
         showBrainrot,
-        timestamp
+        timestamp,
+
+        showFilters,
+        setShowFilters,
+
+        from,
+        setFrom,
+
+        to,
+        setTo,
+
+        sourceSystems,
+
+        toggleSourceSystem
     };
 }

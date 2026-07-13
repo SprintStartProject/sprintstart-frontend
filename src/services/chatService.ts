@@ -49,13 +49,19 @@ interface ChatEvent {
 /**
  * Creates a new prompt and handles the chat response.
  *
- * @param chatId The chat the prompt is created in
- * @param text The content of the prompt
- * @param handlers Helper operations handling the output of the chat response
+ * @param chatId The chat the prompt is created in.
+ * @param text The content of the prompt.
+ * @param sourceSystems The specified systems the AI may use to generate an answer.
+ * @param from The start of the time period specifying when the documents used for generating the answer were uploaded.
+ * @param to The end of the time period specifying when the documents used for generating the answer were uploaded.
+ * @param handlers Helper operations handling the output of the chat response.
  */
 export async function streamMessage(
     chatId: string,
     text: string,
+    sourceSystems: string[],
+    from: string,
+    to: string,
     handlers: StreamHandlers
 ): Promise<void> {
     // Ensure the token is up to date (refresh if it expires in < 30s)
@@ -69,6 +75,15 @@ export async function streamMessage(
         return;
     }
 
+    const filters =
+        sourceSystems.length || from || to
+            ? {
+                sourceSystems: sourceSystems.length ? sourceSystems : undefined,
+                from: from ? `${from}T00:00:00Z` : undefined,
+                to: to ? `${to}T23:59:59Z` : undefined,
+            }
+            : undefined;
+
     const res = await fetch(`/api/v1/chats/prompt`, {
         method: "POST",
         headers: {
@@ -77,7 +92,8 @@ export async function streamMessage(
         },
         body: JSON.stringify({
             "chatId": chatId,
-            "msg": text
+            "msg": text,
+            "filters": filters
         })
     });
 
