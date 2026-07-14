@@ -39,9 +39,10 @@ export function ProjectUserList({ users }: ProjectUserListProps) {
                         <div className="flex items-center gap-3">
                             <div className="flex shrink-0 items-center justify-center">
                                 <UserAvatar
-                                    profileIcon={user.profileIcon}
-                                    fallbackName={"firstName" in user ? user.firstName : user.username}
                                     size={36}
+                                    profileIcon={user.profileIcon}
+                                    fallbackName={"firstName" in user ? `${user.firstName} ${user.lastName}`.trim() : user.username}
+                                    seed={user.id}
                                 />
                             </div>
 

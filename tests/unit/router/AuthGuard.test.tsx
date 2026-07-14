@@ -236,7 +236,12 @@ describe('AuthGuard', () => {
         });
         vi.mocked(teamManagementService.hasCompletedSkillAssessment).mockResolvedValue(false);
         vi.mocked(teamManagementService.getSkills).mockResolvedValue([
-            { id: 'skill1', roleId: 'role1', name: 'Typescript' },
+            {
+                id: 'skill1',
+                roleIds: ['role1'],
+                name: 'Typescript',
+                status: 'ACTIVE',
+            },
         ]);
 
         render(

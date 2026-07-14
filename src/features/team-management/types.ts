@@ -50,12 +50,19 @@ export type SkillLevel =
     | 'ADVANCED'
     | 'EXPERT';
 
+export type SkillStatus = 'ACTIVE' | 'RETIRED';
+
 export type Skill = {
     id: string;
     name: string;
-    roleId: string;
+    roleIds: string[];
+    status: SkillStatus;
     level?: SkillLevel;
 };
+
+export function isSkillLinkedToRole(skill: Skill, roleId: string): boolean {
+    return skill.roleIds.includes(roleId);
+}
 
  export type UserSkillAssessment = {
      userId: string;

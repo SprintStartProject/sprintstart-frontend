@@ -11,6 +11,7 @@ import type {
   StepStatus,
 } from "../types";
 import { onboardingService } from "../../../services/onboardingService";
+import { StepOriginBadge } from "./StepOriginBadge";
 
 import {
   ArrowLeft,
@@ -83,6 +84,44 @@ export function OnBoardingItemPage() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<boolean>(false);
 
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
+
+  const [nextLoading, setNextLoading] = useState<boolean>(false);
+
+  /**
+   * Jumps to the next actionable step in the user's path: fetches the whole path,
+   * picks the first step that isn't finished/skipped (excluding this one), starts it
+   * and navigates there. Falls back to the overview when nothing is left to do.
+   */
+  const goToNextStep = async (): Promise<void> => {
+    setNextLoading(true);
+    try {
+      const path = await onboardingService.fetchPath();
+      const nextStep = path.phases
+        .flatMap((phase) => phase.steps)
+        .find(
+          (step) =>
+            step.id !== stepDetail?.id &&
+            step.status !== "FINISHED" &&
+            step.status !== "SKIPPED",
+        );
+
+      if (nextStep) {
+        try {
+          await onboardingService.startStep(nextStep.id);
+        } catch (err) {
+          console.error("Failed to start next onboarding step:", err);
+        }
+        void navigate(`/onboarding/${nextStep.id}`);
+      } else {
+        // Nothing pending left — journey complete, go back to the overview.
+        void navigate("/onboarding");
+      }
+    } catch (err) {
+      console.error("Error navigating to next step:", err);
+    } finally {
+      setNextLoading(false);
+    }
+  };
 
   const updateStepStatus = async (newStatus: StepStatus) => {
     if (!stepDetail) return;
@@ -281,7 +320,7 @@ export function OnBoardingItemPage() {
   return (
     <div className="min-h-screen bg-app-bg">
       {/* HEADER */}
-      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+      <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-content py-4">
           <button
             onClick={() => void navigate("/onboarding")}
@@ -317,6 +356,9 @@ export function OnBoardingItemPage() {
               <h1 className="text-2xl sm:text-3xl font-bold text-app-text">
                 {stepDetail.title}
               </h1>
+              <div className="mt-3">
+                <StepOriginBadge step={stepDetail} />
+              </div>
               <p className="text-app-text-muted mt-2 text-sm">
                 {stepDetail.description}
               </p>
@@ -330,7 +372,7 @@ export function OnBoardingItemPage() {
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* MAIN CONTENT */}
       <main className="app-page-content py-6 pb-24">
@@ -454,6 +496,29 @@ export function OnBoardingItemPage() {
                       : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? "" : "s"} pending`}
                 </span>
               </button>
+
+              {/* Once this step is behind the user (finished or skipped),
+                  jump straight to the next pending step. */}
+              {(stepDetail.status === "FINISHED" ||
+                stepDetail.status === "SKIPPED") && (
+                <button
+                  onClick={() => void goToNextStep()}
+                  disabled={nextLoading}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-app-border"
+                >
+                  {nextLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      Continue to next step
+                      <CircleArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 

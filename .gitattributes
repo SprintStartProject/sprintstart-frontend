@@ -1,0 +1,5 @@
+# Keycloakify-managed files are always written with LF.
+# Pin their line endings so autocrlf=true doesn't flag them as
+# perpetually modified on Windows (phantom diff, empty git diff).
+/public/keycloak-theme/.gitignore  text eol=lf
+/src/keycloak-theme/.gitignore     text eol=lf

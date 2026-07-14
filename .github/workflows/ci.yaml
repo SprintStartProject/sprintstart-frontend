@@ -40,9 +40,9 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - run: npm install
       - run: npm ci
-      - run: npm run unit
       - run: npm run lint
       - run: npm run build
+      - run: npm run unit
+      - run: npm run a11y
       - run: docker build -t sprintstart-frontend .

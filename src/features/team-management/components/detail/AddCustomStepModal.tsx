@@ -1,4 +1,7 @@
 import { Plus, X } from 'lucide-react';
+import { useState, type DragEvent } from 'react';
+import { AutoResizeTextarea } from '../../../../components/ui/AutoResizeTextarea';
+import { DragHandle } from '../../../../components/ui/DragHandle';
 import { Modal } from '../../../../components/ui/Modal';
 
 export type CustomStepTaskDraft = {
@@ -41,6 +44,20 @@ export function AddCustomStepModal({
     onClose,
     onSubmit,
 }: AddCustomStepModalProps) {
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+    function reorderTasks(fromIndex: number, toIndex: number) {
+        if (fromIndex === toIndex) return;
+
+        onTasksChange((current) => {
+            const next = [...current];
+            const [moved] = next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, moved);
+            return next;
+        });
+    }
+
     return (
         <Modal
             isOpen={open}
@@ -76,45 +93,80 @@ export function AddCustomStepModal({
             }
         >
             <div className="space-y-3">
-                <input
-                    value={title}
-                    onChange={(event) => onTitleChange(event.target.value)}
-                    placeholder="Meet your colleagues"
-                    className="w-full rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-                />
+                {/* Title and estimated minutes in one row */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <div className="sm:col-span-3">
+                        <label htmlFor="custom-step-title" className="text-xs font-medium text-app-text-muted">
+                            Step title *
+                        </label>
+                        <input
+                            id="custom-step-title"
+                            value={title}
+                            onChange={(event) => onTitleChange(event.target.value)}
+                            placeholder="e.g., Meet your colleagues"
+                            className="mt-1 w-full rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
+                        />
+                    </div>
 
-                <textarea
-                    value={description}
-                    onChange={(event) => onDescriptionChange(event.target.value)}
-                    placeholder="Describe what the member should do."
-                    rows={3}
-                    className="w-full resize-none rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-                />
+                    <div>
+                        <label htmlFor="custom-step-minutes" className="text-xs font-medium text-app-text-muted">
+                            Est. minutes *
+                        </label>
+                        <input
+                            id="custom-step-minutes"
+                            type="number"
+                            min="1"
+                            value={estimatedMinutes}
+                            onChange={(event) => onEstimatedMinutesChange(event.target.value)}
+                            placeholder="30"
+                            className="mt-1 w-full rounded-xl border border-app-border bg-app-bg px-2 py-1.5 text-center text-sm text-app-text outline-none focus:border-app-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                    </div>
+                </div>
 
-                <textarea
-                    value={expectedOutcome}
-                    onChange={(event) => onExpectedOutcomeChange(event.target.value)}
-                    placeholder="Describe the expected outcome."
-                    rows={2}
-                    className="w-full resize-none rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-                />
+                {/* Description field - auto-resizing */}
+                <div>
+                    <label htmlFor="custom-step-description" className="text-xs font-medium text-app-text-muted">
+                        Description
+                    </label>
+                    <div className="mt-1">
+                        <AutoResizeTextarea
+                            id="custom-step-description"
+                            value={description}
+                            onChange={onDescriptionChange}
+                            placeholder="Describe what the member should do. Keep it clear and actionable."
+                            minRows={3}
+                            maxRows={10}
+                        />
+                    </div>
+                </div>
 
-                <label className="block">
-                    <span className="text-xs font-medium text-app-text-muted">
-                        Estimated minutes
-                    </span>
-                    <input
-                        type="number"
-                        min="1"
-                        value={estimatedMinutes}
-                        onChange={(event) => onEstimatedMinutesChange(event.target.value)}
-                        className="mt-1 w-32 rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-                    />
-                </label>
+                {/* Expected outcome field - auto-resizing */}
+                <div>
+                    <label htmlFor="custom-step-expected-outcome" className="text-xs font-medium text-app-text-muted">
+                        Expected outcome
+                    </label>
+                    <div className="mt-1">
+                        <AutoResizeTextarea
+                            id="custom-step-expected-outcome"
+                            value={expectedOutcome}
+                            onChange={onExpectedOutcomeChange}
+                            placeholder="What should the member achieve by completing this step?"
+                            minRows={2}
+                            maxRows={8}
+                        />
+                    </div>
+                </div>
 
+                {/* Tasks section */}
                 <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3">
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-app-text">Tasks</p>
+                        <div>
+                            <p className="text-sm font-semibold text-app-text">Tasks</p>
+                            <p className="mt-0.5 text-xs text-app-text-muted">
+                                Optional breakdown of this step into smaller tasks
+                            </p>
+                        </div>
                         <button
                             type="button"
                             onClick={() =>
@@ -123,7 +175,7 @@ export function AddCustomStepModal({
                                     { title: '', description: '' },
                                 ])
                             }
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-app-brand hover:bg-app-brand-soft"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-brand transition-colors hover:bg-app-brand-soft hover:text-app-brand-text"
                         >
                             <Plus className="h-3.5 w-3.5" />
                             Add task
@@ -134,26 +186,50 @@ export function AddCustomStepModal({
                         {tasks.map((task, index) => (
                             <div
                                 key={index}
-                                className="grid gap-2 rounded-xl border border-app-border bg-app-bg p-2"
+                                draggable
+                                onDragStart={(event: DragEvent<HTMLDivElement>) => {
+                                    event.dataTransfer.effectAllowed = 'move';
+                                    setDraggedIndex(index);
+                                }}
+                                onDragOver={(event: DragEvent<HTMLDivElement>) => {
+                                    if (draggedIndex === null || draggedIndex === index) return;
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = 'move';
+                                    setDragOverIndex(index);
+                                }}
+                                onDragLeave={(event: DragEvent<HTMLDivElement>) => {
+                                    const nextTarget = event.relatedTarget;
+                                    if (
+                                        nextTarget instanceof Node &&
+                                        event.currentTarget.contains(nextTarget)
+                                    ) {
+                                        return;
+                                    }
+                                    setDragOverIndex((current) => (current === index ? null : current));
+                                }}
+                                onDrop={(event: DragEvent<HTMLDivElement>) => {
+                                    event.preventDefault();
+                                    if (draggedIndex !== null) {
+                                        reorderTasks(draggedIndex, index);
+                                    }
+                                    setDraggedIndex(null);
+                                    setDragOverIndex(null);
+                                }}
+                                onDragEnd={() => {
+                                    setDraggedIndex(null);
+                                    setDragOverIndex(null);
+                                }}
+                                className={`group/task-item relative rounded-xl border bg-app-bg p-3 transition-all ${
+                                    dragOverIndex === index && draggedIndex !== index
+                                        ? 'border-app-brand bg-app-brand-soft shadow-sm'
+                                        : 'border-app-border'
+                                } ${draggedIndex === index ? 'scale-[0.99] opacity-50' : ''}`}
                             >
-                                <div className="flex gap-2">
-                                    <input
-                                        value={task.title}
-                                        onChange={(event) =>
-                                            onTasksChange((current) =>
-                                                current.map((item, itemIndex) =>
-                                                    itemIndex === index
-                                                        ? {
-                                                              ...item,
-                                                              title: event.target.value,
-                                                          }
-                                                        : item,
-                                                ),
-                                            )
-                                        }
-                                        placeholder="Task title"
-                                        className="min-w-0 flex-1 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-                                    />
+                                <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover/task-item:opacity-100">
+                                    <span className="rounded bg-app-surface px-2 py-0.5 text-xs font-medium text-app-text-muted">
+                                        Task {index + 1}
+                                    </span>
+
                                     {tasks.length > 1 && (
                                         <button
                                             type="button"
@@ -164,40 +240,86 @@ export function AddCustomStepModal({
                                                     ),
                                                 )
                                             }
-                                            className="rounded-lg p-2 text-app-text-muted hover:bg-app-danger-bg hover:text-app-danger-text"
-                                            aria-label="Remove task row"
+                                            className="rounded-lg p-0.5 text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text"
+                                            aria-label={`Remove task ${index + 1}`}
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
                                     )}
                                 </div>
 
-                                <input
-                                    value={task.description}
-                                    onChange={(event) =>
-                                        onTasksChange((current) =>
-                                            current.map((item, itemIndex) =>
-                                                itemIndex === index
-                                                    ? {
-                                                          ...item,
-                                                          description: event.target.value,
-                                                      }
-                                                    : item,
-                                            ),
-                                        )
-                                    }
-                                    placeholder="Optional task description"
-                                    className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-                                />
+                                <div className="space-y-2">
+                                    <div>
+                                        <div className="mb-1 flex items-center">
+                                            <DragHandle visibleClassName="group-hover/task-item:mr-1 group-hover/task-item:w-4 group-hover/task-item:opacity-100" />
+                                            <label htmlFor={`custom-task-title-${index}`} className="text-xs font-medium text-app-text-muted">
+                                                Task title
+                                            </label>
+                                        </div>
+                                        <input
+                                            id={`custom-task-title-${index}`}
+                                            value={task.title}
+                                            onChange={(event) =>
+                                                onTasksChange((current) =>
+                                                    current.map((item, itemIndex) =>
+                                                        itemIndex === index
+                                                            ? {
+                                                                  ...item,
+                                                                  title: event.target.value,
+                                                              }
+                                                            : item,
+                                                    ),
+                                                )
+                                            }
+                                            placeholder="What needs to be done?"
+                                            className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor={`custom-task-description-${index}`} className="mb-1 block text-xs font-medium text-app-text-muted">
+                                            Task description (optional)
+                                        </label>
+                                        <AutoResizeTextarea
+                                            id={`custom-task-description-${index}`}
+                                            value={task.description}
+                                            onChange={(value) =>
+                                                onTasksChange((current) =>
+                                                    current.map((item, itemIndex) =>
+                                                        itemIndex === index
+                                                            ? {
+                                                                  ...item,
+                                                                  description: value,
+                                                              }
+                                                            : item,
+                                                    ),
+                                                )
+                                            }
+                                            placeholder="Additional details for this task"
+                                            minRows={1}
+                                            maxRows={6}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
+
+                    {tasks.length === 0 && (
+                        <div className="mt-3 rounded-xl border border-dashed border-app-border bg-app-surface p-3 text-center">
+                            <p className="text-xs text-app-text-muted">
+                                No tasks added yet. Tasks help break down complex steps.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {errorMessage && (
-                    <p className="text-xs text-app-danger-text">
-                        {errorMessage}
-                    </p>
+                    <div className="rounded-xl border border-app-danger-border bg-app-danger-bg p-3">
+                        <p className="text-xs font-medium text-app-danger-text">
+                            {errorMessage}
+                        </p>
+                    </div>
                 )}
             </div>
         </Modal>

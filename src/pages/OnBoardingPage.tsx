@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { onboardingService } from "../services/onboardingService";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/apiClient";
+import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
 
 import {
   CheckCircle2,
@@ -56,6 +57,20 @@ function ProgressBar({ value, max }: ProgressBarProps) {
       />
     </div>
   );
+}
+
+/**
+ * Index of the phase the user is currently working on: the first phase that still
+ * has a not-yet-finished/skipped step. Falls back to the last phase when everything
+ * is done, so a reload never drops the user back to phase 1.
+ */
+function findActivePhaseIndex(path: OnboardingPathEndpoint): number {
+  const index = path.phases.findIndex((phase) =>
+    phase.steps.some(
+      (step) => step.status !== "FINISHED" && step.status !== "SKIPPED",
+    ),
+  );
+  return index === -1 ? Math.max(0, path.phases.length - 1) : index;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -111,6 +126,8 @@ export function OnBoardingPage() {
 
         const path = await onboardingService.fetchPath();
         setOnBoardingPath(path);
+        // Land on the phase the user is actually working on, not always phase 1.
+        setSelectedPhaseIndex(findActivePhaseIndex(path));
         setLoadingState("success");
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
@@ -362,6 +379,9 @@ export function OnBoardingPage() {
               <h2 className="text-2xl sm:text-3xl font-bold text-app-text">
                 {recommendedStep.title}
               </h2>
+              <div className="mt-3">
+                <StepOriginBadge step={recommendedStep} />
+              </div>
               <p className="text-app-text-muted mt-2 max-w-2xl">
                 {recommendedStep.description}
               </p>
@@ -433,6 +453,9 @@ export function OnBoardingPage() {
                           >
                             {step.title}
                           </h3>
+                          <div className="mt-2">
+                            <StepOriginBadge step={step} />
+                          </div>
                           <p className="text-sm text-app-text-muted mt-1 leading-relaxed">
                             {step.description}
                           </p>

@@ -7,8 +7,9 @@
     "postinstall": "keycloakify sync-extensions",
     "dev": "vite",
     "test": "vitest run",
-    "unit": "vitest run",
-    "try": "npm install && npm run build && npm run lint && npm run unit",
+    "unit": "vitest run --exclude 'tests/unit/a11y/**/*'",
+    "a11y": "vitest run tests/unit/a11y/",
+    "try": "npm install && npm run build && npm run lint && npm run unit && npm run a11y",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@keycloakify/login-ui-storybook": "~250004.2.0",
+    "@storybook/addon-a11y": "^10.4.6",
     "@storybook/react-vite": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -64,6 +66,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.4",
     "vite": "^8.0.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "vitest-axe": "^0.1.0"
   }
 }

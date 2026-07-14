@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import type { FAQOverview, FAQGroup } from "../types";
+import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
+import { useFetch } from "../../../hooks/useFetch";
 
 import {
   TrendingUp,
@@ -12,30 +13,49 @@ import {
   ArrowLeft,
   Users,
   MessageSquareMore,
+  RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
 
 export function FaqPage() {
-  const [overview, setOverview] = useState<FAQOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await insightsService.fetchFAQGroups();
-        setOverview(data);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
-    void load();
-  }, []);
+  const {
+    data: overview,
+    loading,
+    error,
+  } = useFetch(() => insightsService.fetchFAQGroups(), [refreshKey]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await insightsService.refreshFAQGroups();
+      setRefreshKey((key) => key + 1);
+    } catch (err) {
+      console.error("FAQ refresh failed", err);
+      setRefreshError(
+        "Refresh failed. Is the AI service running and are there questions to group?",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshButton = (
+    <button
+      onClick={() => void handleRefresh()}
+      disabled={refreshing}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:opacity-60 shrink-0"
+    >
+      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+      {refreshing ? "Refreshing…" : "Refresh"}
+    </button>
+  );
 
   if (loading) {
     return (
@@ -47,9 +67,17 @@ export function FaqPage() {
 
   if (error || !overview || overview.groups.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-20">
+      <div className="flex flex-col items-center gap-3 py-20">
         <AlertCircle className="w-5 h-5 text-app-text-muted" />
-        <p className="text-app-text-muted">Could not load FAQ data.</p>
+        <p className="text-app-text-muted">
+          No FAQ groups yet. Trigger a refresh to generate them.
+        </p>
+        {refreshButton}
+        {refreshError && (
+          <p className="text-sm text-app-danger-text max-w-md text-center">
+            {refreshError}
+          </p>
+        )}
       </div>
     );
   }
@@ -81,7 +109,7 @@ export function FaqPage() {
   return (
     <div className="min-h-screen bg-app-bg">
       {/* Header */}
-      <div className="border-b border-app-border bg-app-bg/90">
+      <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
           <button
             onClick={() => void navigate("/pm-dashboard")}
@@ -91,20 +119,25 @@ export function FaqPage() {
             Back to PM-Dashboard
           </button>
 
-          <PageHeader
-            icon={MessageSquareMore}
-            title="Recurring Questions"
-            subtitle="Frequently asked questions grouped by topic and ranked by frequency."
-            className="mb-6"
-          />
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <PageHeader
+              icon={MessageSquareMore}
+              title="Recurring Questions"
+              subtitle="Frequently asked questions grouped by topic and ranked by frequency."
+            />
+            {refreshButton}
+          </div>
+          {refreshError && (
+            <p className="text-sm text-app-danger-text mb-4">{refreshError}</p>
+          )}
 
           {/* Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-sky-700" />
+                <Users className="w-5 h-5 text-app-brand" />
                 <div>
-                  <div className="text-2xl font-semibold text-sky-700">
+                  <div className="text-2xl font-semibold text-app-brand">
                     {totalGroups}
                   </div>
                   <div className="text-xs text-app-text-muted">
@@ -116,9 +149,9 @@ export function FaqPage() {
 
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <MessageSquareMore className="w-5 h-5 text-emerald-600" />
+                <MessageSquareMore className="w-5 h-5 text-app-success-solid" />
                 <div>
-                  <div className="text-2xl font-semibold text-emerald-600">
+                  <div className="text-2xl font-semibold text-app-success-solid">
                     {totalQuestions}
                   </div>
                   <div className="text-xs text-app-text-muted">
@@ -130,9 +163,9 @@ export function FaqPage() {
 
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <TrendingUp className="w-5 h-5 text-rose-600" />
+                <TrendingUp className="w-5 h-5 text-app-danger-solid" />
                 <div>
-                  <div className="text-2xl font-semibold text-rose-600">
+                  <div className="text-2xl font-semibold text-app-danger-solid">
                     {mostAskedCount}
                   </div>
                   <div className="text-xs text-app-text-muted">
@@ -144,9 +177,9 @@ export function FaqPage() {
 
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-amber-600" />
+                <FileText className="w-5 h-5 text-app-warning-solid" />
                 <div>
-                  <div className="text-2xl font-semibold text-amber-600">
+                  <div className="text-2xl font-semibold text-app-warning-solid">
                     {totalDocuments}
                   </div>
                   <div className="text-xs text-app-text-muted">
@@ -157,7 +190,7 @@ export function FaqPage() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Content */}
       <main className="app-page-content py-8">

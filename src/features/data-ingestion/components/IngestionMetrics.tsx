@@ -10,15 +10,56 @@ import type { DataSource } from "../types.ts";
 
 type IngestionMetricsProps = {
     sources: DataSource[];
+    /**
+     * Renders a slim row of inline stat chips (icon + value + label, no
+     * card borders) instead of the full metric-card grid, for tight spaces
+     * like the PM Dashboard's ingestion strip.
+     */
+    compact?: boolean;
 };
 
-export function IngestionMetrics({ sources }: IngestionMetricsProps) {
+/**
+ * Displays high-level summary metrics for all connected data sources.
+ * Gives project managers a quick overview of system health and sync status.
+ */
+export function IngestionMetrics({ sources, compact = false }: IngestionMetricsProps) {
     const syncedSources = sources.filter((source) => source.lastRunAt !== null).length;
     const latestIngestedArtifacts = sources.reduce(
         (sum, source) => sum + source.latestIngestedCount,
         0,
     );
     const totalErrors = sources.reduce((sum, source) => sum + source.errors, 0);
+
+    if (compact) {
+        return (
+            <div className="flex flex-wrap items-center gap-4">
+                <StatChip
+                    label="Synced"
+                    value={`${syncedSources}/${sources.length}`}
+                    icon={CheckCircle2}
+                    iconColor="text-app-success-text"
+                />
+
+                <StatChip
+                    label="Ingested"
+                    value={formatNumber(latestIngestedArtifacts)}
+                    icon={Database}
+                    iconColor="text-app-brand"
+                />
+
+                <StatChip
+                    label="Errors"
+                    value={formatNumber(totalErrors)}
+                    icon={AlertTriangle}
+                    iconColor={
+                        totalErrors > 0
+                            ? "text-app-warning-solid"
+                            : "text-app-text-muted"
+                    }
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -53,6 +94,26 @@ export function IngestionMetrics({ sources }: IngestionMetricsProps) {
                 icon={Clock3}
                 iconColor="text-app-warning-solid"
             />
+        </div>
+    );
+}
+
+function StatChip({
+    label,
+    value,
+    icon: Icon,
+    iconColor,
+}: {
+    label: string;
+    value: string;
+    icon: LucideIcon;
+    iconColor: string;
+}) {
+    return (
+        <div className="flex items-center gap-1.5 text-sm">
+            <Icon size={14} className={`shrink-0 ${iconColor}`} />
+            <span className="font-semibold text-app-text">{value}</span>
+            <span className="text-app-text-muted">{label}</span>
         </div>
     );
 }

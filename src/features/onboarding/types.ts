@@ -50,6 +50,7 @@ export interface OnboardingStepEndpoint {
   id: string;
   phaseId: string;
   position: number;
+  isAiAssisted?: boolean;
   title: string;
   description: string;
   type: StepType;

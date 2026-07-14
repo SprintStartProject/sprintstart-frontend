@@ -1,7 +1,16 @@
 import '@testing-library/jest-dom';
 import React from 'react';
-import { vi, beforeAll, afterAll, afterEach } from 'vitest';
+import { vi, beforeAll, afterAll, afterEach, expect } from 'vitest';
 import type { ReactNode } from 'react';
+import * as matchers from 'vitest-axe/matchers';
+import 'vitest-axe/extend-expect';
+
+declare module 'vitest' {
+  export interface Assertion<T = any> extends matchers.AxeMatchers {}
+  export interface AsymmetricMatchersContaining extends matchers.AxeMatchers {}
+}
+
+expect.extend(matchers);
 import { setupServer } from 'msw/node';
 import { handlers } from './msw-handlers';
 
@@ -65,7 +74,7 @@ vi.mock('framer-motion', async (importOriginal) => {
   const actual = await importOriginal<typeof import('framer-motion')>();
   
   // Dynamically map common HTML tags used with motion elements
-  const commonPrimitives = ['div', 'button', 'span', 'ul', 'li', 'section', 'nav', 'form'];
+  const commonPrimitives = ['div', 'button', 'span', 'ul', 'li', 'section', 'nav', 'form', 'label'];
   
   const mockedMotion = commonPrimitives.reduce((acc, tagName) => {
     acc[tagName] = ({ children, className, ...props }: { children?: ReactNode; className?: string; [key: string]: unknown }) =>
@@ -86,3 +95,7 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
   disconnect() {}
 };
+
+if (!window.HTMLElement.prototype.scrollIntoView) {
+    window.HTMLElement.prototype.scrollIntoView = function() {};
+}

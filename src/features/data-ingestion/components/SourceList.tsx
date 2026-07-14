@@ -8,6 +8,10 @@ type SourceListProps = {
     onSelectSource: (sourceSystem: SourceSystem) => void;
 };
 
+/**
+ * Lists all currently connected data sources with their high-level status.
+ * Allows users to select a source to view more detailed metrics in the side panel.
+ */
 export function SourceList({
     sources,
     selectedSourceSystem,

@@ -25,6 +25,10 @@ type SourceConnectModalProps = {
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
+/**
+ * Modal form for connecting a new data source to SprintStart.
+ * Manages the complex state of selecting a source type (e.g., GitHub) and configuring its connection parameters.
+ */
 export function SourceConnectModal({
     selectedSourceSystem,
     sourceSystems,

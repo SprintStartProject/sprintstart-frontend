@@ -4,18 +4,20 @@
 // zur Detailpage /insights/faq/:groupId
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { FAQOverview, FAQGroup } from "../types";
+import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
+import { useFetch } from "../../../hooks/useFetch";
+import { ClickableCard } from "../../../components/common/ClickableCard";
 
 import {
-  //Messages,
   TrendingUp,
   FileText,
   ArrowRight,
   Loader2,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
@@ -23,24 +25,33 @@ import {
 // ─────────────────────────────────────────────────────────────
 
 export function FaqWidget() {
-  const [overview, setOverview] = useState<FAQOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await insightsService.fetchFAQGroups();
-        setOverview(data);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const {
+    data: overview,
+    loading,
+    error,
+  } = useFetch(() => insightsService.fetchFAQGroups(), [refreshKey]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await insightsService.refreshFAQGroups();
+      setRefreshKey((key) => key + 1);
+    } catch (err) {
+      console.error("FAQ refresh failed", err);
+      setRefreshError(
+        "Refresh failed. Is the AI service running and are there questions to group?",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // ── LOADING ──────────────────────────────────────────────
 
@@ -56,9 +67,31 @@ export function FaqWidget() {
 
   if (error || !overview || overview.groups.length === 0) {
     return (
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-2 min-h-48 text-center">
+      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-3 min-h-48 text-center">
         <AlertCircle className="w-5 h-5 text-app-text-muted" />
-        <p className="text-sm text-app-text-muted">Could not load FAQ data.</p>
+        <p className="text-sm text-app-text-muted">
+          No FAQ groups yet. Trigger a refresh to generate them.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-app-brand hover:bg-app-brand-hover text-white text-xs font-medium transition-all disabled:opacity-60"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            onClick={() => void navigate("/insights/faq")}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors"
+          >
+            Open FAQ page
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {refreshError && (
+          <p className="text-xs text-app-danger-text max-w-xs">{refreshError}</p>
+        )}
       </div>
     );
   }
@@ -78,7 +111,11 @@ export function FaqWidget() {
   // ── RENDER ───────────────────────────────────────────────
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+    <ClickableCard
+      onClick={() => void navigate("/insights/faq")}
+      interactive={false}
+      className="rounded-2xl border border-app-border bg-app-surface p-5 cursor-pointer transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[button:hover]:!border-app-border has-[button:hover]:!bg-app-surface"
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -87,18 +124,39 @@ export function FaqWidget() {
             Recurring questions
           </span>
         </div>
-        <button
-          onClick={() => void navigate("/insights/faq")}
-          className="flex items-center gap-1 text-xs text-app-text-muted hover:text-app-text transition-colors"
-        >
-          See all ({sorted.length})
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleRefresh();
+            }}
+            disabled={refreshing}
+            title="Refresh"
+            className="flex items-center text-app-text-muted hover:text-app-text transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void navigate("/insights/faq");
+            }}
+            className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+          >
+            See all ({sorted.length})
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Hero card — most asked */}
       <button
-        onClick={() => goToDetail(hero)}
+        onClick={(event) => {
+          event.stopPropagation();
+          goToDetail(hero);
+        }}
         className="w-full text-left rounded-2xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-4 mb-3 relative overflow-hidden"
       >
         {/* Big count in the corner */}
@@ -106,7 +164,7 @@ export function FaqWidget() {
           {hero.count}
         </span>
 
-        <div className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-medium px-2.5 py-1 rounded-full mb-3">
+        <div className="inline-flex items-center gap-1.5 bg-app-success-bg text-app-success-text text-xs font-medium px-2.5 py-1 rounded-full mb-3">
           <TrendingUp className="w-3 h-3" />
           Most asked
         </div>
@@ -133,7 +191,10 @@ export function FaqWidget() {
         {rest.map((group) => (
           <button
             key={group.groupId}
-            onClick={() => goToDetail(group)}
+            onClick={(event) => {
+              event.stopPropagation();
+              goToDetail(group);
+            }}
             className="text-left rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-3"
           >
             <div className="text-xl font-semibold text-app-brand mb-1">
@@ -151,6 +212,6 @@ export function FaqWidget() {
           </button>
         ))}
       </div>
-    </div>
+    </ClickableCard>
   );
 }

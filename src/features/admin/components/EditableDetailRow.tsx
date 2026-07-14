@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 type EditableDetailRowProps = {
     label: string;
     value: string;
@@ -13,10 +15,12 @@ export function EditableDetailRow({
     type = "text",
     autoComplete,
 }: EditableDetailRowProps) {
+    const id = useId();
     return (
         <div className="grid grid-cols-[7.5rem_1fr] items-center gap-4 py-2.5">
-            <label className="text-sm text-app-text-muted">{label}</label>
+            <label htmlFor={id} className="text-sm text-app-text-muted">{label}</label>
             <input
+                id={id}
                 type={type}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}

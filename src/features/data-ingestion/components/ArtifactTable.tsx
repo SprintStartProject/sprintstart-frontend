@@ -19,6 +19,10 @@ type FailedArtifactRow = FailedArtifact & {
     occurredAt?: string;
 };
 
+/**
+ * Displays the recent ingestion artifacts and failed items across all sources.
+ * Helps users identify which specific files or records failed to sync.
+ */
 export function ArtifactTable({ sources, runs }: ArtifactTableProps) {
     const latestIngestedCount = sources.reduce(
         (sum, source) => sum + source.latestIngestedCount,

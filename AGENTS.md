@@ -5,6 +5,7 @@ Keep it current: if a rule here stops matching reality, fix the rule in the same
 
 > **Related docs**
 > - [ARCHITECTURE.md](./ARCHITECTURE.md) — system context (frontend / backend / AI service), boundaries, deployment.
+> - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — the full, committed documentation standards (summarized in §6).
 > - `GEMINI.md` — condensed context (local/agent-specific).
 > - `frontend-documentation-playbook.local.md` — the full documentation rules (summarized in §6).
 
@@ -92,7 +93,7 @@ Conventions:
 
 ## 6. Documentation (the *why*, not the obvious *what*)
 
-Follow the documentation playbook. In short — use **TSDoc** blocks on exported symbols:
+Follow the documentation playbook — the full rules live in [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md). In short — use **TSDoc** blocks on exported symbols:
 
 - **Pages/views:** responsibility, which user flow, key backend/auth/routing/state dependencies.
 - **Reusable components:** when purpose/behavior/constraints aren't obvious from the name.

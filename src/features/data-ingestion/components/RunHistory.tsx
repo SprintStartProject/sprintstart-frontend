@@ -12,6 +12,10 @@ type RunHistoryProps = {
     runs: IngestionRun[];
 };
 
+/**
+ * Displays a historical log of all recent ingestion runs.
+ * Useful for tracking when syncs occurred and their overall success or failure status.
+ */
 export function RunHistory({ runs }: RunHistoryProps) {
     if (runs.length === 0) {
         return (

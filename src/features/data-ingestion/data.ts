@@ -1,6 +1,7 @@
 import { Database, FileText, GitBranch } from "lucide-react";
 import type {
     DataSource,
+    IngestionRun,
     IngestionRunStatus,
     SourceIngestionStatus,
     SourceMeta,
@@ -76,6 +77,72 @@ export function createDataSource(
         latestUpdatedCount,
         failedItems: status?.failedItems ?? [],
     };
+}
+
+/**
+ * Merges the latest per-source ingestion status with the latest matching
+ * ingestion run to build the `DataSource[]` list consumed by the data
+ * ingestion page and by dashboard widgets that surface ingestion health
+ * (e.g. {@link IngestionMetrics}). Kept here so every consumer of the
+ * `/api/v1/ingestion-status` + `/api/v1/ingestion-runs` endpoints shares the
+ * same merge logic instead of re-implementing it.
+ *
+ * A source is only included once it has run at least once (either a
+ * recorded `lastRunTime` in its status, or a matching run in `runs`).
+ */
+export function buildDataSources(
+    sourceStatuses: SourceIngestionStatus[],
+    runs: IngestionRun[],
+): DataSource[] {
+    const statusBySource = new Map<SourceSystem, SourceIngestionStatus>();
+    const latestRunBySource = new Map<SourceSystem, IngestionRun>();
+
+    sourceStatuses.forEach((status) => {
+        statusBySource.set(status.sourceSystem, status);
+    });
+
+    runs.forEach((run) => {
+        if (!latestRunBySource.has(run.sourceSystem)) {
+            latestRunBySource.set(run.sourceSystem, run);
+        }
+    });
+
+    return SOURCE_SYSTEMS.filter((sourceSystem) => {
+        const status = statusBySource.get(sourceSystem);
+        return (
+            (status?.lastRunTime !== null &&
+                status?.lastRunTime !== undefined) ||
+            latestRunBySource.has(sourceSystem)
+        );
+    }).map((sourceSystem) => {
+        const source = createDataSource(
+            sourceSystem,
+            statusBySource.get(sourceSystem),
+        );
+        const latestRun = latestRunBySource.get(sourceSystem);
+
+        if (!latestRun) return source;
+
+        const hasErrors = latestRun.failedCount > 0;
+        const status = getSourceStatus(false, hasErrors, latestRun.status);
+
+        return {
+            ...source,
+            status,
+            statusLabel: getSourceStatusLabel(
+                false,
+                hasErrors,
+                latestRun.status,
+            ),
+            artifacts: latestRun.ingestedCount,
+            lastSync: formatDateTime(latestRun.startedAt),
+            errors: latestRun.failedCount,
+            lastRunAt: latestRun.startedAt,
+            latestIngestedCount: latestRun.ingestedCount,
+            latestUpdatedCount: latestRun.updatedCount,
+            failedItems: latestRun.failedItems,
+        };
+    });
 }
 
 export function getSourceStatus(

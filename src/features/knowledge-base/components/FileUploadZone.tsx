@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileCode, Loader2, AlertCircle, ImageIcon } from 'lucide-react';
 
@@ -22,6 +22,7 @@ interface Props {
 export function FileUploadZone({ onUpload, isUploading }: Props) {
     const [isDragActive, setIsDragActive] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const inputId = useId();
 
     const validateFiles = (files: FileList | File[]): File[] => {
         const allowedTypes = [
@@ -101,41 +102,43 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
     return (
         <div className="w-full">
-            <motion.div
+            <input
+                id={inputId}
+                type="file"
+                className="sr-only"
+                onChange={handleFileInput}
+                accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
+                multiple
+                aria-label="Upload files"
+                tabIndex={-1}
+            />
+            <motion.button
+                type="button"
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
-                tabIndex={0}
-                role="button"
+                disabled={isUploading}
                 aria-label="Upload documentation or images"
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        document.getElementById('fileInput')?.click();
+                        document.getElementById(inputId)?.click();
                     }
                 }}
                 animate={{
                     scale: isDragActive ? 1.01 : 1,
                 }}
                 className={[
-                    'relative flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200 group sm:p-10',
+                    'relative flex w-full cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200 group sm:p-10',
                     'focus:outline-none focus:ring-2 focus:ring-app-focus',
                     isDragActive
                         ? 'border-app-brand-border-strong bg-app-brand-soft'
                         : 'border-app-border-muted bg-app-bg hover:border-app-brand-border hover:bg-app-surface-hover',
-                    isUploading ? 'pointer-events-none opacity-50' : '',
+                    isUploading ? 'opacity-50' : '',
                 ].join(' ')}
-                onClick={() => document.getElementById('fileInput')?.click()}
+                onClick={() => document.getElementById(inputId)?.click()}
             >
-                <input
-                    id="fileInput"
-                    type="file"
-                    className="sr-only"
-                    onChange={handleFileInput}
-                    accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
-                    multiple
-                />
 
                 <div
                     className={[
@@ -173,11 +176,12 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
                         Images (.png, .webp)
                     </div>
                 </div>
-            </motion.div>
+            </motion.button>
 
             <AnimatePresence>
                 {error && (
                     <motion.div
+                        role="alert"
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}

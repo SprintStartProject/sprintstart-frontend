@@ -4,14 +4,14 @@
 // On click navigiert zu /insights/knowledge-gaps/:gapId
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type {
-  KnowledgeGapOverview,
-  KnowledgeGap,
-  KnowledgeGapSeverity,
-} from "../../../features/knowledge-gaps/types";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { useFetch } from "../../../hooks/useFetch";
+import { formatRelativeDate } from "../format";
+import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
+import { ClickableCard } from "../../../components/common/ClickableCard";
 
 import {
   ShieldAlert,
@@ -19,142 +19,39 @@ import {
   Loader2,
   AlertCircle,
   Clock,
+  RefreshCw,
 } from "lucide-react";
-
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
-
-const SEVERITY_ORDER: Record<KnowledgeGapSeverity, number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-};
-
-const SEVERITY_STYLES: Record<
-  KnowledgeGapSeverity,
-  { bar: string; badge: string; label: string }
-> = {
-  high: {
-    bar: "bg-red-400",
-    badge: "bg-red-100 text-red-700",
-    label: "High",
-  },
-  medium: {
-    bar: "bg-amber-400",
-    badge: "bg-amber-100 text-amber-700",
-    label: "Medium",
-  },
-  low: {
-    bar: "bg-emerald-400",
-    badge: "bg-emerald-100 text-emerald-700",
-    label: "Low",
-  },
-};
-
-function formatRelativeDate(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
-
-// ─────────────────────────────────────────────────────────────
-// SUB-COMPONENT: SeverityBar
-// Visual severity indicator — thin colored left border + bar
-// ─────────────────────────────────────────────────────────────
-
-function SeverityBar({ severity }: { severity: KnowledgeGapSeverity }) {
-  const { bar } = SEVERITY_STYLES[severity];
-  return (
-    <div className="w-1 self-stretch rounded-full shrink-0 bg-app-border">
-      <div className={`w-full rounded-full ${bar}`} style={{ height: "100%" }} />
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SUB-COMPONENT: SeveritySummaryBar
-// Stacked bar showing ratio of high / medium / low
-// ─────────────────────────────────────────────────────────────
-
-function SeveritySummaryBar({ gaps }: { gaps: KnowledgeGap[] }) {
-  const total = gaps.length;
-  if (total === 0) return null;
-
-  const counts = {
-    high: gaps.filter((g) => g.severity === "high").length,
-    medium: gaps.filter((g) => g.severity === "medium").length,
-    low: gaps.filter((g) => g.severity === "low").length,
-  };
-
-  return (
-    <div className="mb-4">
-      {/* Stacked bar */}
-      <div className="flex h-2 rounded-full overflow-hidden gap-0.5 mb-2">
-        {counts.high > 0 && (
-          <div
-            className="bg-red-400 rounded-full"
-            style={{ width: `${(counts.high / total) * 100}%` }}
-          />
-        )}
-        {counts.medium > 0 && (
-          <div
-            className="bg-amber-400 rounded-full"
-            style={{ width: `${(counts.medium / total) * 100}%` }}
-          />
-        )}
-        {counts.low > 0 && (
-          <div
-            className="bg-emerald-400 rounded-full"
-            style={{ width: `${(counts.low / total) * 100}%` }}
-          />
-        )}
-      </div>
-      {/* Legend */}
-      <div className="flex items-center gap-3">
-        {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map((s) =>
-          counts[s] > 0 ? (
-            <span key={s} className="flex items-center gap-1 text-xs text-app-text-muted">
-              <span
-                className={`inline-block w-2 h-2 rounded-full ${SEVERITY_STYLES[s].bar}`}
-              />
-              {counts[s]} {SEVERITY_STYLES[s].label}
-            </span>
-          ) : null,
-        )}
-        <span className="ml-auto text-xs text-app-text-muted">{total} total</span>
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: KnowledgeGapWidget
 // ─────────────────────────────────────────────────────────────
 
 export function KnowledgeGapWidget() {
-  const [overview, setOverview] = useState<KnowledgeGapOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await knowledgeGapService.fetchKnowledgeGaps();
-        setOverview(data);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const {
+    data: overview,
+    loading,
+    error,
+  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(), [refreshKey]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await knowledgeGapService.refreshKnowledgeGaps();
+      setRefreshKey((key) => key + 1);
+    } catch (err) {
+      console.error("Knowledge-gaps refresh failed", err);
+      setRefreshError("Refresh failed. Is the AI service running?");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // ── LOADING ────────────────────────────────────────────
 
@@ -170,9 +67,31 @@ export function KnowledgeGapWidget() {
 
   if (error || !overview || overview.gaps.length === 0) {
     return (
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-2 min-h-48 text-center">
+      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-3 min-h-48 text-center">
         <AlertCircle className="w-5 h-5 text-app-text-muted" />
-        <p className="text-sm text-app-text-muted">No knowledge gaps found.</p>
+        <p className="text-sm text-app-text-muted">
+          No knowledge gaps yet. Trigger a refresh to detect them.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-app-brand hover:bg-app-brand-hover text-white text-xs font-medium transition-all disabled:opacity-60"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            onClick={() => void navigate("/insights/knowledge-gaps")}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors"
+          >
+            Open page
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {refreshError && (
+          <p className="text-xs text-app-danger-text max-w-xs">{refreshError}</p>
+        )}
       </div>
     );
   }
@@ -189,7 +108,11 @@ export function KnowledgeGapWidget() {
   // ── RENDER ─────────────────────────────────────────────
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+    <ClickableCard
+      onClick={() => void navigate("/insights/knowledge-gaps")}
+      interactive={false}
+      className="rounded-2xl border border-app-border bg-app-surface p-5 cursor-pointer transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[button:hover]:!border-app-border has-[button:hover]:!bg-app-surface"
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -198,17 +121,35 @@ export function KnowledgeGapWidget() {
             Knowledge gaps
           </span>
         </div>
-        <button
-          onClick={() => void navigate("/insights/knowledge-gaps")}
-          className="flex items-center gap-1 text-xs text-app-text-muted hover:text-app-text transition-colors"
-        >
-          See all ({gapCount})
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleRefresh();
+            }}
+            disabled={refreshing}
+            title="Refresh"
+            className="flex items-center text-app-text-muted hover:text-app-text transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void navigate("/insights/knowledge-gaps");
+            }}
+            className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+          >
+            See all ({gapCount})
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Stacked severity overview bar */}
-      <SeveritySummaryBar gaps={overview.gaps} />
+      <SeveritySummaryBar gaps={overview.gaps} className="mb-4" />
 
       {/* Gap list */}
       <div className="space-y-2">
@@ -217,7 +158,10 @@ export function KnowledgeGapWidget() {
           return (
             <button
               key={gap.id}
-              onClick={() => void navigate(`/insights/knowledge-gaps/${gap.id}`)}
+              onClick={(event) => {
+                event.stopPropagation();
+                void navigate(`/insights/knowledge-gaps/${gap.id}`);
+              }}
               className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-3"
             >
               <SeverityBar severity={gap.severity} />
@@ -254,7 +198,7 @@ export function KnowledgeGapWidget() {
 
                   <span className="ml-auto flex items-center gap-1 shrink-0">
                     <Clock className="w-3 h-3" />
-                    {formatRelativeDate(gap.lastUpdated)}
+                    {formatRelativeDate(gap.lastIngested)}
                   </span>
                 </div>
               </div>
@@ -262,6 +206,6 @@ export function KnowledgeGapWidget() {
           );
         })}
       </div>
-    </div>
+    </ClickableCard>
   );
 }

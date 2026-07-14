@@ -4,32 +4,24 @@
 // Zeigt alle Infos zu einer FAQ-Gruppe inkl. PM-Detail
 // ============================================================
 
-import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import type {
-  FAQDetail,
   FAQQuestion,
   FAQDocument,
 } from "../../../features/faq/types";
 import { insightsService } from "../../../services/faqService";
+import { useFetch } from "../../../hooks/useFetch";
 
 import {
   ArrowLeft,
   ShieldAlert,
   FileText,
-  ExternalLink,
   Loader2,
   AlertCircle,
   MessageSquareMore,
   BookOpen,
   ArrowUp,
 } from "lucide-react";
-
-//import { features } from "process";
-// ─────────────────────────────────────────────────────────────
-// HELPER
-// ─────────────────────────────────────────────────────────────
-
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: FaqDetailPage
@@ -39,24 +31,14 @@ export function FaqDetailPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
 
-  const [detail, setDetail] = useState<FAQDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!groupId) return;
-    const load = async () => {
-      try {
-        const data = await insightsService.fetchFAQGroup(groupId);
-        setDetail(data);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, [groupId]);
+  const {
+    data: detail,
+    loading,
+    error,
+  } = useFetch(
+    () => insightsService.fetchFAQGroup(groupId ?? ""),
+    [groupId],
+  );
 
   // ── LOADING ──────────────────────────────────────────────
 
@@ -114,7 +96,7 @@ export function FaqDetailPage() {
             <h1 className="text-xl font-bold text-app-text leading-snug">
               {detail.questions[0].text}
             </h1>
-            <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-medium px-3 py-1.5 rounded-full shrink-0">
+            <span className="inline-flex items-center gap-1.5 bg-app-success-bg text-app-success-text text-xs font-medium px-3 py-1.5 rounded-full shrink-0">
               <ArrowUp className="w-3 h-3" />
               {detail.count} times asked
             </span>
@@ -127,7 +109,7 @@ export function FaqDetailPage() {
 
         {/* PM detail section */}
         <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 uppercase tracking-widest mb-4">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-app-brand uppercase tracking-widest mb-4">
             <ShieldAlert className="w-3.5 h-3.5" />
             PM detail
           </div>
@@ -166,18 +148,11 @@ export function FaqDetailPage() {
                 <span className="text-sm text-app-text flex-1 min-w-0 truncate">
                   {doc.title}
                 </span>
-                <span className="text-xs text-app-text-muted bg-app-surface-muted px-2 py-0.5 rounded shrink-0">
-                  {doc.source}
-                </span>
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline shrink-0"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Open
-                </a>
+                {doc.source && (
+                  <span className="text-xs text-app-text-muted bg-app-surface-muted px-2 py-0.5 rounded shrink-0">
+                    {doc.source}
+                  </span>
+                )}
               </div>
             ))}
           </div>

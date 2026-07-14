@@ -12,6 +12,11 @@ import {type Chat, type ChatMessage, type Citation, type SourceSystem} from "../
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
+/**
+ * Manages the state and business logic for the chat interface.
+ * Handles fetching chat history, initiating new chats, and streaming responses
+ * from the AI assistant via the backend.
+ */
 export function useChat() {
     const { id: chatId } = useParams();
     const [userId, setUserId] = useState<string>("");
@@ -108,6 +113,10 @@ export function useChat() {
         });
     }, [chatId, messages]);
 
+    /**
+     * Refreshes the list of chats for the current user.
+     * Called after a stream finishes to ensure the new chat appears in the sidebar.
+     */
     const refreshChats = useCallback(async () => {
         const data = await getChats();
         setChats(data.chats.filter(chat => chat.userId === userId));

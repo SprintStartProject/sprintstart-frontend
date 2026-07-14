@@ -141,6 +141,7 @@ export function DocumentTable({ documents, onDelete }: Props) {
                                         onClick={() => onDelete(doc.id)}
                                         className="rounded-xl p-2 text-app-text-muted transition-all hover:bg-app-danger-bg hover:text-app-danger-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                                         title="Remove document"
+                                        aria-label={`Remove document ${doc.name}`}
                                     >
                                         <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                                     </button>

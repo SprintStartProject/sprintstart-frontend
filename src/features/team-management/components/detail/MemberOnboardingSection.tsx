@@ -7,6 +7,9 @@ import {
     Plus,
     SkipForward,
 } from 'lucide-react';
+import { useState, type DragEvent } from 'react';
+import { DragHandle } from '../../../../components/ui/DragHandle';
+import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
 import type {
     OnboardingPhaseEndpoint,
     OnboardingStepEndpoint,
@@ -47,6 +50,11 @@ type MemberOnboardingSectionProps = {
     onSelectPhase: (phaseId: string, firstStepId: string) => void;
     onSelectStep: (stepId: string) => void;
     onAddStep: (target: StepInsertTarget) => void;
+    onReorderSteps: (
+        phaseId: string,
+        activeStepId: string,
+        overStepId: string,
+    ) => void;
     formatMinutes: (minutes?: number | null) => string;
     getActualMinutes: (step: DetailOnboardingStep) => number | null;
     getStepStatusStyles: (status: string) => string;
@@ -67,6 +75,7 @@ export function MemberOnboardingSection({
     onSelectPhase,
     onSelectStep,
     onAddStep,
+    onReorderSteps,
     formatMinutes,
     getActualMinutes,
     getStepStatusStyles,
@@ -134,6 +143,7 @@ export function MemberOnboardingSection({
                                 stepTaskCounts={stepTaskCounts}
                                 onSelectStep={onSelectStep}
                                 onAddStep={onAddStep}
+                                onReorderSteps={onReorderSteps}
                                 formatMinutes={formatMinutes}
                                 getActualMinutes={getActualMinutes}
                                 getStepStatusStyles={getStepStatusStyles}
@@ -244,6 +254,7 @@ function StepList({
     stepTaskCounts,
     onSelectStep,
     onAddStep,
+    onReorderSteps,
     formatMinutes,
     getActualMinutes,
     getStepStatusStyles,
@@ -255,10 +266,18 @@ function StepList({
     stepTaskCounts: Record<string, StepTaskCount>;
     onSelectStep: (stepId: string) => void;
     onAddStep: (target: StepInsertTarget) => void;
+    onReorderSteps: (
+        phaseId: string,
+        activeStepId: string,
+        overStepId: string,
+    ) => void;
     formatMinutes: (minutes?: number | null) => string;
     getActualMinutes: (step: DetailOnboardingStep) => number | null;
     getStepStatusStyles: (status: string) => string;
 }) {
+    const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
+    const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
+
     if (steps.length === 0) {
         return (
             <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-5 text-sm text-app-text-muted">
@@ -293,9 +312,49 @@ function StepList({
                     actualMinutes && step.estimatedMinutes
                         ? actualMinutes - step.estimatedMinutes
                         : null;
+                const isDragging = draggedStepId === step.id;
+                const isDragTarget =
+                    dragOverStepId === step.id && draggedStepId !== step.id;
 
                 return (
-                    <div key={step.id} className="group/step-insert space-y-1">
+                    <div
+                        key={step.id}
+                        className="group/step-insert space-y-1"
+                        onDragOver={(event) => {
+                            if (!draggedStepId || draggedStepId === step.id) return;
+
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                            setDragOverStepId(step.id);
+                        }}
+                        onDragLeave={(event) => {
+                            const nextTarget = event.relatedTarget;
+
+                            if (
+                                nextTarget instanceof Node &&
+                                event.currentTarget.contains(nextTarget)
+                            ) {
+                                return;
+                            }
+
+                            setDragOverStepId((currentStepId) =>
+                                currentStepId === step.id ? null : currentStepId,
+                            );
+                        }}
+                        onDrop={(event) => {
+                            event.preventDefault();
+
+                            if (!selectedPhase || !draggedStepId) return;
+
+                            onReorderSteps(
+                                selectedPhase.id,
+                                draggedStepId,
+                                step.id,
+                            );
+                            setDraggedStepId(null);
+                            setDragOverStepId(null);
+                        }}
+                    >
                         {index === 0 && selectedPhase && (
                             <StepInsertButton
                                 label={`Add step before ${step.title}`}
@@ -317,6 +376,17 @@ function StepList({
                             timingDelta={timingDelta}
                             taskCount={stepTaskCounts[step.id]}
                             onSelect={() => onSelectStep(step.id)}
+                            onDragStart={(event) => {
+                                event.dataTransfer.effectAllowed = 'move';
+                                event.dataTransfer.setData('text/plain', step.id);
+                                setDraggedStepId(step.id);
+                            }}
+                            onDragEnd={() => {
+                                setDraggedStepId(null);
+                                setDragOverStepId(null);
+                            }}
+                            isDragging={isDragging}
+                            isDragTarget={isDragTarget}
                             formatMinutes={formatMinutes}
                             getStepStatusStyles={getStepStatusStyles}
                         />
@@ -348,6 +418,10 @@ function StepCard({
     timingDelta,
     taskCount,
     onSelect,
+    onDragStart,
+    onDragEnd,
+    isDragging,
+    isDragTarget,
     formatMinutes,
     getStepStatusStyles,
 }: {
@@ -359,6 +433,10 @@ function StepCard({
     timingDelta: number | null;
     taskCount?: StepTaskCount;
     onSelect: () => void;
+    onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+    onDragEnd: () => void;
+    isDragging: boolean;
+    isDragTarget: boolean;
     formatMinutes: (minutes?: number | null) => string;
     getStepStatusStyles: (status: string) => string;
 }) {
@@ -366,6 +444,9 @@ function StepCard({
         <div
             role="button"
             tabIndex={0}
+            draggable
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
             onClick={onSelect}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -373,8 +454,10 @@ function StepCard({
                     onSelect();
                 }
             }}
-            className={`group w-full rounded-2xl border bg-app-surface p-4 text-left transition-all ${
-                isSelected
+            className={`group/step w-full rounded-2xl border bg-app-surface p-4 text-left transition-all ${
+                isDragTarget
+                    ? 'border-app-brand bg-app-brand-soft shadow-sm'
+                    : isSelected
                     ? 'border-app-brand shadow-sm'
                     : isNextStep
                       ? 'border-app-brand-border bg-app-brand-soft'
@@ -383,20 +466,26 @@ function StepCard({
                 step.status === 'FINISHED' || step.status === 'SKIPPED'
                     ? 'opacity-70'
                     : ''
+            } ${
+                isDragging ? 'scale-[0.99] opacity-50' : ''
             }`}
         >
             <div className="flex gap-4">
-                <span className="pt-0.5">
-                    {step.status === 'FINISHED' ? (
-                        <CheckCircle2 className="h-5 w-5 text-app-success-solid" />
-                    ) : step.status === 'SKIPPED' ? (
-                        <SkipForward className="h-5 w-5 text-app-danger-solid" />
-                    ) : step.status === 'IN_PROGRESS' ? (
-                        <Clock className="h-5 w-5 text-app-warning-text" />
-                    ) : (
-                        <Circle className="h-5 w-5 text-app-text-disabled" />
-                    )}
-                </span>
+                <div className="flex items-center">
+                    <DragHandle visibleClassName="group-hover/step:mr-1 group-hover/step:w-4 group-hover/step:opacity-100 group-hover/step:text-app-text-muted" />
+
+                    <span>
+                        {step.status === 'FINISHED' ? (
+                            <CheckCircle2 className="h-5 w-5 text-app-success-solid" />
+                        ) : step.status === 'SKIPPED' ? (
+                            <SkipForward className="h-5 w-5 text-app-danger-solid" />
+                        ) : step.status === 'IN_PROGRESS' ? (
+                            <Clock className="h-5 w-5 text-app-warning-text" />
+                        ) : (
+                            <Circle className="h-5 w-5 text-app-text-disabled" />
+                        )}
+                    </span>
+                </div>
 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -414,6 +503,9 @@ function StepCard({
                             }`}>
                                 {step.title}
                             </h4>
+                            <div className="mt-2">
+                                <StepOriginBadge step={step} />
+                            </div>
                         </div>
 
                         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${getStepStatusStyles(step.status)}`}>

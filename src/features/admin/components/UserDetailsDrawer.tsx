@@ -212,7 +212,7 @@ export function UserDetailsDrawer({
             title={visibleTitle}
             leading={
                 <div className="flex shrink-0 items-center justify-center">
-                    <UserAvatar profileIcon={user.profileIcon} fallbackName={user.firstName} size={64} />
+                    <UserAvatar profileIcon={user.profileIcon} fallbackName={`${user.firstName} ${user.lastName}`.trim()} seed={user.id} size={64} />
                 </div>
             }
             badge={

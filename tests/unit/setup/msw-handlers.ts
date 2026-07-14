@@ -258,6 +258,95 @@ export const handlers = [
         ]),
     ),
 
+    http.get('/api/v1/skills', () =>
+        HttpResponse.json([
+            {
+                id: 'skill1',
+                name: 'TypeScript',
+                roleIds: ['role1'],
+                status: 'ACTIVE',
+            },
+        ]),
+    ),
+
+    http.post('/api/v1/admin/skills', async ({ request }) => {
+        const body = (await request.json()) as {
+            name: string;
+            roleIds: string[];
+        };
+        return HttpResponse.json({
+            id: 'mock-skill-' + Date.now(),
+            name: body.name,
+            roleIds: body.roleIds,
+            status: 'ACTIVE',
+        });
+    }),
+
+    http.get('/api/v1/skills/:skillId', ({ params }) =>
+        HttpResponse.json({
+            id: params.skillId,
+            name: 'TypeScript',
+            roleIds: ['role1'],
+            status: 'ACTIVE',
+        }),
+    ),
+
+    http.patch('/api/v1/admin/skills/:skillId', async ({ request, params }) => {
+        const body = (await request.json()) as {
+            name?: string;
+            roleIds?: string[];
+        };
+        return HttpResponse.json({
+            id: params.skillId,
+            name: body.name ?? 'TypeScript',
+            roleIds: body.roleIds ?? ['role1'],
+            status: 'ACTIVE',
+        });
+    }),
+
+    http.get('/api/v1/projectRoles/:roleId/skills', ({ params }) =>
+        HttpResponse.json([
+            {
+                id: 'skill1',
+                name: 'TypeScript',
+                roleIds: [params.roleId],
+                status: 'ACTIVE',
+            },
+        ]),
+    ),
+
+    http.put('/api/v1/projectRoles/:roleId/skills', async ({ request, params }) => {
+        const body = (await request.json()) as { skillIds: string[] };
+        return HttpResponse.json(
+            body.skillIds.map((skillId) => ({
+                id: skillId,
+                name: 'Skill ' + skillId,
+                roleIds: [params.roleId],
+                status: 'ACTIVE' as const,
+            })),
+        );
+    }),
+
+    http.delete('/api/v1/admin/skills/:skillId', () =>
+        new HttpResponse(null, { status: 204 }),
+    ),
+
+    http.get('/api/v1/me/skills', () => HttpResponse.json([])),
+
+    http.post('/api/v1/me/skill/assess', async ({ request }) => {
+        const body = (await request.json()) as { skillId: string; level: string };
+        return HttpResponse.json({
+            id: 'assessment-' + body.skillId,
+            userId: 'user1',
+            skillId: body.skillId,
+            level: body.level,
+        });
+    }),
+
+    http.get('/api/v1/admin/users/:userId/skill-assessments/completed', () =>
+        HttpResponse.json([]),
+    ),
+
     http.post('/api/v1/projectRoles', async ({ request }) => {
         const body = (await request.json()) as { name: string; description: string };
         return HttpResponse.json({

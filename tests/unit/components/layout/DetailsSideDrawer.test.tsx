@@ -12,14 +12,14 @@ describe('DetailsSideDrawer', () => {
         );
 
         expect(screen.getByText('Drawer Title')).toBeInTheDocument();
-        expect(screen.getByText('Drawer Title').closest('aside')).toHaveClass('translate-x-0');
+        expect(screen.getByText('Drawer Title').closest('[role="dialog"]')).toHaveClass('translate-x-0');
 
         rerender(
             <DetailsSideDrawer isOpen={false} onClose={vi.fn()} title="Drawer Title" leading={<span>Leading</span>}>
                 <p>Drawer Content</p>
             </DetailsSideDrawer>,
         );
-        expect(screen.getByText('Drawer Title').closest('aside')).toHaveClass('translate-x-full');
+        expect(screen.getByText('Drawer Title').closest('[role="dialog"]')).toHaveClass('translate-x-full');
     });
 
     it('fires onClose when the X button is clicked', async () => {

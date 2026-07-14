@@ -206,6 +206,7 @@ export function KnowledgeBasePage() {
                                     type="button"
                                     onClick={() => setBatchResult(null)}
                                     className="rounded-lg p-1 text-app-text-subtle transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                                    aria-label="Dismiss upload notification"
                                 >
                                     <X className="h-4 w-4" />
                                 </button>

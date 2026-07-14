@@ -18,6 +18,7 @@ export function TeamMemberFilters({
     return (
         <div className="flex flex-wrap items-center gap-2">
             <select
+                aria-label="Filter team members by role"
                 value={filters.roleId}
                 onChange={(event) =>
                     onFiltersChange({
@@ -37,6 +38,7 @@ export function TeamMemberFilters({
             </select>
 
             <select
+                aria-label="Sort team members"
                 value={filters.sortBy}
                 onChange={(event) =>
                     onFiltersChange({

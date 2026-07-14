@@ -1,15 +1,15 @@
 // ============================================================
-// KnowledgeGapDetailPage.tsx
+// KnowledgeGapsDetailPage.tsx
 // Route: /insights/knowledge-gaps/:gapId
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import type {
-  KnowledgeGap,
-  KnowledgeGapSeverity,
-} from "../../../features/knowledge-gaps/types";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { getTeamOverview } from "../../../services/teamManagementService";
+import { useFetch } from "../../../hooks/useFetch";
+import { formatDateTime, formatRelativeDate, daysSince } from "../format";
+import { SEVERITY_STYLES } from "../severity";
 
 import {
   ArrowLeft,
@@ -17,73 +17,38 @@ import {
   AlertCircle,
   Clock,
   User,
-  MessageCircleQuestion,
+  UserPlus,
+  X,
+  FileCheck,
   ShieldAlert,
   Wrench,
+  Database,
 } from "lucide-react";
 
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
-
-const SEVERITY_STYLES: Record<
-  KnowledgeGapSeverity,
-  { badge: string; bar: string; label: string; ring: string }
-> = {
-  high: {
-    badge: "bg-red-100 text-red-700",
-    bar: "bg-red-400",
-    label: "High severity",
-    ring: "border-red-200",
-  },
-  medium: {
-    badge: "bg-amber-100 text-amber-700",
-    bar: "bg-amber-400",
-    label: "Medium severity",
-    ring: "border-amber-200",
-  },
-  low: {
-    badge: "bg-emerald-100 text-emerald-700",
-    bar: "bg-emerald-400",
-    label: "Low severity",
-    ring: "border-emerald-200",
-  },
-};
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+// Nudge the PM to re-ingest when the newest artifact is older than this.
+const STALE_AFTER_DAYS = 30;
 
 // ─────────────────────────────────────────────────────────────
-// COMPONENT: KnowledgeGapDetailPage
+// COMPONENT: KnowledgeGapsDetailPage
 // ─────────────────────────────────────────────────────────────
 
 export function KnowledgeGapsDetailPage() {
   const { gapId } = useParams<{ gapId: string }>();
   const navigate = useNavigate();
 
-  const [gap, setGap] = useState<KnowledgeGap | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [savingOwners, setSavingOwners] = useState(false);
 
-  useEffect(() => {
-    if (!gapId) return;
-    const load = async () => {
-      try {
-        const data = await knowledgeGapService.fetchKnowledgeGap(gapId);
-        setGap(data);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, [gapId]);
+  const {
+    data: gap,
+    loading,
+    error,
+  } = useFetch(
+    () => knowledgeGapService.fetchKnowledgeGap(gapId ?? ""),
+    [gapId, refreshKey],
+  );
+
+  const { data: teamUsers } = useFetch(() => getTeamOverview(), []);
 
   // ── LOADING ────────────────────────────────────────────
 
@@ -122,7 +87,34 @@ export function KnowledgeGapsDetailPage() {
     );
   }
 
-  const { badge, bar, label, ring } = SEVERITY_STYLES[gap.severity];
+  const { badge, bar, longLabel, ring } = SEVERITY_STYLES[gap.severity];
+
+  // A component has a single owner; assigning replaces any previous one.
+  const currentOwner = gap.owners[0] ?? null;
+  const assignableUsers = (teamUsers ?? []).filter(
+    (u) => u.userId !== currentOwner?.id,
+  );
+
+  const saveOwners = async (userIds: string[]) => {
+    setSavingOwners(true);
+    try {
+      await knowledgeGapService.setComponentOwners(gap.component, userIds);
+      setRefreshKey((key) => key + 1);
+    } catch (err) {
+      console.error("Failed to update owner", err);
+    } finally {
+      setSavingOwners(false);
+    }
+  };
+
+  const setOwner = (userId: string) => {
+    if (userId) void saveOwners([userId]);
+  };
+  const clearOwner = () => void saveOwners([]);
+
+  const firstIngested = gap.firstIngested ?? gap.lastIngested;
+  const daysSinceIngest = daysSince(gap.lastIngested);
+  const isStale = daysSinceIngest > STALE_AFTER_DAYS;
 
   // ── RENDER ─────────────────────────────────────────────
 
@@ -146,11 +138,12 @@ export function KnowledgeGapsDetailPage() {
               </h1>
               <div className="flex items-center gap-2 text-xs text-app-text-muted">
                 <Clock className="w-3.5 h-3.5" />
-                Last updated {formatDate(gap.lastUpdated)}
+                First ingested {formatDateTime(firstIngested)} ·{" "}
+                {formatRelativeDate(firstIngested)}
               </div>
             </div>
             <span className={`text-xs font-semibold px-3 py-1.5 rounded-full shrink-0 ${badge}`}>
-              {label}
+              {longLabel}
             </span>
           </div>
         </div>
@@ -179,11 +172,11 @@ export function KnowledgeGapsDetailPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-app-surface-muted rounded-xl p-3">
               <div className="text-xs text-app-text-muted mb-1 flex items-center gap-1">
-                <MessageCircleQuestion className="w-3.5 h-3.5" />
-                Related questions
+                <FileCheck className="w-3.5 h-3.5" />
+                Present document types
               </div>
               <div className="text-2xl font-semibold text-app-text">
-                {gap.relatedQuestions}
+                {gap.presentTypes?.length ?? 0}
               </div>
             </div>
             <div className="bg-app-surface-muted rounded-xl p-3">
@@ -197,6 +190,26 @@ export function KnowledgeGapsDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Present types */}
+        {gap.presentTypes && gap.presentTypes.length > 0 && (
+          <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
+              <FileCheck className="w-3.5 h-3.5" />
+              Present document types
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {gap.presentTypes.map((t) => (
+                <span
+                  key={t}
+                  className="text-sm text-app-success-text bg-app-success-bg border border-app-success-border rounded-lg px-3 py-1.5"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Missing types */}
         <div className="rounded-2xl border border-app-border bg-app-surface p-5">
@@ -216,35 +229,107 @@ export function KnowledgeGapsDetailPage() {
           </div>
         </div>
 
-        {/* Owners */}
+        {/* Owner */}
         <div className="rounded-2xl border border-app-border bg-app-surface p-5">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
             <User className="w-3.5 h-3.5" />
-            Owners ({gap.owners.length})
+            Owner
           </div>
           <div className="space-y-2">
-            {gap.owners.map((owner) => (
-              <div
-                key={owner.id}
-                className="flex items-center gap-3 bg-app-surface-muted rounded-xl p-3"
-              >
+            {!currentOwner && (
+              <p className="text-sm text-app-text-muted">
+                No owner assigned yet.
+              </p>
+            )}
+            {currentOwner && (
+              <div className="flex items-center gap-3 bg-app-surface-muted rounded-xl p-3">
                 {/* Avatar initials */}
                 <div className="w-8 h-8 rounded-full bg-app-brand-soft flex items-center justify-center shrink-0">
                   <span className="text-xs font-semibold text-app-brand-text">
-                    {owner.firstname[0]}{owner.lastname[0]}
+                    {currentOwner.firstname[0]}{currentOwner.lastname[0]}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-app-text">
-                    {owner.firstname} {owner.lastname}
+                    {currentOwner.firstname} {currentOwner.lastname}
                   </div>
                   <div className="text-xs text-app-text-muted">
-                    @{owner.username} · {owner.workingArea}
+                    @{currentOwner.username}
+                    {currentOwner.role ? ` · ${currentOwner.role}` : ""}
                   </div>
                 </div>
+                <button
+                  onClick={clearOwner}
+                  disabled={savingOwners}
+                  title="Remove owner"
+                  className="text-app-text-muted hover:text-app-danger-solid transition-colors disabled:opacity-60 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            ))}
+            )}
           </div>
+
+          {/* Assign / change owner */}
+          <div className="mt-3 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-app-text-muted shrink-0" />
+            <select
+              value=""
+              disabled={savingOwners || assignableUsers.length === 0}
+              onChange={(e) => setOwner(e.target.value)}
+              className="flex-1 text-sm rounded-lg border border-app-border bg-app-bg text-app-text px-3 py-2 disabled:opacity-60"
+            >
+              <option value="" disabled>
+                {currentOwner ? "Change owner…" : "Assign owner…"}
+              </option>
+              {assignableUsers.map((u) => (
+                <option key={u.userId} value={u.userId}>
+                  {u.firstname} {u.lastname}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Data source */}
+        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
+            <Database className="w-3.5 h-3.5" />
+            Data source
+          </div>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="text-sm text-app-text space-y-1">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-app-text-muted shrink-0" />
+                <span>
+                  Last ingested{" "}
+                  <span className="font-medium">
+                    {formatDateTime(gap.lastIngested)}
+                  </span>{" "}
+                  <span className="text-app-text-muted">
+                    · {formatRelativeDate(gap.lastIngested)}
+                  </span>
+                </span>
+              </div>
+              <div className="text-xs text-app-text-muted pl-6">
+                Last analyzed {formatDateTime(gap.refreshedAt)}
+              </div>
+            </div>
+            <button
+              onClick={() => void navigate("/data-ingestion")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all shrink-0"
+            >
+              <Database className="w-4 h-4" />
+              Update data source
+            </button>
+          </div>
+          {isStale && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-app-warning-text bg-app-warning-bg border border-app-warning-border rounded-lg px-3 py-2">
+              <Clock className="w-3.5 h-3.5 shrink-0" />
+              This data was last ingested {daysSinceIngest} days ago — re-ingest the
+              source to refresh it.
+            </div>
+          )}
         </div>
 
       </main>

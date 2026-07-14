@@ -14,6 +14,11 @@ import { RunHistory } from "../features/data-ingestion/components/RunHistory.tsx
 import { SourceConnectModal } from "../features/data-ingestion/components/SourceConnectModal.tsx";
 import { SourceDetailsPanel } from "../features/data-ingestion/components/SourceDetailsPanel.tsx";
 import { SourceList } from "../features/data-ingestion/components/SourceList.tsx";
+import { ConnectorList } from "../features/connectors/components/ConnectorList.tsx";
+import { ConnectorsLoadingState } from "../features/connectors/components/ConnectorsLoadingState.tsx";
+import { toConnectorListItems } from "../features/connectors/data.ts";
+import type { ConnectorListItem } from "../features/connectors/types.ts";
+import { connectorService } from "../services/connectorService.ts";
 import {
     createDataSource,
     formatDateTime,
@@ -221,6 +226,29 @@ export function DataIngestionPage() {
         string | null
     >(null);
     const [pollingUntil, setPollingUntil] = useState<number | null>(null);
+
+    const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
+    const [connectorsLoadingState, setConnectorsLoadingState] =
+        useState<LoadingState>("idle");
+    const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<
+        string | null
+    >(null);
+    const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
+    const [togglingConnectorId, setTogglingConnectorId] = useState<
+        string | null
+    >(null);
+    const [selectedConnectorId, setSelectedConnectorId] = useState<
+        string | null
+    >(null);
+
+    const handleToggleConnectorSources = useCallback(
+        (connector: ConnectorListItem) => {
+            setSelectedConnectorId((current) =>
+                current === connector.id ? null : connector.id,
+            );
+        },
+        [],
+    );
 
     const commitIngestionData = useCallback(
         (statusData: SourceIngestionStatus[], runData: IngestionRun[]) => {
@@ -454,6 +482,71 @@ export function DataIngestionPage() {
         [runs, sourceStatuses],
     );
 
+    const loadConnectors = useCallback(async () => {
+        setConnectorsLoadingState("loading");
+        setConnectorsErrorMessage(null);
+
+        try {
+            const response = await connectorService.listConnectors();
+            setConnectors(toConnectorListItems(response));
+            setHasLoadedConnectors(true);
+            setConnectorsLoadingState("success");
+        } catch (error) {
+            setConnectorsLoadingState("error");
+            setConnectorsErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to load connectors",
+            );
+        }
+    }, []);
+
+    const handleTabChange = useCallback(
+        (tab: ActiveTab) => {
+            setActiveTab(tab);
+
+            if (
+                tab === "connectors" &&
+                !hasLoadedConnectors &&
+                connectorsLoadingState !== "loading"
+            ) {
+                void loadConnectors();
+            }
+        },
+        [connectorsLoadingState, hasLoadedConnectors, loadConnectors],
+    );
+
+    const handleToggleConnectorEnabled = useCallback(
+        async (connector: ConnectorListItem) => {
+            setTogglingConnectorId(connector.id);
+            setConnectorsErrorMessage(null);
+
+            try {
+                const response = await connectorService.setConnectorEnabled(
+                    connector.id,
+                    !connector.enabled,
+                );
+
+                setConnectors((current) =>
+                    current.map((item) =>
+                        item.id === connector.id
+                            ? { ...item, ...response }
+                            : item,
+                    ),
+                );
+            } catch (error) {
+                setConnectorsErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to update connector",
+                );
+            } finally {
+                setTogglingConnectorId(null);
+            }
+        },
+        [],
+    );
+
     const selectedSource = useMemo(() => {
         if (!selectedSourceSystem) return null;
 
@@ -507,7 +600,7 @@ export function DataIngestionPage() {
                         <section className="overflow-hidden rounded-3xl border border-app-border bg-app-surface">
                             <DataIngestionTabs
                                 activeTab={activeTab}
-                                onTabChange={setActiveTab}
+                                onTabChange={handleTabChange}
                                 onAddSource={handleOpenSourceModal}
                             />
 
@@ -535,6 +628,42 @@ export function DataIngestionPage() {
 
                                 {!isLoading && activeTab === "runs" ? (
                                     <RunHistory runs={runs} />
+                                ) : null}
+
+                                {activeTab === "connectors" ? (
+                                    <>
+                                        {connectorsErrorMessage && (
+                                            <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+                                                {connectorsErrorMessage}
+                                            </div>
+                                        )}
+
+                                        {connectorsLoadingState === "loading" &&
+                                        !hasLoadedConnectors ? (
+                                            <ConnectorsLoadingState />
+                                        ) : (
+                                            <ConnectorList
+                                                connectors={connectors}
+                                                togglingConnectorId={
+                                                    togglingConnectorId
+                                                }
+                                                expandedConnectorId={
+                                                    selectedConnectorId
+                                                }
+                                                onToggleEnabled={(connector) => {
+                                                    void handleToggleConnectorEnabled(
+                                                        connector,
+                                                    );
+                                                }}
+                                                onToggleSources={
+                                                    handleToggleConnectorSources
+                                                }
+                                                onSourcesSaved={() => {
+                                                    void loadConnectors();
+                                                }}
+                                            />
+                                        )}
+                                    </>
                                 ) : null}
                             </div>
                         </section>

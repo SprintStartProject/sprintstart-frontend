@@ -34,4 +34,19 @@ export const insightsService = {
             return faqDetailMock;
         }
     },
+
+    /**
+     * Triggers the backend to (re)build the FAQ groups via the AI service.
+     *
+     * Unlike the fetch methods, this does not fall back to mock data: the caller
+     * needs to know whether the refresh actually succeeded, so errors propagate.
+     *
+     * @returns The number of groups stored after the refresh.
+     */
+    async refreshFAQGroups(): Promise<{ groupCount: number }> {
+        return await apiClient.fetch<{ groupCount: number }>(
+            '/api/v1/insights/faq/refresh',
+            { method: 'POST' }
+        );
+    },
 };

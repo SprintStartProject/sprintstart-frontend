@@ -27,14 +27,12 @@
     {
       "id": "doc_001",
       "title": "VPN Setup Guide",
-      "source": "confluence",
-      "url": "https://company.atlassian.net/wiki/spaces/IT/pages/vpn-setup"
+      "source": "confluence"
     },
     {
       "id": "doc_014",
       "title": "Remote Work Handbook",
-      "source": "sharepoint",
-      "url": "https://company.sharepoint.com/remote-work"
+      "source": "sharepoint"
     }
   ]
 }

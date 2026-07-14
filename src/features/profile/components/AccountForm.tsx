@@ -14,7 +14,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [lastName, setLastName] = useState(profile.lastName || '');
     const [email, setEmail] = useState(profile.email || '');
-    const [profileIcon, setProfileIcon] = useState(profile.profileIcon || profile.username || 'User');
+    const [profileIcon, setProfileIcon] = useState(profile.profileIcon || profile.id);
     const [isSaving, setIsSaving] = useState(false);
     const [isChoosingIcon, setIsChoosingIcon] = useState(false);
     const [iconOptions, setIconOptions] = useState<string[]>([]);
@@ -55,7 +55,8 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                     <UserAvatar 
                         size={80}
                         profileIcon={profileIcon}
-                        fallbackName={profile.username}
+                        fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                        seed={profile.id}
                     />
                 </div>
                 <div>
@@ -88,6 +89,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                                 type="button"
                                 onClick={() => handleSelectIcon(seed)}
                                 className="shrink-0 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg"
+                                aria-label={`Select avatar ${seed}`}
                             >
                                 <UserAvatar size={48} profileIcon={seed} />
                             </button>

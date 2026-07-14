@@ -1,5 +1,10 @@
 import { PermissionGroup, type UserProfile } from '../services/types';
 
+/**
+ * Defines the Role-Based Access Control (RBAC) rules for the frontend application.
+ * Manages which of the four permission groups (USER, PM, HR, ADMIN) can access specific routes.
+ * Centralizing this ensures secure, predictable navigation flows based on user authority.
+ */
 export type AppRoute =
     | '/'
     | '/chat'

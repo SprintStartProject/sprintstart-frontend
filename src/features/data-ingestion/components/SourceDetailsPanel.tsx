@@ -61,6 +61,10 @@ async function fetchSourceDetails(sourceSystem: SourceSystem) {
 
 const EMPTY_RECENT_RUNS: IngestionRun[] = [];
 
+/**
+ * Slide-out panel showing detailed statistics and recent runs for a specific data source.
+ * Allows users to manually trigger a refresh/update of the source.
+ */
 export function SourceDetailsPanel({
                                        source,
                                        githubRepository = null,

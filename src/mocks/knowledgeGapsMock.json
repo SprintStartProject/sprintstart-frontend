@@ -1,108 +1,124 @@
 {
-    "gaps": [
+  "gaps": [
+    {
+      "id": "1",
+      "component": "auth-service",
+      "missingTypes": [
+        "runbook",
+        "adr"
+      ],
+      "presentTypes": [
+        "readme",
+        "api-documentation"
+      ],
+      "owners": [
         {
-            "id": "1",
-            "component": "auth-service",
-            "missingTypes": [
-                "runbook",
-                "adr"
-            ],
-            "lastUpdated": "2025-05-01T00:00:00Z",
-            "owners": [
-                {
-                    "id": "user_001",
-                    "username": "jdoe",
-                    "firstname": "John",
-                    "lastname": "Doe",
-                    "workingArea": "BACKEND"
-                }
-            ],
-            "severity": "high",
-            "relatedQuestions": 12
-        },
-        {
-            "id": "2",
-            "component": "user-management",
-            "missingTypes": [
-                "architecture-diagram"
-            ],
-            "lastUpdated": "2025-04-12T00:00:00Z",
-            "owners": [
-                {
-                    "id": "user_002",
-                    "username": "asmith",
-                    "firstname": "Anna",
-                    "lastname": "Smith",
-                    "workingArea": "BACKEND"
-                }
-            ],
-            "severity": "medium",
-            "relatedQuestions": 7
-        },
-        {
-            "id": "3",
-            "component": "notification-service",
-            "missingTypes": [
-                "runbook"
-            ],
-            "lastUpdated": "2025-02-20T00:00:00Z",
-            "owners": [
-                {
-                    "id": "user_003",
-                    "username": "mweber",
-                    "firstname": "Max",
-                    "lastname": "Weber",
-                    "workingArea": "DEVOPS"
-                }
-            ],
-            "severity": "high",
-            "relatedQuestions": 10
-        },
-        {
-            "id": "4",
-            "component": "frontend-portal",
-            "missingTypes": [
-                "developer-guide"
-            ],
-            "lastUpdated": "2025-06-01T00:00:00Z",
-            "owners": [
-                {
-                    "id": "user_004",
-                    "username": "lmueller",
-                    "firstname": "Lisa",
-                    "lastname": "Müller",
-                    "workingArea": "FRONTEND"
-                }
-            ],
-            "severity": "low",
-            "relatedQuestions": 3
-        },
-        {   
-            "id": "5",
-            "component": "payment-service",
-            "missingTypes": [
-                "adr",
-                "api-documentation"
-            ],
-            "lastUpdated": "2025-03-15T00:00:00Z",
-            "owners": [
-                {
-                    "id": "user_005",
-                    "username": "tbecker",
-                    "firstname": "Tom",
-                    "lastname": "Becker",
-                    "workingArea": "BACKEND"
-                },
-                {
-                    "id": "user_006",
-                    "username": "sklein",
-                    "firstname": "Sarah",
-                    "lastname": "Klein",
-                    "workingArea": "ARCHITECTURE"
-                }
-            ],
-            "severity": "high",
-            "relatedQuestions": 18
+          "id": "user_001",
+          "username": "jdoe",
+          "firstname": "John",
+          "lastname": "Doe"
         }
-    ]
+      ],
+      "severity": "high",
+      "lastIngested": "2025-05-01T00:00:00Z",
+      "refreshedAt": "2026-07-12T00:00:00Z",
+      "firstIngested": "2025-01-10T09:15:00Z"
+    },
+    {
+      "id": "2",
+      "component": "user-management",
+      "missingTypes": [
+        "architecture-diagram"
+      ],
+      "presentTypes": [
+        "readme"
+      ],
+      "owners": [
+        {
+          "id": "user_002",
+          "username": "asmith",
+          "firstname": "Anna",
+          "lastname": "Smith"
+        }
+      ],
+      "severity": "medium",
+      "lastIngested": "2025-04-12T00:00:00Z",
+      "refreshedAt": "2026-07-12T00:00:00Z",
+      "firstIngested": "2025-01-10T09:15:00Z"
+    },
+    {
+      "id": "3",
+      "component": "notification-service",
+      "missingTypes": [
+        "runbook"
+      ],
+      "presentTypes": [
+        "readme",
+        "adr"
+      ],
+      "owners": [
+        {
+          "id": "user_003",
+          "username": "mweber",
+          "firstname": "Max",
+          "lastname": "Weber"
+        }
+      ],
+      "severity": "high",
+      "lastIngested": "2025-02-20T00:00:00Z",
+      "refreshedAt": "2026-07-12T00:00:00Z",
+      "firstIngested": "2025-01-10T09:15:00Z"
+    },
+    {
+      "id": "4",
+      "component": "frontend-portal",
+      "missingTypes": [
+        "developer-guide"
+      ],
+      "presentTypes": [
+        "readme"
+      ],
+      "owners": [
+        {
+          "id": "user_004",
+          "username": "lmueller",
+          "firstname": "Lisa",
+          "lastname": "Müller"
+        }
+      ],
+      "severity": "low",
+      "lastIngested": "2025-06-01T00:00:00Z",
+      "refreshedAt": "2026-07-12T00:00:00Z",
+      "firstIngested": "2025-01-10T09:15:00Z"
+    },
+    {
+      "id": "5",
+      "component": "payment-service",
+      "missingTypes": [
+        "adr",
+        "api-documentation"
+      ],
+      "presentTypes": [
+        "readme"
+      ],
+      "owners": [
+        {
+          "id": "user_005",
+          "username": "tbecker",
+          "firstname": "Tom",
+          "lastname": "Becker"
+        },
+        {
+          "id": "user_006",
+          "username": "sklein",
+          "firstname": "Sarah",
+          "lastname": "Klein"
+        }
+      ],
+      "severity": "high",
+      "lastIngested": "2025-03-15T00:00:00Z",
+      "refreshedAt": "2026-07-12T00:00:00Z",
+      "firstIngested": "2025-01-10T09:15:00Z"
+    }
+  ]
 }

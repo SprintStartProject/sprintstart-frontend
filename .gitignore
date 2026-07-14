@@ -15,6 +15,7 @@ dist
 dist-ssr
 coverage
 test-results
+storybook-static
 
 # Environment files
 .env

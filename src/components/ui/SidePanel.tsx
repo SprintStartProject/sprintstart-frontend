@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 type SidePanelProps = {
     isOpen: boolean;
@@ -25,6 +25,20 @@ type SidePanelProps = {
     closeOnEscape?: boolean;
 };
 
+const focusableSelector = [
+    "a[href]",
+    "button:not([disabled])",
+    "textarea:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function getFocusableElements(container: HTMLElement) {
+    return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((element) => !element.hasAttribute("aria-hidden"));
+}
+
 export function SidePanel({
     isOpen,
     onClose,
@@ -48,12 +62,65 @@ export function SidePanel({
     closeAriaLabel = "Close details",
     closeOnEscape = true,
 }: SidePanelProps) {
+    const panelRef = useRef<HTMLDivElement>(null);
+    const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+    const titleId = useId();
+    const descriptionId = useId();
+
     useEffect(() => {
-        if (!isOpen || !closeOnEscape) return;
+        if (!isOpen) {
+            previouslyFocusedElement.current?.focus();
+            return;
+        }
+
+        previouslyFocusedElement.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+        const animationFrameId = window.requestAnimationFrame(() => {
+            const panel = panelRef.current;
+            if (!panel) return;
+
+            const [firstFocusable] = getFocusableElements(panel);
+            (firstFocusable ?? panel).focus();
+        });
+
+        return () => {
+            window.cancelAnimationFrame(animationFrameId);
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
 
         function handleKeyDown(event: KeyboardEvent) {
-            if (event.key === "Escape") {
+            if (event.key === "Escape" && closeOnEscape) {
                 onClose();
+                return;
+            }
+
+            if (event.key !== "Tab") {
+                return;
+            }
+
+            const panel = panelRef.current;
+            if (!panel) return;
+
+            const focusableElements = getFocusableElements(panel);
+            if (focusableElements.length === 0) {
+                event.preventDefault();
+                panel.focus();
+                return;
+            }
+
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+
+            if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+            } else if (!event.shiftKey && document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
             }
         }
 
@@ -75,11 +142,18 @@ export function SidePanel({
                 />
             )}
 
-            <aside
+            <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={title ? titleId : undefined}
+                aria-describedby={description ? descriptionId : undefined}
                 className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden rounded-l-[28px] border-l border-app-border ${panelBackgroundClassName} shadow-2xl transition-[transform,opacity] duration-300 ease-out ${
                     isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
                 } ${panelClassName}`}
                 aria-hidden={!isOpen}
+                inert={!isOpen}
+                tabIndex={-1}
             >
                 {(title || description || leading || badge || actions) && (
                     <div className={`${headerDividerClassName} ${headerClassName}`}>
@@ -89,13 +163,13 @@ export function SidePanel({
 
                                 <div className="min-w-0">
                                     {title && (
-                                        <h2 className="break-words text-xl font-bold leading-tight text-app-text">
+                                        <h2 id={titleId} className="break-words text-xl font-bold leading-tight text-app-text">
                                             {title}
                                         </h2>
                                     )}
 
                                     {description && (
-                                        <div className="mt-1 text-sm leading-relaxed text-app-text-muted">
+                                        <div id={descriptionId} className="mt-1 text-sm leading-relaxed text-app-text-muted">
                                             {description}
                                         </div>
                                     )}
@@ -133,7 +207,7 @@ export function SidePanel({
                         {footer}
                     </div>
                 )}
-            </aside>
+            </div>
         </>
     );
 }

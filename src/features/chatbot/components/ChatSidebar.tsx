@@ -3,7 +3,10 @@ import { Plus } from "lucide-react";
 import type { ChatSidebarProps } from "../types";
 
 /**
- * The sidebar displaying all chats created by the user.
+ * ChatSidebar
+ *
+ * Displays the list of user chats and provides navigation between them.
+ * Triggers the provided `setSidebarOpen` callback on mobile to close the drawer after selection.
  */
 export function ChatSidebar({ chats, setSidebarOpen }: ChatSidebarProps) {
     return (

@@ -1,32 +1,23 @@
 // ============================================================
 // TeamManagementWidget.tsx
 // Dashboard widget — shows the 4 most stuck team members
-// (longest time on current step) plus unread counts for
+// (longest time on current step) as cards (same TeamMemberCard
+// used on the Team Management page) plus unread counts for
 // pending feedback and skip requests.
-// Clicking "See all" or a member card navigates to the
-// Team Management page / member detail page.
+// Clicking anywhere on the widget navigates to the Team
+// Management page; clicking a member card navigates straight to
+// that member's detail page.
 // ============================================================
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, ArrowRight, Loader2, AlertCircle, MessageSquareText, SkipForward } from 'lucide-react';
 import { getTeamOverview } from '../../../services/teamManagementService';
+import { ClickableCard } from '../../../components/common/ClickableCard';
+import { TeamMemberCard } from './TeamMemberCard';
 import type { TeamOverviewUser } from '../types';
 
 // ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
-
-const AT_RISK_AFTER_DAYS = 5;
-
-function getElapsedDays(startedAt: string): number {
-    return Math.max(
-        0,
-        Math.floor((Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24))
-    );
-}
-
-import { UserAvatar } from '../../../components/common/UserAvatar';
 // SUB-COMPONENT: badge pill used in the widget header
 // ─────────────────────────────────────────────────────────────
 
@@ -50,68 +41,6 @@ function CountBadge({ icon, count, label, variant }: CountBadgeProps) {
             {icon}
             {count}
         </span>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SUB-COMPONENT: single member row inside the widget
-// ─────────────────────────────────────────────────────────────
-
-type MemberRowProps = {
-    user: TeamOverviewUser;
-    onClick: () => void;
-};
-
-function MemberRow({ user, onClick }: MemberRowProps) {
-    const elapsedDays = user.currentStep?.startedAt
-        ? getElapsedDays(user.currentStep.startedAt)
-        : 0;
-    const progressPercentage = Math.round(user.progressPercentage * 100);
-    const isAtRisk = !!user.currentStep && elapsedDays > AT_RISK_AFTER_DAYS;
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="w-full text-left flex items-center gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-brand-border-strong hover:bg-app-surface-hover transition-colors p-3"
-        >
-            {/* Avatar */}
-            <div className="flex shrink-0 items-center justify-center">
-                <UserAvatar profileIcon={user.profileIcon} fallbackName={user.firstname} size={32} />
-            </div>
-
-            {/* Name + step */}
-            <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-app-text">
-                    {user.firstname} {user.lastname}
-                </p>
-                <p className="truncate text-xs text-app-text-muted">
-                    {user.currentStep?.title ?? 'No current step'}
-                </p>
-
-                {/* Progress bar */}
-                <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-app-progress-track">
-                        <div
-                            className="h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-all duration-500"
-                            style={{ width: `${progressPercentage}%` }}
-                        />
-                    </div>
-                    <span className="text-xs tabular-nums text-app-text-muted">
-                        {progressPercentage}%
-                    </span>
-                </div>
-            </div>
-
-            {/* Elapsed days — highlighted when at risk */}
-            <span
-                className={`shrink-0 text-xs font-medium tabular-nums ${
-                    isAtRisk ? 'text-app-warning-text' : 'text-app-text-muted'
-                }`}
-            >
-                {user.currentStep ? `${elapsedDays}d` : '—'}
-            </span>
-        </button>
     );
 }
 
@@ -188,7 +117,11 @@ export function TeamManagementWidget() {
     // ── RENDER ───────────────────────────────────────────────
 
     return (
-        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+        <ClickableCard
+            onClick={() => void navigate('/team-management')}
+            interactive={false}
+            className="rounded-2xl border border-app-border bg-app-surface p-5 cursor-pointer transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[a:hover]:!border-app-border has-[a:hover]:!bg-app-surface"
+        >
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -200,8 +133,11 @@ export function TeamManagementWidget() {
 
                 <button
                     type="button"
-                    onClick={() => void navigate('/team-management')}
-                    className="flex items-center gap-1 text-xs text-app-text-muted hover:text-app-text transition-colors"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        void navigate('/team-management');
+                    }}
+                    className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                 >
                     See all ({users.length})
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -230,16 +166,22 @@ export function TeamManagementWidget() {
                 </div>
             )}
 
-            {/* Member rows */}
-            <div className="flex flex-col gap-2">
+            {/* Member cards — same TeamMemberCard used on the Team Management page,
+                rendered in its compact variant to fit the dashboard widget */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {mostStuck.map((user) => (
-                    <MemberRow
+                    // Propagation guard only: TeamMemberCard is itself a keyboard-
+                    // and mouse-accessible <Link>, this wrapper just stops its click
+                    // from also triggering the surrounding card's onClick/onKeyDown.
+                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+                    <div
                         key={user.userId}
-                        user={user}
-                        onClick={() => void navigate(`/team/${user.userId}`)}
-                    />
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <TeamMemberCard user={user} compact />
+                    </div>
                 ))}
             </div>
-        </div>
+        </ClickableCard>
     );
 }
