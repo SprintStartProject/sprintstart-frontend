@@ -96,7 +96,11 @@ export function OnBoardingItemPage() {
     setNextLoading(true);
     try {
       const path = await onboardingService.fetchPath();
+      // Never jump into a locked phase: if the current phase's knowledge check still
+      // blocks the next one, there is no reachable next step, so fall back to the
+      // overview where the pending check is shown.
       const nextStep = path.phases
+        .filter((phase) => !phase.locked)
         .flatMap((phase) => phase.steps)
         .find(
           (step) =>

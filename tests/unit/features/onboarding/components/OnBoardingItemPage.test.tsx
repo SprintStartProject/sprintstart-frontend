@@ -176,6 +176,9 @@ describe('OnBoardingItemPage', () => {
                 position: 1,
                 title: 'Phase 1',
                 description: '',
+                locked: false,
+                unlockReason: null,
+                checkSummary: { required: false, questionCount: 0, passed: false, latestAttemptId: null, latestAttemptAt: null },
                 steps: [{ id: 'step2', phaseId: 'p1', position: 2, title: 'Step 2', description: '', type: 'TASK' as const, estimatedMinutes: 10, expectedOutcomes: [], tasks: [], resources: [], status: 'WAITING' as const, startedAt: null, completedAt: null, feedback: null, skip: null }],
             }],
         });

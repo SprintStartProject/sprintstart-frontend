@@ -9,6 +9,12 @@ import type {
     OnboardingPersonalizeEvent,
     OnboardingPersonalizeHandlers,
     StepStatus,
+    PhaseCheckEndpoint,
+    PhaseCheckAnswerSubmission,
+    PhaseCheckAttemptResult,
+    AdminPhaseCheckEndpoint,
+    UpsertPhaseCheckQuestion,
+    PhaseCheckAttemptsReviewEndpoint,
 } from '../features/onboarding/types';
 import onboardingStepMock from '../mocks/onboardingStepMock.json';
 
@@ -145,6 +151,67 @@ expectedOutcome: step.expectedOutcomes?.[0] ?? '',
                 reason,
             }),
         });
+    },
+
+    // ── PHASE KNOWLEDGE CHECKS ────────────────────────────────
+
+    /**
+     * Loads the knowledge check of a phase for the current user.
+     * Never contains correct answers — those only come back from submitPhaseCheck.
+     */
+    async fetchPhaseCheck(phaseId: string): Promise<PhaseCheckEndpoint> {
+        return await apiClient.fetch<PhaseCheckEndpoint>(`/api/v1/onboarding/me/phases/${phaseId}/checks`);
+    },
+
+    /**
+     * Submits the user's answers for a phase knowledge check. The result says
+     * whether the attempt passed and reveals the correct answers per question.
+     */
+    async submitPhaseCheck(
+        phaseId: string,
+        answers: PhaseCheckAnswerSubmission[],
+    ): Promise<PhaseCheckAttemptResult> {
+        return await apiClient.fetch<PhaseCheckAttemptResult>(
+            `/api/v1/onboarding/me/phases/${phaseId}/checks/attempts`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ answers }),
+            },
+        );
+    },
+
+    /**
+     * Loads a phase check for admin editing screens, including correct answers.
+     * Requires ADMIN/PM/HR role.
+     */
+    async fetchPhaseCheckForEditing(phaseId: string): Promise<AdminPhaseCheckEndpoint> {
+        return await apiClient.fetch<AdminPhaseCheckEndpoint>(`/api/v1/onboarding/phases/${phaseId}/checks`);
+    },
+
+    /**
+     * Replaces all knowledge check questions of a phase. Requires ADMIN/PM/HR role.
+     */
+    async savePhaseCheck(
+        phaseId: string,
+        questions: UpsertPhaseCheckQuestion[],
+    ): Promise<AdminPhaseCheckEndpoint> {
+        return await apiClient.fetch<AdminPhaseCheckEndpoint>(`/api/v1/onboarding/phases/${phaseId}/checks`, {
+            method: 'PUT',
+            body: JSON.stringify({ questions }),
+        });
+    },
+
+    /**
+     * Loads a user's submitted check attempts for a phase so admins, PMs, or HR
+     * can review the results. Requires ADMIN/PM/HR role.
+     */
+    async fetchPhaseCheckAttempts(
+        userId: string,
+        phaseId: string,
+    ): Promise<PhaseCheckAttemptsReviewEndpoint> {
+        return await apiClient.fetch<PhaseCheckAttemptsReviewEndpoint>(
+            `/api/v1/onboarding/users/${userId}/phases/${phaseId}/checks/attempts`,
+        );
     },
 
     // ── FEEDBACK ──────────────────────────────────────────────
