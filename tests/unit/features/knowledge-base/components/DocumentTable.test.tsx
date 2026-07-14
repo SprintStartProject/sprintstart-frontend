@@ -65,7 +65,7 @@ describe('DocumentTable', () => {
 
         render(<DocumentTable documents={docs} onDelete={onDelete} />);
 
-        const deleteButton = screen.getByRole('button', { name: 'Remove document remove-me.md' });
+        const deleteButton = screen.getByRole('button', { name: 'Remove document' });
         await user.click(deleteButton);
 
         expect(onDelete).toHaveBeenCalledWith('d1');

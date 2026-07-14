@@ -8,11 +8,11 @@ type TabSwitcherProps = {
 
 export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
     return (
-        <div className="flex gap-1 rounded-2xl border border-app-border bg-app-surface-muted p-1">
+        <div className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-app-border bg-app-surface-muted p-1 sm:w-auto sm:flex">
             <button
                 type="button"
                 onClick={() => onChange("users")}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                     activeTab === "users"
                         ? "bg-app-surface text-app-text shadow-sm"
                         : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
@@ -25,7 +25,7 @@ export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
             <button
                 type="button"
                 onClick={() => onChange("projects")}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                     activeTab === "projects"
                         ? "bg-app-surface text-app-text shadow-sm"
                         : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
@@ -38,7 +38,7 @@ export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
             <button
                 type="button"
                 onClick={() => onChange("tokens")}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                     activeTab === "tokens"
                         ? "bg-app-surface text-app-text shadow-sm"
                         : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"

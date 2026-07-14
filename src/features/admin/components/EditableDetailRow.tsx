@@ -17,7 +17,7 @@ export function EditableDetailRow({
 }: EditableDetailRowProps) {
     const id = useId();
     return (
-        <div className="grid grid-cols-[7.5rem_1fr] items-center gap-4 py-2.5">
+        <div className="grid grid-cols-1 items-center gap-1.5 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
             <label htmlFor={id} className="text-sm text-app-text-muted">{label}</label>
             <input
                 id={id}

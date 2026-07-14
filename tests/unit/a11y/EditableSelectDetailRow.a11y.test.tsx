@@ -1,26 +1,27 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-import { MemoryRouter } from 'react-router-dom';
 import { EditableSelectDetailRow } from '../../../src/features/admin/components/EditableSelectDetailRow';
 
 describe('EditableSelectDetailRow Accessibility', () => {
-    it('should not have any a11y violations', async () => {
+    it('has no axe violations and exposes its label to the trigger', async () => {
+        const user = userEvent.setup();
         const { baseElement } = render(
-            <MemoryRouter>
-                <main>
-                    <EditableSelectDetailRow
-                        label="Role"
-                        value="Admin"
-                        onChange={vi.fn()}
-                        options={['Admin', 'User', 'Project Manager']}
-                    />
-                </main>
-            </MemoryRouter>
+            <main>
+                <EditableSelectDetailRow
+                    label="Role"
+                    value="User"
+                    options={['Admin', 'User']}
+                    onChange={vi.fn()}
+                />
+            </main>,
         );
 
-        expect(screen.getByRole('button', { name: /Admin/ })).toHaveAttribute('aria-haspopup', 'listbox');
+        const trigger = screen.getByRole('button', { name: 'Role' });
+        await user.click(trigger);
 
+        expect(screen.getByRole('listbox')).toBeInTheDocument();
         expect(await axe(baseElement)).toHaveNoViolations();
     });
 });

@@ -1,118 +1,151 @@
 import type {
-    ArtifactType,
-    FailedArtifact,
-    IngestionRun,
-    IngestionRunStatus,
-    SourceIngestionStatus,
-    SourceSystem,
+  Artifact,
+  ArtifactPage,
+  ArtifactType,
+  FailedArtifact,
+  IngestionRun,
+  IngestionRunStatus,
+  SourceIngestionStatus,
+  SourceSystem,
 } from "../features/data-ingestion/types.ts";
 import { apiClient } from "./apiClient.ts";
 
 type CanonicalFailedArtifact = {
-    sourceId: string | null;
-    artifactType: ArtifactType;
-    sourceUrl: string | null;
-    reason: string;
+  sourceId: string | null;
+  artifactType: ArtifactType;
+  sourceUrl: string | null;
+  reason: string;
 };
 
 type CanonicalIngestionRunResponse = {
-    runId: string;
-    sourceSystem: SourceSystem;
-    startedAt: string;
-    finishedAt: string | null;
-    ingestedCount?: number;
-    updatedCount?: number;
-    failedCount?: number;
-    failedItems?: CanonicalFailedArtifact[];
-    status?: IngestionRunStatus | "SUCCESS" | null;
+  runId: string;
+  sourceSystem: SourceSystem;
+  startedAt: string;
+  finishedAt: string | null;
+  ingestedCount?: number;
+  updatedCount?: number;
+  failedCount?: number;
+  failedItems?: CanonicalFailedArtifact[];
+  status?: IngestionRunStatus | "SUCCESS" | null;
 };
 
 type CanonicalSourceIngestionStatusResponse = {
-    sourceSystem: SourceSystem;
-    lastRunTime: string | null;
-    ingestedCount?: number;
-    updatedCount?: number;
-    failedCount?: number;
-    failedItems?: CanonicalFailedArtifact[];
-    status?: IngestionRunStatus | "SUCCESS" | null;
+  sourceSystem: SourceSystem;
+  lastRunTime: string | null;
+  ingestedCount?: number;
+  updatedCount?: number;
+  failedCount?: number;
+  failedItems?: CanonicalFailedArtifact[];
+  status?: IngestionRunStatus | "SUCCESS" | null;
+};
+
+type GetProjectArtifactsOptions = {
+  page?: number;
+  size?: number;
+  filter?: string;
 };
 
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 100;
+const DEFAULT_ARTIFACT_PAGE_SIZE = 20;
+const SNAPSHOT_ARTIFACT_PAGE_SIZE = 100;
 
 function clampLimit(limit: number) {
-    return Math.min(Math.max(Math.trunc(limit), MIN_LIMIT), MAX_LIMIT);
+  return Math.min(Math.max(Math.trunc(limit), MIN_LIMIT), MAX_LIMIT);
+}
+
+function clampPage(page: number) {
+  return Math.max(Math.trunc(page), 1);
 }
 
 function mapFailedArtifact(item: CanonicalFailedArtifact): FailedArtifact {
-    const sourceReference =
-        item.sourceId ?? item.sourceUrl ?? "Unknown artifact";
+  const sourceReference = item.sourceId ?? item.sourceUrl ?? "Unknown artifact";
 
-    return {
-        artifactIdentifier: `${item.artifactType}: ${sourceReference}`,
-        reason: item.reason,
-    };
+  return {
+    artifactIdentifier: `${item.artifactType}: ${sourceReference}`,
+    reason: item.reason,
+  };
 }
 
 function normalizeRunStatus(
-    status: CanonicalIngestionRunResponse["status"],
+  status: CanonicalIngestionRunResponse["status"],
 ): IngestionRunStatus | null {
-    switch (status) {
-        case "CONNECTED":
-        case "RUNNING":
-        case "COMPLETED":
-        case "PARTIAL":
-        case "FAILED":
-            return status;
-        case "SUCCESS":
-            return "COMPLETED";
-        default:
-            return null;
-    }
+  switch (status) {
+    case "CONNECTED":
+    case "RUNNING":
+    case "COMPLETED":
+    case "PARTIAL":
+    case "FAILED":
+      return status;
+    case "SUCCESS":
+      return "COMPLETED";
+    default:
+      return null;
+  }
 }
 
-function inferRunStatus(run: CanonicalIngestionRunResponse): IngestionRunStatus {
-    const normalizedStatus = normalizeRunStatus(run.status);
+function inferRunStatus(
+  run: CanonicalIngestionRunResponse,
+): IngestionRunStatus {
+  const normalizedStatus = normalizeRunStatus(run.status);
 
-    if (normalizedStatus) return normalizedStatus;
-    if (!run.finishedAt) return "RUNNING";
+  if (normalizedStatus) return normalizedStatus;
+  if (!run.finishedAt) return "RUNNING";
 
-    const failedCount = run.failedCount ?? 0;
-    const failedItemCount = run.failedItems?.length ?? 0;
+  const failedCount = run.failedCount ?? 0;
+  const failedItemCount = run.failedItems?.length ?? 0;
 
-    return failedCount > 0 || failedItemCount > 0 ? "FAILED" : "COMPLETED";
+  return failedCount > 0 || failedItemCount > 0 ? "FAILED" : "COMPLETED";
 }
 
 function mapIngestionRun(run: CanonicalIngestionRunResponse): IngestionRun {
-    const failedItems = run.failedItems ?? [];
+  const failedItems = run.failedItems ?? [];
 
-    return {
-        runId: run.runId,
-        sourceSystem: run.sourceSystem,
-        startedAt: run.startedAt,
-        finishedAt: run.finishedAt,
-        ingestedCount: run.ingestedCount ?? 0,
-        updatedCount: run.updatedCount ?? 0,
-        failedCount: run.failedCount ?? failedItems.length,
-        status: inferRunStatus(run),
-        failedItems: failedItems.map(mapFailedArtifact),
-    };
+  return {
+    runId: run.runId,
+    sourceSystem: run.sourceSystem,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    ingestedCount: run.ingestedCount ?? 0,
+    updatedCount: run.updatedCount ?? 0,
+    failedCount: run.failedCount ?? failedItems.length,
+    status: inferRunStatus(run),
+    failedItems: failedItems.map(mapFailedArtifact),
+  };
 }
 
 function mapIngestionStatus(
-    status: CanonicalSourceIngestionStatusResponse,
+  status: CanonicalSourceIngestionStatusResponse,
 ): SourceIngestionStatus {
-    const failedItems = (status.failedItems ?? []).map(mapFailedArtifact);
+  const failedItems = (status.failedItems ?? []).map(mapFailedArtifact);
 
-    return {
-        sourceSystem: status.sourceSystem,
-        lastRunTime: status.lastRunTime,
-        ingestedCount: status.ingestedCount ?? 0,
-        updatedCount: status.updatedCount ?? 0,
-        failedCount: status.failedCount ?? failedItems.length,
-        status: normalizeRunStatus(status.status),
-        failedItems,
-    };
+  return {
+    sourceSystem: status.sourceSystem,
+    lastRunTime: status.lastRunTime,
+    ingestedCount: status.ingestedCount ?? 0,
+    updatedCount: status.updatedCount ?? 0,
+    failedCount: status.failedCount ?? failedItems.length,
+    status: normalizeRunStatus(status.status),
+    failedItems,
+  };
+}
+
+function buildArtifactQuery({
+  page = 1,
+  size = DEFAULT_ARTIFACT_PAGE_SIZE,
+  filter = "",
+}: GetProjectArtifactsOptions) {
+  const params = new URLSearchParams({
+    page: String(clampPage(page)),
+    size: String(clampLimit(size)),
+  });
+
+  const trimmedFilter = filter.trim();
+  if (trimmedFilter) {
+    params.set("filter", trimmedFilter);
+  }
+
+  return params.toString();
 }
 
 /**
@@ -123,12 +156,12 @@ function mapIngestionStatus(
  * @throws Error if the backend request fails.
  */
 export async function getIngestionRuns(limit = 50): Promise<IngestionRun[]> {
-    const safeLimit = clampLimit(limit);
-    const data = await apiClient.fetch<CanonicalIngestionRunResponse[]>(
-        `/api/v1/ingestion-runs?limit=${safeLimit}`,
-    );
+  const safeLimit = clampLimit(limit);
+  const data = await apiClient.fetch<CanonicalIngestionRunResponse[]>(
+    `/api/v1/ingestion-runs?limit=${safeLimit}`,
+  );
 
-    return data.map(mapIngestionRun);
+  return data.map(mapIngestionRun);
 }
 
 /**
@@ -138,9 +171,51 @@ export async function getIngestionRuns(limit = 50): Promise<IngestionRun[]> {
  * @throws Error if the backend request fails.
  */
 export async function getIngestionStatus(): Promise<SourceIngestionStatus[]> {
-    const data = await apiClient.fetch<
-        CanonicalSourceIngestionStatusResponse[]
-    >("/api/v1/ingestion-status");
+  const data = await apiClient.fetch<CanonicalSourceIngestionStatusResponse[]>(
+    "/api/v1/ingestion-status",
+  );
 
-    return data.map(mapIngestionStatus);
+  return data.map(mapIngestionStatus);
+}
+
+export async function getProjectArtifacts(
+  projectId: string,
+  options: GetProjectArtifactsOptions = {},
+): Promise<ArtifactPage> {
+  const query = buildArtifactQuery(options);
+
+  return apiClient.fetch<ArtifactPage>(
+    `/api/v1/projects/${projectId}/artifacts?${query}`,
+  );
+}
+
+export async function getProjectArtifactSnapshot(
+  projectId: string,
+): Promise<{ artifacts: Artifact[]; totalElements: number }> {
+  const firstPage = await getProjectArtifacts(projectId, {
+    page: 1,
+    size: SNAPSHOT_ARTIFACT_PAGE_SIZE,
+  });
+
+  const remainingPageNumbers = Array.from(
+    { length: Math.max(firstPage.page.totalPages - 1, 0) },
+    (_, index) => index + 2,
+  );
+
+  const remainingPages = await Promise.all(
+    remainingPageNumbers.map((page) =>
+      getProjectArtifacts(projectId, {
+        page,
+        size: SNAPSHOT_ARTIFACT_PAGE_SIZE,
+      }),
+    ),
+  );
+
+  return {
+    artifacts: [
+      ...firstPage.items,
+      ...remainingPages.flatMap((page) => page.items),
+    ],
+    totalElements: firstPage.page.totalElements,
+  };
 }

@@ -5,22 +5,22 @@ import { apiClient } from "./apiClient.ts";
  * reported by the backend Connector Overview API.
  */
 export type ConnectorDto = {
-    id: string;
-    name: string;
-    enabled: boolean;
-    firstConfiguredAt: string | null;
-    lastConfiguredAt: string | null;
+  id: string;
+  name: string;
+  enabled: boolean;
+  firstConfiguredAt: string | null;
+  lastConfiguredAt: string | null;
 };
 
 export type ConfigureConnectorRequest = {
-    enabled: boolean;
+  enabled: boolean;
 };
 
 export type ConfigureConnectorResponse = {
-    id: string;
-    enabled: boolean;
-    firstConfiguredAt: string | null;
-    lastConfiguredAt: string | null;
+  id: string;
+  enabled: boolean;
+  firstConfiguredAt: string | null;
+  lastConfiguredAt: string | null;
 };
 
 /**
@@ -30,36 +30,36 @@ export type ConfigureConnectorResponse = {
  * means it is excluded (denied).
  */
 export type ConnectorSource = {
-    id: string;
-    name: string;
-    url: string;
-    enabled: boolean;
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
 };
 
 export type GetSourcesOfConnectorResponse = {
-    connectorId: string;
-    sources: ConnectorSource[];
+  connectorId: string;
+  sources: ConnectorSource[];
 };
 
 export type PatchSourceRequest = {
-    sourceId: string;
-    enabled: boolean;
+  sourceId: string;
+  enabled: boolean;
 };
 
 export type PatchSourcesRequest = {
-    sources: PatchSourceRequest[];
+  sources: PatchSourceRequest[];
 };
 
 export type PatchedSource = {
-    id: string;
-    name: string;
-    url: string;
-    enabled: boolean;
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
 };
 
 export type PatchSourcesOfConnectorResponse = {
-    connectorId: string;
-    sources: PatchedSource[];
+  connectorId: string;
+  sources: PatchedSource[];
 };
 
 /**
@@ -71,64 +71,64 @@ export type PatchSourcesOfConnectorResponse = {
  * backend's `{ message }` body.
  */
 export const connectorService = {
-    /**
-     * Lists every registered connector (enabled or not), e.g. the GitHub
-     * repository connector.
-     */
-    async listConnectors(): Promise<ConnectorDto[]> {
-        return apiClient.fetch<ConnectorDto[]>("/api/v1/connectors");
-    },
+  /**
+   * Lists every registered connector (enabled or not), e.g. the GitHub
+   * repository connector.
+   */
+  async listConnectors(): Promise<ConnectorDto[]> {
+    return apiClient.fetch<ConnectorDto[]>("/api/v1/connectors");
+  },
 
-    /**
-     * Globally enables or disables a connector.
-     *
-     * @param connectorId - Lowercase connector id (`^[a-z0-9-]+$`), e.g. "github".
-     * @param enabled - Whether the connector should be enabled.
-     */
-    async setConnectorEnabled(
-        connectorId: string,
-        enabled: boolean,
-    ): Promise<ConfigureConnectorResponse> {
-        return apiClient.fetch<ConfigureConnectorResponse>(
-            `/api/v1/connectors/${connectorId}`,
-            {
-                method: "PATCH",
-                body: JSON.stringify({ enabled } satisfies ConfigureConnectorRequest),
-            },
-        );
-    },
+  /**
+   * Globally enables or disables a connector.
+   *
+   * @param connectorId - Lowercase connector id (`^[a-z0-9-]+$`), e.g. "github".
+   * @param enabled - Whether the connector should be enabled.
+   */
+  async setConnectorEnabled(
+    connectorId: string,
+    enabled: boolean,
+  ): Promise<ConfigureConnectorResponse> {
+    return apiClient.fetch<ConfigureConnectorResponse>(
+      `/api/v1/connectors/${connectorId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ enabled } satisfies ConfigureConnectorRequest),
+      },
+    );
+  },
 
-    /**
-     * Retrieves the in-scope sources (e.g. connected repositories) of a
-     * connector, along with their current allow/deny state.
-     */
-    async getConnectorSources(
-        connectorId: string,
-    ): Promise<GetSourcesOfConnectorResponse> {
-        return apiClient.fetch<GetSourcesOfConnectorResponse>(
-            `/api/v1/connectors/${connectorId}/sources`,
-        );
-    },
+  /**
+   * Retrieves the in-scope sources (e.g. connected repositories) of a
+   * connector, along with their current allow/deny state.
+   */
+  async getConnectorSources(
+    connectorId: string,
+  ): Promise<GetSourcesOfConnectorResponse> {
+    return apiClient.fetch<GetSourcesOfConnectorResponse>(
+      `/api/v1/connectors/${connectorId}/sources`,
+    );
+  },
 
-    /**
-     * Batch-updates the allow/deny (enabled) state of one or more sources
-     * for a connector. The backend synchronizes the change to the AI
-     * service asynchronously; this call resolves once that hand-off
-     * completes.
-     *
-     * @param connectorId - Lowercase connector id, e.g. "github".
-     * @param sources - The sources to patch; must be non-empty.
-     */
-    async patchConnectorSources(
-        connectorId: string,
-        sources: PatchSourceRequest[],
-    ): Promise<PatchSourcesOfConnectorResponse> {
-        return apiClient.fetch<PatchSourcesOfConnectorResponse>(
-            `/api/v1/connectors/${connectorId}/sources/status`,
-            {
-                method: "PATCH",
-                body: JSON.stringify({ sources } satisfies PatchSourcesRequest),
-            },
-        );
-    },
+  /**
+   * Batch-updates the allow/deny (enabled) state of one or more sources
+   * for a connector. The backend synchronizes the change to the AI
+   * service asynchronously; this call resolves once that hand-off
+   * completes.
+   *
+   * @param connectorId - Lowercase connector id, e.g. "github".
+   * @param sources - The sources to patch; must be non-empty.
+   */
+  async patchConnectorSources(
+    connectorId: string,
+    sources: PatchSourceRequest[],
+  ): Promise<PatchSourcesOfConnectorResponse> {
+    return apiClient.fetch<PatchSourcesOfConnectorResponse>(
+      `/api/v1/connectors/${connectorId}/sources/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ sources } satisfies PatchSourcesRequest),
+      },
+    );
+  },
 };

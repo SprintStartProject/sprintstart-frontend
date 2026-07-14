@@ -1,10 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import type {
-    ConnectorDto,
-    ConnectorSource,
+  ConnectorDto,
+  ConnectorSource,
 } from "../../services/connectorService.ts";
 
-export type { ConnectorDto, ConnectorSource } from "../../services/connectorService.ts";
+export type {
+  ConnectorDto,
+  ConnectorSource,
+} from "../../services/connectorService.ts";
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
 
@@ -15,9 +18,9 @@ export type LoadingState = "idle" | "loading" | "success" | "error";
  * fallback built from the backend-provided `name`.
  */
 export type ConnectorMeta = {
-    label: string;
-    description: string;
-    icon: LucideIcon;
+  label: string;
+  description: string;
+  icon: LucideIcon;
 };
 
 /**
@@ -25,7 +28,7 @@ export type ConnectorMeta = {
  * `ConnectorList`.
  */
 export type ConnectorListItem = ConnectorDto & {
-    meta: ConnectorMeta;
+  meta: ConnectorMeta;
 };
 
 /**
@@ -35,8 +38,8 @@ export type ConnectorListItem = ConnectorDto & {
  * pattern used by `ProjectAccessPanel`.
  */
 export type DraftSourceChanges = {
-    sourceKey: string;
-    changedSourceIds: Set<string>;
+  sourceKey: string;
+  changedSourceIds: Set<string>;
 };
 
 export type ConnectorSourceRow = ConnectorSource;

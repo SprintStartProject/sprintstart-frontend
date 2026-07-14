@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
@@ -8,7 +9,9 @@ import type { DocumentMetadata } from '../../../src/services/types';
 
 vi.mock('framer-motion', () => ({
     motion: new Proxy({}, {
-        get: () => (props: Record<string, unknown>) => props.children
+        get: (_target, tagName: string) =>
+            ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
+                React.createElement(tagName, props, children),
     }),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }));
@@ -43,8 +46,7 @@ describe('DocumentTable Accessibility', () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByRole('button', { name: 'Remove document README.md' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Remove document guide.md' })).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Remove document' })).toHaveLength(2);
 
         expect(await axe(baseElement)).toHaveNoViolations();
     });

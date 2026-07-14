@@ -24,6 +24,8 @@ describe('ProjectAccessPanel Accessibility', () => {
                         assignedProjects={assignedProjects}
                         availableProjects={availableProjects}
                         onOpenProjectDetails={vi.fn()}
+                        onAssignProject={vi.fn().mockResolvedValue(undefined)}
+                        onRemoveProject={vi.fn().mockResolvedValue(undefined)}
                     />
                 </main>
             </MemoryRouter>

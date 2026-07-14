@@ -1,585 +1,399 @@
-import {
-    RefreshCw,
-} from "lucide-react";
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-    type ReactNode,
-} from "react";
-import { SidePanel } from "../../../components/ui/SidePanel";
-import {
-    getIngestionRuns,
-    getIngestionStatus,
-} from "../../../services/ingestionService.ts";
-import {
-    DETAILS_RUN_LIMIT,
-    formatDateTime,
-    formatNumber,
-    formatRunFinishedAt,
-    getRunStatusLabel,
-    getRunStatusTone,
-    getSourceStatus,
-    getSourceStatusLabel,
-} from "../data.ts";
+import { GitBranch, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import type {
-    GithubRepositoryReference,
-    IngestionRun,
-    LoadingState,
-    SourceDetailsSource,
-    SourceIngestionStatus,
-    SourceSystem,
-    SourceStatus,
-} from "../types.ts";
+  ConfigureGithubRepositoryRequest,
+  GithubRepositoryConfig,
+} from "../../../services/sources/githubService.ts";
+import { formatDateTime, formatNumber, SOURCE_META } from "../data.ts";
+import type { DataSource, LoadingState, SourceStatus } from "../types.ts";
+import { GithubRepositorySyncSettings } from "./GithubRepositorySyncSettings.tsx";
 
 type SourceDetailsPanelProps = {
-    source: SourceDetailsSource;
-    githubRepository?: GithubRepositoryReference | null;
-    onUpdateSource?: (sourceSystem: SourceSystem) => Promise<void>;
-    onClose: () => void;
+  source: DataSource;
+  onUpdateSource?: (source: DataSource) => Promise<void>;
+  onRefreshDetails?: () => Promise<void>;
+  canManageSyncSettings?: boolean;
+  onLoadRepositoryConfig?: (
+    repository: NonNullable<DataSource["githubRepository"]>,
+  ) => Promise<GithubRepositoryConfig>;
+  onSaveRepositoryConfig?: (
+    repository: NonNullable<DataSource["githubRepository"]>,
+    request: ConfigureGithubRepositoryRequest,
+  ) => Promise<void>;
+  onClose: () => void;
 };
 
-async function fetchSourceDetails(sourceSystem: SourceSystem) {
-    const [statusData, runData] = await Promise.all([
-        getIngestionStatus(),
-        getIngestionRuns(DETAILS_RUN_LIMIT),
-    ]);
-
-    const currentSourceStatus =
-        statusData.find((status) => status.sourceSystem === sourceSystem) ?? null;
-
-    const currentSourceRuns = runData.filter(
-        (run) => run.sourceSystem === sourceSystem,
-    );
-
-    return {
-        sourceStatus: currentSourceStatus,
-        recentRuns: currentSourceRuns,
-    };
-}
-
-const EMPTY_RECENT_RUNS: IngestionRun[] = [];
-
 /**
- * Slide-out panel showing detailed statistics and recent runs for a specific data source.
- * Allows users to manually trigger a refresh/update of the source.
+ * Slide-out panel showing the repository and ingestion details currently exposed by the backend.
  */
 export function SourceDetailsPanel({
-                                       source,
-                                       githubRepository = null,
-                                       onUpdateSource,
-                                       onClose,
-                                   }: SourceDetailsPanelProps) {
-    const [loadingState, setLoadingState] = useState<LoadingState>("idle");
-    const [updateState, setUpdateState] = useState<LoadingState>("idle");
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [updateMessage, setUpdateMessage] = useState<string | null>(null);
-    const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(
-        null,
-    );
-    const [sourceStatus, setSourceStatus] =
-        useState<SourceIngestionStatus | null>(null);
-    const [recentRuns, setRecentRuns] = useState<IngestionRun[]>([]);
-    const [loadedSourceSystem, setLoadedSourceSystem] =
-        useState<SourceSystem | null>(null);
+  source,
+  onUpdateSource,
+  onRefreshDetails,
+  canManageSyncSettings = false,
+  onLoadRepositoryConfig,
+  onSaveRepositoryConfig,
+  onClose,
+}: SourceDetailsPanelProps) {
+  const [updateState, setUpdateState] = useState<LoadingState>("idle");
+  const [refreshState, setRefreshState] = useState<LoadingState>("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const Icon = SOURCE_META[source.sourceSystem].icon;
+  const repository = source.githubRepository;
+  const isUpdating = updateState === "loading";
+  const isRefreshing = refreshState === "loading";
+  const canUpdateRepository =
+    source.sourceSystem === "GITHUB" &&
+    repository !== null &&
+    onUpdateSource !== undefined;
+  const canManageRepositoryConfig =
+    canManageSyncSettings &&
+    source.sourceSystem === "GITHUB" &&
+    repository !== null &&
+    onLoadRepositoryConfig !== undefined &&
+    onSaveRepositoryConfig !== undefined;
 
-    const loadSourceDetails = useCallback(async () => {
-        setLoadingState("loading");
-        setErrorMessage(null);
+  const loadRepositoryConfig = useCallback(async () => {
+    if (!canManageRepositoryConfig || !repository || !onLoadRepositoryConfig) {
+      throw new Error("Repository sync config is not available.");
+    }
 
-        try {
-            const result = await fetchSourceDetails(source.sourceSystem);
+    return onLoadRepositoryConfig(repository);
+  }, [canManageRepositoryConfig, onLoadRepositoryConfig, repository]);
 
-            setSourceStatus(result.sourceStatus);
-            setRecentRuns(result.recentRuns);
-            setLoadedSourceSystem(source.sourceSystem);
-            setLoadingState("success");
-        } catch (error) {
-            setLoadedSourceSystem(source.sourceSystem);
-            setLoadingState("error");
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : "Failed to load source details",
-            );
-        }
-    }, [source.sourceSystem]);
+  const saveRepositoryConfig = useCallback(
+    async (request: ConfigureGithubRepositoryRequest) => {
+      if (
+        !canManageRepositoryConfig ||
+        !repository ||
+        !onSaveRepositoryConfig
+      ) {
+        throw new Error("Repository sync config is not available.");
+      }
 
-    useEffect(() => {
-        let ignore = false;
+      await onSaveRepositoryConfig(repository, request);
+    },
+    [canManageRepositoryConfig, onSaveRepositoryConfig, repository],
+  );
 
-        void fetchSourceDetails(source.sourceSystem)
-            .then((result) => {
-                if (ignore) return;
+  const handleUpdateSource = useCallback(async () => {
+    if (!canUpdateRepository || !onUpdateSource) return;
 
-                setSourceStatus(result.sourceStatus);
-                setRecentRuns(result.recentRuns);
-                setLoadedSourceSystem(source.sourceSystem);
-                setErrorMessage(null);
-                setLoadingState("success");
-            })
-            .catch((error: unknown) => {
-                if (ignore) return;
+    setUpdateState("loading");
+    setMessage(null);
+    setErrorMessage(null);
 
-                setLoadedSourceSystem(source.sourceSystem);
-                setLoadingState("error");
-                setErrorMessage(
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to load source details",
-                );
-            });
+    try {
+      await onUpdateSource(source);
+      setUpdateState("success");
+      setMessage(
+        "Repository update started. Details will refresh while ingestion runs.",
+      );
+    } catch (error) {
+      setUpdateState("error");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to start repository update",
+      );
+    }
+  }, [canUpdateRepository, onUpdateSource, source]);
 
-        return () => {
-            ignore = true;
-        };
-    }, [source.sourceSystem]);
+  const handleRefreshDetails = useCallback(async () => {
+    if (!onRefreshDetails) return;
 
-    const hasLoadedSelectedSource = loadedSourceSystem === source.sourceSystem;
+    setRefreshState("loading");
+    setMessage(null);
+    setErrorMessage(null);
 
-    const visibleSourceStatus = hasLoadedSelectedSource ? sourceStatus : null;
-    const visibleRecentRuns = hasLoadedSelectedSource
-        ? recentRuns
-        : EMPTY_RECENT_RUNS;
-    const visibleErrorMessage = hasLoadedSelectedSource ? errorMessage : null;
+    try {
+      await onRefreshDetails();
+      setRefreshState("success");
+      setMessage("Repository details refreshed.");
+    } catch (error) {
+      setRefreshState("error");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to refresh repository details",
+      );
+    }
+  }, [onRefreshDetails]);
 
-    const isLoading = loadingState === "loading" || !hasLoadedSelectedSource;
-    const isUpdating = updateState === "loading";
+  const details = useMemo(() => {
+    const artifactCount = source.totalArtifactCount ?? source.artifacts;
+    const hasSourceArtifactTimestamp = artifactCount > 0 && source.lastRunAt;
+    const lastSync = hasSourceArtifactTimestamp
+      ? formatDateTime(source.lastRunAt)
+      : source.sharesSourceSystem
+        ? "Not available"
+        : source.lastSync;
 
-    const handleUpdateSource = useCallback(async () => {
-        if (!onUpdateSource) return;
+    return {
+      artifactCount,
+      lastSync,
+      latestUpdatedCount: source.latestUpdatedCount,
+      errors: source.errors,
+      runIds: source.runIds,
+    };
+  }, [source]);
 
-        setUpdateState("loading");
-        setUpdateMessage(null);
-        setUpdateErrorMessage(null);
-
-        try {
-            await onUpdateSource(source.sourceSystem);
-            setUpdateState("success");
-            setUpdateMessage("Update started. The page will refresh while ingestion runs.");
-            await loadSourceDetails();
-        } catch (error) {
-            setUpdateState("error");
-            setUpdateErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : "Failed to start source update",
-            );
-        }
-    }, [loadSourceDetails, onUpdateSource, source.sourceSystem]);
-
-    const details = useMemo(() => {
-        const latestRun = visibleRecentRuns[0] ?? null;
-        const ingestedCount =
-            latestRun?.ingestedCount ??
-            visibleSourceStatus?.ingestedCount ??
-            source.latestIngestedCount ??
-            source.artifacts;
-
-        const updatedCount =
-            latestRun?.updatedCount ??
-            visibleSourceStatus?.updatedCount ??
-            source.latestUpdatedCount ??
-            0;
-
-        const failedCount =
-            latestRun?.failedCount ??
-            visibleSourceStatus?.failedCount ??
-            source.errors;
-
-        const failedItems =
-            latestRun?.failedItems ??
-            visibleSourceStatus?.failedItems ??
-            source.failedItems ??
-            [];
-
-        const lastSync = latestRun
-            ? formatDateTime(latestRun.startedAt)
-            : visibleSourceStatus?.lastRunTime !== undefined
-                ? formatDateTime(visibleSourceStatus.lastRunTime)
-                : source.lastSync;
-
-        const hasNeverSynced =
-            !latestRun &&
-            (visibleSourceStatus?.lastRunTime === null ||
-                lastSync === "Never");
-
-        const hasErrors = failedCount > 0;
-        const latestStatus =
-            visibleSourceStatus?.status ?? latestRun?.status ?? null;
-        const status: SourceStatus = getSourceStatus(
-            hasNeverSynced,
-            hasErrors,
-            latestStatus,
-        );
-
-        return {
-            status,
-            statusLabel: getSourceStatusLabel(
-                hasNeverSynced,
-                hasErrors,
-                latestStatus,
-            ),
-            ingestedCount,
-            updatedCount,
-            failedCount,
-            failedItems,
-            lastSync,
-            hasNeverSynced,
-            hasErrors,
-        };
-    }, [source, visibleRecentRuns, visibleSourceStatus]);
-
-    return (
-        <SidePanel
-            isOpen
-            onClose={onClose}
-            title={source.name}
-            description={`Latest ingestion data for ${source.sourceSystem}`}
-            widthClassName="w-full max-w-[440px] sm:w-[440px]"
-            overlayClassName="bg-app-overlay"
-            panelBackgroundClassName="bg-app-surface"
-            headerDividerClassName=""
-            footerClassName="border-t border-app-border bg-app-surface px-6 py-5"
-            closeAriaLabel="Close source details"
-            footer={
-                <div className="space-y-3">
-                    {onUpdateSource && source.sourceSystem === "GITHUB" && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void handleUpdateSource();
-                            }}
-                            disabled={isLoading || isUpdating}
-                            className="w-full rounded-xl bg-app-brand px-4 py-3 font-medium text-app-text-inverse transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <span className="flex items-center justify-center gap-2">
-                                <RefreshCw
-                                    size={16}
-                                    className={isUpdating ? "animate-spin" : ""}
-                                />
-                                {githubRepository
-                                    ? `Update ${githubRepository.owner}/${githubRepository.name}`
-                                    : "Update GitHub repositories"}
-                            </span>
-                        </button>
-                    )}
-
-                    <button
-                        type="button"
-                        onClick={() => {
-                            void loadSourceDetails();
-                        }}
-                        disabled={isLoading || isUpdating}
-                        className="w-full rounded-xl border border-app-border bg-app-surface-muted px-4 py-3 font-medium text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        <span className="flex items-center justify-center gap-2">
-                            <RefreshCw
-                                size={16}
-                                className={isLoading ? "animate-spin" : ""}
-                            />
-                            Refresh Details
-                        </span>
-                    </button>
-                </div>
+  return (
+    <DetailsSideDrawer
+      isOpen
+      onClose={onClose}
+      title={source.name}
+      closeAriaLabel="Close source details"
+      zIndexClassName="z-50"
+      showOverlay
+      leading={
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
+          <Icon className="h-6 w-6" />
+        </div>
+      }
+      badge={
+        <>
+          <Badge>{source.type}</Badge>
+          <StatusBadge status={source.status}>{source.statusLabel}</StatusBadge>
+          <StatusBadge status={source.ingestionStatus}>
+            {source.ingestionStatusLabel}
+          </StatusBadge>
+        </>
+      }
+      footer={
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => {
+              void handleUpdateSource();
+            }}
+            disabled={!canUpdateRepository || isUpdating || isRefreshing}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+            title={
+              canUpdateRepository
+                ? undefined
+                : "Repository updates need GitHub owner and repository name."
             }
-        >
-                    <div className="space-y-7">
-                        {visibleErrorMessage && (
-                            <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-                                {visibleErrorMessage}
-                            </div>
-                        )}
+          >
+            {isUpdating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <GitBranch className="h-4 w-4" />
+            )}
+            Update repo
+          </button>
 
-                        {updateMessage && (
-                            <div className="rounded-2xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text">
-                                {updateMessage}
-                            </div>
-                        )}
-
-                        {updateErrorMessage && (
-                            <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-                                {updateErrorMessage}
-                            </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-2">
-                            <Badge>{source.type}</Badge>
-
-                            {details.status === "connected" ? (
-                                <BadgeSuccess>{details.statusLabel}</BadgeSuccess>
-                            ) : details.status === "running" ? (
-                                <BadgeRunning>{details.statusLabel}</BadgeRunning>
-                            ) : (
-                                <BadgeWarning>{details.statusLabel}</BadgeWarning>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <InfoCard
-                                label="Last Sync"
-                                value={details.lastSync}
-                            />
-
-                            <InfoCard
-                                label="Recent Runs"
-                                value={formatNumber(visibleRecentRuns.length)}
-                            />
-
-                            <InfoCard
-                                label="Ingested"
-                                value={formatNumber(details.ingestedCount)}
-                            />
-
-                            <InfoCard
-                                label="Updated"
-                                value={formatNumber(details.updatedCount)}
-                            />
-
-                            <InfoCard
-                                label="Failed"
-                                value={formatNumber(details.failedCount)}
-                                danger={details.failedCount > 0}
-                            />
-
-                            <InfoCard
-                                label="Source System"
-                                value={source.sourceSystem}
-                            />
-                        </div>
-
-                        {isLoading && (
-                            <div className="rounded-xl border border-app-border bg-app-surface-muted p-4">
-                                <div className="flex items-center gap-3 text-sm text-app-text-muted">
-                                    <RefreshCw
-                                        size={16}
-                                        className="animate-spin text-app-brand"
-                                    />
-                                    Loading latest source details...
-                                </div>
-                            </div>
-                        )}
-
-                        <div>
-                            <SectionTitle>
-                                Failed Items
-                            </SectionTitle>
-
-                            {details.hasNeverSynced ? (
-                                <EmptyState value="No failed items can be shown because this source has not been synced yet." />
-                            ) : details.failedItems.length > 0 ? (
-                                <div className="space-y-3">
-                                    {details.failedItems.map((item) => (
-                                        <div
-                                            key={`${item.artifactIdentifier}-${item.reason}`}
-                                            className="rounded-xl border border-app-warning-border bg-app-warning-bg p-4"
-                                        >
-                                            <p className="break-words text-sm font-semibold text-app-warning-text">
-                                                {item.artifactIdentifier}
-                                            </p>
-
-                                            <p className="mt-2 break-words text-sm text-app-text-muted">
-                                                {item.reason}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState value="No failed items reported for this source." />
-                            )}
-                        </div>
-
-                        <div>
-                            <SectionTitle>
-                                Recent Runs
-                            </SectionTitle>
-
-                            {visibleRecentRuns.length > 0 ? (
-                                <div className="space-y-3">
-                                    {visibleRecentRuns.map((run) => (
-                                        <RunCard key={run.runId} run={run} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState value="No recent ingestion runs found for this source." />
-                            )}
-                        </div>
-                    </div>
-        </SidePanel>
-    );
-}
-
-function SectionTitle({
-                          children,
-                      }: {
-    children: ReactNode;
-}) {
-    return (
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-text-subtle">
-            {children}
-        </p>
-    );
-}
-
-function InfoCard({
-                      label,
-                      value,
-                      danger = false,
-                  }: {
-    label: string;
-    value: string;
-    danger?: boolean;
-}) {
-    return (
-        <div className="rounded-xl border border-app-border bg-app-surface-muted p-4">
-            <p className="text-xs uppercase tracking-wide text-app-text-subtle">
-                {label}
-            </p>
-
-            <p
-                className={`mt-2 break-words font-semibold ${
-                    danger ? "text-app-danger-text" : "text-app-text"
-                }`}
-            >
-                {value}
-            </p>
+          <button
+            type="button"
+            onClick={() => {
+              void handleRefreshDetails();
+            }}
+            disabled={!onRefreshDetails || isUpdating || isRefreshing}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Refresh details
+          </button>
         </div>
-    );
+      }
+    >
+      {message && <Message tone="success">{message}</Message>}
+
+      {errorMessage && <Message tone="warning">{errorMessage}</Message>}
+
+      <Section title="Repository">
+        <dl>
+          <DetailRow label="Full name" value={repository?.fullName} />
+          <DetailRow label="Owner" value={repository?.owner} />
+          <DetailLinkRow label="GitHub URL" value={repository?.url} />
+          <DetailRow
+            label="Repository ID"
+            value={repository?.repositoryId ?? source.sourceId}
+            mono
+          />
+          <DetailRow
+            label="Source enabled"
+            value={formatEnabled(repository?.enabled)}
+          />
+        </dl>
+      </Section>
+
+      {canManageRepositoryConfig && repository && (
+        <Section title="Sync Schedule">
+          <GithubRepositorySyncSettings
+            loadKey={repository.fullName}
+            loadConfig={loadRepositoryConfig}
+            onSave={saveRepositoryConfig}
+          />
+        </Section>
+      )}
+
+      <Section title="Ingestion">
+        <dl>
+          <DetailRow label="Last sync" value={details.lastSync} />
+          <DetailRow
+            label="Artifacts"
+            value={formatNumber(details.artifactCount)}
+          />
+          <DetailRow
+            label="Latest updated"
+            value={formatNumber(details.latestUpdatedCount)}
+          />
+          <DetailRow label="Failed" value={formatNumber(details.errors)} />
+        </dl>
+      </Section>
+
+      {source.failedItems.length > 0 && (
+        <Section title="Failed Items">
+          <div className="space-y-3">
+            {source.failedItems.map((item) => (
+              <div
+                key={`${item.artifactIdentifier}-${item.reason}`}
+                className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
+              >
+                <p className="wrap-break-word text-sm font-medium text-app-warning-text">
+                  {item.artifactIdentifier}
+                </p>
+                <p className="mt-1 text-sm text-app-text-muted">
+                  {item.reason}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+    </DetailsSideDrawer>
+  );
 }
 
-function RunCard({ run }: { run: IngestionRun }) {
-    return (
-        <div className="rounded-xl border border-app-border bg-app-surface-muted p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <p className="text-sm font-semibold text-app-text">
-                        {formatDateTime(run.startedAt)}
-                    </p>
-
-                    <p className="mt-1 break-all text-xs text-app-text-subtle">
-                        {run.runId}
-                    </p>
-                </div>
-
-                <RunStatusBadge status={run.status} />
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-lg bg-app-surface px-3 py-2">
-                    <p className="text-app-text-subtle">Ingested</p>
-                    <p className="mt-1 font-semibold text-app-text">
-                        {formatNumber(run.ingestedCount)}
-                    </p>
-                </div>
-
-                <div className="rounded-lg bg-app-surface px-3 py-2">
-                    <p className="text-app-text-subtle">Updated</p>
-                    <p className="mt-1 font-semibold text-app-text">
-                        {formatNumber(run.updatedCount)}
-                    </p>
-                </div>
-
-                <div className="rounded-lg bg-app-surface px-3 py-2">
-                    <p className="text-app-text-subtle">Failed</p>
-                    <p
-                        className={`mt-1 font-semibold ${
-                            run.failedCount > 0
-                                ? "text-app-danger-text"
-                                : "text-app-text"
-                        }`}
-                    >
-                        {formatNumber(run.failedCount)}
-                    </p>
-                </div>
-            </div>
-
-            <p className="mt-3 text-xs text-app-text-subtle">
-                Finished: {formatRunFinishedAt(run.finishedAt, run.status)}
-            </p>
-        </div>
-    );
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-8 border-t border-app-border pt-6 first:mt-0 first:border-t-0 first:pt-0">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-app-text-subtle">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
 }
 
-function RunStatusBadge({ status }: { status: IngestionRun["status"] }) {
-    const label = getRunStatusLabel(status);
-    const tone = getRunStatusTone(status);
-
-    if (tone === "success") {
-        return (
-            <span className="rounded-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-medium text-app-success-text">
-                {label}
-            </span>
-        );
-    }
-
-    if (tone === "running") {
-        return (
-            <span className="rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text">
-                {label}
-            </span>
-        );
-    }
-
-    return (
-        <span className="rounded-full border border-app-warning-border bg-app-warning-bg px-3 py-1 text-xs font-medium text-app-warning-text">
-            {label}
-        </span>
-    );
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value?: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-1 items-start gap-1 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
+      <dt className="text-sm text-app-text-muted">{label}</dt>
+      <dd
+        className={`wrap-break-word text-sm font-medium text-app-text ${
+          mono ? "font-mono text-xs" : ""
+        }`}
+      >
+        {value || "Not available"}
+      </dd>
+    </div>
+  );
 }
 
-function EmptyState({ value }: { value: string }) {
-    return (
-        <div className="rounded-xl border border-dashed border-app-border bg-app-surface-muted p-4 text-sm text-app-text-muted">
+function DetailLinkRow({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="grid grid-cols-1 items-start gap-1 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
+      <dt className="text-sm text-app-text-muted">{label}</dt>
+      <dd className="wrap-break-word text-sm font-medium text-app-text">
+        {value ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noreferrer"
+            className="text-app-brand-text underline decoration-app-brand-border underline-offset-4 hover:text-app-brand"
+          >
             {value}
-        </div>
-    );
+          </a>
+        ) : (
+          "Not available"
+        )}
+      </dd>
+    </div>
+  );
 }
 
-function Badge({
-                   children,
-               }: {
-    children: ReactNode;
-}) {
-    return (
-        <span className="rounded-full bg-app-neutral-bg px-3 py-1 text-xs font-medium text-app-neutral-text">
-            {children}
-        </span>
-    );
+function formatEnabled(value?: boolean | null) {
+  if (value === true) return "Enabled";
+  if (value === false) return "Disabled";
+  return "Not available";
 }
 
-function BadgeSuccess({
-                          children,
-                      }: {
-    children: ReactNode;
+function StatusBadge({
+  status,
+  children,
+}: {
+  status: SourceStatus;
+  children: ReactNode;
 }) {
-    return (
-        <span className="rounded-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-medium text-app-success-text">
-            {children}
-        </span>
-    );
+  if (status === "connected") return <BadgeSuccess>{children}</BadgeSuccess>;
+  if (status === "running") return <BadgeRunning>{children}</BadgeRunning>;
+  if (status === "disabled") return <Badge>{children}</Badge>;
+  return <BadgeWarning>{children}</BadgeWarning>;
 }
 
-function BadgeRunning({
-                          children,
-                      }: {
-    children: ReactNode;
+function Message({
+  tone,
+  children,
+}: {
+  tone: "success" | "warning";
+  children: ReactNode;
 }) {
-    return (
-        <span className="rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text">
-            {children}
-        </span>
-    );
+  const className =
+    tone === "success"
+      ? "border-app-success-border bg-app-success-bg text-app-success-text"
+      : "border-app-warning-border bg-app-warning-bg text-app-warning-text";
+
+  return (
+    <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${className}`}>
+      {children}
+    </div>
+  );
 }
 
-function BadgeWarning({
-                          children,
-                      }: {
-    children: ReactNode;
-}) {
-    return (
-        <span className="rounded-full border border-app-warning-border bg-app-warning-bg px-3 py-1 text-xs font-medium text-app-warning-text">
-            {children}
-        </span>
-    );
+function Badge({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full bg-app-neutral-bg px-3 py-1 text-xs font-medium text-app-neutral-text">
+      {children}
+    </span>
+  );
+}
+
+function BadgeSuccess({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-medium text-app-success-text">
+      {children}
+    </span>
+  );
+}
+
+function BadgeRunning({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text">
+      {children}
+    </span>
+  );
+}
+
+function BadgeWarning({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full border border-app-warning-border bg-app-warning-bg px-3 py-1 text-xs font-medium text-app-warning-text">
+      {children}
+    </span>
+  );
 }

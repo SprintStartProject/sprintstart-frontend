@@ -6,19 +6,26 @@ import type { DataSource } from '../../../../../src/features/data-ingestion/type
 
 function createMockSource(overrides: Partial<DataSource> = {}): DataSource {
     return {
+        sourceId: 'source-github',
         sourceSystem: 'GITHUB',
         name: 'GitHub Repository',
         type: 'GitHub',
         icon: GitBranch,
         status: 'connected',
         statusLabel: 'Synced',
+        ingestionStatus: 'connected',
+        ingestionStatusLabel: 'Synced',
         artifacts: 10,
         lastSync: '2026-07-05',
         errors: 0,
         latestIngestedCount: 10,
         latestUpdatedCount: 3,
+        totalArtifactCount: 10,
+        runIds: [],
+        sharesSourceSystem: false,
         lastRunAt: '2026-07-05T10:00:00Z',
         failedItems: [],
+        githubRepository: null,
         description: 'Indexes repositories.',
         ...overrides,
     };

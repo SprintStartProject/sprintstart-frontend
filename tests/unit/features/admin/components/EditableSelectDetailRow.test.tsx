@@ -19,7 +19,7 @@ describe('EditableSelectDetailRow', () => {
     it('renders collapsed with aria-expanded false and no listbox', () => {
         render(<EditableSelectDetailRow {...defaultProps} />);
 
-        const combobox = screen.getByRole('button', { name: 'User' });
+        const combobox = screen.getByRole('button', { name: 'Permission group' });
         expect(combobox).toHaveAttribute('aria-expanded', 'false');
         expect(combobox).toHaveAttribute('aria-haspopup', 'listbox');
         expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
@@ -29,10 +29,10 @@ describe('EditableSelectDetailRow', () => {
         const user = userEvent.setup();
         render(<EditableSelectDetailRow {...defaultProps} />);
 
-        await user.click(screen.getByRole('button', { name: 'User' }));
+        await user.click(screen.getByRole('button', { name: 'Permission group' }));
 
         expect(screen.getByRole('listbox')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'User' })).toHaveAttribute(
+        expect(screen.getByRole('button', { name: 'Permission group' })).toHaveAttribute(
             'aria-expanded',
             'true',
         );
@@ -43,7 +43,7 @@ describe('EditableSelectDetailRow', () => {
         const user = userEvent.setup();
         render(<EditableSelectDetailRow {...defaultProps} />);
 
-        await user.click(screen.getByRole('button', { name: 'User' }));
+        await user.click(screen.getByRole('button', { name: 'Permission group' }));
 
         const selectedOption = screen.getByRole('option', { name: 'User' });
         expect(selectedOption).toHaveAttribute('aria-selected', 'true');
@@ -58,7 +58,7 @@ describe('EditableSelectDetailRow', () => {
         const user = userEvent.setup();
         render(<EditableSelectDetailRow {...defaultProps} onChange={onChange} />);
 
-        await user.click(screen.getByRole('button', { name: 'User' }));
+        await user.click(screen.getByRole('button', { name: 'Permission group' }));
         await user.click(screen.getByRole('option', { name: 'Admin' }));
 
         expect(onChange).toHaveBeenCalledWith('Admin');
@@ -69,7 +69,7 @@ describe('EditableSelectDetailRow', () => {
         const user = userEvent.setup();
         render(<EditableSelectDetailRow {...defaultProps} />);
 
-        await user.click(screen.getByRole('button', { name: 'User' }));
+        await user.click(screen.getByRole('button', { name: 'Permission group' }));
         expect(screen.getByRole('listbox')).toBeInTheDocument();
 
         await user.click(screen.getByText('Permission group'));

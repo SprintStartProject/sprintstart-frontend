@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProjectAccessPanel } from '../../../../../src/features/admin/components/ProjectAccessPanel';
 import type { ProjectSummary } from '../../../../../src/services/adminUserService';
@@ -18,6 +18,12 @@ const availableProjects: ProjectSummary[] = [
     { id: 'proj-3', name: 'Gamma' },
 ];
 
+const defaultCallbacks = {
+    onOpenProjectDetails: vi.fn(),
+    onAssignProject: vi.fn().mockResolvedValue(undefined),
+    onRemoveProject: vi.fn().mockResolvedValue(undefined),
+};
+
 describe('ProjectAccessPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -28,7 +34,7 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={assignedProjects}
                 availableProjects={availableProjects}
-                onOpenProjectDetails={vi.fn()}
+                {...defaultCallbacks}
             />,
         );
 
@@ -40,7 +46,7 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={[]}
                 availableProjects={availableProjects}
-                onOpenProjectDetails={vi.fn()}
+                {...defaultCallbacks}
             />,
         );
 
@@ -53,7 +59,7 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={assignedProjects}
                 availableProjects={availableProjects}
-                onOpenProjectDetails={vi.fn()}
+                {...defaultCallbacks}
             />,
         );
 
@@ -70,7 +76,7 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={assignedProjects}
                 availableProjects={availableProjects}
-                onOpenProjectDetails={vi.fn()}
+                {...defaultCallbacks}
             />,
         );
 
@@ -87,17 +93,16 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={assignedProjects}
                 availableProjects={availableProjects}
-                onOpenProjectDetails={vi.fn()}
+                {...defaultCallbacks}
             />,
         );
 
         await user.click(screen.getByRole('button', { name: /Add project/i }));
         await user.click(screen.getByText('Beta'));
 
-        const alphaCards = screen.getAllByText('Alpha');
-        const betaCards = screen.getAllByText('Beta');
-        expect(alphaCards.length).toBeGreaterThan(0);
-        expect(betaCards.length).toBeGreaterThan(0);
+        await waitFor(() => {
+            expect(defaultCallbacks.onAssignProject).toHaveBeenCalledWith('proj-2');
+        });
     });
 
     it('removes an assigned project via the remove button', async () => {
@@ -106,13 +111,15 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={assignedProjects}
                 availableProjects={availableProjects}
-                onOpenProjectDetails={vi.fn()}
+                {...defaultCallbacks}
             />,
         );
 
         await user.click(screen.getByRole('button', { name: 'Remove Alpha' }));
 
-        expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+        await waitFor(() => {
+            expect(defaultCallbacks.onRemoveProject).toHaveBeenCalledWith('proj-1');
+        });
     });
 
     it('calls onOpenProjectDetails when the open-details button is clicked', async () => {
@@ -122,6 +129,7 @@ describe('ProjectAccessPanel', () => {
             <ProjectAccessPanel
                 assignedProjects={assignedProjects}
                 availableProjects={availableProjects}
+                {...defaultCallbacks}
                 onOpenProjectDetails={onOpenProjectDetails}
             />,
         );

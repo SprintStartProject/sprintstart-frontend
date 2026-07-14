@@ -229,6 +229,19 @@
   padding-right: var(--app-page-gutter);
 }
 
+.admin-page-frame {
+  width: 100%;
+  padding-left: clamp(1rem, 4vw, 2rem);
+  padding-right: clamp(1rem, 4vw, 2rem);
+}
+
+@media (min-width: 1280px) {
+  .admin-page-frame {
+    padding-left: var(--app-page-gutter);
+    padding-right: var(--app-page-gutter);
+  }
+}
+
 .app-page-shell {
   width: 100%;
   padding-top: var(--app-page-block-gutter);

@@ -1,19 +1,21 @@
 type AccountEnabledToggleProps = {
     enabled: boolean;
     disabled: boolean;
+    ariaLabel?: string;
     onChange: (enabled: boolean) => void;
 };
 
 export function AccountEnabledToggle({
                                          enabled,
                                          disabled,
+                                         ariaLabel = "Toggle account access",
                                          onChange,
                                      }: AccountEnabledToggleProps) {
     return (
         <button
             type="button"
             role="switch"
-            aria-label="Toggle account access"
+            aria-label={ariaLabel}
             aria-checked={enabled}
             disabled={disabled}
             onClick={() => onChange(!enabled)}

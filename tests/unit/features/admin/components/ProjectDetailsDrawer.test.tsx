@@ -23,7 +23,6 @@ const projectDetails: AdminProjectDetails = {
     id: 'proj-1',
     name: 'Alpha',
     description: 'Detailed project description',
-    tags: [],
     sources: [
         { id: 'src-1', name: 'Repo A', type: 'GITHUB', status: 'CONNECTED' },
     ],

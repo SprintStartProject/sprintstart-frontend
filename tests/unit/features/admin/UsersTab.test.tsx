@@ -69,11 +69,13 @@ describe('UsersTab', () => {
         expect(defaultProps.onToggleUserSelection).toHaveBeenCalledWith('1');
     });
 
-    it('calls onOpenUserDetails when the details button is clicked', async () => {
+    it('calls onOpenUserDetails when row is clicked', async () => {
         const user = userEvent.setup();
         render(<UsersTab {...defaultProps} />);
 
-        await user.click(screen.getAllByRole('button', { name: 'Open details for John Doe' })[0]);
+        await user.click(
+            screen.getByRole('button', { name: 'Open details for John Doe' }),
+        );
         expect(defaultProps.onOpenUserDetails).toHaveBeenCalledWith(mockUsers[0]);
     });
 

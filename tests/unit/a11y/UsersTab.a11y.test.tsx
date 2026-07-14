@@ -60,9 +60,9 @@ describe('UsersTab Accessibility', () => {
         );
 
         expect(screen.getByRole('checkbox', { name: 'Select all users' })).toBeInTheDocument();
-        expect(screen.getAllByRole('checkbox', { name: 'Select Alice Smith' })).toHaveLength(2);
-        expect(screen.getAllByRole('button', { name: 'Open details for Alice Smith' })).toHaveLength(2);
-        expect(screen.getAllByRole('button', { name: 'Open context menu for Alice Smith' })).toHaveLength(2);
+        expect(screen.getAllByRole('checkbox', { name: 'Select Alice Smith' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Open details for Alice Smith' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Open context menu for Alice Smith' })).toHaveLength(1);
 
         expect(await axe(baseElement)).toHaveNoViolations();
     });

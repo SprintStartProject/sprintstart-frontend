@@ -1,31 +1,42 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-import { MemoryRouter } from 'react-router-dom';
 import { TokensTab } from '../../../src/features/admin/components/TokensTab';
 
+const githubServiceMock = vi.hoisted(() => ({
+    addGithubPat: vi.fn(),
+    updateGithubPat: vi.fn(),
+    deleteGithubPat: vi.fn(),
+}));
+
 vi.mock('../../../src/services/sources/githubService', () => ({
-    addGithubPat: vi.fn().mockResolvedValue(undefined),
-    updateGithubPat: vi.fn().mockResolvedValue(undefined),
-    deleteGithubPat: vi.fn().mockResolvedValue(undefined)
+    addGithubPat: githubServiceMock.addGithubPat,
+    updateGithubPat: githubServiceMock.updateGithubPat,
+    deleteGithubPat: githubServiceMock.deleteGithubPat,
 }));
 
 describe('TokensTab Accessibility', () => {
-    it('should not have any a11y violations', async () => {
-        const { baseElement } = render(
-            <MemoryRouter>
-                <main>
-                    <TokensTab
-                        tokenNames={['default', 'ci']}
-                        onRefresh={vi.fn()}
-                    />
-                </main>
-            </MemoryRouter>
+    it('has no axe violations in empty, add, and existing-token states', async () => {
+        const user = userEvent.setup();
+        const { baseElement, rerender } = render(
+            <main>
+                <TokensTab tokenNames={[]} onRefresh={vi.fn()} />
+            </main>,
         );
 
-        expect(screen.getByRole('button', { name: 'Add Token' })).toBeInTheDocument();
-        expect(screen.getAllByRole('button', { name: 'Rotate' })).toHaveLength(2);
+        expect(await axe(baseElement)).toHaveNoViolations();
 
+        await user.click(screen.getByRole('button', { name: 'Add Token' }));
+        expect(screen.getByLabelText('Token name')).toBeInTheDocument();
+        expect(await axe(baseElement)).toHaveNoViolations();
+
+        rerender(
+            <main>
+                <TokensTab tokenNames={['default']} onRefresh={vi.fn()} />
+            </main>,
+        );
+        expect(screen.getByText('default')).toBeInTheDocument();
         expect(await axe(baseElement)).toHaveNoViolations();
     });
 });

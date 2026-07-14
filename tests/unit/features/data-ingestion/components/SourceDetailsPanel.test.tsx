@@ -1,143 +1,59 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import * as ingestionService from '../../../../../src/services/ingestionService';
+import { GitBranch } from 'lucide-react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SourceDetailsPanel } from '../../../../../src/features/data-ingestion/components/SourceDetailsPanel';
-import type {
-    GithubRepositoryReference,
-    IngestionRun,
-    SourceDetailsSource,
-    SourceIngestionStatus,
-} from '../../../../../src/features/data-ingestion/types';
+import type { DataSource, GithubRepositoryDetails } from '../../../../../src/features/data-ingestion/types';
 
-vi.mock('../../../../../src/services/ingestionService', () => ({
-    getIngestionRuns: vi.fn(),
-    getIngestionStatus: vi.fn(),
-}));
+const githubRepository: GithubRepositoryDetails = {
+    owner: 'acme',
+    name: 'monorepo',
+    repositoryId: 'repo-1',
+    fullName: 'acme/monorepo',
+    url: 'https://github.com/acme/monorepo',
+    enabled: true,
+};
 
-const mockSource: SourceDetailsSource = {
+const mockSource: DataSource = {
+    sourceId: 'source-github',
     sourceSystem: 'GITHUB',
     name: 'GitHub Repository',
     type: 'GitHub',
+    icon: GitBranch,
     status: 'connected',
+    statusLabel: 'Connected',
+    ingestionStatus: 'connected',
+    ingestionStatusLabel: 'Synced',
     artifacts: 10,
     lastSync: '2026-07-05',
     errors: 0,
     latestIngestedCount: 10,
     latestUpdatedCount: 3,
+    totalArtifactCount: 10,
+    runIds: ['run-1'],
+    sharesSourceSystem: false,
+    lastRunAt: '2026-07-05T10:00:00Z',
     failedItems: [],
+    githubRepository,
+    description: 'Indexes repositories.',
 };
-
-const mockStatus: SourceIngestionStatus = {
-    sourceSystem: 'GITHUB',
-    lastRunTime: '2026-07-05T10:00:00Z',
-    ingestedCount: 12,
-    updatedCount: 3,
-    failedCount: 0,
-    status: 'COMPLETED',
-    failedItems: [],
-};
-
-const mockRun: IngestionRun = {
-    runId: 'run-1',
-    sourceSystem: 'GITHUB',
-    startedAt: '2026-07-05T10:00:00Z',
-    finishedAt: '2026-07-05T10:05:00Z',
-    ingestedCount: 12,
-    updatedCount: 3,
-    failedCount: 0,
-    status: 'COMPLETED',
-    failedItems: [],
-};
-
-function setupMocks(
-    status: SourceIngestionStatus[] = [mockStatus],
-    runs: IngestionRun[] = [mockRun],
-) {
-    vi.mocked(ingestionService.getIngestionStatus).mockResolvedValue(status);
-    vi.mocked(ingestionService.getIngestionRuns).mockResolvedValue(runs);
-}
 
 describe('SourceDetailsPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        setupMocks();
     });
 
-    it('fetches status and runs on mount and renders source details', async () => {
-        render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
-        );
+    it('renders repository and ingestion details', () => {
+        render(<SourceDetailsPanel source={mockSource} onClose={vi.fn()} />);
 
-        expect(ingestionService.getIngestionStatus).toHaveBeenCalledTimes(1);
-        expect(ingestionService.getIngestionRuns).toHaveBeenCalledWith(10);
-
-        await waitFor(() => {
-            expect(screen.getByText('Source System')).toBeInTheDocument();
-        });
-        expect(screen.getByText('GITHUB')).toBeInTheDocument();
-        expect(screen.getAllByText('Recent Runs').length).toBeGreaterThan(0);
+        expect(screen.getByText('GitHub Repository')).toBeInTheDocument();
+        expect(screen.getByText('Repository')).toBeInTheDocument();
+        expect(screen.getByText('acme/monorepo')).toBeInTheDocument();
+        expect(screen.getByText('Ingestion')).toBeInTheDocument();
+        expect(screen.getByText('10')).toBeInTheDocument();
     });
 
-    it('derives the latest status label from the fetched status', async () => {
-        render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('Synced')).toBeInTheDocument();
-        });
-    });
-
-    it('renders recent runs in the panel', async () => {
-        render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('run-1')).toBeInTheDocument();
-        });
-    });
-
-    it('renders the Update GitHub button when onUpdateSource is provided for a GITHUB source', async () => {
-        render(
-            <SourceDetailsPanel
-                source={mockSource}
-                onUpdateSource={vi.fn().mockResolvedValue(undefined)}
-                onClose={vi.fn()}
-            />,
-        );
-
-        await waitFor(() => {
-            expect(
-                screen.getByRole('button', { name: /Update GitHub/ }),
-            ).toBeInTheDocument();
-        });
-    });
-
-    it('shows the repository name in the Update button when githubRepository is provided', async () => {
-        const githubRepository: GithubRepositoryReference = {
-            owner: 'acme',
-            name: 'monorepo',
-        };
-
-        render(
-            <SourceDetailsPanel
-                source={mockSource}
-                githubRepository={githubRepository}
-                onUpdateSource={vi.fn().mockResolvedValue(undefined)}
-                onClose={vi.fn()}
-            />,
-        );
-
-        await waitFor(() => {
-            expect(
-                screen.getByRole('button', { name: /Update acme\/monorepo/ }),
-            ).toBeInTheDocument();
-        });
-    });
-
-    it('calls onUpdateSource when the Update GitHub button is clicked', async () => {
+    it('calls onUpdateSource with the selected source', async () => {
         const user = userEvent.setup();
         const onUpdateSource = vi.fn().mockResolvedValue(undefined);
 
@@ -149,80 +65,71 @@ describe('SourceDetailsPanel', () => {
             />,
         );
 
+        await user.click(screen.getByRole('button', { name: /Update repo/ }));
+
+        expect(onUpdateSource).toHaveBeenCalledWith(mockSource);
         await waitFor(() => {
             expect(
-                screen.getByRole('button', { name: /Update GitHub/ }),
+                screen.getByText(
+                    'Repository update started. Details will refresh while ingestion runs.',
+                ),
             ).toBeInTheDocument();
         });
-
-        await user.click(screen.getByRole('button', { name: /Update GitHub/ }));
-
-        expect(onUpdateSource).toHaveBeenCalledWith('GITHUB');
     });
 
-    it('calls the service again when the Refresh Details button is clicked', async () => {
+    it('calls onRefreshDetails when the refresh button is clicked', async () => {
         const user = userEvent.setup();
+        const onRefreshDetails = vi.fn().mockResolvedValue(undefined);
 
         render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
+            <SourceDetailsPanel
+                source={mockSource}
+                onRefreshDetails={onRefreshDetails}
+                onClose={vi.fn()}
+            />,
         );
 
+        await user.click(
+            screen.getByRole('button', { name: /Refresh details/ }),
+        );
+
+        expect(onRefreshDetails).toHaveBeenCalledTimes(1);
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Refresh Details/ })).toBeInTheDocument();
-        });
-
-        expect(ingestionService.getIngestionStatus).toHaveBeenCalledTimes(1);
-
-        await user.click(screen.getByRole('button', { name: /Refresh Details/ }));
-
-        await waitFor(() => {
-            expect(ingestionService.getIngestionStatus).toHaveBeenCalledTimes(2);
+            expect(screen.getByText('Repository details refreshed.')).toBeInTheDocument();
         });
     });
 
-    it('does not render the Update button when onUpdateSource is omitted', async () => {
+    it('disables repository updates when repository details are unavailable', () => {
         render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
+            <SourceDetailsPanel
+                source={{ ...mockSource, githubRepository: null }}
+                onUpdateSource={vi.fn().mockResolvedValue(undefined)}
+                onClose={vi.fn()}
+            />,
         );
 
-        await waitFor(() => {
-            expect(screen.getByText('GITHUB')).toBeInTheDocument();
-        });
-
-        expect(screen.queryByRole('button', { name: /Update/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Update repo/ })).toBeDisabled();
     });
 
-    it('shows an error message when the service fetch fails', async () => {
-        vi.mocked(ingestionService.getIngestionStatus).mockRejectedValue(
-            new Error('Network failure'),
-        );
-
+    it('renders failed items from the source', () => {
         render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
+            <SourceDetailsPanel
+                source={{
+                    ...mockSource,
+                    errors: 1,
+                    failedItems: [
+                        {
+                            artifactIdentifier: 'FILE: broken.md',
+                            reason: 'Parse error',
+                        },
+                    ],
+                }}
+                onClose={vi.fn()}
+            />,
         );
 
-        await waitFor(() => {
-            expect(screen.getByText('Network failure')).toBeInTheDocument();
-        });
-    });
-
-    it('renders failed items from the latest run', async () => {
-        const failedRun: IngestionRun = {
-            ...mockRun,
-            failedItems: [
-                { artifactIdentifier: 'FILE: broken.md', reason: 'Parse error' },
-            ],
-            failedCount: 1,
-        };
-        setupMocks([mockStatus], [failedRun]);
-
-        render(
-            <SourceDetailsPanel source={mockSource} onClose={vi.fn()} />,
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('FILE: broken.md')).toBeInTheDocument();
-        });
+        expect(screen.getByText('Failed Items')).toBeInTheDocument();
+        expect(screen.getByText('FILE: broken.md')).toBeInTheDocument();
         expect(screen.getByText('Parse error')).toBeInTheDocument();
     });
 });

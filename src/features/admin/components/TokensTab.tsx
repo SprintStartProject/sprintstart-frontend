@@ -88,8 +88,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
         setRotateError("");
     };
 
-    const handleRotateSubmit = async (event: FormEvent) => {
-        event.preventDefault();
+    const submitRotateToken = async () => {
         if (!rotatingName) return;
         setIsRotating(true);
         setRotateError("");
@@ -104,6 +103,11 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
         } finally {
             setIsRotating(false);
         }
+    };
+
+    const handleRotateSubmit = async (event: FormEvent) => {
+        event.preventDefault();
+        await submitRotateToken();
     };
 
     const handleDeleteRequest = (name: string) => {
@@ -136,7 +140,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm font-semibold text-app-text">
                     {tokenNames.length} {tokenNames.length === 1 ? "token" : "tokens"}
                 </span>
@@ -145,7 +149,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                     <button
                         type="button"
                         onClick={handleAddOpen}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover"
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
                     >
                         <Plus className="h-4 w-4" />
                         Add Token
@@ -156,7 +160,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
             {isAddOpen && (
                 <form
                     onSubmit={(e) => void handleAddSubmit(e)}
-                    className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-5"
+                    className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
                 >
                     <div className="mb-4 flex items-center justify-between">
                         <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
@@ -207,7 +211,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                             <p className="text-sm text-app-danger-text">{addError}</p>
                         )}
 
-                        <div className="flex justify-end gap-2 pt-1">
+                        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={handleAddCancel}
@@ -251,22 +255,22 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                 <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
                     {tokenNames.map((name) => (
                         <div key={name} className="border-b border-app-border last:border-b-0">
-                            <div className="flex items-center gap-4 px-5 py-4">
+                            <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-app-border bg-app-surface-muted">
                                     <Key className="h-4 w-4 text-app-text-muted" />
                                 </div>
 
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-app-text">{name}</p>
+                                    <p className="break-words text-sm font-semibold text-app-text">{name}</p>
                                     <p className="text-xs text-app-text-muted">GitHub PAT (classic)</p>
                                 </div>
 
                                 {pendingDeleteName !== name && rotatingName !== name && (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
                                         <button
                                             type="button"
                                             onClick={() => handleRotateOpen(name)}
-                                            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text sm:flex-none"
                                         >
                                             <RefreshCw className="h-3.5 w-3.5" />
                                             Rotate
@@ -274,7 +278,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteRequest(name)}
-                                            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-app-danger-bg bg-app-danger-bg px-3 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white"
+                                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-danger-bg bg-app-danger-bg px-3 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white sm:flex-none"
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
                                             Delete
@@ -282,52 +286,6 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                     </div>
                                 )}
                             </div>
-
-                            {rotatingName === name && (
-                                <form
-                                    onSubmit={(e) => void handleRotateSubmit(e)}
-                                    className="border-t border-app-border bg-app-surface-muted px-5 py-4"
-                                >
-                                    <p className="mb-3 text-xs font-medium text-app-text-muted">
-                                        Enter a new token to replace <strong>{name}</strong>
-                                    </p>
-                                    <div className="flex items-start gap-2">
-                                        <input
-                                            type="password"
-                                            value={rotateToken}
-                                            onChange={(e) => setRotateToken(e.target.value)}
-                                            placeholder="ghp_... or github_pat_..."
-                                            required
-                                            disabled={isRotating}
-                                            className="h-11 flex-1 rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
-                                        />
-                                        <button
-                                            type="submit"
-                                            disabled={isRotating}
-                                            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            {isRotating ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <RefreshCw className="h-4 w-4" />
-                                            )}
-                                            {isRotating ? "Rotating..." : "Confirm"}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleRotateCancel}
-                                            disabled={isRotating}
-                                            className="flex h-11 w-11 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-                                            aria-label="Cancel rotate"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                    {rotateError && (
-                                        <p className="mt-2 text-sm text-app-danger-text">{rotateError}</p>
-                                    )}
-                                </form>
-                            )}
 
                             {pendingDeleteName === name && (
                                 <div className="border-t border-app-border bg-app-danger-bg px-5 py-4">
@@ -337,7 +295,7 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                     {deleteError && (
                                         <p className="mb-2 text-sm text-app-danger-text">{deleteError}</p>
                                     )}
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-col gap-2 sm:flex-row">
                                         <button
                                             type="button"
                                             onClick={() => void handleDeleteConfirm()}
@@ -363,6 +321,70 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                         </button>
                                     </div>
                                 </div>
+                            )}
+
+                            {rotatingName === name && (
+                                <form
+                                    onSubmit={(event) => void handleRotateSubmit(event)}
+                                    className="border-t border-app-brand-border bg-app-brand-soft px-4 py-4 sm:px-5"
+                                >
+                                    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-app-text">
+                                                Rotate token
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+                                        <div className="min-w-0 flex-1">
+                                            <label htmlFor="rotate-token-value" className="mb-1.5 block text-xs font-medium text-app-text-muted">
+                                                New GitHub PAT
+                                            </label>
+                                            <div className="relative">
+                                                <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
+                                                <input
+                                                    id="rotate-token-value"
+                                                    type="password"
+                                                    value={rotateToken}
+                                                    onChange={(event) => setRotateToken(event.target.value)}
+                                                    placeholder="ghp_... or github_pat_..."
+                                                    required
+                                                    disabled={isRotating}
+                                                    className="h-11 w-full rounded-xl border border-app-brand-border bg-app-surface pl-11 pr-4 text-sm font-medium text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
+                                            <button
+                                                type="submit"
+                                                disabled={isRotating}
+                                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isRotating ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <RefreshCw className="h-4 w-4" />
+                                                )}
+                                                {isRotating ? "Rotating..." : "Confirm"}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleRotateCancel}
+                                                disabled={isRotating}
+                                                className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {rotateError && (
+                                        <p className="mt-3 text-sm text-app-danger-text">{rotateError}</p>
+                                    )}
+                                </form>
                             )}
                         </div>
                     ))}

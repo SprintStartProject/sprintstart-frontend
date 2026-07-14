@@ -1,52 +1,48 @@
-import { apiClient } from './apiClient';
-import type { UserProfile } from './types';
+import { apiClient } from "./apiClient";
+import type { UserProfile } from "./types";
 
-/**
- * Service managing user authentication, profile retrieval, and updates.
- * Now integrated with Keycloak via the central apiClient.
- */
+type BackendUserProfile = Omit<UserProfile, "projectRoles"> & {
+  projectRoles?: UserProfile["projectRoles"];
+  projectIds?: string[];
+};
+
+function toUserProfile(profile: BackendUserProfile): UserProfile {
+  return {
+    ...profile,
+    projectRoles: profile.projectRoles ?? [],
+    projectIds: profile.projectIds ?? [],
+  };
+}
+
 export const userService = {
-    /**
-     * Legacy login method. In Keycloak mode, authentication is handled by the SSO flow.
-     * This method is kept for type compatibility but should be bypassed by the AuthProvider.
-     */
-    login(): Promise<UserProfile> {
-        throw new Error('Direct login is disabled. Please use the SSO flow.');
-    },
+  login(): Promise<UserProfile> {
+    throw new Error("Direct login is disabled. Please use the SSO flow.");
+  },
 
-    /**
-     * Retrieves the profile of the currently authenticated user from the backend.
-     * The backend resolves the user based on the JWT subject.
-     * 
-     * @returns Promise resolving to UserProfile.
-     * @throws Error if the user is not found or unauthorized.
-     */
-    async getProfile(): Promise<UserProfile | null> {
-        try {
-            return await apiClient.fetch<UserProfile>('/api/v1/users/me');
-        } catch (error) {
-            console.error('Failed to retrieve profile', error);
-            return null;
-        }
-    },
-
-    /**
-     * Updates specific fields of the user's profile on the backend.
-     * 
-     * @param profile - Partial profile object containing fields to update.
-     * @returns Promise resolving to the updated UserProfile.
-     */
-    async updateProfile(profile: Partial<UserProfile>): Promise<UserProfile> {
-        return await apiClient.fetch<UserProfile>('/api/v1/users/me', {
-            method: 'PATCH',
-            body: JSON.stringify(profile),
-        });
-    },
-
-    /**
-     * Legacy logout method. In Keycloak mode, use the Keycloak instance to logout.
-     */
-    logout(): Promise<void> {
-        return Promise.resolve();
+  async getProfile(): Promise<UserProfile | null> {
+    try {
+      const profile =
+        await apiClient.fetch<BackendUserProfile>("/api/v1/users/me");
+      return toUserProfile(profile);
+    } catch (error) {
+      console.error("Failed to retrieve profile", error);
+      return null;
     }
+  },
+
+  async updateProfile(profile: Partial<UserProfile>): Promise<UserProfile> {
+    const updatedProfile = await apiClient.fetch<BackendUserProfile>(
+      "/api/v1/users/me",
+      {
+        method: "PATCH",
+        body: JSON.stringify(profile),
+      },
+    );
+
+    return toUserProfile(updatedProfile);
+  },
+
+  logout(): Promise<void> {
+    return Promise.resolve();
+  },
 };

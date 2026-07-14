@@ -30,9 +30,15 @@ describe('githubService', () => {
                 owner: 'octocat',
                 name: 'Hello-World',
                 tokenName: 'default',
+                projectId: 'project-1',
             });
 
-            expect(capturedBody).toEqual({ owner: 'octocat', name: 'Hello-World', tokenName: 'default' });
+            expect(capturedBody).toEqual({
+                owner: 'octocat',
+                name: 'Hello-World',
+                tokenName: 'default',
+                projectId: 'project-1',
+            });
             expect(result.transactionId).toBe('txn-1');
         });
 
@@ -40,7 +46,12 @@ describe('githubService', () => {
             server.use(http.post('/api/v1/github/connect', () => HttpResponse.json({}, { status: 400 })));
 
             await expect(
-                connectGithubRepository({ owner: 'o', name: 'n', tokenName: 't' }),
+                connectGithubRepository({
+                    owner: 'o',
+                    name: 'n',
+                    tokenName: 't',
+                    projectId: 'project-1',
+                }),
             ).rejects.toMatchObject({ name: 'ApiError', status: 400 });
         });
     });
@@ -101,10 +112,10 @@ describe('githubService', () => {
     describe('updateAllGithubRepositories', () => {
         it('POSTs to update-all and returns the transaction id', async () => {
             server.use(
-                http.post('/api/v1/github/update-all', () => HttpResponse.json({ transactionId: 'txn-all' })),
+                http.post('/api/v1/github/update-all', () => HttpResponse.json([{ transactionId: 'txn-all' }])),
             );
             const result = await updateAllGithubRepositories();
-            expect(result.transactionId).toBe('txn-all');
+            expect(result[0]?.transactionId).toBe('txn-all');
         });
     });
 

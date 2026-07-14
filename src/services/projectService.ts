@@ -2,533 +2,328 @@
 // projectService.ts
 // ============================================================
 
-import { apiClient } from "./apiClient";
-import projectMock from "../mocks/projectMock.json";
+import { ApiError, apiClient } from "./apiClient";
 
-const USE_PROJECT_MOCKS = true;
-const MOCK_DELAY_MS = 180;
-
-export type GlobalUserRole = "ADMIN" | "USER" | (string & {});
+export type GlobalUserRole = "ADMIN" | "HR" | "PM" | "USER" | (string & {});
 
 export type ProjectRole = "MEMBER" | "MANAGER" | "TEAMLEAD" | (string & {});
 
 export type ProjectSourceType =
-    | "GITHUB"
-    | "JIRA"
-    | "SONARQUBE"
-    | "UPLOAD"
-    | (string & {});
+  | "GITHUB"
+  | "JIRA"
+  | "SONARQUBE"
+  | "UPLOAD"
+  | (string & {});
 
 export type ProjectSourceStatus =
-    | "CONNECTED"
-    | "DISCONNECTED"
-    | "INDEXING"
-    | "ERROR"
-    | (string & {});
+  | "CONNECTED"
+  | "DISCONNECTED"
+  | "UPDATING"
+  | "OUT_OF_DATE"
+  | "DISABLED"
+  | "FAILED"
+  | "INDEXING"
+  | "ERROR"
+  | (string & {});
 
 export type ProjectSource = {
-    id: string;
-    name: string;
-    type: ProjectSourceType;
-    status: ProjectSourceStatus;
+  id: string;
+  name: string;
+  type: ProjectSourceType;
+  status: ProjectSourceStatus;
 };
 
 export type ProjectUserSummary = {
-    id: string;
-    username: string;
-    email: string;
-    profileIcon?: string;
-
-    /**
-     * Project-specific roles are only valid in a project context.
-     */
-    projectRoles: ProjectRole[];
+  id: string;
+  username: string;
+  email: string;
+  profileIcon?: string;
+  roles?: GlobalUserRole[];
+  projectRoles: ProjectRole[];
 };
 
 export type ProjectUser = {
-    id: string;
-    username: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    profileIcon?: string;
-
-    /**
-     * Global application roles, for example ADMIN or USER.
-     */
-    roles: GlobalUserRole[];
-
-    /**
-     * Project-specific access roles for this exact project.
-     */
-    projectRoles: ProjectRole[];
-
-    enabled: boolean;
+  id: string;
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profileIcon?: string;
+  roles: GlobalUserRole[];
+  projectRoles: ProjectRole[];
+  enabled: boolean;
 };
 
 export type AdminProject = {
-    id: string;
-    name: string;
-    description: string;
-    tags?: string[];
-    sources: ProjectSource[];
-    users: ProjectUserSummary[];
+  id: string;
+  name: string;
+  description: string;
+  sources: ProjectSource[];
+  users: ProjectUserSummary[];
 };
 
 export type AdminProjectDetails = Omit<AdminProject, "users"> & {
-    users: ProjectUser[];
+  users: ProjectUser[];
 };
 
+export type ProjectSummary = Pick<AdminProject, "id" | "name">;
+
 export type CreateProjectRequest = {
-    name: string;
-    description?: string;
-    tags?: string[];
+  name: string;
+  description?: string;
 };
 
 export type UpdateProjectRequest = {
-    name?: string;
-    description?: string;
-    tags?: string[];
+  name?: string;
+  description?: string;
 };
 
 export type AssignProjectUsersRequest = {
-    userIds: string[];
-
-    /**
-     * Optional because the original endpoint only required userIds.
-     * If omitted, the mock assigns MEMBER by default.
-     */
-    projectRoles?: ProjectRole[];
+  userIds: string[];
 };
 
-type MockAdminUser = {
-    id: string;
-    username: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    firstname?: string;
-    lastname?: string;
-    roles?: unknown[];
-    permissionGroup?: string;
-    enabled?: boolean;
+export type DeleteProjectResponse = {
+  id: string;
+  deleted: boolean;
 };
 
-type ProjectMock = {
-    adminProjects: AdminProject[];
-    adminUsers?: MockAdminUser[];
+type BackendProjectSource = {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
 };
 
-const mock: ProjectMock = projectMock;
+type BackendProjectUserSummary = {
+  id: string;
+  username: string;
+  email: string | null;
+};
 
-let mockProjects: AdminProject[] = clone(mock.adminProjects ?? []);
-let mockUsers: MockAdminUser[] = clone(mock.adminUsers ?? []);
+type BackendProjectUser = BackendProjectUserSummary & {
+  firstName: string;
+  lastName: string;
+  roles: string[];
+  projectRoles: string[];
+  enabled: boolean;
+};
 
-function wait(ms: number) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
+type BackendAdminProject = {
+  id: string;
+  name: string;
+  description: string | null;
+  sources: BackendProjectSource[];
+  users: BackendProjectUserSummary[];
+};
 
-function clone<T>(value: T): T {
-    if (typeof structuredClone === "function") {
-        return structuredClone(value);
-    }
+type BackendAdminProjectDetails = Omit<BackendAdminProject, "users"> & {
+  users: BackendProjectUser[];
+};
 
-    const parsed: unknown = JSON.parse(JSON.stringify(value));
-    return parsed as T;
-}
+type BackendCurrentUserProject = {
+  id?: string;
+  projectId?: string;
+  name?: string;
+};
 
-async function withMockDelay<T>(value: T): Promise<T> {
-    await wait(MOCK_DELAY_MS);
-    return clone(value);
-}
+type BackendCurrentUser = {
+  projectIds?: string[];
+  projects?: BackendCurrentUserProject[];
+};
 
-function createMockId(prefix: string): string {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-        return `${prefix}-${crypto.randomUUID()}`;
-    }
-
-    return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function normalizeGlobalRoles(user?: MockAdminUser): GlobalUserRole[] {
-    if (!user) {
-        return ["USER"];
-    }
-
-    if (user.permissionGroup) {
-        return [user.permissionGroup.toUpperCase()];
-    }
-
-    if (!Array.isArray(user.roles)) {
-        return ["USER"];
-    }
-
-    const stringRoles = user.roles.filter(
-        (role): role is string => typeof role === "string",
-    );
-
-    if (stringRoles.length > 0) {
-        return stringRoles.map((role) => role.toUpperCase());
-    }
-
-    return ["USER"];
-}
-
-function getMockProjectById(projectId: string): AdminProject {
-    const project = mockProjects.find((candidate) => candidate.id === projectId);
-
-    if (!project) {
-        throw new Error(`Project with id "${projectId}" was not found.`);
-    }
-
-    return project;
-}
-
-function getMockUserById(userId: string): MockAdminUser {
-    const user = mockUsers.find((candidate) => candidate.id === userId);
-
-    if (!user) {
-        throw new Error(`User with id "${userId}" was not found.`);
-    }
-
-    return user;
-}
-
-function findMockUserById(userId: string): MockAdminUser | undefined {
-    return mockUsers.find((candidate) => candidate.id === userId);
-}
-
-function getFallbackNameParts(userSummary: ProjectUserSummary) {
-    const usernameParts = userSummary.username
-        .split(".")
-        .map((part) => part.trim())
-        .filter(Boolean);
-
-    if (usernameParts.length >= 2) {
-        return {
-            firstName: capitalize(usernameParts[0]),
-            lastName: capitalize(usernameParts.slice(1).join(" ")),
-        };
-    }
-
-    return {
-        firstName: "",
-        lastName: "",
-    };
-}
-
-function capitalize(value: string): string {
-    if (!value) return value;
-
-    return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function toProjectUser(userSummary: ProjectUserSummary): ProjectUser {
-    const user = findMockUserById(userSummary.id);
-    const fallbackNameParts = getFallbackNameParts(userSummary);
-
-    return {
-        id: userSummary.id,
-        username: user?.username ?? userSummary.username,
-        email: user?.email ?? userSummary.email,
-        firstName:
-            user?.firstName ??
-            user?.firstname ??
-            fallbackNameParts.firstName,
-        lastName:
-            user?.lastName ??
-            user?.lastname ??
-            fallbackNameParts.lastName,
-        roles: normalizeGlobalRoles(user),
-        projectRoles: userSummary.projectRoles,
-        enabled: user?.enabled ?? true,
-    };
-}
-
-function toProjectDetails(project: AdminProject): AdminProjectDetails {
-    return {
-        ...project,
-        tags: project.tags ?? [],
-        users: project.users.map(toProjectUser),
-    };
+function toProjectSource(source: BackendProjectSource): ProjectSource {
+  return {
+    id: source.id,
+    name: source.name,
+    type: source.type,
+    status: source.status,
+  };
 }
 
 function toProjectUserSummary(
-    user: MockAdminUser,
-    projectRoles: ProjectRole[],
+  user: BackendProjectUserSummary,
 ): ProjectUserSummary {
-    return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        projectRoles,
-    };
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email ?? "",
+    projectRoles: [],
+  };
+}
+
+function toProjectUser(user: BackendProjectUser): ProjectUser {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email ?? "",
+    firstName: user.firstName,
+    lastName: user.lastName,
+    roles: user.roles,
+    projectRoles: user.projectRoles,
+    enabled: user.enabled,
+  };
+}
+
+function toAdminProject(project: BackendAdminProject): AdminProject {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description ?? "",
+    sources: project.sources.map(toProjectSource),
+    users: project.users.map(toProjectUserSummary),
+  };
+}
+
+function toAdminProjectDetails(
+  project: BackendAdminProjectDetails,
+): AdminProjectDetails {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description ?? "",
+    sources: project.sources.map(toProjectSource),
+    users: project.users.map(toProjectUser),
+  };
+}
+
+function toBackendProjectRequest(
+  request: CreateProjectRequest | UpdateProjectRequest,
+) {
+  return {
+    name: request.name,
+    description: request.description,
+  };
+}
+
+function toFallbackProject(id: string, name?: string): AdminProject {
+  return {
+    id,
+    name: name ?? `Project ${id.slice(0, 8)}`,
+    description: "",
+    sources: [],
+    users: [],
+  };
+}
+async function getProjectsFromCurrentUser(): Promise<AdminProject[]> {
+  const user = await apiClient.fetch<BackendCurrentUser>("/api/v1/users/me");
+  const projectIds = user.projectIds ?? [];
+  const projects = user.projects ?? [];
+
+  const namedProjects = projects.reduce<AdminProject[]>((acc, project) => {
+    const id = project.id ?? project.projectId;
+    if (!id) return acc;
+
+    acc.push(toFallbackProject(id, project.name));
+    return acc;
+  }, []);
+
+  const namedProjectIds = new Set(namedProjects.map((project) => project.id));
+  const fallbackProjects = projectIds
+    .filter((projectId) => !namedProjectIds.has(projectId))
+    .map((projectId) => toFallbackProject(projectId));
+
+  return [...namedProjects, ...fallbackProjects];
+}
+
+async function fetchAdminProjects(): Promise<AdminProject[]> {
+  const projects = await apiClient.fetch<BackendAdminProject[]>(
+    "/api/v1/admin/projects",
+  );
+
+  return projects.map(toAdminProject);
 }
 
 export const projectService = {
-    /**
-     * GET /api/v1/admin/projects
-     *
-     * Returns all projects, including metadata, connected sources
-     * and assigned project users.
-     */
-    async getProjects(): Promise<AdminProject[]> {
-        if (USE_PROJECT_MOCKS) {
-            return withMockDelay(mockProjects);
-        }
+  async getProjects(): Promise<AdminProject[]> {
+    try {
+      return await fetchAdminProjects();
+    } catch (error) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        return getProjectsFromCurrentUser();
+      }
 
-        return apiClient.fetch<AdminProject[]>("/api/v1/admin/projects");
-    },
+      throw error;
+    }
+  },
 
-    /**
-     * GET /api/v1/admin/projects/{id}
-     *
-     * Returns detailed information for a specific project.
-     */
-    async getProjectById(projectId: string): Promise<AdminProjectDetails> {
-        if (USE_PROJECT_MOCKS) {
-            return withMockDelay(toProjectDetails(getMockProjectById(projectId)));
-        }
+  async getProjectById(projectId: string): Promise<AdminProjectDetails> {
+    const project = await apiClient.fetch<BackendAdminProjectDetails>(
+      `/api/v1/admin/projects/${projectId}`,
+    );
 
-        return apiClient.fetch<AdminProjectDetails>(
-            `/api/v1/admin/projects/${projectId}`,
-        );
-    },
+    return toAdminProjectDetails(project);
+  },
 
-    /**
-     * POST /api/v1/admin/projects
-     *
-     * Request body:
-     * {
-     *   name: "SprintStart Frontend",
-     *   description: "Frontend web application for SprintStart",
-     *   tags: ["Frontend", "React"]
-     * }
-     */
-    async createProject(
-        request: CreateProjectRequest,
-    ): Promise<AdminProjectDetails> {
-        if (USE_PROJECT_MOCKS) {
-            const createdProject: AdminProject = {
-                id: createMockId("project"),
-                name: request.name,
-                description: request.description ?? "",
-                tags: request.tags ?? [],
-                sources: [],
-                users: [],
-            };
+  async createProject(
+    request: CreateProjectRequest,
+  ): Promise<AdminProjectDetails> {
+    const project = await apiClient.fetch<BackendAdminProjectDetails>(
+      "/api/v1/admin/projects",
+      {
+        method: "POST",
+        body: JSON.stringify(toBackendProjectRequest(request)),
+      },
+    );
 
-            mockProjects = [createdProject, ...mockProjects];
+    return toAdminProjectDetails(project);
+  },
 
-            return withMockDelay(toProjectDetails(createdProject));
-        }
+  async updateProject(
+    projectId: string,
+    request: UpdateProjectRequest,
+  ): Promise<AdminProjectDetails> {
+    const project = await apiClient.fetch<BackendAdminProjectDetails>(
+      `/api/v1/admin/projects/${projectId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(toBackendProjectRequest(request)),
+      },
+    );
 
-        return apiClient.fetch<AdminProjectDetails>("/api/v1/admin/projects", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(request),
-        });
-    },
+    return toAdminProjectDetails(project);
+  },
 
-    /**
-     * PATCH /api/v1/admin/projects/{projectId}
-     *
-     * Request body:
-     * {
-     *   name: "SprintStart Frontend",
-     *   description: "Updated frontend web application description",
-     *   tags: ["Frontend", "React"]
-     * }
-     */
-    async updateProject(
-        projectId: string,
-        request: UpdateProjectRequest,
-    ): Promise<AdminProjectDetails> {
-        if (USE_PROJECT_MOCKS) {
-            const project = getMockProjectById(projectId);
+  async deleteProject(projectId: string): Promise<DeleteProjectResponse> {
+    return apiClient.fetch<DeleteProjectResponse>(
+      `/api/v1/admin/projects/${projectId}`,
+      {
+        method: "DELETE",
+      },
+    );
+  },
 
-            const updatedProject: AdminProject = {
-                ...project,
-                name: request.name ?? project.name,
-                description: request.description ?? project.description,
-                tags: request.tags ?? project.tags ?? [],
-            };
+  async getProjectUsers(projectId: string): Promise<ProjectUser[]> {
+    const users = await apiClient.fetch<BackendProjectUser[]>(
+      `/api/v1/admin/projects/${projectId}/users`,
+    );
 
-            mockProjects = mockProjects.map((candidate) =>
-                candidate.id === projectId ? updatedProject : candidate,
-            );
+    return users.map(toProjectUser);
+  },
 
-            return withMockDelay(toProjectDetails(updatedProject));
-        }
+  async assignUsersToProject(
+    projectId: string,
+    request: AssignProjectUsersRequest,
+  ): Promise<ProjectUser[]> {
+    const users = await apiClient.fetch<BackendProjectUser[]>(
+      `/api/v1/admin/projects/${projectId}/users`,
+      {
+        method: "POST",
+        body: JSON.stringify({ userIds: request.userIds }),
+      },
+    );
 
-        return apiClient.fetch<AdminProjectDetails>(
-            `/api/v1/admin/projects/${projectId}`,
-            {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(request),
-            },
-        );
-    },
+    return users.map(toProjectUser);
+  },
 
-    /**
-     * DELETE /api/v1/admin/projects/{projectId}
-     *
-     * Successful deletion should return 204 No Content.
-     */
-    async deleteProject(projectId: string): Promise<void> {
-        if (USE_PROJECT_MOCKS) {
-            getMockProjectById(projectId);
-
-            mockProjects = mockProjects.filter(
-                (candidate) => candidate.id !== projectId,
-            );
-
-            await wait(MOCK_DELAY_MS);
-            return;
-        }
-
-        await apiClient.fetch<void>(`/api/v1/admin/projects/${projectId}`, {
-            method: "DELETE",
-        });
-    },
-
-    /**
-     * GET /api/v1/admin/projects/{projectId}/users
-     *
-     * Returns all users assigned to a specific project.
-     * projectRoles are included here because this response is project-specific.
-     */
-    async getProjectUsers(projectId: string): Promise<ProjectUser[]> {
-        if (USE_PROJECT_MOCKS) {
-            const project = getMockProjectById(projectId);
-
-            return withMockDelay(project.users.map(toProjectUser));
-        }
-
-        return apiClient.fetch<ProjectUser[]>(
-            `/api/v1/admin/projects/${projectId}/users`,
-        );
-    },
-
-    /**
-     * POST /api/v1/admin/projects/{projectId}/users
-     *
-     * Request body:
-     * {
-     *   userIds: ["user-uuid-1", "user-uuid-2"],
-     *   projectRoles: ["MEMBER"]
-     * }
-     *
-     * projectRoles is optional in this frontend type because the original
-     * endpoint only required userIds. The mock uses MEMBER as default.
-     */
-    async assignUsersToProject(
-        projectId: string,
-        request: AssignProjectUsersRequest,
-    ): Promise<ProjectUser[]> {
-        if (USE_PROJECT_MOCKS) {
-            const project = getMockProjectById(projectId);
-            const projectRoles = request.projectRoles ?? ["MEMBER"];
-
-            const nextUsers = [...project.users];
-
-            request.userIds.forEach((userId) => {
-                const user = getMockUserById(userId);
-                const existingIndex = nextUsers.findIndex(
-                    (candidate) => candidate.id === userId,
-                );
-
-                const userSummary = toProjectUserSummary(user, projectRoles);
-
-                if (existingIndex >= 0) {
-                    nextUsers[existingIndex] = userSummary;
-                    return;
-                }
-
-                nextUsers.push(userSummary);
-            });
-
-            const updatedProject: AdminProject = {
-                ...project,
-                users: nextUsers,
-            };
-
-            mockProjects = mockProjects.map((candidate) =>
-                candidate.id === projectId ? updatedProject : candidate,
-            );
-
-            return withMockDelay(updatedProject.users.map(toProjectUser));
-        }
-
-        await apiClient.fetch<void>(
-            `/api/v1/admin/projects/${projectId}/users`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(request),
-            },
-        );
-
-        return projectService.getProjectUsers(projectId);
-    },
-
-    /**
-     * DELETE /api/v1/admin/projects/{projectId}/users/{userId}
-     *
-     * Successful removal should return 204 No Content.
-     * No response body like { removed: true } is expected.
-     */
-    async removeUserFromProject(
-        projectId: string,
-        userId: string,
-    ): Promise<void> {
-        if (USE_PROJECT_MOCKS) {
-            const project = getMockProjectById(projectId);
-
-            const hasAssignment = project.users.some((user) => user.id === userId);
-
-            if (!hasAssignment) {
-                throw new Error(
-                    `User with id "${userId}" is not assigned to project "${projectId}".`,
-                );
-            }
-
-            const updatedProject: AdminProject = {
-                ...project,
-                users: project.users.filter((user) => user.id !== userId),
-            };
-
-            mockProjects = mockProjects.map((candidate) =>
-                candidate.id === projectId ? updatedProject : candidate,
-            );
-
-            await wait(MOCK_DELAY_MS);
-            return;
-        }
-
-        await apiClient.fetch<void>(
-            `/api/v1/admin/projects/${projectId}/users/${userId}`,
-            {
-                method: "DELETE",
-            },
-        );
-    },
-
-    /**
-     * Frontend helper only.
-     *
-     * Useful for tests or for resetting the local mock state after creating,
-     * updating or deleting projects while USE_PROJECT_MOCKS is enabled.
-     */
-    resetProjectMocks(): void {
-        mockProjects = clone(mock.adminProjects ?? []);
-        mockUsers = clone(mock.adminUsers ?? []);
-    },
+  async removeUserFromProject(
+    projectId: string,
+    userId: string,
+  ): Promise<void> {
+    await apiClient.fetch<void>(
+      `/api/v1/admin/projects/${projectId}/users/${userId}`,
+      {
+        method: "DELETE",
+      },
+    );
+  },
 };

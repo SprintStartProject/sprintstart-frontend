@@ -3,23 +3,30 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GitBranch, Database } from 'lucide-react';
 import { SourceList } from '../../../../../src/features/data-ingestion/components/SourceList';
-import type { DataSource, SourceSystem } from '../../../../../src/features/data-ingestion/types';
+import type { DataSource } from '../../../../../src/features/data-ingestion/types';
 
 function createMockSource(overrides: Partial<DataSource> = {}): DataSource {
     return {
+        sourceId: 'source-github',
         sourceSystem: 'GITHUB',
         name: 'GitHub Repository',
         type: 'GitHub',
         icon: GitBranch,
         status: 'connected',
         statusLabel: 'Synced',
+        ingestionStatus: 'connected',
+        ingestionStatusLabel: 'Synced',
         artifacts: 10,
         lastSync: '2026-07-05',
         errors: 0,
         latestIngestedCount: 10,
         latestUpdatedCount: 3,
+        totalArtifactCount: 10,
+        runIds: [],
+        sharesSourceSystem: false,
         lastRunAt: '2026-07-05T10:00:00Z',
         failedItems: [],
+        githubRepository: null,
         description: 'Indexes repositories, README files, pull requests.',
         ...overrides,
     };
@@ -48,7 +55,7 @@ describe('SourceList', () => {
         render(
             <SourceList
                 sources={sources}
-                selectedSourceSystem={null}
+                selectedSourceId={null}
                 onSelectSource={vi.fn()}
             />,
         );
@@ -64,6 +71,7 @@ describe('SourceList', () => {
         const sources: DataSource[] = [
             createMockSource({
                 latestIngestedCount: 42,
+                totalArtifactCount: 42,
                 latestUpdatedCount: 7,
                 lastSync: '2026-07-05',
                 errors: 3,
@@ -73,12 +81,12 @@ describe('SourceList', () => {
         render(
             <SourceList
                 sources={sources}
-                selectedSourceSystem={null}
+                selectedSourceId={null}
                 onSelectSource={vi.fn()}
             />,
         );
 
-        expect(screen.getByText('Latest Ingested')).toBeInTheDocument();
+        expect(screen.getByText('Artifacts Ingested')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
         expect(screen.getByText('Latest Updated')).toBeInTheDocument();
         expect(screen.getByText('7')).toBeInTheDocument();
@@ -94,6 +102,7 @@ describe('SourceList', () => {
         const sources: DataSource[] = [
             createMockSource({ sourceSystem: 'GITHUB', name: 'GitHub Repository' }),
             createMockSource({
+                sourceId: 'source-jira',
                 sourceSystem: 'JIRA',
                 name: 'Jira Project Board',
                 icon: Database,
@@ -103,14 +112,14 @@ describe('SourceList', () => {
         render(
             <SourceList
                 sources={sources}
-                selectedSourceSystem={null}
+                selectedSourceId={null}
                 onSelectSource={onSelectSource}
             />,
         );
 
         await user.click(screen.getByText('Jira Project Board'));
 
-        expect(onSelectSource).toHaveBeenCalledWith('JIRA' satisfies SourceSystem);
+        expect(onSelectSource).toHaveBeenCalledWith('source-jira');
         expect(onSelectSource).toHaveBeenCalledTimes(1);
     });
 
@@ -118,6 +127,7 @@ describe('SourceList', () => {
         const sources: DataSource[] = [
             createMockSource({ sourceSystem: 'GITHUB', name: 'GitHub Repository' }),
             createMockSource({
+                sourceId: 'source-jira',
                 sourceSystem: 'JIRA',
                 name: 'Jira Project Board',
                 icon: Database,
@@ -127,7 +137,7 @@ describe('SourceList', () => {
         render(
             <SourceList
                 sources={sources}
-                selectedSourceSystem="JIRA"
+                selectedSourceId="source-jira"
                 onSelectSource={vi.fn()}
             />,
         );
@@ -143,7 +153,7 @@ describe('SourceList', () => {
         render(
             <SourceList
                 sources={[]}
-                selectedSourceSystem={null}
+                selectedSourceId={null}
                 onSelectSource={vi.fn()}
             />,
         );
@@ -170,7 +180,7 @@ describe('SourceList', () => {
         render(
             <SourceList
                 sources={sources}
-                selectedSourceSystem={null}
+                selectedSourceId={null}
                 onSelectSource={vi.fn()}
             />,
         );

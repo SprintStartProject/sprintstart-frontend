@@ -12,7 +12,6 @@ import {
     CheckCircle2,
     X,
 } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
 
 /**
  * Multi-file and multi-format management view for uploaded project resources.
@@ -22,11 +21,9 @@ export function KnowledgeBasePage() {
     const { profile } = useAuth();
 
     const [documents, setDocuments] = useState<DocumentMetadata[]>(() => {
-        const saved = sessionStorage.getItem(
-            `kb_docs_${profile?.id || 'guest'}`,
-        );
+        const saved = sessionStorage.getItem(`kb_docs_${profile?.id || 'guest'}`);
 
-        return saved ? (JSON.parse(saved) as DocumentMetadata[]) : [];
+        return saved ? JSON.parse(saved) as DocumentMetadata[] : [];
     });
 
     const [isLoading, setIsLoading] = useState(true);
@@ -40,41 +37,33 @@ export function KnowledgeBasePage() {
 
     useEffect(() => {
         if (profile) {
-            sessionStorage.setItem(
-                `kb_docs_${profile.id}`,
-                JSON.stringify(documents),
-            );
+            sessionStorage.setItem(`kb_docs_${profile.id}`, JSON.stringify(documents));
         }
     }, [documents, profile]);
 
-    const loadDocuments = useCallback(
-        async (isMounted = true) => {
-            if (!profile) return;
+    const loadDocuments = useCallback(async (isMounted = true) => {
+        if (!profile) return;
 
-            try {
-                const docs = await knowledgeService.fetchDocuments(profile.id);
+        try {
+            const docs = await knowledgeService.fetchDocuments(profile.id);
 
-                if (isMounted) {
-                    setDocuments((prev) => {
-                        const pendingDocs = prev.filter(
-                            (d) => d.status === DocumentStatus.PENDING,
-                        );
+            if (isMounted) {
+                setDocuments(prev => {
+                    const pendingDocs = prev.filter(d => d.status === DocumentStatus.PENDING);
 
-                        const filteredPending = pendingDocs.filter(
-                            (p) => !docs.some((d) => d.id === p.id),
-                        );
+                    const filteredPending = pendingDocs.filter(
+                        p => !docs.some(d => d.id === p.id),
+                    );
 
-                        return [...docs, ...filteredPending];
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to load documents:', error);
-            } finally {
-                if (isMounted) setIsLoading(false);
+                    return [...docs, ...filteredPending];
+                });
             }
-        },
-        [profile],
-    );
+        } catch (error) {
+            console.error('Failed to load documents:', error);
+        } finally {
+            if (isMounted) setIsLoading(false);
+        }
+    }, [profile]);
 
     useEffect(() => {
         let isMounted = true;
@@ -101,25 +90,20 @@ export function KnowledgeBasePage() {
         setBatchResult(null);
 
         try {
-            const results = await knowledgeService.uploadDocuments(
-                files,
-                profile.id,
-            );
+            const results = await knowledgeService.uploadDocuments(files, profile.id);
 
-            const successfulResults = results.filter((r) => r.status === 'ok');
-            const failedResults = results.filter((r) => r.status === 'failed');
+            const successfulResults = results.filter(r => r.status === 'ok');
+            const failedResults = results.filter(r => r.status === 'failed');
 
             const newDocs: DocumentMetadata[] = [];
 
-            successfulResults.forEach((r) => {
+            successfulResults.forEach(r => {
                 const isDuplicate =
-                    documents.some((d) => d.id === r.id) ||
-                    newDocs.some((d) => d.id === r.id);
+                    documents.some(d => d.id === r.id) ||
+                    newDocs.some(d => d.id === r.id);
 
                 if (!isDuplicate) {
-                    const originalFile = files.find(
-                        (f) => f.name === r.filename,
-                    );
+                    const originalFile = files.find(f => f.name === r.filename);
 
                     newDocs.push({
                         id: r.id,
@@ -133,13 +117,13 @@ export function KnowledgeBasePage() {
             });
 
             if (newDocs.length > 0) {
-                setDocuments((prev) => [...newDocs, ...prev]);
+                setDocuments(prev => [...newDocs, ...prev]);
             }
 
             setBatchResult({
                 success: successfulResults.length,
                 failed: failedResults.length,
-                errors: failedResults.map((r) => `${r.filename}: ${r.error}`),
+                errors: failedResults.map(r => `${r.filename}: ${r.error}`),
             });
 
             if (failedResults.length === 0) {
@@ -155,29 +139,40 @@ export function KnowledgeBasePage() {
     const handleDelete = async (id: string) => {
         try {
             await knowledgeService.deleteDocument(id);
-            setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+            setDocuments(prev => prev.filter(doc => doc.id !== id));
         } catch (error) {
             console.error('Delete failed:', error);
         }
     };
 
     return (
-        <div className="min-h-screen bg-app-bg text-app-text">
-            <header className="border-b border-app-border bg-app-bg">
-                <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="app-page-frame py-6"
-                >
-                    <PageHeader
-                        icon={BookOpen}
-                        title="Knowledge Base"
-                        subtitle="Ingest project documentation and keep workspace context ready for search, chat and onboarding."
-                    />
-                </motion.div>
-            </header>
+        <div className="min-h-screen bg-app-bg p-3 text-app-text sm:p-6 lg:p-10">
+            <div className="mx-auto max-w-6xl space-y-6 sm:space-y-10">
+                <header className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-app-brand-soft p-1.5 sm:p-2">
+                            <BookOpen className="h-5 w-5 text-app-brand-text sm:h-6 sm:w-6" />
+                        </div>
 
-            <main className="app-page-frame space-y-6 py-6 sm:space-y-10 lg:py-8">
+                        <motion.h1
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="text-xl font-bold tracking-tight text-app-text sm:text-3xl"
+                        >
+                            Knowledge Base
+                        </motion.h1>
+                    </div>
+
+                    <motion.p
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="max-w-2xl text-sm leading-relaxed text-app-text-subtle sm:text-lg"
+                    >
+                        Ingest project documentation. Upload Markdown files to provide context for your workspace.
+                    </motion.p>
+                </header>
+
                 <AnimatePresence>
                     {batchResult && (
                         <motion.div
@@ -197,16 +192,14 @@ export function KnowledgeBasePage() {
                                     ) : (
                                         <CheckCircle2 className="h-5 w-5 text-app-success-text" />
                                     )}
-                                    Upload Complete: {batchResult.success}{' '}
-                                    documents ingested, {batchResult.failed}{' '}
-                                    failed
+
+                                    Upload Complete: {batchResult.success} documents ingested, {batchResult.failed} failed
                                 </span>
 
                                 <button
                                     type="button"
                                     onClick={() => setBatchResult(null)}
                                     className="rounded-lg p-1 text-app-text-subtle transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
-                                    aria-label="Dismiss upload notification"
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
@@ -237,8 +230,7 @@ export function KnowledgeBasePage() {
                                 </h2>
 
                                 <p className="mt-1 text-sm text-app-text-subtle">
-                                    Select .md files to add them to the
-                                    knowledge base.
+                                    Select .md files to add them to the knowledge base.
                                 </p>
                             </div>
 
@@ -260,6 +252,7 @@ export function KnowledgeBasePage() {
                         <div className="flex items-center justify-between px-2">
                             <h2 className="flex items-center gap-3 text-xl font-semibold text-app-text">
                                 Knowledge Repository
+
                                 {documents.length > 0 && (
                                     <span className="rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                                         {documents.length} Docs
@@ -274,9 +267,7 @@ export function KnowledgeBasePage() {
                                 }}
                                 className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-app-text-subtle transition-all hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                             >
-                                <RefreshCw
-                                    className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
-                                />
+                                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                                 Refresh
                             </button>
                         </div>
@@ -301,7 +292,7 @@ export function KnowledgeBasePage() {
                         )}
                     </motion.div>
                 </div>
-            </main>
+            </div>
         </div>
     );
 }

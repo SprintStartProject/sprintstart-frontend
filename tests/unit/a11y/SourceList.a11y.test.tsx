@@ -8,20 +8,27 @@ import type { DataSource } from '../../../src/features/data-ingestion/types';
 
 const sources: DataSource[] = [
     {
+        sourceId: 'source-github',
         sourceSystem: 'GITHUB',
         name: 'GitHub Repository',
         type: 'GitHub',
         status: 'connected',
         statusLabel: 'Connected',
+        ingestionStatus: 'connected',
+        ingestionStatusLabel: 'Synced',
         artifacts: 42,
         lastSync: '2026-07-01',
         errors: 0,
         latestIngestedCount: 10,
         latestUpdatedCount: 5,
+        totalArtifactCount: 42,
+        runIds: [],
+        sharesSourceSystem: false,
         lastRunAt: '2026-07-01T00:00:00.000Z',
         icon: GitBranch,
         description: 'Indexes repositories and source files.',
-        failedItems: []
+        failedItems: [],
+        githubRepository: null
     }
 ];
 
@@ -32,7 +39,7 @@ describe('SourceList Accessibility', () => {
                 <main>
                     <SourceList
                         sources={sources}
-                        selectedSourceSystem={null}
+                        selectedSourceId={null}
                         onSelectSource={vi.fn()}
                     />
                 </main>
