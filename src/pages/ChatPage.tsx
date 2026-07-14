@@ -1,4 +1,4 @@
-import { Bot, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
+import { Bot, Check, Filter, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAuth } from "../context/useAuth";
 import { UserAvatar } from "../components/common/UserAvatar.tsx";
@@ -8,6 +8,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { SOURCE_SYSTEMS } from "../features/chatbot/types.ts";
 
 import "katex/dist/katex.min.css";
 
@@ -23,6 +24,7 @@ export function ChatPage() {
         handleSubmit,
         isThinking,
         isStreaming,
+        thinkingState,
         newRequest,
         setNewRequest,
         selectedCitation,
@@ -32,7 +34,15 @@ export function ChatPage() {
         textareaRef,
         bottomRef,
         showBrainrot,
-        timestamp
+        timestamp,
+        showFilters,
+        setShowFilters,
+        from,
+        setFrom,
+        to,
+        setTo,
+        sourceSystems,
+        toggleSourceSystem
     } = useChat();
     const hasChatHistory = chats?.length !== 0;
 
@@ -260,10 +270,22 @@ export function ChatPage() {
 
                                 <div className="flex flex-col items-start max-w-[85%]">
                                     <div className="px-4 py-2.5 rounded-2xl rounded-tl-none bg-app-surface-muted text-app-text">
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1 items-center">
                                             <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce" />
                                             <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:150ms]" />
                                             <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:300ms]" />
+
+                                            {thinkingState === "retrieve" && (
+                                                <span className="italic pl-2 animate-pulse">Searching knowledge base...</span>
+                                            )}
+
+                                            {thinkingState === "synthesis" && (
+                                                <span className="italic pl-2 animate-pulse">Synthesizing answer...</span>
+                                            )}
+
+                                            {thinkingState === "grep" && (
+                                                <span className="italic pl-2 animate-pulse">Scanning documents...</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -307,7 +329,119 @@ export function ChatPage() {
                 )}
 
                 <footer className="p-4 bg-app-bg border-t border-app-border">
+                    {showFilters && (
+                        <div className="max-w-4xl mx-auto w-full px-4 mb-3">
+                            <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-app-border bg-app-surface-muted/70 backdrop-blur px-4 py-3">
+
+                                <div className="flex flex-col gap-1">
+                                    <label
+                                        htmlFor="filter-from"
+                                        className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold"
+                                    >
+                                        From
+                                    </label>
+
+                                    <input
+                                        id="filter-from"
+                                        type="date"
+                                        value={from}
+                                        onChange={(e) => setFrom(e.target.value)}
+                                        className="
+                                            h-10 rounded-xl
+                                            border border-app-border
+                                            bg-app-bg
+                                            px-3
+                                            text-sm
+                                            outline-none
+                                            focus:ring-2 focus:ring-app-focus/50
+                                        "
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <label
+                                        htmlFor="filter-to"
+                                        className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold"
+                                    >
+                                        To
+                                    </label>
+
+                                    <input
+                                        id="filter-to"
+                                        type="date"
+                                        value={to}
+                                        onChange={(e) => setTo(e.target.value)}
+                                        className="
+                                            h-10 rounded-xl
+                                            border border-app-border
+                                            bg-app-bg
+                                            px-3
+                                            text-sm
+                                            outline-none
+                                            focus:ring-2 focus:ring-app-focus/50
+                                        "
+                                    />
+                                </div>
+
+                                <div className="h-8 w-px bg-app-border-muted self-center hidden lg:block" />
+
+                                <div className="flex flex-col gap-1 flex-1 min-w-[240px]">
+                                    <span className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold">
+                                        Systems
+                                    </span>
+
+                                    <div className="flex flex-wrap gap-2 min-h-10 items-center">
+                                        {SOURCE_SYSTEMS.map((source) => {
+                                            const selected = sourceSystems.includes(source);
+
+                                            return (
+                                                <button
+                                                    key={source}
+                                                    type="button"
+                                                    aria-pressed={selected}
+                                                    onClick={() => toggleSourceSystem(source)}
+                                                    className={`
+                                                        h-10
+                                                        rounded-full
+                                                        px-4
+                                                        text-xs
+                                                        font-semibold
+                                                        uppercase
+                                                        tracking-wide
+                                                        border
+                                                        transition-colors
+                                                        flex
+                                                        items-center
+                                                        gap-1.5
+                                                        ${
+                                                            selected
+                                                                ? "bg-app-brand text-white border-app-brand"
+                                                                : "bg-app-bg border-app-border text-app-text hover:bg-app-surface"
+                                                        }
+                                                    `}
+                                                >
+                                                    {selected && <Check size={13} />}
+                                                    {source}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-3 items-end">
+                        <button
+                            type="button"
+                            aria-label="Toggle source filters"
+                            aria-expanded={showFilters}
+                            onClick={() => setShowFilters((v) => !v)}
+                            className="p-2.5 rounded-xl border border-app-border bg-app-surface-muted hover:bg-app-surface transition-colors h-11 w-11 flex items-center justify-center"
+                        >
+                            <Filter size={20} />
+                        </button>
+
                         <textarea
                             ref={textareaRef}
                             aria-label="Message"
