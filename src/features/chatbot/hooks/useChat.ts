@@ -268,7 +268,7 @@ export function useChat() {
             setIsStreaming(false);
             setIsThinking(false);
         }
-    }, [chatId, navigate, chats, refreshChats, userId]);
+    }, [chatId, navigate, chats, refreshChats, userId, sourceSystems, from, to]);
 
     /**
      * Adds the newly created messages to the chat.

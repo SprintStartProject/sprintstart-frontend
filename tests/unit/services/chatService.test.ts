@@ -87,7 +87,7 @@ describe('chatService', () => {
             const onDone = vi.fn();
             const onError = vi.fn();
 
-            await streamMessage('chat1', 'hello', { onToken, onCitation: vi.fn(), onDone, onError });
+            await streamMessage('chat1', 'hello', [], '', '', { onToken, onCitation: vi.fn(), onToolUse: vi.fn(), onDone, onError });
 
             expect(mockKeycloakInstance.updateToken).toHaveBeenCalledWith(30);
             expect(capturedAuthHeader).toBe('Bearer test-token');
@@ -113,9 +113,10 @@ describe('chatService', () => {
                 }),
             );
 
-            await streamMessage('chat1', 'hello', {
+            await streamMessage('chat1', 'hello', [], '', '', {
                 onToken: vi.fn(),
                 onCitation: vi.fn(),
+                onToolUse: vi.fn(),
                 onDone: vi.fn(),
             });
 
@@ -131,9 +132,10 @@ describe('chatService', () => {
             );
 
             const onError = vi.fn();
-            await streamMessage('chat1', 'hello', {
+            await streamMessage('chat1', 'hello', [], '', '', {
                 onToken: vi.fn(),
                 onCitation: vi.fn(),
+                onToolUse: vi.fn(),
                 onDone: vi.fn(),
                 onError,
             });
@@ -164,9 +166,10 @@ describe('chatService', () => {
             const onCitation = vi.fn();
             const onDone = vi.fn();
 
-            await streamMessage('chat1', 'hello', {
+            await streamMessage('chat1', 'hello', [], '', '', {
                 onToken: vi.fn(),
                 onCitation,
+                onToolUse: vi.fn(),
                 onDone,
             });
 
@@ -196,9 +199,10 @@ describe('chatService', () => {
             );
 
             const onError = vi.fn();
-            await streamMessage('chat1', 'hello', {
+            await streamMessage('chat1', 'hello', [], '', '', {
                 onToken: vi.fn(),
                 onCitation: vi.fn(),
+                onToolUse: vi.fn(),
                 onDone: vi.fn(),
                 onError,
             });
