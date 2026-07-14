@@ -68,6 +68,14 @@ export type GithubRepositoryConfig = {
   nextSyncAt: string | null;
 };
 
+/**
+ * Connects a GitHub repository to SprintStart by notifying the backend.
+ * The backend handles the actual ingestion asynchronously.
+ *
+ * @param request - The GitHub repository owner and repository name.
+ * @returns The backend transaction identifier for the accepted connection job.
+ * @throws Error if the connection request fails.
+ */
 export async function connectGithubRepository(
   request: ConnectGithubRepositoryRequest,
 ): Promise<ConnectGithubRepositoryResponse> {

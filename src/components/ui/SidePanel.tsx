@@ -138,7 +138,7 @@ export function SidePanel({
                     type="button"
                     aria-label={closeAriaLabel}
                     onClick={onClose}
-                    className={`fixed inset-0 ${zIndexClassName} ${overlayClassName}`}
+                    className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} ${overlayClassName}`}
                 />
             )}
 

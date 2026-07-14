@@ -16,6 +16,7 @@ const userDetails: AdminUser = {
     roles: [{ id: 'role-dev', name: 'Developer', description: '', type: 'primary' }],
     permissionGroup: 'User',
     projects: [],
+    projectIds: [],
     enabled: true,
     profileIcon: '',
     hasCompletedOnboarding: true,

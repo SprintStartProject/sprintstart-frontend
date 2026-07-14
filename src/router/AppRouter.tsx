@@ -1,7 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { ChatPage } from '../pages/ChatPage';
 import { DashboardPage } from '../pages/DashboardPage.tsx';
-import { KnowledgeBasePage } from '../pages/KnowledgeBasePage';
+import { KnowledgeBasePage } from '../pages/KnowledgeBasePage.tsx';
 import { DataIngestionPage } from '../pages/DataIngestionPage.tsx';
 import { OnBoardingPage } from '../pages/OnBoardingPage';
 import { OnBoardingItemPage } from '../features/onboarding/components/OnBoardingItemPage';

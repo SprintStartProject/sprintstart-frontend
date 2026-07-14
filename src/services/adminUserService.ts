@@ -52,6 +52,7 @@ export type UserProfile = {
   roles: UserRole[];
   permissionGroup: string;
   projects: ProjectSummary[];
+  projectIds: string[];
   enabled: boolean;
   profileIcon: string;
   hasCompletedOnboarding: boolean;
@@ -67,6 +68,7 @@ export type AdminUser = {
   roles: UserRole[];
   permissionGroup: string;
   projects: ProjectSummary[];
+  projectIds: string[];
   enabled: boolean;
   profileIcon: string;
   hasCompletedOnboarding: boolean;
@@ -174,10 +176,8 @@ function toAdminUser(user: BackendUserResponse): AdminUser {
     lastName: user.lastName,
     roles: toUserRolesFromProjectRoles(user.projectRoles),
     permissionGroup: toPermissionGroupLabel(user.permissionGroup),
-    projects: (user.projectIds ?? []).map((projectId) => ({
-      id: projectId,
-      name: `Project ${projectId.slice(0, 8)}`,
-    })),
+    projects: [],
+    projectIds: user.projectIds ?? [],
     enabled: user.enabled,
     profileIcon: user.profileIcon ?? "",
     hasCompletedOnboarding: user.hasCompletedOnboarding,

@@ -37,7 +37,12 @@ export function ProfileLayout() {
 
     const handleUpdateProfile = async (updates: Partial<UserProfile>) => {
         try {
-            const updatedProfile = await userService.updateProfile(updates);
+            // Workaround: Backend requires projectsId on PATCH requests
+            const payload = {
+                ...updates,
+                projectIds: profile?.projectIds || []
+            };
+            const updatedProfile = await userService.updateProfile(payload);
             setProfile(updatedProfile);
             await refetchProfile();
         } catch (error) {

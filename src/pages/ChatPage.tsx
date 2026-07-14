@@ -1,4 +1,4 @@
-import { Bot, Check, Filter, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
+import { Bot, Check, ExternalLink, Filter, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAuth } from "../context/useAuth";
 import { UserAvatar } from "../components/common/UserAvatar.tsx";
@@ -310,7 +310,19 @@ export function ChatPage() {
                     <div className="absolute right-6 bottom-24 w-80 rounded-xl bg-app-surface border border-app-border p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4">
                         <div className="flex justify-between items-start mb-2">
                             <h3 className="text-sm font-bold text-app-text truncate pr-4">
-                                {selectedCitation.filename}
+                                {selectedCitation.sourceUrl ? (
+                                    <a
+                                        href={selectedCitation.sourceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 hover:underline"
+                                    >
+                                        {selectedCitation.filename}
+                                        <ExternalLink size={12} />
+                                    </a>
+                                ) : (
+                                    selectedCitation.filename
+                                )}
                             </h3>
 
                             <button
@@ -322,8 +334,9 @@ export function ChatPage() {
                             </button>
                         </div>
 
-                        <div className="text-xs text-app-text line-clamp-4 leading-relaxed">
-                            {selectedCitation.section_path}
+                        <div className="text-xs text-app-text-muted leading-relaxed">
+                            {selectedCitation.startLine !== undefined && `Line ${selectedCitation.startLine}`}
+                            {selectedCitation.startPage !== undefined && `Page ${selectedCitation.startPage}`}
                         </div>
                     </div>
                 )}

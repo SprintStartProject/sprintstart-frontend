@@ -115,6 +115,7 @@ function createMockUser(overrides: Partial<AdminUser> = {}): AdminUser {
         roles: [],
         permissionGroup: 'User',
         projects: [] as ProjectSummary[],
+        projectIds: [],
         enabled: true,
         profileIcon: '',
         hasCompletedOnboarding: true,

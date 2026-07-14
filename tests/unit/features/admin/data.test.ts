@@ -25,6 +25,7 @@ function createAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
         roles: [],
         permissionGroup: 'ADMIN',
         projects: [],
+        projectIds: [],
         enabled: true,
         profileIcon: 'icon',
         hasCompletedOnboarding: true,

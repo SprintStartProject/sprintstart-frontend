@@ -21,6 +21,7 @@ vi.mock('../../../src/services/adminUserService', () => ({
                 roles: [],
                 permissionGroup: 'User',
                 projects: [],
+                projectIds: [],
                 enabled: true,
                 profileIcon: '',
                 hasCompletedOnboarding: true,

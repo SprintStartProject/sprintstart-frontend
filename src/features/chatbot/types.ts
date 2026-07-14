@@ -38,7 +38,10 @@ export type ChatMessage = {
 };
 
 export type Citation = {
-    chunk_id: string,
+    /**
+     * Id of the artifact (file) the citation refers to.
+     */
+    artifactId: string,
 
     /**
      * Name of the file the citation refers to.
@@ -46,9 +49,19 @@ export type Citation = {
     filename: string,
 
     /**
-     * The exact path to the file.
+     * Where the artifact came from (e.g. a GitHub URL), if known.
      */
-    section_path: string
+    sourceUrl?: string,
+
+    /**
+     * 1-based source line the citation starts on, for text/code sources.
+     */
+    startLine?: number,
+
+    /**
+     * 1-based page the citation was extracted from, for PDF sources.
+     */
+    startPage?: number
 };
 
 export type ChatSidebarProps = {

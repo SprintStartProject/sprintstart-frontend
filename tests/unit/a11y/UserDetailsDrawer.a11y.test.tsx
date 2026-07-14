@@ -57,6 +57,7 @@ const user: AdminUser = {
     roles: [{ id: 'r1', name: 'Developer', description: '', type: 'primary' }],
     permissionGroup: 'Admin',
     projects: [{ id: 'p1', name: 'SprintStart' }],
+    projectIds: ['p1'],
     enabled: true,
     profileIcon: '',
     hasCompletedOnboarding: true

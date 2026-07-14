@@ -5,7 +5,7 @@ import { Upload, FileCode, Loader2, AlertCircle, ImageIcon } from 'lucide-react'
 /**
  * Props for the FileUploadZone component.
  */
-interface Props {
+interface FileUploadZoneProps {
     /** Callback function triggered when one or more valid files are dropped or selected. */
     onUpload: (files: File[]) => void;
     /** Disables interactions and shows a processing spinner when true. */
@@ -19,7 +19,7 @@ interface Props {
  * client-side validation for file types (PDF, MD, TXT, PNG, JPG, WEBP) 
  * and a 10MB size limit per file.
  */
-export function FileUploadZone({ onUpload, isUploading }: Props) {
+export function FileUploadZone({ onUpload, isUploading }: FileUploadZoneProps) {
     const [isDragActive, setIsDragActive] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -35,27 +35,26 @@ export function FileUploadZone({ onUpload, isUploading }: Props) {
 
         const maxSize = 10 * 1024 * 1024;
         const validFiles: File[] = [];
-        let hasError = false;
+        const errors: string[] = [];
 
         Array.from(files).forEach(file => {
+            // Browsers often report an empty/`application/octet-stream` MIME for `.md`,
+            // so accept it by extension as a fallback to the type allowlist.
             const isMd = file.name.toLowerCase().endsWith('.md');
 
             if (!allowedTypes.includes(file.type) && !isMd) {
-                setError(
+                errors.push(
                     `File type not supported: ${file.name}. Only PDF, MD, TXT, PNG, JPG, and WEBP are allowed.`,
                 );
-                hasError = true;
             } else if (file.size > maxSize) {
-                setError(`File too large: ${file.name}. Max size is 10MB.`);
-                hasError = true;
+                errors.push(`File too large: ${file.name}. Max size is 10MB.`);
             } else {
                 validFiles.push(file);
             }
         });
 
-        if (!hasError) {
-            setError(null);
-        }
+        // Surface the first validation error of the batch; clear when the batch is clean.
+        setError(errors.length > 0 ? errors[0] : null);
 
         return validFiles;
     };

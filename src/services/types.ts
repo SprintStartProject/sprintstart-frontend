@@ -45,9 +45,9 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   projectRoles: ProjectRoleSummary[];
+  projectIds: string[];
   permissionGroup: PermissionGroup;
   enabled: boolean;
   profileIcon: string | null;
   hasCompletedOnboarding: boolean;
-  projectIds?: string[];
 }

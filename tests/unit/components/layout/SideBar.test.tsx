@@ -19,6 +19,7 @@ const mockProfile = {
     firstName: 'Test',
     lastName: 'User',
     projectRoles: [],
+    projectIds: [],
     permissionGroup: PermissionGroup.USER,
     enabled: true,
     profileIcon: null,
