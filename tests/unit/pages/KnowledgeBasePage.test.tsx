@@ -92,11 +92,10 @@ describe('KnowledgeBasePage', () => {
 
         await waitFor(() => {
             expect(screen.getByText('readme.md')).toBeInTheDocument();
+            const stored = sessionStorage.getItem('kb_docs_user1');
+            expect(stored).not.toBeNull();
+            expect(JSON.parse(stored!)).toHaveLength(1);
         });
-
-        const stored = sessionStorage.getItem('kb_docs_user1');
-        expect(stored).not.toBeNull();
-        expect(JSON.parse(stored!)).toHaveLength(1);
     });
 
     it('shows a batch result toast after a successful upload', async () => {
