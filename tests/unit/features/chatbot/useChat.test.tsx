@@ -115,7 +115,7 @@ describe('useChat', () => {
                 );
                 controller.enqueue(
                     encoder.encode(
-                        'data: {"type":"citation","chunk_id":"1","filename":"file.txt","section_path":""}\n\n',
+                        'data: {"type":"citation","artifact_id":"1","filename":"file.txt"}\n\n',
                     ),
                 );
                 controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));

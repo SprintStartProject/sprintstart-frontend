@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { adminUserService } from '../../../src/services/adminUserService';
 import { http, HttpResponse } from 'msw';
-import { server } from '../../unit/setup/vitest.setup';
+import { server } from '../setup/vitest.setup.ts';
 
 describe('adminUserService', () => {
     beforeEach(() => {
@@ -22,6 +22,7 @@ describe('adminUserService', () => {
                     permissionGroup: 'PM',
                     enabled: true,
                     profileIcon: null,
+                    projectIds: [],
                     hasCompletedOnboarding: true,
                 }),
             ),
@@ -59,6 +60,7 @@ describe('adminUserService', () => {
                     permissionGroup: 'HR',
                     enabled: true,
                     profileIcon: null,
+                    projectIds: [],
                     hasCompletedOnboarding: true,
                 });
             }),
@@ -84,6 +86,35 @@ describe('adminUserService', () => {
         expect(res.id).toBe('123');
     });
 
+    it('updateUserEnabled uses the enabled endpoint and maps the updated user', async () => {
+        server.use(
+            http.patch('/api/v1/admin/users/123/enabled', async ({ request }) => {
+                const body = (await request.json()) as Record<string, unknown>;
+                expect(body.enabled).toBe(false);
+                return HttpResponse.json({
+                    id: '123',
+                    authId: 'auth123',
+                    username: 'testuser',
+                    email: 'test@example.com',
+                    firstName: 'Test',
+                    lastName: 'User',
+                    projectRoles: [],
+                    permissionGroup: 'USER',
+                    enabled: false,
+                    profileIcon: null,
+                    hasCompletedOnboarding: true,
+                });
+            }),
+        );
+
+        const result = await adminUserService.updateUserEnabled('123', {
+            enabled: false,
+        });
+
+        expect(result.enabled).toBe(false);
+        expect(result.permissionGroup).toBe('User');
+    });
+
     it('getAvailableRolesFromUsers extracts unique roles and sorts them', () => {
         const users = [
             {
@@ -97,6 +128,7 @@ describe('adminUserService', () => {
                     { id: 'a', name: 'Alpha Role', description: '', type: 'primary' as const },
                 ],
                 projects: [],
+                projectIds: [],
                 permissionGroup: 'User',
                 enabled: true,
                 profileIcon: '',
@@ -112,6 +144,7 @@ describe('adminUserService', () => {
                     { id: 'b', name: 'Beta Role', description: '', type: 'primary' as const },
                 ],
                 projects: [],
+                projectIds: [],
                 permissionGroup: 'User',
                 enabled: true,
                 profileIcon: '',

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { FAQGroup } from "../types";
@@ -12,17 +13,49 @@ import {
   ArrowLeft,
   Users,
   MessageSquareMore,
+  RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
 
 export function FaqPage() {
   const navigate = useNavigate();
 
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
   const {
     data: overview,
     loading,
     error,
-  } = useFetch(() => insightsService.fetchFAQGroups(), []);
+  } = useFetch(() => insightsService.fetchFAQGroups(), [refreshKey]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await insightsService.refreshFAQGroups();
+      setRefreshKey((key) => key + 1);
+    } catch (err) {
+      console.error("FAQ refresh failed", err);
+      setRefreshError(
+        "Refresh failed. Is the AI service running and are there questions to group?",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshButton = (
+    <button
+      onClick={() => void handleRefresh()}
+      disabled={refreshing}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:opacity-60 shrink-0"
+    >
+      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+      {refreshing ? "Refreshing…" : "Refresh"}
+    </button>
+  );
 
   if (loading) {
     return (
@@ -34,9 +67,17 @@ export function FaqPage() {
 
   if (error || !overview || overview.groups.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-20">
+      <div className="flex flex-col items-center gap-3 py-20">
         <AlertCircle className="w-5 h-5 text-app-text-muted" />
-        <p className="text-app-text-muted">Could not load FAQ data.</p>
+        <p className="text-app-text-muted">
+          No FAQ groups yet. Trigger a refresh to generate them.
+        </p>
+        {refreshButton}
+        {refreshError && (
+          <p className="text-sm text-app-danger-text max-w-md text-center">
+            {refreshError}
+          </p>
+        )}
       </div>
     );
   }
@@ -68,7 +109,7 @@ export function FaqPage() {
   return (
     <div className="min-h-screen bg-app-bg">
       {/* Header */}
-      <div className="border-b border-app-border bg-app-bg/90">
+      <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
           <button
             onClick={() => void navigate("/pm-dashboard")}
@@ -78,12 +119,17 @@ export function FaqPage() {
             Back to PM-Dashboard
           </button>
 
-          <PageHeader
-            icon={MessageSquareMore}
-            title="Recurring Questions"
-            subtitle="Frequently asked questions grouped by topic and ranked by frequency."
-            className="mb-6"
-          />
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <PageHeader
+              icon={MessageSquareMore}
+              title="Recurring Questions"
+              subtitle="Frequently asked questions grouped by topic and ranked by frequency."
+            />
+            {refreshButton}
+          </div>
+          {refreshError && (
+            <p className="text-sm text-app-danger-text mb-4">{refreshError}</p>
+          )}
 
           {/* Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -144,7 +190,7 @@ export function FaqPage() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Content */}
       <main className="app-page-content py-8">

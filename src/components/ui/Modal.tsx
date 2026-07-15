@@ -129,7 +129,7 @@ export function Modal({
 
     return (
         <div
-            className={`fixed inset-0 ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
+            className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
         >
             {closeOnBackdrop && (
                 <button

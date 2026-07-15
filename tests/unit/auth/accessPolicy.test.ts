@@ -11,6 +11,7 @@ const createMockProfile = (permissionGroup: PermissionGroup): UserProfile => ({
     firstName: 'Test',
     lastName: 'User',
     projectRoles: [],
+    projectIds: [],
     permissionGroup,
     enabled: true,
     profileIcon: null,

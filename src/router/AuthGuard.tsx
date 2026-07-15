@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { isSkillLinkedToRole } from "../features/team-management/types";
 import {
     getSkillAssessmentPromptState,
     getMyTeamOverview,
@@ -46,7 +47,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
             const hasSkillsForRoles =
                 !!teamMember &&
                 teamMember.roles.some((role) =>
-                    allSkills.some((skill) => skill.roleId === role.id),
+                    allSkills.some(
+                        (skill) =>
+                            skill.status === "ACTIVE" &&
+                            isSkillLinkedToRole(skill, role.id),
+                    ),
                 );
 
             setSkillAssessmentUserId(teamMember.userId);

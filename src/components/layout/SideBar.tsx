@@ -222,7 +222,8 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
                                 <UserAvatar
                                     size={32}
                                     profileIcon={profile.profileIcon}
-                                    fallbackName={profile.username}
+                                    fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                                    seed={profile.id}
                                 />
                             </div>
 

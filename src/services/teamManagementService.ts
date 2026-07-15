@@ -6,6 +6,7 @@ import type {
   Skill,
   TeamOverviewUser,
   SkillLevel,
+  SkillStatus,
 } from "../features/team-management/types";
 import type {
   OnboardingPhaseEndpoint,
@@ -23,75 +24,94 @@ let mockProjectRoles: ProjectRole[] = Array.from(
   ).values(),
 );
 
-let mockSkills = skillsMock.skills as Skill[];
+type LegacySkill = {
+  id: string;
+  name: string;
+  roleId?: string;
+  roleIds?: string[];
+  status?: SkillStatus;
+};
+
+function normalizeSkill(skill: LegacySkill): Skill {
+  const roleIds = skill.roleIds ?? (skill.roleId ? [skill.roleId] : []);
+
+  return {
+    id: skill.id,
+    name: skill.name,
+    roleIds,
+    status: skill.status ?? "ACTIVE",
+  };
+}
+
+let mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
 
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,
+  projectIds?: string[],
 ): Promise<TeamOverviewUser[]> {
   try {
     const params = new URLSearchParams();
     if (roleId && roleId !== "all") params.append("roleIds", roleId);
+    projectIds?.forEach((projectId) => params.append("projectIds", projectId));
     if (sortBy) params.append("sortBy", sortBy);
     params.append("size", "100");
 
     const query = params.toString();
     const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
 
-        const response = await apiClient.fetch<{ content: TeamOverviewUser[] }>(
-            url,
-        );
+    const response = await apiClient.fetch<{ content: TeamOverviewUser[] }>(
+      url,
+    );
 
-        const users = response.content.map((user) => ({
-            ...user,
-            roles: user.roles.map(
-                (role: ProjectRole & { roleId?: string }) => ({
-                    ...role,
-                    id: role.id || role.roleId || '',
-                }),
-            ),
-        }));
+    const users = response.content.map((user) => ({
+      ...user,
+      roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
+        ...role,
+        id: role.id || role.roleId || "",
+      })),
+    }));
 
-        try {
-            const feedback = await getAllOnboardingFeedback();
-            const usersWithUnreadFeedback = new Set(
-                feedback
-                    .filter((item) => item.read !== true && !item.readAt)
-                    .map((item) => item.userId)
-                    .filter((userId): userId is string => Boolean(userId)),
-            );
+    try {
+      const feedback = await getAllOnboardingFeedback();
+      const usersWithUnreadFeedback = new Set(
+        feedback
+          .filter((item) => item.read !== true && !item.readAt)
+          .map((item) => item.userId)
+          .filter((userId): userId is string => Boolean(userId)),
+      );
 
-            return users.map((user) => ({
-                ...user,
-                hasFeedback: usersWithUnreadFeedback.has(user.userId),
-            }));
-        } catch {
-            return users;
-        }
+      return users.map((user) => ({
+        ...user,
+        hasFeedback: usersWithUnreadFeedback.has(user.userId),
+      }));
     } catch {
-        return mockUsers;
+      return users;
     }
+  } catch {
+    return mockUsers;
+  }
 }
 
 export async function getTeamMember(
-    userId: string,
+  userId: string,
 ): Promise<TeamOverviewUser | undefined> {
-    const users = await getTeamOverview();
+  const users = await getTeamOverview();
 
-    return users.find((user) => user.userId === userId);
+  return users.find((user) => user.userId === userId);
 }
 
 export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
-    try {
-    const user = await apiClient.fetch<TeamOverviewUser>("/api/v1/onboarding/me/team-overview");
+  try {
+    const user = await apiClient.fetch<TeamOverviewUser>(
+      "/api/v1/onboarding/me/team-overview",
+    );
     return {
       ...user,
-      roles: user.roles.map(
-    (role: ProjectRole & { roleId?: string }) => ({
+      roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
         ...role,
-        id: role.id || role.roleId || '',
-    }),
-),
+        id: role.id || role.roleId || "",
+      })),
     };
   } catch {
     // Fallback to finding the first user in mock for development
@@ -245,7 +265,9 @@ export async function getUserOnboardingFeedback(
   }));
 }
 
-export async function getAllOnboardingFeedback(): Promise<OnboardingFeedback[]> {
+export async function getAllOnboardingFeedback(): Promise<
+  OnboardingFeedback[]
+> {
   const feedback = await apiClient.fetch<OnboardingFeedback[]>(
     "/api/v1/admin/onboarding/feedback",
   );
@@ -259,9 +281,12 @@ export async function getAllOnboardingFeedback(): Promise<OnboardingFeedback[]> 
 export async function markOnboardingFeedbackRead(
   feedbackId: string,
 ): Promise<void> {
-  await apiClient.fetch(`/api/v1/admin/onboarding/feedback/${feedbackId}/read`, {
-    method: "POST",
-  });
+  await apiClient.fetch(
+    `/api/v1/admin/onboarding/feedback/${feedbackId}/read`,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export async function getUserOnboardingPath(
@@ -312,11 +337,17 @@ export async function getUserOnboardingPath(
 
 export type CreateOnboardingStepRequest = {
   position: number;
+  isAiAssisted?: boolean;
   title: string;
   description: string;
   type: StepType;
   estimatedMinutes: number;
   expectedOutcome?: string;
+};
+
+export type UpdateOnboardingStepRequest = CreateOnboardingStepRequest & {
+  status?: string;
+  skip?: unknown;
 };
 
 export type CreateOnboardingTaskRequest = {
@@ -330,8 +361,21 @@ export async function createOnboardingStepForPhase(
   phaseId: string,
   request: CreateOnboardingStepRequest,
 ): Promise<OnboardingStepEndpoint> {
-  return await apiClient.fetch<OnboardingStepEndpoint>(`/api/v1/onboarding/phases/${phaseId}/steps`, {
-    method: "POST",
+  return await apiClient.fetch<OnboardingStepEndpoint>(
+    `/api/v1/onboarding/phases/${phaseId}/steps`,
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function updateOnboardingStep(
+  stepId: string,
+  request: UpdateOnboardingStepRequest,
+): Promise<OnboardingStepEndpoint> {
+  return await apiClient.fetch<OnboardingStepEndpoint>(`/api/v1/onboarding/steps/${stepId}`, {
+    method: "PUT",
     body: JSON.stringify(request),
   });
 }
@@ -340,15 +384,40 @@ export async function createOnboardingTaskForStep(
   stepId: string,
   request: CreateOnboardingTaskRequest,
 ): Promise<OnboardingTaskEndpoint> {
-  return await apiClient.fetch<OnboardingTaskEndpoint>(`/api/v1/onboarding/steps/${stepId}/tasks`, {
-    method: "POST",
-    body: JSON.stringify(request),
-  });
+  return await apiClient.fetch<OnboardingTaskEndpoint>(
+    `/api/v1/onboarding/steps/${stepId}/tasks`,
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+  );
 }
 
 export async function deleteOnboardingStep(stepId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/onboarding/steps/${stepId}`, {
     method: "DELETE",
+  });
+}
+
+export type UpdateOnboardingTaskRequest = {
+  position: number;
+  title: string;
+  description: string;
+  finished: boolean;
+};
+
+/**
+ * Updates an onboarding task, including its position. Used by the drag-and-drop
+ * task reordering in the team member detail view. The backend automatically
+ * shifts sibling tasks within the same step when the position changes.
+ */
+export async function updateOnboardingTask(
+  taskId: string,
+  request: UpdateOnboardingTaskRequest,
+): Promise<OnboardingTaskEndpoint> {
+  return await apiClient.fetch<OnboardingTaskEndpoint>(`/api/v1/onboarding/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify(request),
   });
 }
 
@@ -371,57 +440,173 @@ export async function deleteOnboardingTask(taskId: string): Promise<void> {
 }
 
 type SkillResponseDto = {
+  id: string;
+  name: string;
+  status?: SkillStatus;
+  roleId?: string;
+  roleIds?: string[];
+  projectRole?: {
     id: string;
-    name: string;
-    roleId?: string;
-    projectRole?: {
-        id: string;
-    };
+  };
 };
 
-export async function getSkills(): Promise<Skill[]> {
-    try {
-        const response = await apiClient.fetch<SkillResponseDto[]>('/api/v1/skills');
+type SkillAssessmentResponseDto = {
+  id?: string;
+  userId: string;
+  skillId: string;
+  level: SkillLevel;
+};
 
-        return response.map(skill => ({
-            id: skill.id,
-            name: skill.name,
-            roleId: skill.projectRole?.id || skill.roleId || '',
-        }));
-    } catch {
-        return mockSkills;
-    }
+function toSkill(skill: SkillResponseDto): Skill {
+  const legacyRoleIds = skill.projectRole?.id
+    ? [skill.projectRole.id]
+    : skill.roleId
+      ? [skill.roleId]
+      : [];
+
+  return {
+    id: skill.id,
+    name: skill.name,
+    roleIds: skill.roleIds ?? legacyRoleIds,
+    status: skill.status ?? "ACTIVE",
+  };
+}
+
+export async function getSkills(): Promise<Skill[]> {
+  try {
+    const response =
+      await apiClient.fetch<SkillResponseDto[]>("/api/v1/skills");
+
+    return response.map(toSkill);
+  } catch {
+    return mockSkills;
+  }
+}
+
+export async function getSkillById(skillId: string): Promise<Skill> {
+  const response = await apiClient.fetch<SkillResponseDto>(
+    `/api/v1/skills/${skillId}`,
+  );
+
+  return toSkill(response);
+}
+
+export async function updateSkill(
+  skillId: string,
+  data: { name?: string; roleIds?: string[] },
+): Promise<Skill> {
+  const response = await apiClient.fetch<SkillResponseDto>(
+    `/api/v1/admin/skills/${skillId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    },
+  );
+
+  return toSkill(response);
+}
+
+export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
+  const response = await apiClient.fetch<SkillResponseDto[]>(
+    `/api/v1/projectRoles/${roleId}/skills`,
+  );
+
+  return response.map(toSkill);
+}
+
+export async function updateRoleSkills(
+  roleId: string,
+  skillIds: string[],
+): Promise<Skill[]> {
+  const response = await apiClient.fetch<SkillResponseDto[]>(
+    `/api/v1/projectRoles/${roleId}/skills`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ skillIds }),
+    },
+  );
+
+  return response.map(toSkill);
+}
+
+export async function reactivateSkill(
+  skillId: string,
+  name: string,
+  roleIds: string[],
+): Promise<Skill> {
+  try {
+    const response = await apiClient.fetch<SkillResponseDto>(
+      "/api/v1/admin/skills",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          roleIds,
+        }),
+      },
+    );
+
+    return toSkill(response);
+  } catch {
+    mockSkills = mockSkills.map((s) =>
+      s.id === skillId ? { ...s, status: "ACTIVE" as const } : s,
+    );
+
+    return (
+      mockSkills.find((s) => s.id === skillId) ?? {
+        id: skillId,
+        name,
+        roleIds,
+        status: "ACTIVE",
+      }
+    );
+  }
 }
 
 export async function createSkill(
-    name: string,
-    roleId: string
+  name: string,
+  roleIds: string[],
 ): Promise<Skill> {
-    try {
-        const response = await apiClient.fetch<SkillResponseDto>('/api/v1/skills', {
-            method: 'POST',
-            body: JSON.stringify({
-                name,
-                roleId,
-            }),
-        });
+  try {
+    const response = await apiClient.fetch<SkillResponseDto>(
+      "/api/v1/admin/skills",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          roleIds,
+        }),
+      },
+    );
 
-        return {
-            id: response.id,
-            name: response.name,
-            roleId: response.projectRole?.id || response.roleId || '',
-        };
-    } catch {
-        const newSkill: Skill = {
-            id: `mock-skill-${Date.now()}`,
-            name,
-            roleId,
-        };
+    return toSkill(response);
+  } catch {
+    const existing = mockSkills.find(
+      (s) =>
+        s.name.toLowerCase() === name.toLowerCase() && s.status === "RETIRED",
+    );
 
-        mockSkills = [...mockSkills, newSkill];
+    if (existing) {
+      const reactivated: Skill = { ...existing, roleIds, status: "ACTIVE" };
 
-        return newSkill;
+      mockSkills = mockSkills.map((s) =>
+        s.id === existing.id ? reactivated : s,
+      );
+
+      return reactivated;
     }
+
+    const newSkill: Skill = {
+      id: `mock-skill-${Date.now()}`,
+      name,
+      roleIds,
+      status: "ACTIVE",
+    };
+
+    mockSkills = [...mockSkills, newSkill];
+
+    return newSkill;
+  }
 }
 
 export async function deleteProjectRole(roleId: string): Promise<void> {
@@ -434,7 +619,10 @@ export async function deleteProjectRole(roleId: string): Promise<void> {
   } catch {
     mockProjectRoles = mockProjectRoles.filter((role) => role.id !== roleId);
 
-    mockSkills = mockSkills.filter((skill) => skill.roleId !== roleId);
+    mockSkills = mockSkills.map((skill) => ({
+      ...skill,
+      roleIds: skill.roleIds.filter((linkedRoleId) => linkedRoleId !== roleId),
+    }));
 
     mockUsers = mockUsers.map((user) => ({
       ...user,
@@ -445,140 +633,149 @@ export async function deleteProjectRole(roleId: string): Promise<void> {
 
 export async function deleteSkill(skillId: string): Promise<void> {
   try {
-    await apiClient.fetch(`/api/v1/skills/${skillId}`, {
+    await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
       method: "DELETE",
     });
 
     return;
   } catch {
-    mockSkills = mockSkills.filter((skill) => skill.id !== skillId);
+    mockSkills = mockSkills.map((skill) =>
+      skill.id === skillId ? { ...skill, status: "RETIRED" } : skill,
+    );
   }
 }
 
 // Removed mock role functions
 
 export type CreateSkillAssessmentRequest = {
-    userId: string;
-    skillId: string;
-    level: SkillLevel;
+  userId: string;
+  skillId: string;
+  level: SkillLevel;
 };
 
 let mockSkillAssessments: CreateSkillAssessmentRequest[] = [];
 
-const skillAssessmentPromptStatePrefix = 'skill-assessment-prompt-state';
+const skillAssessmentPromptStatePrefix = "skill-assessment-prompt-state";
 
-export type SkillAssessmentPromptState = 'dismissed' | 'completed';
+export type SkillAssessmentPromptState = "dismissed" | "completed";
 
 function getSkillAssessmentPromptStateKey(userId: string) {
-    return `${skillAssessmentPromptStatePrefix}:${userId}`;
+  return `${skillAssessmentPromptStatePrefix}:${userId}`;
 }
 
 export function getSkillAssessmentPromptState(
-    userId: string,
+  userId: string,
 ): SkillAssessmentPromptState | null {
-    if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
-    const value = window.localStorage.getItem(
-        getSkillAssessmentPromptStateKey(userId),
-    );
+  const value = window.localStorage.getItem(
+    getSkillAssessmentPromptStateKey(userId),
+  );
 
-    return value === 'dismissed' || value === 'completed' ? value : null;
+  return value === "dismissed" || value === "completed" ? value : null;
 }
 
 export function markSkillAssessmentPromptDismissed(userId: string): void {
-    if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
-    window.localStorage.setItem(
-        getSkillAssessmentPromptStateKey(userId),
-        'dismissed',
-    );
+  window.localStorage.setItem(
+    getSkillAssessmentPromptStateKey(userId),
+    "dismissed",
+  );
 }
 
 export function markSkillAssessmentPromptCompleted(userId: string): void {
-    if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
-    window.localStorage.setItem(
-        getSkillAssessmentPromptStateKey(userId),
-        'completed',
-    );
+  window.localStorage.setItem(
+    getSkillAssessmentPromptStateKey(userId),
+    "completed",
+  );
 }
 
 export async function hasCompletedSkillAssessment(
-    userId: string,
+  userId: string,
 ): Promise<boolean> {
-    try {
-        const response = await apiClient.fetch<{ userId: string; skillId: string; level: SkillLevel }[]>(
-            `/api/v1/users/${userId}/skill-assessments/completed`,
-        );
+  try {
+    const response =
+      await apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills");
 
-        return response.length > 0;
-    } catch {
-        return mockSkillAssessments.some(
-            (assessment) => assessment.userId === userId,
-        );
-    }
+    return response.length > 0;
+  } catch {
+    return mockSkillAssessments.some(
+      (assessment) => assessment.userId === userId,
+    );
+  }
 }
 
 export async function saveUserSkillAssessments(
-    assessments: CreateSkillAssessmentRequest[],
+  assessments: CreateSkillAssessmentRequest[],
 ): Promise<void> {
-    try {
-        for (const assessment of assessments) {
-            await apiClient.fetch('/api/v1/skill-assessments', {
-                method: 'POST',
-                body: JSON.stringify({
-                    skillId: assessment.skillId,
-                    level: assessment.level,
-                }),
-            });
-        }
-    } catch {
-        mockSkillAssessments = mockSkillAssessments.filter(
-            (assessment) =>
-                !assessments.some(
-                    (incoming) =>
-                        incoming.userId === assessment.userId &&
-                        incoming.skillId === assessment.skillId,
-                ),
-        );
-
-        mockSkillAssessments = [...mockSkillAssessments, ...assessments];
+  try {
+    for (const assessment of assessments) {
+      await apiClient.fetch("/api/v1/me/skill/assess", {
+        method: "POST",
+        body: JSON.stringify({
+          skillId: assessment.skillId,
+          level: assessment.level,
+        }),
+      });
     }
+  } catch {
+    mockSkillAssessments = mockSkillAssessments.filter(
+      (assessment) =>
+        !assessments.some(
+          (incoming) =>
+            incoming.userId === assessment.userId &&
+            incoming.skillId === assessment.skillId,
+        ),
+    );
+
+    mockSkillAssessments = [...mockSkillAssessments, ...assessments];
+  }
 }
 
 export type UserSkillLevel = {
-    id: string;
-    skillId: string;
-    skillName: string;
-    roleName: string;
-    level: SkillLevel;
+  id: string;
+  skillId: string;
+  skillName: string;
+  roleName: string;
+  level: SkillLevel;
 };
 
+async function getCompletedSkillAssessments(
+  userId: string,
+): Promise<SkillAssessmentResponseDto[]> {
+  return await apiClient.fetch<SkillAssessmentResponseDto[]>(
+    `/api/v1/admin/users/${userId}/skill-assessments/completed`,
+  );
+}
+
 export async function getUserSkillLevels(
-    userId: string,
+  userId: string,
 ): Promise<UserSkillLevel[]> {
-    try {
-        const [assessments, skills, roles] = await Promise.all([
-            apiClient.fetch<{ userId: string; skillId: string; level: SkillLevel }[]>(
-                `/api/v1/users/${userId}/skill-assessments/completed`,
-            ),
-            getSkills(),
-            getProjectRoles(),
-        ]);
+  try {
+    const [assessments, skills, roles] = await Promise.all([
+      getCompletedSkillAssessments(userId),
+      getSkills(),
+      getProjectRoles(),
+    ]);
 
-        return assessments.map((assessment) => {
-            const skill = skills.find((s) => s.id === assessment.skillId);
-            const role = roles.find((r) => r.id === skill?.roleId);
+    return assessments.map((assessment) => {
+      const skill = skills.find((s) => s.id === assessment.skillId);
+      const roleNames = roles
+        .filter((role) => skill?.roleIds.includes(role.id))
+        .map((role) => role.name);
 
-            return {
-                id: `${userId}-${assessment.skillId}`,
-                skillId: assessment.skillId,
-                skillName: skill?.name ?? 'Unknown skill',
-                roleName: role?.name ?? 'Unknown role',
-                level: assessment.level,
-            };
-        });
-    } catch {
-        return [];
-    }
+      return {
+        id: `${userId}-${assessment.skillId}`,
+        skillId: assessment.skillId,
+        skillName: skill?.name ?? "Unknown skill",
+        roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",
+        level: assessment.level,
+      };
+    });
+  } catch {
+    return [];
+  }
 }

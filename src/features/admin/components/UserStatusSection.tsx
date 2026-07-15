@@ -16,7 +16,7 @@ function AccountAccessRow({
                               onEnabledChange,
                           }: AccountAccessRowProps) {
     return (
-        <div className="grid grid-cols-[7.5rem_1fr] items-center gap-4 py-2.5">
+        <div className="grid grid-cols-1 items-center gap-1.5 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
             <dt className="text-sm text-app-text-muted">Account access</dt>
             <dd className="flex flex-wrap items-center gap-3">
                 <StatusChip
@@ -62,7 +62,7 @@ export function UserStatusSection({
                     disabled={disabled}
                     onEnabledChange={onEnabledChange}
                 />
-                <div className="grid grid-cols-[7.5rem_1fr] items-center gap-4 py-2.5">
+                <div className="grid grid-cols-1 items-center gap-1.5 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
                     <dt className="text-sm text-app-text-muted">Onboarding</dt>
                     <dd>
                         <StatusChip

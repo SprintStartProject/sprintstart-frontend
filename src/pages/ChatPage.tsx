@@ -1,6 +1,8 @@
-import { Bot, MessageSquareText, Send, Sparkles, User, X } from "lucide-react";
+import { Bot, MessageSquareText, Send, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
+import { useAuth } from "../context/useAuth";
+import { UserAvatar } from "../components/common/UserAvatar.tsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -23,6 +25,7 @@ const SUGGESTIONS = [
  * Displays the interface for communication with the chat.
  */
 export function ChatPage() {
+    const { profile } = useAuth();
     const {
         messages,
         chatId,
@@ -38,6 +41,7 @@ export function ChatPage() {
         bottomRef,
         scrollContainerRef
     } = useChat();
+    const hasChatHistory = chats?.length !== 0;
 
     // Dino easter egg: while the assistant is thinking, pressing Space drops the
     // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
@@ -96,8 +100,13 @@ export function ChatPage() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-app-bg text-app-text lg:h-screen">
-            {chats?.length !== 0 && (
+        <div
+            className={[
+                "flex h-[calc(100vh-64px)] overflow-hidden bg-app-bg text-app-text lg:h-screen",
+                hasChatHistory ? "" : "app-page-frame",
+            ].filter(Boolean).join(" ")}
+        >
+            {hasChatHistory && (
                 <aside className="hidden w-64 shrink-0 flex-col border-r border-app-border bg-app-bg-soft md:flex">
                     <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
                 </aside>
@@ -207,14 +216,19 @@ export function ChatPage() {
                                     }`}
                                 >
                                     <div
-                                        className={`flex size-8 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ${
+                                        className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
                                             isRequest
-                                                ? "bg-app-brand ring-app-brand-border-strong"
-                                                : "bg-app-brand-soft ring-app-brand-border"
+                                                ? ""
+                                                : "bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border"
                                         }`}
                                     >
                                         {isRequest ? (
-                                            <User size={15} className="text-white" />
+                                            <UserAvatar
+                                                profileIcon={profile?.profileIcon}
+                                                fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : "User"}
+                                                seed={profile?.id}
+                                                size={32}
+                                            />
                                         ) : (
                                             <Bot size={15} className="text-app-brand-text" />
                                         )}

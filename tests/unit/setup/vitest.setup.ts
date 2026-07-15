@@ -74,7 +74,20 @@ vi.mock('framer-motion', async (importOriginal) => {
   const actual = await importOriginal<typeof import('framer-motion')>();
   
   // Dynamically map common HTML tags used with motion elements
-  const commonPrimitives = ['div', 'button', 'span', 'ul', 'li', 'section', 'nav', 'form', 'label'];
+  const commonPrimitives = [
+    'div',
+    'button',
+    'span',
+    'ul',
+    'li',
+    'section',
+    'nav',
+    'form',
+    'label',
+    'h1',
+    'h2',
+    'p',
+  ];
   
   const mockedMotion = commonPrimitives.reduce((acc, tagName) => {
     acc[tagName] = ({ children, className, ...props }: { children?: ReactNode; className?: string; [key: string]: unknown }) =>

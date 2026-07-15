@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '../../../components/ui/Modal';
+import { isSkillLinkedToRole } from '../types';
 import type { Skill, SkillLevel, TeamOverviewUser } from '../types';
 
 export type CreateSkillAssessmentRequest = {
@@ -38,7 +39,11 @@ export function SkillWizard({
     const requiredSkills = useMemo(() => {
         const roleIds = user.roles.map((role) => role.id);
 
-        return skills.filter((skill) => roleIds.includes(skill.roleId));
+        return skills.filter(
+            (skill) =>
+                skill.status === 'ACTIVE' &&
+                roleIds.some((roleId) => isSkillLinkedToRole(skill, roleId)),
+        );
     }, [skills, user.roles]);
 
     const allSkillsRated =

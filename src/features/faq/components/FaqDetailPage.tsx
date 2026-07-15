@@ -16,7 +16,6 @@ import {
   ArrowLeft,
   ShieldAlert,
   FileText,
-  ExternalLink,
   Loader2,
   AlertCircle,
   MessageSquareMore,
@@ -149,18 +148,11 @@ export function FaqDetailPage() {
                 <span className="text-sm text-app-text flex-1 min-w-0 truncate">
                   {doc.title}
                 </span>
-                <span className="text-xs text-app-text-muted bg-app-surface-muted px-2 py-0.5 rounded shrink-0">
-                  {doc.source}
-                </span>
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-app-brand hover:underline shrink-0"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Open
-                </a>
+                {doc.source && (
+                  <span className="text-xs text-app-text-muted bg-app-surface-muted px-2 py-0.5 rounded shrink-0">
+                    {doc.source}
+                  </span>
+                )}
               </div>
             ))}
           </div>

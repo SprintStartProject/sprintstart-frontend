@@ -35,8 +35,9 @@ export interface FAQQuestion {
 export interface FAQDocument {
     id: string;
     title: string;
-    source: string;
-    url: string;
+    // Origin system (e.g. confluence, github). Optional — the AI service does not
+    // always know the document's source, and it never provides a direct URL.
+    source?: string;
 }
 
 export interface FAQDetail {

@@ -1,329 +1,397 @@
-import { AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
 import {
-    formatDateTime,
-    formatNumber,
-    getRunStatusLabel,
-    getRunStatusTone,
-    getSourceLabel,
-} from "../data.ts";
-import type { DataSource, FailedArtifact, IngestionRun } from "../types.ts";
+  AlertTriangle,
+  ExternalLink,
+  FileText,
+  Loader2,
+  Search,
+} from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { getProjectArtifacts } from "../../../services/ingestionService.ts";
+import { formatDateTime, formatNumber, getSourceLabel } from "../data.ts";
+import type { Artifact, ArtifactPage, DataSource } from "../types.ts";
 
 type ArtifactTableProps = {
-    sources: DataSource[];
-    runs: IngestionRun[];
+  projectId: string | null;
+  sources: DataSource[];
 };
 
-type FailedArtifactRow = FailedArtifact & {
-    key: string;
-    sourceLabel: string;
-    occurredAt?: string;
+type LoadingState = "idle" | "loading" | "success" | "error";
+
+const ARTIFACT_PAGE_SIZE = 10;
+const EMPTY_ARTIFACT_PAGE: ArtifactPage = {
+  items: [],
+  page: {
+    number: 1,
+    size: ARTIFACT_PAGE_SIZE,
+    totalElements: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrevious: false,
+  },
 };
 
 /**
- * Displays the recent ingestion artifacts and failed items across all sources.
- * Helps users identify which specific files or records failed to sync.
+ * Displays persisted ingestion artifacts for the selected project.
+ * The rows come from the backend artifact listing instead of inferred run counters.
  */
-export function ArtifactTable({ sources, runs }: ArtifactTableProps) {
-    const latestIngestedCount = sources.reduce(
-        (sum, source) => sum + source.latestIngestedCount,
-        0,
-    );
-    const latestUpdatedCount = sources.reduce(
-        (sum, source) => sum + source.latestUpdatedCount,
-        0,
-    );
-    const latestFailedCount = sources.reduce(
-        (sum, source) => sum + source.errors,
-        0,
-    );
+export function ArtifactTable({ projectId, sources }: ArtifactTableProps) {
+  const [artifactPage, setArtifactPage] =
+    useState<ArtifactPage>(EMPTY_ARTIFACT_PAGE);
+  const [loadingState, setLoadingState] = useState<LoadingState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [draftFilter, setDraftFilter] = useState("");
+  const [filter, setFilter] = useState("");
 
-    const failedRows = buildFailedArtifactRows(sources, runs);
-    const latestRuns = runs.slice(0, 8);
+  useEffect(() => {
+    let isMounted = true;
 
+    void Promise.resolve().then(async () => {
+      if (!projectId) {
+        if (!isMounted) return;
+
+        setArtifactPage(EMPTY_ARTIFACT_PAGE);
+        setLoadingState("idle");
+        setErrorMessage(null);
+        return;
+      }
+
+      if (!isMounted) return;
+      setLoadingState("loading");
+      setErrorMessage(null);
+
+      try {
+        const nextArtifactPage = await getProjectArtifacts(projectId, {
+          page: pageNumber,
+          size: ARTIFACT_PAGE_SIZE,
+          filter,
+        });
+
+        if (!isMounted) return;
+
+        setArtifactPage(nextArtifactPage);
+        setLoadingState("success");
+      } catch (error) {
+        if (!isMounted) return;
+
+        setArtifactPage(EMPTY_ARTIFACT_PAGE);
+        setLoadingState("error");
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Artifacts could not be loaded.",
+        );
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [filter, pageNumber, projectId]);
+
+  const sourceCount = useMemo(
+    () =>
+      new Set(artifactPage.items.map((artifact) => artifact.sourceSystem)).size,
+    [artifactPage.items],
+  );
+  const failedCount = sources.reduce((sum, source) => sum + source.errors, 0);
+  const isLoading = loadingState === "loading";
+  const hasArtifacts = artifactPage.items.length > 0;
+
+  const submitFilter = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPageNumber(1);
+    setFilter(draftFilter.trim());
+  };
+
+  const clearFilter = () => {
+    setDraftFilter("");
+    setFilter("");
+    setPageNumber(1);
+  };
+
+  if (!projectId) {
     return (
-        <div className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-3">
-                <SummaryCard
-                    title="Latest Ingested"
-                    value={formatNumber(latestIngestedCount)}
-                    description=""
-                    tone="success"
-                />
+      <EmptyState value="Select a project to browse ingested artifacts." />
+    );
+  }
 
-                <SummaryCard
-                    title="Latest Updated"
-                    value={formatNumber(latestUpdatedCount)}
-                    description=""
-                    tone="neutral"
-                />
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-3">
+        <SummaryCard
+          title="Artifacts"
+          value={formatNumber(artifactPage.page.totalElements)}
+          description={
+            filter ? "matching current search" : "stored for this project"
+          }
+        />
 
-                <SummaryCard
-                    title="Failed Artifacts"
-                    value={formatNumber(latestFailedCount)}
-                    description=""
-                    tone={latestFailedCount > 0 ? "warning" : "success"}
-                />
+        <SummaryCard
+          title="Visible Sources"
+          value={formatNumber(sourceCount)}
+          description="source systems on this page"
+        />
+
+        <SummaryCard
+          title="Latest Failures"
+          value={formatNumber(failedCount)}
+          description="from latest source statuses"
+          warning={failedCount > 0}
+        />
+      </div>
+
+      <section className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+        <div className="flex flex-col gap-4 border-b border-app-border bg-app-bg-soft px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-app-text">
+              Project Artifacts
+            </h3>
+            <p className="mt-1 text-sm text-app-text-muted">
+              Persisted artifacts returned by the ingestion backend.
+            </p>
+          </div>
+
+          <form
+            onSubmit={submitFilter}
+            className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl"
+          >
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Search artifacts</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
+              <input
+                value={draftFilter}
+                onChange={(event) => setDraftFilter(event.target.value)}
+                placeholder="Search title, type or source"
+                className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-10 pr-3 text-sm text-app-text outline-none transition focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-app-brand px-4 text-sm font-medium text-app-text-inverse transition hover:bg-app-brand-hover"
+            >
+              Search
+            </button>
+
+            {filter && (
+              <button
+                type="button"
+                onClick={clearFilter}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text transition hover:bg-app-surface-hover"
+              >
+                Clear
+              </button>
+            )}
+          </form>
+        </div>
+
+        {errorMessage && (
+          <div className="border-b border-app-warning-border bg-app-warning-bg px-5 py-3 text-sm text-app-warning-text">
+            {errorMessage}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex min-h-64 items-center justify-center bg-app-surface px-5 py-10">
+            <div className="flex items-center gap-3 text-sm text-app-text-muted">
+              <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
+              Loading artifacts...
+            </div>
+          </div>
+        ) : hasArtifacts ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-app-border text-left text-sm">
+                <thead className="bg-app-surface-muted text-xs uppercase tracking-wide text-app-text-subtle">
+                  <tr>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Artifact
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Source
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Ingested
+                    </th>
+
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Link
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-app-border bg-app-surface">
+                  {artifactPage.items.map((artifact) => (
+                    <ArtifactRow key={artifact.id} artifact={artifact} />
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            <section className="overflow-hidden rounded-2xl border border-app-border">
-                <div className="border-b border-app-border bg-app-bg-soft px-5 py-4">
-                    <h3 className="text-sm font-semibold text-app-text">
-                        Recent Artifact Activity
-                    </h3>
-                </div>
-
-                {latestRuns.length > 0 ? (
-                    <div className="divide-y divide-app-border">
-                        {latestRuns.map((run) => (
-                            <article
-                                key={run.runId}
-                                className="grid gap-4 bg-app-surface px-5 py-5 lg:grid-cols-[1.1fr_1fr_1fr_1fr] lg:items-center"
-                            >
-                                <div>
-                                    <p className="text-sm font-semibold text-app-text">
-                                        {getSourceLabel(run.sourceSystem)}
-                                    </p>
-
-                                    <p className="mt-1 break-all text-xs text-app-text-subtle">
-                                        {run.runId}
-                                    </p>
-                                </div>
-
-                                <ActivityCounts run={run} />
-
-                                <div>
-                                    <p className="text-xs uppercase tracking-wide text-app-text-subtle lg:hidden">
-                                        Started
-                                    </p>
-
-                                    <p className="mt-1 text-sm text-app-text">
-                                        {formatDateTime(run.startedAt)}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <RunHealth run={run} />
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState value="No ingestion run activity has been returned yet." />
-                )}
-            </section>
-
-            <section className="overflow-hidden rounded-2xl border border-app-border">
-                <div className="border-b border-app-border bg-app-bg-soft px-5 py-4">
-                    <h3 className="text-sm font-semibold text-app-text">
-                        Failed Artifact Details
-                    </h3>
-                </div>
-
-                {failedRows.length > 0 ? (
-                    <div className="divide-y divide-app-border">
-                        {failedRows.map((item) => (
-                            <article
-                                key={item.key}
-                                className="grid gap-4 bg-app-surface px-5 py-5 lg:grid-cols-[1fr_1.4fr_1.6fr] lg:items-start"
-                            >
-                                <div>
-                                    <p className="text-sm font-semibold text-app-text">
-                                        {item.sourceLabel}
-                                    </p>
-
-                                    {item.occurredAt && (
-                                        <p className="mt-1 text-xs text-app-text-subtle">
-                                            {formatDateTime(item.occurredAt)}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <p className="break-words text-sm font-medium text-app-warning-text">
-                                        {item.artifactIdentifier}
-                                    </p>
-
-                                    {item.artifactIdentifier.startsWith(
-                                        "http",
-                                    ) && (
-                                        <a
-                                            href={item.artifactIdentifier}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-app-brand hover:text-app-brand-hover"
-                                        >
-                                            Open source
-                                            <ExternalLink size={12} />
-                                        </a>
-                                    )}
-                                </div>
-
-                                <p className="break-words text-sm text-app-text-muted">
-                                    {item.reason}
-                                </p>
-                            </article>
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState value="No failed artifacts reported in the latest source statuses or recent runs." />
-                )}
-            </section>
-        </div>
-    );
+            <ArtifactPagination
+              artifactPage={artifactPage}
+              onPrevious={() =>
+                setPageNumber((current) => Math.max(current - 1, 1))
+              }
+              onNext={() => setPageNumber((current) => current + 1)}
+            />
+          </>
+        ) : (
+          <EmptyState
+            value={
+              filter
+                ? "No artifacts match the current search."
+                : "No ingested artifacts have been returned for this project yet."
+            }
+          />
+        )}
+      </section>
+    </div>
+  );
 }
 
-function buildFailedArtifactRows(
-    sources: DataSource[],
-    runs: IngestionRun[],
-): FailedArtifactRow[] {
-    const rows = new Map<string, FailedArtifactRow>();
+function ArtifactRow({ artifact }: { artifact: Artifact }) {
+  const title = artifact.title?.trim() || artifact.id;
 
-    sources.forEach((source) => {
-        source.failedItems.forEach((item) => {
-            const key = `${source.sourceSystem}:status:${item.artifactIdentifier}:${item.reason}`;
-            rows.set(key, {
-                ...item,
-                key,
-                sourceLabel: getSourceLabel(source.sourceSystem),
-                occurredAt: source.lastRunAt ?? undefined,
-            });
-        });
-    });
+  return (
+    <tr className="align-top transition hover:bg-app-surface-hover">
+      <td className="max-w-md px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft text-app-text-muted">
+            <FileText className="h-4 w-4" />
+          </div>
 
-    runs.forEach((run) => {
-        run.failedItems.forEach((item) => {
-            const key = `${run.sourceSystem}:${run.runId}:${item.artifactIdentifier}:${item.reason}`;
-            rows.set(key, {
-                ...item,
-                key,
-                sourceLabel: getSourceLabel(run.sourceSystem),
-                occurredAt: run.startedAt,
-            });
-        });
-    });
+          <div className="min-w-0">
+            <p className="break-words font-semibold text-app-text">{title}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge>{artifact.artifactType.replace("_", " ")}</Badge>
+              <span className="break-all font-mono text-xs text-app-text-subtle">
+                {artifact.id}
+              </span>
+            </div>
+          </div>
+        </div>
+      </td>
 
-    return Array.from(rows.values()).slice(0, 50);
+      <td className="px-5 py-4 text-app-text-muted">
+        {getSourceLabel(artifact.sourceSystem)}
+      </td>
+
+      <td className="whitespace-nowrap px-5 py-4 text-app-text-muted">
+        {formatDateTime(artifact.ingestedAt)}
+      </td>
+
+      <td className="px-5 py-4">
+        {artifact.sourceUrl ? (
+          <a
+            href={artifact.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-xs font-medium text-app-brand transition hover:bg-app-surface-hover hover:text-app-brand-hover"
+          >
+            Open
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        ) : (
+          <span className="text-sm text-app-text-disabled">No link</span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function ArtifactPagination({
+  artifactPage,
+  onPrevious,
+  onNext,
+}: {
+  artifactPage: ArtifactPage;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  const firstVisible =
+    artifactPage.page.totalElements === 0
+      ? 0
+      : (artifactPage.page.number - 1) * artifactPage.page.size + 1;
+  const lastVisible = Math.min(
+    artifactPage.page.number * artifactPage.page.size,
+    artifactPage.page.totalElements,
+  );
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-app-border bg-app-bg-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-app-text-muted">
+        Showing {formatNumber(firstVisible)}-{formatNumber(lastVisible)} of{" "}
+        {formatNumber(artifactPage.page.totalElements)} artifacts
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={!artifactPage.page.hasPrevious}
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Previous
+        </button>
+
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!artifactPage.page.hasNext}
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function SummaryCard({
-    title,
-    value,
-    description,
-    tone,
+  title,
+  value,
+  description,
+  warning = false,
 }: {
-    title: string;
-    value: string;
-    description: string;
-    tone: "neutral" | "success" | "warning";
+  title: string;
+  value: string;
+  description: string;
+  warning?: boolean;
 }) {
-    const icon =
-        tone === "warning" ? (
-            <AlertTriangle size={18} className="text-app-warning-solid" />
-        ) : (
-            <CheckCircle2 size={18} className="text-app-success-text" />
-        );
-
-    return (
-        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <p className="text-sm text-app-text-muted">{title}</p>
-                    <p className="mt-2 text-3xl font-bold text-app-text">
-                        {value}
-                    </p>
-                </div>
-
-                {icon}
-            </div>
-
-            <p className="mt-3 text-sm text-app-text-muted">{description}</p>
-        </div>
-    );
-}
-
-function ActivityCounts({ run }: { run: IngestionRun }) {
-    return (
+  return (
+    <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-            <p className="text-xs uppercase tracking-wide text-app-text-subtle lg:hidden">
-                Counts
-            </p>
-
-            <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                <CountPill label="Ingested" value={run.ingestedCount} />
-                <CountPill label="Updated" value={run.updatedCount} />
-                <CountPill
-                    label="Failed"
-                    value={run.failedCount}
-                    danger={run.failedCount > 0}
-                />
-            </div>
+          <p className="text-sm text-app-text-muted">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-app-text">{value}</p>
         </div>
-    );
+
+        {warning ? (
+          <AlertTriangle className="h-5 w-5 text-app-warning-solid" />
+        ) : (
+          <FileText className="h-5 w-5 text-app-brand" />
+        )}
+      </div>
+
+      <p className="mt-3 text-sm text-app-text-muted">{description}</p>
+    </div>
+  );
 }
 
-function CountPill({
-    label,
-    value,
-    danger = false,
-}: {
-    label: string;
-    value: number;
-    danger?: boolean;
-}) {
-    return (
-        <span
-            className={`rounded-full px-2.5 py-1 ${
-                danger
-                    ? "bg-app-warning-bg text-app-warning-text"
-                    : "bg-app-bg-soft text-app-text-muted"
-            }`}
-        >
-            {label}: {formatNumber(value)}
-        </span>
-    );
-}
-
-function RunHealth({ run }: { run: IngestionRun }) {
-    const tone = getRunStatusTone(run.status);
-
-    if (tone === "success" && run.failedCount === 0) {
-        return (
-            <span className="inline-flex items-center gap-2 roundReed-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-medium text-app-success-text">
-                <CheckCircle2 size={13} />
-                No failures
-            </span>
-        );
-    }
-
-    if (tone === "running") {
-        return (
-            <span className="inline-flex items-center gap-2 rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text">
-                {getRunStatusLabel(run.status)}
-            </span>
-        );
-    }
-
-    if (run.failedCount > 0) {
-        return (
-            <span className="inline-flex items-center gap-2 rounded-full border border-app-warning-border bg-app-warning-bg px-3 py-1 text-xs font-medium text-app-warning-text">
-                <AlertTriangle size={13} />
-                Needs review
-            </span>
-        );
-    }
-
-    return (
-        <span className="inline-flex items-center gap-2 rounded-full border border-app-warning-border bg-app-warning-bg px-3 py-1 text-xs font-medium text-app-warning-text">
-            <AlertTriangle size={13} />
-            {getRunStatusLabel(run.status)}
-        </span>
-    );
+function Badge({ children }: { children: string }) {
+  return (
+    <span className="rounded-full bg-app-neutral-bg px-2.5 py-1 text-xs font-medium text-app-neutral-text">
+      {children}
+    </span>
+  );
 }
 
 function EmptyState({ value }: { value: string }) {
-    return (
-        <div className="bg-app-surface px-5 py-8 text-center text-sm text-app-text-muted">
-            {value}
-        </div>
-    );
+  return (
+    <div className="bg-app-surface px-5 py-10 text-center text-sm text-app-text-muted">
+      {value}
+    </div>
+  );
 }

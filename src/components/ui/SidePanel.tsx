@@ -68,12 +68,15 @@ export function SidePanel({
     const descriptionId = useId();
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            previouslyFocusedElement.current?.focus();
+            return;
+        }
 
         previouslyFocusedElement.current =
             document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-        window.requestAnimationFrame(() => {
+        const animationFrameId = window.requestAnimationFrame(() => {
             const panel = panelRef.current;
             if (!panel) return;
 
@@ -82,7 +85,7 @@ export function SidePanel({
         });
 
         return () => {
-            previouslyFocusedElement.current?.focus();
+            window.cancelAnimationFrame(animationFrameId);
         };
     }, [isOpen]);
 
@@ -135,7 +138,7 @@ export function SidePanel({
                     type="button"
                     aria-label={closeAriaLabel}
                     onClick={onClose}
-                    className={`fixed inset-0 ${zIndexClassName} ${overlayClassName}`}
+                    className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} ${overlayClassName}`}
                 />
             )}
 
@@ -145,7 +148,7 @@ export function SidePanel({
                 aria-modal="true"
                 aria-labelledby={title ? titleId : undefined}
                 aria-describedby={description ? descriptionId : undefined}
-                className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden rounded-l-[28px] border-l border-app-border ${panelBackgroundClassName} shadow-2xl transition-[transform,opacity] duration-300 ease-out ${
+                className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl transition-[transform,opacity] duration-300 ease-out sm:rounded-l-[28px] ${
                     isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
                 } ${panelClassName}`}
                 aria-hidden={!isOpen}
@@ -154,8 +157,8 @@ export function SidePanel({
             >
                 {(title || description || leading || badge || actions) && (
                     <div className={`${headerDividerClassName} ${headerClassName}`}>
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex min-w-0 items-start gap-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+                            <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
                                 {leading}
 
                                 <div className="min-w-0">
@@ -179,7 +182,7 @@ export function SidePanel({
                                 </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
                                 {actions}
 
                                 <button

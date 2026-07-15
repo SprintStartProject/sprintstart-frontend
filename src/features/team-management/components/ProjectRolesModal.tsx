@@ -1,8 +1,7 @@
-import { Trash2 } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AlertDialog } from '../../../components/ui/AlertDialog';
 import { Modal } from '../../../components/ui/Modal';
-import type { ProjectRole, Skill } from '../types';
 import {
     createProjectRole,
     createSkill,
@@ -10,7 +9,10 @@ import {
     deleteSkill,
     getProjectRoles,
     getSkills,
+    reactivateSkill,
 } from '../../../services/teamManagementService';
+import { isSkillLinkedToRole } from '../types';
+import type { ProjectRole, Skill } from '../types';
 
 type ProjectRolesModalProps = {
     open: boolean;
@@ -51,7 +53,7 @@ export function ProjectRolesModal({
 
         const newRole = await createProjectRole(
             roleName.trim(),
-            roleDescription.trim()
+            roleDescription.trim(),
         );
 
         setRoles((current) => [...current, newRole]);
@@ -63,9 +65,19 @@ export function ProjectRolesModal({
     async function handleCreateSkill() {
         if (!selectedRole || !skillName.trim()) return;
 
-        const newSkill = await createSkill(skillName.trim(), selectedRole.id);
+        const newSkill = await createSkill(
+            skillName.trim(),
+            [selectedRole.id],
+        );
 
-        setSkills((current) => [...current, newSkill]);
+        setSkills((current) => {
+            const exists = current.some((s) => s.id === newSkill.id);
+
+            return exists
+                ? current.map((s) => (s.id === newSkill.id ? newSkill : s))
+                : [...current, newSkill];
+        });
+
         setSkillName('');
     }
 
@@ -75,11 +87,14 @@ export function ProjectRolesModal({
         await deleteProjectRole(deleteRoleId);
 
         setRoles((current) =>
-            current.filter((role) => role.id !== deleteRoleId)
+            current.filter((role) => role.id !== deleteRoleId),
         );
 
         setSkills((current) =>
-            current.filter((skill) => skill.roleId !== deleteRoleId)
+            current.map((skill) => ({
+                ...skill,
+                roleIds: skill.roleIds.filter((roleId) => roleId !== deleteRoleId),
+            })),
         );
 
         if (selectedRole?.id === deleteRoleId) {
@@ -89,20 +104,44 @@ export function ProjectRolesModal({
         setDeleteRoleId(null);
     }
 
+    async function handleReactivateSkill(skill: Skill) {
+        const updated = await reactivateSkill(
+            skill.id,
+            skill.name,
+            skill.roleIds,
+        );
+
+        setSkills((current) =>
+            current.map((s) => (s.id === skill.id ? updated : s)),
+        );
+    }
+
     async function confirmDeleteSkill() {
         if (!deleteSkillId) return;
 
         await deleteSkill(deleteSkillId);
 
         setSkills((current) =>
-            current.filter((skill) => skill.id !== deleteSkillId)
+            current.map((skill) =>
+                skill.id === deleteSkillId
+                    ? { ...skill, status: 'RETIRED' }
+                    : skill,
+            ),
         );
 
         setDeleteSkillId(null);
     }
 
     const selectedRoleSkills = selectedRole
-        ? skills.filter((skill) => skill.roleId === selectedRole.id)
+        ? skills
+              .filter((skill) => isSkillLinkedToRole(skill, selectedRole.id))
+              .sort((first, second) =>
+                  first.status === second.status
+                      ? first.name.localeCompare(second.name)
+                      : first.status === 'ACTIVE'
+                        ? -1
+                        : 1,
+              )
         : [];
 
     const roleToDelete = roles.find((role) => role.id === deleteRoleId);
@@ -192,7 +231,7 @@ export function ProjectRolesModal({
                                             type="button"
                                             onClick={() =>
                                                 setSelectedRole(
-                                                    isSelected ? null : role
+                                                    isSelected ? null : role,
                                                 )
                                             }
                                             className="min-w-0 flex-1 text-left"
@@ -204,10 +243,11 @@ export function ProjectRolesModal({
 
                                         <button
                                             type="button"
+                                            aria-label={`Delete ${role.name}`}
                                             onClick={() =>
                                                 setDeleteRoleId(role.id)
                                             }
-                                            className="rounded-lg p-1 text-app-text-muted hover:bg-app-surface-hover hover:text-red-500"
+                                            className="rounded-lg p-1 text-app-text-muted hover:bg-app-surface-hover hover:text-app-danger-text"
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </button>
@@ -242,21 +282,49 @@ export function ProjectRolesModal({
                                         {selectedRoleSkills.map((skill) => (
                                             <span
                                                 key={skill.id}
-                                                className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-surface px-3 py-1 text-xs text-app-text"
+                                                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
+                                                    skill.status === 'RETIRED'
+                                                        ? 'border-app-warning-border bg-app-warning-bg text-app-warning-text'
+                                                        : 'border-app-border bg-app-surface text-app-text'
+                                                }`}
                                             >
                                                 {skill.name}
 
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setDeleteSkillId(
-                                                            skill.id
-                                                        )
-                                                    }
-                                                    className="text-app-text-muted hover:text-red-500"
-                                                >
-                                                    ×
-                                                </button>
+                                                {skill.status === 'RETIRED' && (
+                                                    <>
+                                                        <span className="font-medium">
+                                                            Retired
+                                                        </span>
+
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Reactivate ${skill.name}`}
+                                                            onClick={() =>
+                                                                void handleReactivateSkill(
+                                                                    skill,
+                                                                )
+                                                            }
+                                                            className="text-app-text-muted hover:text-app-success-text"
+                                                        >
+                                                            <RotateCcw className="h-3 w-3" />
+                                                        </button>
+                                                    </>
+                                                )}
+
+                                                {skill.status === 'ACTIVE' && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Retire ${skill.name}`}
+                                                        onClick={() =>
+                                                            setDeleteSkillId(
+                                                                skill.id,
+                                                            )
+                                                        }
+                                                        className="text-app-text-muted hover:text-app-danger-text"
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </button>
+                                                )}
                                             </span>
                                         ))}
 
@@ -269,14 +337,16 @@ export function ProjectRolesModal({
                                 </div>
 
                                 <div className="mt-4 flex gap-2">
-                                    <input
-                                        value={skillName}
-                                        onChange={(event) =>
-                                            setSkillName(event.target.value)
-                                        }
-                                        placeholder="Add skill, e.g. React"
-                                        className="min-w-0 flex-1 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong"
-                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <input
+                                            value={skillName}
+                                            onChange={(event) =>
+                                                setSkillName(event.target.value)
+                                            }
+                                            placeholder="Add skill, e.g. React"
+                                            className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong"
+                                        />
+                                    </div>
 
                                     <button
                                         type="button"
@@ -293,22 +363,27 @@ export function ProjectRolesModal({
                         )}
                     </div>
                 </div>
-
             </Modal>
 
             <AlertDialog
                 isOpen={Boolean(deleteRoleId || deleteSkillId)}
-                title="Confirm deletion"
+                title={deleteSkillId ? 'Confirm retirement' : 'Confirm deletion'}
                 description={
                     <>
-                        Are you sure you want to delete{' '}
+                        Are you sure you want to{' '}
+                        {deleteSkillId ? 'retire' : 'delete'}{' '}
                         <span className="font-medium text-app-text">
-                            {roleToDelete?.name ?? skillToDelete?.name ?? 'this item'}
+                            {roleToDelete?.name ??
+                                skillToDelete?.name ??
+                                'this item'}
                         </span>
-                        ? This action cannot be undone.
+                        ?
+                        {deleteSkillId
+                            ? ' Existing assessments remain available, but the skill can no longer be assigned or assessed.'
+                            : ' This action cannot be undone.'}
                     </>
                 }
-                confirmLabel="Delete"
+                confirmLabel={deleteSkillId ? 'Retire' : 'Delete'}
                 variant="danger"
                 onClose={() => {
                     setDeleteRoleId(null);

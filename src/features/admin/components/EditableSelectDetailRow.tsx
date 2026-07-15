@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 type EditableSelectDetailRowProps = {
@@ -16,6 +16,7 @@ export function EditableSelectDetailRow({
 }: EditableSelectDetailRowProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement | null>(null);
+    const labelId = useId();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -42,8 +43,10 @@ export function EditableSelectDetailRow({
     };
 
     return (
-        <div className="grid grid-cols-[7.5rem_1fr] items-center gap-4 py-2.5">
-            <label className="text-sm text-app-text-muted">{label}</label>
+        <div className="grid grid-cols-1 items-center gap-1.5 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
+            <span id={labelId} className="text-sm text-app-text-muted">
+                {label}
+            </span>
 
             <div ref={dropdownRef} className="relative">
                 <button
@@ -56,6 +59,7 @@ export function EditableSelectDetailRow({
                     }`}
                     aria-haspopup="listbox"
                     aria-expanded={isOpen}
+                    aria-labelledby={labelId}
                 >
                     <span className="truncate">{value}</span>
                     <ChevronDown
@@ -68,6 +72,7 @@ export function EditableSelectDetailRow({
                 {isOpen && (
                     <div
                         role="listbox"
+                        aria-labelledby={labelId}
                         className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-xl"
                     >
                         {options.map((option) => {

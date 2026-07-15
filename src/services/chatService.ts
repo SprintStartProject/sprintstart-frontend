@@ -40,9 +40,11 @@ interface ChatEvent {
     type: "token" | "citation" | "done" | "error";
     content?: string;
     message?: string;
-    chunk_id?: string;
+    artifact_id?: string;
     filename?: string;
-    section_path?: string;
+    source_url?: string;
+    start_line?: number;
+    start_page?: number;
 }
 
 /**
@@ -119,11 +121,13 @@ export async function streamMessage(
                     break;
 
                 case "citation":
-                    if (event.chunk_id && event.filename) {
+                    if (event.artifact_id && event.filename) {
                         handlers.onCitation({
-                            chunk_id: event.chunk_id,
+                            artifactId: event.artifact_id,
                             filename: event.filename,
-                            section_path: event.section_path ?? ""
+                            sourceUrl: event.source_url,
+                            startLine: event.start_line,
+                            startPage: event.start_page
                         });
                     }
                     break;

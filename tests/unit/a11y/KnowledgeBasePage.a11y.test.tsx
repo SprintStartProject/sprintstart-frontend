@@ -5,7 +5,13 @@ import { MemoryRouter } from 'react-router-dom';
 import { KnowledgeBasePage } from '../../../src/pages/KnowledgeBasePage';
 
 vi.mock('../../../src/context/useAuth', () => ({
-    useAuth: () => ({ profile: { id: 'user1', firstName: 'Test', username: 'Test', email: 'test@test.com' } })
+    useAuth: () => ({ profile: { id: 'user1', firstName: 'Test', username: 'Test', email: 'test@test.com', projectIds: ['proj1'] } })
+}));
+
+vi.mock('../../../src/services/knowledgeService', () => ({
+    knowledgeService: {
+        getUnifiedArtifacts: vi.fn().mockResolvedValue([]),
+    },
 }));
 
 describe('KnowledgeBasePage Accessibility', () => {
@@ -15,7 +21,7 @@ describe('KnowledgeBasePage Accessibility', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: 'Upload documentation or images' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Upload new artifact' })).toBeInTheDocument();
         });
 
         expect(await axe(baseElement)).toHaveNoViolations();

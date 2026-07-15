@@ -1,245 +1,182 @@
-// ============================================================
-// TeamManagementWidget.tsx
-// Dashboard widget — shows the 4 most stuck team members
-// (longest time on current step) plus unread counts for
-// pending feedback and skip requests.
-// Clicking "See all" or a member card navigates to the
-// Team Management page / member detail page.
-// ============================================================
-
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Users, ArrowRight, Loader2, AlertCircle, MessageSquareText, SkipForward } from 'lucide-react';
-import { getTeamOverview } from '../../../services/teamManagementService';
-import type { TeamOverviewUser } from '../types';
-
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
-
-const AT_RISK_AFTER_DAYS = 5;
-
-function getElapsedDays(startedAt: string): number {
-    return Math.max(
-        0,
-        Math.floor((Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24))
-    );
-}
-
-import { UserAvatar } from '../../../components/common/UserAvatar';
-// SUB-COMPONENT: badge pill used in the widget header
-// ─────────────────────────────────────────────────────────────
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertCircle,
+  ArrowRight,
+  Loader2,
+  MessageSquareText,
+  SkipForward,
+  Users,
+} from "lucide-react";
+import { ClickableCard } from "../../../components/common/ClickableCard";
+import { getTeamOverview } from "../../../services/teamManagementService";
+import type { TeamOverviewUser } from "../types";
+import { TeamMemberCard } from "./TeamMemberCard";
 
 type CountBadgeProps = {
-    icon: React.ReactNode;
-    count: number;
-    label: string;
-    /** soft = brand-tinted background, muted = neutral */
-    variant: 'soft' | 'muted';
+  icon: ReactNode;
+  count: number;
+  label: string;
+  variant: "soft" | "muted";
+};
+
+type TeamManagementWidgetProps = {
+  projectId?: string;
 };
 
 function CountBadge({ icon, count, label, variant }: CountBadgeProps) {
-    const base = 'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium';
-    const styles =
-        variant === 'soft'
-            ? `${base} bg-app-brand-soft text-app-brand-text`
-            : `${base} bg-app-surface-muted text-app-text-muted`;
+  const base =
+    "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium";
+  const styles =
+    variant === "soft"
+      ? `${base} bg-app-brand-soft text-app-brand-text`
+      : `${base} bg-app-surface-muted text-app-text-muted`;
 
-    return (
-        <span className={styles} title={label}>
-            {icon}
-            {count}
-        </span>
-    );
+  return (
+    <span className={styles} title={label}>
+      {icon}
+      {count}
+    </span>
+  );
 }
 
-// ─────────────────────────────────────────────────────────────
-// SUB-COMPONENT: single member row inside the widget
-// ─────────────────────────────────────────────────────────────
+export function TeamManagementWidget({
+  projectId = "",
+}: TeamManagementWidgetProps) {
+  const [users, setUsers] = useState<TeamOverviewUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const navigate = useNavigate();
 
-type MemberRowProps = {
-    user: TeamOverviewUser;
-    onClick: () => void;
-};
+  useEffect(() => {
+    let isCurrentRequest = true;
 
-function MemberRow({ user, onClick }: MemberRowProps) {
-    const elapsedDays = user.currentStep?.startedAt
-        ? getElapsedDays(user.currentStep.startedAt)
-        : 0;
-    const progressPercentage = Math.round(user.progressPercentage * 100);
-    const isAtRisk = !!user.currentStep && elapsedDays > AT_RISK_AFTER_DAYS;
+    void Promise.resolve().then(async () => {
+      if (!isCurrentRequest) return;
 
+      setLoading(true);
+      setError(false);
+
+      try {
+        const data = await getTeamOverview(
+          undefined,
+          undefined,
+          projectId ? [projectId] : undefined,
+        );
+        if (!isCurrentRequest) return;
+
+        setUsers(data);
+      } catch {
+        if (!isCurrentRequest) return;
+
+        setError(true);
+      } finally {
+        if (isCurrentRequest) {
+          setLoading(false);
+        }
+      }
+    });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [projectId]);
+
+  if (loading) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="w-full text-left flex items-center gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-brand-border-strong hover:bg-app-surface-hover transition-colors p-3"
-        >
-            {/* Avatar */}
-            <div className="flex shrink-0 items-center justify-center">
-                <UserAvatar profileIcon={user.profileIcon} fallbackName={user.firstname} size={32} />
-            </div>
-
-            {/* Name + step */}
-            <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-app-text">
-                    {user.firstname} {user.lastname}
-                </p>
-                <p className="truncate text-xs text-app-text-muted">
-                    {user.currentStep?.title ?? 'No current step'}
-                </p>
-
-                {/* Progress bar */}
-                <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-app-progress-track">
-                        <div
-                            className="h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-all duration-500"
-                            style={{ width: `${progressPercentage}%` }}
-                        />
-                    </div>
-                    <span className="text-xs tabular-nums text-app-text-muted">
-                        {progressPercentage}%
-                    </span>
-                </div>
-            </div>
-
-            {/* Elapsed days — highlighted when at risk */}
-            <span
-                className={`shrink-0 text-xs font-medium tabular-nums ${
-                    isAtRisk ? 'text-app-warning-text' : 'text-app-text-muted'
-                }`}
-            >
-                {user.currentStep ? `${elapsedDays}d` : '—'}
-            </span>
-        </button>
+      <div className="flex min-h-48 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
+        <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
+      </div>
     );
-}
+  }
 
-// ─────────────────────────────────────────────────────────────
-// COMPONENT: TeamManagementWidget
-// ─────────────────────────────────────────────────────────────
-
-export function TeamManagementWidget() {
-    const [users, setUsers] = useState<TeamOverviewUser[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const data = await getTeamOverview();
-                setUsers(data);
-            } catch {
-                setError(true);
-            } finally {
-                setLoading(false);
-            }
-        };
-        void load();
-    }, []);
-
-    // ── LOADING ──────────────────────────────────────────────
-
-    if (loading) {
-        return (
-            <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex items-center justify-center min-h-48">
-                <Loader2 className="w-5 h-5 animate-spin text-app-brand" />
-            </div>
-        );
-    }
-
-    // ── ERROR ────────────────────────────────────────────────
-
-    if (error || users.length === 0) {
-        return (
-            <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-2 min-h-48 text-center">
-                <AlertCircle className="w-5 h-5 text-app-text-muted" />
-                <p className="text-sm text-app-text-muted">
-                    Could not load team data.
-                </p>
-            </div>
-        );
-    }
-
-    // ── DERIVED DATA ─────────────────────────────────────────
-
-    // Sort by longest time on current step (most stuck first), take top 4
-    const mostStuck = [...users]
-        .sort(
-            (a, b) => {
-                if (!a.currentStep?.startedAt) return 1;
-                if (!b.currentStep?.startedAt) return -1;
-
-                return (
-                    new Date(a.currentStep.startedAt).getTime() -
-                    new Date(b.currentStep.startedAt).getTime()
-                );
-            }
-        )
-        .slice(0, 4);
-
-    // Unread counts across ALL users, not just the visible 4
-    const pendingFeedbackCount = users.filter((u) => u.hasFeedback).length;
-    const pendingSkipCount = users.filter(
-        (u) => u.currentStep?.skip?.status === 'PENDING'
-    ).length;
-
-    // ── RENDER ───────────────────────────────────────────────
-
+  if (error || users.length === 0) {
     return (
-        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-app-brand" />
-                    <span className="text-sm font-semibold text-app-text">
-                        Team progress
-                    </span>
-                </div>
+      <div className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
+        <AlertCircle className="h-5 w-5 text-app-text-muted" />
+        <p className="text-sm text-app-text-muted">Could not load team data.</p>
+      </div>
+    );
+  }
 
-                <button
-                    type="button"
-                    onClick={() => void navigate('/team-management')}
-                    className="flex items-center gap-1 text-xs text-app-text-muted hover:text-app-text transition-colors"
-                >
-                    See all ({users.length})
-                    <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-            </div>
+  const mostStuck = [...users]
+    .sort((a, b) => {
+      if (!a.currentStep?.startedAt) return 1;
+      if (!b.currentStep?.startedAt) return -1;
 
-            {/* Unread count badges — only render the badges that have a count */}
-            {(pendingFeedbackCount > 0 || pendingSkipCount > 0) && (
-                <div className="flex items-center gap-2 mb-4">
-                    {pendingFeedbackCount > 0 && (
-                        <CountBadge
-                            icon={<MessageSquareText className="w-3 h-3" />}
-                            count={pendingFeedbackCount}
-                            label={`${pendingFeedbackCount} unread feedback`}
-                            variant="soft"
-                        />
-                    )}
-                    {pendingSkipCount > 0 && (
-                        <CountBadge
-                            icon={<SkipForward className="w-3 h-3" />}
-                            count={pendingSkipCount}
-                            label={`${pendingSkipCount} open skip request${pendingSkipCount > 1 ? 's' : ''}`}
-                            variant="muted"
-                        />
-                    )}
-                </div>
-            )}
+      return (
+        new Date(a.currentStep.startedAt).getTime() -
+        new Date(b.currentStep.startedAt).getTime()
+      );
+    })
+    .slice(0, 4);
 
-            {/* Member rows */}
-            <div className="flex flex-col gap-2">
-                {mostStuck.map((user) => (
-                    <MemberRow
-                        key={user.userId}
-                        user={user}
-                        onClick={() => void navigate(`/team/${user.userId}`)}
-                    />
-                ))}
-            </div>
+  const pendingFeedbackCount = users.filter((user) => user.hasFeedback).length;
+  const pendingSkipCount = users.filter(
+    (user) => user.currentStep?.skip?.status === "PENDING",
+  ).length;
+
+  return (
+    <ClickableCard
+      onClick={() => void navigate("/team-management")}
+      interactive={false}
+      className="cursor-pointer rounded-2xl border border-app-border bg-app-surface p-5 transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[a:hover]:!border-app-border has-[a:hover]:!bg-app-surface"
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-app-brand" />
+          <span className="text-sm font-semibold text-app-text">
+            Team progress
+          </span>
         </div>
-    );
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void navigate("/team-management");
+          }}
+          className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+        >
+          See all ({users.length})
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {(pendingFeedbackCount > 0 || pendingSkipCount > 0) && (
+        <div className="mb-4 flex items-center gap-2">
+          {pendingFeedbackCount > 0 && (
+            <CountBadge
+              icon={<MessageSquareText className="h-3 w-3" />}
+              count={pendingFeedbackCount}
+              label={`${pendingFeedbackCount} unread feedback`}
+              variant="soft"
+            />
+          )}
+          {pendingSkipCount > 0 && (
+            <CountBadge
+              icon={<SkipForward className="h-3 w-3" />}
+              count={pendingSkipCount}
+              label={`${pendingSkipCount} open skip request${
+                pendingSkipCount > 1 ? "s" : ""
+              }`}
+              variant="muted"
+            />
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {mostStuck.map((user) => (
+          // TeamMemberCard is already a keyboard-accessible Link; this wrapper
+          // only prevents its click from also triggering the widget background.
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+          <div key={user.userId} onClick={(event) => event.stopPropagation()}>
+            <TeamMemberCard user={user} compact />
+          </div>
+        ))}
+      </div>
+    </ClickableCard>
+  );
 }

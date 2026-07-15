@@ -36,6 +36,8 @@ import {
     deleteOnboardingStep,
     deleteOnboardingTask,
     getOnboardingTasksByStep,
+    updateOnboardingStep,
+    updateOnboardingTask,
     type OnboardingFeedback,
     type UserSkillLevel,
 } from '../services/teamManagementService';
@@ -390,6 +392,81 @@ export function TeamMemberDetailPage() {
         }
     }
 
+    async function handleReorderSteps(
+        phaseId: string,
+        activeStepId: string,
+        overStepId: string,
+    ) {
+        if (activeStepId === overStepId) return;
+
+        const phase = onboardingPath?.phases.find((item) => item.id === phaseId);
+        const currentSteps = [...(phase?.steps ?? [])].sort(
+            (a, b) => a.position - b.position,
+        );
+        const activeIndex = currentSteps.findIndex((step) => step.id === activeStepId);
+        const overIndex = currentSteps.findIndex((step) => step.id === overStepId);
+
+        if (!phase || activeIndex < 0 || overIndex < 0) return;
+
+        const reorderedSteps = [...currentSteps];
+        const [movedStep] = reorderedSteps.splice(activeIndex, 1);
+        reorderedSteps.splice(overIndex, 0, movedStep);
+
+        const nextSteps = reorderedSteps.map((step, index) => ({
+            ...step,
+            position: index,
+        }));
+        const changedSteps = nextSteps.filter(
+            (step) =>
+                currentSteps.find((currentStep) => currentStep.id === step.id)
+                    ?.position !== step.position,
+        );
+
+        setStepActionId(activeStepId);
+        setOnboardingError('');
+        setOnboardingPath((currentPath) =>
+            currentPath
+                ? {
+                      ...currentPath,
+                      phases: currentPath.phases.map((currentPhase) =>
+                          currentPhase.id === phaseId
+                              ? {
+                                    ...currentPhase,
+                                    steps: nextSteps,
+                                }
+                              : currentPhase,
+                      ),
+                  }
+                : currentPath,
+        );
+
+        try {
+            for (const step of changedSteps) {
+                await updateOnboardingStep(step.id, {
+                    position: step.position,
+                    title: step.title,
+                    description: step.description,
+                    type: step.type,
+                    estimatedMinutes: step.estimatedMinutes,
+                    expectedOutcome: step.expectedOutcomes?.[0] ?? '',
+                    status: step.status,
+                    skip: step.skip ?? null,
+                });
+            }
+
+            await refreshOnboardingPath();
+        } catch (error) {
+            setOnboardingError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to reorder onboarding steps.',
+            );
+            await refreshOnboardingPath();
+        } finally {
+            setStepActionId(null);
+        }
+    }
+
     async function refreshStepTasks(stepId: string) {
         const nextTasks = await getOnboardingTasksByStep(stepId);
 
@@ -406,6 +483,65 @@ export function TeamMemberDetailPage() {
         }));
 
         return nextTasks;
+    }
+
+    async function handleReorderTasks(
+        stepId: string,
+        activeTaskId: string,
+        overTaskId: string,
+    ) {
+        if (activeTaskId === overTaskId) return;
+
+        const currentTasks = [...(stepTasksById[stepId] ?? [])].sort(
+            (a, b) => a.position - b.position,
+        );
+        const activeIndex = currentTasks.findIndex((task) => task.id === activeTaskId);
+        const overIndex = currentTasks.findIndex((task) => task.id === overTaskId);
+
+        if (activeIndex < 0 || overIndex < 0) return;
+
+        const reorderedTasks = [...currentTasks];
+        const [movedTask] = reorderedTasks.splice(activeIndex, 1);
+        reorderedTasks.splice(overIndex, 0, movedTask);
+
+        const nextTasks = reorderedTasks.map((task, index) => ({
+            ...task,
+            position: index,
+        }));
+        const changedTasks = nextTasks.filter(
+            (task) =>
+                currentTasks.find((currentTask) => currentTask.id === task.id)
+                    ?.position !== task.position,
+        );
+
+        setStepActionId(stepId);
+        setOnboardingError('');
+        setStepTasksById((current) => ({
+            ...current,
+            [stepId]: nextTasks,
+        }));
+
+        try {
+            for (const task of changedTasks) {
+                await updateOnboardingTask(task.id, {
+                    position: task.position,
+                    title: task.title,
+                    description: task.description,
+                    finished: task.finished,
+                });
+            }
+
+            await refreshStepTasks(stepId);
+        } catch (error) {
+            setOnboardingError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to reorder tasks.',
+            );
+            await refreshStepTasks(stepId);
+        } finally {
+            setStepActionId(null);
+        }
     }
 
     async function handleDeleteTask(task: OnboardingTaskEndpoint) {
@@ -447,7 +583,10 @@ export function TeamMemberDetailPage() {
             setNewTaskTitle('');
             setNewTaskDescription('');
             await refreshStepTasks(taskInsertTarget.stepId);
-            await refreshOnboardingPath();
+            // Adding a task reopens a completed step on the backend (status back to
+            // IN_PROGRESS). Refresh the path so the step cards update, and the team-overview
+            // member data so the header progress bar and current step reflect the change too.
+            await Promise.all([refreshOnboardingPath(), refreshMember()]);
         } catch (error) {
             setOnboardingError(
                 error instanceof Error
@@ -503,6 +642,7 @@ export function TeamMemberDetailPage() {
             const createdStep = await createOnboardingStepForPhase(targetPhaseId, {
                 position:
                     stepInsertTarget?.position ?? selectedPhase.steps?.length ?? 0,
+                isAiAssisted: false,
                 title: customStepTitle.trim(),
                 description: customStepDescription.trim(),
                 type: 'TASK',
@@ -680,7 +820,7 @@ export function TeamMemberDetailPage() {
 
     return (
         <div className="min-h-screen bg-app-bg">
-            <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+            <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <button
                         onClick={goBack}
@@ -693,7 +833,7 @@ export function TeamMemberDetailPage() {
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex items-center gap-4">
                             <div className="flex shrink-0 items-center justify-center">
-                                <UserAvatar profileIcon={user.profileIcon} fallbackName={user.firstname} size={56} />
+                                <UserAvatar profileIcon={user.profileIcon} fallbackName={`${user.firstname} ${user.lastname}`.trim()} seed={user.userId} size={56} />
                             </div>
 
                             <div>
@@ -763,7 +903,7 @@ export function TeamMemberDetailPage() {
                         </span>
                     </div>
                 </div>
-            </div>
+            </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
@@ -788,15 +928,22 @@ export function TeamMemberDetailPage() {
                             setDetailStepId(stepId);
                         }}
                         onAddStep={setStepInsertTarget}
+                        onReorderSteps={(phaseId, activeStepId, overStepId) =>
+                            void handleReorderSteps(
+                                phaseId,
+                                activeStepId,
+                                overStepId,
+                            )
+                        }
                         formatMinutes={formatMinutes}
                         getActualMinutes={getActualMinutes}
                         getStepStatusStyles={getStepStatusStyles}
                     />
-                    <aside className="space-y-4">
+                    <aside aria-label="Member insights" className="space-y-4">
                     <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-                        <h4 className="text-lg font-semibold text-app-text">
+                        <h2 className="text-lg font-semibold text-app-text">
                             Feedback & Skip Requests
-                        </h4>
+                        </h2>
 
                         <div className="mt-4 space-y-3">
                             <div className="flex items-center justify-between gap-3">
@@ -1146,6 +1293,13 @@ export function TeamMemberDetailPage() {
                     onCreateTask={() => void handleCreateTask()}
                     formatMinutes={formatMinutes}
                     getStepStatusStyles={getStepStatusStyles}
+                    onReorderTasks={(activeTaskId, overTaskId) =>
+                        void handleReorderTasks(
+                            detailStep.id,
+                            activeTaskId,
+                            overTaskId,
+                        )
+                    }
                 />
             )}
         </div>

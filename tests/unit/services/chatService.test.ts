@@ -146,7 +146,9 @@ describe('chatService', () => {
             const stream = new ReadableStream({
                 start(controller) {
                     controller.enqueue(
-                        encoder.encode('data: {"type":"citation","chunk_id":"c1","filename":"doc.txt","section_path":"p1"}\n\n'),
+                        encoder.encode(
+                            'data: {"type":"citation","artifact_id":"a1","filename":"doc.txt","start_line":5}\n\n',
+                        ),
                     );
                     controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
                     controller.close();
@@ -171,9 +173,11 @@ describe('chatService', () => {
             });
 
             expect(onCitation).toHaveBeenCalledWith({
-                chunk_id: 'c1',
+                artifactId: 'a1',
                 filename: 'doc.txt',
-                section_path: 'p1',
+                sourceUrl: undefined,
+                startLine: 5,
+                startPage: undefined,
             });
             expect(onDone).toHaveBeenCalledTimes(1);
         });

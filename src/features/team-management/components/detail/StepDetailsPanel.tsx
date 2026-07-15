@@ -8,7 +8,10 @@ import {
     ThumbsUp,
     Trash2,
 } from 'lucide-react';
+import { useState, type DragEvent } from 'react';
+import { DragHandle } from '../../../../components/ui/DragHandle';
 import { SidePanel } from '../../../../components/ui/SidePanel';
+import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
 import type {
     OnboardingStepEndpoint,
     OnboardingTaskEndpoint,
@@ -60,6 +63,10 @@ type StepDetailsPanelProps = {
     onCreateTask: () => void;
     formatMinutes: (minutes?: number | null) => string;
     getStepStatusStyles: (status: string) => string;
+    onReorderTasks?: (
+        activeTaskId: string,
+        overTaskId: string,
+    ) => void;
 };
 
 export function StepDetailsPanel({
@@ -89,9 +96,11 @@ export function StepDetailsPanel({
     onCreateTask,
     formatMinutes,
     getStepStatusStyles,
+    onReorderTasks,
 }: StepDetailsPanelProps) {
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+    const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
     const skipStatus = getSkipStatus(step);
-
     return (
         <SidePanel
             isOpen
@@ -99,9 +108,12 @@ export function StepDetailsPanel({
             title={step.title}
             description={step.description}
             badge={
-                <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getStepStatusStyles(step.status)}`}>
-                    {step.status.replace('_', ' ')}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getStepStatusStyles(step.status)}`}>
+                        {step.status.replace('_', ' ')}
+                    </span>
+                    <StepOriginBadge step={step} />
+                </div>
             }
             panelBackgroundClassName="bg-app-surface"
             headerDividerClassName=""
@@ -197,134 +209,38 @@ export function StepDetailsPanel({
                         </div>
                     ) : (
                         tasks.map((task, index) => (
-                            <div key={task.id} className="group/task-insert space-y-1">
-                                {index === 0 && (
-                                    <TaskInsertButton
-                                        label={`Add task before ${task.title}`}
-                                        onClick={() =>
-                                            onTaskInsertTargetChange({
-                                                stepId: step.id,
-                                                position: 0,
-                                            })
-                                        }
-                                    />
-                                )}
-
-                                {index === 0 &&
-                                    taskInsertTarget?.stepId === step.id &&
-                                    taskInsertTarget.position === 0 && (
-                                        <NewTaskForm
-                                            title={newTaskTitle}
-                                            description={newTaskDescription}
-                                            addingTask={addingTask}
-                                            onTitleChange={onNewTaskTitleChange}
-                                            onDescriptionChange={onNewTaskDescriptionChange}
-                                            onCancel={() => {
-                                                onTaskInsertTargetChange(null);
-                                                onNewTaskTitleChange('');
-                                                onNewTaskDescriptionChange('');
-                                            }}
-                                            onSubmit={onCreateTask}
-                                        />
-                                    )}
-
-                                <div className="flex items-start justify-between gap-3 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3">
-                                    <div className="flex min-w-0 gap-3">
-                                        {task.finished ? (
-                                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-app-success-solid" />
-                                        ) : (
-                                            <Circle className="mt-0.5 h-4 w-4 shrink-0 text-app-text-disabled" />
-                                        )}
-
-                                        <div className="min-w-0">
-                                            <p className={`text-sm font-medium ${
-                                                task.finished
-                                                    ? 'line-through text-app-text-subtle'
-                                                    : 'text-app-text'
-                                            }`}>
-                                                {task.title}
-                                            </p>
-                                            {task.description && (
-                                                <p className="mt-1 text-xs text-app-text-muted">
-                                                    {task.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => onRequestDeleteTask(task)}
-                                        disabled={stepActionId !== null}
-                                        className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-50"
-                                        aria-label={`Delete ${task.title}`}
-                                        title="Delete task"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                </div>
-
-                                {taskToDelete?.id === task.id && (
-                                    <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3">
-                                        <p className="text-sm text-app-danger-text">
-                                            Delete{' '}
-                                            <span className="font-medium">
-                                                {task.title}
-                                            </span>
-                                            ? This cannot be undone.
-                                        </p>
-
-                                        <div className="mt-3 flex justify-end gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={onCancelDeleteTask}
-                                                disabled={stepActionId === task.stepId}
-                                                className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-xs font-medium text-app-text hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                Cancel
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => onConfirmDeleteTask(task)}
-                                                disabled={stepActionId === task.stepId}
-                                                className="rounded-xl bg-app-danger-solid px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {stepActionId === task.stepId
-                                                    ? 'Deleting...'
-                                                    : 'Delete'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <TaskInsertButton
-                                    label={`Add task after ${task.title}`}
-                                    onClick={() =>
-                                        onTaskInsertTargetChange({
-                                            stepId: step.id,
-                                            position: index + 1,
-                                        })
+                            <TaskItem
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                step={step}
+                                taskInsertTarget={taskInsertTarget}
+                                newTaskTitle={newTaskTitle}
+                                newTaskDescription={newTaskDescription}
+                                addingTask={addingTask}
+                                draggedTaskId={draggedTaskId}
+                                dragOverTaskId={dragOverTaskId}
+                                stepActionId={stepActionId}
+                                taskToDelete={taskToDelete}
+                                onTaskInsertTargetChange={onTaskInsertTargetChange}
+                                onNewTaskTitleChange={onNewTaskTitleChange}
+                                onNewTaskDescriptionChange={onNewTaskDescriptionChange}
+                                onCreateTask={onCreateTask}
+                                onRequestDeleteTask={onRequestDeleteTask}
+                                onCancelDeleteTask={onCancelDeleteTask}
+                                onConfirmDeleteTask={onConfirmDeleteTask}
+                                draggable={Boolean(onReorderTasks)}
+                                onDragStart={(taskId) => setDraggedTaskId(taskId)}
+                                onDragOver={(taskId) => setDragOverTaskId(taskId)}
+                                onDragLeave={() => setDragOverTaskId(null)}
+                                onDrop={(taskId) => {
+                                    if (onReorderTasks && draggedTaskId && draggedTaskId !== taskId) {
+                                        onReorderTasks(draggedTaskId, taskId);
                                     }
-                                />
-
-                                {taskInsertTarget?.stepId === step.id &&
-                                    taskInsertTarget.position === index + 1 && (
-                                        <NewTaskForm
-                                            title={newTaskTitle}
-                                            description={newTaskDescription}
-                                            addingTask={addingTask}
-                                            onTitleChange={onNewTaskTitleChange}
-                                            onDescriptionChange={onNewTaskDescriptionChange}
-                                            onCancel={() => {
-                                                onTaskInsertTargetChange(null);
-                                                onNewTaskTitleChange('');
-                                                onNewTaskDescriptionChange('');
-                                            }}
-                                            onSubmit={onCreateTask}
-                                        />
-                                    )}
-                            </div>
+                                    setDraggedTaskId(null);
+                                    setDragOverTaskId(null);
+                                }}
+                            />
                         ))
                     )}
 
@@ -447,6 +363,234 @@ export function StepDetailsPanel({
                 )}
             </section>
         </SidePanel>
+    );
+}
+
+function TaskItem({
+    task,
+    index,
+    step,
+    taskInsertTarget,
+    newTaskTitle,
+    newTaskDescription,
+    addingTask,
+    draggedTaskId,
+    dragOverTaskId,
+    stepActionId,
+    taskToDelete,
+    onTaskInsertTargetChange,
+    onNewTaskTitleChange,
+    onNewTaskDescriptionChange,
+    onCreateTask,
+    onRequestDeleteTask,
+    onCancelDeleteTask,
+    onConfirmDeleteTask,
+    draggable,
+    onDragStart,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+}: {
+    task: OnboardingTaskEndpoint;
+    index: number;
+    step: DetailOnboardingStep;
+    taskInsertTarget: TaskInsertTarget;
+    newTaskTitle: string;
+    newTaskDescription: string;
+    addingTask: boolean;
+    draggedTaskId: string | null;
+    dragOverTaskId: string | null;
+    stepActionId: string | null;
+    taskToDelete: OnboardingTaskEndpoint | null;
+    onTaskInsertTargetChange: (target: TaskInsertTarget) => void;
+    onNewTaskTitleChange: (value: string) => void;
+    onNewTaskDescriptionChange: (value: string) => void;
+    onCreateTask: () => void;
+    onRequestDeleteTask: (task: OnboardingTaskEndpoint) => void;
+    onCancelDeleteTask: () => void;
+    onConfirmDeleteTask: (task: OnboardingTaskEndpoint) => void;
+    draggable: boolean;
+    onDragStart: (taskId: string) => void;
+    onDragOver: (taskId: string) => void;
+    onDragLeave: () => void;
+    onDrop: (taskId: string) => void;
+}) {
+    const isDragging = draggedTaskId === task.id;
+    const isDragTarget = dragOverTaskId === task.id && draggedTaskId !== task.id;
+
+    return (
+        <div className="group/task-insert space-y-1">
+            {index === 0 && (
+                <TaskInsertButton
+                    label={`Add task before ${task.title}`}
+                    onClick={() =>
+                        onTaskInsertTargetChange({
+                            stepId: step.id,
+                            position: 0,
+                        })
+                    }
+                />
+            )}
+
+            {index === 0 &&
+                taskInsertTarget?.stepId === step.id &&
+                taskInsertTarget.position === 0 && (
+                    <NewTaskForm
+                        title={newTaskTitle}
+                        description={newTaskDescription}
+                        addingTask={addingTask}
+                        onTitleChange={onNewTaskTitleChange}
+                        onDescriptionChange={onNewTaskDescriptionChange}
+                        onCancel={() => {
+                            onTaskInsertTargetChange(null);
+                            onNewTaskTitleChange('');
+                            onNewTaskDescriptionChange('');
+                        }}
+                        onSubmit={onCreateTask}
+                    />
+                )}
+
+            <div
+                draggable={draggable}
+                onDragStart={(event: DragEvent<HTMLDivElement>) => {
+                    if (!draggable) return;
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', task.id);
+                    onDragStart(task.id);
+                }}
+                onDragOver={(event: DragEvent<HTMLDivElement>) => {
+                    if (!draggable) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                    onDragOver(task.id);
+                }}
+                onDragLeave={(event: DragEvent<HTMLDivElement>) => {
+                    if (!draggable) return;
+                    const nextTarget = event.relatedTarget;
+                    if (
+                        nextTarget instanceof Node &&
+                        event.currentTarget.contains(nextTarget)
+                    ) {
+                        return;
+                    }
+                    onDragLeave();
+                }}
+                onDrop={(event: DragEvent<HTMLDivElement>) => {
+                    if (!draggable) return;
+                    event.preventDefault();
+                    onDrop(task.id);
+                }}
+                className={`group/task flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 transition-all ${
+                    isDragTarget
+                        ? 'border-app-brand bg-app-brand-soft shadow-sm'
+                        : 'border-app-border bg-app-surface-muted'
+                } ${isDragging ? 'scale-[0.99] opacity-50' : ''}`}
+            >
+                <div className="flex min-w-0">
+                    {draggable && (
+                        <DragHandle
+                            visibleClassName="group-hover/task:mr-1 group-hover/task:w-4 group-hover/task:opacity-100"
+                            className="mt-0.5"
+                        />
+                    )}
+
+                    <div className="flex min-w-0 gap-2">
+                        {task.finished ? (
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-app-success-solid" />
+                        ) : (
+                            <Circle className="mt-0.5 h-4 w-4 shrink-0 text-app-text-disabled" />
+                        )}
+
+                        <div className="min-w-0">
+                            <p className={`text-sm font-medium ${
+                                task.finished
+                                    ? 'line-through text-app-text-subtle'
+                                    : 'text-app-text'
+                            }`}>
+                                {task.title}
+                            </p>
+                            {task.description && (
+                                <p className="mt-1 text-xs text-app-text-muted">
+                                    {task.description}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => onRequestDeleteTask(task)}
+                    disabled={stepActionId !== null}
+                    className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={`Delete ${task.title}`}
+                    title="Delete task"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            </div>
+
+            {taskToDelete?.id === task.id && (
+                <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3">
+                    <p className="text-sm text-app-danger-text">
+                        Delete{' '}
+                        <span className="font-medium">
+                            {task.title}
+                        </span>
+                        ? This cannot be undone.
+                    </p>
+
+                    <div className="mt-3 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={onCancelDeleteTask}
+                            disabled={stepActionId === task.stepId}
+                            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-xs font-medium text-app-text hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => onConfirmDeleteTask(task)}
+                            disabled={stepActionId === task.stepId}
+                            className="rounded-xl bg-app-danger-solid px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {stepActionId === task.stepId
+                                ? 'Deleting...'
+                                : 'Delete'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <TaskInsertButton
+                label={`Add task after ${task.title}`}
+                onClick={() =>
+                    onTaskInsertTargetChange({
+                        stepId: step.id,
+                        position: index + 1,
+                    })
+                }
+            />
+
+            {taskInsertTarget?.stepId === step.id &&
+                taskInsertTarget.position === index + 1 && (
+                    <NewTaskForm
+                        title={newTaskTitle}
+                        description={newTaskDescription}
+                        addingTask={addingTask}
+                        onTitleChange={onNewTaskTitleChange}
+                        onDescriptionChange={onNewTaskDescriptionChange}
+                        onCancel={() => {
+                            onTaskInsertTargetChange(null);
+                            onNewTaskTitleChange('');
+                            onNewTaskDescriptionChange('');
+                        }}
+                        onSubmit={onCreateTask}
+                    />
+                )}
+        </div>
     );
 }
 

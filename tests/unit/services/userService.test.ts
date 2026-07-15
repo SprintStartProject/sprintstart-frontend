@@ -80,4 +80,16 @@ describe('userService', () => {
             userService.updateProfile({ firstName: 'FallbackName' }),
         ).rejects.toThrow();
     });
+
+    it('getMyProjects returns the projects the user is assigned to', async () => {
+        server.use(
+            http.get('/api/v1/users/me/projects', () =>
+                HttpResponse.json([{ id: 'project-1', name: 'Apollo' }]),
+            ),
+        );
+
+        const projects = await userService.getMyProjects();
+
+        expect(projects).toEqual([{ id: 'project-1', name: 'Apollo' }]);
+    });
 });

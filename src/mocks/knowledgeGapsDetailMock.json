@@ -1,20 +1,24 @@
 {
-    "id": "1",
-    "component": "auth-service",
-    "missingTypes": [
-        "runbook",
-        "adr"
-    ],
-    "lastUpdated": "2025-05-01T00:00:00Z",
-    "owners": [
-        {
-            "id": "user_001",
-            "username": "jdoe",
-            "firstname": "John",
-            "lastname": "Doe",
-            "workingArea": "BACKEND"
-        }
-    ],
-    "severity": "high",
-    "relatedQuestions": 12
+  "id": "1",
+  "component": "auth-service",
+  "missingTypes": [
+    "runbook",
+    "adr"
+  ],
+  "presentTypes": [
+    "readme",
+    "api-documentation"
+  ],
+  "owners": [
+    {
+      "id": "user_001",
+      "username": "jdoe",
+      "firstname": "John",
+      "lastname": "Doe"
+    }
+  ],
+  "severity": "high",
+  "lastIngested": "2025-05-01T00:00:00Z",
+  "refreshedAt": "2026-07-12T00:00:00Z",
+  "firstIngested": "2025-01-10T09:15:00Z"
 }
