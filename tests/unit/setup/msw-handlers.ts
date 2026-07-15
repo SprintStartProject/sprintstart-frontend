@@ -95,6 +95,10 @@ export const handlers = [
     ]),
   ),
 
+  http.get("/api/v1/users/me/projects", () =>
+    HttpResponse.json([{ id: "project-1", name: "SprintStart Project" }]),
+  ),
+
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],

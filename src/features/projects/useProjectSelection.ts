@@ -3,11 +3,18 @@ import {
   projectService,
   type AdminProject,
 } from "../../services/projectService";
+import { userService } from "../../services/userService";
 
 const PROJECT_SELECTION_STORAGE_KEY = "sprintstart:selected-project-id";
 
 type UseProjectSelectionOptions = {
   enabled?: boolean;
+  // GET /api/v1/admin/projects (the richer listing, including sources/users)
+  // is ADMIN-only. Non-admins still need a project id to scope actions like
+  // connecting a source, so they're routed to the self-service listing
+  // instead -- projects come back with empty sources/users placeholders,
+  // since only the admin-gated UI reads those fields.
+  isAdmin?: boolean;
 };
 
 function readStoredProjectId(): string {
@@ -33,6 +40,7 @@ function storeProjectId(projectId: string) {
 
 export function useProjectSelection({
   enabled = true,
+  isAdmin = false,
 }: UseProjectSelectionOptions = {}) {
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [selectedProjectId, setSelectedProjectIdState] =
@@ -57,7 +65,18 @@ export function useProjectSelection({
     setErrorMessage(null);
 
     try {
-      const nextProjects = await projectService.getProjects();
+      const nextProjects = isAdmin
+        ? await projectService.getProjects()
+        : await userService.getMyProjects().then((projects) =>
+            projects.map(
+              (project): AdminProject => ({
+                ...project,
+                description: "",
+                sources: [],
+                users: [],
+              }),
+            ),
+          );
       setProjects(nextProjects);
 
       setSelectedProjectIdState((currentProjectId) => {
@@ -81,7 +100,7 @@ export function useProjectSelection({
     } finally {
       setIsLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, isAdmin]);
 
   useEffect(() => {
     void Promise.resolve().then(() => loadProjects());

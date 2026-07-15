@@ -14,6 +14,8 @@ function createMockRun(overrides: Partial<IngestionRun> = {}): IngestionRun {
         failedCount: 0,
         status: 'COMPLETED',
         failedItems: [],
+        aiSyncStatus: 'SUCCEEDED',
+        aiSyncFailureReason: null,
         ...overrides,
     };
 }
@@ -133,5 +135,42 @@ describe('RunHistory', () => {
         render(<RunHistory runs={runs} />);
 
         expect(screen.getByText('In progress')).toBeInTheDocument();
+    });
+
+    it('shows an Indexing badge alongside Success when the AI sync is still pending', () => {
+        const runs: IngestionRun[] = [
+            createMockRun({ status: 'COMPLETED', aiSyncStatus: 'PENDING' }),
+        ];
+
+        render(<RunHistory runs={runs} />);
+
+        expect(screen.getByText('Success')).toBeInTheDocument();
+        expect(screen.getByText('Indexing...')).toBeInTheDocument();
+    });
+
+    it('shows an Indexing failed badge when the AI sync failed', () => {
+        const runs: IngestionRun[] = [
+            createMockRun({
+                status: 'COMPLETED',
+                aiSyncStatus: 'FAILED',
+                aiSyncFailureReason: 'AI service unreachable',
+            }),
+        ];
+
+        render(<RunHistory runs={runs} />);
+
+        expect(screen.getByText('Indexing failed')).toBeInTheDocument();
+    });
+
+    it('hides the AI sync badge when it is not applicable', () => {
+        const runs: IngestionRun[] = [
+            createMockRun({ status: 'FAILED', aiSyncStatus: 'NOT_APPLICABLE' }),
+        ];
+
+        render(<RunHistory runs={runs} />);
+
+        expect(screen.queryByText('Indexing...')).not.toBeInTheDocument();
+        expect(screen.queryByText('Indexed')).not.toBeInTheDocument();
+        expect(screen.queryByText('Indexing failed')).not.toBeInTheDocument();
     });
 });

@@ -517,7 +517,7 @@ export function DataIngestionPage() {
     errorMessage: projectErrorMessage,
     setSelectedProjectId,
     reloadProjects,
-  } = useProjectSelection();
+  } = useProjectSelection({ isAdmin: profile?.permissionGroup === "ADMIN" });
 
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";

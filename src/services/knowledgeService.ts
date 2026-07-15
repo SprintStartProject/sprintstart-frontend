@@ -146,8 +146,15 @@ export const knowledgeService = {
             throw new ApiError(response.status, errorBody || response.statusText);
         }
 
-        const content = await response.text();
         const mimeType = response.headers.get('Content-Type') ?? 'text/plain';
+
+        if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+            const blob = await response.blob();
+            const content = URL.createObjectURL(blob);
+            return { content, mimeType, isObjectUrl: true };
+        }
+
+        const content = await response.text();
 
         return { content, mimeType };
     },

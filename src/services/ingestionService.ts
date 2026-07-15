@@ -1,4 +1,5 @@
 import type {
+  AiSyncStatus,
   Artifact,
   ArtifactPage,
   ArtifactType,
@@ -27,6 +28,8 @@ type CanonicalIngestionRunResponse = {
   failedCount?: number;
   failedItems?: CanonicalFailedArtifact[];
   status?: IngestionRunStatus | "SUCCESS" | null;
+  aiSyncStatus?: AiSyncStatus | null;
+  aiSyncFailureReason?: string | null;
 };
 
 type CanonicalSourceIngestionStatusResponse = {
@@ -98,6 +101,21 @@ function inferRunStatus(
   return failedCount > 0 || failedItemCount > 0 ? "FAILED" : "COMPLETED";
 }
 
+function normalizeAiSyncStatus(
+  aiSyncStatus: CanonicalIngestionRunResponse["aiSyncStatus"],
+): AiSyncStatus {
+  switch (aiSyncStatus) {
+    case "PENDING":
+    case "SUCCEEDED":
+    case "FAILED":
+      return aiSyncStatus;
+    default:
+      // Missing on older/unmigrated backends -- fall back to "not applicable"
+      // rather than showing a false "still indexing" state indefinitely.
+      return "NOT_APPLICABLE";
+  }
+}
+
 function mapIngestionRun(run: CanonicalIngestionRunResponse): IngestionRun {
   const failedItems = run.failedItems ?? [];
 
@@ -111,6 +129,8 @@ function mapIngestionRun(run: CanonicalIngestionRunResponse): IngestionRun {
     failedCount: run.failedCount ?? failedItems.length,
     status: inferRunStatus(run),
     failedItems: failedItems.map(mapFailedArtifact),
+    aiSyncStatus: normalizeAiSyncStatus(run.aiSyncStatus),
+    aiSyncFailureReason: run.aiSyncFailureReason ?? null,
   };
 }
 

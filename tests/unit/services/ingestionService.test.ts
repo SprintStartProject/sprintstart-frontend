@@ -25,6 +25,8 @@ describe('ingestionService', () => {
                             failedCount: 0,
                             failedItems: [],
                             status: 'COMPLETED',
+                            aiSyncStatus: 'SUCCEEDED',
+                            aiSyncFailureReason: null,
                         },
                     ]);
                 }),
@@ -43,7 +45,30 @@ describe('ingestionService', () => {
                 failedCount: 0,
                 status: 'COMPLETED',
                 failedItems: [],
+                aiSyncStatus: 'SUCCEEDED',
+                aiSyncFailureReason: null,
             });
+        });
+
+        it('defaults aiSyncStatus to NOT_APPLICABLE when the backend omits it', async () => {
+            server.use(
+                http.get('/api/v1/ingestion-runs', () =>
+                    HttpResponse.json([
+                        {
+                            runId: 'r1b',
+                            sourceSystem: 'GITHUB',
+                            startedAt: '2026-07-01T00:00:00Z',
+                            finishedAt: '2026-07-01T01:00:00Z',
+                            status: 'COMPLETED',
+                        },
+                    ]),
+                ),
+            );
+
+            const runs = await getIngestionRuns();
+
+            expect(runs[0].aiSyncStatus).toBe('NOT_APPLICABLE');
+            expect(runs[0].aiSyncFailureReason).toBeNull();
         });
 
         it('normalizes SUCCESS status to COMPLETED', async () => {

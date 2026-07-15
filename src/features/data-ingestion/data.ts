@@ -1,5 +1,6 @@
 import { Database, FileText, GitBranch } from "lucide-react";
 import type {
+  AiSyncStatus,
   BackendProjectSourceStatus,
   DataSource,
   IngestionRun,
@@ -247,6 +248,30 @@ export function getRunStatusTone(status: IngestionRunStatus) {
 
 export function isRunInProgress(status?: IngestionRunStatus | null) {
   return status === "CONNECTED" || status === "RUNNING";
+}
+
+/**
+ * Label for a run's AI sync stage, distinct from its (local) run status --
+ * a run can read "Success" above while this still reads "Indexing...".
+ * Returns null for NOT_APPLICABLE so callers can hide the badge entirely.
+ */
+export function getAiSyncStatusLabel(status: AiSyncStatus) {
+  switch (status) {
+    case "PENDING":
+      return "Indexing...";
+    case "SUCCEEDED":
+      return "Indexed";
+    case "FAILED":
+      return "Indexing failed";
+    case "NOT_APPLICABLE":
+      return null;
+  }
+}
+
+export function getAiSyncStatusTone(status: AiSyncStatus) {
+  if (status === "SUCCEEDED") return "success";
+  if (status === "PENDING") return "running";
+  return "warning";
 }
 
 export function getSourceLabel(sourceSystem: SourceSystem) {

@@ -1,4 +1,5 @@
 import { apiClient } from "./apiClient";
+import type { ProjectSummary } from "./projectService";
 import type { UserProfile } from "./types";
 
 type BackendUserProfile = Omit<UserProfile, "projectRoles" | "projectIds"> & {
@@ -77,5 +78,17 @@ export const userService = {
    */
   logout(): Promise<void> {
     return Promise.resolve();
+  },
+
+  /**
+   * GET /api/v1/users/me/projects
+   *
+   * Returns the projects the authenticated user is assigned to. Available to
+   * any authenticated user (unlike GET /api/v1/admin/projects, which is
+   * ADMIN-only), so PM/HR flows that need a project id -- e.g. connecting a
+   * GitHub repository -- can be scoped to the current user's own projects.
+   */
+  async getMyProjects(): Promise<ProjectSummary[]> {
+    return apiClient.fetch<ProjectSummary[]>("/api/v1/users/me/projects");
   },
 };

@@ -21,7 +21,7 @@ export function PmDashboardPage() {
     isLoading: isLoadingProjects,
     errorMessage: projectErrorMessage,
     setSelectedProjectId,
-  } = useProjectSelection();
+  } = useProjectSelection({ isAdmin: profile?.permissionGroup === "ADMIN" });
 
   return (
     <div className="min-h-screen bg-app-bg">

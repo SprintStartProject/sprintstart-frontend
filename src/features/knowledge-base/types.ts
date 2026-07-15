@@ -38,6 +38,7 @@ export interface Artifact {
 export interface ArtifactContent {
     content: string;
     mimeType: string;
+    isObjectUrl?: boolean;
 }
 
 /**

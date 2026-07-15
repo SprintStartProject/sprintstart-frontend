@@ -135,6 +135,15 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId }: ArtifactV
         };
     }, [artifact, projectId]);
 
+    useEffect(() => {
+        const currentContent = state.content;
+        return () => {
+            if (currentContent?.isObjectUrl) {
+                URL.revokeObjectURL(currentContent.content);
+            }
+        };
+    }, [state.content]);
+
     /**
      * Triggers the AI summarization stream for the currently loaded artifact.
      *
@@ -249,6 +258,16 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId }: ArtifactV
                                 >
                                     {content.content}
                                 </ReactMarkdown>
+                            </div>
+                        ) : content?.mimeType === 'application/pdf' ? (
+                            <div className="w-full h-[calc(100vh-12rem)] min-h-[500px] rounded-lg overflow-hidden border border-app-border">
+                                <object data={content.content} type="application/pdf" className="w-full h-full">
+                                    <p className="p-4 text-app-text-muted">Unable to display PDF file. <a href={content.content} download={artifact?.title || "document.pdf"} className="text-app-brand hover:underline">Download</a> instead.</p>
+                                </object>
+                            </div>
+                        ) : content?.mimeType.startsWith('image/') ? (
+                            <div className="flex justify-center bg-app-bg p-4 rounded-lg border border-app-border">
+                                <img src={content.content} alt={artifact?.title || 'Image'} className="max-w-full rounded shadow-sm" />
                             </div>
                         ) : (
                             <pre className="font-mono text-sm text-app-text bg-app-bg p-4 rounded-lg overflow-x-auto whitespace-pre-wrap border border-app-border">

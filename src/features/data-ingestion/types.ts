@@ -20,6 +20,13 @@ export type IngestionRunStatus =
   | "PARTIAL"
   | "FAILED";
 
+/**
+ * Whether a run's artifacts have actually reached the AI service's index, separate
+ * from `IngestionRunStatus`. A run can show COMPLETED (fetched and saved locally)
+ * while this is still PENDING or has moved to FAILED -- that gap is why this exists.
+ */
+export type AiSyncStatus = "NOT_APPLICABLE" | "PENDING" | "SUCCEEDED" | "FAILED";
+
 export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST";
 
 export type Artifact = {
@@ -57,6 +64,8 @@ export type IngestionRun = {
   failedCount: number;
   status: IngestionRunStatus;
   failedItems: FailedArtifact[];
+  aiSyncStatus: AiSyncStatus;
+  aiSyncFailureReason: string | null;
 };
 
 export type FailedArtifact = {
