@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BookText, ChevronDown } from "lucide-react";
+import { BookText, ChevronDown, ExternalLink } from "lucide-react";
 import type { Citation } from "../types";
 
 type MessageCitationsProps = {
@@ -9,8 +9,18 @@ type MessageCitationsProps = {
 type CitationGroup = {
     filename: string;
     count: number;
-    sections: string[];
+    sourceUrl?: string;
+    locations: string[];
 };
+
+/**
+ * Renders a human-readable location for a citation, e.g. "Line 42" or "Page 7".
+ */
+function formatLocation(citation: Citation): string | null {
+    if (citation.startLine !== undefined) return `Line ${citation.startLine}`;
+    if (citation.startPage !== undefined) return `Page ${citation.startPage}`;
+    return null;
+}
 
 /**
  * Groups the raw per-chunk citations returned by the assistant into one entry
@@ -19,7 +29,8 @@ type CitationGroup = {
  *
  * The whole block is collapsed by default (just a "Quellen · N" line) so it
  * never dominates the message. Expanding reveals compact per-file chips; a chip
- * can be selected to list the individual section paths it cites.
+ * can be selected to list the individual locations (lines/pages) it cites, and
+ * files that carry a sourceUrl link out to the original artifact.
  */
 export function MessageCitations({ citations }: MessageCitationsProps) {
     const [open, setOpen] = useState(false);
@@ -30,18 +41,20 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
 
         for (const citation of citations) {
             const existing = map.get(citation.filename);
-            const section = citation.section_path?.trim();
+            const location = formatLocation(citation);
 
             if (existing) {
                 existing.count += 1;
-                if (section && !existing.sections.includes(section)) {
-                    existing.sections.push(section);
+                existing.sourceUrl ??= citation.sourceUrl;
+                if (location && !existing.locations.includes(location)) {
+                    existing.locations.push(location);
                 }
             } else {
                 map.set(citation.filename, {
                     filename: citation.filename,
                     count: 1,
-                    sections: section ? [section] : []
+                    sourceUrl: citation.sourceUrl,
+                    locations: location ? [location] : []
                 });
             }
         }
@@ -76,7 +89,7 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                     <div className="mt-1.5 flex flex-wrap gap-1">
                         {groups.map((group) => {
                             const isActive = group.filename === activeFile;
-                            const canExpand = group.sections.length > 0;
+                            const canExpand = group.locations.length > 0;
 
                             return (
                                 <button
@@ -103,18 +116,31 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                         })}
                     </div>
 
-                    {activeGroup && activeGroup.sections.length > 0 && (
-                        <ul className="mt-1.5 rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5">
-                            {activeGroup.sections.map((section, idx) => (
-                                <li
-                                    key={idx}
-                                    className="flex gap-1.5 py-0.5 text-[11px] leading-relaxed text-app-text-muted"
+                    {activeGroup && (
+                        <div className="mt-1.5 rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5">
+                            {activeGroup.sourceUrl && (
+                                <a
+                                    href={activeGroup.sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
                                 >
-                                    <span className="text-app-text-disabled">·</span>
-                                    <span className="min-w-0 break-words">{section}</span>
-                                </li>
-                            ))}
-                        </ul>
+                                    Quelle öffnen
+                                    <ExternalLink size={10} />
+                                </a>
+                            )}
+
+                            <ul className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                {activeGroup.locations.map((location, idx) => (
+                                    <li
+                                        key={idx}
+                                        className="text-[11px] leading-relaxed text-app-text-muted"
+                                    >
+                                        {location}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     )}
                 </>
             )}
