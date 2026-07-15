@@ -398,6 +398,30 @@
   border-top-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Blinking caret shown at the end of an assistant message while tokens are
+   still streaming in. aria-hidden so screen readers don't announce it. */
+.streaming-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background-color: currentColor;
+  animation: streaming-blink 1s steps(2, start) infinite;
+}
+
+@keyframes streaming-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streaming-caret {
+    animation: none;
+  }
+}
+
 html,
 body,
 #root {

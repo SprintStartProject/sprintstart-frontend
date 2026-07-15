@@ -29,11 +29,19 @@ export function useChat() {
     const [isThinking, setIsThinking] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
 
+    /**
+     * Id of the assistant message currently receiving streamed tokens. Lets the
+     * UI render a streaming caret on the in-progress message only. Cleared on
+     * done/error/abort.
+     */
+    const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+
     const [thinkingState, setThinkingState] = useState<string | null>(null);
     const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
     const [newRequest, setNewRequest] = useState("");
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -48,6 +56,16 @@ export function useChat() {
     const [to, setTo] = useState("");
 
     const [sourceSystems, setSourceSystems] = useState<SourceSystem[]>([]);
+
+    const activeFilterCount = useMemo(() => {
+        return sourceSystems.length + (from ? 1 : 0) + (to ? 1 : 0);
+    }, [sourceSystems, from, to]);
+
+    const clearFilters = useCallback(() => {
+        setFrom("");
+        setTo("");
+        setSourceSystems([]);
+    }, []);
 
     /**
      * Adds a system to the list of source systems (GitHub, Jira, etc.) used by AI to generate responses or removes it
@@ -166,7 +184,18 @@ export function useChat() {
 
         // create new chat if needed
         if (!currentChatId) {
-            const newChat = await createChat(userId);
+            const created = await createChat(userId);
+
+            // The backend's create-chat endpoint returns only { id } — no
+            // title, userId, or createdAt. Synthesize a full Chat client-side
+            // so the sidebar updates instantly; the post-stream refreshChats()
+            // will replace it with the real backend data.
+            const newChat = {
+                id: created.id,
+                title: "",
+                userId,
+                createdAt: new Date().toISOString(),
+            };
 
             setChats(prev => [newChat, ...prev]);
 
@@ -220,6 +249,7 @@ export function useChat() {
                 onToken: token => {
                     setIsStreaming(true);
                     setIsThinking(false);
+                    setStreamingMessageId(assistantId);
 
                     setMessagesByChat(prev => ({
                         ...prev,
@@ -249,6 +279,7 @@ export function useChat() {
                 // if the stream element marks the end of the stream, finalize the message
                 onDone: () => {
                     setIsStreaming(false);
+                    setStreamingMessageId(null);
 
                     setMessagesByChat(prev => ({
                         ...prev,
@@ -267,12 +298,14 @@ export function useChat() {
                     console.error(err);
                     setIsStreaming(false);
                     setIsThinking(false);
+                    setStreamingMessageId(null);
                 }
             });
         } catch (e) {
             console.error(e);
             setIsStreaming(false);
             setIsThinking(false);
+            setStreamingMessageId(null);
         }
     }, [chatId, navigate, chats, refreshChats, userId, sourceSystems, from, to]);
 
@@ -314,6 +347,9 @@ export function useChat() {
         sidebarOpen,
         setSidebarOpen,
 
+        desktopSidebarOpen,
+        setDesktopSidebarOpen,
+
         handleSubmit,
         addMessage,
 
@@ -324,6 +360,8 @@ export function useChat() {
         isStreaming,
 
         thinkingState,
+
+        streamingMessageId,
 
         selectedCitation,
         setSelectedCitation,
@@ -343,6 +381,9 @@ export function useChat() {
 
         sourceSystems,
 
-        toggleSourceSystem
+        toggleSourceSystem,
+
+        activeFilterCount,
+        clearFilters
     };
 }

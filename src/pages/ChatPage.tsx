@@ -1,5 +1,5 @@
 import { Bot, Check, ExternalLink, Filter, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAuth } from "../context/useAuth";
 import { UserAvatar } from "../components/common/UserAvatar.tsx";
@@ -9,6 +9,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
 import { MessageCitations } from "../features/chatbot/components/MessageCitations.tsx";
+import { CopyButton } from "../features/chatbot/components/CopyButton.tsx";
 import { DinoGame } from "../features/chatbot/components/DinoGame.tsx";
 import { linkifyCitations } from "../features/chatbot/markdown/linkifyCitations.ts";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
@@ -35,10 +36,13 @@ export function ChatPage() {
         isThinking,
         isStreaming,
         thinkingState,
+        streamingMessageId,
         newRequest,
         setNewRequest,
         sidebarOpen,
         setSidebarOpen,
+        desktopSidebarOpen,
+        setDesktopSidebarOpen,
         textareaRef,
         bottomRef,
         selectedCitation,
@@ -51,9 +55,10 @@ export function ChatPage() {
         setTo,
         sourceSystems,
         toggleSourceSystem,
+        activeFilterCount,
+        clearFilters,
         scrollContainerRef
     } = useChat();
-    const hasChatHistory = chats?.length !== 0;
 
     // Dino easter egg: while the assistant is thinking, pressing Space drops the
     // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
@@ -112,48 +117,36 @@ export function ChatPage() {
     };
 
     return (
-        <div
-            className={[
-                "flex h-[calc(100vh-64px)] overflow-hidden bg-app-bg text-app-text lg:h-screen",
-                hasChatHistory ? "" : "app-page-frame",
-            ].filter(Boolean).join(" ")}
-        >
-            {hasChatHistory && (
-                <aside className="hidden w-64 shrink-0 flex-col border-r border-app-border bg-app-bg-soft md:flex">
-                    <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
-                </aside>
-            )}
-
+        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-app-bg text-app-text lg:h-screen">
+            {/* Mobile slide-out drawer — slides in from the right on mobile */}
             <aside
                 id="chat-mobile-sidebar"
                 aria-label="Mobile chat navigation"
                 aria-hidden={!sidebarOpen}
                 inert={!sidebarOpen}
-                className={`
-                    fixed top-0 left-0 z-50 h-full w-64 bg-app-bg-soft
-                    border-r border-app-border shadow-2xl
-                    transform transition-transform duration-300
-                    md:hidden
-                    ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-                `}
+                className={[
+                    "fixed top-0 right-0 z-50 h-full w-64 bg-app-bg-soft",
+                    "border-l border-app-border shadow-2xl",
+                    "transform transition-transform duration-300 md:hidden",
+                    sidebarOpen ? "translate-x-0" : "translate-x-full",
+                ].join(" ")}
             >
                 <div className="flex items-center justify-between p-4">
                     <h2 className="font-bold">Chats</h2>
-
                     <button aria-label="Close sidebar" onClick={() => setSidebarOpen(false)}>
                         <X size={24} />
                     </button>
                 </div>
-
                 <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
             </aside>
 
+            {/* Mobile toggle button — top-left so it doesn't overlap the mobile header burger */}
             <button
                 aria-label="Toggle sidebar"
                 aria-controls="chat-mobile-sidebar"
                 aria-expanded={sidebarOpen}
                 className="
-                    fixed top-4 right-[var(--app-page-gutter)] z-50 mt-15
+                    fixed top-4 left-[var(--app-page-gutter)] z-50 mt-15
                     rounded-full border border-app-border bg-app-surface
                     p-3 text-app-text shadow-lg
                     hover:cursor-pointer hover:bg-app-surface-hover
@@ -164,13 +157,27 @@ export function ChatPage() {
                 <MessageSquareText size={24} />
             </button>
 
+            {/* Main content column */}
             <div className="flex min-w-0 flex-1 flex-col">
-                <PageHeader
-                    icon={Sparkles}
-                    title="AI Assistant"
-                    subtitle="Ask questions about project knowledge, code, documentation and onboarding."
-                    className="shrink-0 border-b border-app-border bg-app-bg/80 px-6 py-4 backdrop-blur-md"
-                />
+                {/* Header: page title + open-sidebar toggle on the right */}
+                <div className="flex shrink-0 items-center gap-2 border-b border-app-border bg-app-bg/80 app-page-frame py-3 backdrop-blur-md">
+                    <PageHeader
+                        icon={Sparkles}
+                        title="AI Assistant"
+                        subtitle="Ask questions about project knowledge, code, documentation and onboarding."
+                        hideSubtitleBelow="md"
+                        className="flex-1"
+                    />
+                    {!desktopSidebarOpen && (
+                        <button
+                            aria-label="Open sidebar"
+                            onClick={() => setDesktopSidebarOpen(true)}
+                            className="hidden md:flex items-center justify-center rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted hover:bg-app-surface-hover hover:text-app-text transition-colors shrink-0"
+                        >
+                            <MessageSquareText size={18} />
+                        </button>
+                    )}
+                </div>
 
                 <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">
                     {!chatId && (
@@ -203,9 +210,20 @@ export function ChatPage() {
                         </div>
                     )}
 
-                    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+                    <div
+                        className="app-page-frame flex w-full flex-col gap-8 py-8"
+                        aria-live="polite"
+                        aria-atomic="false"
+                    >
                         {messages.map((message, index) => {
                             const isRequest = message.role === "USER";
+
+                            // Subtle divider between consecutive assistant turns so long
+                            // answers don't blur together.
+                            const prevAssistant =
+                                index > 0 &&
+                                messages[index - 1].role === "ASSISTANT" &&
+                                message.role === "ASSISTANT";
 
                             if (
                                 message.role === "ASSISTANT" &&
@@ -220,13 +238,23 @@ export function ChatPage() {
                                 ? message.content
                                 : linkifyCitations(message.content, citations.length);
 
+                            // Show a blinking caret at the end of the assistant
+                            // message that is currently receiving streamed tokens.
+                            const showStreamingCaret =
+                                !isRequest &&
+                                isStreaming &&
+                                message.id === streamingMessageId;
+
                             return (
-                                <div
-                                    key={index}
-                                    className={`flex w-full gap-3 ${
-                                        isRequest ? "flex-row-reverse" : "flex-row"
-                                    }`}
-                                >
+                                <Fragment key={index}>
+                                    {prevAssistant && (
+                                        <div className="mx-auto w-3/4 border-t border-app-border-muted" />
+                                    )}
+                                    <div
+                                        className={`flex w-full gap-3 ${
+                                            isRequest ? "flex-row-reverse" : "flex-row"
+                                        }`}
+                                    >
                                     <div
                                         className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
                                             isRequest
@@ -247,8 +275,8 @@ export function ChatPage() {
                                     </div>
 
                                     <div
-                                        className={`flex max-w-[85%] flex-col ${
-                                            isRequest ? "items-end" : "items-start"
+                                        className={`flex flex-col ${
+                                            isRequest ? "max-w-[70%] items-end" : "max-w-[85%] items-start"
                                         }`}
                                     >
                                         <div
@@ -341,17 +369,29 @@ export function ChatPage() {
                                                 {mdContent}
                                             </ReactMarkdown>
 
+                                            {showStreamingCaret && (
+                                                <span
+                                                    className="streaming-caret"
+                                                    aria-hidden="true"
+                                                />
+                                            )}
+
                                             {!isRequest && citations.length > 0 && (
                                                 <MessageCitations citations={citations} />
                                             )}
                                         </div>
+
+                                        {!isRequest && !showStreamingCaret && message.content !== "" && (
+                                            <CopyButton text={message.content} />
+                                        )}
                                     </div>
-                                </div>
+                                    </div>
+                                </Fragment>
                             );
                         })}
 
                         {gameActive && isThinking ? (
-                            <div className="flex w-full gap-3">
+                            <div className="flex w-full gap-3" aria-hidden="true">
                                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border">
                                     <Bot size={15} className="text-app-brand-text" />
                                 </div>
@@ -378,7 +418,7 @@ export function ChatPage() {
                             </div>
                         ) : (
                             isThinking && (
-                                <div className="flex w-full gap-3">
+                                <div className="flex w-full gap-3" aria-hidden="true">
                                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border">
                                         <Bot size={15} className="text-app-brand-text" />
                                     </div>
@@ -447,9 +487,9 @@ export function ChatPage() {
                     </div>
                 )}
 
-                <footer className="shrink-0 border-t border-app-border bg-app-bg px-4 py-4">
+                <footer className="shrink-0 border-t border-app-border bg-app-bg app-page-frame py-4">
                     {showFilters && (
-                        <div className="max-w-4xl mx-auto w-full px-4 mb-3">
+                        <div className="mb-3">
                             <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-app-border bg-app-surface-muted/70 backdrop-blur px-4 py-3">
 
                                 <div className="flex flex-col gap-1">
@@ -463,6 +503,7 @@ export function ChatPage() {
                                     <input
                                         id="filter-from"
                                         type="date"
+                                        max={to || undefined}
                                         value={from}
                                         onChange={(e) => setFrom(e.target.value)}
                                         className="
@@ -488,6 +529,7 @@ export function ChatPage() {
                                     <input
                                         id="filter-to"
                                         type="date"
+                                        min={from || undefined}
                                         value={to}
                                         onChange={(e) => setTo(e.target.value)}
                                         className="
@@ -505,11 +547,26 @@ export function ChatPage() {
                                 <div className="h-8 w-px bg-app-border-muted self-center hidden lg:block" />
 
                                 <div className="flex flex-col gap-1 flex-1 min-w-[240px]">
-                                    <span className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold">
-                                        Systems
-                                    </span>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold">
+                                            Systems
+                                        </span>
+                                        {activeFilterCount > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={clearFilters}
+                                                className="text-xs font-semibold text-app-text-muted hover:text-app-brand transition-colors"
+                                            >
+                                                Clear All
+                                            </button>
+                                        )}
+                                    </div>
 
-                                    <div className="flex flex-wrap gap-2 min-h-10 items-center">
+                                    <div
+                                        role="group"
+                                        aria-label="Source systems"
+                                        className="flex flex-wrap gap-2 min-h-10 items-center"
+                                    >
                                         {SOURCE_SYSTEMS.map((source) => {
                                             const selected = sourceSystems.includes(source);
 
@@ -552,16 +609,21 @@ export function ChatPage() {
 
                     <form
                         onSubmit={handleSubmit}
-                        className="mx-auto flex max-w-5xl items-end gap-2 rounded-2xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
+                        className="flex items-end gap-2 rounded-2xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
                     >
                         <button
                             type="button"
                             aria-label="Toggle source filters"
                             aria-expanded={showFilters}
                             onClick={() => setShowFilters((v) => !v)}
-                            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-surface border border-app-border-muted text-app-text-muted hover:bg-app-surface-hover hover:text-app-text transition-colors"
+                            className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-surface border border-app-border-muted text-app-text-muted hover:bg-app-surface-hover hover:text-app-text transition-colors"
                         >
                             <Filter size={18} />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-app-brand text-[10px] font-bold text-white shadow-sm ring-1 ring-app-surface">
+                                    {activeFilterCount}
+                                </span>
+                            )}
                         </button>
                         <textarea
                             ref={textareaRef}
@@ -594,11 +656,35 @@ export function ChatPage() {
                         </button>
                     </form>
 
-                    <p className="mx-auto mt-2 max-w-5xl px-1 text-center text-[11px] text-app-text-disabled">
+                    <p className="mt-2 text-center text-[11px] text-app-text-disabled">
                         Enter zum Senden · Shift + Enter für eine neue Zeile
                     </p>
                 </footer>
             </div>
+
+            {/* Desktop chat history sidebar — RIGHT side, always rendered */}
+            <aside
+                aria-label="Chat history"
+                className={[
+                    "hidden shrink-0 flex-col border-l border-app-border bg-app-bg-soft transition-all duration-200 md:flex",
+                    desktopSidebarOpen ? "w-64" : "w-0 overflow-hidden border-l-0",
+                ].join(" ")}
+            >
+                {/* Sidebar header */}
+                <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                    <h2 className="font-bold text-sm tracking-wide text-app-text-muted uppercase">Chats</h2>
+                    <button
+                        aria-label="Close sidebar"
+                        onClick={() => setDesktopSidebarOpen(false)}
+                        className="text-app-text-muted hover:text-app-text transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="flex flex-1 flex-col overflow-hidden">
+                    <ChatSidebar chats={chats} setSidebarOpen={() => {}} />
+                </div>
+            </aside>
         </div>
     );
 }

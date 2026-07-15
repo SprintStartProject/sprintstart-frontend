@@ -7,6 +7,12 @@ type PageHeaderProps = {
     subtitle: string;
     actions?: ReactNode;
     className?: string;
+    /**
+     * Hides the subtitle below the given Tailwind breakpoint until that width is
+     * reached. Useful on space-constrained mobile layouts (e.g. the chat header)
+     * where the subtitle is secondary. `undefined` keeps the subtitle always visible.
+     */
+    hideSubtitleBelow?: "sm" | "md" | "lg";
 };
 
 export function PageHeader({
@@ -15,6 +21,7 @@ export function PageHeader({
     subtitle,
     actions,
     className = "",
+    hideSubtitleBelow,
 }: PageHeaderProps) {
     return (
         <div className={className}>
@@ -28,7 +35,11 @@ export function PageHeader({
                         </h1>
                     </div>
 
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-subtle">
+                    <p
+                        className={`mt-2 max-w-2xl text-sm leading-6 text-app-text-subtle ${
+                            hideSubtitleBelow ? `hidden ${hideSubtitleBelow}:block` : ""
+                        }`}
+                    >
                         {subtitle}
                     </p>
                 </div>

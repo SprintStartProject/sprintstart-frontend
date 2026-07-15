@@ -831,7 +831,7 @@ export function DinoGame({ onExit }: DinoGameProps) {
             {status !== "over" && (
                 <div className="pointer-events-none absolute inset-x-0 top-9 flex justify-center">
                     <span className="rounded bg-app-surface/70 px-2 py-0.5 text-[10px] text-app-text-disabled backdrop-blur-sm">
-                        Space halten = hoch springen · ↓ ducken
+                        Hold Space = high jump · ↓ duck
                     </span>
                 </div>
             )}
@@ -844,7 +844,7 @@ export function DinoGame({ onExit }: DinoGameProps) {
                     {newHighScore ? (
                         <div className="flex animate-bounce items-center gap-1.5 rounded-full bg-app-brand-soft px-3 py-1 text-xs font-bold text-app-brand-text ring-1 ring-app-brand-border">
                             <span>🏆</span>
-                            <span>Neuer Highscore! {score}</span>
+                            <span>New High Score! {score}</span>
                         </div>
                     ) : (
                         <p className="text-xs text-app-text-muted">
@@ -857,14 +857,14 @@ export function DinoGame({ onExit }: DinoGameProps) {
                             onClick={pressJump}
                             className="rounded-lg bg-app-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
                         >
-                            Nochmal (Space)
+                            Play Again (Space)
                         </button>
                         <button
                             type="button"
                             onClick={onExit}
                             className="rounded-lg border border-app-border px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:text-app-text"
                         >
-                            Beenden (Esc)
+                            Exit (Esc)
                         </button>
                     </div>
                 </div>

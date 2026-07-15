@@ -179,5 +179,9 @@ describe('useChat', () => {
         expect(aiMsg.content).toBe('Hello world');
         expect(aiMsg.citations?.length).toBe(1);
         expect(aiMsg.citations?.[0].filename).toBe('file.txt');
+
+        // Streaming id is cleared once the stream finishes.
+        expect(result.current.streamingMessageId).toBeNull();
+        expect(result.current.isStreaming).toBe(false);
     });
 });
