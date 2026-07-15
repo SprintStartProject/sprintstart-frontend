@@ -106,7 +106,6 @@ export type StreamHandlers = {
 
 export const SOURCE_SYSTEMS = [
     "GITHUB",
-    "JIRA",
     "UPLOAD"
 ] as const;
 

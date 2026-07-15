@@ -61,8 +61,11 @@ describe('ChatPage', () => {
         expect(screen.getByText('Hi there')).toBeInTheDocument();
     });
 
-    it('renders citation chips for assistant messages with citations', () => {
+    it('renders citation chips for assistant messages with citations', async () => {
+        const user = userEvent.setup();
         render(<MemoryRouter><ChatPage /></MemoryRouter>);
+        const toggleBtn = screen.getByRole('button', { name: /Quellen ·/i });
+        await user.click(toggleBtn);
         expect(screen.getByText(/readme\.md/)).toBeInTheDocument();
     });
 

@@ -1,4 +1,5 @@
 import { Bot, Check, ExternalLink, Filter, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAuth } from "../context/useAuth";
 import { UserAvatar } from "../components/common/UserAvatar.tsx";
@@ -7,10 +8,19 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
+import { MessageCitations } from "../features/chatbot/components/MessageCitations.tsx";
+import { DinoGame } from "../features/chatbot/components/DinoGame.tsx";
+import { linkifyCitations } from "../features/chatbot/markdown/linkifyCitations.ts";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { SOURCE_SYSTEMS } from "../features/chatbot/types.ts";
 
 import "katex/dist/katex.min.css";
+
+const SUGGESTIONS = [
+    "How do I set up the project locally?",
+    "Explain the onboarding flow",
+    "Where is the authentication handled?"
+];
 
 /**
  * Displays the interface for communication with the chat.
@@ -27,14 +37,12 @@ export function ChatPage() {
         thinkingState,
         newRequest,
         setNewRequest,
-        selectedCitation,
-        setSelectedCitation,
         sidebarOpen,
         setSidebarOpen,
         textareaRef,
         bottomRef,
-        showBrainrot,
-        timestamp,
+        selectedCitation,
+        setSelectedCitation,
         showFilters,
         setShowFilters,
         from,
@@ -42,9 +50,66 @@ export function ChatPage() {
         to,
         setTo,
         sourceSystems,
-        toggleSourceSystem
+        toggleSourceSystem,
+        scrollContainerRef
     } = useChat();
     const hasChatHistory = chats?.length !== 0;
+
+    // Dino easter egg: while the assistant is thinking, pressing Space drops the
+    // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
+    const [gameActive, setGameActive] = useState(false);
+
+    // Close the game as soon as the answer arrives (and on chat switches).
+    if (gameActive && !isThinking) {
+        setGameActive(false);
+    }
+
+    useEffect(() => {
+        if (!isThinking || gameActive) return;
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.code !== "Space") return;
+
+            // Don't hijack space while the user is typing their next message.
+            const active = document.activeElement;
+            const typing =
+                active instanceof HTMLElement &&
+                (active.tagName === "TEXTAREA" ||
+                    active.tagName === "INPUT" ||
+                    active.isContentEditable);
+            if (typing) return;
+
+            e.preventDefault();
+            setGameActive(true);
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [isThinking, gameActive]);
+
+    // Focus textarea when opening a new chat (empty state).
+    useEffect(() => {
+        if (!chatId) {
+            setTimeout(() => textareaRef.current?.focus(), 0);
+        }
+    }, [chatId, textareaRef]);
+
+    // Scroll the freshly-started game into view, even if the user was scrolled up.
+    useEffect(() => {
+        if (gameActive) {
+            bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [gameActive, bottomRef]);
+
+    const fillSuggestion = (text: string) => {
+        setNewRequest(text);
+        const el = textareaRef.current;
+        if (el) {
+            el.focus();
+            el.style.height = "auto";
+            el.style.height = `${el.scrollHeight}px`;
+        }
+    };
 
     return (
         <div
@@ -54,7 +119,7 @@ export function ChatPage() {
             ].filter(Boolean).join(" ")}
         >
             {hasChatHistory && (
-                <aside className="w-64 bg-app-bg border-r border-app-border md:flex flex-col shrink-0 hidden">
+                <aside className="hidden w-64 shrink-0 flex-col border-r border-app-border bg-app-bg-soft md:flex">
                     <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
                 </aside>
             )}
@@ -65,14 +130,14 @@ export function ChatPage() {
                 aria-hidden={!sidebarOpen}
                 inert={!sidebarOpen}
                 className={`
-                    fixed top-0 left-0 h-full w-64 bg-app-bg
-                    border-r border-app-border z-50
+                    fixed top-0 left-0 z-50 h-full w-64 bg-app-bg-soft
+                    border-r border-app-border shadow-2xl
                     transform transition-transform duration-300
                     md:hidden
                     ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
                 `}
             >
-                <div className="p-4 flex justify-between items-center">
+                <div className="flex items-center justify-between p-4">
                     <h2 className="font-bold">Chats</h2>
 
                     <button aria-label="Close sidebar" onClick={() => setSidebarOpen(false)}>
@@ -88,27 +153,18 @@ export function ChatPage() {
                 aria-controls="chat-mobile-sidebar"
                 aria-expanded={sidebarOpen}
                 className="
-                    fixed
-                    top-4
-                    right-[var(--app-page-gutter)]
-                    z-50
+                    fixed top-4 right-[var(--app-page-gutter)] z-50 mt-15
+                    rounded-full border border-app-border bg-app-surface
+                    p-3 text-app-text shadow-lg
+                    hover:cursor-pointer hover:bg-app-surface-hover
                     md:hidden
-                    p-3
-                    text-white
-                    rounded-full
-                    bg-app-surface
-                    border
-                    border-app-border
-                    shadow-lg
-                    mt-15
-                    hover:cursor-pointer
                 "
                 onClick={() => setSidebarOpen(!sidebarOpen)}
             >
                 <MessageSquareText size={24} />
             </button>
 
-            <div className="flex flex-col flex-1 min-w-0">
+            <div className="flex min-w-0 flex-1 flex-col">
                 <PageHeader
                     icon={Sparkles}
                     title="AI Assistant"
@@ -116,25 +172,38 @@ export function ChatPage() {
                     className="shrink-0 border-b border-app-border bg-app-bg/80 px-6 py-4 backdrop-blur-md"
                 />
 
-                <div className="flex-1 overflow-y-auto flex flex-col">
+                <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">
                     {!chatId && (
-                        <div className="flex-1 flex flex-col justify-center items-center p-8 text-center">
-                            <div className="bg-app-brand-soft p-4 rounded-3xl mb-4">
-                                <Bot className="text-app-brand-text size-12" />
+                        <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+                            <div className="mb-5 rounded-3xl bg-app-brand-soft p-4 ring-1 ring-app-brand-border">
+                                <Bot className="size-11 text-app-brand-text" />
                             </div>
 
-                            <h1 className="text-app-text font-bold text-2xl mb-2">
+                            <h1 className="mb-2 text-2xl font-bold text-app-text">
                                 How can I help you today?
                             </h1>
 
-                            <p className="text-app-text-muted max-w-md text-sm">
+                            <p className="mb-6 max-w-md text-sm text-app-text-muted">
                                 Ask anything about your project&apos;s codebase, documentation, or
                                 onboarding process.
                             </p>
+
+                            <div className="flex max-w-xl flex-wrap justify-center gap-2">
+                                {SUGGESTIONS.map((s) => (
+                                    <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => fillSuggestion(s)}
+                                        className="rounded-full border border-app-border-muted bg-app-surface px-3.5 py-1.5 text-xs text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text"
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
 
-                    <div className="max-w-4xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
+                    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
                         {messages.map((message, index) => {
                             const isRequest = message.role === "USER";
 
@@ -146,16 +215,23 @@ export function ChatPage() {
                                 return null;
                             }
 
+                            const citations = message.citations ?? [];
+                            const mdContent = isRequest
+                                ? message.content
+                                : linkifyCitations(message.content, citations.length);
+
                             return (
                                 <div
                                     key={index}
-                                    className={`flex w-full gap-4 ${
+                                    className={`flex w-full gap-3 ${
                                         isRequest ? "flex-row-reverse" : "flex-row"
                                     }`}
                                 >
                                     <div
-                                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                                            isRequest ? "" : "bg-app-surface-muted"
+                                        className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
+                                            isRequest
+                                                ? ""
+                                                : "bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border"
                                         }`}
                                     >
                                         {isRequest ? (
@@ -166,26 +242,50 @@ export function ChatPage() {
                                                 size={32}
                                             />
                                         ) : (
-                                            <Bot size={16} className="text-app-brand-text" />
+                                            <Bot size={15} className="text-app-brand-text" />
                                         )}
                                     </div>
 
                                     <div
-                                        className={`flex flex-col max-w-[85%] ${
+                                        className={`flex max-w-[85%] flex-col ${
                                             isRequest ? "items-end" : "items-start"
                                         }`}
                                     >
                                         <div
-                                            className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                                            className={`chat-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                                                 isRequest
-                                                    ? "bg-app-brand text-white rounded-tr-none"
-                                                    : "bg-app-surface-muted text-app-text rounded-tl-none"
+                                                    ? "chat-md-user rounded-tr-sm bg-app-brand text-white"
+                                                    : "rounded-tl-sm border border-app-border-muted bg-app-surface-muted text-app-text"
                                             }`}
                                         >
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm, remarkMath]}
                                                 rehypePlugins={[rehypeKatex]}
                                                 components={{
+                                                    a({ href, children }: { href?: string; children?: React.ReactNode }) {
+                                                        const match = href
+                                                            ? /^#cite-(\d+)$/.exec(href)
+                                                            : null;
+
+                                                        if (match) {
+                                                            const n = Number(match[1]);
+                                                            const citation = citations[n - 1];
+                                                            return (
+                                                                <sup
+                                                                    className="citation-ref"
+                                                                    title={citation ? citation.filename : `Quelle ${n}`}
+                                                                >
+                                                                    {n}
+                                                                </sup>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <a href={href} target="_blank" rel="noopener noreferrer">
+                                                                {children}
+                                                            </a>
+                                                        );
+                                                    },
                                                     table: ({ children }) => (
                                                         <div className="overflow-x-auto">
                                                             <table className={`w-full border-collapse border-2 my-3 ${isRequest ? "border-app-brand-border" : "border-app-border-muted"}`}>
@@ -225,7 +325,7 @@ export function ChatPage() {
                                                         return (
                                                             <pre
                                                                 className={`
-                                                                    p-3 
+                                                                    p-3
                                                                     my-3
                                                                     rounded-xl
                                                                     overflow-x-auto
@@ -238,23 +338,11 @@ export function ChatPage() {
                                                         );
                                                     }
                                                 }}>
-                                                {message.content}
+                                                {mdContent}
                                             </ReactMarkdown>
 
-                                            {message.citations && message.citations.length > 0 && (
-                                                <div className="mt-3 pt-3 border-t border-app-border-muted flex flex-wrap gap-1.5">
-                                                    {message.citations.map((citation, cIdx) => (
-                                                        <button
-                                                            key={cIdx}
-                                                            onClick={() =>
-                                                                setSelectedCitation(citation)
-                                                            }
-                                                            className="text-[10px] bg-app-bg-soft hover:bg-app-surface text-app-brand-text px-2 py-0.5 rounded border border-app-brand-border transition-colors"
-                                                        >
-                                                            [{cIdx + 1}] {citation.filename}
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                            {!isRequest && citations.length > 0 && (
+                                                <MessageCitations citations={citations} />
                                             )}
                                         </div>
                                     </div>
@@ -262,44 +350,62 @@ export function ChatPage() {
                             );
                         })}
 
-                        {isThinking &&  (
-                            <div className="flex w-full gap-4">
-                                <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-app-surface-muted">
-                                    <Bot size={16} className="text-app-brand-text" />
+                        {gameActive && isThinking ? (
+                            <div className="flex w-full gap-3">
+                                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border">
+                                    <Bot size={15} className="text-app-brand-text" />
                                 </div>
 
-                                <div className="flex flex-col items-start max-w-[85%]">
-                                    <div className="px-4 py-2.5 rounded-2xl rounded-tl-none bg-app-surface-muted text-app-text">
-                                        <div className="flex gap-1 items-center">
-                                            <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce" />
-                                            <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:150ms]" />
-                                            <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:300ms]" />
+                                <div className="min-w-0 flex-1">
+                                    <DinoGame onExit={() => setGameActive(false)} />
+                                    
+                                    <div className="mt-2 px-4 py-2.5 rounded-2xl bg-app-surface-muted text-app-text flex items-center gap-1 w-max border border-app-border-muted">
+                                        <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce" />
+                                        <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:150ms]" />
+                                        <span className="w-2 h-2 rounded-full bg-app-brand animate-bounce [animation-delay:300ms]" />
 
-                                            {thinkingState === "retrieve" && (
-                                                <span className="italic pl-2 animate-pulse">Searching knowledge base...</span>
-                                            )}
-
-                                            {thinkingState === "synthesis" && (
-                                                <span className="italic pl-2 animate-pulse">Synthesizing answer...</span>
-                                            )}
-
-                                            {thinkingState === "grep" && (
-                                                <span className="italic pl-2 animate-pulse">Scanning documents...</span>
-                                            )}
-                                        </div>
+                                        {thinkingState === "retrieve" && (
+                                            <span className="italic pl-2 animate-pulse text-sm">Searching knowledge base...</span>
+                                        )}
+                                        {thinkingState === "synthesis" && (
+                                            <span className="italic pl-2 animate-pulse text-sm">Synthesizing answer...</span>
+                                        )}
+                                        {thinkingState === "grep" && (
+                                            <span className="italic pl-2 animate-pulse text-sm">Scanning documents...</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        ) : (
+                            isThinking && (
+                                <div className="flex w-full gap-3">
+                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border">
+                                        <Bot size={15} className="text-app-brand-text" />
+                                    </div>
 
-                        {showBrainrot && (
-                            <iframe
-                                title="Subway Surfers Gameplay 2h"
-                                src={`https://www.youtube.com/embed/vTfD20dbxho?start=${timestamp}&autoplay=1&mute=1`}
-                                className="w-full h-100 rounded-xl"
-                                allowFullScreen
-                                allow="autoplay"
-                            />
+                                    <div className="flex flex-col items-start max-w-[85%]">
+                                        <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted text-app-text">
+                                            <div className="flex gap-1 items-center">
+                                                <span className="size-2 animate-bounce rounded-full bg-app-brand" />
+                                                <span className="size-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
+                                                <span className="size-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+
+                                                {thinkingState === "retrieve" && (
+                                                    <span className="italic pl-2 animate-pulse text-sm">Searching knowledge base...</span>
+                                                )}
+
+                                                {thinkingState === "synthesis" && (
+                                                    <span className="italic pl-2 animate-pulse text-sm">Synthesizing answer...</span>
+                                                )}
+
+                                                {thinkingState === "grep" && (
+                                                    <span className="italic pl-2 animate-pulse text-sm">Scanning documents...</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
                         )}
 
                         <div ref={bottomRef} />
@@ -341,7 +447,7 @@ export function ChatPage() {
                     </div>
                 )}
 
-                <footer className="p-4 bg-app-bg border-t border-app-border">
+                <footer className="shrink-0 border-t border-app-border bg-app-bg px-4 py-4">
                     {showFilters && (
                         <div className="max-w-4xl mx-auto w-full px-4 mb-3">
                             <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-app-border bg-app-surface-muted/70 backdrop-blur px-4 py-3">
@@ -444,22 +550,24 @@ export function ChatPage() {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-3 items-end">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="mx-auto flex max-w-5xl items-end gap-2 rounded-2xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
+                    >
                         <button
                             type="button"
                             aria-label="Toggle source filters"
                             aria-expanded={showFilters}
                             onClick={() => setShowFilters((v) => !v)}
-                            className="p-2.5 rounded-xl border border-app-border bg-app-surface-muted hover:bg-app-surface transition-colors h-11 w-11 flex items-center justify-center"
+                            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-surface border border-app-border-muted text-app-text-muted hover:bg-app-surface-hover hover:text-app-text transition-colors"
                         >
-                            <Filter size={20} />
+                            <Filter size={18} />
                         </button>
-
                         <textarea
                             ref={textareaRef}
                             aria-label="Message"
                             placeholder="Ask anything about the project..."
-                            className="flex-1 px-4 py-2.5 rounded-xl text-app-text text-sm bg-app-surface-muted border border-app-border-muted placeholder:text-app-text-disabled outline-none focus:ring-2 focus:ring-app-focus/50 transition-all max-h-44 min-h-11 overflow-y-auto resize-none"
+                            className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
                             value={newRequest}
                             rows={1}
                             onChange={(e) => {
@@ -480,11 +588,15 @@ export function ChatPage() {
                             type="submit"
                             aria-label="Send message"
                             disabled={isThinking || isStreaming || !newRequest.trim()}
-                            className="p-2.5 bg-app-brand text-white rounded-xl hover:bg-app-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors h-11 w-11 flex justify-center items-center"
+                            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                            <Send size={20} />
+                            <Send size={18} />
                         </button>
                     </form>
+
+                    <p className="mx-auto mt-2 max-w-5xl px-1 text-center text-[11px] text-app-text-disabled">
+                        Enter zum Senden · Shift + Enter für eine neue Zeile
+                    </p>
                 </footer>
             </div>
         </div>

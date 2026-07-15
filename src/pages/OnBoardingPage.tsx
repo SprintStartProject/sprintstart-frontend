@@ -30,6 +30,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
+import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckModal";
 import { OnboardingCompleteCelebration } from "../features/onboarding/components/OnboardingCompleteCelebration";
 //import type {UserProfile} from "../services/types.ts";
@@ -101,6 +102,10 @@ export function OnBoardingPage() {
   // Current AI generation stage, shown while loadingState === "generating"
   const [generationStage, setGenerationStage] = useState<{ name: string; detail?: string } | null>(null);
 
+  // Dino easter egg: pressing Space while the path is being generated starts a
+  // tiny endless runner. It unmounts by itself once generation finishes.
+  const [gameActive, setGameActive] = useState(false);
+
   // Phase whose knowledge check is currently open in the modal (null = closed)
   const [checkPhase, setCheckPhase] = useState<OnboardingPhaseEndpoint | null>(null);
 
@@ -139,6 +144,7 @@ export function OnBoardingPage() {
   const generatePath = async () => {
     setLoadingState("generating");
     setGenerationStage(null);
+    setGameActive(false);
     await onboardingService.personalizePath({
       onStage: (name, detail) => setGenerationStage({ name, detail }),
       onPath: (path) => setOnBoardingPath(path),
@@ -149,6 +155,30 @@ export function OnBoardingPage() {
       },
     });
   };
+
+  // Easter egg trigger: Space starts the game while the path is generating.
+  useEffect(() => {
+    if (loadingState !== "generating" || gameActive) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+
+      // Don't hijack space while the user is typing somewhere.
+      const active = document.activeElement;
+      const typing =
+        active instanceof HTMLElement &&
+        (active.tagName === "TEXTAREA" ||
+          active.tagName === "INPUT" ||
+          active.isContentEditable);
+      if (typing) return;
+
+      e.preventDefault();
+      setGameActive(true);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [loadingState, gameActive]);
 
   // ── DATA FETCHING using useEffect ─────────────────────────────
 
@@ -280,7 +310,7 @@ export function OnBoardingPage() {
   if (loadingState === "generating") {
     return (
       <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
-        <div className="max-w-md text-center">
+        <div className={gameActive ? "w-full max-w-2xl text-center" : "max-w-md text-center"}>
           <Sparkles className="w-10 h-10 text-app-brand mx-auto mb-4 animate-pulse" />
           <h2 className="text-xl font-semibold text-app-text mb-2">
             Generating your personalized onboarding path...
@@ -291,7 +321,14 @@ export function OnBoardingPage() {
           {generationStage?.detail && (
             <p className="text-xs text-app-text-subtle mb-6">{generationStage.detail}</p>
           )}
-          <Loader2 className="w-6 h-6 animate-spin text-app-brand mx-auto mt-4" />
+
+          {gameActive ? (
+            <div className="mt-6">
+              <DinoGame onExit={() => setGameActive(false)} />
+            </div>
+          ) : (
+            <Loader2 className="w-6 h-6 animate-spin text-app-brand mx-auto mt-4" />
+          )}
         </div>
       </div>
     );
