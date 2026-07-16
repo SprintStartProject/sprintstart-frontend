@@ -14,6 +14,7 @@ import { DinoGame } from "../features/chatbot/components/DinoGame.tsx";
 import { linkifyCitations } from "../features/chatbot/markdown/linkifyCitations.ts";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { SOURCE_SYSTEMS } from "../features/chatbot/types.ts";
+import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 
 import "katex/dist/katex.min.css";
 
@@ -95,6 +96,14 @@ export function ChatPage() {
         clearFilters,
         scrollContainerRef
     } = useChat();
+
+    const projectId = profile?.projectIds?.[0] ?? null;
+    const [viewingCitationArtifact, setViewingCitationArtifact] = useState<{
+        artifactId: string;
+        filename: string;
+        sourceUrl?: string;
+        lines: number[];
+    } | null>(null);
 
     // Dino easter egg: while the assistant is thinking, pressing Space drops the
     // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
@@ -445,7 +454,7 @@ export function ChatPage() {
                                             )}
 
                                             {!isRequest && citations.length > 0 && (
-                                                <MessageCitations citations={citations} />
+                                                <MessageCitations citations={citations} onOpenArtifact={setViewingCitationArtifact} />
                                             )}
                                         </div>
 
@@ -774,6 +783,29 @@ export function ChatPage() {
                     <ChatSidebar chats={chats} setSidebarOpen={() => {}} />
                 </div>
             </aside>
+
+            {viewingCitationArtifact && projectId && (
+                <ArtifactViewerDrawer
+                    artifact={{
+                        id: viewingCitationArtifact.artifactId,
+                        title: viewingCitationArtifact.filename,
+                        artifactType: "FILE",
+                        sourceSystem: "GITHUB",
+                        sourceId: "",
+                        sourceUrl: viewingCitationArtifact.sourceUrl || null,
+                        mime: "text/plain",
+                        language: null,
+                        ingestedAt: new Date().toISOString(),
+                        createdAtSource: null,
+                        updatedAtSource: null,
+                        contentHash: null,
+                        ingestionRunId: null
+                    }}
+                    onClose={() => setViewingCitationArtifact(null)}
+                    projectId={projectId}
+                    highlightLines={viewingCitationArtifact.lines}
+                />
+            )}
         </div>
     );
 }

@@ -4,6 +4,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import 'github-markdown-css/github-markdown.css';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from '../types';
 import { knowledgeService } from '../../../services/knowledgeService';
 import { ApiError } from '../../../services/apiClient';
@@ -18,6 +21,8 @@ interface ArtifactViewerDrawerProps {
     onClose: () => void;
     /** Project scope required to fetch the artifact content and summary. */
     projectId: string;
+    /** Optional line numbers to highlight and scroll into view. */
+    highlightLines?: number[];
 }
 
 type ViewMode = 'raw' | 'summary';
@@ -105,8 +110,35 @@ const shouldRenderAsMarkdown = (content: ArtifactContent, artifact: Artifact | n
  * without reading massive files or issues. The summary is streamed over Server-Sent Events and
  * rendered incrementally as tokens arrive; citation metadata is rendered as a source list.
  */
-export function ArtifactViewerDrawer({ artifact, onClose, projectId }: ArtifactViewerDrawerProps) {
+export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLines }: ArtifactViewerDrawerProps) {
     const [state, dispatch] = useReducer(drawerReducer, initialState);
+
+    const getLanguage = (filename?: string | null) => {
+        if (!filename) return 'typescript';
+        const ext = filename.split('.').pop()?.toLowerCase();
+        if (filename.toLowerCase() === 'dockerfile') return 'docker';
+        switch (ext) {
+            case 'js':
+            case 'jsx': return 'javascript';
+            case 'ts':
+            case 'tsx': return 'typescript';
+            case 'py': return 'python';
+            case 'kt':
+            case 'kts': return 'kotlin';
+            case 'java': return 'java';
+            case 'md': return 'markdown';
+            case 'json': return 'json';
+            case 'yml':
+            case 'yaml': return 'yaml';
+            case 'sh': return 'bash';
+            case 'html': return 'markup';
+            case 'css': return 'css';
+            case 'sql': return 'sql';
+            case 'xml': return 'xml';
+            case 'csv': return 'csv';
+            default: return 'typescript';
+        }
+    };
 
     const abortRef = useRef<AbortController | null>(null);
 
@@ -143,6 +175,20 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId }: ArtifactV
             }
         };
     }, [state.content]);
+
+    useEffect(() => {
+        if (highlightLines && highlightLines.length > 0 && state.viewMode === 'raw' && !state.isLoading && state.content) {
+            const timer = setTimeout(() => {
+                // Scroll to the first highlighted line
+                const firstLine = Math.min(...highlightLines);
+                const lineEl = document.getElementById(`line-${firstLine}`);
+                if (lineEl) {
+                    lineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [highlightLines, state.viewMode, state.isLoading, state.content]);
 
     /**
      * Triggers the AI summarization stream for the currently loaded artifact.
@@ -250,11 +296,38 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId }: ArtifactV
                             <div className="h-4 bg-app-border rounded w-2/3"></div>
                         </div>
                     ) : (
-                        content && shouldRenderAsMarkdown(content, artifact) ? (
-                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                        content && shouldRenderAsMarkdown(content, artifact) && (!highlightLines || highlightLines.length === 0) ? (
+                            <div className="markdown-body !bg-transparent text-app-text">
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm, remarkMath]}
                                     rehypePlugins={[rehypeKatex]}
+                                    components={{
+                                        code({ className, children }: { className?: string; children?: React.ReactNode }) {
+                                            const match = /language-(\w+)/.exec(className || '');
+                                            if (!match) {
+                                                return (
+                                                    <code className={className}>
+                                                        {children}
+                                                    </code>
+                                                );
+                                            }
+                                            return (
+                                                <div className="my-4 rounded-lg overflow-hidden border border-app-border text-sm">
+                                                    <SyntaxHighlighter
+                                                        language={match[1]}
+                                                        style={vscDarkPlus}
+                                                        showLineNumbers={false}
+                                                        wrapLines={true}
+                                                        customStyle={{ margin: 0, padding: '1rem', backgroundColor: 'var(--color-app-bg)' }}
+                                                    >
+                                                        {/* eslint-disable-next-line @typescript-eslint/no-base-to-string */}
+                                                        {String(children).replace(/\n$/, '')}
+                                                    </SyntaxHighlighter>
+                                                </div>
+                                            );
+                                        },
+                                        pre: ({ children }) => <>{children}</>
+                                    }}
                                 >
                                     {content.content}
                                 </ReactMarkdown>
@@ -270,9 +343,22 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId }: ArtifactV
                                 <img src={content.content} alt={artifact?.title || 'Image'} className="max-w-full rounded shadow-sm" />
                             </div>
                         ) : (
-                            <pre className="font-mono text-sm text-app-text bg-app-bg p-4 rounded-lg overflow-x-auto whitespace-pre-wrap border border-app-border">
-                                {content?.content}
-                            </pre>
+                            <div className="rounded-lg overflow-hidden border border-app-border text-sm">
+                                <SyntaxHighlighter
+                                    language={getLanguage(artifact?.title)}
+                                    style={vscDarkPlus}
+                                    showLineNumbers={true}
+                                    wrapLines={true}
+                                    customStyle={{ margin: 0, padding: '1rem', backgroundColor: 'var(--color-app-bg)' }}
+                                    lineProps={(lineNumber) => ({
+                                        style: { display: 'block', padding: '0 4px' },
+                                        className: highlightLines?.includes(lineNumber) ? 'bg-app-brand/30 border-l-2 border-app-brand' : '',
+                                        id: `line-${lineNumber}`
+                                    })}
+                                >
+                                    {content?.content || ''}
+                                </SyntaxHighlighter>
+                            </div>
                         )
                     )}
                 </div>

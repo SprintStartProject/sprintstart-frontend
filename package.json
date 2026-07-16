@@ -23,6 +23,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "boring-avatars": "^2.0.4",
     "framer-motion": "^12.40.0",
+    "github-markdown-css": "^5.9.0",
     "katex": "^0.17.0",
     "keycloak-js": "^26.2.4",
     "keycloakify": "^11.15.10",

@@ -4,13 +4,17 @@ import type { Citation } from "../types";
 
 type MessageCitationsProps = {
     citations: Citation[];
+    onOpenArtifact?: (data: { artifactId: string; filename: string; sourceUrl?: string; lines: number[] }) => void;
 };
 
 type CitationGroup = {
     filename: string;
+    artifactId: string;
     count: number;
     sourceUrl?: string;
+    firstLine?: number;
     locations: string[];
+    rawLines: number[];
 };
 
 /**
@@ -53,17 +57,19 @@ function formatRanges(prefix: string, numbers: number[]): string[] {
  * can be selected to list the individual locations (lines/pages) it cites, and
  * files that carry a sourceUrl link out to the original artifact.
  */
-export function MessageCitations({ citations }: MessageCitationsProps) {
+export function MessageCitations({ citations, onOpenArtifact }: MessageCitationsProps) {
     const [open, setOpen] = useState(false);
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     const groups = useMemo<CitationGroup[]>(() => {
         const map = new Map<string, {
             filename: string;
+            artifactId: string;
             count: number;
             sourceUrl?: string;
             lines: Set<number>;
             pages: Set<number>;
+            firstLine?: number;
         }>();
 
         for (const citation of citations) {
@@ -72,26 +78,34 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
             if (existing) {
                 existing.count += 1;
                 existing.sourceUrl ??= citation.sourceUrl;
-                if (citation.startLine !== undefined) existing.lines.add(citation.startLine);
-                if (citation.startPage !== undefined) existing.pages.add(citation.startPage);
+                if (existing.firstLine === undefined && citation.startLine !== undefined && citation.startLine !== null) {
+                    existing.firstLine = citation.startLine;
+                }
+                if (citation.startLine !== undefined && citation.startLine !== null) existing.lines.add(citation.startLine);
+                if (citation.startPage !== undefined && citation.startPage !== null) existing.pages.add(citation.startPage);
             } else {
                 const group = {
                     filename: citation.filename,
+                    artifactId: citation.artifactId,
                     count: 1,
                     sourceUrl: citation.sourceUrl,
                     lines: new Set<number>(),
-                    pages: new Set<number>()
+                    pages: new Set<number>(),
+                    firstLine: citation.startLine
                 };
-                if (citation.startLine !== undefined) group.lines.add(citation.startLine);
-                if (citation.startPage !== undefined) group.pages.add(citation.startPage);
+                if (citation.startLine !== undefined && citation.startLine !== null) group.lines.add(citation.startLine);
+                if (citation.startPage !== undefined && citation.startPage !== null) group.pages.add(citation.startPage);
                 map.set(citation.filename, group);
             }
         }
 
         return [...map.values()].map(group => ({
             filename: group.filename,
+            artifactId: group.artifactId,
             count: group.count,
             sourceUrl: group.sourceUrl,
+            firstLine: group.firstLine,
+            rawLines: Array.from(group.lines),
             locations: [
                 ...formatRanges("Line", Array.from(group.lines)),
                 ...formatRanges("Page", Array.from(group.pages))
@@ -123,7 +137,7 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                 <div className="mt-1.5 flex flex-wrap gap-1">
                     {groups.map((group) => {
                         const isActive = group.filename === activeFile;
-                        const canExpand = group.locations.length > 0;
+                        const canExpand = group.locations.length > 0 || !!onOpenArtifact;
 
                         return (
                             <div key={group.filename} className="relative">
@@ -149,7 +163,21 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
 
                                 {isActive && (
                                     <div className="absolute left-0 top-full z-10 mt-1 w-max min-w-[150px] max-w-[300px] rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5 shadow-md">
-                                        {group.sourceUrl && (
+                                        {onOpenArtifact ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenArtifact({
+                                                    artifactId: group.artifactId,
+                                                    filename: group.filename,
+                                                    sourceUrl: group.sourceUrl,
+                                                    lines: group.rawLines
+                                                })}
+                                                className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline cursor-pointer"
+                                            >
+                                                Open source
+                                                <ExternalLink size={10} />
+                                            </button>
+                                        ) : group.sourceUrl ? (
                                             <a
                                                 href={group.sourceUrl}
                                                 target="_blank"
@@ -159,7 +187,7 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                                                 Open source
                                                 <ExternalLink size={10} />
                                             </a>
-                                        )}
+                                        ) : null}
                                         <div className="flex max-h-48 flex-wrap gap-x-2 gap-y-0.5 overflow-y-auto">
                                             {group.locations.map((location, idx) => (
                                                 <span
@@ -180,3 +208,4 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
         </div>
     );
 }
+
