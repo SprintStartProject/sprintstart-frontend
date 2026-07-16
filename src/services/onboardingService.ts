@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { parseSSEStream } from './sse';
 import keycloak from '../config/keycloak';
 import type {
     OnboardingPathEndpoint,
@@ -53,43 +54,27 @@ export const onboardingService = {
             return;
         }
 
-        const reader = res.body?.getReader();
-        if (!reader) {
+        const stream = res.body;
+        if (!stream) {
             throw new Error('No response stream');
         }
 
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() ?? '';
-
-            for (const line of lines) {
-                if (!line.startsWith('data:')) continue;
-
-                const event = JSON.parse(line.replace('data:', '').trim()) as OnboardingPersonalizeEvent;
-
-                switch (event.type) {
-                    case 'stage':
-                        handlers.onStage?.(event.name ?? '', event.detail);
-                        break;
-                    case 'path':
-                        if (event.path) {
-                            handlers.onPath(event.path);
-                        }
-                        break;
-                    case 'done':
-                        handlers.onDone();
-                        return;
-                    case 'error':
-                        handlers.onError?.(event.message ?? 'Unknown error');
-                        return;
-                }
+        for await (const event of parseSSEStream<OnboardingPersonalizeEvent>(stream)) {
+            switch (event.type) {
+                case 'stage':
+                    handlers.onStage?.(event.name ?? '', event.detail);
+                    break;
+                case 'path':
+                    if (event.path) {
+                        handlers.onPath(event.path);
+                    }
+                    break;
+                case 'done':
+                    handlers.onDone();
+                    return;
+                case 'error':
+                    handlers.onError?.(event.message ?? 'Unknown error');
+                    return;
             }
         }
 

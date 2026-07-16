@@ -1,4 +1,4 @@
-import { Bot, Check, ExternalLink, Filter, MessageSquareText, Plus, Send, Sparkles, X } from "lucide-react";
+import { AlertCircle, Bot, Check, ExternalLink, Filter, MessageSquareText, Plus, Send, Sparkles, Square, X } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAuth } from "../context/useAuth";
@@ -68,6 +68,7 @@ export function ChatPage() {
         chatId,
         chats,
         handleSubmit,
+        stopStreaming,
         isThinking,
         isStreaming,
         thinkingState,
@@ -314,6 +315,27 @@ export function ChatPage() {
                                             isRequest ? "max-w-[70%] items-end" : "max-w-[85%] items-start"
                                         }`}
                                     >
+                                        {!isRequest && (
+                                            <details open={!!message.reasoning} className="mb-2 w-full rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted/50 text-sm shadow-sm">
+                                                <summary className="cursor-pointer select-none px-4 py-2 text-app-text-muted hover:text-app-text transition-colors font-medium flex items-center gap-2">
+                                                    <Bot size={14} />
+                                                    Thought Process
+                                                </summary>
+                                                <div className="px-4 pb-3 text-app-text-muted chat-md opacity-80">
+                                                    {message.reasoning ? (
+                                                        <ReactMarkdown
+                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                            rehypePlugins={[rehypeKatex]}
+                                                        >
+                                                            {message.reasoning}
+                                                        </ReactMarkdown>
+                                                    ) : (
+                                                        <span className="italic text-sm">No thoughts.</span>
+                                                    )}
+                                                </div>
+                                            </details>
+                                        )}
+
                                         <div
                                             className={`chat-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                                                 isRequest
@@ -426,6 +448,13 @@ export function ChatPage() {
                                                 <MessageCitations citations={citations} />
                                             )}
                                         </div>
+
+                                        {!isRequest && message.error && (
+                                            <div className="flex items-center gap-2 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm text-app-danger-text">
+                                                <AlertCircle size={14} className="shrink-0" />
+                                                <span>{message.error}</span>
+                                            </div>
+                                        )}
 
                                         {!isRequest && !showStreamingCaret && message.content !== "" && (
                                             <CopyButton text={message.content} />
@@ -695,14 +724,25 @@ export function ChatPage() {
                             }}
                         />
 
-                        <button
-                            type="submit"
-                            aria-label="Send message"
-                            disabled={isThinking || isStreaming || !newRequest.trim()}
-                            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <Send size={18} />
-                        </button>
+                        {isThinking || isStreaming ? (
+                            <button
+                                type="button"
+                                aria-label="Stop generation"
+                                onClick={stopStreaming}
+                                className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
+                            >
+                                <Square size={16} className="fill-current" />
+                            </button>
+                        ) : (
+                            <button
+                                type="submit"
+                                aria-label="Send message"
+                                disabled={!newRequest.trim()}
+                                className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <Send size={18} />
+                            </button>
+                        )}
                     </form>
 
                     <p className="mt-2 text-center text-[11px] text-app-text-disabled">

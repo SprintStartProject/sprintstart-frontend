@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import {
     createChat,
@@ -43,6 +43,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const [to, setTo] = useState("");
 
     const [sourceSystems, setSourceSystems] = useState<SourceSystem[]>([]);
+
+    // AbortController for the in-flight chat stream. Set when a message is
+    // sent, cleared on done/error/abort. `stopStreaming` calls `abort()` so
+    // the `fetch` reader throws an `AbortError` that `chatService` converts
+    // to a clean `onDone` — partial content stays visible.
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    // Guards against redundant per-token state updates (#6). Set to true on
+    // the first token, reset on done/error/abort. Without this, every single
+    // token re-sets `isStreaming`/`isThinking`/`streamingMessageId` even
+    // though they only need to change once at the start of the stream.
+    const streamingStartedRef = useRef(false);
 
     const activeFilterCount = useMemo(() => {
         return sourceSystems.length + (from ? 1 : 0) + (to ? 1 : 0);
@@ -153,6 +165,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }));
 
         setIsThinking(true);
+        streamingStartedRef.current = false;
+
+        // Create a fresh AbortController for this stream so `stopStreaming`
+        // can abort it mid-flight.
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
 
         // Navigate after messages are in state. Don't await — navigate
         // returns void and awaiting would yield to React's state queue,
@@ -168,10 +186,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                     setThinkingState(tool);
                 },
 
-                onToken: token => {
-                    setIsStreaming(true);
+                onReasoning: text => {
                     setIsThinking(false);
-                    setStreamingMessageId(assistantId);
+
+                    setMessagesByChat(prev => ({
+                        ...prev,
+                        [currentChatId]: (prev[currentChatId] ?? []).map(m =>
+                            m.id === assistantId
+                                ? { ...m, reasoning: (m.reasoning ?? "") + text }
+                                : m
+                        )
+                    }));
+                },
+
+                onToken: token => {
+                    // #6: only set streaming flags once, on the first token.
+                    if (!streamingStartedRef.current) {
+                        streamingStartedRef.current = true;
+                        setIsStreaming(true);
+                        setIsThinking(false);
+                        setStreamingMessageId(assistantId);
+                    }
 
                     setMessagesByChat(prev => ({
                         ...prev,
@@ -198,6 +233,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 },
 
                 onDone: () => {
+                    streamingStartedRef.current = false;
+                    abortControllerRef.current = null;
                     setIsStreaming(false);
                     setStreamingMessageId(null);
 
@@ -215,18 +252,44 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
                 onError: err => {
                     console.error(err);
+                    streamingStartedRef.current = false;
+                    abortControllerRef.current = null;
                     setIsStreaming(false);
                     setIsThinking(false);
                     setStreamingMessageId(null);
+
+                    // #3: surface the error on the assistant message so the
+                    // user sees what went wrong, not just a silent stop.
+                    setMessagesByChat(prev => ({
+                        ...prev,
+                        [currentChatId]: (prev[currentChatId] ?? []).map(m =>
+                            m.id === assistantId
+                                ? { ...m, error: err, isStreaming: false }
+                                : m
+                        )
+                    }));
                 }
-            });
+            }, abortController.signal);
         } catch (e) {
             console.error(e);
+            streamingStartedRef.current = false;
+            abortControllerRef.current = null;
             setIsStreaming(false);
             setIsThinking(false);
             setStreamingMessageId(null);
         }
     }, [chats, refreshChats, userId, sourceSystems, from, to]);
+
+    /**
+     * Aborts the in-flight chat stream (if any). The partial content already
+     * streamed stays visible — `chatService` converts the `AbortError` into a
+     * clean `onDone` call, so state resets exactly as if the stream had ended
+     * naturally.
+     */
+    const stopStreaming = useCallback(() => {
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
+    }, []);
 
     const value: ChatContextValue = {
         chats,
@@ -252,6 +315,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clearFilters,
         loadMessages,
         sendMessage,
+        stopStreaming,
         refreshChats,
     };
 

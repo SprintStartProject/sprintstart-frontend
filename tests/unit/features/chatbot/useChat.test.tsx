@@ -194,4 +194,137 @@ describe('useChat', () => {
         expect(result.current.streamingMessageId).toBeNull();
         expect(result.current.isStreaming).toBe(false);
     });
+
+    it('surfaces stream errors on the assistant message', async () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode('data: {"type":"token","content":"partial"}\n\n'));
+                controller.enqueue(encoder.encode('data: {"type":"error","message":"LLM overload"}\n\n'));
+                controller.close();
+            },
+        });
+
+        server.use(
+            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/chat1', () => HttpResponse.json({ messages: [] })),
+            http.get('/api/v1/users/me', () =>
+                HttpResponse.json({
+                    id: 'user1',
+                    authId: 'auth-1',
+                    username: 'testuser',
+                    email: 'test@example.com',
+                    firstName: 'Test',
+                    lastName: 'User',
+                    projectRoles: [],
+                    permissionGroup: 'USER',
+                    enabled: true,
+                    profileIcon: null,
+                    hasCompletedOnboarding: true,
+                }),
+            ),
+            http.post('/api/v1/chats/prompt', () =>
+                new HttpResponse(stream, {
+                    headers: { 'Content-Type': 'text/event-stream' },
+                }),
+            ),
+            http.post('/api/v1/chats', () =>
+                HttpResponse.json({
+                    id: 'newChatId',
+                }),
+            ),
+        );
+
+        const { result } = renderHook(() => useChat(), { wrapper });
+
+        await waitFor(() => {
+            expect(result.current.chats).toEqual([]);
+        });
+
+        await act(async () => {
+            await result.current.addMessage('My prompt');
+        });
+
+        await waitFor(() => {
+            expect(result.current.messages.length).toBe(2);
+        });
+
+        const aiMsg = result.current.messages[1];
+        expect(aiMsg.role).toBe('ASSISTANT');
+        expect(aiMsg.content).toBe('partial');
+        expect(aiMsg.error).toBe('LLM overload');
+        expect(result.current.isStreaming).toBe(false);
+        expect(result.current.streamingMessageId).toBeNull();
+    });
+
+    it('exposes stopStreaming function that can abort a stream', async () => {
+        const encoder = new TextEncoder();
+        // Simulate an abort: the stream enqueues one token, then the next
+        // read() throws an AbortError. MSW doesn't propagate abort to mock
+        // streams, so we simulate the error directly — the behavior is the
+        // same as a real abort: chatService catches AbortError → onDone.
+        const abortError = new Error('aborted');
+        abortError.name = 'AbortError';
+
+        const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(encoder.encode('data: {"type":"token","content":"partial"}\n\n'));
+                // Error the stream after the first chunk is consumed,
+                // simulating what happens when the AbortSignal fires.
+                setTimeout(() => controller.error(abortError), 10);
+            },
+        });
+
+        server.use(
+            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/chat1', () => HttpResponse.json({ messages: [] })),
+            http.get('/api/v1/users/me', () =>
+                HttpResponse.json({
+                    id: 'user1',
+                    authId: 'auth-1',
+                    username: 'testuser',
+                    email: 'test@example.com',
+                    firstName: 'Test',
+                    lastName: 'User',
+                    projectRoles: [],
+                    permissionGroup: 'USER',
+                    enabled: true,
+                    profileIcon: null,
+                    hasCompletedOnboarding: true,
+                }),
+            ),
+            http.post('/api/v1/chats/prompt', () =>
+                new HttpResponse(stream, {
+                    headers: { 'Content-Type': 'text/event-stream' },
+                }),
+            ),
+            http.post('/api/v1/chats', () =>
+                HttpResponse.json({
+                    id: 'newChatId',
+                }),
+            ),
+        );
+
+        const { result } = renderHook(() => useChat(), { wrapper });
+
+        await waitFor(() => {
+            expect(result.current.chats).toEqual([]);
+        });
+
+        expect(typeof result.current.stopStreaming).toBe('function');
+
+        await act(async () => {
+            await result.current.addMessage('My prompt');
+        });
+
+        await waitFor(() => {
+            expect(result.current.isStreaming).toBe(false);
+        });
+
+        // Partial content stays visible
+        const aiMsg = result.current.messages[1];
+        expect(aiMsg).toBeTruthy();
+        expect(aiMsg.content).toBe('partial');
+        expect(aiMsg.error).toBeUndefined();
+    });
 });

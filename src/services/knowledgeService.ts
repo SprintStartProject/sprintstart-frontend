@@ -1,4 +1,5 @@
 import { apiClient, ApiError } from './apiClient';
+import { parseSSEStream } from './sse';
 import { userService } from './userService';
 import keycloak from '../config/keycloak';
 import type { Artifact, ArtifactContent, SummaryStreamHandlers } from '../features/knowledge-base/types';
@@ -205,64 +206,44 @@ export const knowledgeService = {
             throw new ApiError(response.status, errorBody || response.statusText);
         }
 
-        const reader = response.body?.getReader();
-        if (!reader) {
+        const stream = response.body;
+        if (!stream) {
             throw new Error('No response stream');
         }
 
-        const decoder = new TextDecoder();
-        let buffer = '';
-
         try {
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-
-                const lines = buffer.split('\n');
-                buffer = lines.pop() ?? '';
-
-                for (const line of lines) {
-                    if (!line.startsWith('data:')) continue;
-
-                    const payload = line.replace('data:', '').trim();
-                    if (!payload) continue;
-
-                    const event = JSON.parse(payload) as SummaryStreamEvent;
-
-                    switch (event.type) {
-                        case 'stage':
-                            if (event.name && event.detail) {
-                                handlers.onStage?.(event.name, event.detail);
-                            }
-                            break;
-
-                        case 'token':
-                            if (event.content !== undefined) {
-                                handlers.onToken(event.content);
-                            }
-                            break;
-
-                        case 'citation':
-                            if (event.artifactId && event.filename) {
-                                handlers.onCitation({
-                                    artifactId: event.artifactId,
-                                    filename: event.filename,
-                                    sourceUrl: event.sourceUrl ?? null,
-                                });
-                            }
-                            break;
-
-                        case 'done':
-                            handlers.onDone();
-                            return;
-
-                        case 'error': {
-                            const message = event.message ?? 'Unknown error';
-                            handlers.onError?.(message);
-                            throw new Error(message);
+            for await (const event of parseSSEStream<SummaryStreamEvent>(stream)) {
+                switch (event.type) {
+                    case 'stage':
+                        if (event.name && event.detail) {
+                            handlers.onStage?.(event.name, event.detail);
                         }
+                        break;
+
+                    case 'token':
+                        if (event.content !== undefined) {
+                            handlers.onToken(event.content);
+                        }
+                        break;
+
+                    case 'citation':
+                        if (event.artifactId && event.filename) {
+                            handlers.onCitation({
+                                artifactId: event.artifactId,
+                                filename: event.filename,
+                                sourceUrl: event.sourceUrl ?? null,
+                            });
+                        }
+                        break;
+
+                    case 'done':
+                        handlers.onDone();
+                        return;
+
+                    case 'error': {
+                        const message = event.message ?? 'Unknown error';
+                        handlers.onError?.(message);
+                        throw new Error(message);
                     }
                 }
             }

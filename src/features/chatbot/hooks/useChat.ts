@@ -52,6 +52,7 @@ export function useChat() {
         activeFilterCount,
         clearFilters,
         sendMessage,
+        stopStreaming,
     } = ctx;
 
     /**
@@ -148,6 +149,7 @@ export function useChat() {
 
         handleSubmit,
         addMessage,
+        stopStreaming,
 
         newRequest,
         setNewRequest,

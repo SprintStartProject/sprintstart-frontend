@@ -1,4 +1,5 @@
 import { apiClient } from "./apiClient";
+import { parseSSEStream } from "./sse";
 import keycloak from "../config/keycloak";
 import type { Chat, ChatMessage, StreamHandlers } from "../features/chatbot/types";
 
@@ -47,7 +48,7 @@ export async function getMessages(chatId: string) {
  * Generic stream event returned by the backend when sending a prompt.
  */
 interface ChatEvent {
-    type: "tool_use" | "token" | "citation" | "done" | "error";
+    type: "tool_use" | "token" | "reasoning" | "citation" | "done" | "error";
     name?: string;
     content?: string;
     message?: string;
@@ -67,6 +68,9 @@ interface ChatEvent {
  * @param from The start of the time period specifying when the documents used for generating the answer were uploaded.
  * @param to The end of the time period specifying when the documents used for generating the answer were uploaded.
  * @param handlers Helper operations handling the output of the chat response.
+ * @param signal Optional `AbortSignal` — when aborted, the stream stops cleanly
+ *   and `handlers.onDone` is called (partial content stays visible). Pass a
+ *   signal from an `AbortController` to implement a "Stop" button.
  */
 export async function streamMessage(
     chatId: string,
@@ -74,7 +78,8 @@ export async function streamMessage(
     sourceSystems: string[],
     from: string,
     to: string,
-    handlers: StreamHandlers
+    handlers: StreamHandlers,
+    signal?: AbortSignal,
 ): Promise<void> {
     // Ensure the token is up to date (refresh if it expires in < 30s)
     try {
@@ -107,7 +112,8 @@ export async function streamMessage(
             "chatId": chatId,
             "msg": text,
             "filters": filters
-        })
+        }),
+        signal,
     });
 
     if (!res.ok) {
@@ -115,36 +121,24 @@ export async function streamMessage(
         return;
     }
 
-    const reader = res.body?.getReader();
+    const stream = res.body;
 
-    if (!reader) {
+    if (!stream) {
         throw new Error("No response stream");
     }
 
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-        const { value, done } = await reader.read();
-
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-            if (!line.startsWith("data:")) continue;
-
-            const event = JSON.parse(
-                line.replace("data:", "").trim()
-            ) as ChatEvent;
-
+    try {
+        for await (const event of parseSSEStream<ChatEvent>(stream)) {
             switch (event.type) {
                 case "tool_use":
                     if (event.name) {
                         handlers.onToolUse(event.name);
+                    }
+                    break;
+
+                case "reasoning":
+                    if (event.content !== undefined) {
+                        handlers.onReasoning(event.content);
                     }
                     break;
 
@@ -175,8 +169,15 @@ export async function streamMessage(
                     return;
             }
         }
-    }
 
-    // Fallback: Ensure onDone is called when the stream ends naturally
-    handlers.onDone();
+        // Fallback: Ensure onDone is called when the stream ends naturally
+        handlers.onDone();
+    } catch (err) {
+        // AbortError: the user clicked Stop — treat as a clean end, not an error.
+        if (err instanceof Error && err.name === "AbortError") {
+            handlers.onDone();
+            return;
+        }
+        throw err;
+    }
 }

@@ -64,6 +64,13 @@ export type ChatContextValue = {
     sendMessage: (chatId: string | undefined, text: string, navigate: NavigateFunction) => Promise<void>;
 
     /**
+     * Aborts the in-flight chat stream (if any). The partial content already
+     * streamed stays visible — this is a clean stop, not an error. Called by
+     * the "Stop" button in the chat UI.
+     */
+    stopStreaming: () => void;
+
+    /**
      * Refreshes the chat list from the backend. Called internally after a
      * stream finishes; also exposed so the hook can call it on mount.
      */
