@@ -63,6 +63,7 @@ export function ChatSidebar({ chats, setSidebarOpen }: ChatSidebarProps) {
         <div className="flex flex-col gap-4 p-4 overflow-y-auto flex-1">
             <NavLink
                 to="/chat"
+                state={{ newChat: true }}
                 className="bg-app-brand rounded-lg hover:bg-app-brand-hover flex justify-center gap-2 items-center text-sm font-semibold p-2.5 text-white transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                 onClick={() => setSidebarOpen(false)}
             >

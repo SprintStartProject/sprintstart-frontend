@@ -79,7 +79,7 @@ describe('ChatPage', () => {
     it('renders citation chips for assistant messages with citations', async () => {
         const user = userEvent.setup();
         render(<MemoryRouter><ChatPage /></MemoryRouter>);
-        const toggleBtn = screen.getByRole('button', { name: /Quellen ·/i });
+        const toggleBtn = screen.getByRole('button', { name: /Sources ·/i });
         await user.click(toggleBtn);
         expect(screen.getByText(/readme\.md/)).toBeInTheDocument();
     });

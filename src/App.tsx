@@ -1,6 +1,7 @@
 import { AppRouter } from './router/AppRouter';
 import { SideBar } from './components/layout/SideBar';
 import { AuthProvider } from './context/AuthProvider';
+import { ChatProvider } from './context/ChatProvider';
 import { ThemeProvider } from './context/ThemeProvider';
 import { useAuth } from './context/useAuth';
 
@@ -25,7 +26,9 @@ function App() {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <AppContent />
+                <ChatProvider>
+                    <AppContent />
+                </ChatProvider>
             </AuthProvider>
         </ThemeProvider>
     );

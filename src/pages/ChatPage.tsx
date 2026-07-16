@@ -24,6 +24,41 @@ const SUGGESTIONS = [
 ];
 
 /**
+ * Computes `fixed`-position style for the citation popover so it appears just
+ * below the clicked `[N]` superscript, clamped to the viewport. Flips above
+ * the citation when there's no room below.
+ */
+function getCitationPopoverStyle(rect: DOMRect): React.CSSProperties {
+    const WIDTH = 320;
+    const GAP = 8;
+    const EST_HEIGHT = 120;
+    const MARGIN = 16;
+
+    let top = rect.bottom + GAP;
+    let left = rect.left;
+
+    if (left + WIDTH > window.innerWidth - MARGIN) {
+        left = window.innerWidth - WIDTH - MARGIN;
+    }
+    if (left < MARGIN) left = MARGIN;
+
+    if (top + EST_HEIGHT > window.innerHeight - MARGIN) {
+        const aboveTop = rect.top - EST_HEIGHT - GAP;
+        if (aboveTop >= MARGIN) {
+            top = aboveTop;
+        }
+    }
+
+    return {
+        position: "fixed",
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${WIDTH}px`,
+        zIndex: 50,
+    };
+}
+
+/**
  * Displays the interface for communication with the chat.
  */
 export function ChatPage() {
@@ -299,11 +334,22 @@ export function ChatPage() {
                                                             const n = Number(match[1]);
                                                             const citation = citations[n - 1];
                                                             return (
-                                                                <sup
-                                                                    className="citation-ref"
-                                                                    title={citation ? citation.filename : `Quelle ${n}`}
-                                                                >
-                                                                    {n}
+                                                                <sup>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="citation-ref"
+                                                                        title={citation ? citation.filename : `Quelle ${n}`}
+                                                                        onClick={(e) => {
+                                                                            if (citation) {
+                                                                                setSelectedCitation({
+                                                                                    citation,
+                                                                                    rect: e.currentTarget.getBoundingClientRect(),
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        {n}
+                                                                    </button>
                                                                 </sup>
                                                             );
                                                         }
@@ -453,22 +499,13 @@ export function ChatPage() {
                 </div>
 
                 {selectedCitation && (
-                    <div className="absolute right-6 bottom-24 w-80 rounded-xl bg-app-surface border border-app-border p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4">
+                    <div
+                        style={getCitationPopoverStyle(selectedCitation.rect)}
+                        className="rounded-xl bg-app-surface border border-app-border p-4 shadow-2xl"
+                    >
                         <div className="flex justify-between items-start mb-2">
                             <h3 className="text-sm font-bold text-app-text truncate pr-4">
-                                {selectedCitation.sourceUrl ? (
-                                    <a
-                                        href={selectedCitation.sourceUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 hover:underline"
-                                    >
-                                        {selectedCitation.filename}
-                                        <ExternalLink size={12} />
-                                    </a>
-                                ) : (
-                                    selectedCitation.filename
-                                )}
+                                {selectedCitation.citation.filename}
                             </h3>
 
                             <button
@@ -480,10 +517,22 @@ export function ChatPage() {
                             </button>
                         </div>
 
-                        <div className="text-xs text-app-text-muted leading-relaxed">
-                            {selectedCitation.startLine !== undefined && `Line ${selectedCitation.startLine}`}
-                            {selectedCitation.startPage !== undefined && `Page ${selectedCitation.startPage}`}
+                        <div className="text-xs text-app-text-muted leading-relaxed mb-2">
+                            {selectedCitation.citation.startLine !== undefined && `Line ${selectedCitation.citation.startLine}`}
+                            {selectedCitation.citation.startPage !== undefined && `Page ${selectedCitation.citation.startPage}`}
                         </div>
+
+                        {selectedCitation.citation.sourceUrl && (
+                            <a
+                                href={selectedCitation.citation.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
+                            >
+                                Open source
+                                <ExternalLink size={12} />
+                            </a>
+                        )}
                     </div>
                 )}
 
@@ -657,7 +706,7 @@ export function ChatPage() {
                     </form>
 
                     <p className="mt-2 text-center text-[11px] text-app-text-disabled">
-                        Enter zum Senden · Shift + Enter für eine neue Zeile
+                        Enter to send · Shift + Enter for a new line
                     </p>
                 </footer>
             </div>

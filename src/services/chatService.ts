@@ -16,9 +16,11 @@ export async function getChats() {
  * Creates a new chat for a specific user.
  *
  * @param userId The user starting the conversation.
+ * @returns The backend returns only `{ id }` — callers must synthesize the
+ *   remaining `Chat` fields (`title`, `userId`, `createdAt`) client-side.
  */
 export async function createChat(userId: string) {
-    return await apiClient.fetch<Chat>(`/api/v1/chats`, {
+    return await apiClient.fetch<{ id: string }>(`/api/v1/chats`, {
         method: "POST",
         body: JSON.stringify({ userId }),
     });
@@ -28,9 +30,17 @@ export async function createChat(userId: string) {
  * Retrieves all messages from a specific chat.
  *
  * @param chatId The chat the messages belong to.
+ * @note The backend's `ChatMessageResponse` omits `id` — we generate stable
+ *   client-side ids here so React keys and the streaming-message tracking work.
  */
 export async function getMessages(chatId: string) {
-    return await apiClient.fetch<{ messages: ChatMessage[] }>(`/api/v1/chats/${chatId}`);
+    const response = await apiClient.fetch<{ messages: ChatMessage[] }>(`/api/v1/chats/${chatId}`);
+    return {
+        messages: response.messages.map((msg) => ({
+            ...msg,
+            id: msg.id ?? crypto.randomUUID(),
+        })),
+    };
 }
 
 /**
@@ -90,6 +100,7 @@ export async function streamMessage(
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            "Accept": "text/event-stream",
             "Authorization": `Bearer ${keycloak.token}`
         },
         body: JSON.stringify({

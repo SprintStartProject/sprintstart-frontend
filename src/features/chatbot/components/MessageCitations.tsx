@@ -27,7 +27,7 @@ function formatLocation(citation: Citation): string | null {
  * per source file. The backend streams a citation for every retrieved chunk, so
  * a single file can appear many times — grouping keeps the block compact.
  *
- * The whole block is collapsed by default (just a "Quellen · N" line) so it
+ * The whole block is collapsed by default (just a "Sources · N" line) so it
  * never dominates the message. Expanding reveals compact per-file chips; a chip
  * can be selected to list the individual locations (lines/pages) it cites, and
  * files that carry a sourceUrl link out to the original artifact.
@@ -76,7 +76,7 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
             >
                 <BookText size={12} />
                 <span className="text-[11px] font-semibold uppercase tracking-wide">
-                    Quellen · {groups.length}
+                    Sources · {groups.length}
                 </span>
                 <ChevronDown
                     size={12}
@@ -125,7 +125,7 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                                     rel="noopener noreferrer"
                                     className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
                                 >
-                                    Quelle öffnen
+                                    Open source
                                     <ExternalLink size={10} />
                                 </a>
                             )}

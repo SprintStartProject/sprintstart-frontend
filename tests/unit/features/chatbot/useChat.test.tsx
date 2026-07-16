@@ -1,6 +1,8 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useChat } from '../../../../src/features/chatbot/hooks/useChat';
+import { ChatProvider } from '../../../../src/context/ChatProvider';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../setup/vitest.setup';
 
@@ -11,6 +13,17 @@ vi.mock('react-router-dom', () => ({
     useParams: () => ({ id: 'chat1' }),
     useLocation: () => ({ pathname: '/' }),
 }));
+
+vi.mock('../../../../src/context/useAuth', () => ({
+    useAuth: () => ({
+        profile: { id: 'user1', firstName: 'Test', lastName: 'User' },
+        status: 'authenticated',
+    }),
+}));
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+    <ChatProvider>{children}</ChatProvider>
+);
 
 describe('useChat', () => {
     beforeEach(() => {
@@ -48,7 +61,7 @@ describe('useChat', () => {
             ),
         );
 
-        const { result } = renderHook(() => useChat());
+        const { result } = renderHook(() => useChat(), { wrapper });
 
         await waitFor(() => {
             expect(result.current.chats).toEqual([{ id: 'chat1', userId: 'user1' }]);
@@ -87,7 +100,7 @@ describe('useChat', () => {
             ),
         );
 
-        const { result } = renderHook(() => useChat());
+        const { result } = renderHook(() => useChat(), { wrapper });
 
         await waitFor(() => {
             expect(result.current.messages).toEqual([
@@ -149,14 +162,11 @@ describe('useChat', () => {
             http.post('/api/v1/chats', () =>
                 HttpResponse.json({
                     id: 'newChatId',
-                    userId: 'user1',
-                    title: '',
-                    createdAt: new Date().toISOString(),
                 }),
             ),
         );
 
-        const { result } = renderHook(() => useChat());
+        const { result } = renderHook(() => useChat(), { wrapper });
 
         await waitFor(() => {
             expect(result.current.chats).toEqual([]);
