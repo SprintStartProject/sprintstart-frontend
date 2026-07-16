@@ -14,12 +14,33 @@ type CitationGroup = {
 };
 
 /**
- * Renders a human-readable location for a citation, e.g. "Line 42" or "Page 7".
+ * Groups consecutive line/page numbers into readable ranges (e.g., "Line 1-5").
  */
-function formatLocation(citation: Citation): string | null {
-    if (citation.startLine !== undefined) return `Line ${citation.startLine}`;
-    if (citation.startPage !== undefined) return `Page ${citation.startPage}`;
-    return null;
+function formatRanges(prefix: string, numbers: number[]): string[] {
+    if (numbers.length === 0) return [];
+    
+    // remove duplicates and sort
+    const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+    
+    const ranges: string[] = [];
+    let start = sorted[0];
+    let prev = start;
+
+    for (let i = 1; i <= sorted.length; i++) {
+        const curr = sorted[i];
+        if (curr === prev + 1) {
+            prev = curr;
+        } else {
+            if (start === prev) {
+                ranges.push(`${prefix} ${start}`);
+            } else {
+                ranges.push(`${prefix} ${start}-${prev}`);
+            }
+            start = curr;
+            prev = curr;
+        }
+    }
+    return ranges;
 }
 
 /**
@@ -37,32 +58,46 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     const groups = useMemo<CitationGroup[]>(() => {
-        const map = new Map<string, CitationGroup>();
+        const map = new Map<string, {
+            filename: string;
+            count: number;
+            sourceUrl?: string;
+            lines: Set<number>;
+            pages: Set<number>;
+        }>();
 
         for (const citation of citations) {
             const existing = map.get(citation.filename);
-            const location = formatLocation(citation);
 
             if (existing) {
                 existing.count += 1;
                 existing.sourceUrl ??= citation.sourceUrl;
-                if (location && !existing.locations.includes(location)) {
-                    existing.locations.push(location);
-                }
+                if (citation.startLine !== undefined) existing.lines.add(citation.startLine);
+                if (citation.startPage !== undefined) existing.pages.add(citation.startPage);
             } else {
-                map.set(citation.filename, {
+                const group = {
                     filename: citation.filename,
                     count: 1,
                     sourceUrl: citation.sourceUrl,
-                    locations: location ? [location] : []
-                });
+                    lines: new Set<number>(),
+                    pages: new Set<number>()
+                };
+                if (citation.startLine !== undefined) group.lines.add(citation.startLine);
+                if (citation.startPage !== undefined) group.pages.add(citation.startPage);
+                map.set(citation.filename, group);
             }
         }
 
-        return [...map.values()];
+        return [...map.values()].map(group => ({
+            filename: group.filename,
+            count: group.count,
+            sourceUrl: group.sourceUrl,
+            locations: [
+                ...formatRanges("Line", Array.from(group.lines)),
+                ...formatRanges("Page", Array.from(group.pages))
+            ]
+        }));
     }, [citations]);
-
-    const activeGroup = groups.find((g) => g.filename === activeFile) ?? null;
 
     if (groups.length === 0) return null;
 
@@ -85,15 +120,14 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
             </button>
 
             {open && (
-                <>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                        {groups.map((group) => {
-                            const isActive = group.filename === activeFile;
-                            const canExpand = group.locations.length > 0;
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                    {groups.map((group) => {
+                        const isActive = group.filename === activeFile;
+                        const canExpand = group.locations.length > 0;
 
-                            return (
+                        return (
+                            <div key={group.filename} className="relative">
                                 <button
-                                    key={group.filename}
                                     type="button"
                                     onClick={() =>
                                         canExpand &&
@@ -107,42 +141,41 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                                 >
                                     <span className="truncate">{group.filename}</span>
                                     {group.count > 1 && (
-                                        <span className="shrink-0 tabular-nums opacity-70">
+                                        <span className="shrink-0 font-mono opacity-70">
                                             ·{group.count}
                                         </span>
                                     )}
                                 </button>
-                            );
-                        })}
-                    </div>
 
-                    {activeGroup && (
-                        <div className="mt-1.5 rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5">
-                            {activeGroup.sourceUrl && (
-                                <a
-                                    href={activeGroup.sourceUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
-                                >
-                                    Open source
-                                    <ExternalLink size={10} />
-                                </a>
-                            )}
-
-                            <ul className="flex flex-wrap gap-x-2 gap-y-0.5">
-                                {activeGroup.locations.map((location, idx) => (
-                                    <li
-                                        key={idx}
-                                        className="text-[11px] leading-relaxed text-app-text-muted"
-                                    >
-                                        {location}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </>
+                                {isActive && (
+                                    <div className="absolute left-0 top-full z-10 mt-1 w-max min-w-[150px] max-w-[300px] rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5 shadow-md">
+                                        {group.sourceUrl && (
+                                            <a
+                                                href={group.sourceUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
+                                            >
+                                                Open source
+                                                <ExternalLink size={10} />
+                                            </a>
+                                        )}
+                                        <div className="flex max-h-48 flex-wrap gap-x-2 gap-y-0.5 overflow-y-auto">
+                                            {group.locations.map((location, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="font-mono text-[11px] leading-relaxed text-app-text-muted"
+                                                >
+                                                    {location}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
