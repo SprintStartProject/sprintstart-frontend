@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-
   type ReactNode,
 } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -32,6 +31,7 @@ import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
+  createJiraSourceFromInstance,
   deriveSourceStatus,
   formatDateTime,
   getBackendSourceStatusLabel,
@@ -70,12 +70,15 @@ import {
   type ConfigureGithubRepositoryRequest,
 } from "../services/sources/githubService.ts";
 import {
+  getJiraInstances,
+  updateJiraInstance,
+  type JiraInstanceDto,
+} from "../services/sources/jiraService.ts";
+import {
   projectService,
   type ProjectSource,
 } from "../services/projectService.ts";
-import {
-  parseGithubRepositoryReference,
-} from "../services/sources/githubRepositoryInput.ts";
+import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
 const DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
   autoUpdate: true,
@@ -96,7 +99,6 @@ const DEFAULT_RUN_FILTER: RunFilterState = {
   status: "ALL",
   repositoryId: "ALL",
 };
-
 
 function toSourceSystem(value: string): SourceSystem | null {
   const normalized = value.toUpperCase();
@@ -151,7 +153,8 @@ function matchSourceInstance(
       (instance) => instance.sourceId.toLowerCase() === fullName,
     ) ??
     instances.find(
-      (instance) => `${instance.owner}/${instance.name}`.toLowerCase() === fullName,
+      (instance) =>
+        `${instance.owner}/${instance.name}`.toLowerCase() === fullName,
     ) ??
     null
   );
@@ -256,7 +259,11 @@ function buildProjectDataSources(
           status: getSourceStatusFromBackend(effectiveBackendStatus),
           backendStatus: effectiveBackendStatus,
           statusLabel: getBackendSourceStatusLabel(effectiveBackendStatus),
-          ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, runStatus),
+          ingestionStatus: getSourceStatus(
+            hasNeverSynced,
+            hasErrors,
+            runStatus,
+          ),
           ingestionStatusLabel: getIngestionStatusLabel(
             hasNeverSynced,
             hasErrors,
@@ -353,11 +360,9 @@ function hasSourceId(sources: DataSource[], sourceId: string) {
 }
 
 const STATUS_BADGE_TONE = {
-  success:
-    "border-app-success-border bg-app-success-bg text-app-success-text",
+  success: "border-app-success-border bg-app-success-bg text-app-success-text",
   brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
-  warning:
-    "border-app-warning-border bg-app-warning-bg text-app-warning-text",
+  warning: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
   neutral: "border-app-border bg-app-neutral-bg text-app-neutral-text",
 } as const;
 
@@ -392,7 +397,8 @@ export function DataIngestionPage() {
   const [runs, setRuns] = useState<IngestionRun[]>([]);
   const [runPageMeta, setRunPageMeta] = useState<PageMetadata | null>(null);
   const [runPageNumber, setRunPageNumber] = useState(1);
-  const [runFilter, setRunFilter] = useState<RunFilterState>(DEFAULT_RUN_FILTER);
+  const [runFilter, setRunFilter] =
+    useState<RunFilterState>(DEFAULT_RUN_FILTER);
   // Monotonic id of the newest run request, so out-of-order responses are dropped.
   const runRequestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
@@ -400,20 +406,24 @@ export function DataIngestionPage() {
   const [sourceInstances, setSourceInstances] = useState<
     SourceInstanceIngestionStatus[]
   >([]);
+  // Connected Jira instances for the selected project. Jira is not a
+  // ProjectSourceProvider on the backend, so its instances never appear in
+  // `projectSources`/`sourceInstances` and are loaded separately here.
+  const [jiraInstances, setJiraInstances] = useState<JiraInstanceDto[]>([]);
   const [projectDataVersion, setProjectDataVersion] = useState(0);
   const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<
     string | null
   >(null);
-  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] =
-    useState<string | null>(null);
+  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<
+    string | null
+  >(null);
   const [isProjectDataLoading, setIsProjectDataLoading] = useState(false);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
-  const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] =
-    useState(false);
+  const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] = useState(false);
   const [globalGithubSyncConfig, setGlobalGithubSyncConfig] =
     useState<ConfigureGithubRepositoryRequest>(
       DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG,
@@ -508,6 +518,7 @@ export function DataIngestionPage() {
       if (isProjectSwitch) {
         setProjectSources([]);
         setSourceInstances([]);
+        setJiraInstances([]);
       }
       setProjectSourcesErrorMessage(null);
       setSourceStatusErrorMessage(null);
@@ -521,10 +532,12 @@ export function DataIngestionPage() {
         setIsProjectDataLoading(true);
       }
 
-      const [projectResult, sourceStatusResult] = await Promise.allSettled([
-        projectService.getAccessibleProject(selectedProjectId),
-        getIngestionSourceStatuses(selectedProjectId),
-      ]);
+      const [projectResult, sourceStatusResult, jiraResult] =
+        await Promise.allSettled([
+          projectService.getAccessibleProject(selectedProjectId),
+          getIngestionSourceStatuses(selectedProjectId),
+          getJiraInstances(selectedProjectId),
+        ]);
 
       if (!isMounted) return;
 
@@ -547,6 +560,13 @@ export function DataIngestionPage() {
             : "Source status could not be loaded.",
         );
       }
+
+      // Jira instances degrade quietly: a load failure (e.g. an HR user without
+      // the PM/ADMIN role the endpoint requires) must not blank the page or
+      // surface an error banner — it just means no Jira cards.
+      setJiraInstances(
+        jiraResult.status === "fulfilled" ? jiraResult.value : [],
+      );
 
       setIsProjectDataLoading(false);
     });
@@ -629,6 +649,7 @@ export function DataIngestionPage() {
   const reloadSourceStatuses = useCallback(async () => {
     if (!selectedProjectId) {
       setSourceInstances([]);
+      setJiraInstances([]);
       return;
     }
 
@@ -639,6 +660,14 @@ export function DataIngestionPage() {
       // The combined project-data effect surfaces load errors; a failed in-place
       // refresh should leave the last-known statuses in place rather than blank
       // the cards.
+    }
+
+    // Independent of the GitHub status refresh: a Jira failure must not stop the
+    // GitHub statuses from updating, and vice versa.
+    try {
+      setJiraInstances(await getJiraInstances(selectedProjectId));
+    } catch {
+      // Keep the last-known Jira instances on a failed in-place refresh.
     }
   }, [selectedProjectId]);
 
@@ -651,7 +680,6 @@ export function DataIngestionPage() {
 
     void loadData(showLoading);
   }, [loadData]);
-
 
   useEffect(() => {
     const hasRunningRun = runs.some((run) => isRunInProgress(run.status));
@@ -691,13 +719,40 @@ export function DataIngestionPage() {
   );
 
   const sources = useMemo<DataSource[]>(() => {
-    return buildProjectDataSources(
+    const githubAndUpload = buildProjectDataSources(
       projectSources,
       sourceInstances,
       runs,
       connectorEnabledById,
     );
-  }, [connectorEnabledById, projectSources, runs, sourceInstances]);
+
+    // Jira sources come from the separate instances list, not project sources.
+    // Match each instance to its latest Jira run by URL (runs are newest-first,
+    // so the first hit per key wins) to fill run-derived counters/status.
+    const latestJiraRunByUrl = new Map<string, IngestionRun>();
+    runs.forEach((run) => {
+      if (run.sourceSystem !== "JIRA") return;
+      const key = run.sourceId?.toLowerCase();
+      if (key && !latestJiraRunByUrl.has(key)) {
+        latestJiraRunByUrl.set(key, run);
+      }
+    });
+
+    const jiraSources = jiraInstances.map((instance) =>
+      createJiraSourceFromInstance(
+        instance,
+        latestJiraRunByUrl.get(instance.instanceUrl.toLowerCase()) ?? null,
+      ),
+    );
+
+    return [...githubAndUpload, ...jiraSources];
+  }, [
+    connectorEnabledById,
+    jiraInstances,
+    projectSources,
+    runs,
+    sourceInstances,
+  ]);
 
   const totalArtifactCount = useMemo(
     () => sourceInstances.reduce((sum, s) => sum + s.artifactCount, 0),
@@ -906,11 +961,12 @@ export function DataIngestionPage() {
     loadGithubTokenNames();
   };
 
-  // Runs after the wizard connects repositories: surface a success message, kick
-  // the polling window and refresh the page's data.
+  // Runs after the wizard connects a source (GitHub repositories or a Jira
+  // instance): surface a success message, kick the polling window and refresh
+  // the page's data.
   const handleDiscoveryConnected = useCallback(() => {
     setConnectSuccessMessage(
-      `Selected repositories are connecting to ${selectedProject?.name ?? "the project"}. Initial ingestion is running in the background.`,
+      `Selected sources are connecting to ${selectedProject?.name ?? "the project"}. Initial ingestion is running in the background.`,
     );
     setPollingUntil(Date.now() + 60000);
     setActiveSection("sources");
@@ -927,30 +983,18 @@ export function DataIngestionPage() {
       void reloadSourceStatuses();
       setProjectDataVersion((version) => version + 1);
     }, 1500);
-  }, [
-    loadData,
-    reloadSourceStatuses,
-    reloadProjects,
-    selectedProject,
-  ]);
+  }, [loadData, reloadSourceStatuses, reloadProjects, selectedProject]);
 
-  const handleUpdateSource = useCallback(
-    async (source: DataSource) => {
-      if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
-        throw new Error(
-          "Repository details are not available for this source.",
-        );
-      }
-
-      await updateGithubRepository(source.githubRepository);
-
+  // Shared post-update refresh: polling window + an immediate and a delayed
+  // reload, so a just-started run appears without a manual refresh.
+  const refreshAfterUpdate = useCallback(
+    (startedMessage: string) => {
       setPollingUntil(Date.now() + 60000);
-      setConnectSuccessMessage(
-        `Update for ${source.githubRepository.fullName} started.`,
-      );
+      setConnectSuccessMessage(startedMessage);
 
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
-      setProjectDataVersion((version) => version + 1);
+      void Promise.all([loadData(false), reloadSourceStatuses()]).then(() =>
+        setProjectDataVersion((version) => version + 1),
+      );
 
       window.setTimeout(() => {
         void loadData(false);
@@ -959,6 +1003,36 @@ export function DataIngestionPage() {
       }, 1500);
     },
     [loadData, reloadSourceStatuses],
+  );
+
+  const handleUpdateSource = useCallback(
+    async (source: DataSource) => {
+      if (source.sourceSystem === "JIRA") {
+        if (!source.jiraInstance) {
+          throw new Error(
+            "Instance details are not available for this source.",
+          );
+        }
+
+        await updateJiraInstance({
+          instanceUrl: source.jiraInstance.instanceUrl,
+        });
+        refreshAfterUpdate(`Update for ${source.name} started.`);
+        return;
+      }
+
+      if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
+        throw new Error(
+          "Repository details are not available for this source.",
+        );
+      }
+
+      await updateGithubRepository(source.githubRepository);
+      refreshAfterUpdate(
+        `Update for ${source.githubRepository.fullName} started.`,
+      );
+    },
+    [refreshAfterUpdate],
   );
 
   const handleSaveGlobalGithubConfig = useCallback(
@@ -1033,9 +1107,7 @@ export function DataIngestionPage() {
         !repositoryId ||
         !selectedProjectId
       ) {
-        throw new Error(
-          "This repository cannot be removed from the project.",
-        );
+        throw new Error("This repository cannot be removed from the project.");
       }
 
       await removeRepositoryFromProject(repositoryId, selectedProjectId);
@@ -1052,7 +1124,8 @@ export function DataIngestionPage() {
   const isLoading = loadingState === "loading";
 
   const showOverview = activeSection === "overview";
-  const showSources = activeSection === "overview" || activeSection === "sources";
+  const showSources =
+    activeSection === "overview" || activeSection === "sources";
   const showRuns = activeSection === "overview" || activeSection === "runs";
 
   const shouldShowInitialLoading =
@@ -1274,7 +1347,6 @@ export function DataIngestionPage() {
                     ) : null}
                   </section>
                 ) : null}
-
               </div>
             )}
           </div>
@@ -1364,6 +1436,7 @@ export function DataIngestionPage() {
           projectId={selectedProjectId}
           projectName={selectedProject?.name}
           tokenNames={githubTokenNames}
+          jiraDefaultEmail={profile?.email ?? null}
           canIngest={Boolean(selectedProjectId) && canIngestIntoSelectedProject}
           ingestBlockedReason={
             !selectedProjectId

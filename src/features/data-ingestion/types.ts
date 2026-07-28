@@ -38,7 +38,11 @@ export type ConnectionStatus =
  * from `IngestionRunStatus`. A run can show COMPLETED (fetched and saved locally)
  * while this is still PENDING or has moved to FAILED -- that gap is why this exists.
  */
-export type AiSyncStatus = "NOT_APPLICABLE" | "PENDING" | "SUCCEEDED" | "FAILED";
+export type AiSyncStatus =
+  | "NOT_APPLICABLE"
+  | "PENDING"
+  | "SUCCEEDED"
+  | "FAILED";
 
 export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST";
 
@@ -171,6 +175,19 @@ export type GithubRepositoryDetails = GithubRepositoryReference & {
   enabled: boolean | null;
 };
 
+/**
+ * Jira-specific identity for a source card, mirroring
+ * {@link GithubRepositoryDetails} for the Jira connector. A connected Jira
+ * instance is identified by its URL (its primary key); the credential is the
+ * `(credentialUserEmail, credentialName)` pair used to authenticate.
+ */
+export type JiraInstanceSourceDetails = {
+  instanceUrl: string;
+  displayName: string;
+  credentialName: string;
+  credentialUserEmail: string;
+};
+
 export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
 
 /**
@@ -239,6 +256,8 @@ export type SourceDetailsSource = {
   sharesSourceSystem?: boolean;
   failedItems?: FailedArtifact[];
   githubRepository?: GithubRepositoryDetails | null;
+  /** Jira instance identity; null/absent for non-Jira sources. */
+  jiraInstance?: JiraInstanceSourceDetails | null;
   description?: string;
   nextSync?: string;
 };

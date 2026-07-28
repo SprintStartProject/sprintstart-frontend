@@ -20,6 +20,10 @@ import type {
   SourceStatusPresentation,
   SourceSystem,
 } from "./types.ts";
+import type {
+  JiraInstanceDto,
+  JiraInstanceStatus,
+} from "../../services/sources/jiraService.ts";
 
 export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
 
@@ -105,6 +109,102 @@ export function createSourceFromInstance(
     lastCommitsSyncAt: instance.lastCommitsSyncAt,
     lastIssuesSyncAt: instance.lastIssuesSyncAt,
     lastPullRequestsSyncAt: instance.lastPullRequestsSyncAt,
+  };
+}
+
+/**
+ * Maps a Jira instance's connection status onto the shared
+ * {@link BackendProjectSourceStatus} vocabulary so Jira sources flow through the
+ * exact same status helpers as GitHub. `sourceEnabled === false` overrides the
+ * status with `DISABLED` (handled by the caller).
+ */
+function jiraStatusToBackend(
+  status: JiraInstanceStatus,
+): BackendProjectSourceStatus {
+  switch (status) {
+    case "UP_TO_DATE":
+      return "CONNECTED";
+    case "UPDATING":
+      return "UPDATING";
+    case "OUT_OF_DATE":
+      return "OUT_OF_DATE";
+    case "FAILED":
+      return "FAILED";
+  }
+}
+
+/**
+ * Turns one connected Jira instance (`/api/v1/jira/instances`) into a
+ * {@link DataSource}, the Jira counterpart to {@link createSourceFromInstance}.
+ *
+ * The instance DTO carries no per-run counters or artifact totals, so the
+ * latest Jira ingestion run matched to this instance (by URL) is passed in to
+ * fill the run-derived fields (counts, AI-sync state, failed items); when no run
+ * is matched those stay zero/empty and only the instance's own status is shown.
+ * `githubRepository` is always null; identity lives in `jiraInstance`.
+ */
+export function createJiraSourceFromInstance(
+  instance: JiraInstanceDto,
+  latestRun?: IngestionRun | null,
+): DataSource {
+  const meta = SOURCE_META.JIRA;
+  const backendStatus: BackendProjectSourceStatus =
+    instance.sourceEnabled === false
+      ? "DISABLED"
+      : jiraStatusToBackend(instance.status);
+  const failedCount = latestRun?.failedCount ?? 0;
+  const hasErrors = failedCount > 0;
+  const hasNeverSynced = !instance.lastUpdate;
+  const runStatus = latestRun?.status ?? null;
+  const ingestedCount = latestRun?.ingestedCount ?? 0;
+
+  return {
+    sourceId: instance.instanceUrl,
+    sourceSystem: "JIRA",
+    name: instance.displayName || instance.instanceUrl,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, runStatus),
+    ingestionStatusLabel: getSourceStatusLabel(
+      hasNeverSynced,
+      hasErrors,
+      runStatus,
+    ),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      runStatus,
+      aiSyncStatus: latestRun?.aiSyncStatus ?? null,
+      hasErrors,
+      hasNeverSynced,
+    }),
+    artifacts: ingestedCount,
+    lastSync: formatDateTime(instance.lastUpdate),
+    nextSync: "Not available",
+    errors: failedCount,
+    description: meta.description,
+    lastRunAt: instance.lastUpdate,
+    latestIngestedCount: ingestedCount,
+    latestUpdatedCount: latestRun?.updatedCount ?? 0,
+    deletedCount: latestRun?.deletedCount ?? 0,
+    // The instance DTO has no stored-artifact total; the last run's ingested
+    // count is the best available approximation until the backend exposes one.
+    totalArtifactCount: ingestedCount,
+    runIds: [],
+    sharesSourceSystem: false,
+    failedItems: latestRun?.failedItems ?? [],
+    githubRepository: null,
+    jiraInstance: {
+      instanceUrl: instance.instanceUrl,
+      displayName: instance.displayName,
+      credentialName: instance.updateCredentialName,
+      credentialUserEmail: instance.updateCredentialUserEmail,
+    },
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
   };
 }
 
@@ -388,7 +488,9 @@ export function getRunSourceLabel(
   labelByRunId?: Map<string, string>,
 ) {
   return (
-    run.sourceId ?? labelByRunId?.get(run.runId) ?? getSourceLabel(run.sourceSystem)
+    run.sourceId ??
+    labelByRunId?.get(run.runId) ??
+    getSourceLabel(run.sourceSystem)
   );
 }
 

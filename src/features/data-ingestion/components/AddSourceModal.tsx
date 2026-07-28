@@ -28,6 +28,9 @@ import {
   parseGithubRepositoryInput,
 } from "../../../services/sources/githubRepositoryInput.ts";
 import { connectGithubRepository } from "../../../services/sources/githubService.ts";
+import { connectJiraInstance } from "../../../services/sources/jiraService.ts";
+import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
+import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
 import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel.tsx";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
@@ -36,6 +39,11 @@ type AddSourceModalProps = {
   projectId: string | null;
   projectName?: string;
   tokenNames: string[];
+  /**
+   * Default Jira account email to preselect for the Jira credential picker
+   * (the login email); editable in the step. Null when the profile has none.
+   */
+  jiraDefaultEmail?: string | null;
   /** Whether the current user may connect sources to the selected project. */
   canIngest: boolean;
   /** Human-readable reason shown when `canIngest` is false. */
@@ -76,13 +84,15 @@ const PAGE_SIZE = 20;
  * Two-step "Add sources" wizard. Step one picks the source type (GitHub, Jira,
  * Upload); step two shows the type-specific flow — GitHub opens the org/user
  * repository discovery (searchable, paginated, multi-select, with a single-repo
- * fallback), while not-yet-available types show a "coming soon" panel. This
- * keeps the familiar source-type choice while making discovery the GitHub path.
+ * fallback), Jira enters one instance directly (no discovery endpoint) and picks
+ * a stored credential, and Upload adds documents. This keeps the familiar
+ * source-type choice while giving each connector its own connect path.
  */
 export function AddSourceModal({
   projectId,
   projectName,
   tokenNames,
+  jiraDefaultEmail,
   canIngest,
   ingestBlockedReason,
   onClose,
@@ -149,8 +159,54 @@ export function AddSourceModal({
   >("idle");
   const [connectError, setConnectError] = useState<string | null>(null);
 
+  // --- Jira connect state ---
+  // Jira has no discovery endpoint, so the instance is entered directly. The
+  // credential is picked from the ones stored under the chosen Jira account
+  // email (editable — the Jira account email may differ from the login email).
+  const [jiraDisplayName, setJiraDisplayName] = useState("");
+  const [jiraUrl, setJiraUrl] = useState("");
+  const [jiraAccountEmail, setJiraAccountEmail] = useState(
+    jiraDefaultEmail ?? "",
+  );
+  const [jiraEmailDraft, setJiraEmailDraft] = useState(jiraDefaultEmail ?? "");
+  const [jiraCredentialName, setJiraCredentialName] = useState("");
+
   const isBusy = discoverState === "loading" || connectState === "loading";
   const isGithub = selectedType === "GITHUB";
+  const isJira = selectedType === "JIRA";
+
+  // Credentials are only loaded while the Jira step is the active type; passing
+  // undefined keeps the hook idle on the GitHub/Upload paths.
+  const {
+    credentials: jiraCredentials,
+    loaded: jiraCredentialsLoaded,
+    error: jiraCredentialsError,
+    isRefreshing: jiraCredentialsLoading,
+  } = useJiraCredentials(
+    isJira ? jiraAccountEmail.trim() || undefined : undefined,
+  );
+
+  // Adopt the first credential once the list for the chosen account email
+  // arrives (and heal a selection no longer present), mirroring the GitHub
+  // token picker's late-arrival handling above.
+  useEffect(() => {
+    if (jiraCredentials.length === 0) return;
+
+    void Promise.resolve().then(() => {
+      setJiraCredentialName((current) =>
+        current && jiraCredentials.some((c) => c.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName,
+      );
+    });
+  }, [jiraCredentials]);
+
+  const commitJiraEmail = () => {
+    if (jiraEmailDraft.trim() === jiraAccountEmail.trim()) return;
+    setJiraAccountEmail(jiraEmailDraft);
+    setJiraCredentialName("");
+    setConnectError(null);
+  };
 
   // Discovery only reports *that* a repo is already a source, not its id or which
   // projects it belongs to. The per-repo status endpoint supplies both, so an
@@ -221,7 +277,9 @@ export function AddSourceModal({
         setHasMore(result.hasMore);
         setPage(nextPage);
         setRepositories((current) =>
-          loadingMore ? [...current, ...result.repositories] : result.repositories,
+          loadingMore
+            ? [...current, ...result.repositories]
+            : result.repositories,
         );
         setDiscoverState("loaded");
 
@@ -278,12 +336,7 @@ export function AddSourceModal({
     });
 
     return states;
-  }, [
-    projectFullNames,
-    repositories,
-    repositoryIdsByFullName,
-    resolvedOwner,
-  ]);
+  }, [projectFullNames, repositories, repositoryIdsByFullName, resolvedOwner]);
 
   const isSelectable = (name: string) => {
     const state = linkStateByName.get(name) ?? "new";
@@ -462,6 +515,96 @@ export function AddSourceModal({
     }
   };
 
+  /**
+   * Connects one Jira instance. The connect endpoint returns 202 with an empty
+   * body (no transaction id) — progress surfaces through the ingestion-run
+   * history — so on success we just fire `onConnected` (starts polling) and
+   * close. 404/502 get their own messages (missing instance/credential vs.
+   * Jira unreachable).
+   */
+  const handleConnectJira = async () => {
+    if (!projectId) {
+      setConnectState("error");
+      setConnectError("Select a project before connecting a Jira instance.");
+      return;
+    }
+
+    if (!canIngest) {
+      setConnectState("error");
+      setConnectError(
+        ingestBlockedReason ??
+          "You can only connect sources to projects you manage.",
+      );
+      return;
+    }
+
+    const displayName = jiraDisplayName.trim();
+    const url = jiraUrl.trim();
+    const userEmail = jiraAccountEmail.trim();
+    const tokenName = jiraCredentialName.trim();
+
+    if (!displayName) {
+      setConnectState("error");
+      setConnectError("Enter a display name for the Jira instance.");
+      return;
+    }
+
+    if (!url) {
+      setConnectState("error");
+      setConnectError(
+        "Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).",
+      );
+      return;
+    }
+
+    if (!userEmail) {
+      setConnectState("error");
+      setConnectError("Enter the Jira account email.");
+      return;
+    }
+
+    if (!tokenName) {
+      setConnectState("error");
+      setConnectError("Select a stored Jira credential.");
+      return;
+    }
+
+    setConnectState("loading");
+    setConnectError(null);
+
+    try {
+      await connectJiraInstance({
+        displayName,
+        url,
+        userEmail,
+        tokenName,
+        projectId,
+      });
+
+      setConnectState("idle");
+      onConnected();
+      onClose();
+    } catch (error) {
+      setConnectState("error");
+
+      if (error instanceof ApiError && error.status === 404) {
+        setConnectError(
+          "The Jira instance or credential could not be found. Check the URL and the selected credential.",
+        );
+      } else if (error instanceof ApiError && error.status === 502) {
+        setConnectError(
+          "The Jira server could not be reached. Check the instance URL and try again.",
+        );
+      } else {
+        setConnectError(
+          error instanceof Error
+            ? error.message
+            : "The Jira instance could not be connected.",
+        );
+      }
+    }
+  };
+
   const modalTitle =
     step === "type"
       ? "Add a data source"
@@ -484,7 +627,9 @@ export function AddSourceModal({
           ? "Find and connect repositories from a GitHub organization or user."
           : isUpload
             ? "Add documents to this project's knowledge base."
-            : undefined;
+            : isJira
+              ? "Connect a Jira instance to start ingesting its issues."
+              : undefined;
 
   return (
     <Modal
@@ -582,7 +727,9 @@ export function AddSourceModal({
                 type="button"
                 onClick={() => void handleConnect()}
                 disabled={
-                  selectedCount === 0 || connectState === "loading" || !canIngest
+                  selectedCount === 0 ||
+                  connectState === "loading" ||
+                  !canIngest
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -595,6 +742,22 @@ export function AddSourceModal({
                       /\s+/g,
                       " ",
                     )}
+              </button>
+            )}
+
+            {isJira && (
+              <button
+                type="button"
+                onClick={() => void handleConnectJira()}
+                disabled={connectState === "loading" || !canIngest}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {connectState === "loading" && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                {connectState === "loading"
+                  ? "Connecting…"
+                  : "Connect Jira instance"}
               </button>
             )}
           </>
@@ -805,7 +968,9 @@ export function AddSourceModal({
               {selectedLinkCount > 0 && (
                 <p className="rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-2.5 text-xs text-app-brand-text">
                   {selectedLinkCount} of the selected{" "}
-                  {selectedLinkCount === 1 ? "repository is" : "repositories are"}{" "}
+                  {selectedLinkCount === 1
+                    ? "repository is"
+                    : "repositories are"}{" "}
                   already ingested and will be linked to
                   {projectName ? ` ${projectName}` : " this project"} without
                   fetching or ingesting again.
@@ -961,7 +1126,26 @@ export function AddSourceModal({
           )}
         </div>
       ) : (
-        <ComingSoonStep sourceSystem={selectedType} />
+        <JiraConnectStep
+          displayName={jiraDisplayName}
+          url={jiraUrl}
+          accountEmail={jiraEmailDraft}
+          credentialName={jiraCredentialName}
+          credentials={jiraCredentials}
+          credentialsLoaded={jiraCredentialsLoaded}
+          credentialsLoading={jiraCredentialsLoading}
+          credentialsError={jiraCredentialsError}
+          isBusy={connectState === "loading"}
+          canIngest={canIngest}
+          ingestBlockedReason={ingestBlockedReason}
+          errorMessage={connectError}
+          onDisplayNameChange={setJiraDisplayName}
+          onUrlChange={setJiraUrl}
+          onAccountEmailChange={setJiraEmailDraft}
+          onAccountEmailCommit={commitJiraEmail}
+          onCredentialNameChange={setJiraCredentialName}
+          onSubmit={() => void handleConnectJira()}
+        />
       )}
     </Modal>
   );
@@ -987,7 +1171,8 @@ function SourceTypeStep({
             const meta = SOURCE_META[sourceSystem];
             const Icon = meta.icon;
             const isSelected = selectedType === sourceSystem;
-            const isAvailable = sourceSystem === "GITHUB";
+            const isAvailable =
+              sourceSystem === "GITHUB" || sourceSystem === "JIRA";
 
             return (
               <button
@@ -1085,8 +1270,8 @@ function SingleRepositoryStep({
 
       {!hasTokens && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Add a GitHub personal access token in Settings first, then come back to
-          connect a repository.
+          Add a GitHub personal access token in Settings first, then come back
+          to connect a repository.
         </div>
       )}
 
@@ -1167,22 +1352,193 @@ function SingleRepositoryStep({
   );
 }
 
-function ComingSoonStep({ sourceSystem }: { sourceSystem: SourceSystem }) {
-  const meta = SOURCE_META[sourceSystem];
-  const Icon = meta.icon;
+/**
+ * Jira connect form. There is no Jira discovery endpoint, so the instance is
+ * entered directly: a display name, the instance URL, the Jira account email
+ * (editable — it may differ from the login email) and one of the credentials
+ * stored under that email. Mirrors the single-repository step's layout and
+ * guardrails so it feels like the same wizard.
+ */
+function JiraConnectStep({
+  displayName,
+  url,
+  accountEmail,
+  credentialName,
+  credentials,
+  credentialsLoaded,
+  credentialsLoading,
+  credentialsError,
+  isBusy,
+  canIngest,
+  ingestBlockedReason,
+  errorMessage,
+  onDisplayNameChange,
+  onUrlChange,
+  onAccountEmailChange,
+  onAccountEmailCommit,
+  onCredentialNameChange,
+  onSubmit,
+}: {
+  displayName: string;
+  url: string;
+  accountEmail: string;
+  credentialName: string;
+  credentials: JiraCredentialsDto[];
+  credentialsLoaded: boolean;
+  credentialsLoading: boolean;
+  credentialsError: string | null;
+  isBusy: boolean;
+  canIngest: boolean;
+  ingestBlockedReason?: string;
+  errorMessage: string | null;
+  onDisplayNameChange: (value: string) => void;
+  onUrlChange: (value: string) => void;
+  onAccountEmailChange: (value: string) => void;
+  onAccountEmailCommit: () => void;
+  onCredentialNameChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const fieldClassName =
+    "mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60";
+
+  const hasEmail = accountEmail.trim().length > 0;
+  const hasCredentials = credentials.length > 0;
+  // Only claim "no credentials" once a load for the current email has settled.
+  const showNoCredentials =
+    hasEmail && credentialsLoaded && !credentialsLoading && !hasCredentials;
 
   return (
-    <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-app-bg-soft">
-        <Icon className="h-6 w-6 text-app-text-muted" />
+    <form
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      {!canIngest && (
+        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+          {ingestBlockedReason ??
+            "You can only connect sources to projects you manage."}
+        </div>
+      )}
+
+      {showNoCredentials && (
+        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+          No Jira credential is stored for {accountEmail.trim()}. Add one under
+          Settings → Access Tokens → Jira first, then come back to connect.
+        </div>
+      )}
+
+      <div>
+        <label
+          htmlFor="jira-display-name"
+          className="text-sm font-medium text-app-text"
+        >
+          Display name
+        </label>
+        <input
+          id="jira-display-name"
+          data-testid="jira-display-name"
+          value={displayName}
+          onChange={(event) => onDisplayNameChange(event.target.value)}
+          disabled={isBusy}
+          placeholder="e.g. Team board"
+          className={fieldClassName}
+        />
       </div>
-      <p className="mt-4 text-base font-semibold text-app-text">
-        {meta.type} connection is coming soon
+
+      <div>
+        <label
+          htmlFor="jira-instance-url"
+          className="text-sm font-medium text-app-text"
+        >
+          Instance URL
+        </label>
+        <input
+          id="jira-instance-url"
+          data-testid="jira-instance-url"
+          type="url"
+          value={url}
+          onChange={(event) => onUrlChange(event.target.value)}
+          disabled={isBusy}
+          placeholder="https://your-domain.atlassian.net"
+          className={fieldClassName}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="jira-account-email"
+            className="text-sm font-medium text-app-text"
+          >
+            Jira account email
+          </label>
+          <input
+            id="jira-account-email"
+            data-testid="jira-account-email"
+            type="email"
+            value={accountEmail}
+            onChange={(event) => onAccountEmailChange(event.target.value)}
+            onBlur={onAccountEmailCommit}
+            disabled={isBusy}
+            placeholder="jira-account@example.com"
+            autoComplete="off"
+            className={fieldClassName}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="jira-credential"
+            className="text-sm font-medium text-app-text"
+          >
+            Credential
+          </label>
+          <select
+            id="jira-credential"
+            data-testid="jira-credential"
+            value={credentialName}
+            onChange={(event) => onCredentialNameChange(event.target.value)}
+            disabled={isBusy || !hasCredentials}
+            className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {hasCredentials ? (
+              credentials.map((credential) => (
+                <option
+                  key={credential.displayName}
+                  value={credential.displayName}
+                >
+                  {credential.displayName}
+                </option>
+              ))
+            ) : (
+              <option value="">
+                {credentialsLoading ? "Loading credentials…" : "No credentials"}
+              </option>
+            )}
+          </select>
+        </div>
+      </div>
+
+      <p className="text-xs text-app-text-subtle">
+        The credential is one of the Jira API tokens stored for this account
+        email. Manage them under Settings → Access Tokens → Jira.
       </p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-app-text-muted">
-        {meta.description} This source type isn&apos;t available to connect yet —
-        for now you can connect GitHub repositories.
-      </p>
-    </div>
+
+      {credentialsError && (
+        <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{credentialsError}</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="flex items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+    </form>
   );
 }

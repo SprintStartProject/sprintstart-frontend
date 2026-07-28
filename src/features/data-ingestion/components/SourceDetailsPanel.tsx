@@ -74,12 +74,16 @@ export function SourceDetailsPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const Icon = SOURCE_META[source.sourceSystem].icon;
   const repository = source.githubRepository;
+  const jira = source.jiraInstance ?? null;
+  const isJira = source.sourceSystem === "JIRA";
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
-  const canUpdateRepository =
-    source.sourceSystem === "GITHUB" &&
-    repository !== null &&
-    onUpdateSource !== undefined;
+  // Update is available for a GitHub repo (needs owner/name) or a Jira instance
+  // (needs its URL); enable/disable and unlink stay GitHub-only for now.
+  const canUpdate =
+    onUpdateSource !== undefined &&
+    ((source.sourceSystem === "GITHUB" && repository !== null) ||
+      (isJira && jira !== null));
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -159,7 +163,7 @@ export function SourceDetailsPanel({
   );
 
   const handleUpdateSource = useCallback(async () => {
-    if (!canUpdateRepository || !onUpdateSource) return;
+    if (!canUpdate || !onUpdateSource) return;
 
     setUpdateState("loading");
     setMessage(null);
@@ -168,18 +172,14 @@ export function SourceDetailsPanel({
     try {
       await onUpdateSource(source);
       setUpdateState("success");
-      setMessage(
-        "Repository update started. Details will refresh while ingestion runs.",
-      );
+      setMessage("Update started. Details will refresh while ingestion runs.");
     } catch (error) {
       setUpdateState("error");
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to start repository update",
+        error instanceof Error ? error.message : "Failed to start the update",
       );
     }
-  }, [canUpdateRepository, onUpdateSource, source]);
+  }, [canUpdate, onUpdateSource, source]);
 
   const handleConfirmUnlink = useCallback(async () => {
     if (!onUnlinkSource) return;
@@ -274,20 +274,24 @@ export function SourceDetailsPanel({
             onClick={() => {
               void handleUpdateSource();
             }}
-            disabled={!canUpdateRepository || isUpdating || isRefreshing}
+            disabled={!canUpdate || isUpdating || isRefreshing}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
             title={
-              canUpdateRepository
+              canUpdate
                 ? undefined
-                : "Repository updates need GitHub owner and repository name."
+                : isJira
+                  ? "Instance updates need the Jira instance URL."
+                  : "Repository updates need GitHub owner and repository name."
             }
           >
             {isUpdating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isJira ? (
+              <Database className="h-4 w-4" />
             ) : (
               <GitBranch className="h-4 w-4" />
             )}
-            Update repo
+            {isJira ? "Update instance" : "Update repo"}
           </button>
 
           <button
@@ -316,7 +320,10 @@ export function SourceDetailsPanel({
         {source.statusView.state === "syncing" && (
           <div className="mb-3 rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-3">
             <p className="flex items-center gap-2 text-sm font-medium text-app-brand-text">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              <Loader2
+                className="h-3.5 w-3.5 animate-spin"
+                aria-hidden="true"
+              />
               {source.statusView.label === "Indexing"
                 ? "Indexing artifacts into the knowledge base…"
                 : "Syncing the latest changes…"}
@@ -340,44 +347,63 @@ export function SourceDetailsPanel({
         </div>
       </Section>
 
-      <Section title="Repository">
-        <dl className="overflow-hidden rounded-xl border border-app-border">
-          <InfoRow label="Full name" value={repository?.fullName} />
-          <InfoRow label="Owner" value={repository?.owner} />
-          <InfoLinkRow label="URL" value={repository?.url} />
-          <InfoRow
-            label="Repository ID"
-            value={repository?.repositoryId ?? source.sourceId}
-            mono
-          />
-          {canToggleEnabled && repository ? (
-            <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5">
-              <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">
-                Source
-              </dt>
-              <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                <span className="text-[13px] font-semibold text-app-text">
-                  {repository.enabled === false ? "Disabled" : "Enabled"}
-                  <span className="ml-1 font-normal text-app-text-subtle">
-                    · {repository.enabled === false ? "excluded from" : "included in"}{" "}
-                    ingestion
+      {isJira && jira && (
+        <Section title="Instance">
+          <dl className="overflow-hidden rounded-xl border border-app-border">
+            <InfoRow label="Display name" value={jira.displayName} />
+            <InfoLinkRow label="URL" value={jira.instanceUrl} />
+            <InfoRow label="Credential" value={jira.credentialName} />
+            <InfoRow label="Account" value={jira.credentialUserEmail} />
+          </dl>
+        </Section>
+      )}
+
+      {!isJira && (
+        <Section title="Repository">
+          <dl className="overflow-hidden rounded-xl border border-app-border">
+            <InfoRow label="Full name" value={repository?.fullName} />
+            <InfoRow label="Owner" value={repository?.owner} />
+            <InfoLinkRow label="URL" value={repository?.url} />
+            <InfoRow
+              label="Repository ID"
+              value={repository?.repositoryId ?? source.sourceId}
+              mono
+            />
+            {canToggleEnabled && repository ? (
+              <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5">
+                <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">
+                  Source
+                </dt>
+                <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="text-[13px] font-semibold text-app-text">
+                    {repository.enabled === false ? "Disabled" : "Enabled"}
+                    <span className="ml-1 font-normal text-app-text-subtle">
+                      ·{" "}
+                      {repository.enabled === false
+                        ? "excluded from"
+                        : "included in"}{" "}
+                      ingestion
+                    </span>
                   </span>
-                </span>
-                <AccountEnabledToggle
-                  enabled={repository.enabled !== false}
-                  disabled={isTogglingEnabled}
-                  ariaLabel={`Toggle ingestion for ${repository.fullName}`}
-                  onChange={(next) => {
-                    void handleToggleEnabled(next);
-                  }}
-                />
-              </dd>
-            </div>
-          ) : (
-            <InfoRow label="Source" value={formatEnabled(repository?.enabled)} />
-          )}
-        </dl>
-      </Section>
+                  <AccountEnabledToggle
+                    enabled={repository.enabled !== false}
+                    disabled={isTogglingEnabled}
+                    ariaLabel={`Toggle ingestion for ${repository.fullName}`}
+                    onChange={(next) => {
+                      void handleToggleEnabled(next);
+                    }}
+                  />
+                </dd>
+              </div>
+            ) : (
+              <InfoRow
+                label="Source"
+                value={formatEnabled(repository?.enabled)}
+              />
+            )}
+          </dl>
+        </Section>
+      )}
 
       {hasArtifactTypeSyncTimes && (
         <Section title="Last Synced">
@@ -432,9 +458,8 @@ export function SourceDetailsPanel({
         <Section title="Project link">
           <div className="rounded-xl border border-app-border px-4 py-3">
             <p className="text-sm text-app-text-muted">
-              Remove this repository from the current project. The repository and
-              its artifacts are kept. You can
-              re-link it later.
+              Remove this repository from the current project. The repository
+              and its artifacts are kept. You can re-link it later.
             </p>
             <button
               type="button"
@@ -591,4 +616,3 @@ function Message({
     </div>
   );
 }
-
