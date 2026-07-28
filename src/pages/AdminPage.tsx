@@ -564,6 +564,7 @@ export function AdminPage() {
               <TokensTab
                 tokenNames={tokenNames}
                 onRefresh={() => void loadTokenNames()}
+                userEmail={profile?.email ?? null}
               />
             )}
           </div>

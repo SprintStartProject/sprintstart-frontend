@@ -234,13 +234,17 @@ export async function addJiraCredential(
  * returned). Credentials are queried per user, not globally.
  *
  * @param userEmail - The user whose credentials to list (path segment).
+ * @param signal - Optional AbortSignal so callers (e.g. a refresh hook) can
+ *   cancel an in-flight request and avoid stale-result races.
  * @throws ApiError — 403 for an insufficient role.
  */
 export async function getJiraCredentialsOfUser(
   userEmail: string,
+  signal?: AbortSignal,
 ): Promise<JiraCredentialsDto[]> {
   return apiClient.fetch<JiraCredentialsDto[]>(
     `/api/v1/jira/credentials/${encodeURIComponent(userEmail)}`,
+    { signal },
   );
 }
 
