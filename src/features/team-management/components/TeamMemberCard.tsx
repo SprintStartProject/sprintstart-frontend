@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Check, Hourglass, MessageSquareText, SkipForward } from 'lucide-react';
 import type { TeamOverviewUser } from '../types';
 import { Badge } from '../../../components/ui/Badge';
+import { UserAvatar } from '../../../components/common/UserAvatar';
 
 type TeamMemberCardProps = {
     user: TeamOverviewUser;
@@ -11,6 +12,16 @@ type TeamMemberCardProps = {
      * size is used on the full Team Management page.
      */
     compact?: boolean;
+    /**
+     * Puts the card into selection mode (used while assigning a role to
+     * multiple members on the Team Management page): the card no longer
+     * links to the member detail page, clicking it toggles selection
+     * instead, and a check indicator plus a colored highlight show the
+     * selected state.
+     */
+    selectable?: boolean;
+    selected?: boolean;
+    onToggleSelect?: (userId: string) => void;
 };
 
 const AT_RISK_AFTER_DAYS = 5;
@@ -24,8 +35,13 @@ function getElapsedDays(startedAt: string): number {
     );
 }
 
-import { UserAvatar } from '../../../components/common/UserAvatar';
-export function TeamMemberCard({ user, compact = false }: TeamMemberCardProps) {
+export function TeamMemberCard({
+    user,
+    compact = false,
+    selectable = false,
+    selected = false,
+    onToggleSelect,
+}: TeamMemberCardProps) {
     const elapsedDays = user.currentStep?.startedAt
         ? getElapsedDays(user.currentStep.startedAt)
         : 0;
@@ -43,13 +59,16 @@ export function TeamMemberCard({ user, compact = false }: TeamMemberCardProps) {
         ? 'Onboarding completed'
         : 'Onboarding in progress';
 
-    return (
-        <Link
-            to={`/team/${user.userId}`}
-            className={`group relative flex flex-col rounded-2xl border border-app-border bg-app-surface transition-all hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-md ${
-                compact ? 'p-2' : 'p-4'
-            }`}
-        >
+    const cardClassName = `group relative flex flex-col rounded-2xl border transition-all ${
+        selectable ? 'cursor-pointer' : ''
+    } ${
+        selected
+            ? 'border-app-brand bg-app-brand-soft ring-1 ring-app-brand'
+            : 'border-app-border bg-app-surface hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-md'
+    } ${compact ? 'p-2' : 'p-4'}`;
+
+    const content = (
+        <>
             <div
                 className={`absolute flex items-center gap-1 ${
                     compact ? 'right-2 top-2' : 'right-3 top-3 gap-1.5'
@@ -99,6 +118,19 @@ export function TeamMemberCard({ user, compact = false }: TeamMemberCardProps) {
             </div>
 
             <div className={`flex items-center gap-2 ${compact ? 'pr-7' : 'pr-14 gap-3'}`}>
+                {selectable && (
+                    <span
+                        aria-hidden="true"
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                            selected
+                                ? 'border-app-brand bg-app-brand text-app-text-inverse'
+                                : 'border-app-border bg-app-surface'
+                        }`}
+                    >
+                        {selected && <Check className="h-3 w-3" />}
+                    </span>
+                )}
+
                 <div className="flex shrink-0 items-center justify-center">
                     <UserAvatar profileIcon={user.profileIcon} fallbackName={`${user.firstname} ${user.lastname}`.trim()} seed={user.userId} size={compact ? 26 : 40} />
                 </div>
@@ -179,6 +211,33 @@ export function TeamMemberCard({ user, compact = false }: TeamMemberCardProps) {
                     </span>
                 </div>
             </div>
+        </>
+    );
+
+    if (selectable) {
+        return (
+            <div
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                aria-label={`${selected ? 'Deselect' : 'Select'} ${user.firstname} ${user.lastname}`}
+                onClick={() => onToggleSelect?.(user.userId)}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onToggleSelect?.(user.userId);
+                    }
+                }}
+                className={cardClassName}
+            >
+                {content}
+            </div>
+        );
+    }
+
+    return (
+        <Link to={`/team/${user.userId}`} className={cardClassName}>
+            {content}
         </Link>
     );
 }
