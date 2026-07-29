@@ -13,6 +13,8 @@ import type {
     PhaseCheckEndpoint,
     PhaseCheckAnswerSubmission,
     PhaseCheckAttemptResult,
+    ReviewCheckEndpoint,
+    ReviewCheckResult,
     AdminPhaseCheckEndpoint,
     UpsertPhaseCheckQuestion,
     PhaseCheckAttemptsReviewEndpoint,
@@ -163,6 +165,28 @@ expectedOutcome: step.expectedOutcomes?.[0] ?? '',
                 body: JSON.stringify({ answers }),
             },
         );
+    },
+
+    // ── REVIEW CHECK ──────────────────────────────────────────
+
+    /**
+     * Loads the current user's review pool: questions they got wrong in earlier phases
+     * and still have to answer correctly once. Never contains correct answers.
+     */
+    async fetchReviewCheck(): Promise<ReviewCheckEndpoint> {
+        return await apiClient.fetch<ReviewCheckEndpoint>('/api/v1/onboarding/me/review-check');
+    },
+
+    /**
+     * Submits answers for the review pool. Correctly answered questions leave the pool
+     * permanently, wrong ones stay open. Answering only some open questions is allowed,
+     * so the pool can be worked through in several sittings.
+     */
+    async submitReviewCheck(answers: PhaseCheckAnswerSubmission[]): Promise<ReviewCheckResult> {
+        return await apiClient.fetch<ReviewCheckResult>('/api/v1/onboarding/me/review-check/attempts', {
+            method: 'POST',
+            body: JSON.stringify({ answers }),
+        });
     },
 
     /**
