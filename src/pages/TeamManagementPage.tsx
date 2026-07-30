@@ -1,5 +1,5 @@
-import { Users, ArrowLeft } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Users, ArrowLeft, ChevronsLeft } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TeamMemberFilters } from '../features/team-management/components/TeamMemberFilters';
 import { TeamMemberCard } from '../features/team-management/components/TeamMemberCard';
@@ -35,6 +35,70 @@ export function TeamManagementPage() {
         string[]
     >([]);
     const [assigning, setAssigning] = useState(false);
+    const [panelOpen, setPanelOpen] = useState(false);
+    // Opened by an explicit click rather than by hovering. A pinned panel is
+    // only closed by the collapse chevron, never by moving the pointer.
+    const [panelPinned, setPanelPinned] = useState(false);
+    const [rolesModalOpen, setRolesModalOpen] = useState(false);
+    const closeTimerRef = useRef<number | null>(null);
+
+    // The panel force-opens while an assignment is running so the in-row
+    // confirm/cancel controls can never be collapsed away mid-action.
+    const isPanelExpanded =
+        panelOpen || panelPinned || assigningRoleId !== null;
+
+    function openPanel() {
+        if (closeTimerRef.current !== null) {
+            window.clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+
+        setPanelOpen(true);
+    }
+
+    function pinPanel() {
+        openPanel();
+        setPanelPinned(true);
+    }
+
+    function collapsePanel() {
+        if (closeTimerRef.current !== null) {
+            window.clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+
+        setPanelPinned(false);
+        setPanelOpen(false);
+    }
+
+    /**
+     * Collapses shortly after the pointer moves into the member list.
+     *
+     * Deliberately driven by *entering* the list rather than by leaving the
+     * panel: the panel sits inside the centred page frame, so the gutter
+     * between it and the window edge would otherwise count as "left" and
+     * collapse the panel while the pointer is still heading for it.
+     */
+    function scheduleClose() {
+        if (panelPinned || assigningRoleId !== null || rolesModalOpen) return;
+
+        if (closeTimerRef.current !== null) {
+            window.clearTimeout(closeTimerRef.current);
+        }
+
+        closeTimerRef.current = window.setTimeout(() => {
+            closeTimerRef.current = null;
+            setPanelOpen(false);
+        }, 200);
+    }
+
+    useEffect(() => {
+        return () => {
+            if (closeTimerRef.current !== null) {
+                window.clearTimeout(closeTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         async function loadTeamOverview() {
@@ -165,8 +229,14 @@ export function TeamManagementPage() {
 
     return (
         <div className="min-h-screen bg-app-bg">
-            <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            {/* Opaque and above the collapsed rail, so the rail never bleeds
+                into the header area. */}
+            <header className="relative z-40 border-b border-app-border bg-app-bg">
+                <div
+                    className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 ${
+                        isPanelExpanded ? "" : "lg:pr-16"
+                    }`}
+                >
                     <button
                         onClick={() => void navigate('/pm-dashboard')}
                         className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
@@ -193,9 +263,17 @@ export function TeamManagementPage() {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-                    <div className="min-w-0">
+            <main
+                className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8 ${
+                    isPanelExpanded ? "" : "lg:pr-16"
+                }`}
+            >
+                <div
+                    className={`grid grid-cols-1 gap-6 ${
+                        isPanelExpanded ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""
+                    }`}
+                >
+                    <div className="min-w-0" onMouseEnter={scheduleClose}>
                         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h2 className="text-lg font-semibold text-app-text">
@@ -236,21 +314,76 @@ export function TeamManagementPage() {
                         )}
                     </div>
 
-                    <div className="border-t border-app-border pt-6 lg:min-h-screen lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                        <div className="lg:sticky lg:top-6">
-                            <RolesSkillsPanel
-                                assigningRoleId={assigningRoleId}
-                                selectedCount={selectedUserIds.length}
-                                hasChanges={hasAssignChanges}
-                                assigning={assigning}
-                                onStartAssign={handleStartAssign}
-                                onCancelAssign={handleCancelAssign}
-                                onConfirmAssign={() => void handleConfirmAssign()}
-                            />
+                    {isPanelExpanded ? (
+                        <div
+                            onMouseEnter={openPanel}
+                            className="border-t border-app-border pt-6 lg:flex lg:min-h-screen lg:flex-col lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+                        >
+                            <div className="lg:sticky lg:top-6">
+                                <RolesSkillsPanel
+                                    assigningRoleId={assigningRoleId}
+                                    selectedCount={selectedUserIds.length}
+                                    hasChanges={hasAssignChanges}
+                                    assigning={assigning}
+                                    onStartAssign={handleStartAssign}
+                                    onCancelAssign={handleCancelAssign}
+                                    onConfirmAssign={() => void handleConfirmAssign()}
+                                    onModalOpenChange={setRolesModalOpen}
+                                    onCollapse={
+                                        assigningRoleId === null
+                                            ? collapsePanel
+                                            : undefined
+                                    }
+                                />
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        /* Collapsed on mobile: a normal full-width toggle, since
+                           the layout is stacked there anyway. */
+                        <button
+                            type="button"
+                            onClick={pinPanel}
+                            aria-expanded={false}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text lg:hidden"
+                        >
+                            <ChevronsLeft className="h-4 w-4 shrink-0" />
+                            <span className="text-xs font-medium">Role Management</span>
+                        </button>
+                    )}
                 </div>
             </main>
+
+            {/* Collapsed rail, pinned to the window edge so no page gutter is
+                wasted to its right. The page keeps a matching right padding so
+                content never slides underneath it. Hovering opens the panel;
+                clicking still works for keyboard and touch users. */}
+            {!isPanelExpanded && (
+                <button
+                    type="button"
+                    onClick={pinPanel}
+                    onMouseEnter={openPanel}
+                    onFocus={pinPanel}
+                    aria-expanded={false}
+                    aria-label="Expand role management"
+                    className="fixed inset-y-0 right-0 z-30 hidden w-10 flex-col items-center justify-center gap-2 border-l border-app-border bg-app-bg text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text lg:flex"
+                >
+                    <ChevronsLeft className="h-4 w-4 shrink-0" />
+                    <span className="whitespace-nowrap text-xs font-medium [writing-mode:vertical-rl]">
+                        Role Management
+                    </span>
+                </button>
+            )}
+
+            {/* Invisible edge strip while expanded, covering the window-edge
+                band the collapsed rail occupies. Keeps the panel open while
+                the pointer rests there, so it does not flip back and forth. */}
+            {isPanelExpanded && (
+                <div
+                    aria-hidden="true"
+                    onMouseEnter={openPanel}
+                    className="fixed inset-y-0 right-0 z-20 hidden w-10 lg:block"
+                />
+            )}
         </div>
     );
 }

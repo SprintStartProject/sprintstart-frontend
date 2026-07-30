@@ -1,4 +1,12 @@
-import { Check, ChevronDown, ChevronRight, Settings, UserPlus, X } from 'lucide-react';
+import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    ChevronsRight,
+    Settings,
+    UserPlus,
+    X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge } from '../../../components/ui/Badge';
 import { ProjectRolesModal } from './ProjectRolesModal';
@@ -21,6 +29,12 @@ type RolesSkillsPanelProps = {
     onStartAssign: (roleId: string) => void;
     onCancelAssign: () => void;
     onConfirmAssign: () => void;
+    /** Collapses the panel back into its rail. Omitted while an assignment is
+     * in progress, so the in-row confirm/cancel controls stay reachable. */
+    onCollapse?: () => void;
+    /** Reports whether the roles modal is open, so a hover-driven parent can
+     * suspend auto-collapsing while the user works inside the modal. */
+    onModalOpenChange?: (open: boolean) => void;
 };
 
 export function RolesSkillsPanel({
@@ -31,6 +45,8 @@ export function RolesSkillsPanel({
     onStartAssign,
     onCancelAssign,
     onConfirmAssign,
+    onCollapse,
+    onModalOpenChange,
 }: RolesSkillsPanelProps) {
     const [roles, setRoles] = useState<ProjectRole[]>([]);
     const [skills, setSkills] = useState<Skill[]>([]);
@@ -69,13 +85,29 @@ export function RolesSkillsPanel({
         <>
             <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-app-text">
-                        Roles &amp; skills
-                    </h3>
+                    <div className="flex min-w-0 items-center gap-1">
+                        {onCollapse && (
+                            <button
+                                type="button"
+                                onClick={onCollapse}
+                                aria-label="Collapse role management"
+                                className="-ml-1 shrink-0 rounded-lg p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                            >
+                                <ChevronsRight className="h-4 w-4" />
+                            </button>
+                        )}
+
+                        <h3 className="truncate text-sm font-semibold text-app-text">
+                            Role Management
+                        </h3>
+                    </div>
 
                     <button
                         type="button"
-                        onClick={() => setRolesModalOpen(true)}
+                        onClick={() => {
+                            setRolesModalOpen(true);
+                            onModalOpenChange?.(true);
+                        }}
                         className="flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border px-2.5 py-1 text-xs text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:text-app-text"
                     >
                         <Settings className="h-3.5 w-3.5" />
@@ -205,6 +237,7 @@ export function RolesSkillsPanel({
                 open={rolesModalOpen}
                 onClose={() => {
                     setRolesModalOpen(false);
+                    onModalOpenChange?.(false);
                     void reloadRolesAndSkills();
                 }}
             />
