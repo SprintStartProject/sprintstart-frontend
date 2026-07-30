@@ -46,9 +46,22 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
   // usually scrolled down at the last question and would never see the result banner.
   const topRef = useRef<HTMLDivElement>(null);
 
-  /** Brings the result banner into view. Optional call: jsdom has no scrollIntoView. */
-  const scrollToResult = () =>
+  /**
+   * Brings the result banner into view, once the graded DOM is committed.
+   *
+   * Deliberately an effect rather than a call at the end of `submit`: grading replaces
+   * every question card with its longer graded form, which grows the content above the
+   * user's scroll position. Scrolling before that commit starts the smooth scroll against
+   * the old layout, and the browser's scroll anchoring then corrects `scrollTop` to keep
+   * the view stable — which cancels the animation mid-flight. Running after the commit
+   * means the scroll starts from the final layout and nothing mutates underneath it.
+   *
+   * The optional call is for jsdom, which has no `scrollIntoView`.
+   */
+  useEffect(() => {
+    if (!result) return;
     topRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [result]);
 
   useEffect(() => {
     const loadPool = async () => {
@@ -89,7 +102,6 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       );
       setResult(await onboardingService.submitReviewCheck(payload));
       setHasSubmitted(true);
-      scrollToResult();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Unknown error");
     } finally {
