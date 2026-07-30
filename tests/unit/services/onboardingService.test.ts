@@ -296,6 +296,31 @@ describe('onboardingService', () => {
         expect(result.onboardingCompleted).toBe(true);
     });
 
+    it('fetchUserReviewCheck loads another user\'s open pool for reviewers', async () => {
+        server.use(
+            http.get('/api/v1/onboarding/users/user1/review-check', () =>
+                HttpResponse.json({
+                    openCount: 1,
+                    questions: [
+                        {
+                            id: 'q1',
+                            position: 0,
+                            type: 'SHORT_TEXT',
+                            question: 'cmd?',
+                            review: true,
+                            reviewSourcePhaseTitle: 'Setup',
+                        },
+                    ],
+                }),
+            ),
+        );
+
+        const pool = await onboardingService.fetchUserReviewCheck('user1');
+
+        expect(pool.openCount).toBe(1);
+        expect(pool.questions[0].reviewSourcePhaseTitle).toBe('Setup');
+    });
+
     it('savePhaseCheck sends a PUT with the questions payload', async () => {
         let capturedBody: unknown = null;
         server.use(

@@ -3,6 +3,7 @@ import {
     CheckCircle2,
     Circle,
     Clock,
+    ClipboardCheck,
     ClipboardList,
     Plus,
     SkipForward,
@@ -13,6 +14,7 @@ import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge'
 import type {
     OnboardingPhaseEndpoint,
     OnboardingStepEndpoint,
+    PhaseCheckSummaryEndpoint,
 } from '../../../onboarding/types';
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
@@ -55,6 +57,8 @@ type MemberOnboardingSectionProps = {
         activeStepId: string,
         overStepId: string,
     ) => void;
+    /** Opens the knowledge check of the selected phase on the given tab. */
+    onOpenCheck: (tab: 'results' | 'questions') => void;
     formatMinutes: (minutes?: number | null) => string;
     getActualMinutes: (step: DetailOnboardingStep) => number | null;
     getStepStatusStyles: (status: string) => string;
@@ -76,6 +80,7 @@ export function MemberOnboardingSection({
     onSelectStep,
     onAddStep,
     onReorderSteps,
+    onOpenCheck,
     formatMinutes,
     getActualMinutes,
     getStepStatusStyles,
@@ -148,10 +153,79 @@ export function MemberOnboardingSection({
                                 getActualMinutes={getActualMinutes}
                                 getStepStatusStyles={getStepStatusStyles}
                             />
+
+                            {/* Last in the phase, mirroring where the member meets the
+                                check in their own onboarding path. */}
+                            <PhaseCheckCard
+                                summary={selectedPhase?.checkSummary}
+                                onOpenCheck={onOpenCheck}
+                            />
                         </div>
                     </div>
                 </>
             )}
+        </div>
+    );
+}
+
+/**
+ * Knowledge-check status of the selected phase, with the entry points for reviewing the
+ * member's attempts and editing the questions.
+ *
+ * Phases without a check still offer the editor, since that is how a check gets created
+ * in the first place when the AI generated none.
+ */
+function PhaseCheckCard({
+    summary,
+    onOpenCheck,
+}: {
+    summary?: PhaseCheckSummaryEndpoint;
+    onOpenCheck: (tab: 'results' | 'questions') => void;
+}) {
+    const required = summary?.required ?? false;
+    const passed = summary?.passed ?? false;
+    const questionCount = summary?.questionCount ?? 0;
+
+    return (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+                <ClipboardCheck
+                    className={`mt-0.5 h-5 w-5 shrink-0 ${
+                        passed ? 'text-app-success-solid' : 'text-app-text-muted'
+                    }`}
+                />
+                <div>
+                    <p className="text-sm font-semibold text-app-text">Knowledge check</p>
+                    <p className="mt-0.5 text-xs text-app-text-muted">
+                        {!required
+                            ? 'No questions configured for this phase.'
+                            : passed
+                              ? `Passed · ${questionCount} question${questionCount === 1 ? '' : 's'}`
+                              : `Not passed yet · ${questionCount} question${questionCount === 1 ? '' : 's'}`}
+                        {summary?.latestAttemptAt &&
+                            ` · last attempt ${new Date(summary.latestAttemptAt).toLocaleDateString()}`}
+                    </p>
+                </div>
+            </div>
+
+            <div className="flex shrink-0 gap-2">
+                {/* Always clickable: the results tab explains an empty history itself,
+                    which beats a disabled button that gives no reason. */}
+                <button
+                    type="button"
+                    onClick={() => onOpenCheck('results')}
+                    className="rounded-xl border border-app-border px-3 py-2 text-xs font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
+                >
+                    View results
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onOpenCheck('questions')}
+                    className="rounded-xl border border-app-border px-3 py-2 text-xs font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
+                >
+                    {required ? 'Edit questions' : 'Add questions'}
+                </button>
+            </div>
         </div>
     );
 }
@@ -236,9 +310,28 @@ function PhasePicker({
                             />
                         </div>
 
-                        <p className="mt-2 text-xs text-app-text-muted">
-                            {completed}/{steps.length} steps
-                        </p>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-xs text-app-text-muted">
+                                {completed}/{steps.length} steps
+                            </p>
+                            {/* Icon plus label, so the state never rests on color alone. */}
+                            {phase.checkSummary?.required && (
+                                <span
+                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                        phase.checkSummary.passed
+                                            ? 'bg-app-success-bg text-app-success-text'
+                                            : 'bg-app-surface text-app-text-muted'
+                                    }`}
+                                >
+                                    {phase.checkSummary.passed ? (
+                                        <CheckCircle2 className="h-3 w-3" />
+                                    ) : (
+                                        <ClipboardCheck className="h-3 w-3" />
+                                    )}
+                                    {phase.checkSummary.passed ? 'Check passed' : 'Check open'}
+                                </span>
+                            )}
+                        </div>
                     </button>
                 );
             })}

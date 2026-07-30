@@ -211,6 +211,17 @@ expectedOutcome: step.expectedOutcomes?.[0] ?? '',
     },
 
     /**
+     * Loads a user's open review pool so admins, PMs, or HR can see which earlier
+     * questions still keep that user from finishing onboarding. Never contains correct
+     * answers — use fetchPhaseCheckForEditing for those. Requires ADMIN/PM/HR role.
+     */
+    async fetchUserReviewCheck(userId: string): Promise<ReviewCheckEndpoint> {
+        return await apiClient.fetch<ReviewCheckEndpoint>(
+            `/api/v1/onboarding/users/${userId}/review-check`,
+        );
+    },
+
+    /**
      * Loads a user's submitted check attempts for a phase so admins, PMs, or HR
      * can review the results. Requires ADMIN/PM/HR role.
      */
