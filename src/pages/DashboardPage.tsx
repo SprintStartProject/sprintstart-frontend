@@ -1,8 +1,8 @@
 import { useCallback, useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/useAuth';
-import { UserAvatar } from '../components/common/UserAvatar';
-import { Link } from 'react-router-dom';
-import { Bot, BookOpen, Sparkles, ChartColumn } from 'lucide-react';
+import { ChartColumn } from 'lucide-react';
+import { centralSpringToken } from '../styles/tokens';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Game2048Modal } from '../features/game2048/components/Game2048Modal';
 import { useGame2048Shortcut } from '../features/game2048/hooks/useGame2048Shortcut';
@@ -10,6 +10,11 @@ import { DinoGameModal } from '../features/dino/components/DinoGameModal';
 import { useDinoShortcut } from '../features/dino/hooks/useDinoShortcut';
 import { SpaceInvadersModal } from '../features/space-invaders/components/SpaceInvadersModal';
 import { useSpaceInvadersShortcut } from '../features/space-invaders/hooks/useSpaceInvadersShortcut';
+import { DashboardHero } from '../features/dashboard/components/DashboardHero';
+import { NextStepWidget } from '../features/dashboard/components/NextStepWidget';
+import { KnowledgeBaseWidget } from '../features/dashboard/components/KnowledgeBaseWidget';
+import { QuickChatWidget } from '../features/dashboard/components/QuickChatWidget';
+import { SkillsStrip } from '../features/dashboard/components/SkillsStrip';
 
 /**
  * Central hub displayed after login.
@@ -77,47 +82,48 @@ export function DashboardPage() {
                 </div>
             </header>
 
-            <main className="app-page-frame flex min-h-[70vh] flex-col p-8">
-                {/* Centered Greeting and Date/Time */}
-                <div className="flex flex-1 flex-col items-center justify-center space-y-6">
-                    <div className="text-center space-y-2">
-                        <p className="text-xl font-medium text-app-text/70">{formattedDate}</p>
-                        <p className="text-3xl font-light text-app-text/90">{formattedTime}</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 pb-6">
-                        <h2 className="text-5xl font-bold tracking-tight text-app-text">
-                            {greeting}, {displayName}
-                        </h2>
-                        <UserAvatar 
-                            size={48} 
-                            profileIcon={profile?.profileIcon} 
-                            fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
-                            seed={profile?.id}
-                        />
-                    </div>
+            <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={centralSpringToken}
+                >
+                    <DashboardHero
+                        greeting={greeting}
+                        displayName={displayName}
+                        formattedDate={formattedDate}
+                        formattedTime={formattedTime}
+                        profileIcon={profile?.profileIcon}
+                        fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
+                        seed={profile?.id}
+                    />
+                </motion.div>
 
-                    {/* Quick Links */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl mt-8">
-                        <Link to="/chat" className="flex flex-col items-center justify-center p-8 bg-app-surface border border-app-border rounded-2xl hover:border-app-accent hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                            <Bot className="w-10 h-10 mb-4 text-blue-500 group-hover:scale-110 transition-all duration-300" />
-                            <h3 className="text-xl font-semibold text-app-text group-hover:text-blue-600 transition-colors">Chat</h3>
-                            <p className="text-app-text/60 text-center mt-2">Talk to the AI assistant</p>
-                        </Link>
-                        
-                        <Link to="/knowledge-base" className="flex flex-col items-center justify-center p-8 bg-app-surface border border-app-border rounded-2xl hover:border-app-accent hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                            <BookOpen className="w-10 h-10 mb-4 text-blue-500 group-hover:scale-110 transition-all duration-300" />
-                            <h3 className="text-xl font-semibold text-app-text group-hover:text-blue-600 transition-colors">Knowledge Base</h3>
-                            <p className="text-app-text/60 text-center mt-2">Explore company resources</p>
-                        </Link>
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...centralSpringToken, delay: 0.08 }}
+                    className="grid grid-cols-1 gap-5 lg:grid-cols-2"
+                >
+                    <NextStepWidget />
+                    <KnowledgeBaseWidget />
+                </motion.div>
 
-                        <Link to="/onboarding" className="flex flex-col items-center justify-center p-8 bg-app-surface border border-app-border rounded-2xl hover:border-app-accent hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                            <Sparkles className="w-10 h-10 mb-4 text-blue-500 group-hover:scale-110 transition-all duration-300" />
-                            <h3 className="text-xl font-semibold text-app-text group-hover:text-blue-600 transition-colors">Onboarding</h3>
-                            <p className="text-app-text/60 text-center mt-2">Continue your setup</p>
-                        </Link>
-                    </div>
-                </div>
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...centralSpringToken, delay: 0.16 }}
+                >
+                    <QuickChatWidget />
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...centralSpringToken, delay: 0.24 }}
+                >
+                    <SkillsStrip />
+                </motion.div>
             </main>
 
             <Game2048Modal open={game2048Open} onClose={() => setGame2048Open(false)} />

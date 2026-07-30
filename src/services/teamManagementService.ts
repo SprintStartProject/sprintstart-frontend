@@ -779,3 +779,39 @@ export async function getUserSkillLevels(
     return [];
   }
 }
+
+/**
+ * Skill levels for the *currently authenticated* user.
+ *
+ * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
+ * open to the USER role — the admin endpoint behind `getUserSkillLevels`
+ * would 403 for a regular user looking at their own dashboard. The raw
+ * assessments only carry skill IDs, so names and roles are joined in from
+ * the skill and project-role lists.
+ */
+export async function getMySkillLevels(): Promise<UserSkillLevel[]> {
+  try {
+    const [assessments, skills, roles] = await Promise.all([
+      apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills"),
+      getSkills(),
+      getProjectRoles(),
+    ]);
+
+    return assessments.map((assessment) => {
+      const skill = skills.find((s) => s.id === assessment.skillId);
+      const roleNames = roles
+        .filter((role) => skill?.roleIds.includes(role.id))
+        .map((role) => role.name);
+
+      return {
+        id: `${assessment.userId}-${assessment.skillId}`,
+        skillId: assessment.skillId,
+        skillName: skill?.name ?? "Unknown skill",
+        roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",
+        level: assessment.level,
+      };
+    });
+  } catch {
+    return [];
+  }
+}

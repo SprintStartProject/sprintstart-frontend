@@ -299,6 +299,27 @@ export const handlers = [
     () => new HttpResponse(null, { status: 200 }),
   ),
 
+  http.get("/api/v1/onboarding/me/team-overview", () =>
+    HttpResponse.json({
+      userId: "user1",
+      firstname: "Alice",
+      lastname: "Smith",
+      email: "alice@example.com",
+      roles: [{ id: "role1", name: "Backend" }],
+      skills: [],
+      progressPercentage: 0.4,
+      currentPhase: { id: "phase1", title: "Phase 1" },
+      currentStep: {
+        id: "step1",
+        title: "Set up your environment",
+        startedAt: "2023-01-01T10:00:00Z",
+        skip: null,
+      },
+      hasFeedback: false,
+      project: { id: "project1", name: "Project 1" },
+    }),
+  ),
+
   http.get("/api/v1/onboarding/team-overview", ({ request }) => {
     const url = new URL(request.url);
     const roleId = url.searchParams.get("roleIds");

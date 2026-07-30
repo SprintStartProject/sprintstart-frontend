@@ -28,6 +28,30 @@ type UploadResponseItem = {
 
 export const knowledgeService = {
     /**
+     * Fetches a single short page of project artifacts for at-a-glance views
+     * such as the dashboard widget.
+     *
+     * Deliberately separate from {@link knowledgeService.getUnifiedArtifacts},
+     * which pages through the entire project and additionally merges personal
+     * uploads — far more work than a preview card needs.
+     *
+     * @param projectId UUID of the project to scope the listing.
+     * @param limit Maximum number of artifacts to return.
+     * @returns The first page of artifacts, or an empty array on failure.
+     */
+    async getRecentArtifacts(projectId: string, limit = 4): Promise<Artifact[]> {
+        try {
+            const response = await apiClient.fetch<{ items?: Artifact[] }>(
+                `/api/v1/projects/${projectId}/artifacts?page=1&size=${limit}`,
+            );
+
+            return response.items ?? [];
+        } catch {
+            return [];
+        }
+    },
+
+    /**
      * Fetches all unified artifacts for a specific project, merged with the
      * authenticated user's personal uploads (mapped into the same Artifact shape).
      *
