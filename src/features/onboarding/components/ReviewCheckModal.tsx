@@ -46,8 +46,12 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
   // usually scrolled down at the last question and would never see the result banner.
   const topRef = useRef<HTMLDivElement>(null);
 
+  // Skips the initial render, where there is nothing to scroll away from yet.
+  const hasResultSettledRef = useRef(false);
+
   /**
-   * Brings the result banner into view, once the graded DOM is committed.
+   * Scrolls back to the top whenever the result appears or is cleared: to the banner after
+   * grading, and to question 1 after "Keep going" loads the next round.
    *
    * Deliberately an effect rather than a call at the end of `submit`: grading replaces
    * every question card with its longer graded form, which grows the content above the
@@ -59,7 +63,10 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
    * The optional call is for jsdom, which has no `scrollIntoView`.
    */
   useEffect(() => {
-    if (!result) return;
+    if (!hasResultSettledRef.current) {
+      hasResultSettledRef.current = true;
+      return;
+    }
     topRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [result]);
 

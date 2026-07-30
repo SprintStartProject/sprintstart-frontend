@@ -254,6 +254,15 @@ export interface AdminPhaseCheckEndpoint {
 }
 
 export interface UpsertPhaseCheckQuestion {
+  /**
+   * ID of an existing question, so it survives the update with its identity intact.
+   * Omit for questions being created.
+   *
+   * Sending it back matters: review pool items and stored attempt answers reference
+   * questions by ID, so a question recreated instead of updated loses that history and
+   * silently drops out of every member's review pool.
+   */
+  id?: string | null;
   position: number;
   type: CheckQuestionType;
   question: string;
@@ -262,6 +271,8 @@ export interface UpsertPhaseCheckQuestion {
   correctAnswer?: string | null;
   // MULTIPLE_CHOICE only
   options?: {
+    /** ID of an existing option; omit for new ones. Stored answers reference these. */
+    id?: string | null;
     position: number;
     label: string;
     correct: boolean;

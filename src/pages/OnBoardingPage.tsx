@@ -2,13 +2,14 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
   OnboardingStepEndpoint,
 } from "../features/onboarding/types";
-import { useNavigate } from "react-router-dom";
+import { findActivePhaseIndex } from "../features/onboarding/activePhase";
+import { useNavigate, useLocation } from "react-router-dom";
 import { onboardingService } from "../services/onboardingService";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/apiClient";
@@ -65,20 +66,6 @@ function ProgressBar({ value, max }: ProgressBarProps) {
   );
 }
 
-/**
- * Index of the phase the user is currently working on: the first phase that still
- * has a not-yet-finished/skipped step. Falls back to the last phase when everything
- * is done, so a reload never drops the user back to phase 1.
- */
-function findActivePhaseIndex(path: OnboardingPathEndpoint): number {
-  const index = path.phases.findIndex((phase) =>
-    phase.steps.some(
-      (step) => step.status !== "FINISHED" && step.status !== "SKIPPED",
-    ),
-  );
-  return index === -1 ? Math.max(0, path.phases.length - 1) : index;
-}
-
 // ─────────────────────────────────────────────────────────────
 // MAIN COMPONENT: OnBoardingPage
 // ─────────────────────────────────────────────────────────────
@@ -123,6 +110,29 @@ export function OnBoardingPage() {
   const [celebrate, setCelebrate] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Set by the step page when a knowledge check is what stands between the user and the
+  // rest of their path, so this page can put that check in front of them.
+  const focusCheckPhaseId = (location.state as { focusCheckPhaseId?: string } | null)
+    ?.focusCheckPhaseId;
+
+  // The phase's knowledge check card, which sits at the end of a potentially long step list.
+  const checkCardRef = useRef<HTMLDivElement>(null);
+  const hasFocusedCheckRef = useRef(false);
+
+  /**
+   * Brings the knowledge check into view when the user was sent here because of it.
+   *
+   * Fires once per visit: the card is the reason for the navigation, but it is the last
+   * thing on the page, so without this the user lands above it and sees the step list they
+   * just finished. Later phase switches must not drag the view back down, hence the ref.
+   */
+  useEffect(() => {
+    if (loadingState !== "success" || !focusCheckPhaseId || hasFocusedCheckRef.current) return;
+    hasFocusedCheckRef.current = true;
+    checkCardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [loadingState, focusCheckPhaseId]);
 
   // Silently re-fetches the path, e.g. after a check attempt changed lock states.
   const refreshPath = async () => {
@@ -250,8 +260,15 @@ export function OnBoardingPage() {
 
         const path = await onboardingService.fetchPath();
         setOnBoardingPath(path);
-        // Land on the phase the user is actually working on, not always phase 1.
-        setSelectedPhaseIndex(findActivePhaseIndex(path));
+        // Land on the phase the user is actually working on, not always phase 1. A phase
+        // the step page pointed us at wins, since an earlier phase can still be open while
+        // the check being waited on belongs to a later one.
+        const requestedIndex = focusCheckPhaseId
+          ? path.phases.findIndex((phase) => phase.id === focusCheckPhaseId)
+          : -1;
+        setSelectedPhaseIndex(
+          requestedIndex >= 0 ? requestedIndex : findActivePhaseIndex(path),
+        );
         setLoadingState("success");
         // Drives the review-check button; failing to read it must not break the page.
         await refreshReviewCount();
@@ -266,7 +283,9 @@ export function OnBoardingPage() {
       }
     };
     void loadOnBoardingPath();
-  }, []);
+    // focusCheckPhaseId comes from the navigation that mounted this page, so it is fixed
+    // for the visit; listing it keeps the phase choice honest about what it reads.
+  }, [focusCheckPhaseId]);
 
   const currentPhase =
     OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
@@ -740,6 +759,7 @@ export function OnBoardingPage() {
               const locked = currentPhase.locked || !allStepsDone;
               return (
                 <div
+                  ref={checkCardRef}
                   className={`group rounded-2xl border transition-all bg-app-surface ${
                     passed
                       ? "border-app-border opacity-60"

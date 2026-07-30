@@ -39,14 +39,21 @@ type PhaseCheckAdminModalProps = {
     onClose: () => void;
 };
 
-/** Editor state for one question; mirrors UpsertPhaseCheckQuestion plus a local key. */
+/**
+ * Editor state for one question; mirrors UpsertPhaseCheckQuestion plus a local key.
+ *
+ * `id` is the server's ID, kept so the save can tell the backend which questions already
+ * exist — without it every save recreates the whole check, which orphans the members'
+ * review pool entries and their attempt history. Null means "new question".
+ */
 type QuestionDraft = {
     key: string;
+    id: string | null;
     type: CheckQuestionType;
     question: string;
     explanation: string;
     correctAnswer: string;
-    options: { key: string; label: string; correct: boolean }[];
+    options: { key: string; id: string | null; label: string; correct: boolean }[];
 };
 
 let draftKeySeed = 0;
@@ -55,12 +62,14 @@ const nextKey = () => `draft-${draftKeySeed++}`;
 function toDraft(question: AdminPhaseCheckQuestionEndpoint): QuestionDraft {
     return {
         key: nextKey(),
+        id: question.id,
         type: question.type,
         question: question.question,
         explanation: question.explanation ?? '',
         correctAnswer: question.correctAnswer ?? '',
         options: (question.options ?? []).map((option) => ({
             key: nextKey(),
+            id: option.id,
             label: option.label,
             correct: option.correct,
         })),
@@ -70,6 +79,7 @@ function toDraft(question: AdminPhaseCheckQuestionEndpoint): QuestionDraft {
 function emptyDraft(type: CheckQuestionType): QuestionDraft {
     return {
         key: nextKey(),
+        id: null,
         type,
         question: '',
         explanation: '',
@@ -77,8 +87,8 @@ function emptyDraft(type: CheckQuestionType): QuestionDraft {
         options:
             type === 'MULTIPLE_CHOICE'
                 ? [
-                      { key: nextKey(), label: '', correct: true },
-                      { key: nextKey(), label: '', correct: false },
+                      { key: nextKey(), id: null, label: '', correct: true },
+                      { key: nextKey(), id: null, label: '', correct: false },
                   ]
                 : [],
     };
@@ -107,8 +117,16 @@ function validate(drafts: QuestionDraft[]): string | null {
     return null;
 }
 
+/**
+ * Turns the editor state into the save payload.
+ *
+ * IDs of existing questions and options are passed through so the backend updates them in
+ * place instead of recreating the check. Questions the user removed are simply absent, which
+ * is how the backend learns to delete exactly those.
+ */
 function toPayload(drafts: QuestionDraft[]): UpsertPhaseCheckQuestion[] {
     return drafts.map((draft, index) => ({
+        id: draft.id ?? undefined,
         position: index,
         type: draft.type,
         question: draft.question.trim(),
@@ -120,6 +138,7 @@ function toPayload(drafts: QuestionDraft[]): UpsertPhaseCheckQuestion[] {
                 ? draft.options
                       .filter((option) => option.label.trim())
                       .map((option, optionIndex) => ({
+                          id: option.id ?? undefined,
                           position: optionIndex,
                           label: option.label.trim(),
                           correct: option.correct,
@@ -483,7 +502,7 @@ function QuestionsEditor({
                                     onUpdate(draft.key, {
                                         options: [
                                             ...draft.options,
-                                            { key: nextKey(), label: '', correct: false },
+                                            { key: nextKey(), id: null, label: '', correct: false },
                                         ],
                                     })
                                 }

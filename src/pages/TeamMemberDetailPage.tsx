@@ -14,6 +14,7 @@ import type {
     OnboardingStepEndpoint,
     OnboardingTaskEndpoint,
 } from '../features/onboarding/types';
+import { findActivePhaseIndex } from '../features/onboarding/activePhase';
 import type {
     ProjectRole,
     TeamOverviewUser,
@@ -211,11 +212,12 @@ export function TeamMemberDetailPage() {
             setKnowledgeGaps(knowledgeGapOverview.gaps);
             setFeedbackItems(feedback);
             setOnboardingPath(path);
-            setSelectedPhaseId(path?.phases?.[0]?.id ?? '');
+            // Open on the phase the member is actually working on. Phase 1 is almost never
+            // the interesting one for a reviewer, and it hides how far along they really are.
+            const activePhase = path?.phases?.[findActivePhaseIndex(path)];
+            setSelectedPhaseId(activePhase?.id ?? '');
             setSelectedStepId(
-                memberData?.currentStep?.id ??
-                    path?.phases?.[0]?.steps?.[0]?.id ??
-                    '',
+                memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? '',
             );
             setLoadingFeedback(false);
             setLoading(false);
@@ -295,8 +297,10 @@ export function TeamMemberDetailPage() {
         const path = await getUserOnboardingPath(userId);
         setOnboardingPath(path);
 
+        // Only when the selected phase disappeared; fall back to the active one rather than
+        // to phase 1, for the same reason as on load.
         if (path?.phases?.length && !path.phases.some((phase) => phase.id === selectedPhaseId)) {
-            setSelectedPhaseId(path.phases[0].id);
+            setSelectedPhaseId(path.phases[findActivePhaseIndex(path)].id);
         }
 
         const refreshedSteps = path?.phases.flatMap((phase) => phase.steps ?? []) ?? [];

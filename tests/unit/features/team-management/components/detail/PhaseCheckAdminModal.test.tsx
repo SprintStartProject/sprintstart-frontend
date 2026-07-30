@@ -71,6 +71,7 @@ describe('PhaseCheckAdminModal', () => {
         await waitFor(() => expect(mocked.savePhaseCheck).toHaveBeenCalled());
         expect(mocked.savePhaseCheck).toHaveBeenCalledWith('phase1', [
             {
+                id: 'q1',
                 position: 0,
                 type: 'SHORT_TEXT',
                 question: 'How do you start it?',
@@ -80,6 +81,53 @@ describe('PhaseCheckAdminModal', () => {
             },
         ]);
         expect(defaultProps.onSaved).toHaveBeenCalled();
+    });
+
+    it('keeps existing question and option ids, and omits them for newly added ones', async () => {
+        const user = userEvent.setup();
+        mocked.fetchPhaseCheckForEditing.mockResolvedValue({
+            phaseId: 'phase1',
+            questions: [
+                {
+                    id: 'q1',
+                    position: 0,
+                    type: 'MULTIPLE_CHOICE' as const,
+                    question: 'Which one?',
+                    explanation: null,
+                    correctAnswer: null,
+                    options: [
+                        { id: 'o1', position: 0, label: 'A', correct: true },
+                        { id: 'o2', position: 1, label: 'B', correct: false },
+                    ],
+                },
+            ],
+        });
+        mocked.savePhaseCheck.mockResolvedValue({ phaseId: 'phase1', questions: [] });
+        render(<PhaseCheckAdminModal {...defaultProps} />);
+
+        await screen.findByDisplayValue('Which one?');
+        await user.click(screen.getByRole('button', { name: /add option/i }));
+        await user.type(screen.getByLabelText(/option 3 label/i), 'C');
+        await user.click(screen.getByRole('button', { name: /save questions/i }));
+
+        // The IDs have to survive the round trip: without them the backend recreates every
+        // question, which throws the member's whole phase out of their review pool.
+        await waitFor(() => expect(mocked.savePhaseCheck).toHaveBeenCalled());
+        expect(mocked.savePhaseCheck).toHaveBeenCalledWith('phase1', [
+            {
+                id: 'q1',
+                position: 0,
+                type: 'MULTIPLE_CHOICE',
+                question: 'Which one?',
+                explanation: undefined,
+                correctAnswer: undefined,
+                options: [
+                    { id: 'o1', position: 0, label: 'A', correct: true },
+                    { id: 'o2', position: 1, label: 'B', correct: false },
+                    { id: undefined, position: 2, label: 'C', correct: false },
+                ],
+            },
+        ]);
     });
 
     it('blocks saving a short text question without a sample answer', async () => {
