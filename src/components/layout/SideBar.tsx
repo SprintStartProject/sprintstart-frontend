@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
+import { motion } from 'framer-motion';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     BookOpen,
@@ -20,6 +21,7 @@ import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../aut
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
 import { SidebarNavLink } from './SidebarNavLink';
+import { hoverSpringToken } from '../../styles/tokens';
 
 type SidebarNavItem = {
     label: string;
@@ -182,60 +184,75 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
                 ))}
             </nav>
 
-            <div className="space-y-[12px] border-t border-app-border bg-app-surface px-[28px] py-[16px]">
-                {profile && (
-                    <div className="mb-4 flex items-center justify-between py-2">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
-                                <UserAvatar
-                                    size={32}
-                                    profileIcon={profile.profileIcon}
-                                    fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
-                                    seed={profile.id}
-                                />
+            {/* Floating glass card instead of a full-bleed bar. The 16px outer
+                gutter plus 12px inner padding lines its content up with the
+                28px inset used by the nav items above. */}
+            <div className="px-[16px] pb-[16px] pt-[8px]">
+                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                    {profile && (
+                        <div className="flex items-center justify-between gap-2 py-[2px]">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
+                                    <UserAvatar
+                                        size={32}
+                                        profileIcon={profile.profileIcon}
+                                        fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                                        seed={profile.id}
+                                    />
+                                </div>
+        
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="truncate text-sm font-semibold text-app-text">
+                                        {profile.username}
+                                    </span>
+        
+                                    <span className="truncate text-[10px] font-medium uppercase tracking-wider text-app-text-muted">
+                                        {profile.permissionGroup.replace('_', ' ')}
+                                    </span>
+                                </div>
                             </div>
-
-                            <div className="flex flex-col overflow-hidden">
-                                <span className="truncate text-sm font-semibold text-app-text">
-                                    {profile.username}
-                                </span>
-
-                                <span className="truncate text-[10px] font-medium uppercase tracking-wider text-app-text-muted">
-                                    {profile.permissionGroup.replace('_', ' ')}
-                                </span>
-                            </div>
+                            <motion.div
+                                whileHover={{ scale: 1.18 }}
+                                whileTap={{ scale: 0.92 }}
+                                transition={hoverSpringToken}
+                                className="shrink-0"
+                            >
+                                <NavLink
+                                    to="/settings"
+                                    onClick={onNavigate}
+                                    className={({ isActive }) =>
+                                        `flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                                            isActive
+                                                ? 'bg-app-brand-soft text-app-brand'
+                                                : 'text-app-text-muted hover:bg-app-surface-hover hover:text-app-text'
+                                        }`
+                                    }
+                                    title="Settings"
+                                    aria-label="Settings"
+                                >
+                                    <Settings className="h-[18px] w-[18px]" />
+                                </NavLink>
+                            </motion.div>
                         </div>
-                        <NavLink
-                            to="/settings"
-                            onClick={onNavigate}
-                            className={({ isActive }) =>
-                                `flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                                    isActive
-                                        ? 'bg-app-surface-hover text-app-brand'
-                                        : 'text-app-text-muted hover:bg-app-surface-hover hover:text-app-text'
-                                }`
-                            }
-                            title="Settings"
-                            aria-label="Settings"
-                        >
-                            <Settings className="h-4 w-4" />
-                        </NavLink>
-                    </div>
-                )}
-
-                <ProjectSwitcher className="w-full" />
-
-                <button
-                    type="button"
-                    onClick={() => {
-                        void logout();
-                    }}
-                    disabled={status === 'loading'}
-                    className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-lg bg-app-danger-bg text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
-                >
-                    <LogOut className="h-[16px] w-[16px]" />
-                    Logout
-                </button>
+                    )}
+        
+                    <ProjectSwitcher className="w-full" />
+        
+                    <motion.button
+                        type="button"
+                        onClick={() => {
+                            void logout();
+                        }}
+                        disabled={status === 'loading'}
+                        whileHover={status === 'loading' ? undefined : { scale: 1.02 }}
+                        whileTap={status === 'loading' ? undefined : { scale: 0.98 }}
+                        transition={hoverSpringToken}
+                        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                    >
+                        <LogOut className="h-[16px] w-[16px]" />
+                        Logout
+                    </motion.button>
+                </div>
             </div>
         </div>
     );
