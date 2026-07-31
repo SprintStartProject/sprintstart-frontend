@@ -73,8 +73,32 @@ describe("SourceDetailsPanel", () => {
     expect(screen.getByText("Instance")).toBeInTheDocument();
     expect(screen.queryByText("Repository")).not.toBeInTheDocument();
     expect(screen.getByText("https://acme.atlassian.net")).toBeInTheDocument();
-    expect(screen.getByText("default")).toBeInTheDocument();
-    expect(screen.getByText("jira@corp.com")).toBeInTheDocument();
+    // Credentials are intentionally not surfaced in the drawer.
+    expect(screen.queryByText("default")).not.toBeInTheDocument();
+    expect(screen.queryByText("jira@corp.com")).not.toBeInTheDocument();
+  });
+
+  it("toggles a Jira instance's ingestion via onSetJiraSourceEnabled", async () => {
+    const user = userEvent.setup();
+    const onSetJiraSourceEnabled = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={jiraSource}
+        canManageSyncSettings
+        onSetJiraSourceEnabled={onSetJiraSourceEnabled}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("switch", { name: /Toggle ingestion for Team board/ }),
+    );
+
+    expect(onSetJiraSourceEnabled).toHaveBeenCalledWith(
+      "https://acme.atlassian.net",
+      false,
+    );
   });
 
   it('updates a Jira instance via the "Update instance" button', async () => {
@@ -92,6 +116,72 @@ describe("SourceDetailsPanel", () => {
     await user.click(screen.getByRole("button", { name: /Update instance/ }));
 
     expect(onUpdateSource).toHaveBeenCalledWith(jiraSource);
+  });
+
+  it("renders the Jira sync schedule and loads it for the instance", async () => {
+    const onLoadJiraConfig = vi.fn().mockResolvedValue({
+      instanceUrl: "https://acme.atlassian.net",
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      schedule: "every 30m",
+      nextSyncAt: null,
+    });
+
+    render(
+      <SourceDetailsPanel
+        source={jiraSource}
+        canManageSyncSettings
+        onLoadJiraConfig={onLoadJiraConfig}
+        onSaveJiraConfig={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Sync Schedule")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(onLoadJiraConfig).toHaveBeenCalledWith(
+        "https://acme.atlassian.net",
+      );
+    });
+  });
+
+  it("saves the Jira sync schedule via onSaveJiraConfig", async () => {
+    const user = userEvent.setup();
+    const onLoadJiraConfig = vi.fn().mockResolvedValue({
+      instanceUrl: "https://acme.atlassian.net",
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      schedule: "every 30m",
+      nextSyncAt: null,
+    });
+    const onSaveJiraConfig = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={jiraSource}
+        canManageSyncSettings
+        onLoadJiraConfig={onLoadJiraConfig}
+        onSaveJiraConfig={onSaveJiraConfig}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(onLoadJiraConfig).toHaveBeenCalled());
+
+    const minutes = screen.getByLabelText("Minutes");
+    await user.clear(minutes);
+    await user.type(minutes, "45");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(onSaveJiraConfig).toHaveBeenCalledWith(
+        "https://acme.atlassian.net",
+        expect.objectContaining({
+          autoUpdate: true,
+          schedule: { type: "INTERVAL", everyMinutes: 45 },
+        }),
+      );
+    });
   });
 
   it("renders repository and ingestion details", () => {

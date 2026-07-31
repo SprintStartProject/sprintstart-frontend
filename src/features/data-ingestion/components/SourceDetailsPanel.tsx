@@ -17,6 +17,10 @@ import type {
   ConfigureGithubRepositoryRequest,
   GithubRepositoryConfig,
 } from "../../../services/sources/githubService.ts";
+import type {
+  ConfigureJiraInstanceRequest,
+  GetJiraInstanceConfigResponse,
+} from "../../../services/sources/jiraService.ts";
 import { formatDateTime, formatNumber, SOURCE_META } from "../data.ts";
 import type { DataSource, LoadingState } from "../types.ts";
 import { GithubRepositorySyncSettings } from "./GithubRepositorySyncSettings.tsx";
@@ -36,9 +40,23 @@ type SourceDetailsPanelProps = {
     repository: NonNullable<DataSource["githubRepository"]>,
     request: ConfigureGithubRepositoryRequest,
   ) => Promise<void>;
+  /** Loads the sync schedule of a Jira instance (by URL) for the schedule form. */
+  onLoadJiraConfig?: (
+    instanceUrl: string,
+  ) => Promise<GetJiraInstanceConfigResponse>;
+  /** Saves the sync schedule of a Jira instance (by URL). */
+  onSaveJiraConfig?: (
+    instanceUrl: string,
+    request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
+  ) => Promise<void>;
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
   onSetSourceEnabled?: (
     repository: NonNullable<DataSource["githubRepository"]>,
+    enabled: boolean,
+  ) => Promise<void>;
+  /** Enables/disables a Jira instance as an ingestion source (by instance URL). */
+  onSetJiraSourceEnabled?: (
+    instanceUrl: string,
     enabled: boolean,
   ) => Promise<void>;
   /**
@@ -60,7 +78,10 @@ export function SourceDetailsPanel({
   canManageSyncSettings = false,
   onLoadRepositoryConfig,
   onSaveRepositoryConfig,
+  onLoadJiraConfig,
+  onSaveJiraConfig,
   onSetSourceEnabled,
+  onSetJiraSourceEnabled,
   onUnlinkSource,
   onClose,
 }: SourceDetailsPanelProps) {
@@ -90,11 +111,25 @@ export function SourceDetailsPanel({
     repository !== null &&
     onLoadRepositoryConfig !== undefined &&
     onSaveRepositoryConfig !== undefined;
+  const canManageJiraConfig =
+    canManageSyncSettings &&
+    isJira &&
+    jira !== null &&
+    onLoadJiraConfig !== undefined &&
+    onSaveJiraConfig !== undefined;
   const canToggleEnabled =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
     repository !== null &&
     onSetSourceEnabled !== undefined;
+  const canToggleJiraEnabled =
+    canManageSyncSettings &&
+    isJira &&
+    jira !== null &&
+    onSetJiraSourceEnabled !== undefined;
+  // Jira has no per-source `enabled` field on the card; a disabled instance is
+  // exactly the one the status endpoint collapses to DISABLED.
+  const jiraEnabled = source.backendStatus !== "DISABLED";
   const isTogglingEnabled = enabledState === "loading";
   // Unlink needs the connection's repositoryId (the DELETE path parameter);
   // authorization is presence-based — the parent only passes onUnlinkSource when
@@ -137,6 +172,34 @@ export function SourceDetailsPanel({
       }
     },
     [onSetSourceEnabled, repository],
+  );
+
+  const handleToggleJiraEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!jira || !onSetJiraSourceEnabled) return;
+
+      setEnabledState("loading");
+      setMessage(null);
+      setErrorMessage(null);
+
+      try {
+        await onSetJiraSourceEnabled(jira.instanceUrl, enabled);
+        setEnabledState("success");
+        setMessage(
+          enabled
+            ? "Source enabled. It is included in ingestion again."
+            : "Source disabled. It is excluded from ingestion.",
+        );
+      } catch (error) {
+        setEnabledState("error");
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to update the source.",
+        );
+      }
+    },
+    [jira, onSetJiraSourceEnabled],
   );
 
   const loadRepositoryConfig = useCallback(async () => {
@@ -352,8 +415,34 @@ export function SourceDetailsPanel({
           <dl className="overflow-hidden rounded-xl border border-app-border">
             <InfoRow label="Display name" value={jira.displayName} />
             <InfoLinkRow label="URL" value={jira.instanceUrl} />
-            <InfoRow label="Credential" value={jira.credentialName} />
-            <InfoRow label="Account" value={jira.credentialUserEmail} />
+            {canToggleJiraEnabled ? (
+              <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5">
+                <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">
+                  Source
+                </dt>
+                <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="text-[13px] font-semibold text-app-text">
+                    {jiraEnabled ? "Enabled" : "Disabled"}
+                    <span className="ml-1 font-normal text-app-text-subtle">
+                      · {jiraEnabled ? "included in" : "excluded from"} ingestion
+                    </span>
+                  </span>
+                  <AccountEnabledToggle
+                    enabled={jiraEnabled}
+                    disabled={isTogglingEnabled}
+                    ariaLabel={`Toggle ingestion for ${jira.displayName}`}
+                    onChange={(next) => {
+                      void handleToggleJiraEnabled(next);
+                    }}
+                  />
+                </dd>
+              </div>
+            ) : (
+              <InfoRow
+                label="Source"
+                value={jiraEnabled ? "Enabled" : "Disabled"}
+              />
+            )}
           </dl>
         </Section>
       )}
@@ -430,6 +519,21 @@ export function SourceDetailsPanel({
             loadKey={repository.fullName}
             loadConfig={loadRepositoryConfig}
             onSave={saveRepositoryConfig}
+          />
+        </Section>
+      )}
+
+      {canManageJiraConfig && jira && onLoadJiraConfig && onSaveJiraConfig && (
+        <Section title="Sync Schedule">
+          {/* Same control as GitHub: the Jira instance sync schedule shares the
+              identical schedule contract, only the load/save endpoints differ. */}
+          <GithubRepositorySyncSettings
+            loadKey={jira.instanceUrl}
+            loadConfig={() => onLoadJiraConfig(jira.instanceUrl)}
+            onSave={(request) => onSaveJiraConfig(jira.instanceUrl, request)}
+            autoUpdateOnText="Due checks update this Jira instance."
+            autoUpdateOffText="Due checks only mark this Jira instance out of date."
+            toggleAriaLabel="Toggle Jira instance auto update"
           />
         </Section>
       )}

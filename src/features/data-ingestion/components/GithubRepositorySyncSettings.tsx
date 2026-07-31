@@ -12,9 +12,21 @@ import type {
 
 type ScheduleType = GithubScheduleSpec["type"];
 
+/**
+ * The minimal loaded-config shape this schedule form actually reads. Both
+ * {@link GithubRepositoryConfig} and the Jira instance config
+ * (`GetJiraInstanceConfigResponse`) satisfy it, so the same control drives the
+ * GitHub repository and Jira instance sync schedules — the two connectors share
+ * an identical schedule contract ({@link GithubScheduleSpec}).
+ */
+export type SyncScheduleConfig = Pick<
+  GithubRepositoryConfig,
+  "autoUpdate" | "spec" | "nextSyncAt"
+>;
+
 type GithubRepositorySyncSettingsProps = {
   loadKey?: string;
-  loadConfig?: () => Promise<GithubRepositoryConfig>;
+  loadConfig?: () => Promise<SyncScheduleConfig>;
   initialConfig?: ConfigureGithubRepositoryRequest;
   onSave: (request: ConfigureGithubRepositoryRequest) => Promise<void>;
   disclaimer?: string;

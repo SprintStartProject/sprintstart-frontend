@@ -70,8 +70,11 @@ import {
   type ConfigureGithubRepositoryRequest,
 } from "../services/sources/githubService.ts";
 import {
+  configureJiraInstance,
+  getJiraConfig,
   getJiraInstances,
   updateJiraInstance,
+  type ConfigureJiraInstanceRequest,
   type JiraInstanceDto,
 } from "../services/sources/jiraService.ts";
 import {
@@ -1124,6 +1127,24 @@ export function DataIngestionPage() {
     [loadData, reloadSourceStatuses],
   );
 
+  const handleLoadJiraConfig = useCallback(
+    async (instanceUrl: string) => getJiraConfig(instanceUrl),
+    [],
+  );
+
+  const handleSaveJiraConfig = useCallback(
+    async (
+      instanceUrl: string,
+      request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
+    ) => {
+      await configureJiraInstance({ instanceUrl, ...request });
+      // Mirrors the GitHub path: no reloadProjects(), just refresh this page's
+      // run list and per-source statuses so the next-sync time updates.
+      await Promise.all([loadData(false), reloadSourceStatuses()]);
+    },
+    [loadData, reloadSourceStatuses],
+  );
+
   // Refreshes just this page's data after a source-level mutation (enable/disable,
   // "Refresh details"). It intentionally does NOT reloadProjects(): the switcher's
   // project list is unaffected by these actions, and reloading it can transiently
@@ -1142,6 +1163,19 @@ export function DataIngestionPage() {
     async (repository: GithubRepositoryDetails, enabled: boolean) => {
       await connectorService.patchConnectorSources("github", [
         { sourceId: repository.fullName, enabled },
+      ]);
+      await refreshSourceDetails();
+    },
+    [refreshSourceDetails],
+  );
+
+  // Jira instances are gated through the same generic connector endpoint as
+  // GitHub: the JiraConnector's patchSource flips `sourceEnabled` and the AI
+  // service is notified, keyed by the instance URL.
+  const handleSetJiraSourceEnabled = useCallback(
+    async (instanceUrl: string, enabled: boolean) => {
+      await connectorService.patchConnectorSources("jira", [
+        { sourceId: instanceUrl, enabled },
       ]);
       await refreshSourceDetails();
     },
@@ -1419,7 +1453,10 @@ export function DataIngestionPage() {
           canManageSyncSettings={canManageGithubSyncSettings}
           onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
           onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
+          onLoadJiraConfig={handleLoadJiraConfig}
+          onSaveJiraConfig={handleSaveJiraConfig}
           onSetSourceEnabled={handleSetSourceEnabled}
+          onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
           onUnlinkSource={
             canIngestIntoSelectedProject ? handleUnlinkSource : undefined
           }
