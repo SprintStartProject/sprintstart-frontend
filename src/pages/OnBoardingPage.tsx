@@ -33,6 +33,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckModal";
 import { OnboardingCompleteCelebration } from "../features/onboarding/components/OnboardingCompleteCelebration";
+import { useMoments } from "../features/moments";
 //import type {UserProfile} from "../services/types.ts";
 
 type LoadingState = "idle" | "loading" | "generating" | "success" | "error";
@@ -113,6 +114,8 @@ export function OnBoardingPage() {
   // Shows the "on board" confetti celebration after passing the final phase's check.
   const [celebrate, setCelebrate] = useState(false);
 
+  const { celebrate: celebrateMoment } = useMoments();
+
   const navigate = useNavigate();
 
   // Silently re-fetches the path, e.g. after a check attempt changed lock states.
@@ -136,8 +139,20 @@ export function OnBoardingPage() {
     const wasFinalPhase =
       !!checkPhase &&
       OnBoardingPathEndpoint?.phases.at(-1)?.id === checkPhase.id;
+    const clearedPhaseTitle = checkPhase?.title;
     setCheckPhase(null);
     if (passed && wasFinalPhase) setCelebrate(true);
+    // Clearing a mid-path check unlocks the next phase — worth a beat of its own.
+    // The final phase keeps its dedicated "on board" celebration instead.
+    if (passed && !wasFinalPhase) {
+      celebrateMoment({
+        tone: "milestone",
+        title: "Phase cleared",
+        message: clearedPhaseTitle
+          ? `You passed the ${clearedPhaseTitle} check. The next phase is unlocked.`
+          : "You passed the check. The next phase is unlocked.",
+      });
+    }
     // Only refresh the path here, never the auth profile: the backend has flagged the
     // user as onboarded, but keeping the in-memory profile stale until the next reload
     // lets the celebration play out before the onboarding UI is gated away.

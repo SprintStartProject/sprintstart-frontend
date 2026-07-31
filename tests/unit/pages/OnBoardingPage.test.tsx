@@ -5,6 +5,16 @@ import { OnBoardingPage } from '../../../src/pages/OnBoardingPage';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../unit/setup/vitest.setup';
 
+// The celebratory layer is decorative and lives behind its own provider; the
+// page only needs a no-op `celebrate` to render.
+vi.mock('../../../src/features/moments', () => ({
+    useMoments: () => ({
+        celebrate: vi.fn(),
+        playLaunchSequence: vi.fn(),
+        isLaunching: false,
+    }),
+}));
+
 vi.mock('../../../src/services/userService', () => ({
     userService: {
         getProfile: vi.fn().mockResolvedValue({

@@ -5,6 +5,7 @@ import { ChatProvider } from './context/ChatProvider';
 import { ChatPreferencesProvider } from './context/ChatPreferencesProvider';
 import { ThemeProvider } from './context/ThemeProvider';
 import { ProjectProvider } from './features/projects/ProjectProvider';
+import { MomentsProvider, RocketPet } from './features/moments';
 import { useAuth } from './context/useAuth';
 
 function AppContent() {
@@ -20,6 +21,10 @@ function AppContent() {
             <main className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
                 <AppRouter />
             </main>
+
+            {/* Decorative easter egg; only for signed-in users, so it never
+                sits on top of the login screen. */}
+            {showSidebar && <RocketPet />}
         </div>
     );
 }
@@ -33,7 +38,11 @@ function App() {
                 <ProjectProvider>
                     <ChatProvider>
                         <ChatPreferencesProvider>
-                            <AppContent />
+                            {/* Inside AuthProvider: the launch sequence is triggered
+                                by the user becoming authenticated. */}
+                            <MomentsProvider>
+                                <AppContent />
+                            </MomentsProvider>
                         </ChatPreferencesProvider>
                     </ChatProvider>
                 </ProjectProvider>

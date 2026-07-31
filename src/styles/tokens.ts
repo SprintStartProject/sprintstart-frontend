@@ -124,3 +124,37 @@ export function getModalDialogVariants(prefersReducedMotion: boolean): Variants 
         },
     };
 }
+
+/**
+ * Spring for celebration cards (knowledge check passed, phase unlocked,
+ * onboarding finished). Deliberately under-damped compared to
+ * `centralSpringToken`: the small overshoot is what makes the card feel like a
+ * reward rather than another dialog. Reserve it for earned moments — using it
+ * on routine UI cheapens both.
+ */
+export const celebrationSpringToken: Transition = {
+    type: "spring",
+    stiffness: 260,
+    damping: 18,
+    mass: 0.9,
+};
+
+/**
+ * Easing for anything flying across the screen — the launch sequence and the
+ * rocket easter egg. Starts hard and coasts out, so it reads as thrust rather
+ * than as a panel sliding.
+ */
+export const flightEaseToken: Transition = {
+    duration: 1.15,
+    ease: [0.4, 0, 0.35, 1],
+};
+
+/**
+ * Slow, endless breathing loop for idle decorative elements (the perched
+ * rocket, ambient glows). Long enough that it never competes for attention.
+ */
+export const idleDriftToken: Transition = {
+    duration: 3.4,
+    repeat: Infinity,
+    ease: "easeInOut",
+};
