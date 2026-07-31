@@ -109,7 +109,7 @@ export function SourceConnectModal({
                                 const Icon = meta.icon;
                                 const isSelected =
                                     selectedSourceSystem === sourceSystem;
-                                const isAvailable = sourceSystem === "GITHUB";
+                                const isAvailable = sourceSystem === "GITHUB" || sourceSystem === "UPLOAD";
 
                                 return (
                                     <button
