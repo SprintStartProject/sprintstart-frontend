@@ -55,9 +55,17 @@ describe('SideBar', () => {
         document.documentElement.className = '';
         Object.defineProperty(window, 'matchMedia', {
             writable: true,
+            // Framer Motion's `useReducedMotion` (used by the sidebar nav items)
+            // subscribes to the media query, so the mock needs the listener API.
             value: vi.fn().mockImplementation((query: string) => ({
                 matches: false,
                 media: query,
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
             })),
         });
     });

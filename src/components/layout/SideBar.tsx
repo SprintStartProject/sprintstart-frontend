@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     BookOpen,
@@ -19,6 +19,7 @@ import { useAuth } from '../../context/useAuth';
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../auth/accessPolicy';
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
+import { SidebarNavLink } from './SidebarNavLink';
 
 type SidebarNavItem = {
     label: string;
@@ -76,15 +77,11 @@ const adminNavItems: SidebarNavItem[] = [
 ];
 
 
-function getNavLinkClass(isActive: boolean): string {
-    return [
-        'group flex h-[40px] items-center gap-[12px] rounded-[8px] px-[12px] text-[14px] font-medium leading-none transition-all duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus',
-        isActive
-            ? 'bg-app-brand text-white shadow-lg [&>svg]:text-white'
-            : 'text-app-text-muted hover:bg-app-surface-hover hover:text-app-text [&>svg]:text-app-text-muted hover:[&>svg]:text-app-text',
-    ].join(' ');
-}
+type SidebarSection = {
+    /** Optional uppercase group label rendered above the entries. */
+    heading?: string;
+    items: SidebarNavItem[];
+};
 
 /**
  * Renders the navigation links and user profile section within the sidebar.
@@ -93,7 +90,13 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
     const { profile, logout, status } = useAuth();
     const { canManageSelected } = useProjectContext();
     const location = useLocation();
-const visibleNavItems = navItems.filter(
+    const [hoveredPath, setHoveredPath] = useState<AppRoute | null>(null);
+    // Scopes the sliding pill to this sidebar instance. The desktop and the
+    // mobile sidebar are mounted at the same time and must not share one
+    // `layoutId`, otherwise Framer Motion animates the pill between them.
+    const indicatorLayoutId = `sidebar-active-pill-${useId()}`;
+
+    const visibleNavItems = navItems.filter(
         (item) =>
             canAccessRoute(profile, item.path, canManageSelected) &&
             // Hide onboarding once the user has completed it and been promoted.
@@ -111,9 +114,25 @@ const visibleNavItems = navItems.filter(
         location.pathname.startsWith('/insights/faq') ||
         location.pathname.startsWith('/insights/knowledge-gaps');
 
+    const sections: SidebarSection[] = [
+        { items: visibleNavItems },
+        { heading: 'Project Manager', items: visibleProjectManagerNavItems },
+        { heading: 'Admin', items: visibleAdminNavItems },
+    ].filter((section) => section.items.length > 0);
+
+    const handleHoverChange = (path: AppRoute, isHovered: boolean) => {
+        setHoveredPath((current) => {
+            if (isHovered) {
+                return path;
+            }
+
+            return current === path ? null : current;
+        });
+    };
+
     return (
         <div className="flex h-full flex-col bg-app-bg text-app-text">
-            <div className="flex items-center gap-3 px-[24px] py-[24px]">
+            <div className="flex items-center gap-3 px-[28px] py-[24px]">
                 <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
                     <Rocket className="h-[18px] w-[18px] text-white" />
                 </div>
@@ -123,107 +142,49 @@ const visibleNavItems = navItems.filter(
                 </h1>
             </div>
 
-            <nav aria-label={ariaLabel} className="flex-1 space-y-[5px] px-[16px] py-[20px]">
-                {visibleNavItems.map((item) => (
-                    <NavLink
-                        key={item.path}
-                        to={item.path}
-                        end={item.path === '/'}
-                        onClick={onNavigate}
-                        className={({ isActive }) => getNavLinkClass(isActive)}
+            <nav
+                aria-label={ariaLabel}
+                onMouseLeave={() => setHoveredPath(null)}
+                // 28px inner padding gives the magnified item exactly enough
+                // room to grow to the sidebar edge without crossing it.
+                className="flex-1 space-y-[5px] px-[28px] py-[20px]"
+            >
+                {sections.map((section, sectionIndex) => (
+                    <div
+                        key={section.heading ?? 'primary'}
+                        className={sectionIndex > 0 ? 'pt-[20px]' : undefined}
                     >
-                        {({ isActive }) => (
-                            <>
-                                {item.icon}
+                        {section.heading ? (
+                            <p className="px-[12px] pb-[8px] text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                                {section.heading}
+                            </p>
+                        ) : null}
 
-                                <span>{item.label}</span>
-
-                                {isActive ? (
-                                    <span className="ml-auto h-[6px] w-[6px] rounded-full bg-white" />
-                                ) : null}
-                            </>
-                        )}
-                    </NavLink>
+                        <div className="space-y-[5px]">
+                            {section.items.map((item) => (
+                                <SidebarNavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    label={item.label}
+                                    icon={item.icon}
+                                    end={item.path === '/'}
+                                    forceActive={item.path === '/pm-dashboard' && isPmSectionActive}
+                                    indicatorLayoutId={indicatorLayoutId}
+                                    isMagnified={hoveredPath === item.path}
+                                    onNavigate={onNavigate}
+                                    onHoverChange={(isHovered) =>
+                                        handleHoverChange(item.path, isHovered)
+                                    }
+                                />
+                            ))}
+                        </div>
+                    </div>
                 ))}
-
-                {visibleProjectManagerNavItems.length > 0 && (
-                    <div className="pt-[20px]">
-                        <p className="px-[8px] pb-[8px] text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                            Project Manager
-                        </p>
-
-                        <div className="space-y-[5px]">
-                            {visibleProjectManagerNavItems.map((item) => (
-                                <NavLink
-                                    key={item.path}
-                                    to={item.path}
-                                    onClick={onNavigate}
-                                    className={({ isActive }) => {
-                                        const shouldHighlight =
-                                            item.path === '/pm-dashboard'
-                                                ? isActive || isPmSectionActive
-                                                : isActive;
-                                        return getNavLinkClass(shouldHighlight);
-                                    }}
-                                >
-                                    {({ isActive }) => {
-                                        const shouldHighlight =
-                                            item.path === '/pm-dashboard'
-                                                ? isActive || isPmSectionActive
-                                                : isActive;
-                                        return (
-                                            <>
-                                                {item.icon}
-
-                                                <span>{item.label}</span>
-
-                                                {shouldHighlight ? (
-                                                    <span className="ml-auto h-[6px] w-[6px] rounded-full bg-white" />
-                                                ) : null}
-                                            </>
-                                        );
-                                    }}
-                                </NavLink>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {visibleAdminNavItems.length > 0 && (
-                    <div className="pt-[20px]">
-                        <p className="px-[8px] pb-[8px] text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                            Admin
-                        </p>
-
-                        <div className="space-y-[5px]">
-                            {visibleAdminNavItems.map((item) => (
-                                <NavLink
-                                    key={item.path}
-                                    to={item.path}
-                                    onClick={onNavigate}
-                                    className={({ isActive }) => getNavLinkClass(isActive)}
-                                >
-                                    {({ isActive }) => (
-                                        <>
-                                            {item.icon}
-
-                                            <span>{item.label}</span>
-
-                                            {isActive ? (
-                                                <span className="ml-auto h-[6px] w-[6px] rounded-full bg-white" />
-                                            ) : null}
-                                        </>
-                                    )}
-                                </NavLink>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </nav>
 
-            <div className="space-y-[12px] border-t border-app-border bg-app-surface p-[16px]">
+            <div className="space-y-[12px] border-t border-app-border bg-app-surface px-[28px] py-[16px]">
                 {profile && (
-                    <div className="mb-4 flex items-center justify-between px-3 py-2">
+                    <div className="mb-4 flex items-center justify-between py-2">
                         <div className="flex items-center gap-3 overflow-hidden">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
                                 <UserAvatar
@@ -337,7 +298,9 @@ export function SideBar() {
                 aria-hidden={!isMobileSidebarOpen}
                 inert={!isMobileSidebarOpen}
                 className={[
-                    'fixed bottom-0 left-0 top-0 z-[60] flex w-[286px] flex-col border-r border-app-border bg-app-bg transition-transform duration-300 ease-out lg:hidden',
+                    // The cubic-bezier is the iOS sheet curve: fast out of the
+                    // gate, long soft settle — reads as gliding, not snapping.
+                    'fixed bottom-0 left-0 top-0 z-[60] flex w-[286px] flex-col border-r border-app-border bg-app-bg transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden',
                     isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
                 ].join(' ')}
             >

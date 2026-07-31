@@ -34,3 +34,27 @@ export const hoverSpringToken: Transition = {
     stiffness: 400,
     damping: 15,
 };
+
+/**
+ * Spring for the macOS-dock style magnification of sidebar items.
+ * Almost critically damped so items grow and shrink without wobbling
+ * while the pointer sweeps across the navigation.
+ */
+export const dockMagnifySpringToken: Transition = {
+    type: "spring",
+    stiffness: 380,
+    damping: 30,
+    mass: 0.6,
+};
+
+/**
+ * Spring for the sliding active indicator (shared `layoutId` pill).
+ * Slightly stiffer than the default so the pill tracks a navigation
+ * change quickly, with just enough softness to read as "liquid".
+ */
+export const slidingIndicatorSpringToken: Transition = {
+    type: "spring",
+    stiffness: 420,
+    damping: 36,
+    mass: 0.9,
+};
