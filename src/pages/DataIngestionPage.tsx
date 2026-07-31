@@ -91,13 +91,31 @@ const RUN_PAGE_SIZE = 10;
 
 type RunFilterState = {
   status: RunStatusFilter;
-  /** A repository id, or `"ALL"`. */
-  repositoryId: string;
+  /** The selected source's `value` (GitHub repo id or Jira instance URL), or `"ALL"`. */
+  sourceValue: string;
+  /**
+   * How to translate `sourceValue` into a query param: GitHub filters by
+   * `repositoryId`, Jira by the connector-neutral `sourceRef`. Null while no
+   * specific source is selected.
+   */
+  sourceSystem: SourceSystem | null;
 };
 
 const DEFAULT_RUN_FILTER: RunFilterState = {
   status: "ALL",
-  repositoryId: "ALL",
+  sourceValue: "ALL",
+  sourceSystem: null,
+};
+
+/**
+ * A source offered in the run-history filter. `value` is the GitHub repository
+ * id or Jira instance URL; `sourceSystem` decides which query param it maps to
+ * (repositoryId vs. sourceRef).
+ */
+type RunSourceFilterOption = {
+  value: string;
+  label: string;
+  sourceSystem: SourceSystem;
 };
 
 function toSourceSystem(value: string): SourceSystem | null {
@@ -582,15 +600,32 @@ export function DataIngestionPage() {
   // from other projects' repositories out of the list; the backend resolves the
   // project to its connected repositories.
   const buildRunQuery = useCallback(
-    (page: number): IngestionRunFilter => ({
-      page,
-      size: RUN_PAGE_SIZE,
-      projectId: selectedProjectId || undefined,
-      repositoryId:
-        runFilter.repositoryId !== "ALL" ? runFilter.repositoryId : undefined,
-      status: runFilter.status !== "ALL" ? runFilter.status : undefined,
-    }),
-    [runFilter.repositoryId, runFilter.status, selectedProjectId],
+    (page: number): IngestionRunFilter => {
+      const hasSource = runFilter.sourceValue !== "ALL";
+
+      return {
+        page,
+        size: RUN_PAGE_SIZE,
+        projectId: selectedProjectId || undefined,
+        // GitHub scopes by repositoryId; Jira (and any connector-neutral source)
+        // scopes by the run's sourceInstanceRef via sourceRef.
+        repositoryId:
+          hasSource && runFilter.sourceSystem === "GITHUB"
+            ? runFilter.sourceValue
+            : undefined,
+        sourceRef:
+          hasSource && runFilter.sourceSystem === "JIRA"
+            ? runFilter.sourceValue
+            : undefined,
+        status: runFilter.status !== "ALL" ? runFilter.status : undefined,
+      };
+    },
+    [
+      runFilter.sourceValue,
+      runFilter.sourceSystem,
+      runFilter.status,
+      selectedProjectId,
+    ],
   );
 
   // Loads exactly the page currently being viewed.
@@ -832,24 +867,39 @@ export function DataIngestionPage() {
     [sources],
   );
 
-  // Repositories offered in the run filter, from the project's connected sources.
-  const runRepositoryOptions = useMemo(
+  // Sources offered in the run filter, from the project's connected sources: a
+  // GitHub repo filters by its repositoryId, a Jira instance by its URL
+  // (sourceId), which the query maps to sourceRef.
+  const runSourceOptions = useMemo<RunSourceFilterOption[]>(
     () =>
-      sources.flatMap((source) =>
-        source.githubRepository?.repositoryId
-          ? [
-              {
-                repositoryId: source.githubRepository.repositoryId,
-                label: source.name,
-              },
-            ]
-          : [],
-      ),
+      sources.flatMap((source): RunSourceFilterOption[] => {
+        if (source.githubRepository?.repositoryId) {
+          return [
+            {
+              value: source.githubRepository.repositoryId,
+              label: source.name,
+              sourceSystem: "GITHUB",
+            },
+          ];
+        }
+
+        if (source.sourceSystem === "JIRA") {
+          return [
+            {
+              value: source.sourceId,
+              label: source.name,
+              sourceSystem: "JIRA",
+            },
+          ];
+        }
+
+        return [];
+      }),
     [sources],
   );
 
   const isRunFilterActive =
-    runFilter.status !== "ALL" || runFilter.repositoryId !== "ALL";
+    runFilter.status !== "ALL" || runFilter.sourceValue !== "ALL";
 
   const handleResetRunFilter = useCallback(() => {
     setRunFilter(DEFAULT_RUN_FILTER);
@@ -1317,17 +1367,21 @@ export function DataIngestionPage() {
 
                       <RunHistoryFilters
                         status={runFilter.status}
-                        repositoryId={runFilter.repositoryId}
-                        repositories={runRepositoryOptions}
+                        sourceValue={runFilter.sourceValue}
+                        sources={runSourceOptions}
                         disabled={isLoading}
                         onStatusChange={(status) => {
                           setRunFilter((current) => ({ ...current, status }));
                           setRunPageNumber(1);
                         }}
-                        onRepositoryChange={(repositoryId) => {
+                        onSourceChange={(sourceValue) => {
+                          const option = runSourceOptions.find(
+                            (candidate) => candidate.value === sourceValue,
+                          );
                           setRunFilter((current) => ({
                             ...current,
-                            repositoryId,
+                            sourceValue,
+                            sourceSystem: option?.sourceSystem ?? null,
                           }));
                           setRunPageNumber(1);
                         }}

@@ -259,6 +259,92 @@ describe('DataIngestionPage', () => {
         expect(mockGetJiraInstances).toHaveBeenCalledWith('proj1');
     });
 
+    it('filters the run history to a Jira instance via sourceRef', async () => {
+        // A GitHub repo (repositoryId) and a Jira instance (URL) together offer
+        // two options in the source filter, so the dropdown appears.
+        mockGetIngestionSourceStatuses.mockResolvedValue([
+            {
+                sourceSystem: 'GITHUB',
+                sourceId: 'octocat/hello-world',
+                displayName: 'octocat/hello-world',
+                repositoryId: 'repo-uuid',
+                owner: 'octocat',
+                name: 'hello-world',
+                sourceUrl: 'https://github.com/octocat/hello-world',
+                connectionStatus: 'CONNECTED',
+                enabled: true,
+                lastRunTime: '2026-07-01T00:00:00Z',
+                ingestedCount: 1,
+                updatedCount: 0,
+                deletedCount: 0,
+                failedCount: 0,
+                failedItems: [],
+                artifactCount: 10,
+                lastCommitsSyncAt: null,
+                lastIssuesSyncAt: null,
+                lastPullRequestsSyncAt: null,
+            },
+            {
+                sourceSystem: 'JIRA',
+                sourceId: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                repositoryId: null,
+                owner: null,
+                name: null,
+                sourceUrl: 'https://team.atlassian.net',
+                connectionStatus: 'CONNECTED',
+                enabled: true,
+                lastRunTime: '2026-07-01T00:00:00Z',
+                ingestedCount: 5,
+                updatedCount: 2,
+                deletedCount: 0,
+                failedCount: 0,
+                failedItems: [],
+                artifactCount: 128,
+                lastCommitsSyncAt: null,
+                lastIssuesSyncAt: '2026-07-01T00:00:00Z',
+                lastPullRequestsSyncAt: null,
+            },
+        ]);
+        mockGetJiraInstances.mockResolvedValue([
+            {
+                instanceUrl: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                lastUpdate: '2026-07-01T00:00:00Z',
+                projectIds: ['proj1'],
+                sourceEnabled: true,
+                status: 'UP_TO_DATE',
+                updateCredentialName: 'default',
+                updateCredentialUserEmail: 'jira@corp.com',
+            },
+        ]);
+
+        const user = userEvent.setup();
+        render(<MemoryRouter><DataIngestionPage /></MemoryRouter>);
+
+        await waitFor(() => {
+            expect(
+                screen.getByLabelText('Filter runs by source'),
+            ).toBeInTheDocument();
+        });
+
+        await user.selectOptions(
+            screen.getByLabelText('Filter runs by source'),
+            'https://team.atlassian.net',
+        );
+
+        // The Jira instance URL is sent as sourceRef, not repositoryId.
+        await waitFor(() => {
+            expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    sourceRef: 'https://team.atlassian.net',
+                    repositoryId: undefined,
+                    page: 1,
+                }),
+            );
+        });
+    });
+
     it('applies a projectId deep link once and then releases the project switcher', async () => {
         const setSelectedProjectId = vi.fn();
         const project = createSelectableProject({ id: 'proj1', isManaged: true });
