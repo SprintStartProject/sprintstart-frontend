@@ -10,6 +10,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { CalendarClock, Plug } from "lucide-react";
 import { Modal } from "../components/ui/Modal.tsx";
+import { PanelPresence } from "../components/ui/PanelPresence.tsx";
 import { Pagination } from "../components/ui/Pagination.tsx";
 import { DataIngestionHeader } from "../features/data-ingestion/components/DataIngestionHeader.tsx";
 import { DataIngestionLoadingState } from "../features/data-ingestion/components/DataIngestionLoadingState.tsx";
@@ -1281,9 +1282,10 @@ export function DataIngestionPage() {
         </main>
       </div>
 
-      {selectedSource && (
+      <PanelPresence value={selectedSource}>
+        {(source) => (
         <SourceDetailsPanel
-          source={selectedSource}
+          source={source}
           onUpdateSource={handleUpdateSource}
           onRefreshDetails={refreshSourceDetails}
           canManageSyncSettings={canManageGithubSyncSettings}
@@ -1295,15 +1297,18 @@ export function DataIngestionPage() {
           }
           onClose={closeSourceDetails}
         />
-      )}
+        )}
+      </PanelPresence>
 
-      {selectedRun && (
-        <RunDetailsPanel
-          run={selectedRun}
-          sourceLabel={getRunSourceLabel(selectedRun, runSourceLabels)}
-          onClose={() => setSelectedRunSnapshot(null)}
-        />
-      )}
+      <PanelPresence value={selectedRun}>
+        {(run) => (
+          <RunDetailsPanel
+            run={run}
+            sourceLabel={getRunSourceLabel(run, runSourceLabels)}
+            onClose={() => setSelectedRunSnapshot(null)}
+          />
+        )}
+      </PanelPresence>
 
       <Modal
         isOpen={isConnectorsModalOpen}

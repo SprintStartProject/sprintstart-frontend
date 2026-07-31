@@ -1,4 +1,5 @@
 import type { BadgeVariant } from "../../components/ui/Badge";
+import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type {
   AdminUser,
   ProjectEditFormState,
@@ -9,7 +10,10 @@ import type {
 } from "./types";
 
 export const PAGE_SIZE = 8;
-export const DRAWER_CLOSE_DELAY_MS = 260;
+// The admin drawers keep their selection alive after closing for the same
+// reason `PanelPresence` does: unmounting sooner would cut the slide off
+// halfway and the drawer would appear to vanish rather than glide away.
+export const DRAWER_CLOSE_DELAY_MS = SIDE_PANEL_SLIDE_MS + 30;
 export const PERMISSION_GROUP_OPTIONS = [
   "Admin",
   "User",

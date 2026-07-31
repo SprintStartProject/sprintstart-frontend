@@ -4,7 +4,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { DetailsSideDrawer } from '../../../../src/components/layout/DetailsSideDrawer';
 
 describe('DetailsSideDrawer', () => {
-    it('applies open/close classes correctly', () => {
+    // The slide itself is an inline transform written by Framer Motion, which
+    // is stubbed out in the test setup. What stays assertable -- and is what
+    // actually matters for correctness -- is that a closed drawer is hidden
+    // from assistive tech and taken out of the tab flow.
+    it('exposes the drawer only while it is open', () => {
         const { rerender } = render(
             <DetailsSideDrawer isOpen={true} onClose={vi.fn()} title="Drawer Title" leading={<span>Leading</span>}>
                 <p>Drawer Content</p>
@@ -12,14 +16,19 @@ describe('DetailsSideDrawer', () => {
         );
 
         expect(screen.getByText('Drawer Title')).toBeInTheDocument();
-        expect(screen.getByText('Drawer Title').closest('[role="dialog"]')).toHaveClass('translate-x-0');
+
+        const drawer = screen.getByText('Drawer Title').closest('[role="dialog"]');
+        expect(drawer).toHaveAttribute('aria-hidden', 'false');
+        expect(drawer).not.toHaveAttribute('inert');
 
         rerender(
             <DetailsSideDrawer isOpen={false} onClose={vi.fn()} title="Drawer Title" leading={<span>Leading</span>}>
                 <p>Drawer Content</p>
             </DetailsSideDrawer>,
         );
-        expect(screen.getByText('Drawer Title').closest('[role="dialog"]')).toHaveClass('translate-x-full');
+
+        expect(drawer).toHaveAttribute('aria-hidden', 'true');
+        expect(drawer).toHaveAttribute('inert');
     });
 
     it('fires onClose when the X button is clicked', async () => {

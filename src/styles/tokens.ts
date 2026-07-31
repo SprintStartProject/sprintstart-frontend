@@ -58,3 +58,26 @@ export const slidingIndicatorSpringToken: Transition = {
     damping: 36,
     mass: 0.9,
 };
+
+/**
+ * How long a `SidePanel` takes to slide in or out, in milliseconds.
+ *
+ * Single source of truth: the panel animation, how long `PanelPresence` keeps
+ * a closing panel mounted, and the admin drawers' own close delay all derive
+ * from this. Keeping them independent is what previously cut the slide off
+ * halfway.
+ */
+export const SIDE_PANEL_SLIDE_MS = 420;
+
+/**
+ * Transition for the `SidePanel` slide.
+ *
+ * A tween rather than a spring: the panel is unmounted a fixed time after it
+ * starts closing, so the motion has to be guaranteed finished by then, which
+ * a spring cannot promise. The curve is the iOS sheet easing -- fast off the
+ * mark, long soft settle.
+ */
+export const sidePanelSlideToken: Transition = {
+    duration: SIDE_PANEL_SLIDE_MS / 1000,
+    ease: [0.32, 0.72, 0, 1],
+};

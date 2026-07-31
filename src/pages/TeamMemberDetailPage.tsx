@@ -63,6 +63,7 @@ function getElapsedDays(startedAt: string): number {
 
 import { UserAvatar } from '../components/common/UserAvatar';
 import { Modal } from '../components/ui/Modal';
+import { PanelPresence } from '../components/ui/PanelPresence';
 import { AddCustomStepModal } from '../features/team-management/components/detail/AddCustomStepModal';
 import { MemberDetailDialogs } from '../features/team-management/components/detail/MemberDetailDialogs';
 import { MemberGapsPanel } from '../features/team-management/components/detail/MemberGapsPanel';
@@ -1257,9 +1258,10 @@ export function TeamMemberDetailPage() {
                 onClose={() => setStepInsertTarget(null)}
                 onSubmit={() => void handleCreateCustomStep()}
             />
-            {detailStep && (
+            <PanelPresence value={detailStep}>
+                {(step) => (
                 <StepDetailsPanel
-                    step={detailStep}
+                    step={step}
                     tasks={sortedDetailStepTasks}
                     doneTaskCount={detailStepDoneTasks}
                     actualMinutes={detailStepActualMinutes}
@@ -1295,13 +1297,14 @@ export function TeamMemberDetailPage() {
                     getStepStatusStyles={getStepStatusStyles}
                     onReorderTasks={(activeTaskId, overTaskId) =>
                         void handleReorderTasks(
-                            detailStep.id,
+                            step.id,
                             activeTaskId,
                             overTaskId,
                         )
                     }
                 />
-            )}
+                )}
+            </PanelPresence>
         </div>
 
     );

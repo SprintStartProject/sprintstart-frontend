@@ -1,5 +1,8 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { useContext, useEffect, useId, useRef, type ReactNode } from "react";
+import { PanelPresenceContext } from "./panelPresenceContext";
+import { sidePanelSlideToken } from "../../styles/tokens";
 
 type SidePanelProps = {
     isOpen: boolean;
@@ -40,7 +43,7 @@ function getFocusableElements(container: HTMLElement) {
 }
 
 export function SidePanel({
-    isOpen,
+    isOpen: isOpenProp,
     onClose,
     title,
     description,
@@ -66,6 +69,14 @@ export function SidePanel({
     const previouslyFocusedElement = useRef<HTMLElement | null>(null);
     const titleId = useId();
     const descriptionId = useId();
+
+    // A surrounding `PanelPresence` knows the panel is closing before the
+    // caller has torn its props down, so it wins over the local prop.
+    const presence = useContext(PanelPresenceContext);
+    const isOpen = presence ? presence.isOpen : isOpenProp;
+
+    const prefersReducedMotion = useReducedMotion();
+    const panelTransition = prefersReducedMotion ? { duration: 0 } : sidePanelSlideToken;
 
     useEffect(() => {
         if (!isOpen) {
@@ -133,24 +144,38 @@ export function SidePanel({
 
     return (
         <>
-            {showOverlay && isOpen && (
+            {/* Kept mounted so the backdrop can fade instead of blinking in and
+                out. `inert` keeps it out of the tab order while closed. */}
+            {showOverlay && (
                 <button
                     type="button"
                     aria-label={closeAriaLabel}
+                    aria-hidden={!isOpen}
+                    inert={!isOpen}
                     onClick={onClose}
-                    className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} ${overlayClassName}`}
+                    className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} ${overlayClassName} transition-opacity duration-300 ease-out ${
+                        isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
                 />
             )}
 
-            <div
+            {/* Driven by Framer Motion rather than by CSS classes, on purpose.
+                A class-based slide has to survive the cascade: Tailwind v4's
+                `translate-x-*` writes the standalone `translate` property, and
+                a panel that mounts already open needs a keyframe to animate in,
+                which then does not reliably hand back over to a transition on
+                the way out. Motion writes the transform inline and owns both
+                directions, so entry and exit are symmetric by construction. */}
+            <motion.div
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={title ? titleId : undefined}
                 aria-describedby={description ? descriptionId : undefined}
-                className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl transition-[transform,opacity] duration-300 ease-out sm:rounded-l-[28px] ${
-                    isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
-                } ${panelClassName}`}
+                initial={{ x: "100%", opacity: 0 }}
+                animate={{ x: isOpen ? 0 : "100%", opacity: isOpen ? 1 : 0 }}
+                transition={panelTransition}
+                className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl sm:rounded-l-[28px] ${panelClassName}`}
                 aria-hidden={!isOpen}
                 inert={!isOpen}
                 tabIndex={-1}
@@ -207,7 +232,7 @@ export function SidePanel({
                         {footer}
                     </div>
                 )}
-            </div>
+            </motion.div>
         </>
     );
 }
