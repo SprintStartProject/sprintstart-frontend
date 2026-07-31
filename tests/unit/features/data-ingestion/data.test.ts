@@ -15,11 +15,12 @@ import {
   formatRunFinishedAt,
   formatNumber,
 } from "../../../../src/features/data-ingestion/data";
-import type { IngestionRunStatus } from "../../../../src/features/data-ingestion/types";
 import type {
-  JiraInstanceDto,
-  JiraInstanceStatus,
-} from "../../../../src/services/sources/jiraService";
+  ConnectionStatus,
+  IngestionRunStatus,
+  SourceInstanceIngestionStatus,
+} from "../../../../src/features/data-ingestion/types";
+import type { JiraInstanceDto } from "../../../../src/services/sources/jiraService";
 
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
@@ -205,6 +206,31 @@ describe("data-ingestion data helpers", () => {
   });
 
   describe("createJiraSourceFromInstance", () => {
+    const status = (
+      overrides: Partial<SourceInstanceIngestionStatus> = {},
+    ): SourceInstanceIngestionStatus => ({
+      sourceSystem: "JIRA",
+      sourceId: "https://acme.atlassian.net",
+      displayName: "Team board",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://acme.atlassian.net",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-28T10:00:00Z",
+      ingestedCount: 42,
+      updatedCount: 3,
+      deletedCount: 1,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 128,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: "2026-07-28T10:00:00Z",
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
+
     const instance = (
       overrides: Partial<JiraInstanceDto> = {},
     ): JiraInstanceDto => ({
@@ -219,32 +245,30 @@ describe("data-ingestion data helpers", () => {
       ...overrides,
     });
 
-    const cases: Array<[JiraInstanceStatus, string]> = [
-      ["UP_TO_DATE", "CONNECTED"],
-      ["UPDATING", "UPDATING"],
-      ["OUT_OF_DATE", "OUT_OF_DATE"],
-      ["FAILED", "FAILED"],
+    const cases: ConnectionStatus[] = [
+      "CONNECTED",
+      "UPDATING",
+      "OUT_OF_DATE",
+      "FAILED",
     ];
 
-    for (const [jiraStatus, backendStatus] of cases) {
-      it(`maps ${jiraStatus} to ${backendStatus}`, () => {
-        const source = createJiraSourceFromInstance(
-          instance({ status: jiraStatus }),
-        );
-        expect(source.backendStatus).toBe(backendStatus);
+    for (const connectionStatus of cases) {
+      it(`carries the ${connectionStatus} connection status`, () => {
+        const source = createJiraSourceFromInstance(status({ connectionStatus }));
+        expect(source.backendStatus).toBe(connectionStatus);
       });
     }
 
     it("overrides the status with DISABLED when the source is disabled", () => {
       const source = createJiraSourceFromInstance(
-        instance({ status: "UP_TO_DATE", sourceEnabled: false }),
+        status({ connectionStatus: "CONNECTED", enabled: false }),
       );
       expect(source.backendStatus).toBe("DISABLED");
       expect(source.statusView.state).toBe("disabled");
     });
 
-    it("carries the instance identity and credential in jiraInstance, not githubRepository", () => {
-      const source = createJiraSourceFromInstance(instance());
+    it("carries the instance identity and merged credential in jiraInstance, not githubRepository", () => {
+      const source = createJiraSourceFromInstance(status(), instance());
       expect(source.sourceSystem).toBe("JIRA");
       expect(source.sourceId).toBe("https://acme.atlassian.net");
       expect(source.name).toBe("Team board");
@@ -257,36 +281,34 @@ describe("data-ingestion data helpers", () => {
       });
     });
 
-    it("fills run-derived counters from a matched latest run", () => {
-      const source = createJiraSourceFromInstance(instance(), {
-        runId: "r1",
-        sourceSystem: "JIRA",
-        sourceId: "https://acme.atlassian.net",
-        owner: null,
-        name: null,
-        repositoryId: null,
-        startedAt: "2026-07-28T10:00:00Z",
-        finishedAt: "2026-07-28T10:05:00Z",
-        ingestedCount: 42,
-        updatedCount: 3,
-        deletedCount: 1,
-        failedCount: 0,
-        status: "COMPLETED",
-        failedItems: [],
-        failureReason: null,
-        aiSyncStatus: "SUCCEEDED",
-        aiSyncFailureReason: null,
-      });
-      expect(source.artifacts).toBe(42);
+    it("takes counters and the real artifact total from the status row", () => {
+      const source = createJiraSourceFromInstance(status(), instance());
+      expect(source.artifacts).toBe(128);
+      expect(source.latestIngestedCount).toBe(42);
       expect(source.latestUpdatedCount).toBe(3);
-      expect(source.totalArtifactCount).toBe(42);
+      expect(source.deletedCount).toBe(1);
+      // The status row's artifactCount is the real stored total, no longer the
+      // last run's ingested count.
+      expect(source.totalArtifactCount).toBe(128);
     });
 
-    it("falls back to the display name only, with zero counters, without a run", () => {
-      const source = createJiraSourceFromInstance(instance());
-      expect(source.artifacts).toBe(0);
-      expect(source.errors).toBe(0);
-      expect(source.failedItems).toEqual([]);
+    it("still renders with empty credentials when no instance DTO is matched", () => {
+      const source = createJiraSourceFromInstance(status());
+      expect(source.artifacts).toBe(128);
+      expect(source.jiraInstance).toEqual({
+        instanceUrl: "https://acme.atlassian.net",
+        displayName: "Team board",
+        credentialName: "",
+        credentialUserEmail: "",
+      });
+    });
+
+    it("reports never-synced when the status row has no last run", () => {
+      const source = createJiraSourceFromInstance(
+        status({ lastRunTime: null }),
+      );
+      expect(source.statusView.state).toBe("attention");
+      expect(source.lastRunAt).toBeNull();
     });
   });
 });

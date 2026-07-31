@@ -728,24 +728,26 @@ export function DataIngestionPage() {
       connectorEnabledById,
     );
 
-    // Jira sources come from the separate instances list, not project sources.
-    // Match each instance to its latest Jira run by URL (runs are newest-first,
-    // so the first hit per key wins) to fill run-derived counters/status.
-    const latestJiraRunByUrl = new Map<string, IngestionRun>();
-    runs.forEach((run) => {
-      if (run.sourceSystem !== "JIRA") return;
-      const key = run.sourceId?.toLowerCase();
-      if (key && !latestJiraRunByUrl.has(key)) {
-        latestJiraRunByUrl.set(key, run);
-      }
-    });
-
-    const jiraSources = jiraInstances.map((instance) =>
-      createJiraSourceFromInstance(
+    // Jira cards are now driven by the connector-neutral status rows (health,
+    // counters, artifact total, last sync) — the same authoritative source as
+    // GitHub. The status endpoint carries no credential metadata, so the Jira
+    // instance DTOs are merged in by URL purely for the credential shown in the
+    // details panel and used by the update action.
+    const jiraInstanceByUrl = new Map(
+      jiraInstances.map((instance) => [
+        instance.instanceUrl.toLowerCase(),
         instance,
-        latestJiraRunByUrl.get(instance.instanceUrl.toLowerCase()) ?? null,
-      ),
+      ]),
     );
+
+    const jiraSources = sourceInstances
+      .filter((status) => status.sourceSystem === "JIRA")
+      .map((status) =>
+        createJiraSourceFromInstance(
+          status,
+          jiraInstanceByUrl.get(status.sourceId.toLowerCase()) ?? null,
+        ),
+      );
 
     return [...githubAndUpload, ...jiraSources];
   }, [

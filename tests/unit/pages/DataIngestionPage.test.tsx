@@ -90,6 +90,16 @@ vi.mock('../../../src/services/sources/githubService', () => ({
     updateGithubRepository: mockUpdateGithubRepository,
 }));
 
+const { mockGetJiraInstances, mockUpdateJiraInstance } = vi.hoisted(() => ({
+    mockGetJiraInstances: vi.fn(),
+    mockUpdateJiraInstance: vi.fn(),
+}));
+
+vi.mock('../../../src/services/sources/jiraService', () => ({
+    getJiraInstances: mockGetJiraInstances,
+    updateJiraInstance: mockUpdateJiraInstance,
+}));
+
 vi.mock('../../../src/services/connectorService', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../../src/services/connectorService')>();
     return {
@@ -126,6 +136,8 @@ describe('DataIngestionPage', () => {
             users: [],
         });
         mockGetIngestionSourceStatuses.mockResolvedValue([]);
+        mockGetJiraInstances.mockResolvedValue([]);
+        mockUpdateJiraInstance.mockResolvedValue({ transactionId: 'jira-tx' });
         mockGetUnifiedArtifacts.mockResolvedValue([]);
         mockListConnectors.mockResolvedValue([]);
         selectProject();
@@ -191,6 +203,60 @@ describe('DataIngestionPage', () => {
         // Owner comes from the endpoint, not from parsed artifact metadata.
         expect(screen.getByText('octocat')).toBeInTheDocument();
         expect(mockGetIngestionSourceStatuses).toHaveBeenCalledWith('proj1');
+    });
+
+    it('builds a Jira source card from the connector-neutral status row', async () => {
+        // Jira is not a project source, so the card is driven purely by the
+        // status endpoint (health/counters/artifact total); the instance DTO is
+        // merged in only for the credential shown in the details panel.
+        mockGetIngestionSourceStatuses.mockResolvedValue([
+            {
+                sourceSystem: 'JIRA',
+                sourceId: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                repositoryId: null,
+                owner: null,
+                name: null,
+                sourceUrl: 'https://team.atlassian.net',
+                connectionStatus: 'CONNECTED',
+                enabled: true,
+                lastRunTime: '2026-07-01T00:00:00Z',
+                ingestedCount: 5,
+                updatedCount: 2,
+                deletedCount: 0,
+                failedCount: 0,
+                failedItems: [],
+                artifactCount: 128,
+                lastCommitsSyncAt: null,
+                lastIssuesSyncAt: '2026-07-01T00:00:00Z',
+                lastPullRequestsSyncAt: null,
+            },
+        ]);
+        mockGetJiraInstances.mockResolvedValue([
+            {
+                instanceUrl: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                lastUpdate: '2026-07-01T00:00:00Z',
+                projectIds: ['proj1'],
+                sourceEnabled: true,
+                status: 'UP_TO_DATE',
+                updateCredentialName: 'default',
+                updateCredentialUserEmail: 'jira@corp.com',
+            },
+        ]);
+
+        render(<MemoryRouter><DataIngestionPage /></MemoryRouter>);
+
+        expect(
+            (await screen.findAllByText('Team board')).length,
+        ).toBeGreaterThan(0);
+
+        // The instance's real stored-artifact total (from the status row) drives
+        // the card and the overview KPI, no longer approximated from a run.
+        await waitFor(() => {
+            expect(screen.getAllByText('128').length).toBeGreaterThan(0);
+        });
+        expect(mockGetJiraInstances).toHaveBeenCalledWith('proj1');
     });
 
     it('applies a projectId deep link once and then releases the project switcher', async () => {

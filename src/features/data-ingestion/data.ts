@@ -20,10 +20,7 @@ import type {
   SourceStatusPresentation,
   SourceSystem,
 } from "./types.ts";
-import type {
-  JiraInstanceDto,
-  JiraInstanceStatus,
-} from "../../services/sources/jiraService.ts";
+import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
 
 export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
 
@@ -115,97 +112,68 @@ export function createSourceFromInstance(
 }
 
 /**
- * Maps a Jira instance's connection status onto the shared
- * {@link BackendProjectSourceStatus} vocabulary so Jira sources flow through the
- * exact same status helpers as GitHub. `sourceEnabled === false` overrides the
- * status with `DISABLED` (handled by the caller).
- */
-function jiraStatusToBackend(
-  status: JiraInstanceStatus,
-): BackendProjectSourceStatus {
-  switch (status) {
-    case "UP_TO_DATE":
-      return "CONNECTED";
-    case "UPDATING":
-      return "UPDATING";
-    case "OUT_OF_DATE":
-      return "OUT_OF_DATE";
-    case "FAILED":
-      return "FAILED";
-  }
-}
-
-/**
- * Turns one connected Jira instance (`/api/v1/jira/instances`) into a
+ * Turns one Jira ingestion status row (`/api/v1/ingestion-sources/status`, the
+ * connector-neutral rows where `sourceSystem === "JIRA"`) into a
  * {@link DataSource}, the Jira counterpart to {@link createSourceFromInstance}.
  *
- * The instance DTO carries no per-run counters or artifact totals, so the
- * latest Jira ingestion run matched to this instance (by URL) is passed in to
- * fill the run-derived fields (counts, AI-sync state, failed items); when no run
- * is matched those stay zero/empty and only the instance's own status is shown.
- * `githubRepository` is always null; identity lives in `jiraInstance`.
+ * The status row is now authoritative for health, counters, total artifact count
+ * and last-sync time — exactly like GitHub — so no run stitch is needed. The
+ * status endpoint carries no credential metadata, though, so the matching
+ * {@link JiraInstanceDto} (looked up by instance URL) is merged in for the
+ * credential shown in the details panel. `githubRepository` is always null;
+ * identity lives in `jiraInstance`, keyed by the instance URL (`sourceId`).
  */
 export function createJiraSourceFromInstance(
-  instance: JiraInstanceDto,
-  latestRun?: IngestionRun | null,
+  status: SourceInstanceIngestionStatus,
+  instance?: JiraInstanceDto | null,
 ): DataSource {
   const meta = SOURCE_META.JIRA;
   const backendStatus: BackendProjectSourceStatus =
-    instance.sourceEnabled === false
-      ? "DISABLED"
-      : jiraStatusToBackend(instance.status);
-  const failedCount = latestRun?.failedCount ?? 0;
-  const hasErrors = failedCount > 0;
-  const hasNeverSynced = !instance.lastUpdate;
-  const runStatus = latestRun?.status ?? null;
-  const ingestedCount = latestRun?.ingestedCount ?? 0;
+    status.enabled === false ? "DISABLED" : status.connectionStatus;
+  const hasErrors = status.failedCount > 0;
+  const hasNeverSynced = status.lastRunTime === null;
 
   return {
-    sourceId: instance.instanceUrl,
+    sourceId: status.sourceId,
     sourceSystem: "JIRA",
-    name: instance.displayName || instance.instanceUrl,
+    name: status.displayName,
     type: meta.type,
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
     statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, runStatus),
-    ingestionStatusLabel: getSourceStatusLabel(
-      hasNeverSynced,
-      hasErrors,
-      runStatus,
-    ),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel: getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
-      runStatus,
-      aiSyncStatus: latestRun?.aiSyncStatus ?? null,
       hasErrors,
       hasNeverSynced,
     }),
-    artifacts: ingestedCount,
-    lastSync: formatDateTime(instance.lastUpdate),
+    artifacts: status.artifactCount,
+    lastSync: formatDateTime(status.lastRunTime),
     nextSync: "Not available",
-    errors: failedCount,
+    errors: status.failedCount,
     description: meta.description,
-    lastRunAt: instance.lastUpdate,
-    latestIngestedCount: ingestedCount,
-    latestUpdatedCount: latestRun?.updatedCount ?? 0,
-    deletedCount: latestRun?.deletedCount ?? 0,
-    // The instance DTO has no stored-artifact total; the last run's ingested
-    // count is the best available approximation until the backend exposes one.
-    totalArtifactCount: ingestedCount,
+    lastRunAt: status.lastRunTime,
+    latestIngestedCount: status.ingestedCount,
+    latestUpdatedCount: status.updatedCount,
+    deletedCount: status.deletedCount,
+    totalArtifactCount: status.artifactCount,
     runIds: [],
     sharesSourceSystem: false,
-    failedItems: latestRun?.failedItems ?? [],
+    failedItems: status.failedItems,
     githubRepository: null,
     jiraInstance: {
-      instanceUrl: instance.instanceUrl,
-      displayName: instance.displayName,
-      credentialName: instance.updateCredentialName,
-      credentialUserEmail: instance.updateCredentialUserEmail,
+      instanceUrl: status.sourceId,
+      // Prefer the instance DTO's display name/credential; the status row still
+      // provides a display name, but only the DTO knows the credential pair.
+      displayName: instance?.displayName ?? status.displayName,
+      credentialName: instance?.updateCredentialName ?? "",
+      credentialUserEmail: instance?.updateCredentialUserEmail ?? "",
     },
     lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
+    // Jira's per-type sync timestamp; the backend maps it to the last update.
+    lastIssuesSyncAt: status.lastIssuesSyncAt,
     lastPullRequestsSyncAt: null,
   };
 }
