@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, type ReactNode } from "react";
-import { centralSpringToken } from "../../styles/tokens";
+import { getModalDialogVariants, modalBackdropVariants } from "../../styles/tokens";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
@@ -138,25 +138,7 @@ export function Modal({
         };
     }, [closeOnEscape, isDismissDisabled, isOpen, onClose]);
 
-    // The dialog rises and settles with a spring; it leaves on a short tween so
-    // dismissing never feels like waiting. Reduced motion collapses both to a
-    // plain opacity change.
-    const dialogVariants = {
-        hidden: prefersReducedMotion
-            ? { opacity: 0 }
-            : { opacity: 0, scale: 0.96, y: 12 },
-        visible: prefersReducedMotion
-            ? { opacity: 1, transition: { duration: 0.15 } }
-            : { opacity: 1, scale: 1, y: 0, transition: centralSpringToken },
-        exit: prefersReducedMotion
-            ? { opacity: 0, transition: { duration: 0.12 } }
-            : {
-                  opacity: 0,
-                  scale: 0.98,
-                  y: 6,
-                  transition: { duration: 0.16, ease: [0.4, 0, 1, 1] as const },
-              },
-    };
+    const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
 
     // Rendered into <body> so the dialog is never trapped inside an ancestor's
     // stacking context. Callers sit anywhere in the tree -- the sidebar's
@@ -166,10 +148,10 @@ export function Modal({
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    variants={modalBackdropVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
                     className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
                 >
                     {closeOnBackdrop && (

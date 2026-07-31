@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { centralSpringToken } from "../../../styles/tokens";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
 import { DinoGame } from "../../chatbot/components/DinoGame";
 
 /**
@@ -28,15 +28,18 @@ interface DinoGameModalProps {
  * the dashboard chord is a true easter egg, always available.
  */
 export function DinoGameModal({ open, onClose }: DinoGameModalProps) {
+    const prefersReducedMotion = useReducedMotion();
+    const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+
     return (
         <AnimatePresence>
             {open && (
                 <motion.div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-app-overlay p-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={centralSpringToken}
+                    variants={modalBackdropVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
                     onClick={onClose}
                     role="dialog"
                     aria-modal="true"
@@ -44,10 +47,10 @@ export function DinoGameModal({ open, onClose }: DinoGameModalProps) {
                 >
                     <motion.div
                         className="relative w-[680px] max-w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-2xl"
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.9, opacity: 0 }}
-                        transition={centralSpringToken}
+                        variants={dialogVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <DinoGame onExit={onClose} />

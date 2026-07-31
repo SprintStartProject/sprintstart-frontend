@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { centralSpringToken } from "../../../styles/tokens";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
 
 /**
  * Props for {@link Game2048Modal}.
@@ -31,6 +31,9 @@ interface Game2048ModalProps {
  * parent document.
  */
 export function Game2048Modal({ open, onClose }: Game2048ModalProps) {
+    const prefersReducedMotion = useReducedMotion();
+    const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Close on Escape when focus is outside the iframe (header, close
@@ -69,10 +72,10 @@ export function Game2048Modal({ open, onClose }: Game2048ModalProps) {
             {open && (
                 <motion.div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-app-overlay p-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={centralSpringToken}
+                    variants={modalBackdropVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
                     onClick={onClose}
                     role="dialog"
                     aria-modal="true"
@@ -80,10 +83,10 @@ export function Game2048Modal({ open, onClose }: Game2048ModalProps) {
                 >
                     <motion.div
                         className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-2xl"
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.9, opacity: 0 }}
-                        transition={centralSpringToken}
+                        variants={dialogVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header bar */}

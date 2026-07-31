@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useId } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { getModalDialogVariants, modalBackdropVariants } from '../../../styles/tokens';
 import { X } from 'lucide-react';
 import { UploadArtifactPanel } from './UploadArtifactPanel';
 
@@ -27,6 +28,9 @@ interface UploadArtifactModalProps {
  * wraps it in `<AnimatePresence>` and toggles `isOpen`.
  */
 export function UploadArtifactModal({ isOpen, onClose, projectId, onUploadSuccess, title = 'Upload Artifacts' }: UploadArtifactModalProps) {
+    const prefersReducedMotion = useReducedMotion();
+    const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+
     const [isUploading, setIsUploading] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
     const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -98,9 +102,10 @@ export function UploadArtifactModal({ isOpen, onClose, projectId, onUploadSucces
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    variants={modalBackdropVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
                     className="fixed inset-0 z-50 flex items-center justify-center bg-app-overlay p-4 backdrop-blur-sm"
                     onClick={(e) => {
                         if (e.target === e.currentTarget && !isUploading) onClose();
@@ -108,9 +113,10 @@ export function UploadArtifactModal({ isOpen, onClose, projectId, onUploadSucces
                 >
                     <motion.div
                         ref={modalRef}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
+                        variants={dialogVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
                         className="relative w-full max-w-2xl rounded-2xl bg-app-bg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] focus:outline-none"
                         data-testid="upload-modal"
                         role="dialog"

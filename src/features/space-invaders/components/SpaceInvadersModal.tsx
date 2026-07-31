@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { centralSpringToken } from "../../../styles/tokens";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
 import { SpaceInvaders } from "../../easter-eggs/components/SpaceInvaders.tsx";
 
 /**
@@ -28,15 +28,18 @@ interface SpaceInvadersModalProps {
  * ({@link useSpaceInvadersShortcut}); also reused by the 404 page.
  */
 export function SpaceInvadersModal({ open, onClose }: SpaceInvadersModalProps) {
+    const prefersReducedMotion = useReducedMotion();
+    const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+
     return (
         <AnimatePresence>
             {open && (
                 <motion.div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-app-overlay p-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={centralSpringToken}
+                    variants={modalBackdropVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
                     onClick={onClose}
                     role="dialog"
                     aria-modal="true"
@@ -44,10 +47,10 @@ export function SpaceInvadersModal({ open, onClose }: SpaceInvadersModalProps) {
                 >
                     <motion.div
                         className="relative max-w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-2xl"
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.9, opacity: 0 }}
-                        transition={centralSpringToken}
+                        variants={dialogVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <SpaceInvaders onExit={onClose} />

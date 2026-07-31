@@ -1,4 +1,4 @@
-import type { Transition } from "framer-motion";
+import type { Transition, Variants } from "framer-motion";
 
 /**
  * Centralized Framer Motion spring transition presets.
@@ -81,3 +81,46 @@ export const sidePanelSlideToken: Transition = {
     duration: SIDE_PANEL_SLIDE_MS / 1000,
     ease: [0.32, 0.72, 0, 1],
 };
+
+/**
+ * Backdrop fade shared by every dialog in the app.
+ *
+ * Leaves slightly faster than it arrives, so the page behind is uncovered
+ * promptly once the user has decided to dismiss.
+ */
+export const modalBackdropVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
+    exit: { opacity: 0, transition: { duration: 0.16, ease: "easeIn" } },
+};
+
+/**
+ * Motion for a dialog surface, shared by `Modal` and by the dialogs that hand
+ * roll their own markup (the game modals, the artifact upload). Use this rather
+ * than inlining `initial`/`animate`/`exit` so every dialog in the app opens
+ * with the same weight.
+ *
+ * Enter is a spring -- it should feel like the dialog has mass and settles.
+ * Exit is a short tween: dismissing must never feel like waiting, and a spring
+ * always spends time easing out that the user reads as lag.
+ */
+export function getModalDialogVariants(prefersReducedMotion: boolean): Variants {
+    if (prefersReducedMotion) {
+        return {
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { duration: 0.15 } },
+            exit: { opacity: 0, transition: { duration: 0.12 } },
+        };
+    }
+
+    return {
+        hidden: { opacity: 0, scale: 0.96, y: 12 },
+        visible: { opacity: 1, scale: 1, y: 0, transition: centralSpringToken },
+        exit: {
+            opacity: 0,
+            scale: 0.98,
+            y: 6,
+            transition: { duration: 0.16, ease: [0.4, 0, 1, 1] },
+        },
+    };
+}
