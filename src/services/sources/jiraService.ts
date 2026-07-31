@@ -315,8 +315,9 @@ export async function getAllJiraConfigs(): Promise<
 
 /**
  * Loads the schedule and auto-update policy of one connected Jira instance.
- * The instance is identified by its full URL, which is the primary key — it is
- * URL-encoded into the path segment so its slashes do not break the path.
+ * The instance is identified by its full URL, passed as a query parameter — not
+ * a path segment: Tomcat rejects the encoded slashes (`%2F`) of a URL in a path
+ * with a 400, so the id travels in the query string where they are allowed.
  *
  * @param instanceUrl - The full Jira instance URL.
  * @throws ApiError — 404 when the instance is unknown, 403 for an insufficient role.
@@ -324,8 +325,10 @@ export async function getAllJiraConfigs(): Promise<
 export async function getJiraConfig(
   instanceUrl: string,
 ): Promise<GetJiraInstanceConfigResponse> {
+  const query = new URLSearchParams({ instanceUrl }).toString();
+
   return apiClient.fetch<GetJiraInstanceConfigResponse>(
-    `/api/v1/jira/config/${encodeURIComponent(instanceUrl)}`,
+    `/api/v1/jira/config/instance?${query}`,
   );
 }
 

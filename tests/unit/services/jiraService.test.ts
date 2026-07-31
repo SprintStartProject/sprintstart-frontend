@@ -292,25 +292,26 @@ describe("jiraService config endpoints", () => {
     expect(configs[0].autoUpdate).toBe(true);
   });
 
-  it("getJiraConfig url-encodes the instance url into the path segment", async () => {
+  it("getJiraConfig passes the instance url as a query parameter", async () => {
     const instanceUrl = "https://acme.atlassian.net";
+    let capturedUrl: string | null = null;
 
     server.use(
-      http.get(
-        `/api/v1/jira/config/${encodeURIComponent(instanceUrl)}`,
-        () =>
-          HttpResponse.json({
-            instanceUrl,
-            autoUpdate: false,
-            spec: { type: "INTERVAL", everyMinutes: 60 },
-            schedule: "every 60m",
-            nextSyncAt: null,
-          }),
-      ),
+      http.get("/api/v1/jira/config/instance", ({ request }) => {
+        capturedUrl = new URL(request.url).searchParams.get("instanceUrl");
+        return HttpResponse.json({
+          instanceUrl,
+          autoUpdate: false,
+          spec: { type: "INTERVAL", everyMinutes: 60 },
+          schedule: "every 60m",
+          nextSyncAt: null,
+        });
+      }),
     );
 
     const config = await getJiraConfig(instanceUrl);
 
+    expect(capturedUrl).toBe(instanceUrl);
     expect(config).toMatchObject({
       instanceUrl,
       autoUpdate: false,
@@ -323,9 +324,8 @@ describe("jiraService config endpoints", () => {
     const instanceUrl = "https://missing.atlassian.net";
 
     server.use(
-      http.get(
-        `/api/v1/jira/config/${encodeURIComponent(instanceUrl)}`,
-        () => HttpResponse.json({ message: "unknown instance" }, { status: 404 }),
+      http.get("/api/v1/jira/config/instance", () =>
+        HttpResponse.json({ message: "unknown instance" }, { status: 404 }),
       ),
     );
 
