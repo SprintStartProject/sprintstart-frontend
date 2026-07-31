@@ -70,9 +70,11 @@ export function createSourceFromInstance(
   const hasNeverSynced = instance.lastRunTime === null;
 
   return {
-    sourceId: instance.repositoryId,
+    // GitHub rows carry a repositoryId; fall back to the connector-neutral
+    // sourceId so the card always has a stable selection key.
+    sourceId: instance.repositoryId ?? instance.sourceId,
     sourceSystem: instance.sourceSystem,
-    name: instance.sourceId,
+    name: instance.displayName,
     type: meta.type,
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
@@ -99,8 +101,8 @@ export function createSourceFromInstance(
     sharesSourceSystem: false,
     failedItems: instance.failedItems,
     githubRepository: {
-      owner: instance.owner,
-      name: instance.name,
+      owner: instance.owner ?? "",
+      name: instance.name ?? "",
       repositoryId: instance.repositoryId,
       fullName: instance.sourceId,
       url: instance.sourceUrl,

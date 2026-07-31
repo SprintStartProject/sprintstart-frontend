@@ -164,8 +164,8 @@ function githubRepositoryFromInstance(
   instance: SourceInstanceIngestionStatus,
 ): GithubRepositoryDetails {
   return {
-    owner: instance.owner,
-    name: instance.name,
+    owner: instance.owner ?? "",
+    name: instance.name ?? "",
     repositoryId: instance.repositoryId,
     fullName: instance.sourceId,
     url: instance.sourceUrl,
@@ -244,7 +244,9 @@ function buildProjectDataSources(
       // endpoint is authoritative for health anyway; a run only adds the
       // AI-sync stage, and having none loaded simply means "unknown".
       const repositoryRun =
-        latestRunByRepository.get(instance.repositoryId) ??
+        (instance.repositoryId
+          ? latestRunByRepository.get(instance.repositoryId)
+          : undefined) ??
         latestRunByRepository.get(instance.sourceId.toLowerCase()) ??
         null;
       const runStatus = repositoryRun?.status ?? null;

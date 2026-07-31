@@ -110,11 +110,19 @@ export type IngestionRun = {
  */
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
-  /** `"owner/name"`. */
+  /**
+   * Stable, connector-neutral key: GitHub `"owner/name"`, Jira the instance URL.
+   */
   sourceId: string;
-  repositoryId: string;
-  owner: string;
-  name: string;
+  /** Display name: GitHub `"owner/name"`, Jira the instance's display name. */
+  displayName: string;
+  /**
+   * GitHub-only repository identity. Null for connector-neutral rows such as
+   * Jira, which are identified by {@link sourceId} (the instance URL) instead.
+   */
+  repositoryId: string | null;
+  owner: string | null;
+  name: string | null;
   sourceUrl: string;
   /**
    * Connection health of the repo. Deliberately NOT called `status`: an
@@ -151,7 +159,14 @@ export type IngestionRunFilter = {
   page?: number;
   size?: number;
   sourceSystem?: SourceSystem;
+  /** GitHub repository UUID; matches runs of that repository. */
   repositoryId?: string;
+  /**
+   * Connector-neutral source-instance reference (the run's `sourceInstanceRef`).
+   * For Jira this is the instance URL, letting the history be scoped to a single
+   * Jira instance the way `repositoryId` scopes it to a GitHub repository.
+   */
+  sourceRef?: string;
   projectId?: string;
   status?: IngestionRunStatus;
   /** ISO datetime; inclusive lower bound on `startedAt`. */
