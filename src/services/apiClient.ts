@@ -13,11 +13,18 @@ export class ApiError extends Error {
 }
 
 /**
- * Derives a human-readable message from an error response body. The backend's
- * custom exception handler returns `{ "message": string }` for errors such as
- * 403/404, so when the body is such JSON we surface `message` instead of the
- * raw JSON string. Non-JSON bodies (and JSON without a usable `message`) fall
- * back to the raw text, then to the HTTP status text.
+ * Derives a human-readable message from an error response body.
+ *
+ * Two JSON shapes are understood so the user never sees raw JSON:
+ *  - the backend's custom exception handler returns `{ "message": string }`
+ *    (403/404 etc.) — its `message` is used directly;
+ *  - Spring's default error body `{ timestamp, status, error, message, path }`
+ *    often carries an empty `message` (e.g. a 500), so its `error` phrase
+ *    ("Internal Server Error", "Not Found", …) is surfaced instead of dumping
+ *    the whole object, timestamp and all, at the user.
+ *
+ * Non-JSON bodies (and JSON without either usable field) fall back to the raw
+ * text, then to the HTTP status text.
  */
 function extractErrorMessage(body: string, statusText: string): string {
     const trimmed = body.trim();
@@ -25,10 +32,17 @@ function extractErrorMessage(body: string, statusText: string): string {
     if (trimmed) {
         try {
             const parsed: unknown = JSON.parse(trimmed);
-            if (parsed !== null && typeof parsed === 'object' && 'message' in parsed) {
-                const { message } = parsed;
+            if (parsed !== null && typeof parsed === 'object') {
+                const { message, error } = parsed as {
+                    message?: unknown;
+                    error?: unknown;
+                };
+
                 if (typeof message === 'string' && message.trim()) {
                     return message;
+                }
+                if (typeof error === 'string' && error.trim()) {
+                    return error;
                 }
             }
         } catch {

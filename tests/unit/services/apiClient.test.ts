@@ -154,7 +154,7 @@ describe('apiClient', () => {
         });
     });
 
-    it('keeps the raw JSON body when it has no usable `message`', async () => {
+    it('surfaces the `error` field when a JSON body has no usable `message`', async () => {
         server.use(
             http.get('/api/v1/broken', () => HttpResponse.json({ error: 'nope' }, { status: 400 })),
         );
@@ -162,7 +162,30 @@ describe('apiClient', () => {
         await expect(apiClient.fetch('/api/v1/broken')).rejects.toMatchObject({
             name: 'ApiError',
             status: 400,
-            message: '{"error":"nope"}',
+            message: 'nope',
+        });
+    });
+
+    it("surfaces Spring's `error` phrase instead of the raw default error body", async () => {
+        server.use(
+            http.get('/api/v1/broken', () =>
+                HttpResponse.json(
+                    {
+                        timestamp: '2026-07-31T10:00:00.000+00:00',
+                        status: 500,
+                        error: 'Internal Server Error',
+                        message: '',
+                        path: '/api/v1/broken',
+                    },
+                    { status: 500 },
+                ),
+            ),
+        );
+
+        await expect(apiClient.fetch('/api/v1/broken')).rejects.toMatchObject({
+            name: 'ApiError',
+            status: 500,
+            message: 'Internal Server Error',
         });
     });
 
