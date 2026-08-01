@@ -381,4 +381,38 @@ describe("SourceDetailsPanel", () => {
     expect(screen.getByText("FILE: broken.md")).toBeInTheDocument();
     expect(screen.getByText("Parse error")).toBeInTheDocument();
   });
+  it("renders Jira issue data as one combined sync resource", () => {
+    render(
+      <SourceDetailsPanel
+        source={{
+          ...jiraSource,
+          lastIssuesSyncAt: "2026-07-05T10:00:00Z",
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Last Synced")).toBeInTheDocument();
+    expect(screen.getByText("Issues")).toBeInTheDocument();
+    expect(screen.queryByText("Commits")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pull requests")).not.toBeInTheDocument();
+  });
+
+  it("keeps the three GitHub sync resource types", () => {
+    render(
+      <SourceDetailsPanel
+        source={{
+          ...mockSource,
+          lastCommitsSyncAt: "2026-07-05T10:00:00Z",
+          lastIssuesSyncAt: "2026-07-05T10:00:00Z",
+          lastPullRequestsSyncAt: "2026-07-05T10:00:00Z",
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Commits")).toBeInTheDocument();
+    expect(screen.getByText("Issues")).toBeInTheDocument();
+    expect(screen.getByText("Pull requests")).toBeInTheDocument();
+  });
 });

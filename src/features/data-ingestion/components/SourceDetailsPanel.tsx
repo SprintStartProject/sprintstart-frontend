@@ -144,8 +144,9 @@ export function SourceDetailsPanel({
   // Noun for the unlink copy: GitHub sources are repositories, Jira sources are
   // instances. Keeps each connector's wording accurate.
   const removableNoun = isJira ? "instance" : "repository";
-  // Per-artifact-type sync timestamps only exist for GitHub repos (endpoint #5).
-  const hasArtifactTypeSyncTimes =
+  // GitHub exposes one timestamp per resource type; Jira refreshes issue data
+  // (including comments and change history) as one combined resource.
+  const hasResourceSyncTimes =
     source.lastCommitsSyncAt !== null ||
     source.lastIssuesSyncAt !== null ||
     source.lastPullRequestsSyncAt !== null;
@@ -428,7 +429,8 @@ export function SourceDetailsPanel({
                   <span className="text-[13px] font-semibold text-app-text">
                     {jiraEnabled ? "Enabled" : "Disabled"}
                     <span className="ml-1 font-normal text-app-text-subtle">
-                      · {jiraEnabled ? "included in" : "excluded from"} ingestion
+                      · {jiraEnabled ? "included in" : "excluded from"}{" "}
+                      ingestion
                     </span>
                   </span>
                   <AccountEnabledToggle
@@ -498,21 +500,30 @@ export function SourceDetailsPanel({
         </Section>
       )}
 
-      {hasArtifactTypeSyncTimes && (
+      {hasResourceSyncTimes && (
         <Section title="Last Synced">
           <dl className="overflow-hidden rounded-xl border border-app-border">
-            <InfoRow
-              label="Commits"
-              value={formatDateTime(source.lastCommitsSyncAt)}
-            />
-            <InfoRow
-              label="Issues"
-              value={formatDateTime(source.lastIssuesSyncAt)}
-            />
-            <InfoRow
-              label="Pull requests"
-              value={formatDateTime(source.lastPullRequestsSyncAt)}
-            />
+            {isJira ? (
+              <InfoRow
+                label="Issues"
+                value={formatDateTime(source.lastIssuesSyncAt)}
+              />
+            ) : (
+              <>
+                <InfoRow
+                  label="Commits"
+                  value={formatDateTime(source.lastCommitsSyncAt)}
+                />
+                <InfoRow
+                  label="Issues"
+                  value={formatDateTime(source.lastIssuesSyncAt)}
+                />
+                <InfoRow
+                  label="Pull requests"
+                  value={formatDateTime(source.lastPullRequestsSyncAt)}
+                />
+              </>
+            )}
           </dl>
         </Section>
       )}
