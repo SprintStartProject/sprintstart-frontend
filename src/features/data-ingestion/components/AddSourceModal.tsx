@@ -15,7 +15,7 @@ import { connectJiraInstance } from "../../../services/sources/jiraService.ts";
 import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
 import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
 import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel.tsx";
-import { SOURCE_META } from "../data.ts";
+import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import {
   GithubRepositoryDiscovery,
@@ -519,6 +519,7 @@ export function AddSourceModal({
         <SourceTypeStep
           selectedType={selectedType}
           onSelectType={setSelectedType}
+          availableTypes={SOURCE_SYSTEMS}
         />
       ) : isUpload ? (
         projectId ? (

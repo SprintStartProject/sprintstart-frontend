@@ -4,14 +4,17 @@ import type { SourceSystem } from "../types.ts";
 /**
  * Source-type picker used by the "Add source" wizard and the project-creation
  * wizard. Each card carries its own description so the differences between the
- * options -- the actual decision being made here -- are visible, and only the
- * GitHub connector is available today (the rest show a "Soon" badge).
+ * options -- the actual decision being made here -- are visible. Which
+ * connectors count as available depends on the context (`availableTypes`): the
+ * "Add source" modal supports all of them, while the project-creation wizard
+ * only wires GitHub, so the rest get a "Soon" badge there.
  */
 export function SourceTypeStep({
   selectedType,
   onSelectType,
   heading = "Source type",
   description,
+  availableTypes = ["GITHUB"],
 }: {
   selectedType: SourceSystem;
   onSelectType: (system: SourceSystem) => void;
@@ -19,6 +22,12 @@ export function SourceTypeStep({
   heading?: string;
   /** Optional sub-line under the heading, e.g. to explain that this is optional. */
   description?: string;
+  /**
+   * Source systems that are connectable in this context. Any system not listed
+   * still renders (so the option stays visible) but shows a "Soon" badge.
+   * Defaults to GitHub-only, matching the project-creation wizard.
+   */
+  availableTypes?: SourceSystem[];
 }) {
   return (
     <div className="space-y-5">
@@ -35,7 +44,7 @@ export function SourceTypeStep({
             const meta = SOURCE_META[sourceSystem];
             const Icon = meta.icon;
             const isSelected = selectedType === sourceSystem;
-            const isAvailable = sourceSystem === "GITHUB";
+            const isAvailable = availableTypes.includes(sourceSystem);
 
             return (
               <button
