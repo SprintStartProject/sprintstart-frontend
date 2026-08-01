@@ -13,6 +13,7 @@ import {
   getJiraConfig,
   getJiraCredentialsOfUser,
   getJiraInstances,
+  removeJiraInstanceFromProject,
   updateAllJiraInstances,
   updateJiraInstance,
 } from "../../../src/services/sources/jiraService";
@@ -290,6 +291,27 @@ describe("jiraService config endpoints", () => {
 
     expect(configs).toHaveLength(1);
     expect(configs[0].autoUpdate).toBe(true);
+  });
+
+  it("removeJiraInstanceFromProject sends a DELETE with query params", async () => {
+    let capturedUrl: URL | null = null;
+
+    server.use(
+      http.delete("/api/v1/jira/instances/project", ({ request }) => {
+        capturedUrl = new URL(request.url);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await removeJiraInstanceFromProject(
+      "https://acme.atlassian.net",
+      "project-1",
+    );
+
+    expect(capturedUrl!.searchParams.get("instanceUrl")).toBe(
+      "https://acme.atlassian.net",
+    );
+    expect(capturedUrl!.searchParams.get("projectId")).toBe("project-1");
   });
 
   it("getJiraConfig passes the instance url as a query parameter", async () => {

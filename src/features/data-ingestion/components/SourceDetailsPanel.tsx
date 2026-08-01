@@ -131,15 +131,19 @@ export function SourceDetailsPanel({
   // exactly the one the status endpoint collapses to DISABLED.
   const jiraEnabled = source.backendStatus !== "DISABLED";
   const isTogglingEnabled = enabledState === "loading";
-  // Unlink needs the connection's repositoryId (the DELETE path parameter);
-  // authorization is presence-based — the parent only passes onUnlinkSource when
-  // the caller may manage the project's sources.
+  // Authorization is presence-based — the parent only passes onUnlinkSource when
+  // the caller may manage the project's sources. GitHub needs the connection's
+  // repositoryId; Jira is identified by its instance URL.
   const canUnlinkSource =
-    source.sourceSystem === "GITHUB" &&
-    repository !== null &&
-    repository.repositoryId !== null &&
-    onUnlinkSource !== undefined;
+    onUnlinkSource !== undefined &&
+    ((source.sourceSystem === "GITHUB" &&
+      repository !== null &&
+      repository.repositoryId !== null) ||
+      (isJira && jira !== null));
   const isUnlinking = unlinkState === "loading";
+  // Noun for the unlink copy: GitHub sources are repositories, Jira sources are
+  // instances. Keeps each connector's wording accurate.
+  const removableNoun = isJira ? "instance" : "repository";
   // Per-artifact-type sync timestamps only exist for GitHub repos (endpoint #5).
   const hasArtifactTypeSyncTimes =
     source.lastCommitsSyncAt !== null ||
@@ -259,7 +263,7 @@ export function SourceDetailsPanel({
       setUnlinkError(
         error instanceof Error
           ? error.message
-          : "Failed to remove the repository from the project.",
+          : "Failed to remove the source from the project.",
       );
     }
   }, [onUnlinkSource, source]);
@@ -562,8 +566,9 @@ export function SourceDetailsPanel({
         <Section title="Project link">
           <div className="rounded-xl border border-app-border px-4 py-3">
             <p className="text-sm text-app-text-muted">
-              Remove this repository from the current project. The repository
-              and its artifacts are kept. You can re-link it later.
+              Remove this {removableNoun} from the current project. The{" "}
+              {removableNoun} and its artifacts are kept. You can re-link it
+              later.
             </p>
             <button
               type="button"
@@ -584,12 +589,8 @@ export function SourceDetailsPanel({
 
       <AlertDialog
         isOpen={isUnlinkDialogOpen}
-        title="Remove repository from project?"
-        description={
-          repository
-            ? `"${repository.fullName}" will no longer feed this project's knowledge base. The repository and its artifacts are kept, and you can re-link it later.`
-            : undefined
-        }
+        title={`Remove ${removableNoun} from project?`}
+        description={`"${source.name}" will no longer feed this project's knowledge base. The ${removableNoun} and its artifacts are kept, and you can re-link it later.`}
         confirmLabel="Remove"
         loadingLabel="Removing…"
         variant="danger"

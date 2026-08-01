@@ -73,6 +73,7 @@ import {
   configureJiraInstance,
   getJiraConfig,
   getJiraInstances,
+  removeJiraInstanceFromProject,
   updateJiraInstance,
   type ConfigureJiraInstanceRequest,
   type JiraInstanceDto,
@@ -1188,6 +1189,24 @@ export function DataIngestionPage() {
   // refreshes the project-scoped lists so the source card disappears.
   const handleUnlinkSource = useCallback(
     async (source: DataSource) => {
+      if (source.sourceSystem === "JIRA") {
+        if (!source.jiraInstance || !selectedProjectId) {
+          throw new Error("This source cannot be removed from the project.");
+        }
+
+        await removeJiraInstanceFromProject(
+          source.jiraInstance.instanceUrl,
+          selectedProjectId,
+        );
+
+        setSelectedSourceId(null);
+        setConnectSuccessMessage(
+          `${source.name} was removed from ${selectedProject?.name ?? "the project"}.`,
+        );
+        await refreshSourceDetails();
+        return;
+      }
+
       const repositoryId = source.githubRepository?.repositoryId;
 
       if (

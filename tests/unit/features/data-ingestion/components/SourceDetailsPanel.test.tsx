@@ -289,6 +289,34 @@ describe("SourceDetailsPanel", () => {
     expect(onUnlinkSource).toHaveBeenCalledWith(mockSource);
   });
 
+  it("unlinks a Jira instance after confirming the dialog", async () => {
+    const user = userEvent.setup();
+    const onUnlinkSource = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={jiraSource}
+        onUnlinkSource={onUnlinkSource}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /Remove from project/ }),
+    );
+
+    // The Jira copy calls it an "instance", not a "repository".
+    expect(
+      screen.getByRole("alertdialog", {
+        name: /Remove instance from project/,
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Remove$/ }));
+
+    expect(onUnlinkSource).toHaveBeenCalledWith(jiraSource);
+  });
+
   it("surfaces the error message when unlinking fails", async () => {
     const user = userEvent.setup();
     const onUnlinkSource = vi

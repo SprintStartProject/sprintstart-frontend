@@ -180,6 +180,30 @@ export async function connectJiraInstance(
 }
 
 /**
+ * Removes a project's link to a connected Jira instance. The instance and its
+ * ingested artifacts are kept and can be re-linked later; only the project
+ * association is dropped, so the instance stops appearing among that project's
+ * sources.
+ *
+ * Both identifiers are passed as query parameters, not path segments: Tomcat
+ * rejects the encoded slashes (`%2F`) of the instance URL in a path with a 400.
+ *
+ * @param instanceUrl - The full Jira instance URL to unlink.
+ * @param projectId - The project whose association should be removed.
+ * @throws ApiError — 404 when the instance is unknown, 403 for an insufficient role.
+ */
+export async function removeJiraInstanceFromProject(
+  instanceUrl: string,
+  projectId: string,
+): Promise<void> {
+  const query = new URLSearchParams({ instanceUrl, projectId }).toString();
+
+  await apiClient.fetch<void>(`/api/v1/jira/instances/project?${query}`, {
+    method: "DELETE",
+  });
+}
+
+/**
  * Triggers an update (re-ingestion) of one connected Jira instance.
  *
  * @returns The accepted ingestion transaction id.
