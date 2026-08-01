@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { knowledgeService } from '../../../src/services/knowledgeService';
+import { apiClient } from '../../../src/services/apiClient';
 import { server } from '../../unit/setup/vitest.setup';
 
 vi.mock('../../../src/services/userService', () => ({
@@ -12,6 +13,9 @@ vi.mock('../../../src/services/userService', () => ({
 describe('knowledgeService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Restore any vi.spyOn mocks (e.g. on apiClient.fetch) so a failed
+        // assertion can't leak a mockResolvedValue into a later test.
+        vi.restoreAllMocks();
     });
 
     describe('uploadDocuments', () => {
@@ -60,6 +64,52 @@ describe('knowledgeService', () => {
             expect(results).toHaveLength(2);
             expect(results[0].status).toBe('success');
             expect(results[1].status).toBe('error');
+        });
+    });
+
+    describe('deleteUpload', () => {
+        it('calls apiClient.fetch with DELETE method, the artifactId path, and a FormData body containing the DeleteArtifactsRequest JSON part', async () => {
+            const fetchSpy = vi.spyOn(apiClient, 'fetch').mockResolvedValue(undefined);
+
+            await knowledgeService.deleteUpload('proj-1', 'up-1', 'remover-1');
+
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+            const [endpoint, options] = fetchSpy.mock.calls[0];
+            expect(endpoint).toBe('/api/v1/uploads/up-1');
+            expect(options?.method).toBe('DELETE');
+            expect(options?.body).toBeInstanceOf(FormData);
+
+            const formData = options?.body as FormData;
+            const requestPart = formData.get('request');
+            expect(requestPart).toBeInstanceOf(Blob);
+            const payload: unknown = JSON.parse(await (requestPart as Blob).text());
+            expect(payload).toEqual({
+                artifactIds: ['up-1'],
+                removerId: 'remover-1',
+                projectId: 'proj-1',
+            });
+        });
+
+        it('resolves on 204 No Content', async () => {
+            server.use(
+                http.delete('/api/v1/uploads/:artifactId', () =>
+                    new HttpResponse(null, { status: 204 }),
+                ),
+            );
+
+            await expect(knowledgeService.deleteUpload('proj-1', 'up-1', 'remover-1')).resolves.toBeUndefined();
+        });
+
+        it('rejects with ApiError on 403', async () => {
+            server.use(
+                http.delete('/api/v1/uploads/:artifactId', () =>
+                    HttpResponse.json({ detail: 'Forbidden' }, { status: 403 }),
+                ),
+            );
+
+            await expect(
+                knowledgeService.deleteUpload('proj-1', 'up-1', 'remover-1'),
+            ).rejects.toMatchObject({ name: 'ApiError', status: 403 });
         });
     });
 

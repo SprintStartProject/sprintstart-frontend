@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Modal } from "../../../components/ui/Modal";
+import { Stepper } from "../../../components/ui/Stepper";
 import {
   projectService,
   type AdminProjectDetails,
   type ProjectManager,
 } from "../../../services/projectService";
 import {
-  addDraftSource,
   connectDraftSources,
-  countUnconnectedSources,
+  createDraftSourceFromDiscovery,
   hasFailedSources,
   removeDraftSource,
   type DraftSource,
 } from "../projectSourcesDraft";
-import { ProjectSourcesStep } from "./ProjectSourcesStep";
+import {
+  GithubRepositoryDiscovery,
+  type DiscoverySelection,
+} from "../../data-ingestion/components/GithubRepositoryDiscovery";
+import {
+  ComingSoonStep,
+  SourceTypeStep,
+} from "../../data-ingestion/components/SourceTypeStep";
+import type { SourceSystem } from "../../data-ingestion/types";
+import { StagedSourceList } from "./StagedSourceList";
 
 type CreateProjectWizardProps = {
   isOpen: boolean;
@@ -25,11 +34,9 @@ type CreateProjectWizardProps = {
 };
 
 type WizardStep = "details" | "sources";
-
-const stepDescriptions: Record<WizardStep, string> = {
-  details: "Step 1 of 2 — name the project and pick who manages it.",
-  sources: "Step 2 of 2 — connect GitHub repositories, or skip for now.",
-};
+// Within the sources step, the source-type choice and the type-specific detail
+// are shown one after another (like the Data Ingestion "Add source" flow).
+type SourceStep = "type" | "detail";
 
 /**
  * Two-step flow for creating a project and optionally attaching sources to it.
@@ -52,6 +59,7 @@ export function CreateProjectWizard({
   const managerSelectId = useId();
 
   const [step, setStep] = useState<WizardStep>("details");
+  const [sourceStep, setSourceStep] = useState<SourceStep>("type");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [managerId, setManagerId] = useState("");
@@ -62,12 +70,32 @@ export function CreateProjectWizard({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState("");
 
+  // Source type chosen on step 2. Only GitHub can be connected during creation;
+  // Jira is coming soon and uploads need the project to already exist.
+  const [selectedType, setSelectedType] = useState<SourceSystem>("GITHUB");
+  // The resolved multi-select from the GitHub discovery picker, staged until the
+  // project is created and the repositories are connected against it.
+  const [selection, setSelection] = useState<DiscoverySelection[]>([]);
+  const [tokenName, setTokenName] = useState(tokenNames[0] ?? "");
+
   const [sources, setSources] = useState<DraftSource[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   // Set once the project exists, so a retry after a partial failure connects
   // the remaining sources instead of creating a second project.
   const [createdProjectId, setCreatedProjectId] = useState("");
+
+  // The token list arrives asynchronously; adopt the first token as soon as it
+  // does (and heal a stale selection) so discovery is usable on the first open.
+  useEffect(() => {
+    if (tokenNames.length === 0) return;
+
+    void Promise.resolve().then(() => {
+      setTokenName((current) =>
+        current && tokenNames.includes(current) ? current : tokenNames[0],
+      );
+    });
+  }, [tokenNames]);
 
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
@@ -96,12 +124,22 @@ export function CreateProjectWizard({
 
   const resetWizard = () => {
     setStep("details");
+    setSourceStep("type");
     setName("");
     setDescription("");
     setManagerId("");
+    setSelectedType("GITHUB");
+    setSelection([]);
     setSources([]);
     setSubmitError("");
     setCreatedProjectId("");
+  };
+
+  // Only GitHub stages a selection; leaving it clears the staged repositories so
+  // the footer count and "coming soon" panels stay consistent.
+  const handleSelectType = (type: SourceSystem) => {
+    setSelectedType(type);
+    if (type !== "GITHUB") setSelection([]);
   };
 
   const closeWizard = () => {
@@ -113,13 +151,14 @@ export function CreateProjectWizard({
 
   const trimmedName = name.trim();
   const isNameValid = trimmedName.length > 0;
-  const pendingSourceCount = countUnconnectedSources(sources);
+  const selectedCount = selection.length;
   const hasFailures = hasFailedSources(sources);
 
   const goToSources = () => {
     if (!isNameValid) return;
 
     setSubmitError("");
+    setSourceStep("type");
     setStep("sources");
   };
 
@@ -149,9 +188,19 @@ export function CreateProjectWizard({
     setSubmitError("");
 
     try {
+      // Materialize the staged drafts from the discovery selection on the first
+      // attempt; a retry reuses `sources`, which already carries per-repo status.
+      let toConnect = sources;
+      if (sources.length === 0 && selection.length > 0) {
+        toConnect = selection.map((item) =>
+          createDraftSourceFromDiscovery(item, tokenName),
+        );
+        setSources(toConnect);
+      }
+
       const projectId = await ensureProject();
 
-      if (sources.length === 0) {
+      if (toConnect.length === 0) {
         resetWizard();
         onClose();
         return;
@@ -159,7 +208,7 @@ export function CreateProjectWizard({
 
       const connectedSources = await connectDraftSources(
         projectId,
-        sources,
+        toConnect,
         setSources,
       );
 
@@ -218,12 +267,26 @@ export function CreateProjectWizard({
   // would misrepresent the details as still editable, so the secondary button
   // turns into a plain way out.
   const isProjectCreated = Boolean(createdProjectId);
+  // The two halves of the sources step, shown only before the project exists.
+  const isTypeStep =
+    step === "sources" && !isProjectCreated && sourceStep === "type";
+  const isDetailStep =
+    step === "sources" && !isProjectCreated && sourceStep === "detail";
+
+  // Details → source type → repositories. The post-create staged list stays on
+  // the last step, which is where the repositories were being connected.
+  const stepIndex = isDetailsStep ? 0 : isTypeStep ? 1 : 2;
 
   return (
     <Modal
       isOpen={isOpen}
       title="New Project"
-      description={stepDescriptions[step]}
+      description={
+        <Stepper
+          steps={["Details", "Source type", "Connect"]}
+          current={stepIndex}
+        />
+      }
       size="xl"
       isDismissDisabled={isSubmitting}
       onClose={closeWizard}
@@ -235,7 +298,9 @@ export function CreateProjectWizard({
             onClick={
               isDetailsStep || isProjectCreated
                 ? closeWizard
-                : () => setStep("details")
+                : isDetailStep
+                  ? () => setSourceStep("type")
+                  : () => setStep("details")
             }
             disabled={isSubmitting}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
@@ -252,11 +317,25 @@ export function CreateProjectWizard({
             )}
           </button>
 
-          {isDetailsStep ? (
+          {isTypeStep && (
+            // Lets the user create the project straight away, choosing to attach
+            // sources later from its Data Ingestion page instead of now.
             <button
               type="button"
-              onClick={goToSources}
-              disabled={!isNameValid}
+              onClick={() => void finish()}
+              disabled={isSubmitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Skip for now
+            </button>
+          )}
+
+          {isDetailsStep || isTypeStep ? (
+            <button
+              type="button"
+              onClick={isDetailsStep ? goToSources : () => setSourceStep("detail")}
+              disabled={(isDetailsStep && !isNameValid) || isSubmitting}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
             >
               Continue
@@ -276,10 +355,10 @@ export function CreateProjectWizard({
               )}
               {isProjectCreated
                 ? "Retry failed sources"
-                : sources.length === 0
+                : selectedCount === 0
                   ? "Create without sources"
-                  : `Create and connect ${pendingSourceCount} ${
-                      pendingSourceCount === 1 ? "repository" : "repositories"
+                  : `Create and connect ${selectedCount} ${
+                      selectedCount === 1 ? "repository" : "repositories"
                     }`}
             </button>
           ) : null}
@@ -371,23 +450,40 @@ export function CreateProjectWizard({
             )}
           </div>
         </form>
-      ) : (
-        <ProjectSourcesStep
+      ) : isProjectCreated ? (
+        // The project exists (e.g. after a partial failure): show the connect
+        // outcome per repository with retry/remove instead of the picker.
+        <StagedSourceList
           sources={sources}
-          tokenNames={tokenNames}
           disabled={isSubmitting}
-          onAdd={(source) =>
-            setSources((current) => addDraftSource(current, source))
-          }
           onRemove={(sourceId) =>
             setSources((current) => removeDraftSource(current, sourceId))
           }
-          onRetry={
-            createdProjectId
-              ? (sourceId) => void retrySource(sourceId)
-              : undefined
-          }
+          onRetry={(sourceId) => void retrySource(sourceId)}
         />
+      ) : isTypeStep ? (
+        <SourceTypeStep
+          selectedType={selectedType}
+          onSelectType={handleSelectType}
+          heading="Start data ingestion"
+          description="Connect a data source to this project now, or skip for now and add sources later from its Data Ingestion page."
+        />
+      ) : selectedType === "GITHUB" ? (
+        <GithubRepositoryDiscovery
+          tokenNames={tokenNames}
+          projectId={null}
+          tokenName={tokenName}
+          onTokenNameChange={setTokenName}
+          onSelectionChange={setSelection}
+          isConnecting={isSubmitting}
+        />
+      ) : selectedType === "JIRA" ? (
+        <ComingSoonStep sourceSystem="JIRA" />
+      ) : (
+        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+          Files can be uploaded once the project exists. Create the project
+          first, then add uploads from its Data Ingestion page.
+        </div>
       )}
     </Modal>
   );

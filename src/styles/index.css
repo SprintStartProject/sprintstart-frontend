@@ -463,3 +463,12 @@ body {
   min-height: 100vh;
   box-sizing: border-box;
 }
+
+@keyframes barrelRoll {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.barrel-roll-active {
+  animation: barrelRoll 2s ease-in-out;
+}

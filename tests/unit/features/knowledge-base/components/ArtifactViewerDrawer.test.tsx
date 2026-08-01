@@ -12,7 +12,12 @@ vi.mock('../../../../../src/services/knowledgeService', () => ({
             mimeType: 'text/markdown',
         }),
         streamArtifactSummary: vi.fn(),
+        deleteUpload: vi.fn().mockResolvedValue(undefined),
     },
+}));
+
+vi.mock('../../../../../src/context/useAuth', () => ({
+    useAuth: () => ({ profile: { id: 'remover-1' } }),
 }));
 
 vi.mock('../../../../../src/components/ui/SidePanel', () => ({
@@ -50,14 +55,23 @@ function createArtifact(overrides: Partial<Artifact> = {}): Artifact {
     };
 }
 
-function renderDrawer(artifact: Artifact | null = createArtifact()) {
-    return render(
-        <ArtifactViewerDrawer
-            artifact={artifact}
-            onClose={() => {}}
-            projectId="proj-1"
-        />,
-    );
+function renderDrawer(
+    artifact: Artifact | null = createArtifact(),
+    overrides: { canDelete?: boolean; onDelete?: (id: string) => void } = {},
+) {
+    const onDelete = overrides.onDelete ?? vi.fn();
+    return {
+        onDelete,
+        ...render(
+            <ArtifactViewerDrawer
+                artifact={artifact}
+                onClose={() => {}}
+                projectId="proj-1"
+                canDelete={overrides.canDelete ?? false}
+                onDelete={onDelete}
+            />,
+        ),
+    };
 }
 
 /**
@@ -181,5 +195,69 @@ describe('ArtifactViewerDrawer', () => {
         unmount();
 
         expect(capturedSignal?.aborted).toBe(true);
+    });
+
+    describe('Delete button', () => {
+        it('is hidden when canDelete is false (even for UPLOAD artifacts)', async () => {
+            renderDrawer(createArtifact({ sourceSystem: 'UPLOAD' }), { canDelete: false });
+
+            await screen.findByTestId('raw-content');
+            expect(screen.queryByTestId('delete-artifact-btn')).not.toBeInTheDocument();
+        });
+
+        it('is hidden for non-UPLOAD artifacts even when canDelete is true', async () => {
+            renderDrawer(createArtifact({ sourceSystem: 'GITHUB' }), { canDelete: true });
+
+            await screen.findByTestId('raw-content');
+            expect(screen.queryByTestId('delete-artifact-btn')).not.toBeInTheDocument();
+        });
+
+        it('is visible for UPLOAD artifacts when canDelete is true', async () => {
+            renderDrawer(createArtifact({ sourceSystem: 'UPLOAD' }), { canDelete: true });
+
+            expect(await screen.findByTestId('delete-artifact-btn')).toBeInTheDocument();
+        });
+
+        it('opens a confirmation dialog on click, then deletes on confirm', async () => {
+            const { onDelete } = renderDrawer(createArtifact({ sourceSystem: 'UPLOAD', id: 'ingestion-1', sourceId: 'up-1' }), { canDelete: true });
+
+            const deleteBtn = await screen.findByTestId('delete-artifact-btn');
+            await userEvent.click(deleteBtn);
+
+            const confirmBtn = await screen.findByTestId('confirm-delete-btn');
+            await userEvent.click(confirmBtn);
+
+            const { knowledgeService } = await import('../../../../../src/services/knowledgeService');
+            // Delete uses sourceId (UploadedArtifact UUID), not id (ingestion mirror UUID).
+            expect(knowledgeService.deleteUpload).toHaveBeenCalledWith('proj-1', 'up-1', 'remover-1');
+            expect(onDelete).toHaveBeenCalledWith('ingestion-1');
+        });
+
+        it('surfaces an error when sourceId is missing for an UPLOAD artifact', async () => {
+            renderDrawer(createArtifact({ sourceSystem: 'UPLOAD', sourceId: undefined }), { canDelete: true });
+
+            const deleteBtn = await screen.findByTestId('delete-artifact-btn');
+            await userEvent.click(deleteBtn);
+
+            const confirmBtn = await screen.findByTestId('confirm-delete-btn');
+            await userEvent.click(confirmBtn);
+
+            expect(await screen.findByTestId('delete-error-banner')).toHaveTextContent('Cannot resolve the uploaded artifact id for deletion.');
+        });
+
+        it('surfaces the error in the confirm dialog when deletion fails', async () => {
+            const { knowledgeService } = await import('../../../../../src/services/knowledgeService');
+            vi.mocked(knowledgeService.deleteUpload).mockRejectedValueOnce(new Error('Network failure'));
+
+            renderDrawer(createArtifact({ sourceSystem: 'UPLOAD' }), { canDelete: true });
+
+            const deleteBtn = await screen.findByTestId('delete-artifact-btn');
+            await userEvent.click(deleteBtn);
+
+            const confirmBtn = await screen.findByTestId('confirm-delete-btn');
+            await userEvent.click(confirmBtn);
+
+            expect(await screen.findByTestId('delete-error-banner')).toHaveTextContent('Network failure');
+        });
     });
 });

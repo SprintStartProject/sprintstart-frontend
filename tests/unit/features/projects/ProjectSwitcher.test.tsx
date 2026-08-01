@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -194,5 +194,38 @@ describe('ProjectSwitcher', () => {
         await user.click(screen.getByRole('button', { name: triggerName }));
 
         expect(screen.getByText('Loading projects...')).toBeInTheDocument();
+    });
+
+    it('does not throw on a synthetic keydown with no key (browser-extension event)', () => {
+        // jsdom (like a real browser) does NOT re-throw synchronously when a
+        // window event listener throws; instead it reports the exception via
+        // a window "error" event. So we capture those to detect the crash.
+        // Before the guard, the ProjectSwitcher listener called
+        // `.toLowerCase()` on an undefined `key` and threw
+        // "Cannot read properties of undefined (reading 'toLowerCase')".
+        const errors: string[] = [];
+        const onError = (e: ErrorEvent) => errors.push(e.message);
+        window.addEventListener('error', onError);
+
+        render(<ProjectSwitcher />);
+        window.dispatchEvent(new Event('keydown'));
+
+        window.removeEventListener('error', onError);
+        expect(errors).toEqual([]);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('opens the switcher on Cmd/Ctrl+K', () => {
+        render(<ProjectSwitcher />);
+
+        act(() => {
+            window.dispatchEvent(
+                new KeyboardEvent('keydown', { key: 'k', metaKey: true }),
+            );
+        });
+
+        expect(
+            screen.getByRole('dialog', { name: 'Switch project' }),
+        ).toBeInTheDocument();
     });
 });

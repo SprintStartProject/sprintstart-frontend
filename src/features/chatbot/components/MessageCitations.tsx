@@ -205,12 +205,15 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                                         {onOpenArtifact ? (
                                             <button
                                                 type="button"
-                                                onClick={() => onOpenArtifact({
-                                                    artifactId: group.artifactId,
-                                                    filename: group.filename,
-                                                    sourceUrl: group.sourceUrl,
-                                                    lines: group.rawLines
-                                                })}
+                                                onClick={() => {
+                                                    onOpenArtifact({
+                                                        artifactId: group.artifactId,
+                                                        filename: group.filename,
+                                                        sourceUrl: group.sourceUrl,
+                                                        lines: group.rawLines
+                                                    });
+                                                    setActiveFile(null);
+                                                }}
                                                 className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline cursor-pointer"
                                             >
                                                 Open source
@@ -221,6 +224,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                                                 href={group.sourceUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
+                                                onClick={() => setActiveFile(null)}
                                                 className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
                                             >
                                                 Open source

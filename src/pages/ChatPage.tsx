@@ -15,6 +15,7 @@ import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { SelectedCitation } from "../context/ChatContext.ts";
+import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
 
 import "katex/dist/katex.min.css";
 
@@ -70,6 +71,46 @@ export function ChatPage() {
     const projectId = profile?.projectIds?.[0] ?? null;
     const [viewingCitationArtifact, setViewingCitationArtifact] =
         useState<CitationArtifactOpen | null>(null);
+
+    // Easter egg states
+    const [isBarrelRolling, setIsBarrelRolling] = useState(false);
+    const [isMatrixActive, setIsMatrixActive] = useState(false);
+
+    // Custom submit handler to intercept easter eggs
+    const handleChatSubmit = useCallback(
+        (e: React.FormEvent<HTMLFormElement>) => {
+            const text = newRequest.trim().toLowerCase();
+            if (text === "do a barrel roll" || text === "do barrel roll" || text === "do barrel") {
+                e.preventDefault();
+                setIsBarrelRolling(true);
+                setNewRequest("");
+                return;
+            }
+            if (text === "the matrix" || text === "do matrix" || text === "matrix") {
+                e.preventDefault();
+                setIsMatrixActive(true);
+                setNewRequest("");
+                return;
+            }
+            handleSubmit(e);
+        },
+        [newRequest, setNewRequest, handleSubmit],
+    );
+
+    // Barrel roll side-effect
+    useEffect(() => {
+        if (isBarrelRolling) {
+            document.body.classList.add("barrel-roll-active");
+            const timeout = setTimeout(() => {
+                document.body.classList.remove("barrel-roll-active");
+                setIsBarrelRolling(false);
+            }, 2000);
+            return () => {
+                clearTimeout(timeout);
+                document.body.classList.remove("barrel-roll-active");
+            };
+        }
+    }, [isBarrelRolling]);
 
     // Dino easter egg: while the assistant is thinking, pressing Space drops the
     // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
@@ -355,7 +396,7 @@ export function ChatPage() {
                 <ChatComposer
                     value={newRequest}
                     onChange={setNewRequest}
-                    onSubmit={handleSubmit}
+                    onSubmit={handleChatSubmit}
                     onStop={stopStreaming}
                     isBusy={isThinking || isStreaming}
                     textareaRef={textareaRef}
@@ -392,8 +433,12 @@ export function ChatPage() {
                     onClose={() => setViewingCitationArtifact(null)}
                     projectId={projectId}
                     highlightLines={viewingCitationArtifact.lines}
+                    canDelete={false}
+                    onDelete={() => {}}
                 />
             )}
+
+            {isMatrixActive && <MatrixRain onClose={() => setIsMatrixActive(false)} />}
         </div>
     );
 }

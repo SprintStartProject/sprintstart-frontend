@@ -68,43 +68,10 @@ export const knowledgeService = {
             console.warn("Unified artifacts endpoint failed (expected if missing), continuing...", e);
         }
 
-        try {
-            const profile = await userService.getProfile();
-            if (profile) {
-                interface UploadListItemResponse {
-                    id: string;
-                    filename: string;
-                    mime: string;
-                    uploadedAt: string;
-                }
-                const uploads = await apiClient.fetch<UploadListItemResponse[]>(`/api/v1/uploads?uploaderId=${encodeURIComponent(profile.id)}`);
-
-                const uploadArtifacts: Artifact[] = uploads.map(u => ({
-                    id: u.id,
-                    title: u.filename,
-                    artifactType: 'FILE',
-                    sourceSystem: 'UPLOAD',
-                    sourceId: u.id,
-                    sourceUrl: null,
-                    mime: u.mime,
-                    language: null,
-                    ingestedAt: u.uploadedAt,
-                    createdAtSource: null,
-                    updatedAtSource: u.uploadedAt,
-                    contentHash: null,
-                    ingestionRunId: null,
-                }));
-
-                // Deduplicate using title (filename) as a temporary frontend workaround,
-                // because the backend doesn't return sourceId for ingested artifacts yet.
-                const existingTitles = new Set(artifacts.map(a => a.title));
-                const uniqueUploads = uploadArtifacts.filter(a => !existingTitles.has(a.title));
-
-                artifacts = [...artifacts, ...uniqueUploads];
-            }
-        } catch (e) {
-            console.warn("Failed to fetch personal uploads", e);
-        }
+        // Personal uploads are now fetched via the unified project artifacts
+        // endpoint above (the backend's GET /api/v1/uploads was changed to
+        // require a projectId query param and use JWT auth instead of the old
+        // uploaderId param, so the separate uploads fetch was removed).
 
         return artifacts;
     },
@@ -200,6 +167,10 @@ export const knowledgeService = {
             throw new ApiError(401, 'Unauthorized');
         }
 
+        if (response.status === 503) {
+            throw new ApiError(503, 'Artifact is still being indexed by the AI service. Please try again in a few moments.');
+        }
+
         if (!response.ok) {
             const errorBody = await response.text().catch(() => 'Unknown error');
             throw new ApiError(response.status, errorBody || response.statusText);
@@ -249,6 +220,41 @@ export const knowledgeService = {
             if (error instanceof Error) throw error;
             throw new Error(String(error));
         }
+    },
+
+    /**
+     * Deletes a single uploaded artifact by its id.
+     *
+     * Sends a multipart DELETE to `/api/v1/uploads/{artifactId}` with a `request`
+     * JSON part containing the artifactIds batch, the removerId (authenticated user)
+     * and the projectId scope. The backend mirrors the same multipart contract as
+     * the upload endpoint — the path variable is captured for REST semantics but
+     * the actual deletion target(s) are read from the body's `artifactIds` set.
+     *
+     * @remarks Permission: the backend currently allows any `USER` role. The
+     * frontend gates this call to PM/HR/ADMIN via `accessPolicy` Pattern A.
+     * Tightening the backend `@PreAuthorize` to `hasAnyRole('PM','HR','ADMIN')`
+     * is tracked as a restricted backend follow-up.
+     *
+     * @param projectId  UUID of the project that scopes the deletion.
+     * @param artifactId UUID of the uploaded artifact to remove.
+     * @param removerId  UUID of the authenticated user requesting the deletion.
+     * @throws ApiError on a non-2xx response (e.g. 403 if the caller lacks access
+     *   to the supplied projectId, 404 if the artifact does not exist).
+     */
+    async deleteUpload(projectId: string, artifactId: string, removerId: string): Promise<void> {
+        const formData = new FormData();
+        const requestPayload = {
+            artifactIds: [artifactId],
+            removerId,
+            projectId,
+        };
+        formData.append('request', new Blob([JSON.stringify(requestPayload)], { type: 'application/json' }));
+
+        await apiClient.fetch<void>(`/api/v1/uploads/${encodeURIComponent(artifactId)}`, {
+            method: 'DELETE',
+            body: formData,
+        });
     },
 
     /**

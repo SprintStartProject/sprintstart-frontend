@@ -8,6 +8,8 @@ import { Game2048Modal } from '../features/game2048/components/Game2048Modal';
 import { useGame2048Shortcut } from '../features/game2048/hooks/useGame2048Shortcut';
 import { DinoGameModal } from '../features/dino/components/DinoGameModal';
 import { useDinoShortcut } from '../features/dino/hooks/useDinoShortcut';
+import { SpaceInvadersModal } from '../features/space-invaders/components/SpaceInvadersModal';
+import { useSpaceInvadersShortcut } from '../features/space-invaders/hooks/useSpaceInvadersShortcut';
 
 /**
  * Central hub displayed after login.
@@ -28,6 +30,11 @@ export function DashboardPage() {
     const [dinoOpen, setDinoOpen] = useState(false);
     const openDino = useCallback(() => setDinoOpen(true), []);
     useDinoShortcut(openDino);
+
+    // Space Invaders easter egg: Ctrl+Shift+3 opens the game in a modal.
+    const [invadersOpen, setInvadersOpen] = useState(false);
+    const openInvaders = useCallback(() => setInvadersOpen(true), []);
+    useSpaceInvadersShortcut(openInvaders);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -115,6 +122,7 @@ export function DashboardPage() {
 
             <Game2048Modal open={game2048Open} onClose={() => setGame2048Open(false)} />
             <DinoGameModal open={dinoOpen} onClose={() => setDinoOpen(false)} />
+            <SpaceInvadersModal open={invadersOpen} onClose={() => setInvadersOpen(false)} />
         </div>
     );
 }

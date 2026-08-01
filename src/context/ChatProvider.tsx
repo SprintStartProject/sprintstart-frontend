@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } fro
 import type { NavigateFunction } from "react-router-dom";
 import {
     createChat,
-    getChats,
+    getMyChats,
     getMessages,
     streamMessage
 } from "../services/chatService";
@@ -206,8 +206,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setMessagesByChat({});
 
             try {
-                const data = await getChats();
-                setChats(data.chats.filter(chat => chat.userId === userId));
+                const data = await getMyChats();
+                setChats(data?.chats ?? []);
             } catch (e) {
                 console.error("Failed to load chats", e);
                 setChats([]);
@@ -217,7 +217,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const sortedChats = useMemo(
         () =>
-            [...chats].sort(
+            [...(chats ?? [])].sort(
                 (a, b) =>
                     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             ),
@@ -225,9 +225,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     );
 
     const refreshChats = useCallback(async () => {
-        const data = await getChats();
-        setChats(data.chats.filter(chat => chat.userId === userId));
-    }, [userId]);
+        const data = await getMyChats();
+        setChats(data?.chats ?? []);
+    }, []);
 
     const loadMessages = useCallback(async (chatId: string) => {
         // Mark this chat as the latest requested so a slow earlier response

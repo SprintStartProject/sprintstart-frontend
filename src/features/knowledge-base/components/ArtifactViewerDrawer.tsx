@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, type ReactNode } from 'react';
-import { Sparkles, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
+import { Sparkles, ArrowLeft, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -11,6 +11,8 @@ import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from '../type
 import { knowledgeService } from '../../../services/knowledgeService';
 import { ApiError } from '../../../services/apiClient';
 import { SidePanel } from '../../../components/ui/SidePanel';
+import { Modal } from '../../../components/ui/Modal';
+import { useAuth } from '../../../context/useAuth';
 import { CitationsList } from './CitationsList';
 
 /**
@@ -24,6 +26,12 @@ interface ArtifactViewerDrawerProps {
     projectId: string;
     /** Optional line numbers to highlight and scroll into view. */
     highlightLines?: number[];
+    /** When true, renders the Delete button for UPLOAD-sourced artifacts. The
+     *  parent gates this via accessPolicy Pattern A (PM/HR/ADMIN only). */
+    canDelete: boolean;
+    /** Called after a successful deletion so the parent can clear the selection
+     *  and re-fetch the artifact list. */
+    onDelete: (artifactId: string) => void;
 }
 
 type ViewMode = 'raw' | 'summary';
@@ -36,6 +44,9 @@ interface DrawerState {
     isLoading: boolean;
     isFetchingSummary: boolean;
     isIndexing: boolean;
+    isDeleting: boolean;
+    isConfirmDeleteOpen: boolean;
+    deleteError: string | null;
     stageDetail?: string;
     error: string | null;
 }
@@ -52,7 +63,13 @@ type DrawerAction =
     | { type: 'summarizeCitation'; citation: ArtifactSummaryCitation }
     | { type: 'summarizeDone' }
     | { type: 'summarizeError'; error: string }
-    | { type: 'showRaw' };
+    | { type: 'showRaw' }
+    | { type: 'deleteStart' }
+    | { type: 'deleteSuccess' }
+    | { type: 'deleteError'; error: string }
+    | { type: 'clearDeleteError' }
+    | { type: 'openDeleteConfirm' }
+    | { type: 'closeDeleteConfirm' };
 
 const initialState: DrawerState = {
     viewMode: 'raw',
@@ -62,6 +79,9 @@ const initialState: DrawerState = {
     isLoading: false,
     isFetchingSummary: false,
     isIndexing: false,
+    isDeleting: false,
+    isConfirmDeleteOpen: false,
+    deleteError: null,
     stageDetail: undefined,
     error: null,
 };
@@ -92,6 +112,18 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
             return { ...state, isFetchingSummary: false, isIndexing: false, error: action.error };
         case 'showRaw':
             return { ...state, viewMode: 'raw' };
+        case 'deleteStart':
+            return { ...state, isDeleting: true, deleteError: null };
+        case 'deleteSuccess':
+            return { ...state, isDeleting: false, deleteError: null };
+        case 'deleteError':
+            return { ...state, isDeleting: false, deleteError: action.error };
+        case 'clearDeleteError':
+            return { ...state, deleteError: null };
+        case 'openDeleteConfirm':
+            return { ...state, isConfirmDeleteOpen: true, deleteError: null };
+        case 'closeDeleteConfirm':
+            return { ...state, isConfirmDeleteOpen: false };
         default:
             return state;
     }
@@ -171,7 +203,8 @@ const getLanguage = (filename?: string | null) => {
  * without reading massive files or issues. The summary is streamed over Server-Sent Events and
  * rendered incrementally as tokens arrive; citation metadata is rendered as a source list.
  */
-export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLines }: ArtifactViewerDrawerProps) {
+export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLines, canDelete, onDelete }: ArtifactViewerDrawerProps) {
+    const { profile } = useAuth();
     const [state, dispatch] = useReducer(drawerReducer, initialState);
 
     const abortRef = useRef<AbortController | null>(null);
@@ -194,6 +227,8 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
         abortRef.current = null;
 
         let isMounted = true;
+        // `reset` action also closes any open delete-confirm modal so a stale
+        // confirmation for the previous artifact can't be carried over.
         dispatch({ type: 'reset' });
 
         knowledgeService.getArtifactContent(projectId, artifact.id, artifact.sourceSystem)
@@ -316,7 +351,55 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
         }
     };
 
-    const { viewMode, content, summary, citations, isLoading, isFetchingSummary, isIndexing, stageDetail, error } = state;
+    const { viewMode, content, summary, citations, isLoading, isFetchingSummary, isIndexing, isDeleting, isConfirmDeleteOpen, deleteError, stageDetail, error } = state;
+
+    /**
+     * Deletes the currently selected uploaded artifact.
+     *
+     * Confirms via an alertdialog before issuing the delete. The `removerId` is
+     * the authenticated user's id; the backend uses it for audit and project-
+     * membership validation. On success the parent `onDelete` callback clears
+     * the selection and re-fetches the artifact list. Errors are surfaced in
+     * the modal's own error slot (not the content-load error slot) so the
+     * artifact view stays visible while the user retries.
+     *
+     * @remarks The delete endpoint expects the `UploadedArtifact`'s UUID, not
+     * the ingestion `Artifact`'s UUID. The displayed artifact is usually the
+     * ingestion mirror (its `id` is the ingestion UUID); the corresponding
+     * `UploadedArtifact` id is carried in `artifact.sourceId`, which
+     * `getUnifiedArtifacts` enriches via title-matching against the uploads
+     * list. When `sourceId` is missing (e.g. ingestion mirror without a
+     * matching upload), deletion is refused with a user-facing error.
+     */
+    const handleDelete = async () => {
+        if (!artifact) return;
+        const removerId = profile?.id;
+        if (!removerId) {
+            dispatch({ type: 'deleteError', error: 'Could not resolve authenticated user id.' });
+            return;
+        }
+        const uploadArtifactId = artifact.sourceId;
+        if (!uploadArtifactId) {
+            dispatch({ type: 'deleteError', error: 'Cannot resolve the uploaded artifact id for deletion.' });
+            return;
+        }
+
+        dispatch({ type: 'deleteStart' });
+        try {
+            await knowledgeService.deleteUpload(projectId, uploadArtifactId, removerId);
+            dispatch({ type: 'deleteSuccess' });
+            dispatch({ type: 'closeDeleteConfirm' });
+            onDelete(artifact.id);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to delete artifact';
+            dispatch({ type: 'deleteError', error: message });
+        }
+    };
+
+    /** Opens the delete confirmation, clearing any prior delete error. */
+    const openDeleteConfirm = () => {
+        dispatch({ type: 'openDeleteConfirm' });
+    };
 
     const titleContent = viewMode === 'summary' ? (
         <button
@@ -331,15 +414,30 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
         <div className="font-semibold text-lg text-app-text line-clamp-1">{artifact?.title}</div>
     );
 
+    const canDeleteThisArtifact = canDelete && artifact?.sourceSystem === 'UPLOAD';
+
     const actionsContent = viewMode === 'raw' && (
-        <button
-            onClick={() => void handleSummarize()}
-            data-testid="summarise-btn"
-            className="flex items-center gap-2 px-3 py-1.5 bg-app-brand text-white rounded-md text-sm font-medium hover:bg-app-brand/90 transition-colors shadow-sm"
-        >
-            <Sparkles className="w-4 h-4" />
-            Summarise
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+                onClick={() => void handleSummarize()}
+                data-testid="summarise-btn"
+                className="flex items-center gap-2 px-3 py-1.5 bg-app-brand text-white rounded-md text-sm font-medium hover:bg-app-brand/90 transition-colors shadow-sm"
+            >
+                <Sparkles className="w-4 h-4" />
+                Summarise
+            </button>
+            {canDeleteThisArtifact && (
+                <button
+                    onClick={openDeleteConfirm}
+                    data-testid="delete-artifact-btn"
+                    disabled={isDeleting}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-app-danger-bg text-app-danger-text border border-app-danger-border rounded-md text-sm font-medium hover:bg-app-danger-text/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                </button>
+            )}
+        </div>
     );
 
     return (
@@ -463,6 +561,47 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                     )}
                 </div>
             )}
+
+            <Modal
+                isOpen={isConfirmDeleteOpen}
+                onClose={() => dispatch({ type: 'closeDeleteConfirm' })}
+                role="alertdialog"
+                title="Delete artifact?"
+                description={`This will permanently remove "${artifact?.title ?? 'this artifact'}" and its indexed content. This cannot be undone.`}
+                size="sm"
+            >
+                {deleteError && (
+                    <div
+                        role="alert"
+                        aria-live="assertive"
+                        className="mb-4 rounded-lg border border-app-danger-border bg-app-danger-bg p-3 text-sm text-app-danger-text"
+                        data-testid="delete-error-banner"
+                    >
+                        {deleteError}
+                    </div>
+                )}
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        onClick={() => dispatch({ type: 'closeDeleteConfirm' })}
+                        disabled={isDeleting}
+                        data-testid="cancel-delete-btn"
+                        className="px-4 py-2 rounded-lg border border-app-border text-app-text-muted text-sm font-medium hover:bg-app-surface-hover transition-colors disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => void handleDelete()}
+                        disabled={isDeleting}
+                        data-testid="confirm-delete-btn"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-app-danger-text text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                        {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        {isDeleting ? 'Deleting...' : 'Delete'}
+                    </button>
+                </div>
+            </Modal>
         </SidePanel>
     );
 }
