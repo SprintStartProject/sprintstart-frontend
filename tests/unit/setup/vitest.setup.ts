@@ -87,6 +87,7 @@ vi.mock('framer-motion', async (importOriginal) => {
     'h1',
     'h2',
     'p',
+    'select',
   ];
   
   const mockedMotion = commonPrimitives.reduce((acc, tagName) => {

@@ -477,8 +477,10 @@ describe('DataIngestionPage', () => {
         expect(await screen.findByText('old-run')).toBeInTheDocument();
 
         const statusSelect = screen.getByLabelText('Filter runs by status');
-        await user.selectOptions(statusSelect, 'FAILED');
-        await user.selectOptions(statusSelect, 'COMPLETED');
+        await user.click(statusSelect);
+        await user.click(await screen.findByRole('option', { name: 'Failed' }));
+        await user.click(statusSelect);
+        await user.click(await screen.findByRole('option', { name: 'Success' }));
 
         expect(await screen.findByText('new-run')).toBeInTheDocument();
 
@@ -498,7 +500,8 @@ describe('DataIngestionPage', () => {
             expect(screen.getByLabelText('Filter runs by status')).toBeInTheDocument();
         });
 
-        await user.selectOptions(screen.getByLabelText('Filter runs by status'), 'FAILED');
+        await user.click(screen.getByLabelText('Filter runs by status'));
+        await user.click(await screen.findByRole('option', { name: 'Failed' }));
 
         await waitFor(() => {
             expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
@@ -535,7 +538,11 @@ describe('DataIngestionPage', () => {
         const filter = () => within(screen.getByRole('group', { name: /filter sections/i }));
         await user.click(filter().getByRole('button', { name: /runs/i }));
 
-        expect(filter().getByRole('button', { name: /runs/i })).toHaveClass('bg-app-brand');
+        const runsButton = filter().getByRole('button', { name: /runs/i });
+        expect(runsButton).toHaveAttribute('aria-pressed', 'true');
+        // The brand fill is a separate element that slides between tabs, so it
+        // lives inside the active button rather than on it.
+        expect(runsButton.querySelector('.bg-app-brand')).not.toBeNull();
     });
 
     it('opens the add-source wizard and reaches GitHub discovery via Continue', async () => {

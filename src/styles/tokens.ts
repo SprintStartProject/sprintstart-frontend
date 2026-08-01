@@ -1,4 +1,4 @@
-import type { Transition, Variants } from "framer-motion";
+import type { TargetAndTransition, Transition, Variants } from "framer-motion";
 
 /**
  * Centralized Framer Motion spring transition presets.
@@ -80,6 +80,40 @@ export const SIDE_PANEL_SLIDE_MS = 420;
 export const sidePanelSlideToken: Transition = {
     duration: SIDE_PANEL_SLIDE_MS / 1000,
     ease: [0.32, 0.72, 0, 1],
+};
+
+/**
+ * Hover and press feedback for buttons and other small controls.
+ *
+ * Spread onto a `motion.button` so every action in the app answers the pointer
+ * the same way:
+ *
+ * ```tsx
+ * <motion.button {...buttonHoverMotion} className="...">Save</motion.button>
+ * ```
+ *
+ * Deliberately gentler than the sidebar's dock magnification (1.03 rather than
+ * 1.12): buttons sit inside dense toolbars and rows, where a large scale would
+ * collide with neighbours or push a layout around.
+ *
+ * Pass `disabled` controls `buttonHoverMotionDisabled` instead, so a dead
+ * button also feels dead.
+ */
+export const buttonHoverMotion: {
+    whileHover: TargetAndTransition;
+    whileTap: TargetAndTransition;
+    transition: Transition;
+} = {
+    whileHover: { scale: 1.03 },
+    whileTap: { scale: 0.97 },
+    transition: hoverSpringToken,
+};
+
+/** No-op counterpart to {@link buttonHoverMotion} for disabled controls. */
+export const buttonHoverMotionDisabled = {
+    whileHover: undefined,
+    whileTap: undefined,
+    transition: hoverSpringToken,
 };
 
 /**

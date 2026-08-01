@@ -1,5 +1,10 @@
 import { Database, Plus, RefreshCw } from "lucide-react";
+import { motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
+import {
+  buttonHoverMotion,
+  buttonHoverMotionDisabled,
+} from "../../../styles/tokens";
 
 type DataIngestionHeaderProps = {
   isLoading: boolean;
@@ -28,24 +33,26 @@ export function DataIngestionHeader({
           subtitle="Manage connected sources, indexed artifacts and ingestion runs."
           actions={
             <>
-              <button
+              <motion.button
                 type="button"
                 onClick={onAddSource}
-                className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover"
+                {...buttonHoverMotion}
+                className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
               >
                 <Plus size={16} />
                 Add sources
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 type="button"
                 onClick={onRefresh}
                 disabled={isLoading}
                 aria-label="Refresh"
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition hover:bg-app-surface-hover hover:text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+                {...(isLoading ? buttonHoverMotionDisabled : buttonHoverMotion)}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-              </button>
+              </motion.button>
             </>
           }
         />

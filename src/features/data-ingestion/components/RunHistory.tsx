@@ -73,7 +73,11 @@ export function RunHistory({
                             className={`grid w-full gap-4 px-5 py-5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus lg:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto] lg:items-center ${
                                 isSelected
                                     ? "bg-app-brand-soft"
-                                    : "bg-app-surface hover:bg-app-surface-hover"
+                                    // Rows sit in a shared grid, so they get an
+                                    // inset brand edge instead of the cards'
+                                    // lift -- a translate would break the
+                                    // column alignment with its neighbours.
+                                    : "bg-app-surface hover:bg-app-surface-hover hover:shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
                             }`}
                         >
                             <div>
