@@ -7,11 +7,8 @@ import {
 import { addJiraCredential } from "../../../../services/sources/jiraService";
 
 type JiraCredentialAddFormProps = {
-  /**
-   * Jira account email the credential is stored under — chosen at the section
-   * level (the "Jira account email" scope), not necessarily the login email.
-   */
-  userEmail: string;
+  /** Login email used only as the initial Jira account email. */
+  defaultUserEmail: string | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
 };
@@ -19,28 +16,31 @@ type JiraCredentialAddFormProps = {
 const ADD_FALLBACK = "Failed to add Jira credential.";
 
 /**
- * Inline "Add Jira credential" form. Unlike a GitHub PAT there is no fixed token
- * prefix to validate client-side, so the token is only required, not
- * format-checked. The credential is keyed by `(userEmail, tokenName)`; the
- * account email is fixed by the section's editable scope (shown here for
- * confirmation) so an added credential always lands in the list being viewed.
- * A ref guard prevents double-submit before the disabled state re-renders.
+ * Inline form for storing a Jira account email and API token for the
+ * authenticated user. The login email is only a convenience default because
+ * the Jira account may use a different address.
  */
 export function JiraCredentialAddForm({
-  userEmail,
+  defaultUserEmail,
   onClose,
   onSaved,
 }: JiraCredentialAddFormProps) {
+  const [userEmail, setUserEmail] = useState(defaultUserEmail ?? "");
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    if (defaultUserEmail) {
+      nameInputRef.current?.focus();
+    } else {
+      emailInputRef.current?.focus();
+    }
+  }, [defaultUserEmail]);
 
   const handleClose = () => {
     if (savingRef.current) return;
@@ -57,7 +57,7 @@ export function JiraCredentialAddForm({
     try {
       try {
         await addJiraCredential({
-          userEmail,
+          userEmail: userEmail.trim(),
           tokenName: name.trim(),
           authToken: token.trim(),
         });
@@ -65,8 +65,6 @@ export function JiraCredentialAddForm({
         setError(parseApiError(mutationError, ADD_FALLBACK));
         return;
       }
-      // Mutation succeeded — a failed refetch still closes the form since
-      // server state is correct; surface a distinct "couldn't refresh" note.
       try {
         await onSaved();
       } catch (refreshError) {
@@ -87,17 +85,9 @@ export function JiraCredentialAddForm({
       className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <span className="text-sm font-semibold text-app-text">
-            New Jira credential
-          </span>
-          <p
-            className="mt-0.5 break-words text-xs text-app-text-muted"
-            data-testid="settings-jira-add-account"
-          >
-            for {userEmail}
-          </p>
-        </div>
+        <span className="text-sm font-semibold text-app-text">
+          New Jira credential
+        </span>
         <button
           type="button"
           onClick={handleClose}
@@ -110,6 +100,28 @@ export function JiraCredentialAddForm({
       </div>
 
       <div className="space-y-3">
+        <div>
+          <label
+            htmlFor="settings-jira-add-email"
+            className="mb-1.5 block text-xs font-medium text-app-text-muted"
+          >
+            Jira account email
+          </label>
+          <input
+            ref={emailInputRef}
+            id="settings-jira-add-email"
+            data-testid="settings-jira-add-email"
+            type="email"
+            value={userEmail}
+            onChange={(e) => setUserEmail(e.target.value)}
+            placeholder="jira-account@example.com"
+            required
+            autoComplete="email"
+            disabled={isSaving}
+            className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
+          />
+        </div>
+
         <div>
           <label
             htmlFor="settings-jira-add-name"

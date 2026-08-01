@@ -11,7 +11,7 @@ import {
   deleteJiraCredential,
   getAllJiraConfigs,
   getJiraConfig,
-  getJiraCredentialsOfUser,
+  getMyJiraCredentials,
   getJiraInstances,
   removeJiraInstanceFromProject,
   updateAllJiraInstances,
@@ -165,23 +165,23 @@ describe("jiraService credential endpoints", () => {
     });
   });
 
-  it("getJiraCredentialsOfUser url-encodes the userEmail path segment", async () => {
+  it("getMyJiraCredentials lists the authenticated user's credentials", async () => {
     server.use(
-      http.get(
-        "/api/v1/jira/credentials/pm%2Buser%40example.com",
-        () =>
-          HttpResponse.json([
-            { userEmail: "pm+user@example.com", displayName: "token-a" },
-          ]),
+      http.get("/api/v1/jira/credentials", () =>
+        HttpResponse.json([
+          { userEmail: "pm+user@example.com", displayName: "token-a" },
+        ]),
       ),
     );
 
-    const credentials = await getJiraCredentialsOfUser("pm+user@example.com");
+    const credentials = await getMyJiraCredentials();
 
     expect(credentials).toHaveLength(1);
-    expect(credentials[0].displayName).toBe("token-a");
+    expect(credentials[0]).toEqual({
+      userEmail: "pm+user@example.com",
+      displayName: "token-a",
+    });
   });
-
   it("deleteJiraCredential sends a DELETE with the credential identity", async () => {
     expect.assertions(1);
 

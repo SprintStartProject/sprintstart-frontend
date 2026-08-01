@@ -4,10 +4,10 @@ import { useJiraCredentials } from "../../../../src/features/settings/hooks/useJ
 import type { JiraCredentialsDto } from "../../../../src/services/sources/jiraService";
 
 vi.mock("../../../../src/services/sources/jiraService", () => ({
-  getJiraCredentialsOfUser: vi.fn(),
+  getMyJiraCredentials: vi.fn(),
 }));
 
-import { getJiraCredentialsOfUser } from "../../../../src/services/sources/jiraService";
+import { getMyJiraCredentials } from "../../../../src/services/sources/jiraService";
 
 const cred = (displayName: string): JiraCredentialsDto => ({
   userEmail: "a@b.com",
@@ -19,13 +19,13 @@ describe("useJiraCredentials", () => {
     vi.clearAllMocks();
   });
 
-  it("loads credentials on mount for a user", async () => {
-    vi.mocked(getJiraCredentialsOfUser).mockResolvedValue([
+  it("loads the authenticated user's credentials on mount", async () => {
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([
       cred("default"),
       cred("ci"),
     ]);
 
-    const { result } = renderHook(() => useJiraCredentials("a@b.com"));
+    const { result } = renderHook(() => useJiraCredentials());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.credentials.map((c) => c.displayName)).toEqual([
@@ -33,26 +33,23 @@ describe("useJiraCredentials", () => {
       "ci",
     ]);
     expect(result.current.error).toBeNull();
-    expect(getJiraCredentialsOfUser).toHaveBeenCalledWith(
-      "a@b.com",
-      expect.any(AbortSignal),
-    );
+    expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
-  it("settles into a loaded-empty state without fetching when there is no email", async () => {
-    const { result } = renderHook(() => useJiraCredentials(undefined));
+  it("settles into a loaded-empty state without fetching when disabled", async () => {
+    const { result } = renderHook(() => useJiraCredentials(false));
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.credentials).toEqual([]);
-    expect(getJiraCredentialsOfUser).not.toHaveBeenCalled();
+    expect(getMyJiraCredentials).not.toHaveBeenCalled();
   });
 
   it("surfaces an error message when loading fails", async () => {
-    vi.mocked(getJiraCredentialsOfUser).mockRejectedValue(
+    vi.mocked(getMyJiraCredentials).mockRejectedValue(
       new Error("Network down"),
     );
 
-    const { result } = renderHook(() => useJiraCredentials("a@b.com"));
+    const { result } = renderHook(() => useJiraCredentials());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.error).toBe("Network down");
@@ -60,11 +57,11 @@ describe("useJiraCredentials", () => {
   });
 
   it("reloads credentials via reload", async () => {
-    vi.mocked(getJiraCredentialsOfUser)
+    vi.mocked(getMyJiraCredentials)
       .mockResolvedValueOnce([cred("a")])
       .mockResolvedValueOnce([cred("a"), cred("b")]);
 
-    const { result } = renderHook(() => useJiraCredentials("a@b.com"));
+    const { result } = renderHook(() => useJiraCredentials());
 
     await waitFor(() =>
       expect(result.current.credentials.map((c) => c.displayName)).toEqual([
@@ -89,11 +86,11 @@ describe("useJiraCredentials", () => {
     const slow = new Promise<JiraCredentialsDto[]>((resolve) => {
       resolveSlow = resolve;
     });
-    vi.mocked(getJiraCredentialsOfUser)
+    vi.mocked(getMyJiraCredentials)
       .mockReturnValueOnce(slow)
       .mockResolvedValueOnce([cred("fresh")]);
 
-    const { result } = renderHook(() => useJiraCredentials("a@b.com"));
+    const { result } = renderHook(() => useJiraCredentials());
 
     await waitFor(() => expect(result.current.isRefreshing).toBe(true));
     await act(async () => {

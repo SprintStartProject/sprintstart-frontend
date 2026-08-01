@@ -1550,7 +1550,6 @@ export function DataIngestionPage() {
           projectId={selectedProjectId}
           projectName={selectedProject?.name}
           tokenNames={githubTokenNames}
-          jiraDefaultEmail={profile?.email ?? null}
           canIngest={Boolean(selectedProjectId) && canIngestIntoSelectedProject}
           ingestBlockedReason={
             !selectedProjectId

@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
+
 import { useEffect, useState } from "react";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { Stepper } from "../../../components/ui/Stepper.tsx";
@@ -27,11 +28,6 @@ type AddSourceModalProps = {
   projectId: string | null;
   projectName?: string;
   tokenNames: string[];
-  /**
-   * Default Jira account email to preselect for the Jira credential picker
-   * (the login email); editable in the step. Null when the profile has none.
-   */
-  jiraDefaultEmail?: string | null;
   /** Whether the current user may connect sources to the selected project. */
   canIngest: boolean;
   /** Human-readable reason shown when `canIngest` is false. */
@@ -55,7 +51,6 @@ export function AddSourceModal({
   projectId,
   projectName,
   tokenNames,
-  jiraDefaultEmail,
   canIngest,
   ingestBlockedReason,
   onClose,
@@ -105,49 +100,32 @@ export function AddSourceModal({
   const selectedCount = selection.length;
 
   // --- Jira connect state ---
-  // Jira has no discovery endpoint, so the instance is entered directly. The
-  // credential is picked from the ones stored under the chosen Jira account
-  // email (editable — the Jira account email may differ from the login email).
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
-  const [jiraAccountEmail, setJiraAccountEmail] = useState(
-    jiraDefaultEmail ?? "",
-  );
-  const [jiraEmailDraft, setJiraEmailDraft] = useState(jiraDefaultEmail ?? "");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
 
-  // Credentials are only loaded while the Jira step is the active type; passing
-  // undefined keeps the hook idle on the GitHub/Upload paths.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
     error: jiraCredentialsError,
     isRefreshing: jiraCredentialsLoading,
-  } = useJiraCredentials(
-    isJira ? jiraAccountEmail.trim() || undefined : undefined,
-  );
+  } = useJiraCredentials(isJira);
 
-  // Adopt the first credential once the list for the chosen account email
-  // arrives (and heal a selection no longer present), mirroring the GitHub
-  // token picker's late-arrival handling above.
   useEffect(() => {
-    if (jiraCredentials.length === 0) return;
+    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
     void Promise.resolve().then(() => {
-      setJiraCredentialName((current) =>
-        current && jiraCredentials.some((c) => c.displayName === current)
+      setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current &&
+          jiraCredentials.some(
+            (credential) => credential.displayName === current,
+          )
           ? current
-          : jiraCredentials[0].displayName,
-      );
+          : jiraCredentials[0].displayName;
+      });
     });
-  }, [jiraCredentials]);
-
-  const commitJiraEmail = () => {
-    if (jiraEmailDraft.trim() === jiraAccountEmail.trim()) return;
-    setJiraAccountEmail(jiraEmailDraft);
-    setJiraCredentialName("");
-    setConnectError(null);
-  };
+  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
   const handleConnect = async () => {
     if (!projectId) {
@@ -302,7 +280,6 @@ export function AddSourceModal({
 
     const displayName = jiraDisplayName.trim();
     const url = jiraUrl.trim();
-    const userEmail = jiraAccountEmail.trim();
     const tokenName = jiraCredentialName.trim();
 
     if (!displayName) {
@@ -319,18 +296,20 @@ export function AddSourceModal({
       return;
     }
 
-    if (!userEmail) {
-      setConnectState("error");
-      setConnectError("Enter the Jira account email.");
-      return;
-    }
-
     if (!tokenName) {
       setConnectState("error");
       setConnectError("Select a stored Jira credential.");
       return;
     }
 
+    const selectedCredential = jiraCredentials.find(
+      (credential) => credential.displayName === tokenName,
+    );
+    if (!selectedCredential) {
+      setConnectState("error");
+      setConnectError("The selected Jira credential is no longer available.");
+      return;
+    }
     setConnectState("loading");
     setConnectError(null);
 
@@ -338,8 +317,8 @@ export function AddSourceModal({
       await connectJiraInstance({
         displayName,
         url,
-        userEmail,
-        tokenName,
+        userEmail: selectedCredential.userEmail,
+        tokenName: selectedCredential.displayName,
         projectId,
       });
 
@@ -573,7 +552,6 @@ export function AddSourceModal({
         <JiraConnectStep
           displayName={jiraDisplayName}
           url={jiraUrl}
-          accountEmail={jiraEmailDraft}
           credentialName={jiraCredentialName}
           credentials={jiraCredentials}
           credentialsLoaded={jiraCredentialsLoaded}
@@ -585,8 +563,6 @@ export function AddSourceModal({
           errorMessage={connectError}
           onDisplayNameChange={setJiraDisplayName}
           onUrlChange={setJiraUrl}
-          onAccountEmailChange={setJiraEmailDraft}
-          onAccountEmailCommit={commitJiraEmail}
           onCredentialNameChange={setJiraCredentialName}
           onSubmit={() => void handleConnectJira()}
         />
@@ -731,16 +707,12 @@ function SingleRepositoryStep({
 }
 
 /**
- * Jira connect form. There is no Jira discovery endpoint, so the instance is
- * entered directly: a display name, the instance URL, the Jira account email
- * (editable — it may differ from the login email) and one of the credentials
- * stored under that email. Mirrors the single-repository step's layout and
- * guardrails so it feels like the same wizard.
+ * Jira connect form for an instance URL and a credential owned by the
+ * authenticated user. The selected credential supplies its Jira account email.
  */
 function JiraConnectStep({
   displayName,
   url,
-  accountEmail,
   credentialName,
   credentials,
   credentialsLoaded,
@@ -752,14 +724,11 @@ function JiraConnectStep({
   errorMessage,
   onDisplayNameChange,
   onUrlChange,
-  onAccountEmailChange,
-  onAccountEmailCommit,
   onCredentialNameChange,
   onSubmit,
 }: {
   displayName: string;
   url: string;
-  accountEmail: string;
   credentialName: string;
   credentials: JiraCredentialsDto[];
   credentialsLoaded: boolean;
@@ -771,19 +740,15 @@ function JiraConnectStep({
   errorMessage: string | null;
   onDisplayNameChange: (value: string) => void;
   onUrlChange: (value: string) => void;
-  onAccountEmailChange: (value: string) => void;
-  onAccountEmailCommit: () => void;
   onCredentialNameChange: (value: string) => void;
   onSubmit: () => void;
 }) {
   const fieldClassName =
     "mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60";
 
-  const hasEmail = accountEmail.trim().length > 0;
   const hasCredentials = credentials.length > 0;
-  // Only claim "no credentials" once a load for the current email has settled.
   const showNoCredentials =
-    hasEmail && credentialsLoaded && !credentialsLoading && !hasCredentials;
+    credentialsLoaded && !credentialsLoading && !hasCredentials;
 
   return (
     <form
@@ -802,11 +767,10 @@ function JiraConnectStep({
 
       {showNoCredentials && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          No Jira credential is stored for {accountEmail.trim()}. Add one under
-          Settings → Access Tokens → Jira first, then come back to connect.
+          No Jira credentials are stored for your account. Add one under
+          Settings, Access Tokens, Jira first, then come back to connect.
         </div>
       )}
-
       <div>
         <label
           htmlFor="jira-display-name"
@@ -844,66 +808,41 @@ function JiraConnectStep({
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="jira-account-email"
-            className="text-sm font-medium text-app-text"
-          >
-            Jira account email
-          </label>
-          <input
-            id="jira-account-email"
-            data-testid="jira-account-email"
-            type="email"
-            value={accountEmail}
-            onChange={(event) => onAccountEmailChange(event.target.value)}
-            onBlur={onAccountEmailCommit}
-            disabled={isBusy}
-            placeholder="jira-account@example.com"
-            autoComplete="off"
-            className={fieldClassName}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="jira-credential"
-            className="text-sm font-medium text-app-text"
-          >
-            Credential
-          </label>
-          <select
-            id="jira-credential"
-            data-testid="jira-credential"
-            value={credentialName}
-            onChange={(event) => onCredentialNameChange(event.target.value)}
-            disabled={isBusy || !hasCredentials}
-            className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {hasCredentials ? (
-              credentials.map((credential) => (
-                <option
-                  key={credential.displayName}
-                  value={credential.displayName}
-                >
-                  {credential.displayName}
-                </option>
-              ))
-            ) : (
-              <option value="">
-                {credentialsLoading ? "Loading credentials…" : "No credentials"}
+      <div>
+        <label
+          htmlFor="jira-credential"
+          className="text-sm font-medium text-app-text"
+        >
+          Credential
+        </label>
+        <select
+          id="jira-credential"
+          data-testid="jira-credential"
+          value={credentialName}
+          onChange={(event) => onCredentialNameChange(event.target.value)}
+          disabled={isBusy || !hasCredentials}
+          className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {hasCredentials ? (
+            credentials.map((credential) => (
+              <option
+                key={credential.displayName}
+                value={credential.displayName}
+              >
+                {credential.displayName} - {credential.userEmail}
               </option>
-            )}
-          </select>
-        </div>
+            ))
+          ) : (
+            <option value="">
+              {credentialsLoading ? "Loading credentials..." : "No credentials"}
+            </option>
+          )}
+        </select>
       </div>
-
       <p className="text-xs text-app-text-subtle">
-        The credential is one of the Jira API tokens stored for this account
-        email. Manage them under Settings → Access Tokens → Jira.
+        Jira account emails are stored with each credential. Manage them under
+        Settings, Access Tokens, Jira.
       </p>
-
       {credentialsError && (
         <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

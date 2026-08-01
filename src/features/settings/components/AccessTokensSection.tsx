@@ -19,7 +19,7 @@ const PROVIDERS: ReadonlyArray<SegmentedControlOption<Provider>> = [
  * whose credential models differ (global GitHub PATs vs. per-user Jira
  * credentials), co-located under a `GitHub | Jira` segmented control. GitHub
  * renders the unchanged {@link TokensSection}; Jira renders the current user's
- * own {@link JiraCredentialsSection}, keyed by their profile email.
+ * own {@link JiraCredentialsSection}. The profile email only pre-fills new entries.
  */
 export function AccessTokensSection() {
   const { profile } = useAuth();
@@ -37,7 +37,7 @@ export function AccessTokensSection() {
       {provider === "github" ? (
         <TokensSection />
       ) : (
-        <JiraCredentialsSection userEmail={profile?.email ?? null} />
+        <JiraCredentialsSection defaultUserEmail={profile?.email ?? null} />
       )}
     </div>
   );

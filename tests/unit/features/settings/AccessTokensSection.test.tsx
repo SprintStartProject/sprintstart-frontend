@@ -20,11 +20,11 @@ vi.mock("../../../../src/features/settings/hooks/useGithubTokens", () => ({
 }));
 
 vi.mock("../../../../src/services/sources/jiraService", () => ({
-  getJiraCredentialsOfUser: vi.fn(),
+  getMyJiraCredentials: vi.fn(),
 }));
 
 import { useAuth } from "../../../../src/context/useAuth";
-import { getJiraCredentialsOfUser } from "../../../../src/services/sources/jiraService";
+import { getMyJiraCredentials } from "../../../../src/services/sources/jiraService";
 
 function mockAuthEmail(email: string | null) {
   vi.mocked(useAuth).mockReturnValue({
@@ -62,7 +62,7 @@ function renderShell() {
 describe("AccessTokensSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getJiraCredentialsOfUser).mockResolvedValue([]);
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
     mockAuthEmail("user@corp.com");
   });
 
@@ -73,7 +73,7 @@ describe("AccessTokensSection", () => {
     expect(screen.queryByLabelText("Jira credentials")).not.toBeInTheDocument();
   });
 
-  it("switches to the Jira provider and back", async () => {
+  it("switches to Jira and loads the authenticated user's credentials", async () => {
     const user = userEvent.setup();
     renderShell();
 
@@ -82,26 +82,21 @@ describe("AccessTokensSection", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("Jira credentials")).toBeInTheDocument(),
     );
-    expect(getJiraCredentialsOfUser).toHaveBeenCalledWith(
-      "user@corp.com",
-      expect.any(AbortSignal),
-    );
-    expect(
-      screen.queryByLabelText("GitHub access tokens"),
-    ).not.toBeInTheDocument();
+    expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
 
     await user.click(screen.getByTestId("access-tokens-segment-github"));
     expect(screen.getByLabelText("GitHub access tokens")).toBeInTheDocument();
   });
 
-  it("passes null email through to the Jira notice when the profile has none", async () => {
+  it("still loads Jira credentials without a profile email", async () => {
     const user = userEvent.setup();
     mockAuthEmail(null);
     renderShell();
 
     await user.click(screen.getByTestId("access-tokens-segment-jira"));
 
-    expect(screen.getByTestId("settings-jira-no-email")).toBeInTheDocument();
-    expect(getJiraCredentialsOfUser).not.toHaveBeenCalled();
+    await waitFor(() => expect(getMyJiraCredentials).toHaveBeenCalled());
+    await user.click(screen.getByTestId("settings-jira-add-open"));
+    expect(screen.getByTestId("settings-jira-add-email")).toHaveValue("");
   });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getJiraCredentialsOfUser } from "../../../services/sources/jiraService";
+import { getMyJiraCredentials } from "../../../services/sources/jiraService";
 import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
 
 type UseJiraCredentialsResult = {
@@ -7,28 +7,17 @@ type UseJiraCredentialsResult = {
   loaded: boolean;
   error: string | null;
   isRefreshing: boolean;
-  /** Reloads the credential list for the current user. No-op when no email. */
+  /** Reloads the authenticated user's credential list. */
   reload: () => Promise<void>;
 };
 
 /**
- * Loads the stored Jira credentials of a single user.
+ * Loads the Jira credentials owned by the authenticated user.
  *
- * Unlike GitHub PATs (which are global — see
- * {@link useGithubTokens}), Jira credentials are keyed per user
- * (`(userEmail, tokenName)`), so this hook takes the owner's email and there is
- * no "list all credentials" endpoint. When `userEmail` is undefined the hook
- * settles into a loaded-empty state instead of fetching, so the UI can show its
- * empty/notice state rather than a spinner.
- *
- * Refresh-safety mirrors {@link useGithubTokens}: each `reload` aborts any
- * in-flight request and tracks a monotonic request id, so a slow stale fetch
- * can never overwrite a newer result. An unmount aborts the pending request and
- * late resolutions are ignored via the mounted ref.
+ * When disabled, the hook settles into a loaded-empty state without fetching.
+ * Reloads abort any in-flight request so stale data cannot win a race.
  */
-export function useJiraCredentials(
-  userEmail: string | undefined,
-): UseJiraCredentialsResult {
+export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
   const [credentials, setCredentials] = useState<JiraCredentialsDto[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,12 +36,10 @@ export function useJiraCredentials(
   }, []);
 
   const reload = useCallback(async () => {
-    // Bump the request id first so any earlier in-flight fetch is treated as
-    // stale even on the no-email short-circuit.
     const id = ++requestIdRef.current;
     inflightRef.current?.abort();
 
-    if (!userEmail) {
+    if (!enabled) {
       if (mountedRef.current) {
         setCredentials([]);
         setLoaded(true);
@@ -67,7 +54,7 @@ export function useJiraCredentials(
 
     setIsRefreshing(true);
     try {
-      const list = await getJiraCredentialsOfUser(userEmail, controller.signal);
+      const list = await getMyJiraCredentials(controller.signal);
       if (id === requestIdRef.current && mountedRef.current) {
         setCredentials(list);
         setLoaded(true);
@@ -88,11 +75,8 @@ export function useJiraCredentials(
         setIsRefreshing(false);
       }
     }
-  }, [userEmail]);
+  }, [enabled]);
 
-  // Reload whenever the user changes. Deferred to a microtask so the
-  // synchronous setState inside `reload` doesn't fire during the effect body
-  // (react-hooks/set-state-in-effect), mirroring useGithubTokens.
   useEffect(() => {
     void Promise.resolve().then(reload);
   }, [reload]);

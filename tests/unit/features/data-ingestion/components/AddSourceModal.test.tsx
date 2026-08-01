@@ -78,9 +78,8 @@ async function gotoGithubStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-/** Serves the Jira credentials stored for a given account email. */
 function jiraCredentialsHandler(names: string[], email = "me@corp.com") {
-  return http.get("/api/v1/jira/credentials/:email", () =>
+  return http.get("/api/v1/jira/credentials", () =>
     HttpResponse.json(
       names.map((displayName) => ({ userEmail: email, displayName })),
     ),
@@ -102,20 +101,17 @@ describe("AddSourceModal", () => {
   it("shows the Jira connect form on the Jira step", async () => {
     server.use(jiraCredentialsHandler(["default"]));
     const user = userEvent.setup();
-    renderModal({ jiraDefaultEmail: "me@corp.com" });
+    renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
     await gotoGithubStep(user);
 
     expect(screen.getByTestId("jira-display-name")).toBeInTheDocument();
     expect(screen.getByTestId("jira-instance-url")).toBeInTheDocument();
-    expect(screen.getByTestId("jira-account-email")).toBeInTheDocument();
-
-    // The stored credential loads into the picker for the default email.
     await waitFor(() =>
       expect(
         within(screen.getByTestId("jira-credential")).getByRole("option", {
-          name: "default",
+          name: "default - me@corp.com",
         }),
       ).toBeInTheDocument(),
     );
@@ -132,7 +128,7 @@ describe("AddSourceModal", () => {
     );
 
     const user = userEvent.setup();
-    const props = renderModal({ jiraDefaultEmail: "me@corp.com" });
+    const props = renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
     await gotoGithubStep(user);
@@ -172,7 +168,7 @@ describe("AddSourceModal", () => {
     );
 
     const user = userEvent.setup();
-    renderModal({ jiraDefaultEmail: "me@corp.com" });
+    renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
     await gotoGithubStep(user);

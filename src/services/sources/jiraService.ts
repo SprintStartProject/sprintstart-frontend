@@ -254,22 +254,18 @@ export async function addJiraCredential(
 }
 
 /**
- * Lists the stored Jira credentials of a single user (token secrets are never
- * returned). Credentials are queried per user, not globally.
+ * Lists the Jira credentials owned by the authenticated user. Token secrets
+ * are never returned.
  *
- * @param userEmail - The user whose credentials to list (path segment).
- * @param signal - Optional AbortSignal so callers (e.g. a refresh hook) can
- *   cancel an in-flight request and avoid stale-result races.
- * @throws ApiError — 403 for an insufficient role.
+ * @param signal - Optional AbortSignal for cancelling an in-flight request.
+ * @throws ApiError when the request fails.
  */
-export async function getJiraCredentialsOfUser(
-  userEmail: string,
+export async function getMyJiraCredentials(
   signal?: AbortSignal,
 ): Promise<JiraCredentialsDto[]> {
-  return apiClient.fetch<JiraCredentialsDto[]>(
-    `/api/v1/jira/credentials/${encodeURIComponent(userEmail)}`,
-    { signal },
-  );
+  return apiClient.fetch<JiraCredentialsDto[]>("/api/v1/jira/credentials", {
+    signal,
+  });
 }
 
 /**

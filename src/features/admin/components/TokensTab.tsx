@@ -41,9 +41,8 @@ type TokensTabProps = {
   tokenNames: string[];
   onRefresh: () => void;
   /**
-   * Email of the current admin, used to key their own Jira credentials. Jira
-   * has no "list all credentials" endpoint, so the admin manages their own
-   * here (same as Settings). Null/undefined when the profile carries no email.
+   * Email of the current admin, used only to prefill new Jira credentials.
+   * Null or undefined when the profile carries no email.
    */
   userEmail?: string | null;
 };
@@ -175,7 +174,7 @@ export function TokensTab({
       />
 
       {provider === "jira" ? (
-        <JiraCredentialsSection userEmail={userEmail ?? null} />
+        <JiraCredentialsSection defaultUserEmail={userEmail ?? null} />
       ) : (
         <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

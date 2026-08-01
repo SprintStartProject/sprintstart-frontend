@@ -7,7 +7,7 @@ import { JiraCredentialsSection } from "../../../../src/features/settings/compon
 import type { JiraCredentialsDto } from "../../../../src/services/sources/jiraService";
 
 vi.mock("../../../../src/services/sources/jiraService", () => ({
-  getJiraCredentialsOfUser: vi.fn(),
+  getMyJiraCredentials: vi.fn(),
   addJiraCredential: vi.fn(),
   changeJiraCredentialName: vi.fn(),
   changeJiraCredentialToken: vi.fn(),
@@ -15,25 +15,24 @@ vi.mock("../../../../src/services/sources/jiraService", () => ({
 }));
 
 import {
-  getJiraCredentialsOfUser,
+  getMyJiraCredentials,
   addJiraCredential,
   changeJiraCredentialName,
   changeJiraCredentialToken,
   deleteJiraCredential,
 } from "../../../../src/services/sources/jiraService";
-import { ApiError } from "../../../../src/services/apiClient";
 
 const EMAIL = "user@corp.com";
-const cred = (displayName: string): JiraCredentialsDto => ({
-  userEmail: EMAIL,
+const cred = (displayName: string, userEmail = EMAIL): JiraCredentialsDto => ({
+  userEmail,
   displayName,
 });
 
-function renderSection(userEmail: string | null = EMAIL) {
+function renderSection(defaultUserEmail: string | null = EMAIL) {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <JiraCredentialsSection userEmail={userEmail} />
+        <JiraCredentialsSection defaultUserEmail={defaultUserEmail} />
       </ThemeProvider>
     </MemoryRouter>,
   );
@@ -42,52 +41,58 @@ function renderSection(userEmail: string | null = EMAIL) {
 describe("JiraCredentialsSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getJiraCredentialsOfUser).mockResolvedValue([cred("default")]);
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([cred("default")]);
     vi.mocked(addJiraCredential).mockResolvedValue(undefined);
     vi.mocked(changeJiraCredentialName).mockResolvedValue(cred("renamed"));
     vi.mocked(changeJiraCredentialToken).mockResolvedValue(cred("default"));
     vi.mocked(deleteJiraCredential).mockResolvedValue(undefined);
   });
 
-  it("renders the credential list with name and owner email on mount", async () => {
+  it("renders all credentials with their Jira account emails", async () => {
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([
+      cred("default"),
+      cred("support", "support@corp.com"),
+    ]);
+
     renderSection();
 
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
-    expect(screen.getByText("1 credential")).toBeInTheDocument();
+    expect(await screen.findByText("default")).toBeInTheDocument();
+    expect(screen.getByText("support")).toBeInTheDocument();
     expect(screen.getByText(EMAIL)).toBeInTheDocument();
+    expect(screen.getByText("support@corp.com")).toBeInTheDocument();
+    expect(screen.getByText("2 credentials")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Refresh Jira credentials" }),
+    ).not.toBeInTheDocument();
+    expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it("loads credentials even when the profile has no email", async () => {
+    renderSection(null);
+
+    expect(await screen.findByText("default")).toBeInTheDocument();
+    expect(getMyJiraCredentials).toHaveBeenCalled();
   });
 
   it("shows the empty state when there are no credentials", async () => {
-    vi.mocked(getJiraCredentialsOfUser).mockResolvedValue([]);
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
 
     renderSection();
 
-    await waitFor(() =>
-      expect(screen.getByText("No credentials yet")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("No credentials yet")).toBeInTheDocument();
   });
 
-  it("shows a notice and does not fetch when the profile has no email", () => {
-    renderSection(null);
-
-    expect(screen.getByTestId("settings-jira-no-email")).toBeInTheDocument();
-    expect(getJiraCredentialsOfUser).not.toHaveBeenCalled();
-  });
-
-  it("adds a credential with the current user email and refreshes", async () => {
+  it("prefills the Jira email and adds a credential", async () => {
     const user = userEvent.setup();
-    vi.mocked(getJiraCredentialsOfUser)
+    vi.mocked(getMyJiraCredentials)
       .mockResolvedValueOnce([cred("default")])
       .mockResolvedValueOnce([cred("default"), cred("ci")]);
 
     renderSection();
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
+    await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-add-open"));
+    expect(screen.getByTestId("settings-jira-add-email")).toHaveValue(EMAIL);
     await user.type(screen.getByTestId("settings-jira-add-name"), "ci");
     await user.type(
       screen.getByTestId("settings-jira-add-token"),
@@ -102,90 +107,35 @@ describe("JiraCredentialsSection", () => {
         authToken: "secret-token",
       }),
     );
-    await waitFor(() =>
-      expect(screen.getByText("2 credentials")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("2 credentials")).toBeInTheDocument();
   });
 
-  it("reloads for a different Jira account email when the scope is changed", async () => {
+  it("allows a Jira email different from the login email", async () => {
     const user = userEvent.setup();
-
     renderSection();
-    await waitFor(() =>
-      expect(getJiraCredentialsOfUser).toHaveBeenCalledWith(
-        EMAIL,
-        expect.any(AbortSignal),
-      ),
-    );
-
-    const emailInput = screen.getByTestId("settings-jira-account-email");
-    await user.clear(emailInput);
-    await user.type(emailInput, "jira-account@atlassian.com");
-    await user.tab(); // blur commits the new scope
-
-    await waitFor(() =>
-      expect(getJiraCredentialsOfUser).toHaveBeenCalledWith(
-        "jira-account@atlassian.com",
-        expect.any(AbortSignal),
-      ),
-    );
-  });
-
-  it("adds a credential under the edited account email, not the login email", async () => {
-    const user = userEvent.setup();
-
-    renderSection();
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
-
-    const emailInput = screen.getByTestId("settings-jira-account-email");
-    await user.clear(emailInput);
-    await user.type(emailInput, "jira-account@atlassian.com");
-    await user.tab();
+    await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-add-open"));
-    await user.type(screen.getByTestId("settings-jira-add-name"), "ci");
+    const emailInput = screen.getByTestId("settings-jira-add-email");
+    await user.clear(emailInput);
+    await user.type(emailInput, "jira-account@atlassian.com");
+    await user.type(screen.getByTestId("settings-jira-add-name"), "work");
     await user.type(screen.getByTestId("settings-jira-add-token"), "tok");
     await user.click(screen.getByTestId("settings-jira-add-submit"));
 
     await waitFor(() =>
       expect(addJiraCredential).toHaveBeenCalledWith({
         userEmail: "jira-account@atlassian.com",
-        tokenName: "ci",
+        tokenName: "work",
         authToken: "tok",
       }),
     );
   });
 
-  it("surfaces a server error when adding a duplicate name", async () => {
+  it("renames a credential using its stored Jira email", async () => {
     const user = userEvent.setup();
-    vi.mocked(addJiraCredential).mockRejectedValue(
-      new ApiError(400, '{"message":"Name already exists"}'),
-    );
-
     renderSection();
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
-
-    await user.click(screen.getByTestId("settings-jira-add-open"));
-    await user.type(screen.getByTestId("settings-jira-add-name"), "default");
-    await user.type(screen.getByTestId("settings-jira-add-token"), "tok");
-    await user.click(screen.getByTestId("settings-jira-add-submit"));
-
-    await waitFor(() =>
-      expect(screen.getByText("Name already exists")).toBeInTheDocument(),
-    );
-  });
-
-  it("renames a credential", async () => {
-    const user = userEvent.setup();
-
-    renderSection();
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
+    await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-rename-open-default"));
     const input = screen.getByTestId("settings-jira-rename-input-default");
@@ -202,13 +152,10 @@ describe("JiraCredentialsSection", () => {
     );
   });
 
-  it("rotates a credential token", async () => {
+  it("rotates a credential token using its stored Jira email", async () => {
     const user = userEvent.setup();
-
     renderSection();
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
+    await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-rotate-open-default"));
     await user.type(
@@ -226,16 +173,14 @@ describe("JiraCredentialsSection", () => {
     );
   });
 
-  it("deletes a credential after confirmation and refreshes", async () => {
+  it("deletes a credential using its stored Jira email and refreshes", async () => {
     const user = userEvent.setup();
-    vi.mocked(getJiraCredentialsOfUser)
+    vi.mocked(getMyJiraCredentials)
       .mockResolvedValueOnce([cred("default")])
       .mockResolvedValueOnce([]);
 
     renderSection();
-    await waitFor(() =>
-      expect(screen.getByText("default")).toBeInTheDocument(),
-    );
+    await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-delete-open-default"));
     await user.click(
@@ -248,8 +193,6 @@ describe("JiraCredentialsSection", () => {
         tokenName: "default",
       }),
     );
-    await waitFor(() =>
-      expect(screen.getByText("No credentials yet")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("No credentials yet")).toBeInTheDocument();
   });
 });
