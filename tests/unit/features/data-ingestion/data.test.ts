@@ -254,7 +254,9 @@ describe("data-ingestion data helpers", () => {
 
     for (const connectionStatus of cases) {
       it(`carries the ${connectionStatus} connection status`, () => {
-        const source = createJiraSourceFromInstance(status({ connectionStatus }));
+        const source = createJiraSourceFromInstance(
+          status({ connectionStatus }),
+        );
         expect(source.backendStatus).toBe(connectionStatus);
       });
     }
@@ -309,6 +311,18 @@ describe("data-ingestion data helpers", () => {
       );
       expect(source.statusView.state).toBe("attention");
       expect(source.lastRunAt).toBeNull();
+    });
+    it("shows a synced badge after a successful Jira sync", () => {
+      const source = createJiraSourceFromInstance(status());
+
+      expect(source.ingestionStatusLabel).toBe("Synced");
+    });
+
+    it("surfaces a disabled Jira connector while preserving the synced badge", () => {
+      const source = createJiraSourceFromInstance(status(), instance(), false);
+
+      expect(source.statusView.label).toBe("Connector disabled");
+      expect(source.ingestionStatusLabel).toBe("Synced");
     });
   });
 });

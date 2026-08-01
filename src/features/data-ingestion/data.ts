@@ -126,6 +126,7 @@ export function createSourceFromInstance(
 export function createJiraSourceFromInstance(
   status: SourceInstanceIngestionStatus,
   instance?: JiraInstanceDto | null,
+  connectorEnabled?: boolean,
 ): DataSource {
   const meta = SOURCE_META.JIRA;
   const backendStatus: BackendProjectSourceStatus =
@@ -143,11 +144,15 @@ export function createJiraSourceFromInstance(
     backendStatus,
     statusLabel: getBackendSourceStatusLabel(backendStatus),
     ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel: getSourceStatusLabel(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
       hasErrors,
       hasNeverSynced,
+      connectorEnabled,
     }),
     artifacts: status.artifactCount,
     lastSync: formatDateTime(status.lastRunTime),

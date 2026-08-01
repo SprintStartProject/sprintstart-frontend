@@ -808,6 +808,7 @@ export function DataIngestionPage() {
         createJiraSourceFromInstance(
           status,
           jiraInstanceByUrl.get(status.sourceId.toLowerCase()) ?? null,
+          connectorEnabledById.get("jira"),
         ),
       );
 
