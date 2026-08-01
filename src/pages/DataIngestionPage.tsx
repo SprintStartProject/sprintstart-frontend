@@ -10,6 +10,10 @@ import { useSearchParams } from "react-router-dom";
 import { CalendarClock, Plug } from "lucide-react";
 import { Modal } from "../components/ui/Modal.tsx";
 import { Pagination } from "../components/ui/Pagination.tsx";
+import {
+  SegmentedControl,
+  type SegmentedControlOption,
+} from "../components/ui/SegmentedControl.tsx";
 import { DataIngestionHeader } from "../features/data-ingestion/components/DataIngestionHeader.tsx";
 import { DataIngestionLoadingState } from "../features/data-ingestion/components/DataIngestionLoadingState.tsx";
 import { DataIngestionSectionFilter } from "../features/data-ingestion/components/DataIngestionSectionFilter.tsx";
@@ -70,6 +74,7 @@ import {
   type ConfigureGithubRepositoryRequest,
 } from "../services/sources/githubService.ts";
 import {
+  configureAllJiraInstances,
   configureJiraInstance,
   getJiraConfig,
   getJiraInstances,
@@ -88,6 +93,20 @@ const DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
   autoUpdate: true,
   schedule: { type: "INTERVAL", everyMinutes: 60 },
 };
+
+const DEFAULT_GLOBAL_JIRA_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
+  autoUpdate: true,
+  schedule: { type: "INTERVAL", everyMinutes: 60 },
+};
+
+type SyncSettingsProvider = "github" | "jira";
+
+const SYNC_SETTINGS_PROVIDERS: ReadonlyArray<
+  SegmentedControlOption<SyncSettingsProvider>
+> = [
+  { id: "github", label: "GitHub" },
+  { id: "jira", label: "Jira" },
+];
 
 // Small enough that the run table stays scannable and pagination is actually
 // reachable rather than a single page of rows.
@@ -452,6 +471,10 @@ export function DataIngestionPage() {
     useState<ConfigureGithubRepositoryRequest>(
       DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG,
     );
+  const [globalJiraSyncConfig, setGlobalJiraSyncConfig] =
+    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
+  const [syncSettingsProvider, setSyncSettingsProvider] =
+    useState<SyncSettingsProvider>("github");
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
   const [connectSuccessMessage, setConnectSuccessMessage] = useState<
     string | null
@@ -841,6 +864,7 @@ export function DataIngestionPage() {
     [sources],
   );
   const hasGithubSources = visibleSourceSystems.has("GITHUB");
+  const hasJiraSources = visibleSourceSystems.has("JIRA");
 
   const sourceHealth = useMemo(() => {
     const count = (state: DataSource["statusView"]["state"]) =>
@@ -1107,6 +1131,14 @@ export function DataIngestionPage() {
     [loadData, reloadSourceStatuses],
   );
 
+  const handleSaveGlobalJiraConfig = useCallback(
+    async (request: ConfigureGithubRepositoryRequest) => {
+      await configureAllJiraInstances(request);
+      setGlobalJiraSyncConfig(request);
+      await Promise.all([loadData(false), reloadSourceStatuses()]);
+    },
+    [loadData, reloadSourceStatuses],
+  );
   const handleLoadGithubRepositoryConfig = useCallback(
     async (repository: GithubRepositoryDetails) => {
       return getGithubRepositoryConfig(repository);
@@ -1379,10 +1411,15 @@ export function DataIngestionPage() {
                             Manage connectors
                           </button>
 
-                          {hasGithubSources ? (
+                          {hasGithubSources || hasJiraSources ? (
                             <button
                               type="button"
-                              onClick={() => setIsSyncSettingsModalOpen(true)}
+                              onClick={() => {
+                                setSyncSettingsProvider(
+                                  hasGithubSources ? "github" : "jira",
+                                );
+                                setIsSyncSettingsModalOpen(true);
+                              }}
                               className="inline-flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-semibold text-app-text transition hover:border-app-brand-border hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                             >
                               <CalendarClock className="h-4 w-4" />
@@ -1527,20 +1564,58 @@ export function DataIngestionPage() {
 
       <Modal
         isOpen={isSyncSettingsModalOpen}
-        title="GitHub Sync Settings"
-        description="Apply one sync policy to all connected GitHub repositories."
+        title={`${syncSettingsProvider === "github" ? "GitHub" : "Jira"} Sync Settings`}
+        description={`Apply one sync policy to all connected ${
+          syncSettingsProvider === "github"
+            ? "GitHub repositories"
+            : "Jira instances"
+        }.`}
         size="lg"
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
         onClose={() => setIsSyncSettingsModalOpen(false)}
       >
+        {hasGithubSources && hasJiraSources ? (
+          <div className="mb-5">
+            <SegmentedControl
+              options={SYNC_SETTINGS_PROVIDERS}
+              value={syncSettingsProvider}
+              onChange={setSyncSettingsProvider}
+              ariaLabel="Sync settings connector"
+            />
+          </div>
+        ) : null}
+
         <GithubRepositorySyncSettings
-          initialConfig={globalGithubSyncConfig}
-          onSave={handleSaveGlobalGithubConfig}
+          key={syncSettingsProvider}
+          initialConfig={
+            syncSettingsProvider === "github"
+              ? globalGithubSyncConfig
+              : globalJiraSyncConfig
+          }
+          onSave={
+            syncSettingsProvider === "github"
+              ? handleSaveGlobalGithubConfig
+              : handleSaveGlobalJiraConfig
+          }
           showNextSync={false}
-          disclaimer="Applying global settings overwrites the sync settings of every connected GitHub repository."
-          autoUpdateOnText="Due checks update all connected GitHub repositories."
-          autoUpdateOffText="Due checks only mark connected GitHub repositories out of date."
-          toggleAriaLabel="Toggle global GitHub auto update"
+          disclaimer={
+            syncSettingsProvider === "github"
+              ? "Applying global settings overwrites the sync settings of every connected GitHub repository."
+              : "Applying global settings overwrites the sync settings of every connected Jira instance."
+          }
+          autoUpdateOnText={
+            syncSettingsProvider === "github"
+              ? "Due checks update all connected GitHub repositories."
+              : "Due checks update all connected Jira instances."
+          }
+          autoUpdateOffText={
+            syncSettingsProvider === "github"
+              ? "Due checks only mark connected GitHub repositories out of date."
+              : "Due checks only mark connected Jira instances out of date."
+          }
+          toggleAriaLabel={`Toggle global ${
+            syncSettingsProvider === "github" ? "GitHub" : "Jira"
+          } auto update`}
           saveLabel="Apply globally"
         />
       </Modal>

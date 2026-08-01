@@ -56,6 +56,7 @@ const {
     mockGetIngestionSourceStatuses,
     mockGetUnifiedArtifacts,
     mockListConnectors,
+    mockConfigureAllGithubRepositories,
 } = vi.hoisted(() => ({
     mockGetIngestionRunsPage: vi.fn(),
     mockGetIngestionStatus: vi.fn(),
@@ -67,6 +68,7 @@ const {
     mockGetIngestionSourceStatuses: vi.fn(),
     mockGetUnifiedArtifacts: vi.fn(),
     mockListConnectors: vi.fn(),
+    mockConfigureAllGithubRepositories: vi.fn(),
 }));
 
 vi.mock('../../../src/services/ingestionService', () => ({
@@ -88,16 +90,23 @@ vi.mock('../../../src/services/sources/githubService', () => ({
     getGithubPatNames: mockGetGithubPatNames,
     updateAllGithubRepositories: mockUpdateAllGithubRepositories,
     updateGithubRepository: mockUpdateGithubRepository,
+    configureAllGithubRepositories: mockConfigureAllGithubRepositories,
 }));
 
-const { mockGetJiraInstances, mockUpdateJiraInstance } = vi.hoisted(() => ({
+const {
+    mockGetJiraInstances,
+    mockUpdateJiraInstance,
+    mockConfigureAllJiraInstances,
+} = vi.hoisted(() => ({
     mockGetJiraInstances: vi.fn(),
     mockUpdateJiraInstance: vi.fn(),
+    mockConfigureAllJiraInstances: vi.fn(),
 }));
 
 vi.mock('../../../src/services/sources/jiraService', () => ({
     getJiraInstances: mockGetJiraInstances,
     updateJiraInstance: mockUpdateJiraInstance,
+    configureAllJiraInstances: mockConfigureAllJiraInstances,
 }));
 
 vi.mock('../../../src/services/connectorService', async (importOriginal) => {
@@ -138,6 +147,8 @@ describe('DataIngestionPage', () => {
         mockGetIngestionSourceStatuses.mockResolvedValue([]);
         mockGetJiraInstances.mockResolvedValue([]);
         mockUpdateJiraInstance.mockResolvedValue({ transactionId: 'jira-tx' });
+        mockConfigureAllGithubRepositories.mockResolvedValue(undefined);
+        mockConfigureAllJiraInstances.mockResolvedValue(undefined);
         mockGetUnifiedArtifacts.mockResolvedValue([]);
         mockListConnectors.mockResolvedValue([]);
         selectProject();
@@ -657,6 +668,72 @@ describe('DataIngestionPage', () => {
                 expect.objectContaining({ status: 'FAILED', page: 1 }),
             );
         });
+    });
+
+    it('opens and saves global Jira sync settings for a Jira-only project', async () => {
+        mockGetAccessibleProject.mockResolvedValue({
+            id: 'proj1',
+            name: 'Project Alpha',
+            description: '',
+            manager: null,
+            sources: [],
+            users: [],
+        });
+        mockGetIngestionSourceStatuses.mockResolvedValue([
+            {
+                sourceSystem: 'JIRA',
+                sourceId: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                repositoryId: null,
+                owner: null,
+                name: null,
+                sourceUrl: 'https://team.atlassian.net',
+                connectionStatus: 'CONNECTED',
+                enabled: true,
+                lastRunTime: '2026-07-01T00:00:00Z',
+                ingestedCount: 5,
+                updatedCount: 2,
+                deletedCount: 0,
+                failedCount: 0,
+                failedItems: [],
+                artifactCount: 128,
+                lastCommitsSyncAt: null,
+                lastIssuesSyncAt: '2026-07-01T00:00:00Z',
+                lastPullRequestsSyncAt: null,
+            },
+        ]);
+        mockGetJiraInstances.mockResolvedValue([
+            {
+                instanceUrl: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                lastUpdate: '2026-07-01T00:00:00Z',
+                projectIds: ['proj1'],
+                sourceEnabled: true,
+                status: 'UP_TO_DATE',
+                updateCredentialName: 'default',
+                updateCredentialUserEmail: 'jira@example.com',
+            },
+        ]);
+
+        const user = userEvent.setup();
+        render(<MemoryRouter><DataIngestionPage /></MemoryRouter>);
+
+        const manageButton = await screen.findByRole('button', { name: /manage sync settings/i });
+        await user.click(manageButton);
+
+        expect(await screen.findByText('Jira Sync Settings')).toBeInTheDocument();
+        expect(screen.queryByRole('tablist', { name: /sync settings connector/i })).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('switch', { name: /toggle global jira auto update/i }));
+        await user.click(screen.getByRole('button', { name: /apply globally/i }));
+
+        await waitFor(() => {
+            expect(mockConfigureAllJiraInstances).toHaveBeenCalledWith({
+                autoUpdate: false,
+                schedule: { type: 'INTERVAL', everyMinutes: 60 },
+            });
+        });
+        expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
     });
 
     it('opens the connectors modal from Manage connectors', async () => {
