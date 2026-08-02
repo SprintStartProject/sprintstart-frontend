@@ -15,7 +15,11 @@ function Frame({ dark }: StoryArgs) {
     return (
         <div className="min-h-[420px] bg-app-bg p-8">
             <p className="max-w-sm text-sm text-app-text-muted">
-                Bottom-right corner. Click it. It comes back.
+                Bottom-right corner. It hides there and leans out every so often
+                — move the pointer near it to bring it fully out, click it to
+                launch it. It stays gone for a few minutes before it comes back.
+                On a touchscreen the first tap brings it out and the second one
+                launches it; switch the toolbar to a mobile device to try that.
             </p>
             <RocketPet />
         </div>
@@ -32,8 +36,8 @@ export default meta;
 type Story = StoryObj<StoryArgs>;
 
 /**
- * The rocket perches at low opacity and lifts on hover, so it reads as
- * available without competing with the page it sits on.
+ * Peeks on a 20–45s timer, so give it a moment. Hover is the reliable way to
+ * see the full pose without waiting.
  */
 export const Default: Story = { args: { dark: true } };
 

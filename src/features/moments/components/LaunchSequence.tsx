@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { RocketGlyph } from "./RocketGlyph.tsx";
-import { headingOf, loopFlight } from "../loopFlight.ts";
-import { flightEaseToken } from "../../../styles/tokens.ts";
+import { launchGeometry } from "../flightGeometry.ts";
+import { FLIGHT_DURATION_S, flightEaseToken } from "../../../styles/tokens.ts";
 
 interface LaunchSequenceProps {
     /** Greeted by name when the profile is loaded; falls back to the wordmark alone. */
@@ -14,13 +14,6 @@ interface LaunchSequenceProps {
 
 /** Total runtime before the overlay hands over to the app, in seconds. */
 const HOLD = 1.85;
-
-/** Flight vector across the screen, in viewport units: up and to the right. */
-const FLIGHT_X_VW = 78;
-const FLIGHT_Y_VH = -64;
-
-/** One loop-the-loop partway across, sized for the bigger 64px rocket. */
-const LOOP = loopFlight(78, headingOf(FLIGHT_X_VW, FLIGHT_Y_VH));
 
 /**
  * The post-sign-in launch sequence.
@@ -37,21 +30,29 @@ const LOOP = loopFlight(78, headingOf(FLIGHT_X_VW, FLIGHT_Y_VH));
  *   and silently break modals and drawers, so all motion stays inside here.
  */
 export function LaunchSequence({ displayName, onDone }: LaunchSequenceProps) {
-    // Any input skips. Someone who has seen it forty times should never wait.
+    // Resolved once: the sequence is over in under three seconds, so a resize
+    // mid-flight is not worth re-deriving for.
+    const { padX, padY, rocketSize, trailLength, trailAngle, flight } = useMemo(
+        () => launchGeometry(window.innerWidth, window.innerHeight),
+        [],
+    );
+
+    // Any key skips. Someone who has seen it forty times should never wait.
+    // Pointers are handled on the overlay itself rather than on `document`: it
+    // has to *swallow* the click, not just react to it. While this is up the
+    // app underneath is invisible, and nobody should be able to press a button
+    // they cannot see.
     useEffect(() => {
         const skip = () => onDone();
         document.addEventListener("keydown", skip);
-        document.addEventListener("pointerdown", skip);
-        return () => {
-            document.removeEventListener("keydown", skip);
-            document.removeEventListener("pointerdown", skip);
-        };
+        return () => document.removeEventListener("keydown", skip);
     }, [onDone]);
 
     return createPortal(
         <motion.div
             aria-hidden="true"
-            className="pointer-events-none fixed inset-0 z-[90] overflow-hidden bg-app-bg"
+            onPointerDown={onDone}
+            className="fixed inset-0 z-[90] overflow-hidden bg-app-bg"
             initial={{ opacity: 1, scale: 1 }}
             animate={{ opacity: [1, 1, 0], scale: [1, 1, 1.7] }}
             transition={{
@@ -63,8 +64,10 @@ export function LaunchSequence({ displayName, onDone }: LaunchSequenceProps) {
         >
             {/* Ignition bloom at the launch pad. */}
             <motion.div
-                className="absolute left-[8%] top-[78%] h-3 w-3 rounded-full"
+                className="absolute h-3 w-3 rounded-full"
                 style={{
+                    left: padX,
+                    top: padY,
                     background:
                         "radial-gradient(circle, var(--progress-fill-end) 0%, var(--brand) 40%, transparent 70%)",
                 }}
@@ -73,53 +76,58 @@ export function LaunchSequence({ displayName, onDone }: LaunchSequenceProps) {
                 transition={{ duration: 1.5, ease: "easeOut" }}
             />
 
-            {/* Exhaust trail. Grows along the flight line, then burns out. */}
+            {/* Exhaust trail. Grows along the flight line, then burns out.
+                Stops at the length of the flight itself — running it to the far
+                edge draws a streak to somewhere the rocket never went. */}
             <motion.div
-                className="absolute left-[8%] top-[78%] h-[3px] origin-left rounded-full"
+                className="absolute h-[3px] origin-left rounded-full"
                 style={{
-                    rotate: -40,
+                    left: padX,
+                    top: padY,
+                    rotate: trailAngle,
                     background:
                         "linear-gradient(90deg, transparent, var(--brand) 30%, var(--progress-fill-end))",
                     boxShadow: "0 0 26px 3px var(--brand-glow)",
                 }}
                 initial={{ width: 0, opacity: 0 }}
-                animate={{ width: ["0vw", "62vw", "96vw"], opacity: [0, 0.9, 0] }}
+                animate={{
+                    width: [0, trailLength * 0.62, trailLength],
+                    opacity: [0, 0.9, 0],
+                }}
                 transition={{ ...flightEaseToken, delay: 0.25 }}
             />
 
+            {/* One element, one transform: travel and loop are a single curve,
+                so there is nothing to layer. Linear playback on purpose — the
+                easing is already baked into the keyframes, and easing them again
+                would ripple the curve. */}
             <motion.div
-                className="absolute left-[8%] top-[78%] flex items-center justify-center"
-                initial={{ x: 0, y: 60, scale: 0.5, opacity: 0 }}
-                animate={{
-                    x: `${FLIGHT_X_VW}vw`,
-                    y: `${FLIGHT_Y_VH}vh`,
-                    scale: 1.05,
-                    opacity: [0, 1, 1],
+                className="absolute flex items-center justify-center text-app-brand"
+                style={{
+                    left: padX,
+                    top: padY,
+                    filter: "drop-shadow(0 0 22px var(--brand-glow))",
                 }}
-                transition={{ ...flightEaseToken, delay: 0.25 }}
+                initial={{ x: 0, y: 60, rotate: flight.rotate[0], scale: 0.5, opacity: 0 }}
+                animate={{
+                    x: flight.x,
+                    y: flight.y,
+                    rotate: flight.rotate,
+                    scale: flight.progress.map((s) => 0.5 + 0.55 * Math.min(1, s * 4)),
+                    opacity: flight.progress.map((s) => Math.min(1, s * 6)),
+                }}
+                transition={{
+                    duration: FLIGHT_DURATION_S,
+                    delay: 0.25,
+                    times: flight.times,
+                    ease: "linear",
+                }}
             >
-                {/* The loop rides on an inner element, so it adds a circular
-                    detour to the travel transform above rather than replacing
-                    it. Linear easing keeps the circle round — easing it would
-                    flatten two of its sides. */}
-                <motion.div
-                    className="flex items-center justify-center text-app-brand"
-                    style={{ filter: "drop-shadow(0 0 22px var(--brand-glow))" }}
-                    initial={{ x: 0, y: 0, rotate: LOOP.rotate[0] }}
-                    animate={{ x: LOOP.x, y: LOOP.y, rotate: LOOP.rotate }}
-                    transition={{
-                        duration: flightEaseToken.duration,
-                        delay: 0.25,
-                        times: LOOP.times,
-                        ease: "linear",
-                    }}
-                >
-                    <RocketGlyph size={64} flame />
-                </motion.div>
+                <RocketGlyph size={rocketSize} flame />
             </motion.div>
 
             <motion.div
-                className="absolute inset-0 flex flex-col items-center justify-center text-center"
+                className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center"
                 initial={{ opacity: 0, y: 14, scale: 0.97, filter: "blur(6px)" }}
                 animate={{
                     opacity: [0, 1, 1, 0],
@@ -134,10 +142,12 @@ export function LaunchSequence({ displayName, onDone }: LaunchSequenceProps) {
                     ease: "easeOut",
                 }}
             >
-                <span className="text-4xl font-bold tracking-tight text-app-text">
+                <span className="text-3xl font-bold tracking-tight text-app-text sm:text-4xl">
                     SprintStart
                 </span>
-                <span className="mt-2 text-xs font-semibold uppercase tracking-[0.24em] text-app-text-subtle">
+                {/* Wide tracking plus a long first name overflows a 360px phone
+                    on one line, and the wordmark has no container to clip it. */}
+                <span className="mt-2 max-w-full text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-subtle sm:text-xs sm:tracking-[0.24em]">
                     {displayName ? `Welcome back, ${displayName}` : "Mission ready"}
                 </span>
             </motion.div>

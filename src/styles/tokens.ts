@@ -139,13 +139,22 @@ export const celebrationSpringToken: Transition = {
     mass: 0.9,
 };
 
+/** How long a rocket takes to cross the screen, in seconds. */
+export const FLIGHT_DURATION_S = 1.15;
+
 /**
- * Easing for anything flying across the screen — the launch sequence and the
- * rocket easter egg. Starts hard and coasts out, so it reads as thrust rather
- * than as a panel sliding.
+ * Easing for things that fly alongside a rocket — exhaust trails, ignition
+ * blooms. Starts hard and coasts out, so it reads as thrust rather than as a
+ * panel sliding.
+ *
+ * The rocket itself does *not* use this. Its easing is baked into the keyframes
+ * that `loopFlight` generates, because the shape of a loop and the speed along
+ * it have to be decoupled; easing those keyframes a second time would ripple the
+ * curve. Only `FLIGHT_DURATION_S` is shared, which is what keeps the trail and
+ * the rocket in step.
  */
 export const flightEaseToken: Transition = {
-    duration: 1.15,
+    duration: FLIGHT_DURATION_S,
     ease: [0.4, 0, 0.35, 1],
 };
 
@@ -157,4 +166,19 @@ export const idleDriftToken: Transition = {
     duration: 3.4,
     repeat: Infinity,
     ease: "easeInOut",
+};
+
+/**
+ * Spring for the rocket pet ducking behind the corner and leaning back out.
+ *
+ * Softer and heavier than `hoverSpringToken` on purpose. The pet is meant to be
+ * caught out of the corner of the eye, and anything snappy enough to feel
+ * responsive reads as a UI panel sliding — which is the one thing a creature
+ * must not look like.
+ */
+export const petPeekSpringToken: Transition = {
+    type: "spring",
+    stiffness: 210,
+    damping: 22,
+    mass: 0.9,
 };
