@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MomentsProvider } from '../../../../src/features/moments/MomentsProvider';
@@ -23,17 +23,20 @@ vi.mock('../../../../src/context/useAuth', () => ({
 }));
 
 
-/** Minimal consumer that queues celebrations on demand. */
+/** Minimal consumer that triggers moments on demand. */
 function Trigger() {
-    const { celebrate } = useMoments();
+    const { celebrate, flyby, completeMission } = useMoments();
     return (
         <>
+            <button onClick={flyby}>fly</button>
+            <button onClick={completeMission}>finish</button>
             <button
                 onClick={() =>
                     celebrate({
                         tone: 'milestone',
                         title: 'Phase cleared',
                         message: 'The next phase is unlocked.',
+                        progress: { current: 2, total: 5 },
                     })
                 }
             >
@@ -148,6 +151,74 @@ describe('MomentsProvider', () => {
         );
 
         expect(screen.queryByText('SprintStart')).not.toBeInTheDocument();
+    });
+
+    it('mounts the flyby and clears it again on its own', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        render(
+            <MomentsProvider>
+                <Trigger />
+            </MomentsProvider>,
+        );
+
+        expect(screen.queryByTestId('rocket-flyby')).not.toBeInTheDocument();
+
+        await user.click(screen.getByText('fly'));
+        expect(screen.getByTestId('rocket-flyby')).toBeInTheDocument();
+
+        // Teardown is on a timer, not on the animation reporting itself done.
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        expect(screen.queryByTestId('rocket-flyby')).not.toBeInTheDocument();
+
+        vi.useRealTimers();
+    });
+
+    it('ignores a second flyby while one is already in flight', async () => {
+        const user = userEvent.setup();
+        render(
+            <MomentsProvider>
+                <Trigger />
+            </MomentsProvider>,
+        );
+
+        await user.click(screen.getByText('fly'));
+        await user.click(screen.getByText('fly'));
+
+        expect(screen.getAllByTestId('rocket-flyby')).toHaveLength(1);
+    });
+
+    it('shows a progress ring on a celebration that carries one', async () => {
+        const user = userEvent.setup();
+        render(
+            <MomentsProvider>
+                <Trigger />
+            </MomentsProvider>,
+        );
+
+        await user.click(screen.getByText('first'));
+
+        expect(
+            await screen.findByRole('img', { name: 'Phase 2 of 5 complete' }),
+        ).toBeInTheDocument();
+    });
+
+    it('plays the mission-complete finale on demand', async () => {
+        const user = userEvent.setup();
+        render(
+            <MomentsProvider>
+                <Trigger />
+            </MomentsProvider>,
+        );
+
+        await user.click(screen.getByText('finish'));
+
+        // The sequence opens on its first beat; the card arrives at the end, so
+        // assert on the overlay being present rather than on its final copy.
+        expect(await screen.findByText('Press any key to skip')).toBeInTheDocument();
     });
 
     it('stops the sequence if auth resolves to signed out mid-flight', () => {

@@ -43,6 +43,71 @@ const ROCKET_OF_WIDTH = 0.085;
 const ROCKET_MIN = 28;
 const ROCKET_MAX = 64;
 
+/** Resolves the rocket's on-screen size against the viewport it is drawn in. */
+export function rocketSizeFor(width: number): number {
+    return Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH));
+}
+
+/**
+ * The flyby: a rocket that crosses the screen corner to corner, marking a step
+ * being completed.
+ *
+ * Sized to take the screen over for a moment rather than to pass across a
+ * corner of it — closer to a scene transition than to a decoration. It still
+ * never dims or blocks the page, because the step flips to done underneath it
+ * at the same moment and that change has to stay visible.
+ *
+ * Deliberately not a `loopFlight`: a loop is a flourish for arriving or
+ * departing, and this is neither. It is a pass, and nothing about the path
+ * should ask the eye to slow down and follow it around a curve.
+ */
+const FLYBY_PEAK_OF_MIN = 0.72;
+const FLYBY_PEAK_MIN = 180;
+
+/** Trail length at the peak, as a multiple of the rocket's size. */
+const FLYBY_TRAIL_RATIO = 2.4;
+
+export interface FlybyGeometry {
+    /** Edge length of the rocket at the middle of the pass, in px. */
+    peakSize: number;
+    /** Start offset from the viewport centre, in px. */
+    fromX: number;
+    fromY: number;
+    /** End offset from the viewport centre, in px. */
+    toX: number;
+    toY: number;
+    /** Nose angle, in degrees clockwise from "up". */
+    rotate: number;
+    /** Length of the exhaust trail at the peak, in px. */
+    trailLength: number;
+}
+
+/**
+ * Resolves the flyby against the viewport.
+ *
+ * Both ends clear the edge by a full rocket width, so the pass never begins or
+ * ends with a rocket visibly parked outside the frame on a wide monitor.
+ */
+export function flybyGeometry(width: number, height: number): FlybyGeometry {
+    const peakSize = Math.max(FLYBY_PEAK_MIN, Math.min(width, height) * FLYBY_PEAK_OF_MIN);
+
+    // Bottom-left to top-right, through the centre.
+    const fromX = -(width / 2 + peakSize);
+    const fromY = height / 2 + peakSize;
+    const toX = -fromX;
+    const toY = -fromY;
+
+    return {
+        peakSize,
+        fromX,
+        fromY,
+        toX,
+        toY,
+        rotate: (Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI,
+        trailLength: peakSize * FLYBY_TRAIL_RATIO,
+    };
+}
+
 /**
  * The rocket pet's flight from its corner, as fractions of the viewport.
  *

@@ -23,6 +23,15 @@ export interface Celebration {
     message: string;
     /** Overrides the dismiss button label (defaults per tone). */
     actionLabel?: string;
+    /**
+     * Renders a progress ring that fills to `current` of `total`.
+     *
+     * For moments that move someone along a known journey — clearing phase 2 of
+     * 5. Showing how far along they are is what separates "you did a thing"
+     * from "you are getting somewhere", and the second one is why people come
+     * back tomorrow.
+     */
+    progress?: { current: number; total: number };
 }
 
 /** What callers pass to `celebrate` — id and seed are assigned by the provider. */

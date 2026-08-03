@@ -13,6 +13,8 @@ vi.mock('../../../src/context/useAuth', () => ({
 vi.mock('../../../src/features/moments', () => ({
     useMoments: () => ({
         celebrate: vi.fn(),
+        flyby: vi.fn(),
+        completeMission: vi.fn(),
         playLaunchSequence: vi.fn(),
         isLaunching: false,
     }),

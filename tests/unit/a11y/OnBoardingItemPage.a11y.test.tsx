@@ -4,6 +4,18 @@ import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { OnBoardingItemPage } from '../../../src/features/onboarding/components/OnBoardingItemPage';
 
+// The celebratory layer is decorative and lives behind its own provider; the
+// page only needs a no-op `flyby` to render.
+vi.mock('../../../src/features/moments', () => ({
+    useMoments: () => ({
+        celebrate: vi.fn(),
+        flyby: vi.fn(),
+        completeMission: vi.fn(),
+        playLaunchSequence: vi.fn(),
+        isLaunching: false,
+    }),
+}));
+
 vi.mock('react-router-dom', async () => {
     const actual = await import('react-router-dom');
     return {

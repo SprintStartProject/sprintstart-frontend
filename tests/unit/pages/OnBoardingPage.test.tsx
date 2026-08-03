@@ -10,6 +10,8 @@ import { server } from '../../unit/setup/vitest.setup';
 vi.mock('../../../src/features/moments', () => ({
     useMoments: () => ({
         celebrate: vi.fn(),
+        flyby: vi.fn(),
+        completeMission: vi.fn(),
         playLaunchSequence: vi.fn(),
         isLaunching: false,
     }),

@@ -9,6 +9,22 @@ vi.mock('react-router-dom', () => ({
     useNavigate: () => mockNavigate,
 }));
 
+// The celebratory layer is decorative and lives behind its own provider, so the
+// page gets a stub. `flyby` is hoisted rather than created inline so it can be
+// asserted on: which action sends the rocket is a product decision, not an
+// implementation detail.
+const mockFlyby = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../../../src/features/moments', () => ({
+    useMoments: () => ({
+        celebrate: vi.fn(),
+        flyby: mockFlyby,
+        completeMission: vi.fn(),
+        playLaunchSequence: vi.fn(),
+        isLaunching: false,
+    }),
+}));
+
 vi.mock('../../../../../src/services/onboardingService', () => ({
     onboardingService: {
         fetchStep: vi.fn(),
@@ -154,6 +170,9 @@ describe('OnBoardingItemPage', () => {
         await user.click(screen.getByRole('button', { name: /Mark as Completed/ }));
 
         await waitFor(() => expect(onboardingService.updateStepStatus).toHaveBeenCalledWith(expect.any(Object), 'FINISHED'));
+        // Completing the step is not itself a journey, so no rocket here — it
+        // belongs to continuing on to the next one.
+        expect(mockFlyby).not.toHaveBeenCalled();
     });
 
     it('shows the "Continue to next step" button when step is finished', async () => {
@@ -190,5 +209,38 @@ describe('OnBoardingItemPage', () => {
         await user.click(screen.getByText('Continue to next step'));
 
         await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/onboarding/step2'));
+        // Step 2 is WAITING, so continuing into it starts it for the first time
+        // — which is what the rocket marks.
+        expect(mockFlyby).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fly the rocket when the next step is already in progress', async () => {
+        vi.mocked(onboardingService.fetchStep).mockResolvedValue({ ...mockStep, status: 'FINISHED', completedAt: '2026-07-02T00:00:00Z' });
+        vi.mocked(onboardingService.fetchPath).mockResolvedValue({
+            id: 'path1',
+            userId: 'user1',
+            createdAt: new Date().toISOString(),
+            phases: [{
+                id: 'p1',
+                pathId: 'path1',
+                position: 1,
+                title: 'Phase 1',
+                description: '',
+                locked: false,
+                unlockReason: null,
+                checkSummary: { required: false, questionCount: 0, passed: false, latestAttemptId: null, latestAttemptAt: null },
+                steps: [{ id: 'step2', phaseId: 'p1', position: 2, title: 'Step 2', description: '', type: 'TASK' as const, estimatedMinutes: 10, expectedOutcomes: [], tasks: [], resources: [], status: 'IN_PROGRESS' as const, startedAt: '2026-07-01T00:00:00Z', completedAt: null, feedback: null, skip: null }],
+            }],
+        });
+
+        const user = userEvent.setup();
+        render(<OnBoardingItemPage />);
+
+        await waitFor(() => expect(screen.getByText('Continue to next step')).toBeInTheDocument());
+        await user.click(screen.getByText('Continue to next step'));
+
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/onboarding/step2'));
+        // Picking a half-finished step back up is a return, not a departure.
+        expect(mockFlyby).not.toHaveBeenCalled();
     });
 });

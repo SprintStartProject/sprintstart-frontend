@@ -3,7 +3,9 @@
 // ============================================================
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
+import { centralSpringToken } from "../../../styles/tokens";
 import type {
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
@@ -12,6 +14,8 @@ import type {
 } from "../types";
 import { onboardingService } from "../../../services/onboardingService";
 import { StepOriginBadge } from "./StepOriginBadge";
+import { TaskCheckItem } from "./TaskCheckItem";
+import { useMoments } from "../../moments";
 
 import {
   ArrowLeft,
@@ -87,6 +91,8 @@ export function OnBoardingItemPage() {
 
   const [nextLoading, setNextLoading] = useState<boolean>(false);
 
+  const { flyby } = useMoments();
+
   /**
    * Jumps to the next actionable step in the user's path: fetches the whole path,
    * picks the first step that isn't finished/skipped (excluding this one), starts it
@@ -110,11 +116,19 @@ export function OnBoardingItemPage() {
         );
 
       if (nextStep) {
+        // The rocket marks a step *beginning*, so it only flies when this one
+        // has not been started before. The path filter above admits both
+        // untouched and already-in-progress steps, and picking a half-finished
+        // one back up is a return, not a departure.
+        const isFirstStart = nextStep.status === "WAITING";
+
         try {
           await onboardingService.startStep(nextStep.id);
         } catch (err) {
           console.error("Failed to start next onboarding step:", err);
         }
+
+        if (isFirstStart) flyby();
         void navigate(`/onboarding/${nextStep.id}`);
       } else {
         // Nothing pending left — journey complete, go back to the overview.
@@ -418,51 +432,29 @@ export function OnBoardingItemPage() {
                   </span>
                 </div>
 
-                {/* Progress Bar */}
+                {/* Progress Bar. Sprung rather than tweened so it overshoots a
+                    hair on each tick — the bar reacts to the click instead of
+                    catching up to it half a second later. */}
                 <div className="bg-app-border-muted rounded-full h-1.5 mb-5 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-app-brand to-app-progress-fill-end rounded-full transition-all duration-500"
-                    style={{ width: `${taskPercentage}%` }}
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-app-brand to-app-progress-fill-end rounded-full"
+                    initial={false}
+                    animate={{ width: `${taskPercentage}%` }}
+                    transition={centralSpringToken}
                   />
                 </div>
 
                 <div className="space-y-3">
-                  {sortedTasks.map((task, index) => {
-                    const isDone = localFinished.has(task.id);
-                    return (
-                      <button
-                        key={task.id}
-                        onClick={() => toggleTask(task.id)}
-                        className={`w-full text-left flex items-start gap-4 rounded-xl border p-4 transition-all ${
-                          isDone
-                            ? "border-app-success-border bg-app-success-bg"
-                            : "border-app-border hover:border-app-brand-border-strong"
-                        }`}
-                      >
-                        {isDone ? (
-                          <CheckCircle2 className="w-5 h-5 text-app-success-solid shrink-0 mt-0.5" />
-                        ) : (
-                          <Circle className="w-5 h-5 text-app-text-disabled shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <span
-                            className={`text-sm font-medium ${
-                              isDone
-                                ? "line-through text-app-text-subtle"
-                                : "text-app-text"
-                            }`}
-                          >
-                            {index + 1}. {task.title}
-                          </span>
-                          {task.description && (
-                            <p className="text-xs text-app-text-muted mt-0.5">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+                  {sortedTasks.map((task, index) => (
+                    <TaskCheckItem
+                      key={task.id}
+                      index={index}
+                      title={task.title}
+                      description={task.description}
+                      isDone={localFinished.has(task.id)}
+                      onToggle={() => toggleTask(task.id)}
+                    />
+                  ))}
                 </div>
               </div>
             )}

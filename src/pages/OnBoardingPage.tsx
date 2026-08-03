@@ -32,7 +32,6 @@ import {
 import { PageHeader } from "../components/layout/PageHeader";
 import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckModal";
-import { OnboardingCompleteCelebration } from "../features/onboarding/components/OnboardingCompleteCelebration";
 import { useMoments } from "../features/moments";
 //import type {UserProfile} from "../services/types.ts";
 
@@ -111,10 +110,9 @@ export function OnBoardingPage() {
   // Phase whose knowledge check is currently open in the modal (null = closed)
   const [checkPhase, setCheckPhase] = useState<OnboardingPhaseEndpoint | null>(null);
 
-  // Shows the "on board" confetti celebration after passing the final phase's check.
-  const [celebrate, setCelebrate] = useState(false);
-
-  const { celebrate: celebrateMoment } = useMoments();
+  // The "on board" finale now lives in the moments layer, so that it can take
+  // over the screen rather than render inside this page's tree.
+  const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
 
   const navigate = useNavigate();
 
@@ -136,21 +134,27 @@ export function OnBoardingPage() {
     passed: boolean;
   }) => {
     // Passing the last phase's check completes the whole journey -> celebrate.
-    const wasFinalPhase =
-      !!checkPhase &&
-      OnBoardingPathEndpoint?.phases.at(-1)?.id === checkPhase.id;
+    const phases = OnBoardingPathEndpoint?.phases ?? [];
+    const clearedIndex = phases.findIndex((phase) => phase.id === checkPhase?.id);
+    const wasFinalPhase = !!checkPhase && phases.at(-1)?.id === checkPhase.id;
     const clearedPhaseTitle = checkPhase?.title;
     setCheckPhase(null);
-    if (passed && wasFinalPhase) setCelebrate(true);
-    // Clearing a mid-path check unlocks the next phase — worth a beat of its own.
-    // The final phase keeps its dedicated "on board" celebration instead.
-    if (passed && !wasFinalPhase) {
+
+    if (passed && wasFinalPhase) {
+      completeMission();
+    } else if (passed) {
+      // Clearing a mid-path check unlocks the next phase — worth a beat of its
+      // own, with the ring showing how much of the journey is now behind them.
       celebrateMoment({
         tone: "milestone",
         title: "Phase cleared",
         message: clearedPhaseTitle
           ? `You passed the ${clearedPhaseTitle} check. The next phase is unlocked.`
           : "You passed the check. The next phase is unlocked.",
+        progress:
+          clearedIndex >= 0 && phases.length > 0
+            ? { current: clearedIndex + 1, total: phases.length }
+            : undefined,
       });
     }
     // Only refresh the path here, never the auth profile: the backend has flagged the
@@ -320,6 +324,10 @@ export function OnBoardingPage() {
     } catch (err) {
       console.error("Failed to start onboarding step:", err);
     }
+    // The rocket marks a step *beginning*, so it rides on the start rather than
+    // on the navigation. Reopening a step you already started is not a new
+    // journey and gets nothing — `handleActiveStep` routes those to `openStep`.
+    flyby();
     openStep(stepId);
   };
 
@@ -789,10 +797,6 @@ export function OnBoardingPage() {
         />
       )}
 
-      {/* Confetti + "on board" celebration after passing the final phase's check */}
-      {celebrate && (
-        <OnboardingCompleteCelebration onDismiss={() => setCelebrate(false)} />
-      )}
     </div>
   );
 }

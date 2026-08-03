@@ -5,6 +5,7 @@ import { CircleCheckBig, PartyPopper, Rocket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { celebrationSpringToken } from "../../../styles/tokens.ts";
 import { ConfettiBurst } from "./ConfettiBurst.tsx";
+import { ProgressRing } from "./ProgressRing.tsx";
 import type { Celebration, MomentTone } from "../types.ts";
 
 interface ToneConfig {
@@ -115,18 +116,29 @@ export function MomentCelebration({
 
                 <ConfettiBurst count={tone.confetti} seedOffset={celebration.seed} />
 
-                <motion.div
-                    initial={reduceMotion ? false : { scale: 0.4, rotate: -25 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={
-                        reduceMotion
-                            ? { duration: 0 }
-                            : { ...celebrationSpringToken, delay: 0.06 }
-                    }
-                    className={`relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${tone.badgeClassName}`}
-                >
-                    <Icon className="h-8 w-8" />
-                </motion.div>
+                {/* A journey moment shows the ring instead of the badge: the two
+                    say the same thing, and stacking them makes the card top-heavy. */}
+                {celebration.progress ? (
+                    <div className="relative mb-5">
+                        <ProgressRing
+                            current={celebration.progress.current}
+                            total={celebration.progress.total}
+                        />
+                    </div>
+                ) : (
+                    <motion.div
+                        initial={reduceMotion ? false : { scale: 0.4, rotate: -25 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={
+                            reduceMotion
+                                ? { duration: 0 }
+                                : { ...celebrationSpringToken, delay: 0.06 }
+                        }
+                        className={`relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${tone.badgeClassName}`}
+                    >
+                        <Icon className="h-8 w-8" />
+                    </motion.div>
+                )}
 
                 <h2
                     id="moment-title"

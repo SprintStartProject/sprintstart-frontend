@@ -3,8 +3,11 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { useAuth } from "../../context/useAuth.ts";
 import { MomentsContext } from "./MomentsContext.ts";
+import { useMomentDevShortcuts } from "./useMomentDevShortcuts.ts";
 import { LaunchSequence } from "./components/LaunchSequence.tsx";
 import { MomentCelebration } from "./components/MomentCelebration.tsx";
+import { MissionComplete } from "./components/MissionComplete.tsx";
+import { RocketFlyby } from "./components/RocketFlyby.tsx";
 import type { Celebration, CelebrationInput } from "./types.ts";
 
 /**
@@ -22,6 +25,8 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
 
     const [hasLaunchPlayed, setHasLaunchPlayed] = useState(false);
     const [queue, setQueue] = useState<Celebration[]>([]);
+    const [flybyId, setFlybyId] = useState<number | null>(null);
+    const [isMissionComplete, setIsMissionComplete] = useState(false);
     const nextId = useRef(0);
 
     // Runs from mount, while `status` is still "loading" — the sequence covers
@@ -54,9 +59,38 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
         setQueue((current) => current.slice(1));
     }, []);
 
+    const flyby = useCallback(() => {
+        if (reduceMotion) return;
+        // Ignored rather than queued while one is already in flight: two rockets
+        // chasing each other reads as a glitch, and the second press was almost
+        // certainly an impatient double-click on the first.
+        setFlybyId((current) => (current === null ? Date.now() : current));
+    }, [reduceMotion]);
+
+    // Stable identity: `RocketFlyby` tears itself down on a timer keyed to this
+    // callback, so a fresh closure on every provider render would keep resetting
+    // that timer and the rocket would never leave.
+    const endFlyby = useCallback(() => setFlybyId(null), []);
+
+    const completeMission = useCallback(() => setIsMissionComplete(true), []);
+
+    // TEMPORARY — remove this call together with the hook before merging to dev.
+    useMomentDevShortcuts({
+        celebrate,
+        flyby,
+        completeMission,
+        playLaunchSequence,
+    });
+
     const value = useMemo(
-        () => ({ celebrate, playLaunchSequence, isLaunching }),
-        [celebrate, playLaunchSequence, isLaunching],
+        () => ({
+            celebrate,
+            flyby,
+            completeMission,
+            playLaunchSequence,
+            isLaunching,
+        }),
+        [celebrate, flyby, completeMission, playLaunchSequence, isLaunching],
     );
 
     const current = queue[0];
@@ -72,11 +106,22 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
                 />
             )}
 
+            {flybyId !== null && (
+                <RocketFlyby key={flybyId} onDone={endFlyby} />
+            )}
+
             {current && (
                 <MomentCelebration
                     key={current.id}
                     celebration={current}
                     onDismiss={dismissCurrent}
+                />
+            )}
+
+            {isMissionComplete && (
+                <MissionComplete
+                    displayName={profile?.firstName ?? undefined}
+                    onDismiss={() => setIsMissionComplete(false)}
                 />
             )}
         </MomentsContext.Provider>
