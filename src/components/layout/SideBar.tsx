@@ -21,6 +21,7 @@ import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../aut
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
 import { usePmAttentionFlag } from '../../features/team-management/usePmAttentionFlag';
+import { SidebarLogo } from './SidebarLogo';
 import { SidebarNavLink } from './SidebarNavLink';
 import { hoverSpringToken } from '../../styles/tokens';
 
@@ -145,9 +146,7 @@ function SidebarContent({
     return (
         <div className="flex h-full flex-col bg-app-bg text-app-text">
             <div className="flex items-center gap-3 px-[28px] py-[24px]">
-                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
-                    <Rocket className="h-[18px] w-[18px] text-white" />
-                </div>
+                <SidebarLogo />
 
                 <h1 className="text-lg font-bold leading-none tracking-tight text-app-text">
                     SprintStart
@@ -312,9 +311,7 @@ export function SideBar() {
 
             <header className="fixed left-0 right-0 top-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
-                        <Rocket className="h-[18px] w-[18px] text-white" />
-                    </div>
+                    <SidebarLogo />
 
                     <span className="text-[16px] font-bold leading-none tracking-tight text-app-text">
                         SprintStart
