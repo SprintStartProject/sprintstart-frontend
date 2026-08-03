@@ -149,7 +149,10 @@ export function UsersTab({
                 {paginatedUsers.map((user) => (
                     <div
                         key={user.id}
-                        className="group relative grid cursor-pointer grid-cols-[36px_minmax(0,1fr)_44px] gap-x-3 gap-y-3 border-b border-app-border px-3 py-4 transition-colors last:border-b-0 hover:bg-app-surface-hover sm:grid-cols-[44px_2.5fr_1.8fr_1.8fr_52px] sm:items-center sm:gap-x-0 sm:gap-y-0 sm:px-5"
+                        // An inset brand edge rather than the cards' lift: these
+                        // rows share a grid with their neighbours, and a
+                        // transform would break the column alignment.
+                        className="group relative grid cursor-pointer grid-cols-[36px_minmax(0,1fr)_44px] gap-x-3 gap-y-3 border-b border-app-border px-3 py-4 transition-colors last:border-b-0 hover:bg-app-surface-hover hover:shadow-[inset_3px_0_0_0_var(--color-app-brand)] sm:grid-cols-[44px_2.5fr_1.8fr_1.8fr_52px] sm:items-center sm:gap-x-0 sm:gap-y-0 sm:px-5"
                     >
                         <button
                             type="button"

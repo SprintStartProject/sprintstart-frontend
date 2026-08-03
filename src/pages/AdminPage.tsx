@@ -55,7 +55,6 @@ export function AdminPage() {
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
-  const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
@@ -511,17 +510,14 @@ export function AdminPage() {
                   selectedUserCount={selectedUserIds.size}
                   searchValue={searchValue}
                   userFilter={userFilter}
-                  showFilters={showFilters}
                   onSearchChange={(value) => {
                     setSearchValue(value);
                     setPage(1);
                   }}
                   onFilterChange={(value) => {
                     setUserFilter(value);
-                    setShowFilters(false);
                     setPage(1);
                   }}
-                  onToggleFilters={() => setShowFilters((current) => !current)}
                   onRequestBulkDelete={requestBulkUserDelete}
                 />
 
