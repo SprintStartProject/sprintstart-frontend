@@ -167,10 +167,28 @@ export function KnowledgeBaseIcon({ isActive }: SidebarIconProps) {
                 initial={hasPlayed ? { scaleX: 1, opacity: 0.85 } : false}
                 animate={
                     hasPlayed
-                        ? { scaleX: [1, 0.05, -1], opacity: [0.85, 0.85, 0] }
+                        ? {
+                              // Overshoots past flat and settles, so the landing
+                              // on the left reads as a page dropping onto the
+                              // stack rather than sliding to a stop.
+                              scaleX: [1, 0.05, -1.12, -0.94, -1],
+                              opacity: [0.85, 0.85, 0.85, 0.85, 0],
+                          }
                         : { opacity: 0 }
                 }
-                transition={{ duration: 0.95, ease: 'easeInOut' }}
+                // Separate transitions per value. Sharing one spread the fade
+                // evenly across the whole flip, so the page dissolved while it
+                // was still travelling and looked like it gave up at the spine.
+                // The arrival now gets more than half the runtime and the fade
+                // only starts once the page has come to rest.
+                transition={{
+                    scaleX: {
+                        duration: 1.15,
+                        times: [0, 0.34, 0.62, 0.78, 0.88],
+                        ease: 'easeInOut',
+                    },
+                    opacity: { duration: 1.15, times: [0, 0.34, 0.62, 0.88, 1] },
+                }}
             />
 
             <path d="M12 5v16" />
