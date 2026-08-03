@@ -21,13 +21,17 @@ import {
   FileText,
   User,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import {
   FilterSelect,
   type FilterSelectOption,
 } from "../../../components/ui/FilterSelect";
-import { buttonHoverMotion } from "../../../styles/tokens";
+import {
+  buttonHoverMotion,
+  buttonHoverMotionDisabled,
+  hoverSpringToken,
+} from "../../../styles/tokens";
 
 type GapSortOption = "severity" | "date" | "component";
 
@@ -78,14 +82,15 @@ export function KnowledgeGapsPage() {
   };
 
   const refreshButton = (
-    <button
+    <motion.button
       onClick={() => void handleRefresh()}
       disabled={refreshing}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:opacity-60 shrink-0"
+      {...(refreshing ? buttonHoverMotionDisabled : buttonHoverMotion)}
+      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)] disabled:opacity-60"
     >
       <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
       {refreshing ? "Refreshing…" : "Refresh"}
-    </button>
+    </motion.button>
   );
 
   if (loading) {
@@ -155,13 +160,16 @@ export function KnowledgeGapsPage() {
     <div className="min-h-screen bg-app-bg">
       <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
-          <button
+          <motion.button
             onClick={() => void navigate("/pm-dashboard")}
-            className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
+            whileHover={{ x: -3 }}
+            whileTap={{ scale: 0.97 }}
+            transition={hoverSpringToken}
+            className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-muted transition-colors hover:text-app-text"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to PM-Dashboard
-          </button>
+          </motion.button>
           <div className="flex items-start justify-between gap-4 mb-6">
             <PageHeader
               icon={ShieldAlert}
@@ -256,18 +264,44 @@ export function KnowledgeGapsPage() {
           </div>
         </div>
 
+        {/* There is no tab bar on this page, so the moving part is the list
+            itself: `layout` makes rows glide to their new position when the
+            sort order changes, and AnimatePresence fades out the ones a
+            severity filter removes instead of snapping the list shut. */}
+        {/* No `layout` on the container on purpose: a layout-animating parent
+            counter-scales its layout-animating children, and a row re-entering
+            an empty list is measured against a near-zero box, which turns that
+            correction into a huge scale that snaps back. The container resizing
+            without animation costs nothing visually. */}
         <div className="space-y-3">
-          {filtered.map((gap) => {
+          <AnimatePresence initial={false}>
+            {filtered.map((gap) => {
             const { badge, label } = SEVERITY_STYLES[gap.severity];
             const owner = gap.owners[0] ?? null;
 
             return (
-              <button
+              <motion.button
                 key={gap.id}
+                // `layout="position"` rather than `layout`: it animates only
+                // where the row sits, never its measured size, so no scale
+                // correction is ever applied. Plain `layout` is what made a
+                // re-appearing row flash at the wrong size.
+                layout="position"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                // No scale here either: `scale` is owned by the CSS hover on
+                // this same element, and two owners for one property fight.
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
                 onClick={() =>
                   void navigate(`/insights/knowledge-gaps/${gap.id}`)
                 }
-                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
+                // The transition list is explicit rather than `transition-all`:
+                // Framer Motion drives `opacity` and `transform` inline on this
+                // element, and a CSS transition covering those properties would
+                // try to ease every frame the animation writes -- which is what
+                // made a returning row flicker. CSS keeps only what it owns.
+                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-[scale,background-color,border-color,box-shadow] duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
               >
                 <SeverityBar severity={gap.severity} />
 
@@ -318,9 +352,10 @@ export function KnowledgeGapsPage() {
                     </span>
                   </div>
                 </div>
-              </button>
+              </motion.button>
             );
-          })}
+            })}
+          </AnimatePresence>
         </div>
       </main>
     </div>

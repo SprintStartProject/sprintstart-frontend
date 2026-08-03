@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ArtifactFilters, ArtifactList, ArtifactViewerDrawer } from '../features/knowledge-base/components';
+import { TABS } from '../features/knowledge-base/tabs';
+import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
 import { Pagination } from '../components/ui/Pagination';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/useAuth';
@@ -145,7 +147,13 @@ export function KnowledgeBasePage() {
                                     <div className="w-8 h-8 border-4 border-app-brand border-t-transparent rounded-full animate-spin"></div>
                                 </div>
                             ) : fetchError ? null : (
-                                <>
+                                // Only the list slides; the loading and error
+                                // states above are not tabs and would otherwise
+                                // animate on their way in too.
+                                <SlidingTabPanel
+                                    activeKey={activeTab}
+                                    index={TABS.findIndex((tab) => tab.id === activeTab)}
+                                >
                                     <ArtifactList
                                         artifacts={paginatedArtifacts}
                                         onSelect={setSelectedArtifactId}
@@ -161,7 +169,7 @@ export function KnowledgeBasePage() {
                                             className="mt-8 mb-12"
                                         />
                                     )}
-                                </>
+                                </SlidingTabPanel>
                             )}
                         </>
                     )}
