@@ -14,30 +14,37 @@ const defaultFilters: TeamOverviewFilters = {
     sortBy: 'LONGEST_STEP',
 };
 
+/**
+ * These controls are `FilterSelect`, not native selects, so the options only
+ * exist in the DOM while the listbox is open and the trigger renders the
+ * selected label as its own text.
+ */
 describe('TeamMemberFilters', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('renders the role filter with all roles', () => {
+    it('offers every role once opened', async () => {
+        const user = userEvent.setup();
         render(<TeamMemberFilters roles={mockRoles} filters={defaultFilters} onFiltersChange={vi.fn()} />);
 
-        const roleSelect = screen.getByRole('combobox', { name: 'Filter team members by role' });
-        expect(roleSelect).toBeInTheDocument();
-        expect(screen.getByText('All roles')).toBeInTheDocument();
-        expect(screen.getByText('Backend')).toBeInTheDocument();
-        expect(screen.getByText('Frontend')).toBeInTheDocument();
+        await user.click(screen.getByRole('combobox', { name: 'Filter team members by role' }));
+
+        expect(screen.getByRole('option', { name: 'All roles' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Backend' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Frontend' })).toBeInTheDocument();
     });
 
-    it('renders the sort-by select with sort options', () => {
+    it('offers every sort order once opened', async () => {
+        const user = userEvent.setup();
         render(<TeamMemberFilters roles={mockRoles} filters={defaultFilters} onFiltersChange={vi.fn()} />);
 
-        const sortSelect = screen.getByRole('combobox', { name: 'Sort team members' });
-        expect(sortSelect).toBeInTheDocument();
-        expect(screen.getByText('Longest on step')).toBeInTheDocument();
-        expect(screen.getByText('Shortest on step')).toBeInTheDocument();
-        expect(screen.getByText('Highest progress')).toBeInTheDocument();
-        expect(screen.getByText('Lowest progress')).toBeInTheDocument();
+        await user.click(screen.getByRole('combobox', { name: 'Sort team members' }));
+
+        expect(screen.getByRole('option', { name: 'Longest on step' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Shortest on step' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Highest progress' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Lowest progress' })).toBeInTheDocument();
     });
 
     it('calls onFiltersChange with new roleId when role is changed', async () => {
@@ -45,7 +52,8 @@ describe('TeamMemberFilters', () => {
         const onFiltersChange = vi.fn();
         render(<TeamMemberFilters roles={mockRoles} filters={defaultFilters} onFiltersChange={onFiltersChange} />);
 
-        await user.selectOptions(screen.getByRole('combobox', { name: 'Filter team members by role' }), 'r1');
+        await user.click(screen.getByRole('combobox', { name: 'Filter team members by role' }));
+        await user.click(screen.getByRole('option', { name: 'Backend' }));
 
         expect(onFiltersChange).toHaveBeenCalledWith({ ...defaultFilters, roleId: 'r1' });
     });
@@ -55,16 +63,21 @@ describe('TeamMemberFilters', () => {
         const onFiltersChange = vi.fn();
         render(<TeamMemberFilters roles={mockRoles} filters={defaultFilters} onFiltersChange={onFiltersChange} />);
 
-        await user.selectOptions(screen.getByRole('combobox', { name: 'Sort team members' }), 'HIGHEST_PROGRESS');
+        await user.click(screen.getByRole('combobox', { name: 'Sort team members' }));
+        await user.click(screen.getByRole('option', { name: 'Highest progress' }));
 
         expect(onFiltersChange).toHaveBeenCalledWith({ ...defaultFilters, sortBy: 'HIGHEST_PROGRESS' });
     });
 
-    it('reflects the current filter values in the selects', () => {
+    it('reflects the current filter values on the triggers', () => {
         const filters: TeamOverviewFilters = { roleId: 'r2', sortBy: 'LOWEST_PROGRESS' };
         render(<TeamMemberFilters roles={mockRoles} filters={filters} onFiltersChange={vi.fn()} />);
 
-        expect(screen.getByRole('combobox', { name: 'Filter team members by role' })).toHaveDisplayValue('Frontend');
-        expect(screen.getByRole('combobox', { name: 'Sort team members' })).toHaveDisplayValue('Lowest progress');
+        expect(screen.getByRole('combobox', { name: 'Filter team members by role' })).toHaveTextContent(
+            'Frontend',
+        );
+        expect(screen.getByRole('combobox', { name: 'Sort team members' })).toHaveTextContent(
+            'Lowest progress',
+        );
     });
 });

@@ -59,12 +59,16 @@ export function TeamMemberCard({
         ? 'Onboarding completed'
         : 'Onboarding in progress';
 
-    const cardClassName = `group relative flex flex-col rounded-2xl border transition-all ${
+    // The magnification is a plain CSS transform rather than a Framer spring:
+    // these cards render in grids of dozens, and a motion component per card
+    // would put a JS-driven animation on every one of them. Tailwind v4's
+    // `transition-all` covers the standalone `scale` property.
+    const cardClassName = `group relative flex flex-col rounded-2xl border transition-all duration-200 motion-reduce:hover:scale-100 ${
         selectable ? 'cursor-pointer' : ''
     } ${
         selected
             ? 'border-app-brand bg-app-brand-soft ring-1 ring-app-brand'
-            : 'border-app-border bg-app-surface hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-md'
+            : 'border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg'
     } ${compact ? 'p-2' : 'p-4'}`;
 
     const content = (

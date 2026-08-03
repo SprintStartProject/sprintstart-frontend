@@ -162,7 +162,7 @@ export function KnowledgeGapWidget() {
                 event.stopPropagation();
                 void navigate(`/insights/knowledge-gaps/${gap.id}`);
               }}
-              className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-3"
+              className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-3"
             >
               <SeverityBar severity={gap.severity} />
 

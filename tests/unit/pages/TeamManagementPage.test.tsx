@@ -52,8 +52,8 @@ describe('TeamManagementPage', () => {
             expect(screen.getByText('Alice Smith')).toBeInTheDocument();
         });
 
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[0], 'role1');
+        await user.click(screen.getByRole('combobox', { name: 'Filter team members by role' }));
+        await user.click(await screen.findByRole('option', { name: 'Backend' }));
 
         await waitFor(() => {
             expect(screen.getByText('Alice Smith')).toBeInTheDocument();
@@ -73,8 +73,8 @@ describe('TeamManagementPage', () => {
             expect(screen.getByText('Alice Smith')).toBeInTheDocument();
         });
 
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[1], 'LOWEST_PROGRESS');
+        await user.click(screen.getByRole('combobox', { name: 'Sort team members' }));
+        await user.click(await screen.findByRole('option', { name: 'Lowest progress' }));
 
         await waitFor(() => {
             const nameElements = screen.getAllByText(/(Bob Jones|Alice Smith)/);
