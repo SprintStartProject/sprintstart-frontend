@@ -34,6 +34,11 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
     if (!isSwitcherEnabled) return;
 
     const handleShortcut = (event: KeyboardEvent) => {
+      // Synthetic "keydown" events (e.g. from browser extensions dispatching a
+      // bare `new Event("keydown")` on window) have an undefined `key`. Bail
+      // before calling a method on it — real KeyboardEvents always have a
+      // string `key`, so this never affects the Cmd/Ctrl+K shortcut.
+      if (typeof event.key !== "string") return;
       if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) {
         return;
       }

@@ -80,7 +80,6 @@ describe('AddSourceModal', () => {
 
     it('starts on the source-type step with GitHub, Jira and Upload choices', () => {
         renderModal();
-        expect(screen.getByText('Source type')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /github/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /jira/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /upload/i })).toBeInTheDocument();
@@ -102,7 +101,7 @@ describe('AddSourceModal', () => {
         renderModal();
         await gotoGithubStep(user);
 
-        await user.type(screen.getByLabelText('Organization or user'), 'acme');
+        await user.type(screen.getByLabelText('Organization, user, or URL'), 'acme');
         await user.click(screen.getByRole('button', { name: 'Discover' }));
 
         expect(await screen.findByText('repo-a')).toBeInTheDocument();
@@ -123,7 +122,7 @@ describe('AddSourceModal', () => {
         renderModal();
         await gotoGithubStep(user);
 
-        await user.type(screen.getByLabelText('Organization or user'), 'acme');
+        await user.type(screen.getByLabelText('Organization, user, or URL'), 'acme');
         await user.click(screen.getByRole('button', { name: 'Discover' }));
         await screen.findByText('repo-a');
 
@@ -161,7 +160,7 @@ describe('AddSourceModal', () => {
         const props = renderModal();
         await gotoGithubStep(user);
 
-        await user.type(screen.getByLabelText('Organization or user'), 'acme');
+        await user.type(screen.getByLabelText('Organization, user, or URL'), 'acme');
         await user.click(screen.getByRole('button', { name: 'Discover' }));
         await screen.findByText('repo-a');
 
@@ -191,7 +190,7 @@ describe('AddSourceModal', () => {
         renderModal();
         await gotoGithubStep(user);
 
-        await user.type(screen.getByLabelText('Organization or user'), 'acme');
+        await user.type(screen.getByLabelText('Organization, user, or URL'), 'acme');
         await user.click(screen.getByRole('button', { name: 'Discover' }));
         await screen.findByText('repo-a');
 
@@ -199,6 +198,27 @@ describe('AddSourceModal', () => {
 
         expect(screen.queryByText('repo-a')).not.toBeInTheDocument();
         expect(screen.getByText('repo-connected')).toBeInTheDocument();
+    });
+
+    it('pre-filters to a single repository when an owner/name is pasted', async () => {
+        server.use(discoveryHandler);
+        const user = userEvent.setup();
+        renderModal();
+        await gotoGithubStep(user);
+
+        // Pasting a full repository reference discovers the owner but isolates the
+        // one repository, so its sibling is filtered out of the results.
+        await user.type(
+            screen.getByLabelText('Organization, user, or URL'),
+            'acme/repo-connected',
+        );
+        await user.click(screen.getByRole('button', { name: 'Discover' }));
+
+        expect(await screen.findByText('repo-connected')).toBeInTheDocument();
+        expect(screen.queryByText('repo-a')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Filter repositories')).toHaveValue(
+            'repo-connected',
+        );
     });
 
     it('batch-connects the selected repositories and reports success', async () => {
@@ -215,7 +235,7 @@ describe('AddSourceModal', () => {
         const props = renderModal();
         await gotoGithubStep(user);
 
-        await user.type(screen.getByLabelText('Organization or user'), 'acme');
+        await user.type(screen.getByLabelText('Organization, user, or URL'), 'acme');
         await user.click(screen.getByRole('button', { name: 'Discover' }));
         await screen.findByText('repo-a');
 
@@ -236,10 +256,15 @@ describe('AddSourceModal', () => {
         const user = userEvent.setup();
         renderModal();
         await gotoGithubStep(user);
-        expect(screen.getByLabelText('Organization or user')).toBeInTheDocument();
+        expect(screen.getByLabelText('Organization, user, or URL')).toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: /back/i }));
-        expect(screen.getByText('Source type')).toBeInTheDocument();
+        // Back on the source-type step: the type cards are shown and the GitHub
+        // discovery input is gone.
+        expect(screen.getByRole('button', { name: /jira/i })).toBeInTheDocument();
+        expect(
+            screen.queryByLabelText('Organization, user, or URL'),
+        ).not.toBeInTheDocument();
     });
 
     it('blocks connecting when the user may not ingest into the project', async () => {

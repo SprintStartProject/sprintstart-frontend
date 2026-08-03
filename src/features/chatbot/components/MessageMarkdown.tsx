@@ -1,5 +1,5 @@
 import { memo, useMemo, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -11,7 +11,7 @@ import type { SelectedCitation } from "../../../context/ChatContext";
 // renders — ReactMarkdown would otherwise see a new array each render and
 // re-walk the markdown AST every time (A4).
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
-const REHYPE_PLUGINS = [rehypeKatex];
+const REHYPE_PLUGINS: ReactMarkdownOptions["rehypePlugins"] = [[rehypeKatex, { strict: "ignore", errorColor: "inherit" }]];
 
 type MessageMarkdownProps = {
     /** Raw markdown content (citation markers like `[1]` are not yet linkified). */

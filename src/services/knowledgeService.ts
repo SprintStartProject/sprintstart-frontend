@@ -92,58 +92,10 @@ export const knowledgeService = {
             console.warn("Unified artifacts endpoint failed (expected if missing), continuing...", e);
         }
 
-        try {
-            const profile = await userService.getProfile();
-            if (profile) {
-                interface UploadListItemResponse {
-                    id: string;
-                    filename: string;
-                    mime: string;
-                    uploadedAt: string;
-                }
-                const uploads = await apiClient.fetch<UploadListItemResponse[]>(`/api/v1/uploads?uploaderId=${encodeURIComponent(profile.id)}`);
-
-                const uploadArtifacts: Artifact[] = uploads.map(u => ({
-                    id: u.id,
-                    title: u.filename,
-                    artifactType: 'FILE',
-                    sourceSystem: 'UPLOAD',
-                    sourceId: u.id,
-                    sourceUrl: null,
-                    mime: u.mime,
-                    language: null,
-                    ingestedAt: u.uploadedAt,
-                    createdAtSource: null,
-                    updatedAtSource: u.uploadedAt,
-                    contentHash: null,
-                    ingestionRunId: null,
-                }));
-
-                // Enrich ingestion-mirrored upload artifacts with their original UploadedArtifact
-                // id via `sourceId`. The backend's ArtifactResponse does not expose `sourceId`, so
-                // we match by title (filename) against the personal uploads list — the same
-                // title-based workaround the dedup below already relies on. Without this, the
-                // delete endpoint would receive the ingestion Artifact's UUID instead of the
-                // UploadedArtifact's UUID and silently no-op.
-                const uploadsByTitle = new Map(uploadArtifacts.map(a => [a.title, a]));
-                artifacts = artifacts.map(a => {
-                    if (a.sourceSystem === 'UPLOAD' && !a.sourceId) {
-                        const upload = uploadsByTitle.get(a.title);
-                        if (upload) return { ...a, sourceId: upload.id };
-                    }
-                    return a;
-                });
-
-                // Deduplicate using title (filename) as a temporary frontend workaround,
-                // because the backend doesn't return sourceId for ingested artifacts yet.
-                const existingTitles = new Set(artifacts.map(a => a.title));
-                const uniqueUploads = uploadArtifacts.filter(a => !existingTitles.has(a.title));
-
-                artifacts = [...artifacts, ...uniqueUploads];
-            }
-        } catch (e) {
-            console.warn("Failed to fetch personal uploads", e);
-        }
+        // Personal uploads are now fetched via the unified project artifacts
+        // endpoint above (the backend's GET /api/v1/uploads was changed to
+        // require a projectId query param and use JWT auth instead of the old
+        // uploaderId param, so the separate uploads fetch was removed).
 
         return artifacts;
     },
@@ -237,6 +189,10 @@ export const knowledgeService = {
         if (response.status === 401) {
             void keycloak.login();
             throw new ApiError(401, 'Unauthorized');
+        }
+
+        if (response.status === 503) {
+            throw new ApiError(503, 'Artifact is still being indexed by the AI service. Please try again in a few moments.');
         }
 
         if (!response.ok) {

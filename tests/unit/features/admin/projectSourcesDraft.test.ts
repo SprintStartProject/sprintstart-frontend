@@ -4,21 +4,30 @@ import {
     connectDraftSources,
     countUnconnectedSources,
     createDraftSource,
+    createDraftSourceFromDiscovery,
     hasFailedSources,
     removeDraftSource,
     type DraftSource,
 } from '../../../../src/features/admin/projectSourcesDraft';
-import { connectGithubRepository } from '../../../../src/services/sources/githubService';
+import {
+    addRepositoryToProject,
+    connectGithubRepository,
+} from '../../../../src/services/sources/githubService';
+import type { DiscoverySelection } from '../../../../src/features/data-ingestion/components/GithubRepositoryDiscovery';
 
 vi.mock('../../../../src/services/sources/githubService', () => ({
     connectGithubRepository: vi.fn(),
+    addRepositoryToProject: vi.fn(),
 }));
 
 const connectGithubRepositoryMock = vi.mocked(connectGithubRepository);
+const addRepositoryToProjectMock = vi.mocked(addRepositoryToProject);
 
 beforeEach(() => {
     connectGithubRepositoryMock.mockReset();
     connectGithubRepositoryMock.mockResolvedValue({ transactionId: 'tx' });
+    addRepositoryToProjectMock.mockReset();
+    addRepositoryToProjectMock.mockResolvedValue({ repositoryId: 'r1', projectIds: ['p1'] });
 });
 
 describe('createDraftSource', () => {
@@ -29,6 +38,40 @@ describe('createDraftSource', () => {
         expect(first.status).toBe('pending');
         expect(first.errorMessage).toBe('');
         expect(first.id).not.toBe(second.id);
+        expect(first.repositoryId).toBeUndefined();
+    });
+
+    it('carries a repository id when one is given', () => {
+        expect(createDraftSource('acme', 'widgets', 'pat', 'repo-1').repositoryId).toBe(
+            'repo-1',
+        );
+    });
+});
+
+describe('createDraftSourceFromDiscovery', () => {
+    const baseSelection: DiscoverySelection = {
+        owner: 'acme',
+        name: 'widgets',
+        isPrivate: false,
+        linkState: 'new',
+    };
+
+    it('stages a new repository without a repository id', () => {
+        const draft = createDraftSourceFromDiscovery(baseSelection, 'pat');
+
+        expect(draft.owner).toBe('acme');
+        expect(draft.name).toBe('widgets');
+        expect(draft.tokenName).toBe('pat');
+        expect(draft.repositoryId).toBeUndefined();
+    });
+
+    it('keeps the repository id for a linkable repository', () => {
+        const draft = createDraftSourceFromDiscovery(
+            { ...baseSelection, linkState: 'linkable', repositoryId: 'repo-9' },
+            'pat',
+        );
+
+        expect(draft.repositoryId).toBe('repo-9');
     });
 });
 
@@ -125,6 +168,21 @@ describe('connectDraftSources', () => {
         expect(connectGithubRepositoryMock).toHaveBeenCalledWith(
             expect.objectContaining({ name: 'gadgets' }),
         );
+    });
+
+    it('links an already-ingested repository instead of re-ingesting it', async () => {
+        const result = await connectDraftSources('p1', [
+            createDraftSource('acme', 'linked', 'pat', 'repo-42'),
+            createDraftSource('acme', 'fresh', 'pat'),
+        ]);
+
+        expect(addRepositoryToProjectMock).toHaveBeenCalledTimes(1);
+        expect(addRepositoryToProjectMock).toHaveBeenCalledWith('repo-42', 'p1');
+        expect(connectGithubRepositoryMock).toHaveBeenCalledTimes(1);
+        expect(connectGithubRepositoryMock).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'fresh' }),
+        );
+        expect(result.every((source) => source.status === 'connected')).toBe(true);
     });
 
     it('reports progress as the run advances', async () => {

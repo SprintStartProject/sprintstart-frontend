@@ -14,7 +14,7 @@ export const CitationsList = memo(function CitationsList({ citations }: Citation
     if (citations.length === 0) return null;
 
     return (
-        <div data-testid="summary-citations" className="mt-6 border-t border-app-border pt-4 not-prose">
+        <div data-testid="summary-citations" className="mt-6 border-t border-app-border pt-4">
             <h3 className="text-sm font-semibold text-app-text mb-2">Sources</h3>
             <ul className="space-y-1">
                 {citations.map((c, index) => (

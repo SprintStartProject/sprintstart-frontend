@@ -1,13 +1,14 @@
 import { useEffect, useReducer, useRef, type ReactNode } from 'react';
 import { Sparkles, ArrowLeft, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Options as ReactMarkdownOptions } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import 'github-markdown-css/github-markdown.css';
+
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from '../types';
+import { preprocessMarkdown } from '../markdown';
 import { knowledgeService } from '../../../services/knowledgeService';
 import { ApiError } from '../../../services/apiClient';
 import { SidePanel } from '../../../components/ui/SidePanel';
@@ -130,15 +131,18 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
 }
 
 /** ISSUE and PULL_REQUEST artifacts are always rendered as Markdown regardless of mime, since the backend normalizes their bodies to Markdown. */
-const shouldRenderAsMarkdown = (content: ArtifactContent, artifact: Artifact | null): boolean =>
-    content.mimeType.startsWith('text/markdown')
-    || artifact?.artifactType === 'ISSUE'
-    || artifact?.artifactType === 'PULL_REQUEST';
+const shouldRenderAsMarkdown = (content: ArtifactContent, artifact: Artifact | null): boolean => {
+    const isMd = artifact?.title?.toLowerCase().endsWith('.md');
+    return content.mimeType.startsWith('text/markdown')
+        || artifact?.artifactType === 'ISSUE'
+        || artifact?.artifactType === 'PULL_REQUEST'
+        || isMd === true;
+};
 
 // Hoisted to module scope so ReactMarkdown doesn't see a new array on every render
 // (otherwise it always re-renders even when the content is unchanged).
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
-const REHYPE_PLUGINS = [rehypeKatex];
+const REHYPE_PLUGINS: ReactMarkdownOptions["rehypePlugins"] = [[rehypeKatex, { strict: 'ignore', errorColor: 'inherit' }]];
 
 const MARKDOWN_COMPONENTS = {
     code({ className, children }: { className?: string; children?: ReactNode }) {
@@ -468,14 +472,14 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                             <div className="h-4 bg-app-border rounded w-2/3"></div>
                         </div>
                     ) : (
-                        content && shouldRenderAsMarkdown(content, artifact) && (!highlightLines || highlightLines.length === 0) ? (
-                            <div className="markdown-body !bg-transparent text-app-text">
+                        content && shouldRenderAsMarkdown(content, artifact) ? (
+                            <div className="prose prose-sm dark:prose-invert max-w-none text-app-text">
                                 <ReactMarkdown
                                     remarkPlugins={REMARK_PLUGINS}
                                     rehypePlugins={REHYPE_PLUGINS}
                                     components={MARKDOWN_COMPONENTS}
                                 >
-                                    {content.content}
+                                    {preprocessMarkdown(content.content)}
                                 </ReactMarkdown>
                             </div>
                         ) : content?.mimeType === 'application/pdf' ? (
@@ -509,7 +513,7 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                     )}
                 </div>
             ) : (
-                <div data-testid="summary-content" className="prose prose-sm dark:prose-invert max-w-none">
+                <div data-testid="summary-content" className="max-w-none">
                     <div className="flex items-center gap-2 mb-6 text-app-brand font-medium border-b border-app-border pb-4">
                         <Sparkles className="w-5 h-5" />
                         <span className="text-lg">AI Summary</span>
@@ -523,7 +527,7 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                             </span>
                         </div>
                     ) : error ? (
-                        <div className="flex flex-col items-center gap-4 py-8 not-prose">
+                        <div className="flex flex-col items-center gap-4 py-8">
                             <p className="text-sm text-app-text-muted text-center max-w-sm">{error}</p>
                             <div className="flex items-center gap-3">
                                 <button
@@ -545,12 +549,13 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                         </div>
                     ) : (
                         <>
-                            <div className="text-app-text">
+                            <div className="prose prose-sm dark:prose-invert max-w-none text-app-text">
                                 <ReactMarkdown
                                     remarkPlugins={REMARK_PLUGINS}
                                     rehypePlugins={REHYPE_PLUGINS}
+                                    components={MARKDOWN_COMPONENTS}
                                 >
-                                    {summary}
+                                    {preprocessMarkdown(summary)}
                                 </ReactMarkdown>
                             </div>
 

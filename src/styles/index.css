@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* Required when dark mode is controlled through a .dark class.
    Without this, Tailwind uses prefers-color-scheme by default. */
@@ -471,4 +472,18 @@ body {
 
 .barrel-roll-active {
   animation: barrelRoll 2s ease-in-out;
+}
+
+/* 
+ * Override KaTeX's default error style (which is blinding red and makes the
+ * entire document look broken if a math block fails to close).
+ * We force it to inherit the normal text color and just add a subtle dotted
+ * red underline to indicate the parse error, rather than bleeding red everywhere.
+ */
+.katex-error {
+  color: inherit !important;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--danger-text);
+  text-decoration-thickness: 2px;
 }

@@ -6,14 +6,14 @@ import { UserAvatar } from "../../../components/common/UserAvatar";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { MessageCitations } from "./MessageCitations";
 import { CopyButton } from "./CopyButton";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
 // Hoisted to module scope (A4) — stable identity across renders.
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
-const REHYPE_PLUGINS = [rehypeKatex];
+const REHYPE_PLUGINS: ReactMarkdownOptions["rehypePlugins"] = [[rehypeKatex, { strict: "ignore" }]];
 
 type ArtifactOpenPayload = {
     artifactId: string;
