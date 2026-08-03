@@ -20,6 +20,7 @@ import { useAuth } from '../../context/useAuth';
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../auth/accessPolicy';
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
+import { usePmAttentionFlag } from '../../features/team-management/usePmAttentionFlag';
 import { SidebarNavLink } from './SidebarNavLink';
 import { hoverSpringToken } from '../../styles/tokens';
 
@@ -32,6 +33,11 @@ type SidebarNavItem = {
 type SidebarContentProps = {
     onNavigate?: () => void;
     'aria-label'?: string;
+    /**
+     * Passed in rather than fetched here: this component is mounted twice at
+     * once (desktop and mobile), so owning the request would fire it twice.
+     */
+    hasPmAttentionItems?: boolean;
 };
 
 const navItems: SidebarNavItem[] = [
@@ -88,7 +94,11 @@ type SidebarSection = {
 /**
  * Renders the navigation links and user profile section within the sidebar.
  */
-function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigation' }: SidebarContentProps) {
+function SidebarContent({
+    onNavigate,
+    'aria-label': ariaLabel = 'Primary Navigation',
+    hasPmAttentionItems = false,
+}: SidebarContentProps) {
     const { profile, logout, status } = useAuth();
     const { canManageSelected } = useProjectContext();
     const location = useLocation();
@@ -173,6 +183,11 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
                                     forceActive={item.path === '/pm-dashboard' && isPmSectionActive}
                                     indicatorLayoutId={indicatorLayoutId}
                                     isMagnified={hoveredPath === item.path}
+                                    hasAttentionMarker={
+                                        item.path === '/pm-dashboard' &&
+                                        hasPmAttentionItems
+                                    }
+                                    attentionLabel="Open skip requests or unread feedback"
                                     onNavigate={onNavigate}
                                     onHoverChange={(isHovered) =>
                                         handleHoverChange(item.path, isHovered)
@@ -264,6 +279,23 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
  */
 export function SideBar() {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const { profile } = useAuth();
+    const { canManageSelected, selectedProjectId } = useProjectContext();
+    const { pathname } = useLocation();
+
+    // Owned here, not in `SidebarContent`: that renders twice at once, once for
+    // desktop and once for the mobile drawer. Fetching inside it meant every
+    // page load and every project switch fired the request twice over.
+    //
+    // Passing the route as the refresh key rechecks on every view change; the
+    // hook rate-limits that so quick navigation cannot hammer the backend.
+    // Gated on access so a regular member never pays for a request they could
+    // not act on anyway.
+    const hasPmAttentionItems = usePmAttentionFlag(
+        selectedProjectId,
+        canAccessRoute(profile, '/pm-dashboard', canManageSelected),
+        pathname,
+    );
 
     const closeMobileSidebar = () => {
         setIsMobileSidebarOpen(false);
@@ -272,7 +304,10 @@ export function SideBar() {
     return (
         <>
             <aside aria-label="Desktop Sidebar" className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex">
-                <SidebarContent aria-label="Desktop Navigation" />
+                <SidebarContent
+                    aria-label="Desktop Navigation"
+                    hasPmAttentionItems={hasPmAttentionItems}
+                />
             </aside>
 
             <header className="fixed left-0 right-0 top-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
@@ -321,7 +356,11 @@ export function SideBar() {
                     isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
                 ].join(' ')}
             >
-                <SidebarContent aria-label="Mobile Navigation" onNavigate={closeMobileSidebar} />
+                <SidebarContent
+                    aria-label="Mobile Navigation"
+                    onNavigate={closeMobileSidebar}
+                    hasPmAttentionItems={hasPmAttentionItems}
+                />
             </aside>
         </>
     );
