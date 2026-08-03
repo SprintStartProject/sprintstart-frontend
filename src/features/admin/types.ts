@@ -20,6 +20,13 @@ export type UserFilter =
   | "not-onboarded";
 export type AdminTab = "users" | "projects" | "tokens";
 
+/**
+ * Left-to-right order of the tabs. Single source of truth: `TabSwitcher`
+ * renders in this order and `AdminPage` derives the slide direction from it, so
+ * the content always travels the same way the active pill does.
+ */
+export const ADMIN_TAB_ORDER: AdminTab[] = ["users", "projects", "tokens"];
+
 export type UserEditFormState = {
   email: string;
   firstName: string;

@@ -5,16 +5,16 @@ import {
     dockMagnifySpringToken,
     slidingIndicatorSpringToken,
 } from "../../../styles/tokens";
-import type { AdminTab } from "../types";
+import { ADMIN_TAB_ORDER, type AdminTab } from "../types";
 
 /** Matches the section filter on the Data Ingestion page. */
 const TAB_HOVER_SCALE = 1.06;
 
-const TABS: { key: AdminTab; label: string; icon: LucideIcon }[] = [
-    { key: "users", label: "Users", icon: Users },
-    { key: "projects", label: "Projects", icon: Layers },
-    { key: "tokens", label: "Tokens", icon: Key },
-];
+const TAB_META: Record<AdminTab, { label: string; icon: LucideIcon }> = {
+    users: { label: "Users", icon: Users },
+    projects: { label: "Projects", icon: Layers },
+    tokens: { label: "Tokens", icon: Key },
+};
 
 type TabSwitcherProps = {
     activeTab: AdminTab;
@@ -39,7 +39,8 @@ export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
             // overflow of its own, so this is only about not touching the edge.
             className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-app-border/70 bg-app-surface-muted/70 p-1 backdrop-blur-md sm:flex sm:w-auto"
         >
-            {TABS.map(({ key, label, icon: Icon }) => {
+            {ADMIN_TAB_ORDER.map((key) => {
+                const { label, icon: Icon } = TAB_META[key];
                 const isActive = activeTab === key;
                 const isMagnified = !prefersReducedMotion && hoveredTab === key;
 

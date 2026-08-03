@@ -57,6 +57,8 @@ import type {
   SourceInstanceIngestionStatus,
   SourceSystem,
 } from "../features/data-ingestion/types.ts";
+import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
 import {
   getIngestionRunsPage,
   getIngestionSourceStatuses,
@@ -1151,7 +1153,13 @@ export function DataIngestionPage() {
             {shouldShowInitialLoading ? (
               <DataIngestionLoadingState />
             ) : (
-              <div className="space-y-8">
+              // Only the section content slides; the loading state above is not
+              // a section and would otherwise animate on its way in too.
+              <SlidingTabPanel
+                activeKey={activeSection}
+                index={SECTION_ORDER.indexOf(activeSection)}
+                className="space-y-8"
+              >
                 {showOverview ? (
                   <OverviewSection
                     sources={sources}
@@ -1279,8 +1287,7 @@ export function DataIngestionPage() {
                     ) : null}
                   </section>
                 ) : null}
-
-              </div>
+              </SlidingTabPanel>
             )}
           </div>
         </main>

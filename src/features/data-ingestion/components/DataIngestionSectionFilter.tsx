@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import type { SectionKey } from "../types.ts";
+import { SECTION_ORDER, type SectionKey } from "../types.ts";
 import {
   dockMagnifySpringToken,
   slidingIndicatorSpringToken,
@@ -9,10 +9,10 @@ import {
 /** Scale applied to the tab under the pointer, mirroring the sidebar dock. */
 const TAB_HOVER_SCALE = 1.06;
 
-type SectionOption = {
-  key: SectionKey;
-  label: string;
-  count?: number;
+const SECTION_LABELS: Record<SectionKey, string> = {
+  overview: "Overview",
+  sources: "Sources",
+  runs: "Runs",
 };
 
 type DataIngestionSectionFilterProps = {
@@ -41,11 +41,11 @@ export function DataIngestionSectionFilter({
   const [hoveredKey, setHoveredKey] = useState<SectionKey | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
-  const options: SectionOption[] = [
-    { key: "overview", label: "Overview" },
-    { key: "sources", label: "Sources", count: sourceCount },
-    { key: "runs", label: "Runs", count: runCount },
-  ];
+  // Overview is a dashboard over everything, so it carries no count of its own.
+  const counts: Partial<Record<SectionKey, number>> = {
+    sources: sourceCount,
+    runs: runCount,
+  };
 
   return (
     <div
@@ -56,7 +56,8 @@ export function DataIngestionSectionFilter({
       // exactly what gives the magnified tab room to grow into.
       className="inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-app-border/70 bg-app-bg-soft/70 p-1 backdrop-blur-md"
     >
-      {options.map((option) => {
+      {SECTION_ORDER.map((key) => {
+        const option = { key, label: SECTION_LABELS[key], count: counts[key] };
         const isActive = active === option.key;
         const isMagnified = !prefersReducedMotion && hoveredKey === option.key;
 

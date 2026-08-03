@@ -32,6 +32,7 @@ import { UsersTab } from "../features/admin/components/UsersTab";
 import { useAdminData } from "../features/admin/hooks/useAdminData";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { ADMIN_TAB_ORDER } from "../features/admin/types";
 import type {
   AdminProjectDetails,
   AdminTab,
@@ -39,6 +40,7 @@ import type {
   ProjectOverview,
   UserFilter,
 } from "../features/admin/types";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { adminUserService } from "../services/adminUserService";
 import { projectService } from "../services/projectService";
 
@@ -503,7 +505,14 @@ export function AdminPage() {
                   </button>
                 </div>
               </div>
-            ) : activeTab === "users" ? (
+            ) : (
+              // Only the tab content slides; the loading and error states above
+              // are not tabs and would otherwise animate on their way in too.
+              <SlidingTabPanel
+                activeKey={activeTab}
+                index={ADMIN_TAB_ORDER.indexOf(activeTab)}
+              >
+                {activeTab === "users" ? (
               <>
                 <AdminUsersToolbar
                   userCount={filteredUsers.length}
@@ -540,7 +549,7 @@ export function AdminPage() {
                   onPageChange={setPage}
                 />
               </>
-            ) : activeTab === "projects" ? (
+                ) : activeTab === "projects" ? (
               <>
                 <AdminProjectsToolbar
                   projectCount={filteredProjects.length}
@@ -556,11 +565,13 @@ export function AdminPage() {
                   onOpenProjectDetails={openProjectDetails}
                 />
               </>
-            ) : (
-              <TokensTab
-                tokenNames={tokenNames}
-                onRefresh={() => void loadTokenNames()}
-              />
+                ) : (
+                  <TokensTab
+                    tokenNames={tokenNames}
+                    onRefresh={() => void loadTokenNames()}
+                  />
+                )}
+              </SlidingTabPanel>
             )}
           </div>
         </div>
