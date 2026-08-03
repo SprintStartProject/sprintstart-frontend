@@ -16,15 +16,26 @@ import {
   Clock,
   ArrowLeft,
   Filter,
-  ArrowUpDown,
   X,
-  ChevronDown,
-  SlidersHorizontal,
   RefreshCw,
   FileText,
   User,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
+import {
+  FilterSelect,
+  type FilterSelectOption,
+} from "../../../components/ui/FilterSelect";
+import { buttonHoverMotion } from "../../../styles/tokens";
+
+type GapSortOption = "severity" | "date" | "component";
+
+const SORT_OPTIONS: FilterSelectOption<GapSortOption>[] = [
+  { value: "severity", label: "Severity" },
+  { value: "date", label: "Last updated" },
+  { value: "component", label: "Component name" },
+];
 
 // ------------------------------------------------------------------
 // PAGE
@@ -36,10 +47,7 @@ export function KnowledgeGapsPage() {
     "medium",
     "low",
   ]);
-  const [sortBy, setSortBy] = useState<
-    "severity" | "date" | "component"
-  >("severity");
-  const [expandFilters, setExpandFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<GapSortOption>("severity");
 
   const navigate = useNavigate();
 
@@ -177,119 +185,75 @@ export function KnowledgeGapsPage() {
       </section>
 
       <main className="app-page-content py-8">
-        {/* Filter & Sort Controls */}
-        <div className="mb-6 rounded-lg border border-app-border bg-app-surface">
-          {/* Header / Compact View */}
-          <button
-            onClick={() => setExpandFilters(!expandFilters)}
-            className="w-full flex items-center justify-between p-4 hover:bg-app-surface-muted transition-colors"
+        {/* Filter & sort controls. Always visible rather than behind a
+            disclosure: there are only four controls, and hiding them meant the
+            active filter state was invisible from the collapsed view. Severity
+            toggles sit on the left, the sort order is pushed to the far right
+            of the same row. */}
+        <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div
+            role="group"
+            aria-label="Filter gaps by severity"
+            className="flex flex-wrap items-center gap-2"
           >
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-app-text-muted" />
-              <span className="text-sm font-medium text-app-text">
-                Filters & Sort
-              </span>
-              <span className="text-xs text-app-text-muted ml-2">
-                ({filtered.length} of {overview.gaps.length})
-              </span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-app-text-muted transition-transform ${
-                expandFilters ? "rotate-180" : ""
-              }`}
+            <Filter aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
+
+            {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map(
+              (severity) => {
+                const isSelected = severityFilter.includes(severity);
+                const { badge, label } = SEVERITY_STYLES[severity];
+
+                return (
+                  <motion.button
+                    key={severity}
+                    type="button"
+                    // These are toggles, not a single choice -- `aria-pressed`
+                    // is what tells assistive tech which severities are
+                    // currently included.
+                    aria-pressed={isSelected}
+                    onClick={() => toggleSeverityFilter(severity)}
+                    {...buttonHoverMotion}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                      isSelected
+                        ? badge
+                        : "border border-app-border/70 bg-app-surface/70 text-app-text-muted backdrop-blur-md hover:border-app-brand-border-strong hover:text-app-text"
+                    }`}
+                  >
+                    {label}
+                  </motion.button>
+                );
+              },
+            )}
+          </div>
+
+          <span className="text-xs tabular-nums text-app-text-muted">
+            {filtered.length} of {overview.gaps.length}
+          </span>
+
+          <div className="ml-auto flex items-center gap-2">
+            {(severityFilter.length < 3 || sortBy !== "severity") && (
+              <motion.button
+                type="button"
+                onClick={() => {
+                  setSeverityFilter(["high", "medium", "low"]);
+                  setSortBy("severity");
+                }}
+                {...buttonHoverMotion}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-transparent px-2.5 text-sm font-medium text-app-brand-text transition-colors hover:border-app-brand-border hover:bg-app-surface-hover"
+              >
+                <X className="h-3.5 w-3.5" />
+                Reset
+              </motion.button>
+            )}
+
+            <FilterSelect
+              label="Sort knowledge gaps"
+              value={sortBy}
+              options={SORT_OPTIONS}
+              onChange={setSortBy}
+              className="w-48"
             />
-          </button>
-
-          {/* Expanded Content */}
-          {expandFilters && (
-            <>
-              <div className="border-t border-app-border px-4 py-4 space-y-4">
-                {/* Filters */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Filter className="w-4 h-4 text-app-text-muted" />
-                    <span className="text-sm font-medium text-app-text">
-                      Severity Filter
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map(
-                      (severity) => {
-                        const isSelected = severityFilter.includes(severity);
-                        const { badge, label } = SEVERITY_STYLES[severity];
-
-                        return (
-                          <button
-                            key={severity}
-                            onClick={() => toggleSeverityFilter(severity)}
-                            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
-                              isSelected
-                                ? badge
-                                : "bg-app-bg text-app-text-muted border border-app-border"
-                            }`}
-                          >
-                            {label}
-                            {isSelected && (
-                              <span className="ml-1">✓</span>
-                            )}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
-
-                {/* Sort Options */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <ArrowUpDown className="w-4 h-4 text-app-text-muted" />
-                    <span className="text-sm font-medium text-app-text">
-                      Sort By
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { value: "severity", label: "Severity" },
-                        { value: "date", label: "Last Updated" },
-                        { value: "component", label: "Component Name" },
-                      ] as Array<{ value: typeof sortBy; label: string }>
-                    ).map(({ value, label }) => (
-                      <button
-                        key={value}
-                        onClick={() => setSortBy(value)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
-                          sortBy === value
-                            ? "bg-app-brand text-white"
-                            : "bg-app-bg text-app-text-muted border border-app-border hover:border-app-border-strong"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Reset Button */}
-                {(severityFilter.length < 3 || sortBy !== "severity") && (
-                  <div className="flex justify-end pt-2 border-t border-app-border">
-                    <button
-                      onClick={() => {
-                        setSeverityFilter(["high", "medium", "low"]);
-                        setSortBy("severity");
-                      }}
-                      className="text-xs text-app-brand hover:text-app-brand/80 transition-colors flex items-center gap-1"
-                    >
-                      <X className="w-3 h-3" />
-                      Reset filters
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -303,7 +267,7 @@ export function KnowledgeGapsPage() {
                 onClick={() =>
                   void navigate(`/insights/knowledge-gaps/${gap.id}`)
                 }
-                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-4"
+                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
               >
                 <SeverityBar severity={gap.severity} />
 
