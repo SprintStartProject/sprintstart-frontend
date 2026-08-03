@@ -1,4 +1,4 @@
-import { Bot } from "lucide-react";
+import { SleepyBot } from "./SleepyBot";
 
 const SUGGESTIONS = [
     "How do I set up the project locally?",
@@ -20,7 +20,7 @@ export function ChatEmptyState({ onPickSuggestion }: ChatEmptyStateProps) {
     return (
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
             <div className="mb-5 rounded-3xl bg-app-brand-soft p-4 ring-1 ring-app-brand-border">
-                <Bot className="size-11 text-app-brand-text" />
+                <SleepyBot size={44} className="text-app-brand-text" />
             </div>
 
             <h1 className="mb-2 text-2xl font-bold text-app-text">

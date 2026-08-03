@@ -87,10 +87,13 @@ vi.mock('framer-motion', async (importOriginal) => {
     'h1',
     'h2',
     'p',
-    // SVG primitives: animated shapes (e.g. the rocket's exhaust flame) render
-    // as `undefined` and crash the tree if they are missing from this list.
+    // SVG primitives: animated shapes (the rocket's exhaust flame, the chat
+    // bot's eyes) render as `undefined` and crash the tree if they are missing
+    // from this list.
+    'svg',
     'path',
     'circle',
+    'rect',
     'g',
   ];
   

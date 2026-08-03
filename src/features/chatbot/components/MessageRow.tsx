@@ -1,11 +1,13 @@
 import { memo, useState } from "react";
-import { AlertCircle, Bot } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type { ChatMessage } from "../types";
 import type { SelectedCitation } from "../../../context/ChatContext";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { MessageCitations } from "./MessageCitations";
 import { CopyButton } from "./CopyButton";
+import { SleepyBot } from "./SleepyBot";
+import { BotGlyph } from "./BotGlyph";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -99,13 +101,11 @@ function MessageRowImpl({
                     isRequest ? "flex-row-reverse" : "flex-row"
                 }`}
             >
-                <div
-                    className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
-                        isRequest
-                            ? ""
-                            : "bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border"
-                    }`}
-                >
+                {/* No disc behind the bot: the drawn glyph already has a
+                    silhouette of its own, and a ring around it read as a badge
+                    holding a tiny icon rather than as a character. Losing it
+                    also frees the full 32px for the bot itself. */}
+                <div className="flex size-8 shrink-0 items-center justify-center">
                     {isRequest ? (
                         <UserAvatar
                             profileIcon={profileIcon}
@@ -114,7 +114,16 @@ function MessageRowImpl({
                             size={32}
                         />
                     ) : (
-                        <Bot size={15} className="text-app-brand-text" />
+                        // Every answer gets a bot that can doze off. Because each
+                        // one draws its own random idle window, a long thread
+                        // nods off in a ragged sequence rather than all at once.
+                        // Only the message currently receiving tokens is held
+                        // awake — that one is visibly working.
+                        <SleepyBot
+                            size={30}
+                            canSleep={message.id !== streamingMessageId}
+                            className="text-app-brand-text"
+                        />
                     )}
                 </div>
 
@@ -130,7 +139,7 @@ function MessageRowImpl({
                             className="mb-2 w-full rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted/50 text-sm shadow-sm"
                         >
                             <summary className="cursor-pointer select-none px-4 py-2 text-app-text-muted hover:text-app-text transition-colors font-medium flex items-center gap-2">
-                                <Bot size={14} />
+                                <BotGlyph size={16} stage="awake" />
                                 Thought Process
                             </summary>
                             <div className="px-4 pb-3 text-app-text-muted chat-md opacity-80">

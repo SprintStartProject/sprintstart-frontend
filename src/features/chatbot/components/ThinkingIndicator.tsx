@@ -1,4 +1,4 @@
-import { Bot } from "lucide-react";
+import { BotGlyph } from "./BotGlyph";
 import { DinoGame } from "./DinoGame";
 import { THINKING_LABELS, type ThinkingState } from "../constants";
 
@@ -49,8 +49,8 @@ export function ThinkingIndicator({
     if (gameActive) {
         return (
             <div className="flex w-full gap-3" role="status">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border">
-                    <Bot size={15} className="text-app-brand-text" />
+                <div className="flex size-8 shrink-0 items-center justify-center">
+                    <BotGlyph size={30} stage="awake" className="text-app-brand-text" />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -69,8 +69,8 @@ export function ThinkingIndicator({
 
     return (
         <div className="flex w-full gap-3" role="status">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft shadow-sm ring-1 ring-app-brand-border">
-                <Bot size={15} className="text-app-brand-text" />
+            <div className="flex size-8 shrink-0 items-center justify-center">
+                <BotGlyph size={30} stage="awake" className="text-app-brand-text" />
             </div>
 
             <div className="flex flex-col items-start max-w-[85%]">
