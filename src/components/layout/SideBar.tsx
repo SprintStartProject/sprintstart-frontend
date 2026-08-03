@@ -1,26 +1,23 @@
-import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-    BookOpen,
-    Briefcase,
-    ChartColumn,
-    Database,
-    LogOut,
-    Menu,
-    MessageSquare,
-    Rocket,
-    Settings,
-    Terminal,
-    X,
-} from 'lucide-react';
+import { LogOut, Menu, Settings, X } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
 import { useAuth } from '../../context/useAuth';
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../auth/accessPolicy';
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
 import { usePmAttentionFlag } from '../../features/team-management/usePmAttentionFlag';
+import {
+    AdminIcon,
+    ChatIcon,
+    DashboardIcon,
+    DataIngestionIcon,
+    KnowledgeBaseIcon,
+    OnboardingIcon,
+    PmDashboardIcon,
+    type SidebarIcon,
+} from './SidebarNavIcons';
 import { SidebarLogo } from './SidebarLogo';
 import { SidebarNavLink } from './SidebarNavLink';
 import { hoverSpringToken } from '../../styles/tokens';
@@ -28,7 +25,11 @@ import { hoverSpringToken } from '../../styles/tokens';
 type SidebarNavItem = {
     label: string;
     path: AppRoute;
-    icon: ReactNode;
+    /**
+     * A component rather than an element: each icon needs to know when its
+     * entry becomes the current route so it can play its animation once.
+     */
+    icon: SidebarIcon;
 };
 
 type SidebarContentProps = {
@@ -45,22 +46,22 @@ const navItems: SidebarNavItem[] = [
     {
         label: 'Dashboard',
         path: '/',
-        icon: <ChartColumn className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: DashboardIcon,
     },
     {
         label: 'Chat',
         path: '/chat',
-        icon: <MessageSquare className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: ChatIcon,
     },
     {
         label: 'Knowledge Base',
         path: '/knowledge-base',
-        icon: <BookOpen className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: KnowledgeBaseIcon,
     },
     {
         label: 'OnBoarding',
         path: '/onboarding',
-        icon: <Rocket className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: OnboardingIcon,
     },
 ];
 
@@ -68,12 +69,12 @@ const projectManagerNavItems: SidebarNavItem[] = [
     {
         label: 'PM Dashboard',
         path: '/pm-dashboard',
-        icon: <Briefcase className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: PmDashboardIcon,
     },
     {
         label: 'Data Ingestion',
         path: '/data-ingestion',
-        icon: <Database className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: DataIngestionIcon,
     },
 ];
 
@@ -81,7 +82,7 @@ const adminNavItems: SidebarNavItem[] = [
     {
         label: 'Access Management',
         path: '/admin',
-        icon: <Terminal className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: AdminIcon,
     },
 ];
 

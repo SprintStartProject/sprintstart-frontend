@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
+import type { SidebarIcon } from './SidebarNavIcons';
 import { dockMagnifySpringToken, slidingIndicatorSpringToken } from '../../styles/tokens';
 
 /**
@@ -15,7 +15,7 @@ const DOCK_HOVER_SCALE = 1.12;
 type SidebarNavLinkProps = {
     to: string;
     label: string;
-    icon: ReactNode;
+    icon: SidebarIcon;
     /** Matches the route exactly (used for the `/` dashboard entry). */
     end?: boolean;
     /**
@@ -60,7 +60,7 @@ function getLinkStateClass(isHighlighted: boolean): string {
 export function SidebarNavLink({
     to,
     label,
-    icon,
+    icon: Icon,
     end,
     indicatorLayoutId,
     forceActive = false,
@@ -151,7 +151,7 @@ export function SidebarNavLink({
                                               : 'text-app-text-muted group-hover:text-app-text'
                                     }`}
                                 >
-                                    {icon}
+                                    <Icon isActive={isHighlighted} />
 
                                     {/* The movement is the whole signal here,
                                         and movement is invisible to a screen
