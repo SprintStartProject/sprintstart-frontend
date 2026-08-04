@@ -70,6 +70,19 @@ export function isSkillLinkedToRole(skill: Skill, roleId: string): boolean {
      level: SkillLevel;
  };
 
+export type TeamManagementTab = 'members' | 'roles';
+
+/**
+ * Left-to-right order of the Team Management tabs. Single source of truth:
+ * `TeamManagementTabSwitcher` renders in this order and `TeamManagementPage`
+ * derives the slide direction from it, so the content always travels the same
+ * way the active pill does.
+ */
+export const TEAM_MANAGEMENT_TAB_ORDER: TeamManagementTab[] = [
+    'members',
+    'roles',
+];
+
 export type TeamOverviewFilters = {
     roleId: string;
     sortBy:
