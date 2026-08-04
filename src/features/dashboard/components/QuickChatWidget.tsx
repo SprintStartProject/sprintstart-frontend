@@ -1,7 +1,8 @@
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { ChatContext } from "../../../context/ChatContext";
 import { centralSpringToken } from "../../../styles/tokens";
 
@@ -41,28 +42,40 @@ export function QuickChatWidget() {
     }
 
     return (
-        <div className="relative overflow-hidden rounded-3xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
+        <div className="relative rounded-3xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
+            {/* The clip lives on this layer rather than on the card itself, so
+                the glow blobs stay inside the rounded edge while the content
+                above is free to leave it — which is how the bot's Z's get to
+                drift off the widget. */}
             <div
                 aria-hidden="true"
-                className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full opacity-15 blur-3xl"
-                style={{ background: "var(--progress-fill-end)" }}
-            />
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-app-brand/12 blur-3xl"
-            />
+                className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl"
+            >
+                <div
+                    className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full opacity-15 blur-3xl"
+                    style={{ background: "var(--progress-fill-end)" }}
+                />
+                <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-app-brand/12 blur-3xl" />
+            </div>
 
             <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center">
-                <div className="flex items-center gap-3 lg:w-56 lg:shrink-0">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-                        <Sparkles className="h-5 w-5" />
+                {/* Stacked and centred rather than a row: at this size the bot
+                    is the subject of the widget, not a bullet point in front of
+                    a label, and a 76px character with text beside it drags the
+                    baseline off-centre. */}
+                <div className="flex flex-col items-center gap-3 text-center lg:w-56 lg:shrink-0">
+                    {/* The same assistant as in the chat, idle timer and all —
+                        so the character is one creature that follows you around
+                        rather than a different mascot per screen. */}
+                    <span className="text-app-brand-text">
+                        <SleepyBot size={76} tracksPointer />
                     </span>
 
                     <div className="min-w-0">
                         <p className="font-semibold text-app-text">
                             Ask the AI assistant
                         </p>
-                        <p className="truncate text-xs text-app-text-muted">
+                        <p className="text-xs text-app-text-muted">
                             Continue in chat
                         </p>
                     </div>

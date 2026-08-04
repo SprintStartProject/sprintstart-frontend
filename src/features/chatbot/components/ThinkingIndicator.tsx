@@ -50,7 +50,7 @@ export function ThinkingIndicator({
         return (
             <div className="flex w-full gap-3" role="status">
                 <div className="flex size-8 shrink-0 items-center justify-center">
-                    <BotGlyph size={30} stage="awake" className="text-app-brand-text" />
+                    <BotGlyph size={30} state="cheering" className="text-app-brand-text" />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -70,7 +70,7 @@ export function ThinkingIndicator({
     return (
         <div className="flex w-full gap-3" role="status">
             <div className="flex size-8 shrink-0 items-center justify-center">
-                <BotGlyph size={30} stage="awake" className="text-app-brand-text" />
+                <BotGlyph size={30} state="thinking" className="text-app-brand-text" />
             </div>
 
             <div className="flex flex-col items-start max-w-[85%]">

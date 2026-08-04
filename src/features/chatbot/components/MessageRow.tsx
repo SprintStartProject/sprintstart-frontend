@@ -139,7 +139,7 @@ function MessageRowImpl({
                             className="mb-2 w-full rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted/50 text-sm shadow-sm"
                         >
                             <summary className="cursor-pointer select-none px-4 py-2 text-app-text-muted hover:text-app-text transition-colors font-medium flex items-center gap-2">
-                                <BotGlyph size={16} stage="awake" />
+                                <BotGlyph size={16} state="awake" />
                                 Thought Process
                             </summary>
                             <div className="px-4 pb-3 text-app-text-muted chat-md opacity-80">
