@@ -1,8 +1,11 @@
 import { ChevronRight, Plus } from "lucide-react";
-import { formatNumber } from "../data.ts";
+import {
+  deriveConnectionStatus,
+  deriveSyncStatus,
+  formatNumber,
+} from "../data.ts";
 import type { DataSource } from "../types.ts";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
-import { SourceSyncBadge } from "./SourceSyncBadge.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
 type SourceListProps = {
@@ -91,9 +94,9 @@ export function SourceList({
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <SourceTypeBadge type={source.type} />
 
-                      <SourceStatusChip status={source.statusView} />
+                      <SourceStatusChip status={deriveConnectionStatus(source)} />
 
-                      <SyncStatusBadge source={source} />
+                      <SourceStatusChip status={deriveSyncStatus(source)} />
                     </div>
                   </div>
                 </div>
@@ -153,18 +156,6 @@ export function SourceList({
  * Hides the sync badge when it would only repeat the status chip's own label
  * (e.g. an in-flight "Syncing"/"Running" pair, or a duplicated "Not synced").
  */
-function SyncStatusBadge({ source }: { source: DataSource }) {
-  const label = source.ingestionStatusLabel;
-
-  if (
-    source.statusView.state === "syncing" ||
-    label === source.statusView.label
-  ) {
-    return null;
-  }
-
-  return <SourceSyncBadge label={label} status={source.ingestionStatus} />;
-}
 
 function InfoBlock({
   label,

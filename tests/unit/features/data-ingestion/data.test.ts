@@ -5,6 +5,8 @@ import {
   INGESTION_RUN_LIMIT,
   DETAILS_RUN_LIMIT,
   createJiraSourceFromInstance,
+  deriveConnectionStatus,
+  deriveSyncStatus,
   getSourceStatus,
   getSourceStatusLabel,
   getRunStatusLabel,
@@ -323,6 +325,73 @@ describe("data-ingestion data helpers", () => {
 
       expect(source.statusView.label).toBe("Connector disabled");
       expect(source.ingestionStatusLabel).toBe("Synced");
+    });
+  });
+
+  describe("deriveConnectionStatus / deriveSyncStatus", () => {
+    const jiraStatus = (
+      overrides: Partial<SourceInstanceIngestionStatus> = {},
+    ): SourceInstanceIngestionStatus =>
+      ({
+        sourceSystem: "JIRA",
+        sourceId: "https://acme.atlassian.net",
+        displayName: "Team board",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://acme.atlassian.net",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-28T10:00:00Z",
+        ingestedCount: 42,
+        updatedCount: 3,
+        deletedCount: 1,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 128,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: "2026-07-28T10:00:00Z",
+        lastPullRequestsSyncAt: null,
+        ...overrides,
+      }) as SourceInstanceIngestionStatus;
+
+    it("shows Connected next to a spinning Syncing badge while a sync runs", () => {
+      const source = createJiraSourceFromInstance(
+        jiraStatus({ connectionStatus: "UPDATING" }),
+      );
+
+      const connection = deriveConnectionStatus(source);
+      const sync = deriveSyncStatus(source);
+
+      expect(connection.label).toBe("Connected");
+      expect(connection.spinning).toBe(false);
+      expect(sync.label).toBe("Syncing");
+      expect(sync.spinning).toBe(true);
+    });
+
+    it("shows Connected next to Synced when healthy and idle", () => {
+      const source = createJiraSourceFromInstance(jiraStatus());
+
+      expect(deriveConnectionStatus(source).label).toBe("Connected");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
+    });
+
+    it("shows Disabled while keeping the last sync freshness", () => {
+      const source = createJiraSourceFromInstance(
+        jiraStatus({ enabled: false }),
+      );
+
+      expect(deriveConnectionStatus(source).state).toBe("disabled");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
+    });
+
+    it("shows Connected next to Not synced before the first run", () => {
+      const source = createJiraSourceFromInstance(
+        jiraStatus({ lastRunTime: null }),
+      );
+
+      expect(deriveConnectionStatus(source).label).toBe("Connected");
+      expect(deriveSyncStatus(source).label).toBe("Not synced");
     });
   });
 });

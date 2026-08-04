@@ -336,6 +336,70 @@ export function deriveSourceStatus({
   };
 }
 
+/**
+ * Splits a source's merged {@link deriveSourceStatus} presentation into the two
+ * badges every source card and details drawer shows: a connection badge and a
+ * sync-status badge. Splitting here (rather than per connector) keeps GitHub and
+ * Jira identical — both always show "Connected/Disabled" next to the live sync
+ * status — instead of one collapsing to a single "Syncing" chip.
+ *
+ * The connection badge answers "is this source linked and enabled?". Only a
+ * disabled source (or one under a disabled connector) reads as not-connected;
+ * syncing, out-of-date and needs-attention are all still connected states.
+ */
+export function deriveConnectionStatus(
+  source: DataSource,
+): SourceStatusPresentation {
+  if (source.statusView.state === "disabled") {
+    return source.statusView;
+  }
+
+  return {
+    state: "connected",
+    label: "Connected",
+    icon: CheckCircle2,
+    tone: "success",
+    spinning: false,
+  };
+}
+
+/**
+ * The sync-status half of the badge pair (see {@link deriveConnectionStatus}):
+ * the live ingestion activity and freshness, keeping the spinner while a sync is
+ * in flight. Syncing, out-of-date and attention already describe the sync, so
+ * they pass through; the connection states (connected/disabled) collapse to the
+ * freshness the source last reached — "Synced" once it has run, else "Not synced".
+ */
+export function deriveSyncStatus(
+  source: DataSource,
+): SourceStatusPresentation {
+  const view = source.statusView;
+
+  if (
+    view.state === "syncing" ||
+    view.state === "stale" ||
+    view.state === "attention"
+  ) {
+    return view;
+  }
+
+  return source.lastRunAt !== null
+    ? {
+        state: "connected",
+        label: "Synced",
+        icon: CheckCircle2,
+        tone: "success",
+        spinning: false,
+      }
+    : {
+        state: "attention",
+        label: "Not synced",
+        icon: AlertTriangle,
+        tone: "danger",
+        spinning: false,
+      };
+}
+
 export function getSourceStatusLabel(
   hasNeverSynced: boolean,
   hasErrors: boolean,

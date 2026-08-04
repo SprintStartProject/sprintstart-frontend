@@ -21,11 +21,16 @@ import type {
   ConfigureJiraInstanceRequest,
   GetJiraInstanceConfigResponse,
 } from "../../../services/sources/jiraService.ts";
-import { formatDateTime, formatNumber, SOURCE_META } from "../data.ts";
+import {
+  deriveConnectionStatus,
+  deriveSyncStatus,
+  formatDateTime,
+  formatNumber,
+  SOURCE_META,
+} from "../data.ts";
 import type { DataSource, LoadingState } from "../types.ts";
 import { GithubRepositorySyncSettings } from "./GithubRepositorySyncSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
-import { SourceSyncBadge } from "./SourceSyncBadge.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
 type SourceDetailsPanelProps = {
@@ -324,15 +329,10 @@ export function SourceDetailsPanel({
       badge={
         <>
           <SourceTypeBadge type={source.type} />
-          <SourceStatusChip status={source.statusView} />
-          {/* The chip conveys connection state; this adds the sync freshness it
-              collapses away, matching the pair shown on the source cards. */}
-          {source.ingestionStatusLabel !== source.statusView.label && (
-            <SourceSyncBadge
-              label={source.ingestionStatusLabel}
-              status={source.ingestionStatus}
-            />
-          )}
+          {/* Two badges, identical for every connector: whether the source is
+              connected/enabled, and its live sync status (spinner while syncing). */}
+          <SourceStatusChip status={deriveConnectionStatus(source)} />
+          <SourceStatusChip status={deriveSyncStatus(source)} />
         </>
       }
       footer={
