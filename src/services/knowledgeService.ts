@@ -39,6 +39,26 @@ export const knowledgeService = {
      * @param limit Maximum number of artifacts to return.
      * @returns The first page of artifacts, or an empty array on failure.
      */
+    /**
+     * Whether the project has anything ingested yet.
+     *
+     * Asks for a single artifact rather than counting: the caller only needs to
+     * know whether the set is empty.
+     *
+     * Deliberately lets failures propagate, unlike `getRecentArtifacts`, which
+     * returns `[]` on error. Callers use this to decide whether to *hide* UI, and
+     * a swallowed error would make a brief outage indistinguishable from an empty
+     * project — quietly removing navigation that should be there. An error must
+     * stay tellable apart from a genuine "nothing here".
+     */
+    async hasIngestedContent(projectId: string): Promise<boolean> {
+        const response = await apiClient.fetch<{ items?: Artifact[] }>(
+            `/api/v1/projects/${projectId}/artifacts?page=1&size=1`,
+        );
+
+        return (response.items?.length ?? 0) > 0;
+    },
+
     async getRecentArtifacts(projectId: string, limit = 4): Promise<Artifact[]> {
         try {
             const response = await apiClient.fetch<{ items?: Artifact[] }>(

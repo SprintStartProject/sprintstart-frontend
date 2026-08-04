@@ -83,9 +83,31 @@ describe('accessPolicy', () => {
             expect(isOnboardingAccessible(profile)).toBe(false);
         });
 
-        it('is true when the user has not completed onboarding', () => {
-            const profile = { ...createMockProfile(PermissionGroup.USER), hasCompletedOnboarding: false };
+        it('is true when the user has not completed onboarding and holds a role', () => {
+            const profile = {
+                ...createMockProfile(PermissionGroup.USER),
+                hasCompletedOnboarding: false,
+                projectRoles: [{ id: 'role-1', name: 'Backend Engineer' }],
+            };
             expect(isOnboardingAccessible(profile)).toBe(true);
+        });
+
+        it('is false before a role is assigned, because no path exists yet', () => {
+            const profile = {
+                ...createMockProfile(PermissionGroup.USER),
+                hasCompletedOnboarding: false,
+                projectRoles: [],
+            };
+            expect(isOnboardingAccessible(profile)).toBe(false);
+        });
+
+        it('stays false once completed, even while a role is still held', () => {
+            const profile = {
+                ...createMockProfile(PermissionGroup.USER),
+                hasCompletedOnboarding: true,
+                projectRoles: [{ id: 'role-1', name: 'Backend Engineer' }],
+            };
+            expect(isOnboardingAccessible(profile)).toBe(false);
         });
 
         it('is false when profile is null', () => {

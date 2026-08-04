@@ -5,7 +5,19 @@ import { MemoryRouter } from 'react-router-dom';
 import { DashboardPage } from '../../../src/pages/DashboardPage';
 
 vi.mock('../../../src/context/useAuth', () => ({
-    useAuth: () => ({ profile: { firstName: 'Test', username: 'Test', email: 'test@test.com' } })
+    // `projectRoles` is not optional on `UserProfile`, and the access policy
+    // reads it while rendering — a partial fake here takes the whole tree down
+    // rather than failing an assertion.
+    useAuth: () => ({
+        profile: {
+            firstName: 'Test',
+            username: 'Test',
+            email: 'test@test.com',
+            projectRoles: [],
+            projectIds: [],
+            hasCompletedOnboarding: false,
+        },
+    }),
 }));
 
 describe('DashboardPage Accessibility', () => {
