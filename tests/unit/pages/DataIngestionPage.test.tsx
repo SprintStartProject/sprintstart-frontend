@@ -270,6 +270,72 @@ describe('DataIngestionPage', () => {
         expect(mockGetJiraInstances).toHaveBeenCalledWith('proj1');
     });
 
+    it('does not double a Jira instance that is also exposed as a project source', async () => {
+        // The backend now exposes connected Jira instances as project sources
+        // (for the admin/project source lists), so the accessible-project list
+        // contains the instance too. Jira cards are built solely from the
+        // connector-neutral status rows, so the project source must not add a
+        // second card for the same instance.
+        mockGetAccessibleProject.mockResolvedValue({
+            id: 'proj1',
+            name: 'Project Alpha',
+            description: '',
+            manager: null,
+            sources: [
+                {
+                    id: 'https://team.atlassian.net',
+                    name: 'Team board',
+                    type: 'JIRA',
+                    status: 'CONNECTED',
+                },
+            ],
+            users: [],
+        });
+        mockGetIngestionSourceStatuses.mockResolvedValue([
+            {
+                sourceSystem: 'JIRA',
+                sourceId: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                repositoryId: null,
+                owner: null,
+                name: null,
+                sourceUrl: 'https://team.atlassian.net',
+                connectionStatus: 'CONNECTED',
+                enabled: true,
+                lastRunTime: '2026-07-01T00:00:00Z',
+                ingestedCount: 5,
+                updatedCount: 2,
+                deletedCount: 0,
+                failedCount: 0,
+                failedItems: [],
+                artifactCount: 128,
+                lastCommitsSyncAt: null,
+                lastIssuesSyncAt: '2026-07-01T00:00:00Z',
+                lastPullRequestsSyncAt: null,
+            },
+        ]);
+        mockGetJiraInstances.mockResolvedValue([
+            {
+                instanceUrl: 'https://team.atlassian.net',
+                displayName: 'Team board',
+                lastUpdate: '2026-07-01T00:00:00Z',
+                projectIds: ['proj1'],
+                sourceEnabled: true,
+                status: 'UP_TO_DATE',
+                updateCredentialName: 'default',
+                updateCredentialUserEmail: 'jira@corp.com',
+            },
+        ]);
+
+        render(<MemoryRouter><DataIngestionPage /></MemoryRouter>);
+
+        // The overview KPI counts the single connected source, not two.
+        const connectedSourcesKpi = await screen.findByRole('button', {
+            name: /connected sources/i,
+        });
+        expect(within(connectedSourcesKpi).getByText('1')).toBeInTheDocument();
+    });
+
     it('filters the run history to a Jira instance via sourceRef', async () => {
         // A GitHub repo (repositoryId) and a Jira instance (URL) together offer
         // two options in the source filter, so the dropdown appears.

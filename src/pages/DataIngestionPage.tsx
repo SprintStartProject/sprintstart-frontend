@@ -221,7 +221,9 @@ function githubRepositoryFromInstance(
  * the authoritative source of the repository identity, health, counters, total
  * artifact count, enabled flag and per-type sync times — no longer reconstructed
  * from artifact metadata. Sources without a per-repo row (uploads, or an
- * unresolvable repo) fall back to their source system's latest run.
+ * unresolvable repo) fall back to their source system's latest run. Jira sources
+ * are skipped here and built separately from the connector-neutral status rows,
+ * so a project source list that includes Jira instances does not double them.
  */
 function buildProjectDataSources(
   projectSources: ProjectSource[],
@@ -261,6 +263,13 @@ function buildProjectDataSources(
   return projectSources.flatMap((projectSource): DataSource[] => {
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
+
+    // Jira cards are built solely from the connector-neutral status rows (the
+    // `jiraSources` path on the page), which carry Jira's authoritative health
+    // and counters. The project source list now also exposes Jira instances
+    // (for the admin/project-scoped source lists), so emitting a card here too
+    // would double every connected Jira instance.
+    if (sourceSystem === "JIRA") return [];
 
     const meta = SOURCE_META[sourceSystem];
     const latestRun = latestRunBySource.get(sourceSystem);
