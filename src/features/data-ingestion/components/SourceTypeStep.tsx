@@ -5,9 +5,9 @@ import type { SourceSystem } from "../types.ts";
  * Source-type picker used by the "Add source" wizard and the project-creation
  * wizard. Each card carries its own description so the differences between the
  * options -- the actual decision being made here -- are visible. Which
- * connectors count as available depends on the context (`availableTypes`): the
- * "Add source" modal supports all of them, while the project-creation wizard
- * only wires GitHub, so the rest get a "Soon" badge there.
+ * connectors count as available depends on the context (`availableTypes`): both
+ * wizards now wire GitHub, Jira and Upload, but any connector left out of
+ * `availableTypes` still renders with a "Soon" badge instead of being hidden.
  */
 export function SourceTypeStep({
   selectedType,
@@ -85,26 +85,6 @@ export function SourceTypeStep({
           })}
         </div>
       </div>
-    </div>
-  );
-}
-
-export function ComingSoonStep({ sourceSystem }: { sourceSystem: SourceSystem }) {
-  const meta = SOURCE_META[sourceSystem];
-  const Icon = meta.icon;
-
-  return (
-    <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-app-bg-soft">
-        <Icon className="h-6 w-6 text-app-text-muted" />
-      </div>
-      <p className="mt-4 text-base font-semibold text-app-text">
-        {meta.type} connection is coming soon
-      </p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-app-text-muted">
-        {meta.description} This source type isn&apos;t available to connect yet —
-        for now you can connect GitHub repositories.
-      </p>
     </div>
   );
 }
