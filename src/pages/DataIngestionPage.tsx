@@ -1492,7 +1492,7 @@ export function DataIngestionPage() {
                       runs={runs}
                       selectedRunId={selectedRunId}
                       onSelectRun={setSelectedRunSnapshot}
-                      sourceLabelByRunId={runSourceLabels}
+                      sourceLabelBySourceRef={runSourceLabels}
                       isFiltered={isRunFilterActive}
                     />
 

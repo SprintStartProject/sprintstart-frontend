@@ -353,7 +353,7 @@ describe("data-ingestion data helpers", () => {
         lastIssuesSyncAt: "2026-07-28T10:00:00Z",
         lastPullRequestsSyncAt: null,
         ...overrides,
-      }) as SourceInstanceIngestionStatus;
+      });
 
     it("shows Connected next to a spinning Syncing badge while a sync runs", () => {
       const source = createJiraSourceFromInstance(

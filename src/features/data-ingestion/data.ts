@@ -490,15 +490,26 @@ export function getSourceLabel(sourceSystem: SourceSystem) {
 }
 
 /**
- * Maps each ingestion run to the connected source it produced artifacts for, so
- * run lists can show the repository (e.g. "sprintstart-frontend") instead of the
- * generic source-system label ("GitHub").
+ * The host of a Jira instance URL without the scheme, e.g.
+ * `"acme.atlassian.net"` for `"https://acme.atlassian.net"`. Falls back to
+ * stripping the scheme/trailing slash by hand if the value is not a valid URL.
+ */
+export function formatJiraInstanceDomain(instanceUrl: string): string {
+  try {
+    return new URL(instanceUrl).host;
+  } catch {
+    return instanceUrl.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  }
+}
+
+/**
+ * Maps a run's source reference (the run's `sourceId`) to the connected source's
+ * friendly display name, so run lists can show that name instead of the raw
+ * reference — most visibly for Jira, whose `sourceId` is the instance URL.
  *
- * The backend does not yet persist a source instance on a run (see
- * backend-ingestion-source-instance-issue.md), so the association is recovered
- * from the source's `runIds`, which are collected from the artifacts each run
- * ingested. Runs that produced no artifacts (empty/failed) won't be in the map
- * and fall back to the source-system label.
+ * Keyed by the same value the run carries in `sourceId`: GitHub `"owner/name"`
+ * (the repository's full name) and Jira the instance URL. Runs whose source is
+ * no longer connected won't be in the map and fall back to the raw reference.
  */
 export function buildRunSourceLabels(
   sources: DataSource[],
@@ -506,31 +517,31 @@ export function buildRunSourceLabels(
   const labels = new Map<string, string>();
 
   sources.forEach((source) => {
-    source.runIds.forEach((runId) => {
-      if (!labels.has(runId)) {
-        labels.set(runId, source.name);
-      }
-    });
+    const ref =
+      source.jiraInstance?.instanceUrl ?? source.githubRepository?.fullName;
+    if (ref && !labels.has(ref)) {
+      labels.set(ref, source.name);
+    }
   });
 
   return labels;
 }
 
 /**
- * Repository label for a run. Prefers the repository identity the backend now
- * persists on the run itself (`sourceId` = "owner/name"), falling back to the
- * artifact-derived {@link buildRunSourceLabels} map for legacy runs that predate
- * that field, and finally to the source-system label.
+ * Display label for a run. Prefers the connected source's friendly display name
+ * (resolved from the run's `sourceId` via {@link buildRunSourceLabels}), falling
+ * back to the raw `sourceId` the backend persists on the run, and finally to the
+ * source-system label for uploads and legacy runs that carry no `sourceId`.
  */
 export function getRunSourceLabel(
   run: IngestionRun,
-  labelByRunId?: Map<string, string>,
+  labelBySourceRef?: Map<string, string>,
 ) {
-  return (
-    run.sourceId ??
-    labelByRunId?.get(run.runId) ??
-    getSourceLabel(run.sourceSystem)
-  );
+  if (run.sourceId) {
+    return labelBySourceRef?.get(run.sourceId) ?? run.sourceId;
+  }
+
+  return getSourceLabel(run.sourceSystem);
 }
 
 export function formatDateTime(value: string | null) {

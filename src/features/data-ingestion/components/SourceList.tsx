@@ -2,6 +2,7 @@ import { ChevronRight, Plus } from "lucide-react";
 import {
   deriveConnectionStatus,
   deriveSyncStatus,
+  formatJiraInstanceDomain,
   formatNumber,
 } from "../data.ts";
 import type { DataSource } from "../types.ts";
@@ -88,6 +89,12 @@ export function SourceList({
                     {source.githubRepository?.owner && (
                       <p className="mt-0.5 break-words text-xs text-app-text-subtle">
                         {source.githubRepository.owner}
+                      </p>
+                    )}
+
+                    {source.jiraInstance?.instanceUrl && (
+                      <p className="mt-0.5 break-words text-xs text-app-text-subtle">
+                        {formatJiraInstanceDomain(source.jiraInstance.instanceUrl)}
                       </p>
                     )}
 
