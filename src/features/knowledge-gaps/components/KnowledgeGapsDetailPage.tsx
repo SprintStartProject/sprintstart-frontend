@@ -4,6 +4,8 @@
 // ============================================================
 
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { buttonHoverMotion, hoverSpringToken } from "../../../styles/tokens";
 import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { getTeamOverview } from "../../../services/teamManagementService";
@@ -76,12 +78,13 @@ export function KnowledgeGapsDetailPage() {
           <p className="text-sm text-app-text-muted mb-6">
             This knowledge gap may no longer exist.
           </p>
-          <button
+          <motion.button
             onClick={() => void navigate(-1)}
-            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
+            {...buttonHoverMotion}
+            className="rounded-xl bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
           >
             Go back
-          </button>
+          </motion.button>
         </div>
       </div>
     );
@@ -123,13 +126,16 @@ export function KnowledgeGapsDetailPage() {
       {/* ── HEADER ──────────────────────────────────────── */}
       <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-content py-4">
-          <button
+          <motion.button
             onClick={() => void navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text transition-colors mb-4"
+            whileHover={{ x: -3 }}
+            whileTap={{ scale: 0.97 }}
+            transition={hoverSpringToken}
+            className="mb-4 flex items-center gap-1.5 text-sm text-app-text-muted transition-colors hover:text-app-text"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
-          </button>
+          </motion.button>
 
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -153,7 +159,7 @@ export function KnowledgeGapsDetailPage() {
       <main className="app-page-content py-8 pb-24 space-y-4">
 
         {/* Severity + stats hero */}
-        <div className={`rounded-2xl border bg-app-surface p-5 ${ring}`}>
+        <div className={`rounded-2xl border bg-app-surface/70 p-5 backdrop-blur-md ${ring}`}>
           {/* Severity bar full width */}
           <div className="h-1.5 rounded-full bg-app-border mb-4 overflow-hidden">
             <div
@@ -193,7 +199,7 @@ export function KnowledgeGapsDetailPage() {
 
         {/* Present types */}
         {gap.presentTypes && gap.presentTypes.length > 0 && (
-          <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+          <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
               <FileCheck className="w-3.5 h-3.5" />
               Present document types
@@ -212,7 +218,7 @@ export function KnowledgeGapsDetailPage() {
         )}
 
         {/* Missing types */}
-        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+        <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
             <ShieldAlert className="w-3.5 h-3.5" />
             Missing documentation types
@@ -230,7 +236,7 @@ export function KnowledgeGapsDetailPage() {
         </div>
 
         {/* Owner */}
-        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+        <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
             <User className="w-3.5 h-3.5" />
             Owner
@@ -292,7 +298,7 @@ export function KnowledgeGapsDetailPage() {
         </div>
 
         {/* Data source */}
-        <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+        <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-3">
             <Database className="w-3.5 h-3.5" />
             Data source
@@ -315,13 +321,14 @@ export function KnowledgeGapsDetailPage() {
                 Last analyzed {formatDateTime(gap.refreshedAt)}
               </div>
             </div>
-            <button
+            <motion.button
               onClick={() => void navigate("/data-ingestion")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all shrink-0"
+              {...buttonHoverMotion}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
             >
               <Database className="w-4 h-4" />
               Update data source
-            </button>
+            </motion.button>
           </div>
           {isStale && (
             <div className="mt-3 flex items-center gap-2 text-xs text-app-warning-text bg-app-warning-bg border border-app-warning-border rounded-lg px-3 py-2">

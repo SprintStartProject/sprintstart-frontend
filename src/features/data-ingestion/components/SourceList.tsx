@@ -1,4 +1,6 @@
 import { ChevronRight, Plus } from "lucide-react";
+import { motion } from "framer-motion";
+import { buttonHoverMotion } from "../../../styles/tokens.ts";
 import { formatNumber } from "../data.ts";
 import type { DataSource } from "../types.ts";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
@@ -39,14 +41,15 @@ export function SourceList({
           </p>
 
           {onAddSource && (
-            <button
+            <motion.button
               type="button"
               onClick={onAddSource}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover"
+              {...buttonHoverMotion}
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
             >
               <Plus className="h-4 w-4" />
               Add sources
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
@@ -64,10 +67,13 @@ export function SourceList({
             key={source.sourceId}
             type="button"
             onClick={() => onSelectSource(source.sourceId)}
-            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg sm:p-6 ${
+            // Same hover language as the dashboard widgets: a small lift, a
+            // brand-coloured edge and a shadow, so "this is clickable" reads
+            // identically wherever it appears in the app.
+            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg motion-reduce:hover:translate-y-0 sm:p-6 ${
               isSelected
                 ? "border-app-brand shadow-sm"
-                : "border-app-border hover:border-app-brand-border"
+                : "border-app-border hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg"
             }`}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

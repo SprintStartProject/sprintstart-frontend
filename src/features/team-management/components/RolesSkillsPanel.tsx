@@ -8,7 +8,9 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Badge } from '../../../components/ui/Badge';
+import { buttonHoverMotion, hoverSpringToken } from '../../../styles/tokens';
 import { ProjectRolesModal } from './ProjectRolesModal';
 import { getProjectRoles, getSkills } from '../../../services/teamManagementService';
 import { isSkillLinkedToRole } from '../types';
@@ -102,17 +104,18 @@ export function RolesSkillsPanel({
                         </h3>
                     </div>
 
-                    <button
+                    <motion.button
                         type="button"
                         onClick={() => {
                             setRolesModalOpen(true);
                             onModalOpenChange?.(true);
                         }}
-                        className="flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border px-2.5 py-1 text-xs text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:text-app-text"
+                        {...buttonHoverMotion}
+                        className="flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border px-2.5 py-1 text-xs text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:text-app-text"
                     >
                         <Settings className="h-3.5 w-3.5" />
                         Manage
-                    </button>
+                    </motion.button>
                 </div>
 
                 <p className="mb-3 text-xs leading-relaxed text-app-text-muted">
@@ -134,10 +137,10 @@ export function RolesSkillsPanel({
                         return (
                             <div
                                 key={role.id}
-                                className={`rounded-xl border transition-colors ${
+                                className={`rounded-xl border transition-all duration-200 motion-reduce:hover:scale-100 ${
                                     isAssigning
                                         ? 'border-app-brand bg-app-brand-soft'
-                                        : 'border-app-border bg-app-surface'
+                                        : 'border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-md'
                                 }`}
                             >
                                 <div className="flex items-center gap-1 px-2 py-1.5">
@@ -183,14 +186,17 @@ export function RolesSkillsPanel({
                                             </button>
                                         </div>
                                     ) : (
-                                        <button
+                                        <motion.button
                                             type="button"
                                             onClick={() => onStartAssign(role.id)}
                                             aria-label={`Assign ${role.name} to members`}
+                                            whileHover={{ scale: 1.15 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            transition={hoverSpringToken}
                                             className="shrink-0 rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-brand-soft hover:text-app-brand-text"
                                         >
                                             <UserPlus className="h-3.5 w-3.5" />
-                                        </button>
+                                        </motion.button>
                                     )}
                                 </div>
 

@@ -73,35 +73,78 @@ vi.mock('react-router', async (importOriginal) => {
 vi.mock('framer-motion', async (importOriginal) => {
   const actual = await importOriginal<typeof import('framer-motion')>();
   
-  // Dynamically map common HTML tags used with motion elements
-  const commonPrimitives = [
-    'div',
-    'button',
-    'span',
-    'ul',
-    'li',
-    'section',
-    'nav',
-    'form',
-    'label',
-    'h1',
-    'h2',
-    'p',
-    // SVG primitives: animated shapes (the rocket's exhaust flame, the chat
-    // bot's eyes) render as `undefined` and crash the tree if they are missing
-    // from this list.
-    'svg',
-    'path',
-    'circle',
-    'rect',
-    'g',
-  ];
-  
-  const mockedMotion = commonPrimitives.reduce((acc, tagName) => {
-    acc[tagName] = ({ children, className, ...props }: { children?: ReactNode; className?: string; [key: string]: unknown }) =>
-      React.createElement(tagName, { className, ...props }, children);
-    return acc;
-  }, {} as Record<string, React.ComponentType<any>>);
+  // Any tag, resolved on demand. This used to be a hand-maintained list, which
+  // meant every new `motion.<tag>` in the app rendered `undefined` and took a
+  // whole test file down with an unhelpful "Element type is invalid" -- with
+  // nothing pointing at the list as the cause. A proxy cannot fall behind.
+  //
+  // Motion-only props are dropped rather than forwarded, so they do not reach
+  // the DOM and trigger "React does not recognize the prop" warnings.
+  const MOTION_ONLY_PROPS = new Set([
+    'initial',
+    'animate',
+    'exit',
+    'variants',
+    'transition',
+    'whileHover',
+    'whileTap',
+    'whileFocus',
+    'whileDrag',
+    'whileInView',
+    'layout',
+    'layoutId',
+    'layoutScroll',
+    'custom',
+    'onHoverStart',
+    'onHoverEnd',
+    'onAnimationComplete',
+    'drag',
+  ]);
+
+  // Cached per tag: the proxy must hand back the *same* component every time.
+  // A fresh function on each access is a new element type to React, so it tears
+  // the subtree down and rebuilds it on every render -- which detaches any DOM
+  // node a test is holding on to, and its attributes then silently stop
+  // updating.
+  const componentCache = new Map<string, React.ComponentType<any>>();
+
+  const mockedMotion = new Proxy(
+    {},
+    {
+      get: (_target, tagName) => {
+        if (typeof tagName !== 'string') return undefined;
+
+        const cached = componentCache.get(tagName);
+        if (cached) return cached;
+
+        const Component = ({
+          children,
+          layoutId,
+          ...props
+        }: {
+          children?: ReactNode;
+          layoutId?: string;
+          [key: string]: unknown;
+        }) => {
+          const domProps = Object.fromEntries(
+            Object.entries(props).filter(([key]) => !MOTION_ONLY_PROPS.has(key)),
+          );
+
+          // Surfaced as an attribute rather than dropped: which shared-layout
+          // element a node belongs to is real behaviour worth asserting on, and
+          // `layoutId` itself would trip React's unknown-prop warning.
+          if (typeof layoutId === 'string') {
+            domProps['data-layout-id'] = layoutId;
+          }
+
+          return React.createElement(tagName, domProps, children);
+        };
+
+        componentCache.set(tagName, Component);
+        return Component;
+      },
+    },
+  ) as Record<string, React.ComponentType<any>>;
 
   return {
     ...actual,

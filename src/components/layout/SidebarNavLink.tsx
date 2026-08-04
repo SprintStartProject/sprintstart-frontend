@@ -1,21 +1,22 @@
-import type { ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
+import type { SidebarIcon } from './SidebarNavIcons';
 import { dockMagnifySpringToken, slidingIndicatorSpringToken } from '../../styles/tokens';
 
 /**
  * Scale applied to the item directly under the pointer.
  *
- * Tuned against the sidebar geometry: with a 286px sidebar and 28px inner
- * padding an item is 230px wide, so 1.12 grows it to the right edge without
- * spilling over the sidebar border. Raising this needs more inner padding.
+ * Bound to the sidebar geometry: the item grows rightwards from a fixed left
+ * edge, so scale and the nav's inner padding together decide where it lands.
+ * At 286px wide with 36px padding an item is 214px, and 1.12 leaves it about
+ * 10px short of the border. Raising either value eats that gap.
  */
 const DOCK_HOVER_SCALE = 1.12;
 
 type SidebarNavLinkProps = {
     to: string;
     label: string;
-    icon: ReactNode;
+    icon: SidebarIcon;
     /** Matches the route exactly (used for the `/` dashboard entry). */
     end?: boolean;
     /**
@@ -28,6 +29,10 @@ type SidebarNavLinkProps = {
     forceActive?: boolean;
     /** True while this entry is the one under the pointer (or focused). */
     isMagnified: boolean;
+    /** Shows a marker that this section has something waiting. */
+    hasAttentionMarker?: boolean;
+    /** Announced to assistive tech in place of the purely visual marker. */
+    attentionLabel?: string;
     onNavigate?: () => void;
     onHoverChange: (isHovered: boolean) => void;
 };
@@ -39,8 +44,8 @@ const BASE_LINK_CLASS = [
 
 function getLinkStateClass(isHighlighted: boolean): string {
     return isHighlighted
-        ? 'text-white [&_svg]:text-white'
-        : 'text-app-text-muted hover:text-app-text [&_svg]:text-app-text-muted hover:[&_svg]:text-app-text';
+        ? 'text-white'
+        : 'text-app-text-muted hover:text-app-text';
 }
 
 /**
@@ -56,11 +61,13 @@ function getLinkStateClass(isHighlighted: boolean): string {
 export function SidebarNavLink({
     to,
     label,
-    icon,
+    icon: Icon,
     end,
     indicatorLayoutId,
     forceActive = false,
     isMagnified,
+    hasAttentionMarker = false,
+    attentionLabel,
     onNavigate,
     onHoverChange,
 }: SidebarNavLinkProps) {
@@ -110,7 +117,52 @@ export function SidebarNavLink({
                             )}
 
                             <span className="relative z-10 flex w-full items-center gap-[12px]">
-                                {icon}
+                                {/* Colour lives on this wrapper rather than on a
+                                    `[&_svg]` descendant selector on the link.
+                                    That selector also caught the attention flag
+                                    and repainted it white on the active pill,
+                                    and overriding it back would have come down
+                                    to CSS source order between two equally
+                                    specific arbitrary variants. */}
+                                <motion.span
+                                    animate={
+                                        hasAttentionMarker && !prefersReducedMotion
+                                            ? { y: [0, -4, 0, -2, 0], rotate: [0, -10, 8, -4, 0] }
+                                            : { y: 0, rotate: 0 }
+                                    }
+                                    transition={
+                                        hasAttentionMarker
+                                            ? {
+                                                  duration: 0.9,
+                                                  // Long pause between bursts:
+                                                  // an icon that never stops
+                                                  // moving stops being a signal
+                                                  // and becomes noise.
+                                                  repeatDelay: 2.4,
+                                                  repeat: Infinity,
+                                                  ease: 'easeInOut',
+                                              }
+                                            : { duration: 0.2 }
+                                    }
+                                    className={`flex shrink-0 transition-colors ${
+                                        hasAttentionMarker
+                                            ? 'text-app-warning-solid'
+                                            : isHighlighted
+                                              ? 'text-white'
+                                              : 'text-app-text-muted group-hover:text-app-text'
+                                    }`}
+                                >
+                                    <Icon isActive={isHighlighted} />
+
+                                    {/* The movement is the whole signal here,
+                                        and movement is invisible to a screen
+                                        reader -- and to anyone who has reduced
+                                        motion on, which is why the colour
+                                        change is not conditional on it. */}
+                                    <span className="sr-only">
+                                        {attentionLabel ?? 'Needs attention'}
+                                    </span>
+                                </motion.span>
 
                                 <span>{label}</span>
 

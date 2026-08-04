@@ -42,7 +42,9 @@ describe('DataIngestionSectionFilter', () => {
 
         const runsButton = filter().getByRole('button', { name: /runs/i });
         expect(runsButton).toHaveAttribute('aria-pressed', 'true');
-        expect(runsButton).toHaveClass('bg-app-brand');
+        // The brand fill is a separate element that slides between tabs, so it
+        // lives inside the active button rather than on it.
+        expect(runsButton.querySelector('.bg-app-brand')).not.toBeNull();
     });
 
     it('calls onChange with the clicked section', async () => {

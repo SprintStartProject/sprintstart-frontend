@@ -157,7 +157,7 @@ export function FaqWidget() {
           event.stopPropagation();
           goToDetail(hero);
         }}
-        className="w-full text-left rounded-2xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-4 mb-3 relative overflow-hidden"
+        className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4 mb-3 relative overflow-hidden"
       >
         {/* Big count in the corner */}
         <span className="absolute top-4 right-4 text-3xl font-semibold text-app-brand">
@@ -195,7 +195,7 @@ export function FaqWidget() {
               event.stopPropagation();
               goToDetail(group);
             }}
-            className="text-left rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-3"
+            className="text-left rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-3"
           >
             <div className="text-xl font-semibold text-app-brand mb-1">
               {group.count}

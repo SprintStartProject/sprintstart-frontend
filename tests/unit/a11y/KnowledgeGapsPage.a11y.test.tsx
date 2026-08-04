@@ -51,7 +51,9 @@ describe('KnowledgeGapsPage Accessibility', () => {
             expect(screen.getByText('AuthService')).toBeInTheDocument();
         });
 
-        expect(screen.getByText('Filters & Sort')).toBeInTheDocument();
+        expect(
+            screen.getByRole('group', { name: 'Filter gaps by severity' }),
+        ).toBeInTheDocument();
 
         expect(await axe(baseElement)).toHaveNoViolations();
     });

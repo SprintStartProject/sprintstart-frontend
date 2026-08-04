@@ -198,7 +198,10 @@ export function FaqPage() {
         <div className="mb-4">
           <button
             onClick={() => goToDetail(hero)}
-            className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-colors p-5 mb-2 relative overflow-hidden"
+            // The hero had no hover state at all despite being clickable.
+            // 1.01 rather than the 1.02 used on grid cards: these rows span the
+            // full content column, so the same percentage travels much further.
+            className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-5 mb-2 relative overflow-hidden"
           >
             <div className="absolute top-4 right-4 flex items-center gap-2 text-app-text-muted">
               <TrendingUp className="w-5 h-5 text-app-brand" />
@@ -230,7 +233,7 @@ export function FaqPage() {
             <button
               key={group.groupId}
               onClick={() => goToDetail(group)}
-              className="w-full text-left rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-4"
+              className="w-full text-left rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
             >
               <div className="flex items-start justify-between gap-4 mb-2">
                 <p className="text-sm font-medium text-app-text">

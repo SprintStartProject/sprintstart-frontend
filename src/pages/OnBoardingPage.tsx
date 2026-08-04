@@ -9,6 +9,8 @@ import type {
   OnboardingStepEndpoint,
 } from "../features/onboarding/types";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { buttonHoverMotion } from "../styles/tokens";
 import { onboardingService } from "../services/onboardingService";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/apiClient";
@@ -437,7 +439,7 @@ export function OnBoardingPage() {
                 <button
                   onClick={() => void generatePath()}
                   title="Regenerate path with AI"
-                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-all hover:bg-app-brand-soft hover:text-app-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft hover:text-app-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -470,10 +472,10 @@ export function OnBoardingPage() {
                 <button
                   key={phase.id}
                   onClick={() => setSelectedPhaseIndex(index)}
-                  className={`flex-1 rounded-2xl border p-4 transition-all text-left ${
+                  className={`flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
                     isSelected
                       ? "border-app-brand bg-app-brand-soft"
-                      : "border-app-border hover:border-app-border-strong bg-app-surface"
+                      : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
                   }`}
                 >
                   <div className="font-semibold text-app-text text-sm mb-1 flex items-center gap-1.5">
@@ -537,13 +539,14 @@ export function OnBoardingPage() {
                 {recommendedStep.description}
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-6">
-                <button
+                <motion.button
                   onClick={() => handleActiveStep(recommendedStep)}
-                  className="px-6 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center gap-2"
+                  {...buttonHoverMotion}
+                  className="flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
                 >
                   {recommendedStep.status === "IN_PROGRESS" ? "Continue" : "Start now"}
                   <ChevronRight className="w-4 h-4" />
-                </button>
+                </motion.button>
               </div>
             </div>
           </div>
@@ -567,13 +570,14 @@ export function OnBoardingPage() {
                 unlock the next phase.
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-6">
-                <button
+                <motion.button
                   onClick={() => setCheckPhase(pendingCheckPhase)}
-                  className="px-6 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center gap-2"
+                  {...buttonHoverMotion}
+                  className="flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
                 >
                   Start knowledge check
                   <ChevronRight className="w-4 h-4" />
-                </button>
+                </motion.button>
               </div>
             </div>
           </div>
@@ -608,12 +612,15 @@ export function OnBoardingPage() {
             return (
               <div
                 key={step.id}
-                className={`group rounded-2xl border transition-all bg-app-surface ${
+                // Completed and locked steps stay still on purpose: nothing
+                // happens when you click them, and magnifying them would
+                // promise an interaction that is not there.
+                className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${
                   mode === "completed"
                     ? "border-app-border opacity-60"
                     : mode === "locked"
                       ? "border-app-border opacity-75"
-                      : "border-app-border hover:border-app-border-strong hover:shadow-lg"
+                      : "border-app-border hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg"
                 }`}
               >
                 <div className="p-5">

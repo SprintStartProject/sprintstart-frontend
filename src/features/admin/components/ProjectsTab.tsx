@@ -87,7 +87,7 @@ export function ProjectsTab({
             key={project.id}
             type="button"
             onClick={() => onOpenProjectDetails(project)}
-            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-border-strong hover:bg-app-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow sm:flex-row sm:items-start sm:justify-between sm:p-5"
+            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow motion-reduce:hover:scale-100 sm:flex-row sm:items-start sm:justify-between sm:p-5"
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">

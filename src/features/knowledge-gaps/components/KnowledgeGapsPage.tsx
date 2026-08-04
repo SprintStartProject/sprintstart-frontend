@@ -16,15 +16,30 @@ import {
   Clock,
   ArrowLeft,
   Filter,
-  ArrowUpDown,
   X,
-  ChevronDown,
-  SlidersHorizontal,
   RefreshCw,
   FileText,
   User,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
+import {
+  FilterSelect,
+  type FilterSelectOption,
+} from "../../../components/ui/FilterSelect";
+import {
+  buttonHoverMotion,
+  buttonHoverMotionDisabled,
+  hoverSpringToken,
+} from "../../../styles/tokens";
+
+type GapSortOption = "severity" | "date" | "component";
+
+const SORT_OPTIONS: FilterSelectOption<GapSortOption>[] = [
+  { value: "severity", label: "Severity" },
+  { value: "date", label: "Last updated" },
+  { value: "component", label: "Component name" },
+];
 
 // ------------------------------------------------------------------
 // PAGE
@@ -36,10 +51,7 @@ export function KnowledgeGapsPage() {
     "medium",
     "low",
   ]);
-  const [sortBy, setSortBy] = useState<
-    "severity" | "date" | "component"
-  >("severity");
-  const [expandFilters, setExpandFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<GapSortOption>("severity");
 
   const navigate = useNavigate();
 
@@ -70,14 +82,15 @@ export function KnowledgeGapsPage() {
   };
 
   const refreshButton = (
-    <button
+    <motion.button
       onClick={() => void handleRefresh()}
       disabled={refreshing}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:opacity-60 shrink-0"
+      {...(refreshing ? buttonHoverMotionDisabled : buttonHoverMotion)}
+      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)] disabled:opacity-60"
     >
       <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
       {refreshing ? "Refreshing…" : "Refresh"}
-    </button>
+    </motion.button>
   );
 
   if (loading) {
@@ -147,13 +160,16 @@ export function KnowledgeGapsPage() {
     <div className="min-h-screen bg-app-bg">
       <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
-          <button
+          <motion.button
             onClick={() => void navigate("/pm-dashboard")}
-            className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
+            whileHover={{ x: -3 }}
+            whileTap={{ scale: 0.97 }}
+            transition={hoverSpringToken}
+            className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-muted transition-colors hover:text-app-text"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to PM-Dashboard
-          </button>
+          </motion.button>
           <div className="flex items-start justify-between gap-4 mb-6">
             <PageHeader
               icon={ShieldAlert}
@@ -177,133 +193,115 @@ export function KnowledgeGapsPage() {
       </section>
 
       <main className="app-page-content py-8">
-        {/* Filter & Sort Controls */}
-        <div className="mb-6 rounded-lg border border-app-border bg-app-surface">
-          {/* Header / Compact View */}
-          <button
-            onClick={() => setExpandFilters(!expandFilters)}
-            className="w-full flex items-center justify-between p-4 hover:bg-app-surface-muted transition-colors"
+        {/* Filter & sort controls. Always visible rather than behind a
+            disclosure: there are only four controls, and hiding them meant the
+            active filter state was invisible from the collapsed view. Severity
+            toggles sit on the left, the sort order is pushed to the far right
+            of the same row. */}
+        <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div
+            role="group"
+            aria-label="Filter gaps by severity"
+            className="flex flex-wrap items-center gap-2"
           >
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-app-text-muted" />
-              <span className="text-sm font-medium text-app-text">
-                Filters & Sort
-              </span>
-              <span className="text-xs text-app-text-muted ml-2">
-                ({filtered.length} of {overview.gaps.length})
-              </span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-app-text-muted transition-transform ${
-                expandFilters ? "rotate-180" : ""
-              }`}
+            <Filter aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
+
+            {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map(
+              (severity) => {
+                const isSelected = severityFilter.includes(severity);
+                const { badge, label } = SEVERITY_STYLES[severity];
+
+                return (
+                  <motion.button
+                    key={severity}
+                    type="button"
+                    // These are toggles, not a single choice -- `aria-pressed`
+                    // is what tells assistive tech which severities are
+                    // currently included.
+                    aria-pressed={isSelected}
+                    onClick={() => toggleSeverityFilter(severity)}
+                    {...buttonHoverMotion}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                      isSelected
+                        ? badge
+                        : "border border-app-border/70 bg-app-surface/70 text-app-text-muted backdrop-blur-md hover:border-app-brand-border-strong hover:text-app-text"
+                    }`}
+                  >
+                    {label}
+                  </motion.button>
+                );
+              },
+            )}
+          </div>
+
+          <span className="text-xs tabular-nums text-app-text-muted">
+            {filtered.length} of {overview.gaps.length}
+          </span>
+
+          <div className="ml-auto flex items-center gap-2">
+            {(severityFilter.length < 3 || sortBy !== "severity") && (
+              <motion.button
+                type="button"
+                onClick={() => {
+                  setSeverityFilter(["high", "medium", "low"]);
+                  setSortBy("severity");
+                }}
+                {...buttonHoverMotion}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-transparent px-2.5 text-sm font-medium text-app-brand-text transition-colors hover:border-app-brand-border hover:bg-app-surface-hover"
+              >
+                <X className="h-3.5 w-3.5" />
+                Reset
+              </motion.button>
+            )}
+
+            <FilterSelect
+              label="Sort knowledge gaps"
+              value={sortBy}
+              options={SORT_OPTIONS}
+              onChange={setSortBy}
+              className="w-48"
             />
-          </button>
-
-          {/* Expanded Content */}
-          {expandFilters && (
-            <>
-              <div className="border-t border-app-border px-4 py-4 space-y-4">
-                {/* Filters */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Filter className="w-4 h-4 text-app-text-muted" />
-                    <span className="text-sm font-medium text-app-text">
-                      Severity Filter
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map(
-                      (severity) => {
-                        const isSelected = severityFilter.includes(severity);
-                        const { badge, label } = SEVERITY_STYLES[severity];
-
-                        return (
-                          <button
-                            key={severity}
-                            onClick={() => toggleSeverityFilter(severity)}
-                            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
-                              isSelected
-                                ? badge
-                                : "bg-app-bg text-app-text-muted border border-app-border"
-                            }`}
-                          >
-                            {label}
-                            {isSelected && (
-                              <span className="ml-1">✓</span>
-                            )}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
-
-                {/* Sort Options */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <ArrowUpDown className="w-4 h-4 text-app-text-muted" />
-                    <span className="text-sm font-medium text-app-text">
-                      Sort By
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { value: "severity", label: "Severity" },
-                        { value: "date", label: "Last Updated" },
-                        { value: "component", label: "Component Name" },
-                      ] as Array<{ value: typeof sortBy; label: string }>
-                    ).map(({ value, label }) => (
-                      <button
-                        key={value}
-                        onClick={() => setSortBy(value)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
-                          sortBy === value
-                            ? "bg-app-brand text-white"
-                            : "bg-app-bg text-app-text-muted border border-app-border hover:border-app-border-strong"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Reset Button */}
-                {(severityFilter.length < 3 || sortBy !== "severity") && (
-                  <div className="flex justify-end pt-2 border-t border-app-border">
-                    <button
-                      onClick={() => {
-                        setSeverityFilter(["high", "medium", "low"]);
-                        setSortBy("severity");
-                      }}
-                      className="text-xs text-app-brand hover:text-app-brand/80 transition-colors flex items-center gap-1"
-                    >
-                      <X className="w-3 h-3" />
-                      Reset filters
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+          </div>
         </div>
 
+        {/* There is no tab bar on this page, so the moving part is the list
+            itself: `layout` makes rows glide to their new position when the
+            sort order changes, and AnimatePresence fades out the ones a
+            severity filter removes instead of snapping the list shut. */}
+        {/* No `layout` on the container on purpose: a layout-animating parent
+            counter-scales its layout-animating children, and a row re-entering
+            an empty list is measured against a near-zero box, which turns that
+            correction into a huge scale that snaps back. The container resizing
+            without animation costs nothing visually. */}
         <div className="space-y-3">
-          {filtered.map((gap) => {
+          <AnimatePresence initial={false}>
+            {filtered.map((gap) => {
             const { badge, label } = SEVERITY_STYLES[gap.severity];
             const owner = gap.owners[0] ?? null;
 
             return (
-              <button
+              <motion.button
                 key={gap.id}
+                // `layout="position"` rather than `layout`: it animates only
+                // where the row sits, never its measured size, so no scale
+                // correction is ever applied. Plain `layout` is what made a
+                // re-appearing row flash at the wrong size.
+                layout="position"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                // No scale here either: `scale` is owned by the CSS hover on
+                // this same element, and two owners for one property fight.
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
                 onClick={() =>
                   void navigate(`/insights/knowledge-gaps/${gap.id}`)
                 }
-                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-4"
+                // The transition list is explicit rather than `transition-all`:
+                // Framer Motion drives `opacity` and `transform` inline on this
+                // element, and a CSS transition covering those properties would
+                // try to ease every frame the animation writes -- which is what
+                // made a returning row flicker. CSS keeps only what it owns.
+                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-[scale,background-color,border-color,box-shadow] duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
               >
                 <SeverityBar severity={gap.severity} />
 
@@ -354,9 +352,10 @@ export function KnowledgeGapsPage() {
                     </span>
                   </div>
                 </div>
-              </button>
+              </motion.button>
             );
-          })}
+            })}
+          </AnimatePresence>
         </div>
       </main>
     </div>

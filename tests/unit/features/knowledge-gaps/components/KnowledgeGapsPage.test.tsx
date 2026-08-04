@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { KnowledgeGapsPage } from '../../../../../src/features/knowledge-gaps/components/KnowledgeGapsPage';
@@ -62,54 +62,62 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument();
     });
 
-    it('expands the filter panel when clicked', async () => {
-        const user = userEvent.setup();
+    // The controls are no longer behind a disclosure -- they are always on the
+    // page, so there is nothing to expand first.
+    it('shows the severity toggles and the sort order without expanding anything', () => {
         renderPage();
 
-        const filterButton = screen.getByText('Filters & Sort');
-        await user.click(filterButton);
+        const severityGroup = within(
+            screen.getByRole('group', { name: 'Filter gaps by severity' }),
+        );
 
-        expect(screen.getByText('Severity Filter')).toBeInTheDocument();
-        expect(screen.getByText('Sort By')).toBeInTheDocument();
+        expect(severityGroup.getByRole('button', { name: 'High' })).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        expect(
+            screen.getByRole('combobox', { name: 'Sort knowledge gaps' }),
+        ).toHaveTextContent('Severity');
     });
 
     it('filters gaps by severity when a filter is toggled off', async () => {
         const user = userEvent.setup();
         renderPage();
 
-        await user.click(screen.getByText('Filters & Sort'));
-        const highFilter = screen.getAllByRole('button', { name: /High/ }).find(
-            (btn) => btn.textContent?.includes('High') && btn.textContent?.includes('✓'),
-        )!;
+        const highFilter = within(
+            screen.getByRole('group', { name: 'Filter gaps by severity' }),
+        ).getByRole('button', { name: 'High' });
         await user.click(highFilter);
 
+        expect(highFilter).toHaveAttribute('aria-pressed', 'false');
         expect(screen.queryByText('Auth Service')).not.toBeInTheDocument();
         expect(screen.getByText('API Gateway')).toBeInTheDocument();
     });
 
-    it('changes the sort order when a sort option is clicked', async () => {
+    it('changes the sort order when a sort option is chosen', async () => {
         const user = userEvent.setup();
         renderPage();
 
-        await user.click(screen.getByText('Filters & Sort'));
-        const componentSort = screen.getByText('Component Name');
-        await user.click(componentSort);
+        const sorter = screen.getByRole('combobox', { name: 'Sort knowledge gaps' });
+        await user.click(sorter);
+        await user.click(screen.getByRole('option', { name: 'Component name' }));
 
-        const buttons = screen.getAllByRole('button');
-        const componentButton = buttons.find((b) => b.textContent === 'Component Name');
-        expect(componentButton).toHaveClass('bg-app-brand');
+        expect(sorter).toHaveTextContent('Component name');
     });
 
     it('shows the reset button when filters are not default', async () => {
         const user = userEvent.setup();
         renderPage();
 
-        await user.click(screen.getByText('Filters & Sort'));
-        const highFilter = screen.getAllByRole('button', { name: /High/ }).find(
-            (btn) => btn.textContent?.includes('High') && btn.textContent?.includes('✓'),
-        )!;
-        await user.click(highFilter);
+        expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
 
-        expect(screen.getByText('Reset filters')).toBeInTheDocument();
+        await user.click(
+            within(screen.getByRole('group', { name: 'Filter gaps by severity' })).getByRole(
+                'button',
+                { name: 'High' },
+            ),
+        );
+
+        expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument();
     });
 });

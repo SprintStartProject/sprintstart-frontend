@@ -210,10 +210,10 @@ function PhasePicker({
                         key={phase.id}
                         type="button"
                         onClick={() => onSelectPhase(phase.id, steps[0]?.id ?? '')}
-                        className={`rounded-2xl border p-4 text-left transition-all ${
+                        className={`rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
                             isSelected
                                 ? 'border-app-brand bg-app-brand-soft'
-                                : 'border-app-border bg-app-surface-muted hover:border-app-border-strong'
+                                : 'border-app-border bg-app-surface-muted hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg'
                         }`}
                     >
                         <div className="flex items-start justify-between gap-3">

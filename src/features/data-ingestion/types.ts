@@ -180,6 +180,13 @@ export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
  */
 export type SectionKey = "overview" | "sources" | "runs";
 
+/**
+ * Left-to-right order of the section filter. Single source of truth: the filter
+ * renders in this order and the page derives the slide direction from it, so
+ * the content always travels the same way the active pill does.
+ */
+export const SECTION_ORDER: SectionKey[] = ["overview", "sources", "runs"];
+
 export type LoadingState = "idle" | "loading" | "success" | "error";
 
 export type ConnectState = "idle" | "loading" | "success" | "error";

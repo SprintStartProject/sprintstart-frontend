@@ -1,7 +1,11 @@
 import { Search, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { SegmentedTabs } from '../../../components/ui/SegmentedTabs';
+import { buttonHoverMotion, buttonHoverMotionDisabled } from '../../../styles/tokens';
 
-export type KnowledgeTab = 'ALL' | 'UPLOADS' | 'PR' | 'ISSUES' | 'FILES' | 'COMMITS';
+import { TABS, type KnowledgeTab } from '../tabs';
+
+export type { KnowledgeTab };
 
 /**
  * Props for the ArtifactFilters component.
@@ -19,15 +23,6 @@ export interface ArtifactFiltersProps {
     /** Whether a refresh is currently in progress. */
     isRefreshing?: boolean;
 }
-
-const TABS: { id: KnowledgeTab; label: string }[] = [
-    { id: 'ALL', label: 'All' },
-    { id: 'UPLOADS', label: 'Uploads' },
-    { id: 'PR', label: 'PR' },
-    { id: 'ISSUES', label: 'Issues' },
-    { id: 'FILES', label: 'Files' },
-    { id: 'COMMITS', label: 'Commits' },
-];
 
 /**
  * ArtifactFilters
@@ -52,51 +47,32 @@ export function ArtifactFilters({
                     placeholder="Search knowledge base..."
                     value={searchQuery}
                     onChange={(e) => onSearchChange(e.target.value)}
-                    className="w-full pl-9 pr-12 py-2 bg-app-surface border border-app-border rounded-lg text-app-text focus:outline-none focus:ring-2 focus:ring-app-brand/20 focus:border-app-brand"
+                    className="w-full rounded-xl border border-app-border/70 bg-app-surface/70 py-2 pl-9 pr-12 text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-brand/20"
                     data-testid="kb-search-input"
                     aria-label="Search knowledge base"
                 />
                 {onRefresh && (
-                    <button
+                    <motion.button
                         onClick={onRefresh}
                         disabled={isRefreshing}
+                        {...(isRefreshing ? buttonHoverMotionDisabled : buttonHoverMotion)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-surface-hover rounded-md transition-colors disabled:opacity-50"
                         title="Refresh Knowledge Base"
                         aria-label="Refresh knowledge base"
                     >
                         <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-app-brand' : ''}`} />
-                    </button>
+                    </motion.button>
                 )}
             </div>
-            
-            <div 
-                className="flex p-1 space-x-1 bg-app-surface border border-app-border rounded-xl w-full overflow-x-auto scrollbar-hide"
-                role="tablist"
-                aria-label="Filter artifacts by type"
-            >
-                {TABS.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => onTabChange(tab.id)}
-                        className={`relative flex-1 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-app-brand focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg ${
-                            activeTab === tab.id ? 'text-app-brand' : 'text-app-text-muted hover:text-app-text hover:bg-app-background'
-                        }`}
-                        aria-selected={activeTab === tab.id}
-                        role="tab"
-                        data-testid={`kb-tab-${tab.id.toLowerCase()}`}
-                    >
-                        {activeTab === tab.id && (
-                            <motion.div
-                                layoutId="activeTabIndicator"
-                                className="absolute inset-0 bg-app-brand/10 rounded-lg border border-app-brand/20"
-                                initial={false}
-                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                            />
-                        )}
-                        <span className="relative z-10">{tab.label}</span>
-                    </button>
-                ))}
-            </div>
+
+            <SegmentedTabs
+                value={activeTab}
+                options={TABS.map((tab) => ({ value: tab.id, label: tab.label }))}
+                onChange={onTabChange}
+                layoutId="knowledge-base-tab-pill"
+                ariaLabel="Filter artifacts by type"
+                fullWidth
+            />
         </div>
     );
 }

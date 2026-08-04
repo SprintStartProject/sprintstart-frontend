@@ -1,59 +1,67 @@
-import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-    BookOpen,
-    Briefcase,
-    ChartColumn,
-    Database,
-    LogOut,
-    Menu,
-    MessageSquare,
-    Rocket,
-    Settings,
-    Terminal,
-    X,
-} from 'lucide-react';
+import { LogOut, Menu, Settings, X } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
 import { useAuth } from '../../context/useAuth';
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../auth/accessPolicy';
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
+import { usePmAttentionFlag } from '../../features/team-management/usePmAttentionFlag';
+import {
+    AdminIcon,
+    ChatIcon,
+    DashboardIcon,
+    DataIngestionIcon,
+    KnowledgeBaseIcon,
+    OnboardingIcon,
+    PmDashboardIcon,
+    type SidebarIcon,
+} from './SidebarNavIcons';
+import { SidebarLogo } from './SidebarLogo';
 import { SidebarNavLink } from './SidebarNavLink';
 import { hoverSpringToken } from '../../styles/tokens';
 
 type SidebarNavItem = {
     label: string;
     path: AppRoute;
-    icon: ReactNode;
+    /**
+     * A component rather than an element: each icon needs to know when its
+     * entry becomes the current route so it can play its animation once.
+     */
+    icon: SidebarIcon;
 };
 
 type SidebarContentProps = {
     onNavigate?: () => void;
     'aria-label'?: string;
+    /**
+     * Passed in rather than fetched here: this component is mounted twice at
+     * once (desktop and mobile), so owning the request would fire it twice.
+     */
+    hasPmAttentionItems?: boolean;
 };
 
 const navItems: SidebarNavItem[] = [
     {
         label: 'Dashboard',
         path: '/',
-        icon: <ChartColumn className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: DashboardIcon,
     },
     {
         label: 'Chat',
         path: '/chat',
-        icon: <MessageSquare className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: ChatIcon,
     },
     {
         label: 'Knowledge Base',
         path: '/knowledge-base',
-        icon: <BookOpen className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: KnowledgeBaseIcon,
     },
     {
         label: 'OnBoarding',
         path: '/onboarding',
-        icon: <Rocket className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: OnboardingIcon,
     },
 ];
 
@@ -61,12 +69,12 @@ const projectManagerNavItems: SidebarNavItem[] = [
     {
         label: 'PM Dashboard',
         path: '/pm-dashboard',
-        icon: <Briefcase className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: PmDashboardIcon,
     },
     {
         label: 'Data Ingestion',
         path: '/data-ingestion',
-        icon: <Database className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: DataIngestionIcon,
     },
 ];
 
@@ -74,7 +82,7 @@ const adminNavItems: SidebarNavItem[] = [
     {
         label: 'Access Management',
         path: '/admin',
-        icon: <Terminal className="h-[18px] w-[18px] shrink-0 transition-colors" />,
+        icon: AdminIcon,
     },
 ];
 
@@ -88,7 +96,11 @@ type SidebarSection = {
 /**
  * Renders the navigation links and user profile section within the sidebar.
  */
-function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigation' }: SidebarContentProps) {
+function SidebarContent({
+    onNavigate,
+    'aria-label': ariaLabel = 'Primary Navigation',
+    hasPmAttentionItems = false,
+}: SidebarContentProps) {
     const { profile, logout, status } = useAuth();
     const { canManageSelected } = useProjectContext();
     const location = useLocation();
@@ -96,7 +108,7 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
     // Scopes the sliding pill to this sidebar instance. The desktop and the
     // mobile sidebar are mounted at the same time and must not share one
     // `layoutId`, otherwise Framer Motion animates the pill between them.
-    const indicatorLayoutId = `sidebar-active-pill-${useId()}`;
+    const instanceId = useId();
 
     const visibleNavItems = navItems.filter(
         (item) =>
@@ -122,6 +134,25 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
         { heading: 'Admin', items: visibleAdminNavItems },
     ].filter((section) => section.items.length > 0);
 
+    /**
+     * The pill animates between entries by measuring where the old one sat.
+     * That measurement is only meaningful while the list itself holds still --
+     * and it does not always. The Project Manager section appears once the
+     * project context reports `canManageSelected`, and the OnBoarding entry
+     * disappears when a profile refresh reports it complete. Both shift every
+     * entry below them by a row.
+     *
+     * Navigating in that window left the pill measuring against the old layout
+     * and flying in from the wrong side. Folding the visible paths into the
+     * `layoutId` means a changed list is simply a different shared element:
+     * the pill appears where it belongs instead of animating from a position
+     * that no longer exists. While the list is stable -- which is nearly
+     * always -- nothing changes.
+     */
+    const indicatorLayoutId = `sidebar-active-pill-${instanceId}-${sections
+        .flatMap((section) => section.items.map((item) => item.path))
+        .join('|')}`;
+
     const handleHoverChange = (path: AppRoute, isHovered: boolean) => {
         setHoveredPath((current) => {
             if (isHovered) {
@@ -134,10 +165,8 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
 
     return (
         <div className="flex h-full flex-col bg-app-bg text-app-text">
-            <div className="flex items-center gap-3 px-[28px] py-[24px]">
-                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
-                    <Rocket className="h-[18px] w-[18px] text-white" />
-                </div>
+            <div className="flex items-center gap-3 px-[36px] py-[24px]">
+                <SidebarLogo />
 
                 <h1 className="text-lg font-bold leading-none tracking-tight text-app-text">
                     SprintStart
@@ -147,9 +176,13 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
             <nav
                 aria-label={ariaLabel}
                 onMouseLeave={() => setHoveredPath(null)}
-                // 28px inner padding gives the magnified item exactly enough
-                // room to grow to the sidebar edge without crossing it.
-                className="flex-1 space-y-[5px] px-[28px] py-[20px]"
+                // 36px inner padding. The magnified item grows rightwards from
+                // a fixed left edge, so this padding is what decides where it
+                // ends up: 286px sidebar - 2x36 = 214px wide, x1.12 = 240px,
+                // landing ~10px short of the border. At 28px it finished flush
+                // against the line. Header and footer use the same inset, so
+                // everything below still shares one left edge.
+                className="flex-1 space-y-[5px] px-[36px] py-[20px]"
             >
                 {sections.map((section, sectionIndex) => (
                     <div
@@ -173,6 +206,11 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
                                     forceActive={item.path === '/pm-dashboard' && isPmSectionActive}
                                     indicatorLayoutId={indicatorLayoutId}
                                     isMagnified={hoveredPath === item.path}
+                                    hasAttentionMarker={
+                                        item.path === '/pm-dashboard' &&
+                                        hasPmAttentionItems
+                                    }
+                                    attentionLabel="Open skip requests or unread feedback"
                                     onNavigate={onNavigate}
                                     onHoverChange={(isHovered) =>
                                         handleHoverChange(item.path, isHovered)
@@ -184,11 +222,11 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
                 ))}
             </nav>
 
-            {/* Floating glass card instead of a full-bleed bar. The 16px outer
-                gutter plus 12px inner padding lines its content up with the
-                28px inset used by the nav items above. */}
-            <div className="px-[16px] pb-[16px] pt-[8px]">
-                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            {/* Floating glass card instead of a full-bleed bar. The 20px outer
+                gutter plus 16px inner padding lines its content up with the
+                36px inset used by the nav items above. */}
+            <div className="px-[20px] pb-[16px] pt-[8px]">
+                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[16px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
                     {profile && (
                         <div className="flex items-center justify-between gap-2 py-[2px]">
                             <div className="flex items-center gap-3 overflow-hidden">
@@ -264,6 +302,23 @@ function SidebarContent({ onNavigate, 'aria-label': ariaLabel = 'Primary Navigat
  */
 export function SideBar() {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const { profile } = useAuth();
+    const { canManageSelected, selectedProjectId } = useProjectContext();
+    const { pathname } = useLocation();
+
+    // Owned here, not in `SidebarContent`: that renders twice at once, once for
+    // desktop and once for the mobile drawer. Fetching inside it meant every
+    // page load and every project switch fired the request twice over.
+    //
+    // Passing the route as the refresh key rechecks on every view change; the
+    // hook rate-limits that so quick navigation cannot hammer the backend.
+    // Gated on access so a regular member never pays for a request they could
+    // not act on anyway.
+    const hasPmAttentionItems = usePmAttentionFlag(
+        selectedProjectId,
+        canAccessRoute(profile, '/pm-dashboard', canManageSelected),
+        pathname,
+    );
 
     const closeMobileSidebar = () => {
         setIsMobileSidebarOpen(false);
@@ -272,14 +327,15 @@ export function SideBar() {
     return (
         <>
             <aside aria-label="Desktop Sidebar" className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex">
-                <SidebarContent aria-label="Desktop Navigation" />
+                <SidebarContent
+                    aria-label="Desktop Navigation"
+                    hasPmAttentionItems={hasPmAttentionItems}
+                />
             </aside>
 
             <header className="fixed left-0 right-0 top-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-app-brand shadow-lg">
-                        <Rocket className="h-[18px] w-[18px] text-white" />
-                    </div>
+                    <SidebarLogo />
 
                     <span className="text-[16px] font-bold leading-none tracking-tight text-app-text">
                         SprintStart
@@ -321,7 +377,11 @@ export function SideBar() {
                     isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
                 ].join(' ')}
             >
-                <SidebarContent aria-label="Mobile Navigation" onNavigate={closeMobileSidebar} />
+                <SidebarContent
+                    aria-label="Mobile Navigation"
+                    onNavigate={closeMobileSidebar}
+                    hasPmAttentionItems={hasPmAttentionItems}
+                />
             </aside>
         </>
     );

@@ -127,6 +127,62 @@ describe('SideBar', () => {
         expect(screen.getAllByText('Access Management').length).toBeGreaterThan(0);
     });
 
+    /**
+     * The sliding pill animates by measuring where the previous one sat, which
+     * only holds while the entry list does. It does not: the Project Manager
+     * section appears once the project context finishes loading, shifting every
+     * entry below it down a row. Navigating in that window used to leave the
+     * pill travelling in from the wrong side.
+     *
+     * Tying the visible paths into the shared-layout id means a changed list is
+     * a different element, so the pill is placed rather than animated from a
+     * position that no longer exists.
+     */
+    it('gives the active pill a different shared-layout id when the entries change', () => {
+        vi.mocked(useAuthHook.useAuth).mockReturnValue({
+            status: 'authenticated',
+            profile: mockProfile,
+            login: vi.fn(),
+            logout: vi.fn(),
+            refetchProfile: vi.fn(),
+        });
+
+        // Re-rendered in place rather than remounted: `useId` hands out a fresh
+        // instance id to a new tree, so a mount/unmount pair would show two
+        // different ids whether or not the entry list is part of them -- and
+        // the test would pass with the fix reverted.
+        const { rerender } = renderWithProviders(<SideBar />);
+        const withoutOnboarding = document
+            .querySelector('[data-layout-id]')
+            ?.getAttribute('data-layout-id');
+
+        vi.mocked(useAuthHook.useAuth).mockReturnValue({
+            status: 'authenticated',
+            // Onboarding still open, so that entry is present and everything
+            // below it sits one row lower.
+            profile: { ...mockProfile, hasCompletedOnboarding: false },
+            login: vi.fn(),
+            logout: vi.fn(),
+            refetchProfile: vi.fn(),
+        });
+
+        rerender(
+            <MemoryRouter>
+                <ThemeProvider>
+                    <SideBar />
+                </ThemeProvider>
+            </MemoryRouter>,
+        );
+
+        const withOnboarding = document
+            .querySelector('[data-layout-id]')
+            ?.getAttribute('data-layout-id');
+
+        expect(withoutOnboarding).toBeTruthy();
+        expect(withOnboarding).toBeTruthy();
+        expect(withOnboarding).not.toBe(withoutOnboarding);
+    });
+
     it('handles mobile sidebar toggling', async () => {
         const user = userEvent.setup();
         vi.mocked(useAuthHook.useAuth).mockReturnValue({
