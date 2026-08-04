@@ -165,7 +165,7 @@ function SidebarContent({
 
     return (
         <div className="flex h-full flex-col bg-app-bg text-app-text">
-            <div className="flex items-center gap-3 px-[36px] py-[24px]">
+            <div className="flex items-center gap-3 px-[24px] py-[24px]">
                 <SidebarLogo />
 
                 <h1 className="text-lg font-bold leading-none tracking-tight text-app-text">
@@ -176,13 +176,14 @@ function SidebarContent({
             <nav
                 aria-label={ariaLabel}
                 onMouseLeave={() => setHoveredPath(null)}
-                // 36px inner padding. The magnified item grows rightwards from
-                // a fixed left edge, so this padding is what decides where it
-                // ends up: 286px sidebar - 2x36 = 214px wide, x1.12 = 240px,
-                // landing ~10px short of the border. At 28px it finished flush
-                // against the line. Header and footer use the same inset, so
-                // everything below still shares one left edge.
-                className="flex-1 space-y-[5px] px-[36px] py-[20px]"
+                // 24px inner padding. This and DOCK_HOVER_SCALE trade directly
+                // against each other: the item grows rightwards from a fixed
+                // left edge, so 286px sidebar - 2x24 = 238px wide, x1.06 = 252px,
+                // finishing ~10px short of the border. Pulling the content
+                // further left again would need a smaller scale to keep that
+                // gap. Header and footer share the inset, so everything lines
+                // up on one left edge.
+                className="flex-1 space-y-[5px] px-[24px] py-[20px]"
             >
                 {sections.map((section, sectionIndex) => (
                     <div
@@ -222,11 +223,11 @@ function SidebarContent({
                 ))}
             </nav>
 
-            {/* Floating glass card instead of a full-bleed bar. The 20px outer
-                gutter plus 16px inner padding lines its content up with the
-                36px inset used by the nav items above. */}
-            <div className="px-[20px] pb-[16px] pt-[8px]">
-                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[16px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            {/* Floating glass card instead of a full-bleed bar. The 12px outer
+                gutter plus 12px inner padding lines its content up with the
+                24px inset used by the nav items above. */}
+            <div className="px-[12px] pb-[16px] pt-[8px]">
+                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
                     {profile && (
                         <div className="flex items-center justify-between gap-2 py-[2px]">
                             <div className="flex items-center gap-3 overflow-hidden">
