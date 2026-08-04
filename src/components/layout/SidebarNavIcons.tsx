@@ -211,7 +211,25 @@ export function OnboardingIcon({ isActive }: SidebarIconProps) {
                 animate={{ x: [-1.5, 1.5, 0], y: [1.5, -1.5, 0] }}
                 transition={{ duration: 0.75, ease: 'easeOut' }}
             >
-                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" />
+                {/* The exhaust is its own element inside the moving group, so
+                    it travels with the rocket while guttering on its own -- a
+                    plume that stayed rigid while the body flew would read as a
+                    solid tail rather than fire. Scaled from where it meets the
+                    hull so it flares outward instead of around its middle. */}
+                <motion.path
+                    d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"
+                    style={{ transformOrigin: '7px 17px', transformBox: 'view-box' }}
+                    initial={hasPlayed ? { scale: 0.4, rotate: 0 } : false}
+                    animate={
+                        hasPlayed
+                            ? {
+                                  scale: [0.4, 1.35, 0.85, 1.2, 0.95, 1],
+                                  rotate: [0, -8, 5, -4, 2, 0],
+                              }
+                            : { scale: 1, rotate: 0 }
+                    }
+                    transition={{ duration: 0.9, ease: 'easeInOut' }}
+                />
                 <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
                 <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
                 <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
@@ -255,11 +273,59 @@ export function DataIngestionIcon({ isActive }: SidebarIconProps) {
     );
 }
 
-/** Static passthroughs -- these two carry no motion of their own. */
-export function PmDashboardIcon() {
-    return <Briefcase className={ICON_CLASS} />;
+/** PM Dashboard: the case rocks on its base when the entry is opened. */
+export function PmDashboardIcon({ isActive }: SidebarIconProps) {
+    const playKey = usePlayOnActivate(isActive);
+    const hasPlayed = playKey > 0;
+    const prefersReducedMotion = useReducedMotion();
+
+    if (prefersReducedMotion) return <Briefcase className={ICON_CLASS} />;
+
+    return (
+        <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+            <motion.g
+                // Pivoted at the foot of the case rather than its centre, so it
+                // tips like a bag set down on a desk instead of spinning.
+                style={{ transformOrigin: '12px 20px', transformBox: 'view-box' }}
+                initial={hasPlayed ? { rotate: 0 } : false}
+                animate={hasPlayed ? { rotate: [0, -9, 7, -4, 2, 0] } : { rotate: 0 }}
+                transition={{ duration: 0.7, ease: 'easeOut' }}
+            >
+                <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                <rect width="20" height="14" x="2" y="6" rx="2" />
+            </motion.g>
+        </IconFrame>
+    );
 }
 
-export function AdminIcon() {
-    return <Terminal className={ICON_CLASS} />;
+/** Access Management: the prompt blinks, then a command types itself out. */
+export function AdminIcon({ isActive }: SidebarIconProps) {
+    const playKey = usePlayOnActivate(isActive);
+    const hasPlayed = playKey > 0;
+    const prefersReducedMotion = useReducedMotion();
+
+    if (prefersReducedMotion) return <Terminal className={ICON_CLASS} />;
+
+    return (
+        <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+            {/* The prompt arrow: a couple of quick blinks, the way a cursor
+                sits waiting before anything is entered. */}
+            <motion.path
+                d="m4 17 6-6-6-6"
+                initial={hasPlayed ? { opacity: 1 } : false}
+                animate={hasPlayed ? { opacity: [1, 0.25, 1, 0.25, 1] } : { opacity: 1 }}
+                transition={{ duration: 0.55, ease: 'linear' }}
+            />
+
+            {/* The command line, drawn left to right from the prompt so it
+                reads as typing rather than as a bar growing from its middle. */}
+            <motion.path
+                d="M12 19h8"
+                style={{ transformOrigin: '12px 19px', transformBox: 'view-box' }}
+                initial={hasPlayed ? { scaleX: 0 } : false}
+                animate={hasPlayed ? { scaleX: 1 } : { scaleX: 1 }}
+                transition={{ duration: 0.35, delay: 0.5, ease: 'easeOut' }}
+            />
+        </IconFrame>
+    );
 }

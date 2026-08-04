@@ -108,7 +108,7 @@ function SidebarContent({
     // Scopes the sliding pill to this sidebar instance. The desktop and the
     // mobile sidebar are mounted at the same time and must not share one
     // `layoutId`, otherwise Framer Motion animates the pill between them.
-    const indicatorLayoutId = `sidebar-active-pill-${useId()}`;
+    const instanceId = useId();
 
     const visibleNavItems = navItems.filter(
         (item) =>
@@ -134,6 +134,25 @@ function SidebarContent({
         { heading: 'Admin', items: visibleAdminNavItems },
     ].filter((section) => section.items.length > 0);
 
+    /**
+     * The pill animates between entries by measuring where the old one sat.
+     * That measurement is only meaningful while the list itself holds still --
+     * and it does not always. The Project Manager section appears once the
+     * project context reports `canManageSelected`, and the OnBoarding entry
+     * disappears when a profile refresh reports it complete. Both shift every
+     * entry below them by a row.
+     *
+     * Navigating in that window left the pill measuring against the old layout
+     * and flying in from the wrong side. Folding the visible paths into the
+     * `layoutId` means a changed list is simply a different shared element:
+     * the pill appears where it belongs instead of animating from a position
+     * that no longer exists. While the list is stable -- which is nearly
+     * always -- nothing changes.
+     */
+    const indicatorLayoutId = `sidebar-active-pill-${instanceId}-${sections
+        .flatMap((section) => section.items.map((item) => item.path))
+        .join('|')}`;
+
     const handleHoverChange = (path: AppRoute, isHovered: boolean) => {
         setHoveredPath((current) => {
             if (isHovered) {
@@ -146,7 +165,7 @@ function SidebarContent({
 
     return (
         <div className="flex h-full flex-col bg-app-bg text-app-text">
-            <div className="flex items-center gap-3 px-[28px] py-[24px]">
+            <div className="flex items-center gap-3 px-[36px] py-[24px]">
                 <SidebarLogo />
 
                 <h1 className="text-lg font-bold leading-none tracking-tight text-app-text">
@@ -157,9 +176,13 @@ function SidebarContent({
             <nav
                 aria-label={ariaLabel}
                 onMouseLeave={() => setHoveredPath(null)}
-                // 28px inner padding gives the magnified item exactly enough
-                // room to grow to the sidebar edge without crossing it.
-                className="flex-1 space-y-[5px] px-[28px] py-[20px]"
+                // 36px inner padding. The magnified item grows rightwards from
+                // a fixed left edge, so this padding is what decides where it
+                // ends up: 286px sidebar - 2x36 = 214px wide, x1.12 = 240px,
+                // landing ~10px short of the border. At 28px it finished flush
+                // against the line. Header and footer use the same inset, so
+                // everything below still shares one left edge.
+                className="flex-1 space-y-[5px] px-[36px] py-[20px]"
             >
                 {sections.map((section, sectionIndex) => (
                     <div
@@ -199,11 +222,11 @@ function SidebarContent({
                 ))}
             </nav>
 
-            {/* Floating glass card instead of a full-bleed bar. The 16px outer
-                gutter plus 12px inner padding lines its content up with the
-                28px inset used by the nav items above. */}
-            <div className="px-[16px] pb-[16px] pt-[8px]">
-                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            {/* Floating glass card instead of a full-bleed bar. The 20px outer
+                gutter plus 16px inner padding lines its content up with the
+                36px inset used by the nav items above. */}
+            <div className="px-[20px] pb-[16px] pt-[8px]">
+                <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[16px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
                     {profile && (
                         <div className="flex items-center justify-between gap-2 py-[2px]">
                             <div className="flex items-center gap-3 overflow-hidden">

@@ -6,9 +6,10 @@ import { dockMagnifySpringToken, slidingIndicatorSpringToken } from '../../style
 /**
  * Scale applied to the item directly under the pointer.
  *
- * Tuned against the sidebar geometry: with a 286px sidebar and 28px inner
- * padding an item is 230px wide, so 1.12 grows it to the right edge without
- * spilling over the sidebar border. Raising this needs more inner padding.
+ * Bound to the sidebar geometry: the item grows rightwards from a fixed left
+ * edge, so scale and the nav's inner padding together decide where it lands.
+ * At 286px wide with 36px padding an item is 214px, and 1.12 leaves it about
+ * 10px short of the border. Raising either value eats that gap.
  */
 const DOCK_HOVER_SCALE = 1.12;
 

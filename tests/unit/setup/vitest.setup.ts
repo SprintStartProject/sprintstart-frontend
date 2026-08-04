@@ -119,14 +119,23 @@ vi.mock('framer-motion', async (importOriginal) => {
 
         const Component = ({
           children,
+          layoutId,
           ...props
         }: {
           children?: ReactNode;
+          layoutId?: string;
           [key: string]: unknown;
         }) => {
           const domProps = Object.fromEntries(
             Object.entries(props).filter(([key]) => !MOTION_ONLY_PROPS.has(key)),
           );
+
+          // Surfaced as an attribute rather than dropped: which shared-layout
+          // element a node belongs to is real behaviour worth asserting on, and
+          // `layoutId` itself would trip React's unknown-prop warning.
+          if (typeof layoutId === 'string') {
+            domProps['data-layout-id'] = layoutId;
+          }
 
           return React.createElement(tagName, domProps, children);
         };
