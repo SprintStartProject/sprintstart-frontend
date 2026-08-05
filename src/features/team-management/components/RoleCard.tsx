@@ -1,11 +1,17 @@
 import { Trash2, Users } from 'lucide-react';
-import type { ProjectRole, Skill } from '../types';
+import { motion, type Transition } from 'framer-motion';
+import { UserAvatar } from '../../../components/common/UserAvatar';
+import type { ProjectRole, Skill, TeamOverviewUser } from '../types';
+
+/** Beyond this the avatars stop being scannable and start being a wall. */
+const MAX_SHOWN_MEMBERS = 6;
 
 type RoleCardProps = {
     role: ProjectRole;
     /** Skills of this role, already filtered and sorted by the parent. */
     skills: Skill[];
-    memberCount: number;
+    /** The members holding this role, already filtered by the parent. */
+    members: TeamOverviewUser[];
     /**
      * Chip shape: name, member count and delete only. Used for every role once
      * one of them is open, since the detail panel then says everything the
@@ -13,14 +19,15 @@ type RoleCardProps = {
      */
     compact: boolean;
     selected: boolean;
+    transition: Transition;
     onSelect: (roleId: string) => void;
     onRequestDelete: (roleId: string) => void;
 };
 
 /**
  * One role, in either of two shapes: a card at rest, a chip once some role is
- * open. The switch is deliberately instant -- morphing the two shapes was tried
- * and dropped frames on a grid of them.
+ * open. The shapes are not morphed into each other -- that was tried and
+ * dropped frames on a grid of them -- the new one grows in instead.
  *
  * The whole shape is the select target, which rules out wrapping it in a button
  * -- the delete control is a button itself and cannot nest. Instead an
@@ -30,14 +37,29 @@ type RoleCardProps = {
 export function RoleCard({
     role,
     skills,
-    memberCount,
+    members,
     compact,
     selected,
+    transition,
     onSelect,
     onRequestDelete,
 }: RoleCardProps) {
+    const shownMembers = members.slice(0, MAX_SHOWN_MEMBERS);
+    const hiddenMemberCount = members.length - shownMembers.length;
+
+    // A rule only earns its place when it has something on both sides of it:
+    // above an empty skill list it would just underline the members.
+    const hasSkillsDivider = members.length > 0 && skills.length > 0;
+
     return (
-        <div
+        // Scale and opacity only. Growing the box by animating its layout was
+        // tried and dropped frames across a grid of these; a transform runs on
+        // the compositor and the column's own height animation supplies the
+        // rest of the movement.
+        <motion.div
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={transition}
             className={`group relative flex transition-colors ${
                 compact
                     ? 'max-w-full items-center gap-1 rounded-xl border px-2 py-1.5'
@@ -80,7 +102,7 @@ export function RoleCard({
                                 : 'bg-app-bg text-app-text-subtle'
                         }`}
                     >
-                        {memberCount}
+                        {members.length}
                     </span>
                 )}
 
@@ -98,8 +120,45 @@ export function RoleCard({
                 <div className="pointer-events-none relative flex w-full min-w-0 flex-col">
                     <p className="mt-1 flex items-center gap-1 text-xs text-app-text-muted">
                         <Users className="h-3 w-3 shrink-0" />
-                        {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                        {members.length}{' '}
+                        {members.length === 1 ? 'member' : 'members'}
                     </p>
+
+                    {/* Who actually holds the role, not just how many: the
+                        count alone still leaves the overview needing a click
+                        per role to answer "and who is that?". Capped, because
+                        a large role would otherwise push every other card off
+                        the screen. */}
+                    {members.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {shownMembers.map((member) => {
+                                const fullName = `${member.firstname} ${member.lastname}`;
+
+                                return (
+                                    <span
+                                        key={member.userId}
+                                        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-app-border bg-app-bg py-0.5 pl-0.5 pr-2"
+                                    >
+                                        <UserAvatar
+                                            profileIcon={member.profileIcon}
+                                            fallbackName={fullName}
+                                            seed={member.userId}
+                                            size={18}
+                                        />
+                                        <span className="truncate text-[11px] font-medium text-app-text">
+                                            {fullName}
+                                        </span>
+                                    </span>
+                                );
+                            })}
+
+                            {hiddenMemberCount > 0 && (
+                                <span className="text-[11px] font-medium text-app-text-muted">
+                                    +{hiddenMemberCount} more
+                                </span>
+                            )}
+                        </div>
+                    )}
 
                     {role.description && (
                         <p className="mt-2 line-clamp-2 text-xs text-app-text-muted">
@@ -107,7 +166,13 @@ export function RoleCard({
                         </p>
                     )}
 
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div
+                        className={`mt-3 flex flex-wrap gap-1.5 ${
+                            hasSkillsDivider
+                                ? 'border-t border-app-border pt-3'
+                                : ''
+                        }`}
+                    >
                         {skills.map((skill) => (
                             <span
                                 key={skill.id}
@@ -136,6 +201,6 @@ export function RoleCard({
                     </div>
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 }
