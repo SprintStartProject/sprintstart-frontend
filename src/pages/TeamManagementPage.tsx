@@ -18,6 +18,7 @@ import {
 } from '../services/teamManagementService';
 import { PageHeader } from '../components/layout/PageHeader';
 import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
+import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
 
 export function TeamManagementPage() {
     const navigate = useNavigate();
@@ -48,6 +49,14 @@ export function TeamManagementPage() {
 
         void loadInitialData();
     }, [loadTeamOverview]);
+
+    // Two-finger swipe between the tabs, for people who would rather not aim
+    // at the bar.
+    const swipeRef = useSwipeableTabs<TeamManagementTab, HTMLElement>({
+        order: TEAM_MANAGEMENT_TAB_ORDER,
+        value: activeTab,
+        onChange: setActiveTab,
+    });
 
     const filteredUsers = useMemo(() => {
         const result = users.filter((user) => {
@@ -90,7 +99,9 @@ export function TeamManagementPage() {
     if (loading) {
         return (
             <div className="min-h-screen bg-app-bg flex items-center justify-center">
-                <p className="text-sm text-app-text-muted">Loading team overview...</p>
+                <p className="text-sm text-app-text-muted">
+                    Loading team overview...
+                </p>
             </div>
         );
     }
@@ -131,7 +142,10 @@ export function TeamManagementPage() {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
+            <main
+                ref={swipeRef}
+                className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8"
+            >
                 <div className="mb-6">
                     <TeamManagementTabSwitcher
                         activeTab={activeTab}
@@ -151,7 +165,8 @@ export function TeamManagementPage() {
                                         Team members
                                     </h2>
                                     <p className="text-sm text-app-text-muted">
-                                        {filteredUsers.length} of {users.length} members shown
+                                        {filteredUsers.length} of {users.length}{' '}
+                                        members shown
                                     </p>
                                 </div>
 

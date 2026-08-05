@@ -87,7 +87,11 @@ export function ProjectsTab({
             key={project.id}
             type="button"
             onClick={() => onOpenProjectDetails(project)}
-            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow motion-reduce:hover:scale-100 sm:flex-row sm:items-start sm:justify-between sm:p-5"
+            // Lifted rather than scaled on hover. Scaling resamples the card's
+            // 1px border from the pre-scale bitmap, and on a row this wide that
+            // reads as the outline thinning out and partly vanishing. A
+            // translation moves the same crisp pixels.
+            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow motion-reduce:hover:translate-y-0 sm:flex-row sm:items-start sm:justify-between sm:p-5"
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">

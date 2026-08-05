@@ -282,6 +282,20 @@
   padding-right: var(--app-page-gutter);
 }
 
+/*
+ * Keeps a two-finger horizontal swipe inside the app.
+ *
+ * Browsers read that gesture as back/forward once the scroll chain reaches the
+ * document with nothing left to scroll sideways, and by the time a `wheel`
+ * listener could call `preventDefault` the navigation is often already
+ * committed -- so the gesture has to be refused here rather than in JS. Only
+ * the horizontal axis: vertical rubber-banding stays as it is.
+ */
+html,
+body {
+  overscroll-behavior-x: contain;
+}
+
 /* Slim, theme-aware scrollbars (Chrome 121+, Firefox) */
 * {
   scrollbar-width: thin;
