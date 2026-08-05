@@ -99,6 +99,19 @@ export const handlers = [
     HttpResponse.json([{ id: "project-1", name: "SprintStart Project" }]),
   ),
 
+  // A single managed project by default, which is what most pages assume. Tests
+  // that care about managing several projects override this handler.
+  http.get("/api/v1/projects/managed", () =>
+    HttpResponse.json([
+      {
+        id: "project-1",
+        name: "SprintStart Project",
+        description: "Default test project",
+        memberCount: 2,
+      },
+    ]),
+  ),
+
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],

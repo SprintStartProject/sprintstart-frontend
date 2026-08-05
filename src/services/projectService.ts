@@ -101,6 +101,19 @@ export type AssignProjectUsersRequest = {
   userIds: string[];
 };
 
+/**
+ * Moves one user out of `sourceProjectId` and into the project addressed by the
+ * request path.
+ *
+ * Deliberately a single request rather than a remove followed by an assign: a
+ * project manager only sees users mapped to their own projects, so a failed
+ * second call would leave them unable to undo the first.
+ */
+export type TransferProjectUserRequest = {
+  userId: string;
+  sourceProjectId: string;
+};
+
 export type DeleteProjectResponse = {
   id: string;
   deleted: boolean;
@@ -417,6 +430,27 @@ export const projectService = {
     );
 
     return projects.map(toManagedProject);
+  },
+
+  /**
+   * Moves a user from one managed project into another in a single request.
+   *
+   * Returns the member list of the target project. Project managers have no
+   * plain removal endpoint on purpose — see `TransferProjectUserRequest`.
+   */
+  async transferProjectUser(
+    targetProjectId: string,
+    request: TransferProjectUserRequest,
+  ): Promise<ProjectUser[]> {
+    const users = await apiClient.fetch<BackendProjectUser[]>(
+      `/api/v1/projects/${targetProjectId}/users/transfer`,
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      },
+    );
+
+    return users.map(toProjectUser);
   },
 
   /** Returns the users that may be assigned as a project manager. Admin-only. */

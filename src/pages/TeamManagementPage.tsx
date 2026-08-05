@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { TeamMemberFilters } from '../features/team-management/components/TeamMemberFilters';
 import { TeamMemberCard } from '../features/team-management/components/TeamMemberCard';
 import { RoleManagementTab } from '../features/team-management/components/RoleManagementTab';
+import { ProjectManagementTab } from '../features/team-management/components/ProjectManagementTab';
 import { TeamManagementTabSwitcher } from '../features/team-management/components/TeamManagementTabSwitcher';
 import {
     TEAM_MANAGEMENT_TAB_ORDER,
@@ -16,6 +17,10 @@ import {
     getTeamOverview,
     getProjectRoles,
 } from '../services/teamManagementService';
+import {
+    projectService,
+    type ManagedProject,
+} from '../services/projectService';
 import { PageHeader } from '../components/layout/PageHeader';
 import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
 import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
@@ -26,6 +31,7 @@ export function TeamManagementPage() {
     const [roles, setRoles] = useState<ProjectRole[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TeamManagementTab>('members');
+    const [managedProjects, setManagedProjects] = useState<ManagedProject[]>([]);
     const [filters, setFilters] = useState<TeamOverviewFilters>({
         roleId: 'all',
         sortBy: 'LONGEST_STEP',
@@ -43,17 +49,38 @@ export function TeamManagementPage() {
 
     useEffect(() => {
         async function loadInitialData() {
-            await loadTeamOverview();
+            // The managed projects decide whether the projects tab exists at
+            // all, so they are needed before the tab bar can be rendered — not
+            // only once that tab is opened. A failure here must not take the
+            // page down: the other two tabs do not depend on it.
+            const [, projects] = await Promise.all([
+                loadTeamOverview(),
+                projectService.getManagedProjects().catch(() => []),
+            ]);
+
+            setManagedProjects(projects);
             setLoading(false);
         }
 
         void loadInitialData();
     }, [loadTeamOverview]);
 
+    /**
+     * Moving people only makes sense with somewhere to move them to, so a
+     * manager with a single project never sees the projects tab.
+     */
+    const visibleTabs = useMemo(
+        () =>
+            TEAM_MANAGEMENT_TAB_ORDER.filter(
+                (tab) => tab !== 'projects' || managedProjects.length > 1,
+            ),
+        [managedProjects.length],
+    );
+
     // Two-finger swipe between the tabs, for people who would rather not aim
     // at the bar.
     const swipeRef = useSwipeableTabs<TeamManagementTab, HTMLElement>({
-        order: TEAM_MANAGEMENT_TAB_ORDER,
+        order: visibleTabs,
         value: activeTab,
         onChange: setActiveTab,
     });
@@ -96,6 +123,24 @@ export function TeamManagementPage() {
         return result;
     }, [users, filters]);
 
+    // One badge for all three tabs: the number shown always belongs to whatever
+    // the panel below is listing.
+    const [headerCount, headerLabel] = (() => {
+        switch (activeTab) {
+            case 'members':
+                return [filteredUsers.length, 'members'] as const;
+
+            case 'roles':
+                return [roles.length, roles.length === 1 ? 'role' : 'roles'] as const;
+
+            default:
+                return [
+                    managedProjects.length,
+                    managedProjects.length === 1 ? 'project' : 'projects',
+                ] as const;
+        }
+    })();
+
     if (loading) {
         return (
             <div className="min-h-screen bg-app-bg flex items-center justify-center">
@@ -125,16 +170,10 @@ export function TeamManagementPage() {
                         actions={
                             <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
                                 <div className="text-3xl font-bold text-app-brand">
-                                    {activeTab === 'members'
-                                        ? filteredUsers.length
-                                        : roles.length}
+                                    {headerCount}
                                 </div>
                                 <div className="text-xs font-medium text-app-brand-text">
-                                    {activeTab === 'members'
-                                        ? 'members'
-                                        : roles.length === 1
-                                          ? 'role'
-                                          : 'roles'}
+                                    {headerLabel}
                                 </div>
                             </div>
                         }
@@ -150,12 +189,13 @@ export function TeamManagementPage() {
                     <TeamManagementTabSwitcher
                         activeTab={activeTab}
                         onChange={setActiveTab}
+                        tabs={visibleTabs}
                     />
                 </div>
 
                 <SlidingTabPanel
                     activeKey={activeTab}
-                    index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}
+                    index={visibleTabs.indexOf(activeTab)}
                 >
                     {activeTab === 'members' ? (
                         <div className="min-w-0">
@@ -196,12 +236,14 @@ export function TeamManagementPage() {
                                 </div>
                             )}
                         </div>
-                    ) : (
+                    ) : activeTab === 'roles' ? (
                         <RoleManagementTab
                             roles={roles}
                             users={users}
                             onDataChanged={loadTeamOverview}
                         />
+                    ) : (
+                        <ProjectManagementTab projects={managedProjects} />
                     )}
                 </SlidingTabPanel>
             </main>
