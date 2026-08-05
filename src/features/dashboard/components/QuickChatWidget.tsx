@@ -63,11 +63,20 @@ export function QuickChatWidget() {
                     is the subject of the widget, not a bullet point in front of
                     a label, and a 76px character with text beside it drags the
                     baseline off-centre. */}
-                <div className="flex flex-col items-center gap-3 text-center lg:w-56 lg:shrink-0">
+                <div className="flex flex-col items-center text-center lg:w-56 lg:shrink-0">
                     {/* The same assistant as in the chat, idle timer and all —
                         so the character is one creature that follows you around
-                        rather than a different mascot per screen. */}
-                    <span className="text-app-brand-text">
+                        rather than a different mascot per screen.
+                        Negative margin rather than the parent's `gap`, which
+                        cannot go below zero: the SVG's own viewBox leaves
+                        empty space below the drawn glyph, plus a little more
+                        from the inline element's own baseline slack, and only
+                        pulling the label up into that dead space actually
+                        closes the gap — a small positive one just stacks on
+                        top of it. Matches the same pull used in the chat empty
+                        state's bot, so the character sits the same distance
+                        from whatever it introduces everywhere it appears. */}
+                    <span className="-mb-2 text-app-brand-text">
                         <SleepyBot size={76} tracksPointer />
                     </span>
 
