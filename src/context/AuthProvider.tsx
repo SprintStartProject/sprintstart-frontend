@@ -4,6 +4,7 @@ import { userService } from '../services/userService';
 import type { UserProfile } from '../services/types';
 import { AuthContext, type AuthStatus } from './AuthContext';
 import keycloak from '../config/keycloak';
+import { markSigningOut } from '../bootSplash';
 /**
  * Provider component that manages the global authentication state via Keycloak.
  */
@@ -66,6 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
+        // Keycloak's logout navigates the page out and back, and the load that
+        // lands here afterwards looks exactly like a cold start. The note is
+        // what stops the boot splash starting a launch for somebody leaving.
+        markSigningOut();
         await keycloak.logout();
     };
     

@@ -2,6 +2,7 @@
 const SPLASH_ID = "boot-splash";
 const READY_CLASS = "is-ready";
 const GREETING_KEY = "sprintstart.boot.greeting";
+const SIGNOUT_KEY = "sprintstart.boot.signout";
 
 /**
  * How long the exit runs before the node is taken out of the DOM.
@@ -40,6 +41,27 @@ export function rememberBootGreeting(firstName: string | null | undefined): void
         else window.localStorage.removeItem(GREETING_KEY);
     } catch {
         // The splash falls back to an unnamed greeting.
+    }
+}
+
+/**
+ * Tells the next document load that it arrived by signing out.
+ *
+ * Called just before handing over to Keycloak's logout, which navigates the
+ * page away and brings it back with nothing on the URL to distinguish that
+ * load from a normal cold start. Without the note, the splash would put a
+ * rocket on the pad on the way out of the app — the beginning of a send-off
+ * for somebody leaving, cut short a moment later when the app works out that
+ * nobody is signed in.
+ *
+ * In `sessionStorage` rather than `localStorage`, and cleared by the very next
+ * load that reads it: it describes one navigation, not a preference.
+ */
+export function markSigningOut(): void {
+    try {
+        window.sessionStorage.setItem(SIGNOUT_KEY, "1");
+    } catch {
+        // The splash will briefly show a pad. Not worth failing a sign-out for.
     }
 }
 

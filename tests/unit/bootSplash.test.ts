@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     dismissBootSplash,
+    markSigningOut,
     rememberBootGreeting,
 } from '../../src/bootSplash';
 
@@ -98,6 +99,17 @@ describe('bootSplash', () => {
 
         // Nothing was being loaded into, so there is no launch to sit through.
         expect(document.getElementById('boot-splash')).not.toBeInTheDocument();
+    });
+
+    it('leaves a note for the load that follows a sign-out', () => {
+        markSigningOut();
+
+        // The load after `keycloak.logout()` carries nothing on the URL to tell
+        // it apart from a cold start, so this is the only way it can know not
+        // to start a launch for somebody on their way out.
+        expect(window.sessionStorage.getItem('sprintstart.boot.signout')).toBe(
+            '1',
+        );
     });
 
     it('remembers a first name for the next boot, and forgets it on sign-out', () => {

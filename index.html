@@ -66,6 +66,16 @@
         --boot-caption: #9ca3af;
       }
 
+      /* The page's own background, before the bundle brings the real one.
+         `body { background: var(--bg) }` lives in src/styles/index.css, which
+         does not exist yet at this point — so without this, every moment not
+         covered by the splash is unstyled white. That includes the whole
+         signed-out path, where the splash is deliberately not shown at all.
+         Tracks the same theme classes, so it never fights the app's version. */
+      html {
+        background: var(--boot-bg);
+      }
+
       #boot-splash {
         /* The flight vector. Length and bearing are all that change between
            screen shapes — the curve itself is stored in the flight's own frame,
@@ -603,6 +613,7 @@
         var NO_REDIRECT_MS = 1200;
 
         var NAME_KEY = "sprintstart.boot.greeting";
+        var SIGNOUT_KEY = "sprintstart.boot.signout";
 
         // Resolves the stored theme onto <html> before the first paint, so the
         // splash (and the app behind it) never flashes the wrong palette.
@@ -632,15 +643,40 @@
           // Keep the generic greeting.
         }
 
+        var url = window.location.search + window.location.hash;
+
+        // Signing out gets no launch at all — not a rocket on the pad, not a
+        // few frames of one. All or nothing: a send-off belongs to somebody
+        // arriving, and half of one in front of a login form reads as the
+        // animation breaking rather than as restraint.
+        //
+        // Two ways to know before painting anything. `error=` on the way back
+        // from the identity provider is a failed silent check — nobody is
+        // signed in, a login form is next. And the leg that lands here straight
+        // after a sign-out carries no auth parameters at all, so the app leaves
+        // a note for it on the way out (see markSigningOut in bootSplash.ts).
+        var signedOut = /[?&#]error=/.test(url);
+        try {
+          if (window.sessionStorage.getItem(SIGNOUT_KEY)) {
+            window.sessionStorage.removeItem(SIGNOUT_KEY);
+            signedOut = true;
+          }
+        } catch (error) {
+          // No session storage: the `error=` leg still gets caught below.
+        }
+
+        if (signedOut) {
+          splash.remove();
+          return;
+        }
+
         // Which leg of the round-trip this load is. Keycloak comes back with
         // its response on the URL — in the fragment by default, in the query
         // when the client is configured that way — so the presence of a state
-        // plus a code or an error is what says "this document is the one that
-        // stays". Everything else is the outbound leg, about to be navigated
-        // away from, and it only holds the rocket on the pad.
-        var url = window.location.search + window.location.hash;
-        var isReturnLeg =
-          /[?&#]state=/.test(url) && /[?&#](code|error)=/.test(url);
+        // plus a code is what says "this document is the one that stays".
+        // Everything else is the outbound leg, about to be navigated away from,
+        // and it only holds the rocket on the pad.
+        var isReturnLeg = /[?&#]state=/.test(url) && /[?&#]code=/.test(url);
 
         function fly() {
           if (!splash.isConnected || splash.dataset.exiting === "true") return;
