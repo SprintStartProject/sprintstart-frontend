@@ -101,7 +101,9 @@ export function SleepyBot({
 
     // Tracking is off while dizzy: the roll drives the pupils through `animate`,
     // and the gaze drives them through `style`. Only one of the two can own them.
-    const gaze = usePointerGaze(
+    // The same gaze also snaps to any rocket crossing the screen, and
+    // `isWatchingRocket` is what turns the rest of the face along with it.
+    const { gaze, isWatchingRocket } = usePointerGaze(
         botRef,
         tracksPointer && stage === "awake" && !isDizzy,
         handleOrbit,
@@ -131,6 +133,7 @@ export function SleepyBot({
                     state={isDizzy ? "dizzy" : stage}
                     isWaking={isWaking}
                     gaze={tracksPointer ? gaze : undefined}
+                    awed={isWatchingRocket}
                 />
             </span>
 

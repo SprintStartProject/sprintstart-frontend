@@ -1,7 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { RefObject } from "react";
 import { useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 import type { MotionValue } from "framer-motion";
+import {
+    getFlyingRocket,
+    subscribeToRocketFlight,
+} from "../../moments/rocketWatch.ts";
 
 /**
  * How far the pupils may travel from centre, in viewBox units.
@@ -49,8 +53,18 @@ export interface Gaze {
     y: MotionValue<number>;
 }
 
+export interface PointerGaze {
+    gaze: Gaze;
+    /**
+     * True while the eyes are on a rocket instead of the pointer. This is the
+     * caller's cue for the rest of the face — the gaze itself already follows.
+     */
+    isWatchingRocket: boolean;
+}
+
 /**
- * Makes a bot's eyes follow the pointer.
+ * Makes a bot's eyes follow the pointer — and drop it for any rocket that
+ * crosses the screen, because anything with eyes would.
  *
  * Driven by motion values rather than React state on purpose: `pointermove`
  * fires dozens of times a second, and re-rendering the whole glyph for each one
@@ -61,6 +75,13 @@ export interface Gaze {
  * "a cursor-tracking widget": eyes that snap exactly to the pointer look
  * mechanical, and a little lag reads as something noticing you.
  *
+ * While a rocket is announced (see `rocketWatch`), a frame loop reads its
+ * position off the DOM and aims the same motion values at it; pointer input is
+ * ignored for the duration, since two masters for one pair of eyes is a bot
+ * that looks broken in both directions. When the flight ends the eyes ease
+ * back to centre rather than snapping to wherever the pointer happens to be —
+ * the look of watching something leave.
+ *
  * Returns zeroed values when disabled, so callers can wire it unconditionally
  * and let the flag decide.
  */
@@ -68,7 +89,7 @@ export function usePointerGaze(
     ref: RefObject<HTMLElement | null>,
     enabled: boolean,
     onOrbit?: () => void,
-): Gaze {
+): PointerGaze {
     const reduceMotion = useReducedMotion();
     const active = enabled && !reduceMotion;
 
@@ -77,6 +98,64 @@ export function usePointerGaze(
 
     const x = useSpring(rawX, { stiffness: 260, damping: 26, mass: 0.5 });
     const y = useSpring(rawY, { stiffness: 260, damping: 26, mass: 0.5 });
+
+    // The rocket currently in flight, if any. External-store rather than local
+    // state, so every bot on the page agrees frame-for-frame on whether there
+    // is something to gawp at.
+    const flyingRocket = useSyncExternalStore(
+        subscribeToRocketFlight,
+        getFlyingRocket,
+        () => null,
+    );
+    const watchedRocket = active ? flyingRocket : null;
+
+    // Mirror for the pointer handler below, which must not re-subscribe (and
+    // drop a half-finished orbit) every time a rocket comes or goes.
+    const watchedRocketRef = useRef(watchedRocket);
+    useEffect(() => {
+        watchedRocketRef.current = watchedRocket;
+    }, [watchedRocket]);
+
+    // Follows the flight. A frame loop rather than events, because the rocket
+    // is mid-animation and its position changes every frame regardless — there
+    // is nothing to be notified *of*. It only runs while a flight is up, so
+    // the idle cost is nothing.
+    useEffect(() => {
+        if (!watchedRocket) return;
+
+        let frame = 0;
+
+        const follow = () => {
+            const element = ref.current;
+
+            if (element && watchedRocket.isConnected) {
+                const box = element.getBoundingClientRect();
+                const target = watchedRocket.getBoundingClientRect();
+
+                if (box.width > 0 && target.width > 0) {
+                    const dx =
+                        target.left + target.width / 2 - (box.left + box.width / 2);
+                    const dy =
+                        target.top + target.height / 2 - (box.top + box.height / 2);
+
+                    rawX.set(clamp(dx / REACH) * MAX_X);
+                    rawY.set(clamp(dy / REACH) * MAX_Y);
+                }
+            }
+
+            frame = requestAnimationFrame(follow);
+        };
+
+        frame = requestAnimationFrame(follow);
+        return () => {
+            cancelAnimationFrame(frame);
+            // Ease back to centre once the show is over. Snapping to the
+            // pointer would mean the eyes teleport the moment the rocket
+            // fades, which undoes the "watched it go" beat.
+            rawX.set(0);
+            rawY.set(0);
+        };
+    }, [watchedRocket, ref, rawX, rawY]);
 
     // Held in a ref so a changing callback identity does not tear down the
     // listener and lose a half-finished lap with it.
@@ -98,6 +177,11 @@ export function usePointerGaze(
         let lastMoveAt = 0;
 
         function handlePointerMove(event: PointerEvent) {
+            // The rocket owns the eyes for as long as it is up. The listener
+            // stays subscribed — tearing it down would lose a half-finished
+            // orbit — but its input goes nowhere.
+            if (watchedRocketRef.current) return;
+
             // Coalesced into one read per frame: the listener can fire several
             // times between paints, and `getBoundingClientRect` forces layout.
             cancelAnimationFrame(frame);
@@ -160,7 +244,7 @@ export function usePointerGaze(
         };
     }, [active, ref, rawX, rawY]);
 
-    return { x, y };
+    return { gaze: { x, y }, isWatchingRocket: watchedRocket !== null };
 }
 
 function clamp(value: number): number {

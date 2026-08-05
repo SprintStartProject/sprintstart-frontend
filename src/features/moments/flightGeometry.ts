@@ -1,4 +1,5 @@
 import { loopFlight, type FlightPath } from "./loopFlight.ts";
+import { FLIGHT_DURATION_S } from "../../styles/tokens.ts";
 
 /**
  * Flight vector, as a fraction of the flight band (see below) and of the
@@ -109,10 +110,11 @@ export function flybyGeometry(width: number, height: number): FlybyGeometry {
 }
 
 /**
- * The rocket pet's flight from its corner, as fractions of the viewport.
+ * The loop leg of the pet's flight, as fractions of the viewport.
  *
- * It stops well short of the far corner: the pet leaves by shrinking and fading
- * — receding into the distance — rather than by reaching the edge.
+ * Deliberately well short of the far corner: this is only where the *loop*
+ * happens. The exit leg appended after it (see `petFlight`) is what actually
+ * carries the rocket off the screen.
  */
 const PET_X = 0.58;
 const PET_Y = 0.52;
@@ -130,6 +132,41 @@ const PET_MAX_CLIMB = 0.34;
 
 /** Edge length of the pet's rocket, in px. */
 export const PET_ROCKET_SIZE = 40;
+
+/**
+ * Where the pet perches: inset from the bottom-right corner, in px. Mirrors the
+ * `right-[14px]` + half of the 40px frame in `RocketPet`'s markup — the flight
+ * needs it to know where on the screen its path actually starts, which is what
+ * the exit computation is relative to.
+ */
+export const PET_PERCH_INSET = 34;
+
+/** Keyframes appended for the exit leg. Straight line; a handful is plenty. */
+export const PET_EXIT_STEPS = 12;
+
+/**
+ * Clearance past the screen edge before the flight may end, in px: the glyph's
+ * half-diagonal (it is rotated, so the corner of its box is what has to clear)
+ * plus a margin so the drop-shadow does not linger on the edge.
+ */
+const PET_EXIT_CLEARANCE = (PET_ROCKET_SIZE * Math.SQRT2) / 2 + 8;
+
+/**
+ * Exit speed the rocket works up to, as a multiple of the loop leg's average.
+ * The exit accelerates from the loop's settle — like a second stage lighting —
+ * and this is how hard it burns by the time it crosses the edge.
+ */
+const PET_EXIT_SPEED = 2.2;
+
+/** Bounds on the exit leg's duration, in seconds, whatever the screen size. */
+const PET_EXIT_MIN_S = 0.35;
+const PET_EXIT_MAX_S = 0.95;
+
+export interface PetFlightPlan {
+    path: FlightPath;
+    /** Total flight time, loop leg plus exit leg, in seconds. */
+    durationS: number;
+}
 
 export interface LaunchGeometry {
     /** Edge length of the rocket, in px. */
@@ -188,17 +225,91 @@ export function launchGeometry(width: number, height: number): LaunchGeometry {
  * the bottom-right edge, which is the tightest place on the screen to begin a
  * loop from. Sized at the moment of launch rather than at mount, so it survives
  * a window resize.
+ *
+ * Two legs. The loop leg is the proven flight — a cycloid across a band capped
+ * at 16:9, which is what keeps the loop smaller than the screen on every
+ * viewport down to a folded phone. The exit leg then carries straight on along
+ * the flight's own heading until the rocket has fully cleared the left or top
+ * edge, accelerating from the loop's settle like a second stage lighting.
+ *
+ * The exit cannot be folded into the cycloid itself: a loop only closes while
+ * its radius exceeds the travel over 2π, so stretching one cycloid to the edge
+ * of an ultrawide demands a loop taller than the screen. Two legs keep the
+ * loop's geometry untouched and let the exit be as long as the screen is wide.
+ *
+ * The returned duration grows with the exit leg, because a longer way out at
+ * the same clock is just a faster rocket — the pacing of the loop everyone
+ * already knows must not change with the monitor.
  */
-export function petFlight(width: number, height: number): FlightPath {
+export function petFlight(width: number, height: number): PetFlightPlan {
     // Same band as the launch, for the same reason: past 16:9 the width drives a
     // loop bigger than the screen is tall.
     const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
 
-    return loopFlight({
-        dx: -PET_X * band,
-        dy: -Math.min(PET_Y * height, PET_MAX_CLIMB * band),
+    const dx = -PET_X * band;
+    const dy = -Math.min(PET_Y * height, PET_MAX_CLIMB * band);
+
+    const loop = loopFlight({
+        dx,
+        dy,
         // Entered from 0°: the pet rests upright on its perch and leans into the
         // climb rather than snapping to its heading on the first frame.
         entryRotate: 0,
     });
+
+    const distance = Math.hypot(dx, dy) || 1;
+    const forwardX = dx / distance;
+    const forwardY = dy / distance;
+
+    // How far past the loop's end the rocket must travel before the whole
+    // glyph has cleared the screen — through whichever edge its heading
+    // reaches first. The perch pins the path to the viewport; without it the
+    // path is offsets with no opinion on where the screen ends.
+    const endAbsX = width - PET_PERCH_INSET + dx;
+    const endAbsY = height - PET_PERCH_INSET + dy;
+    const untilLeft =
+        forwardX < 0 ? (endAbsX + PET_EXIT_CLEARANCE) / -forwardX : Infinity;
+    const untilTop =
+        forwardY < 0 ? (endAbsY + PET_EXIT_CLEARANCE) / -forwardY : Infinity;
+    const exitLength = Math.max(0, Math.min(untilLeft, untilTop));
+
+    // Accelerating from rest, so the leg's time is set by the speed it works up
+    // to: t = 2d/v for a quadratic ramp. Clamped so a phone's short hop still
+    // reads as a burn and an ultrawide's long run does not overstay.
+    const exitSpeed = (PET_EXIT_SPEED * distance) / FLIGHT_DURATION_S;
+    const exitS = Math.min(
+        PET_EXIT_MAX_S,
+        Math.max(PET_EXIT_MIN_S, (2 * exitLength) / exitSpeed),
+    );
+    const durationS = FLIGHT_DURATION_S + exitS;
+
+    // Stitch the legs. Times are rescaled so the loop keeps its own pacing
+    // inside the longer flight; progress becomes the fraction of the *whole*
+    // journey, so scale and fades driven off it keep meaning what they meant.
+    const totalLength = distance + exitLength;
+    const loopShare = FLIGHT_DURATION_S / durationS;
+
+    const x = [...loop.x];
+    const y = [...loop.y];
+    const rotate = [...loop.rotate];
+    const times = loop.times.map((t) => Number((t * loopShare).toFixed(4)));
+    const progress = loop.progress.map((s) =>
+        Number(((s * distance) / totalLength).toFixed(4)),
+    );
+
+    const finalRotate = rotate[rotate.length - 1];
+    for (let step = 1; step <= PET_EXIT_STEPS; step++) {
+        const t = step / PET_EXIT_STEPS;
+        // Quadratic ramp: starts at the loop's settled rest, leaves at full
+        // burn. Even time spacing plus squared distance is the acceleration.
+        const along = exitLength * t * t;
+
+        x.push(Number((dx + forwardX * along).toFixed(2)));
+        y.push(Number((dy + forwardY * along).toFixed(2)));
+        rotate.push(finalRotate);
+        times.push(Number((loopShare + t * (1 - loopShare)).toFixed(4)));
+        progress.push(Number(((distance + along) / totalLength).toFixed(4)));
+    }
+
+    return { path: { x, y, rotate, times, progress }, durationS };
 }

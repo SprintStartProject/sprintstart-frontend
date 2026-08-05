@@ -44,4 +44,28 @@ describe('BotGlyph', () => {
 
         expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     });
+
+    it('swaps the flat mouth for the round one while awed', () => {
+        const { container } = render(<BotGlyph size={30} state="awake" awed />);
+
+        // One mouth at a time: the "ooo" replaces the bar, it does not join it.
+        // Five rects remain — two side nubs, the head, the two-layer face
+        // plate — where the awake face has six, the sixth being the mouth bar.
+        expect(container.querySelector('[data-testid="bot-awe-mouth"]')).toBeInTheDocument();
+        expect(container.querySelectorAll('rect')).toHaveLength(5);
+
+        const plain = render(<BotGlyph size={30} state="awake" />);
+        expect(plain.container.querySelectorAll('rect')).toHaveLength(6);
+    });
+
+    it.each(['asleep', 'drowsy', 'dizzy'] as BotState[])(
+        'ignores awe in the %s state, which owns its own face',
+        (state) => {
+            const { container } = render(<BotGlyph size={30} state={state} awed />);
+
+            expect(
+                container.querySelector('[data-testid="bot-awe-mouth"]'),
+            ).not.toBeInTheDocument();
+        },
+    );
 });
