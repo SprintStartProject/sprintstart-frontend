@@ -1,10 +1,14 @@
 import { useId, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue } from 'framer-motion';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LogOut, Menu, Settings, X } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
 import { useAuth } from '../../context/useAuth';
-import { canAccessRoute, isOnboardingAccessible, type AppRoute } from '../../auth/accessPolicy';
+import {
+    canAccessRoute,
+    isOnboardingAccessible,
+    type AppRoute,
+} from '../../auth/accessPolicy';
 import { ProjectSwitcher } from '../../features/projects/components/ProjectSwitcher';
 import { useProjectContext } from '../../features/projects/useProjectContext';
 import { usePmAttentionFlag } from '../../features/team-management/usePmAttentionFlag';
@@ -86,7 +90,6 @@ const adminNavItems: SidebarNavItem[] = [
     },
 ];
 
-
 type SidebarSection = {
     /** Optional uppercase group label rendered above the entries. */
     heading?: string;
@@ -104,7 +107,13 @@ function SidebarContent({
     const { profile, logout, status } = useAuth();
     const { canManageSelected } = useProjectContext();
     const location = useLocation();
-    const [hoveredPath, setHoveredPath] = useState<AppRoute | null>(null);
+    /**
+     * Viewport y of the pointer while it is over the nav, `-Infinity` when it
+     * is not. A motion value rather than state: it changes on every pointer
+     * move, and re-rendering the whole sidebar that often to animate a
+     * transform would be paying React for something the compositor can do.
+     */
+    const pointerY = useMotionValue(Number.NEGATIVE_INFINITY);
     // Scopes the sliding pill to this sidebar instance. The desktop and the
     // mobile sidebar are mounted at the same time and must not share one
     // `layoutId`, otherwise Framer Motion animates the pill between them.
@@ -116,8 +125,8 @@ function SidebarContent({
             // Hide onboarding once the user has completed it and been promoted.
             (item.path !== '/onboarding' || isOnboardingAccessible(profile)),
     );
-    const visibleProjectManagerNavItems = projectManagerNavItems.filter((item) =>
-        canAccessRoute(profile, item.path, canManageSelected),
+    const visibleProjectManagerNavItems = projectManagerNavItems.filter(
+        (item) => canAccessRoute(profile, item.path, canManageSelected),
     );
     const visibleAdminNavItems = adminNavItems.filter((item) =>
         canAccessRoute(profile, item.path, canManageSelected),
@@ -153,16 +162,6 @@ function SidebarContent({
         .flatMap((section) => section.items.map((item) => item.path))
         .join('|')}`;
 
-    const handleHoverChange = (path: AppRoute, isHovered: boolean) => {
-        setHoveredPath((current) => {
-            if (isHovered) {
-                return path;
-            }
-
-            return current === path ? null : current;
-        });
-    };
-
     return (
         <div className="flex h-full flex-col bg-app-bg text-app-text">
             <div className="flex items-center gap-3 px-[24px] py-[24px]">
@@ -175,7 +174,11 @@ function SidebarContent({
 
             <nav
                 aria-label={ariaLabel}
-                onMouseLeave={() => setHoveredPath(null)}
+                // Tracked on the nav, not per entry: pointer enter/leave on the
+                // individual rows is skipped outright when the mouse crosses
+                // several of them inside one frame.
+                onPointerMove={(event) => pointerY.set(event.clientY)}
+                onPointerLeave={() => pointerY.set(Number.NEGATIVE_INFINITY)}
                 // 24px inner padding. This and DOCK_HOVER_SCALE trade directly
                 // against each other: the item grows rightwards from a fixed
                 // left edge, so 286px sidebar - 2x24 = 238px wide, x1.06 = 252px,
@@ -204,18 +207,18 @@ function SidebarContent({
                                     label={item.label}
                                     icon={item.icon}
                                     end={item.path === '/'}
-                                    forceActive={item.path === '/pm-dashboard' && isPmSectionActive}
+                                    forceActive={
+                                        item.path === '/pm-dashboard' &&
+                                        isPmSectionActive
+                                    }
                                     indicatorLayoutId={indicatorLayoutId}
-                                    isMagnified={hoveredPath === item.path}
+                                    pointerY={pointerY}
                                     hasAttentionMarker={
                                         item.path === '/pm-dashboard' &&
                                         hasPmAttentionItems
                                     }
                                     attentionLabel="Open skip requests or unread feedback"
                                     onNavigate={onNavigate}
-                                    onHoverChange={(isHovered) =>
-                                        handleHoverChange(item.path, isHovered)
-                                    }
                                 />
                             ))}
                         </div>
@@ -239,14 +242,17 @@ function SidebarContent({
                                         seed={profile.id}
                                     />
                                 </div>
-        
+
                                 <div className="flex flex-col overflow-hidden">
                                     <span className="truncate text-sm font-semibold text-app-text">
                                         {profile.username}
                                     </span>
-        
+
                                     <span className="truncate text-[10px] font-medium uppercase tracking-wider text-app-text-muted">
-                                        {profile.permissionGroup.replace('_', ' ')}
+                                        {profile.permissionGroup.replace(
+                                            '_',
+                                            ' ',
+                                        )}
                                     </span>
                                 </div>
                             </div>
@@ -274,17 +280,21 @@ function SidebarContent({
                             </motion.div>
                         </div>
                     )}
-        
+
                     <ProjectSwitcher className="w-full" />
-        
+
                     <motion.button
                         type="button"
                         onClick={() => {
                             void logout();
                         }}
                         disabled={status === 'loading'}
-                        whileHover={status === 'loading' ? undefined : { scale: 1.02 }}
-                        whileTap={status === 'loading' ? undefined : { scale: 0.98 }}
+                        whileHover={
+                            status === 'loading' ? undefined : { scale: 1.02 }
+                        }
+                        whileTap={
+                            status === 'loading' ? undefined : { scale: 0.98 }
+                        }
                         transition={hoverSpringToken}
                         className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                     >
@@ -327,7 +337,10 @@ export function SideBar() {
 
     return (
         <>
-            <aside aria-label="Desktop Sidebar" className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex">
+            <aside
+                aria-label="Desktop Sidebar"
+                className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex"
+            >
                 <SidebarContent
                     aria-label="Desktop Navigation"
                     hasPmAttentionItems={hasPmAttentionItems}
@@ -345,7 +358,9 @@ export function SideBar() {
 
                 <button
                     type="button"
-                    aria-label={isMobileSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+                    aria-label={
+                        isMobileSidebarOpen ? 'Close sidebar' : 'Open sidebar'
+                    }
                     aria-expanded={isMobileSidebarOpen}
                     onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
                     className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
