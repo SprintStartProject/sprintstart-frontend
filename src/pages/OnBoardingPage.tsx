@@ -35,6 +35,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckModal";
 import { useMoments } from "../features/moments";
+import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 //import type {UserProfile} from "../services/types.ts";
 
 type LoadingState = "idle" | "loading" | "generating" | "success" | "error";
@@ -115,6 +116,14 @@ export function OnBoardingPage() {
   // The "on board" finale now lives in the moments layer, so that it can take
   // over the screen rather than render inside this page's tree.
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
+
+  // The reveal of a freshly built path, the first time its owner sees it.
+  // Handed the path only once the page is showing it: whichever way the user
+  // got here — waiting out the generator or opening onboarding days after it
+  // finished — this is the moment the path first exists for them.
+  usePathRevealMoment(
+    loadingState === "success" ? OnBoardingPathEndpoint : null,
+  );
 
   const navigate = useNavigate();
 

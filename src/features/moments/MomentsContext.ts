@@ -27,7 +27,24 @@ export interface MomentsContextValue {
      * quieter than this.
      */
     completeMission: () => void;
-    /** Replays the launch sequence (used by the post-login trigger and dev tools). */
+    /**
+     * Launches the rocket off Earth and hands over to the page underneath. For
+     * the first time someone opens a finished onboarding path — whether they
+     * watched it being generated or it was waiting for them when they arrived.
+     *
+     * Takes nothing and shows no copy: it is a transition onto the path, not a
+     * message about it. Deciding *whether* this is that first time is the
+     * caller's job (see `usePathRevealMoment`); this only plays it.
+     */
+    revealPath: () => void;
+    /**
+     * Plays the arcing launch sequence.
+     *
+     * No longer fires on boot — that is the CSS splash in `index.html`, which
+     * is the only thing that can cover a load that starts before this bundle
+     * and survives Keycloak's silent-SSO redirect. This is left for on-demand
+     * use (dev tools today).
+     */
     playLaunchSequence: () => void;
     /** True while the launch sequence covers the screen. */
     isLaunching: boolean;

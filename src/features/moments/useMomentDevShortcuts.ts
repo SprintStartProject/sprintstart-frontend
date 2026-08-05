@@ -12,11 +12,12 @@ interface DevShortcutHandlers {
     celebrate: (input: CelebrationInput) => void;
     flyby: () => void;
     completeMission: () => void;
+    revealPath: () => void;
     playLaunchSequence: () => void;
 }
 
 /** Physical key -> which moment it fires. */
-const CHORDS = ["Digit4", "Digit5", "Digit6", "Digit7"] as const;
+const CHORDS = ["Digit4", "Digit5", "Digit6", "Digit7", "Digit8"] as const;
 
 /**
  * Keyboard chords for triggering each moment on demand, in development only.
@@ -32,6 +33,7 @@ const CHORDS = ["Digit4", "Digit5", "Digit6", "Digit7"] as const;
  * | Ctrl+Shift+5   | phase cleared (with ring)  |
  * | Ctrl+Shift+6   | onboarding finale          |
  * | Ctrl+Shift+7   | login launch sequence      |
+ * | Ctrl+Shift+8   | new path launch            |
  *
  * Digits continue the existing easter-egg chords (Ctrl+Shift+1/2/3 for the
  * dino, 2048 and Space Invaders) rather than starting a second scheme on
@@ -49,6 +51,7 @@ export function useMomentDevShortcuts({
     celebrate,
     flyby,
     completeMission,
+    revealPath,
     playLaunchSequence,
 }: DevShortcutHandlers) {
     useEffect(() => {
@@ -86,10 +89,13 @@ export function useMomentDevShortcuts({
                 case "Digit7":
                     playLaunchSequence();
                     break;
+                case "Digit8":
+                    revealPath();
+                    break;
             }
         }
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [celebrate, flyby, completeMission, playLaunchSequence]);
+    }, [celebrate, flyby, completeMission, revealPath, playLaunchSequence]);
 }

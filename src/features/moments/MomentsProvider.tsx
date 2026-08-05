@@ -1,18 +1,21 @@
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { useAuth } from "../../context/useAuth.ts";
+import { dismissBootSplash, rememberBootGreeting } from "../../bootSplash.ts";
 import { MomentsContext } from "./MomentsContext.ts";
 import { useMomentDevShortcuts } from "./useMomentDevShortcuts.ts";
 import { LaunchSequence } from "./components/LaunchSequence.tsx";
 import { MomentCelebration } from "./components/MomentCelebration.tsx";
 import { MissionComplete } from "./components/MissionComplete.tsx";
+import { PathReveal } from "./components/PathReveal.tsx";
 import { RocketFlyby } from "./components/RocketFlyby.tsx";
 import type { Celebration, CelebrationInput } from "./types.ts";
 
 /**
- * Owns the app's celebratory layer: the launch sequence that covers boot, and
- * the queue of celebration overlays.
+ * Owns the app's celebratory layer: the celebration overlays, the rocket
+ * moments, and the hand-over from the boot splash that `index.html` paints
+ * before this bundle exists.
  *
  * Must sit inside `AuthProvider` — it reads the auth status to stay off the
  * login screen. Renders its overlays as siblings of `children`; both portal
@@ -23,22 +26,58 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
     const { status, profile } = useAuth();
     const reduceMotion = useReducedMotion();
 
-    const [hasLaunchPlayed, setHasLaunchPlayed] = useState(false);
+    // Starts "played": boot is covered by the splash in `index.html`, not by
+    // this. The sequence is now only what `playLaunchSequence` asks for.
+    const [hasLaunchPlayed, setHasLaunchPlayed] = useState(true);
     const [queue, setQueue] = useState<Celebration[]>([]);
     const [flybyId, setFlybyId] = useState<number | null>(null);
     const [isMissionComplete, setIsMissionComplete] = useState(false);
+    const [pathRevealId, setPathRevealId] = useState<number | null>(null);
     const nextId = useRef(0);
 
-    // Runs from mount, while `status` is still "loading" — the sequence covers
-    // Keycloak's check-sso and the profile fetch, so the app boots behind it
-    // instead of after it. Signing in is a redirect, so a fresh sign-in is a
-    // fresh page load and gets the sequence for free.
+    // Boot is *not* covered from here any more, and that is the fix for a
+    // launch that used to stutter, cut to black and then start over.
     //
-    // Bailing on "unauthenticated" is what keeps it off the login screen:
+    // Keycloak runs `check-sso` with the login iframe off, which is a full
+    // redirect out to the identity provider and back on every single load. A
+    // sequence started at mount therefore played into a page that was already
+    // on its way out: it janked against the bundle still parsing, the redirect
+    // blacked it out mid-flight, and the reload then played it again from the
+    // top. Nothing about that is fixable from inside React, because two of the
+    // three phases happen before this component exists.
+    //
+    // So the load is covered by the CSS splash in `index.html` — it paints on
+    // the first frame of *both* page loads and animates on the compositor — and
+    // this is left for `playLaunchSequence`.
+    //
+    // Bailing on "unauthenticated" still keeps it off the login screen:
     // launching a rocket at someone who then gets asked to sign in is a promise
     // the app cannot keep.
     const isLaunching =
         !hasLaunchPlayed && !reduceMotion && status !== "unauthenticated";
+
+    // The splash's cue to leave: the app now knows what it is showing, whether
+    // that is the app or the login screen. Deliberately not tied to the route or
+    // to data loading — a splash that waits for content outstays the moment it
+    // was covering and starts reading as a hang. It will not cut the launch
+    // short either; `dismissBootSplash` holds the fade until the flight is over.
+    //
+    // The greeting is stashed on the way past: the splash renders before any of
+    // the app exists, so the only name it can say is one from a previous visit.
+    useEffect(() => {
+        if (status === "loading") return;
+
+        if (status === "authenticated") {
+            rememberBootGreeting(profile?.firstName);
+            dismissBootSplash();
+            return;
+        }
+
+        // Signed out: the login form is next, and finishing a launch in front
+        // of it would be a send-off for a journey this person has not started.
+        rememberBootGreeting(null);
+        dismissBootSplash("now");
+    }, [status, profile?.firstName]);
 
     const playLaunchSequence = useCallback(() => setHasLaunchPlayed(false), []);
     const finishLaunch = useCallback(() => setHasLaunchPlayed(true), []);
@@ -74,11 +113,25 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
 
     const completeMission = useCallback(() => setIsMissionComplete(true), []);
 
+    // Not queued behind `celebrate`: the reveal is the first thing that happens
+    // on a brand-new path, so there is nothing for it to collide with, and
+    // holding it behind a queue would put it on screen after the user has
+    // already started reading the page it is introducing.
+    const revealPath = useCallback(() => {
+        setPathRevealId((current) => (current === null ? Date.now() : current));
+    }, []);
+
+    // Stable identity, for the same reason `endFlyby` is: `PathReveal` runs its
+    // beats off timers keyed to this callback, and a fresh closure on every
+    // provider render would keep resetting them.
+    const endPathReveal = useCallback(() => setPathRevealId(null), []);
+
     // TEMPORARY — remove this call together with the hook before merging to dev.
     useMomentDevShortcuts({
         celebrate,
         flyby,
         completeMission,
+        revealPath,
         playLaunchSequence,
     });
 
@@ -87,10 +140,18 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
             celebrate,
             flyby,
             completeMission,
+            revealPath,
             playLaunchSequence,
             isLaunching,
         }),
-        [celebrate, flyby, completeMission, playLaunchSequence, isLaunching],
+        [
+            celebrate,
+            flyby,
+            completeMission,
+            revealPath,
+            playLaunchSequence,
+            isLaunching,
+        ],
     );
 
     const current = queue[0];
@@ -116,6 +177,10 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
                     celebration={current}
                     onDismiss={dismissCurrent}
                 />
+            )}
+
+            {pathRevealId !== null && (
+                <PathReveal key={pathRevealId} onDone={endPathReveal} />
             )}
 
             {isMissionComplete && (
