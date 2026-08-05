@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useMoments } from "../../moments";
 import type { OnboardingPathEndpoint } from "../types";
 
@@ -61,36 +61,71 @@ function isPathUntouched(path: OnboardingPathEndpoint): boolean {
 }
 
 /**
- * Plays the launch the first time someone sees a finished onboarding path.
+ * Offers the launch the first time someone opens a finished onboarding path.
  *
  * Both ways in are the same case here, which is why this hangs off the loaded
  * path rather than off the generator finishing: it fires whether the user
  * watched their path being built or it was generated earlier and they are only
  * now opening onboarding.
  *
- * Pass `null` while the page is loading, generating or in error — the reveal
+ * Pass `null` while the page is loading, generating or in error — the launch
  * belongs on a path that is actually on screen behind it.
  *
- * Guarded twice against replaying: `localStorage` across sessions, and a ref
- * for this mount, because the page re-fetches the path in place after a
- * knowledge check and would otherwise hand over a new object for the same path.
+ * **Spent on launch, not on sight.** The rocket waits for the user to set it
+ * off, and only that marks the path. Someone who opens onboarding, clicks
+ * through to chat and comes back finds the rocket waiting again, because a
+ * launch they never fired is not one they have had. The alternative — marking
+ * when it is merely shown — turns a two-second detour into permanently missing
+ * the one moment the path gets.
+ *
+ * The mount-scoped ref is separate from that: it stops a *second* offer inside
+ * one visit, since the page re-fetches its path in place and would otherwise
+ * hand over a new object for a path already on the pad.
+ *
+ * Runs as a layout effect so the overlay is committed in the same paint that
+ * first shows the path. With a plain effect the browser paints the finished
+ * page, *then* the rocket lands on top of it — a frame of the path flashing
+ * out from behind its own launch, every time someone opens onboarding.
  */
 export function usePathRevealMoment(path: OnboardingPathEndpoint | null): void {
     const { revealPath } = useMoments();
-    const revealedRef = useRef<string | null>(null);
+    const offeredRef = useRef<string | null>(null);
+    const endLaunchRef = useRef<(() => void) | null>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!path) return;
-        if (revealedRef.current === path.id) return;
+        if (offeredRef.current === path.id) return;
         if (readRevealedPathId() === path.id) return;
         if (!isPathUntouched(path)) return;
 
-        // Marked before playing, not after: the reveal is dismissed by the user
-        // and there is no guarantee they ever get round to it — closing the tab
-        // mid-animation still counts as having been shown it.
-        revealedRef.current = path.id;
-        markRevealed(path.id);
+        const pathId = path.id;
+        offeredRef.current = pathId;
 
-        revealPath();
+        endLaunchRef.current = revealPath({
+            onLaunched: () => markRevealed(pathId),
+        });
     }, [path, revealPath]);
+
+    // The launch belongs to this page and ends when the page does — not when
+    // the user clicks the sidebar. Those are not the same instant: the router
+    // keeps the current view on screen while a navigation is pending, so
+    // closing on the click uncovers the path for however long that takes,
+    // which is the flash you get on the way out. Unmounting is exactly when
+    // the new view takes over.
+    //
+    // Deliberately its own effect with no dependencies: putting the disposer
+    // on the effect above would fire it whenever the path object changes
+    // identity — a refetch would silently kill a launch still on the pad.
+    //
+    // A layout effect, so the teardown lands in the same commit as the page
+    // swap. A passive one runs after the browser has painted, which leaves a
+    // frame of the launch sitting on top of the view the user just moved to —
+    // the same flash as before, only pointing the other way.
+    useLayoutEffect(
+        () => () => {
+            endLaunchRef.current?.();
+            endLaunchRef.current = null;
+        },
+        [],
+    );
 }

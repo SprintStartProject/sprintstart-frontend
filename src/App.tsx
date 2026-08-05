@@ -18,7 +18,13 @@ function AppContent() {
         <div className="flex min-h-screen w-full bg-app-bg text-app-text">
             {showSidebar && <SideBar />}
 
-            <main className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
+            {/* `data-moment-stage`: the area the page-scoped moments (the
+                onboarding launch and landing) cover, instead of the whole
+                screen — see momentStage.ts in the moments feature. */}
+            <main
+                data-moment-stage
+                className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0"
+            >
                 <AppRouter />
             </main>
 

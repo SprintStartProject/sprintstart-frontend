@@ -10,7 +10,11 @@ import { MomentCelebration } from "./components/MomentCelebration.tsx";
 import { MissionComplete } from "./components/MissionComplete.tsx";
 import { PathReveal } from "./components/PathReveal.tsx";
 import { RocketFlyby } from "./components/RocketFlyby.tsx";
-import type { Celebration, CelebrationInput } from "./types.ts";
+import type {
+    Celebration,
+    CelebrationInput,
+    PathRevealHandlers,
+} from "./types.ts";
 
 /**
  * Owns the app's celebratory layer: the celebration overlays, the rocket
@@ -32,7 +36,10 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
     const [queue, setQueue] = useState<Celebration[]>([]);
     const [flybyId, setFlybyId] = useState<number | null>(null);
     const [isMissionComplete, setIsMissionComplete] = useState(false);
-    const [pathRevealId, setPathRevealId] = useState<number | null>(null);
+    const [pathReveal, setPathReveal] = useState<{
+        id: number;
+        onLaunched?: () => void;
+    } | null>(null);
     const nextId = useRef(0);
 
     // Boot is *not* covered from here any more, and that is the fix for a
@@ -117,14 +124,24 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
     // on a brand-new path, so there is nothing for it to collide with, and
     // holding it behind a queue would put it on screen after the user has
     // already started reading the page it is introducing.
-    const revealPath = useCallback(() => {
-        setPathRevealId((current) => (current === null ? Date.now() : current));
+    const revealPath = useCallback((handlers?: PathRevealHandlers) => {
+        const id = Date.now();
+
+        setPathReveal(
+            (current) => current ?? { id, onLaunched: handlers?.onLaunched },
+        );
+
+        // Only clears the launch this call actually started. A disposer that
+        // fired unconditionally would let a page unmounting late take down a
+        // launch that something else has since put up.
+        return () =>
+            setPathReveal((current) => (current?.id === id ? null : current));
     }, []);
 
     // Stable identity, for the same reason `endFlyby` is: `PathReveal` runs its
     // beats off timers keyed to this callback, and a fresh closure on every
     // provider render would keep resetting them.
-    const endPathReveal = useCallback(() => setPathRevealId(null), []);
+    const endPathReveal = useCallback(() => setPathReveal(null), []);
 
     // TEMPORARY — remove this call together with the hook before merging to dev.
     useMomentDevShortcuts({
@@ -179,8 +196,12 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
                 />
             )}
 
-            {pathRevealId !== null && (
-                <PathReveal key={pathRevealId} onDone={endPathReveal} />
+            {pathReveal && (
+                <PathReveal
+                    key={pathReveal.id}
+                    onLaunch={pathReveal.onLaunched}
+                    onDone={endPathReveal}
+                />
             )}
 
             {isMissionComplete && (

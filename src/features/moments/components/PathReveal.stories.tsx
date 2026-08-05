@@ -26,10 +26,12 @@ function Replayable({ dark }: StoryArgs) {
     return (
         <div className="flex min-h-[560px] flex-col items-center justify-center gap-4 bg-app-bg">
             <p className="max-w-sm text-center text-sm text-app-text-muted">
-                Four beats: the rocket stands on Earth, lights up, climbs while the
-                planet falls away, then leaves through the top and takes the sky
-                with it — uncovering whatever is underneath. Click or press a key
-                to cut straight to the hand-over.
+                The rocket waits on the pad until the first key or click sets it
+                off; then it lights up, climbs while the planet falls away, and
+                leaves through the top, taking the sky with it. A second input
+                cuts straight to the hand-over. In the app it covers only the
+                content area — here, with no marked stage, it takes the whole
+                viewport.
             </p>
 
             <button

@@ -2,7 +2,7 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
@@ -174,8 +174,22 @@ export function OnBoardingPage() {
     if (submittedAttempt) void refreshPath();
   };
 
-  // Triggers AI path generation and streams progress until a path is produced.
-  const generatePath = async () => {
+  /**
+   * Triggers AI path generation and streams progress until a path is produced.
+   *
+   * `recoverExisting` handles the one failure that is not really a failure: a
+   * user has exactly one path, so a generation that collides with an existing
+   * one means somebody else already built it — a duplicate request, a second
+   * tab, a retry after a dropped connection. The backend answers with a unique
+   * constraint violation, which is true but useless to the user, and the path
+   * they were promised is sitting there ready. So the initial load asks for it
+   * once before it gives up.
+   *
+   * Deliberately not set for the "regenerate" button: there, an existing path
+   * is precisely what the user asked to replace, and quietly handing back the
+   * old one would look like the button does nothing.
+   */
+  const generatePath = async ({ recoverExisting = false } = {}) => {
     setLoadingState("generating");
     setGenerationStage(null);
     setGameActive(false);
@@ -184,8 +198,21 @@ export function OnBoardingPage() {
       onPath: (path) => setOnBoardingPath(path),
       onDone: () => setLoadingState("success"),
       onError: (message) => {
-        setLoadingState("error");
-        setErrorMessage(message);
+        void (async () => {
+          if (recoverExisting) {
+            try {
+              const path = await onboardingService.fetchPath();
+              setOnBoardingPath(path);
+              setSelectedPhaseIndex(findActivePhaseIndex(path));
+              setLoadingState("success");
+              return;
+            } catch {
+              // Nothing there after all — the original error stands.
+            }
+          }
+          setLoadingState("error");
+          setErrorMessage(message);
+        })();
       },
     });
   };
@@ -233,7 +260,17 @@ export function OnBoardingPage() {
 
   // ── DATA FETCHING using useEffect ─────────────────────────────
 
+  // Guards the load against running twice. StrictMode invokes every effect
+  // twice in development, and this one can *create* something: two loads both
+  // find no path, both start a generation, and the second one collides with
+  // the row the first just inserted. The user is then shown a unique
+  // constraint violation for a path that was built perfectly well.
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+
     const loadOnBoardingPath = async () => {
       setLoadingState("loading");
       try {
@@ -248,7 +285,7 @@ export function OnBoardingPage() {
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           // No path generated yet — kick off AI personalization instead of erroring out.
-          void generatePath();
+          void generatePath({ recoverExisting: true });
           return;
         }
         setLoadingState("error");

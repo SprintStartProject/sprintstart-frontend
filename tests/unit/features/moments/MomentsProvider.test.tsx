@@ -32,7 +32,7 @@ function Trigger() {
             <button onClick={playLaunchSequence}>launch</button>
             <button onClick={flyby}>fly</button>
             <button onClick={completeMission}>finish</button>
-            <button onClick={revealPath}>reveal</button>
+            <button onClick={() => revealPath()}>reveal</button>
             <button
                 onClick={() =>
                     celebrate({
@@ -280,11 +280,13 @@ describe('MomentsProvider', () => {
 
         await user.click(screen.getByText('reveal'));
 
+        // Opens waiting on the pad: the first input is the launch button, and
+        // the prompt says so.
         expect(await screen.findByTestId('path-reveal')).toBeInTheDocument();
-        expect(screen.getByText('Press any key to skip')).toBeInTheDocument();
+        expect(screen.getByText('Press any key to launch')).toBeInTheDocument();
     });
 
-    it('tears the launch down on its own, so it can never sit over the app', async () => {
+    it('waits on the pad for as long as it takes, then flies itself out once lit', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -297,12 +299,20 @@ describe('MomentsProvider', () => {
         await user.click(screen.getByText('reveal'));
         expect(screen.getByTestId('path-reveal')).toBeInTheDocument();
 
-        // It ends by handing over to the page rather than by being dismissed:
-        // there is no button to press, so the beats have to run themselves out.
-        // Advanced one beat at a time: each stage only schedules the next once
-        // its own state update has been flushed, so a single long jump would
-        // fire the first timer and then find an empty queue.
-        for (let beat = 0; beat < 6; beat++) {
+        // No timer stands in for the user: someone who steps away comes back
+        // to a rocket still waiting for them, however long that was.
+        act(() => {
+            vi.advanceTimersByTime(60_000);
+        });
+        expect(screen.getByText('Press any key to launch')).toBeInTheDocument();
+
+        // Once lit, the remaining beats run themselves out — the launch ends by
+        // handing over to the page, not by being dismissed. Advanced one beat
+        // at a time: each stage only schedules the next once its own state
+        // update has been flushed, so a single long jump would fire the first
+        // timer and then find an empty queue.
+        await user.keyboard('{Enter}');
+        for (let beat = 0; beat < 4; beat++) {
             act(() => {
                 vi.advanceTimersByTime(1000);
             });
@@ -323,7 +333,11 @@ describe('MomentsProvider', () => {
         await user.click(screen.getByText('reveal'));
         expect(await screen.findByTestId('path-reveal')).toBeInTheDocument();
 
-        // First input cuts to the hand-over, second takes the rest of it.
+        // First input is the launch itself...
+        await user.keyboard('{Escape}');
+        expect(screen.getByText('Press any key to skip')).toBeInTheDocument();
+
+        // ...the second cuts to the hand-over, the third takes the rest.
         await user.keyboard('{Escape}');
         await user.keyboard('{Escape}');
 

@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { CelebrationInput } from "./types.ts";
+import type { CelebrationInput, PathRevealHandlers } from "./types.ts";
 
 /**
  * Shape of the moments context.
@@ -28,15 +28,23 @@ export interface MomentsContextValue {
      */
     completeMission: () => void;
     /**
-     * Launches the rocket off Earth and hands over to the page underneath. For
-     * the first time someone opens a finished onboarding path — whether they
-     * watched it being generated or it was waiting for them when they arrived.
+     * Puts a rocket on the pad, waiting for the user to launch it off Earth,
+     * and hands over to the page underneath once it has gone. For the first
+     * time someone opens a finished onboarding path — whether they watched it
+     * being generated or it was waiting for them when they arrived.
      *
-     * Takes nothing and shows no copy: it is a transition onto the path, not a
-     * message about it. Deciding *whether* this is that first time is the
-     * caller's job (see `usePathRevealMoment`); this only plays it.
+     * Shows no copy: it is a transition onto the path, not a message about it.
+     * Deciding *whether* this is that first time is the caller's job (see
+     * `usePathRevealMoment`); this only offers it, and reports back through
+     * `onLaunched` when the user actually takes it.
+     *
+     * Returns a disposer that takes the launch back down. Callers should tie it
+     * to the lifetime of the page the moment belongs to — the launch outlives
+     * any single click, and only the page going away means the user has left.
+     * Calling it after the launch has already ended, or when another one has
+     * since taken over, does nothing.
      */
-    revealPath: () => void;
+    revealPath: (handlers?: PathRevealHandlers) => () => void;
     /**
      * Plays the arcing launch sequence.
      *
