@@ -134,6 +134,20 @@ export function ChatPage() {
         }
     }
 
+    // E5: replacement for the live region that used to wrap the message list.
+    // `ThinkingIndicator` already carries `role="status"` for the working
+    // state, so this only needs to report that a turn has finished. Gated on
+    // the chat id as well: switching away from a streaming chat also clears
+    // the busy flags, and that must not be announced as a finished answer.
+    const busy = isThinking || isStreaming;
+    const [announcement, setAnnouncement] = useState("");
+    const [prevTurn, setPrevTurn] = useState({ chatId, busy });
+    if (prevTurn.chatId !== chatId || prevTurn.busy !== busy) {
+        const finished = prevTurn.chatId === chatId && prevTurn.busy && !busy;
+        setPrevTurn({ chatId, busy });
+        setAnnouncement(finished ? "Response complete." : "");
+    }
+
     // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
     useEffect(() => {
         const handleUnlockChange = () => {
@@ -321,11 +335,11 @@ export function ChatPage() {
                 <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">
                     {!chatId && <ChatEmptyState onPickSuggestion={fillSuggestion} />}
 
-                    <div
-                        className="app-page-frame flex w-full flex-col gap-8 py-8"
-                        aria-live="polite"
-                        aria-atomic="false"
-                    >
+                    {/* E5: deliberately NOT a live region. Marking the message
+                        list `aria-live` made screen readers re-announce the
+                        whole answer on every streamed token; the sr-only
+                        status node below announces the end of a turn instead. */}
+                    <div className="app-page-frame flex w-full flex-col gap-8 py-8">
                         {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
                             switch, new messages). Per AGENTS.md §11. */}
@@ -366,6 +380,10 @@ export function ChatPage() {
                             thinkingState={thinkingState}
                             onGameExit={() => setGameActive(false)}
                         />
+
+                        <div className="sr-only" role="status" aria-live="polite">
+                            {announcement}
+                        </div>
 
                         <div ref={bottomRef} />
                     </div>

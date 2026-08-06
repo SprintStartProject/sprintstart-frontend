@@ -29,6 +29,16 @@ export type ChatContextValue = {
     streamingMessageId: string | null;
     thinkingState: string | null;
 
+    /**
+     * The chat the in-flight stream belongs to, or `null` when nothing is
+     * running. The four flags above are global (only one stream runs at a
+     * time), so consumers MUST gate them on this id — otherwise the thinking
+     * indicator, the composer's busy state and the stop button leak into
+     * whatever chat the user has since navigated to. `useChat` does this
+     * gating; prefer its derived values over reading the raw flags here.
+     */
+    streamingChatId: string | null;
+
     selectedCitation: SelectedCitation | null;
     setSelectedCitation: (value: SelectedCitation | null) => void;
 

@@ -12,6 +12,14 @@ const DRAFT_KEY = (chatId: string | undefined) =>
     `chatDraft.${chatId ?? "__new__"}`;
 
 /**
+ * Sentinel for "the draft ref has not been initialized yet", so the swap effect
+ * below can tell a first run (mount — nothing to save, load the stored draft)
+ * apart from a real chat switch. `undefined` can't be used: it's a valid chatId
+ * value meaning "new chat".
+ */
+const DRAFT_UNINITIALIZED = Symbol("draftUninitialized");
+
+/**
  * Consumes the global {@link ChatContext} and combines it with router params
  * (`chatId`) and component-local UI state (sidebar toggle, DOM refs, scroll
  * behavior). The heavy lifting — message state, streaming, filters — lives in
@@ -46,6 +54,7 @@ export function useChat() {
         isStreaming,
         streamingMessageId,
         thinkingState,
+        streamingChatId,
         selectedCitation,
         setSelectedCitation,
         newRequest,
@@ -90,6 +99,20 @@ export function useChat() {
     }, [chats, chatId]);
 
     /**
+     * The provider's streaming flags are global (one stream at a time), so they
+     * have to be attributed to the chat that started the stream before any UI
+     * reads them. Ungated, the thinking indicator, the composer's busy state and
+     * the stop button all follow the user into whatever chat they switch to —
+     * and the stop button would abort a stream belonging to a different chat.
+     */
+    const isActiveChatStreaming = streamingChatId !== null && streamingChatId === chatId;
+
+    const stopActiveStream = useCallback(() => {
+        if (!isActiveChatStreaming) return;
+        stopStreaming();
+    }, [isActiveChatStreaming, stopStreaming]);
+
+    /**
      * Loads messages from the backend when a chat is opened for the first time
      * (not yet cached in `messagesByChat`). If the user navigates away and
      * comes back, cached messages are shown immediately — no refetch.
@@ -130,11 +153,17 @@ export function useChat() {
     useEffect(() => {
         const chatChanged = chatId !== prevChatIdRef.current;
         const messageAdded = messages.length > prevMessageCountRef.current;
+        // An uncached chat renders empty for one frame while `loadMessages`
+        // is in flight, so the switch above jumps to the bottom of nothing.
+        // Its history arriving is still part of opening the chat — without
+        // this it counts as "new messages" and smooth-scrolls through the
+        // entire thread.
+        const wasEmpty = prevMessageCountRef.current === 0;
 
         prevChatIdRef.current = chatId;
         prevMessageCountRef.current = messages.length;
 
-        if (chatChanged) {
+        if (chatChanged || (messageAdded && wasEmpty)) {
             bottomRef.current?.scrollIntoView({ behavior: "auto" });
             return;
         }
@@ -153,17 +182,28 @@ export function useChat() {
     // chatId's draft is loaded — so in-progress text survives chat switching
     // and page refreshes. A debounced save keeps localStorage in sync while
     // the user types.
-    const draftChatIdRef = useRef<string | undefined>(chatId);
+    // Starts uninitialized rather than at `chatId`: `newRequest` lives in the
+    // provider and outlives this hook, so seeding it with the current chat made
+    // the effect bail on mount — the stored draft was never loaded (a reload
+    // then dropped it, because the debounce below saw an empty composer), and
+    // arriving from another page carried the previous chat's text over and
+    // overwrote the new chat's draft with it.
+    const draftChatIdRef = useRef<string | undefined | typeof DRAFT_UNINITIALIZED>(
+        DRAFT_UNINITIALIZED,
+    );
 
     useEffect(() => {
         const prevChatId = draftChatIdRef.current;
         if (prevChatId === chatId) return;
 
         // Save the draft for the chat we're leaving, then load the new one.
-        if (newRequest) {
-            localStorage.setItem(DRAFT_KEY(prevChatId), newRequest);
-        } else {
-            localStorage.removeItem(DRAFT_KEY(prevChatId));
+        // On the first run there is no chat being left — only load.
+        if (prevChatId !== DRAFT_UNINITIALIZED) {
+            if (newRequest) {
+                localStorage.setItem(DRAFT_KEY(prevChatId), newRequest);
+            } else {
+                localStorage.removeItem(DRAFT_KEY(prevChatId));
+            }
         }
 
         draftChatIdRef.current = chatId;
@@ -218,17 +258,19 @@ export function useChat() {
 
         handleSubmit,
         addMessage,
-        stopStreaming,
+        stopStreaming: stopActiveStream,
 
         newRequest,
         setNewRequest,
 
-        isThinking,
-        isStreaming,
+        // Gated on `isActiveChatStreaming` — see the note above. Consumers get
+        // "is *this* chat working", never "is any chat working".
+        isThinking: isThinking && isActiveChatStreaming,
+        isStreaming: isStreaming && isActiveChatStreaming,
 
-        thinkingState,
+        thinkingState: isActiveChatStreaming ? thinkingState : null,
 
-        streamingMessageId,
+        streamingMessageId: isActiveChatStreaming ? streamingMessageId : null,
 
         selectedCitation,
         setSelectedCitation,

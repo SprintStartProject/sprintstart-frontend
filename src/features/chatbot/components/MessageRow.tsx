@@ -80,8 +80,11 @@ function MessageRowImpl({
     }
 
     // Suppress the empty assistant placeholder while the assistant is still
-    // thinking (no tokens yet) — the ThinkingIndicator renders instead.
-    if (message.role === "ASSISTANT" && message.content === "" && isThinking) {
+    // thinking (no tokens yet) — the ThinkingIndicator renders instead. A
+    // bubble that carries an error is never suppressed: an interrupted or
+    // stopped turn leaves exactly that (empty content + error) and would
+    // otherwise stay invisible for the rest of the session.
+    if (message.role === "ASSISTANT" && message.content === "" && !message.error && isThinking) {
         return null;
     }
 

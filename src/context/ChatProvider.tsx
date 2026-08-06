@@ -61,6 +61,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
     const [thinkingState, setThinkingState] = useState<string | null>(null);
 
+    // The chat the in-flight stream belongs to. The flags above are global
+    // (one stream at a time), so without this the thinking indicator, the
+    // composer's busy state and the stop button follow the user into whatever
+    // chat they switch to. Consumers gate on this in `useChat`.
+    const [streamingChatId, setStreamingChatId] = useState<string | null>(null);
+
     const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
     const [newRequest, setNewRequest] = useState("");
 
@@ -203,6 +209,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setIsStreaming(false);
             setStreamingMessageId(null);
             setThinkingState(null);
+            setStreamingChatId(null);
             setMessagesByChat({});
 
             try {
@@ -263,6 +270,33 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // Invalidate any previous stream so its handlers can't clobber state.
         const thisStreamId = ++streamIdRef.current;
 
+        // Settle a stream that is still in flight before starting a new one.
+        // The id bump above already silenced its handlers, so without this the
+        // request would keep streaming in the background while its chat kept an
+        // empty assistant bubble forever — no content, no error, and no refetch
+        // (`loadMessages` skips chats that are already cached).
+        const orphan = draftRef.current;
+        clearStreamTimeout();
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
+        if (orphan) {
+            cancelDraft();
+            flushDraft();
+            draftRef.current = null;
+            // Partial content stays visible, exactly like a manual stop. Only a
+            // bubble that never received a token needs an explanation.
+            if (!orphan.content) {
+                setMessagesByChat(prev => ({
+                    ...prev,
+                    [orphan.chatId]: (prev[orphan.chatId] ?? []).map(m =>
+                        m.id === orphan.assistantId
+                            ? { ...m, error: "Interrupted by a new message.", isStreaming: false }
+                            : m
+                    )
+                }));
+            }
+        }
+
         let currentChatId = chatId;
         let shouldNavigate = false;
         let chatForMessages: Chat | undefined;
@@ -319,6 +353,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }));
 
         setIsThinking(true);
+        // A follow-up sent mid-stream would otherwise inherit the previous
+        // stream's flags — a caret on a message that no longer receives tokens
+        // and the previous turn's tool label under the dots.
+        setIsStreaming(false);
+        setStreamingMessageId(null);
+        setThinkingState(null);
+        setStreamingChatId(currentChatId);
         streamingStartedRef.current = false;
 
         // Initialize the rAF-batched draft so token/reasoning/citation events
@@ -383,6 +424,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setIsStreaming(false);
             setIsThinking(false);
             setStreamingMessageId(null);
+            // Without this the last tool label survives the turn and is shown
+            // again at the start of the next one, before the first real
+            // `tool_use` event arrives.
+            setThinkingState(null);
+            setStreamingChatId(null);
         };
 
         try {
@@ -517,6 +563,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clearStreamTimeout();
         cancelDraft();
         flushDraft();
+        const stopped = draftRef.current;
         draftRef.current = null;
         abortControllerRef.current?.abort();
         abortControllerRef.current = null;
@@ -524,7 +571,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setIsStreaming(false);
         setIsThinking(false);
         setStreamingMessageId(null);
-    }, [cancelDraft, flushDraft, clearStreamTimeout]);
+        setThinkingState(null);
+        setStreamingChatId(null);
+
+        // Stopping before the first token would otherwise leave a bare empty
+        // bubble — the placeholder is only hidden while `isThinking` is true.
+        if (stopped && !stopped.content) {
+            setMessagesByChat(prev => ({
+                ...prev,
+                [stopped.chatId]: (prev[stopped.chatId] ?? []).map(m =>
+                    m.id === stopped.assistantId
+                        ? { ...m, error: "Stopped before the assistant replied.", isStreaming: false }
+                        : m
+                )
+            }));
+        }
+
+        // The abort reaches `onDone` with an already-invalidated stream id, so
+        // its `refreshChats` is skipped — a chat stopped right after creation
+        // would keep the client-side fallback title forever.
+        void refreshChats().catch(e => console.error("Failed to refresh chats", e));
+    }, [cancelDraft, flushDraft, clearStreamTimeout, refreshChats]);
 
     const value: ChatContextValue = {
         chats,
@@ -534,6 +601,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         isStreaming,
         streamingMessageId,
         thinkingState,
+        streamingChatId,
         selectedCitation,
         setSelectedCitation,
         newRequest,
