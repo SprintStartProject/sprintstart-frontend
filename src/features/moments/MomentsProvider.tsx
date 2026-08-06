@@ -16,6 +16,18 @@ import type {
     PathRevealHandlers,
 } from "./types.ts";
 
+const ROCKET_PET_KEY = "sprintstart.moments.showRocketPet";
+
+/** Off unless the user has explicitly turned it on in Settings. */
+function getInitialShowRocketPet(): boolean {
+    try {
+        return window.localStorage.getItem(ROCKET_PET_KEY) === "true";
+    } catch (error) {
+        console.warn("Failed to read rocket pet preference", error);
+        return false;
+    }
+}
+
 /**
  * Owns the app's celebratory layer: the celebration overlays, the rocket
  * moments, and the hand-over from the boot splash that `index.html` paints
@@ -41,6 +53,7 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
         onLaunched?: () => void;
     } | null>(null);
     const nextId = useRef(0);
+    const [showRocketPet, setShowRocketPetState] = useState(getInitialShowRocketPet);
 
     // Boot is *not* covered from here any more, and that is the fix for a
     // launch that used to stutter, cut to black and then start over.
@@ -85,6 +98,16 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
         rememberBootGreeting(null);
         dismissBootSplash("now");
     }, [status, profile?.firstName]);
+
+    const setShowRocketPet = useCallback((value: boolean) => {
+        setShowRocketPetState(value);
+        try {
+            window.localStorage.setItem(ROCKET_PET_KEY, String(value));
+        } catch (error) {
+            // Won't survive a reload, but stays in effect for this session.
+            console.warn("Failed to persist rocket pet preference", error);
+        }
+    }, []);
 
     const playLaunchSequence = useCallback(() => setHasLaunchPlayed(false), []);
     const finishLaunch = useCallback(() => setHasLaunchPlayed(true), []);
@@ -160,6 +183,8 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
             revealPath,
             playLaunchSequence,
             isLaunching,
+            showRocketPet,
+            setShowRocketPet,
         }),
         [
             celebrate,
@@ -168,6 +193,8 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
             revealPath,
             playLaunchSequence,
             isLaunching,
+            showRocketPet,
+            setShowRocketPet,
         ],
     );
 

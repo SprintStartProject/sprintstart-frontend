@@ -56,6 +56,14 @@ export interface MomentsContextValue {
     playLaunchSequence: () => void;
     /** True while the launch sequence covers the screen. */
     isLaunching: boolean;
+    /**
+     * Whether the rocket pet renders at all. A pure preference, not a moment
+     * itself — off by default (Aug 2026): it is a novelty someone opts into
+     * from Settings, not something everyone has to notice and dismiss.
+     * Persisted, so the choice survives a reload.
+     */
+    showRocketPet: boolean;
+    setShowRocketPet: (value: boolean) => void;
 }
 
 /**

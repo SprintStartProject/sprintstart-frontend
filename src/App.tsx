@@ -5,11 +5,12 @@ import { ChatProvider } from './context/ChatProvider';
 import { ChatPreferencesProvider } from './context/ChatPreferencesProvider';
 import { ThemeProvider } from './context/ThemeProvider';
 import { ProjectProvider } from './features/projects/ProjectProvider';
-import { MomentsProvider, RocketPet } from './features/moments';
+import { MomentsProvider, RocketPet, useMoments } from './features/moments';
 import { useAuth } from './context/useAuth';
 
 function AppContent() {
     const { status } = useAuth();
+    const { showRocketPet } = useMoments();
 
     // Show sidebar only if logged in (even if onboarding is needed)
     const showSidebar = status !== 'unauthenticated' && status !== 'loading';
@@ -29,8 +30,9 @@ function AppContent() {
             </main>
 
             {/* Decorative easter egg; only for signed-in users, so it never
-                sits on top of the login screen. */}
-            {showSidebar && <RocketPet />}
+                sits on top of the login screen, and off unless turned on in
+                Settings (see MomentsSection). */}
+            {showSidebar && showRocketPet && <RocketPet />}
         </div>
     );
 }
