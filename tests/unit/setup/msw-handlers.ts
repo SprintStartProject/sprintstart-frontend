@@ -112,6 +112,9 @@ export const handlers = [
     ]),
   ),
 
+  // No connected sources by default; tests that care override this handler.
+  http.get("/api/v1/ingestion-sources/status", () => HttpResponse.json([])),
+
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],
@@ -379,7 +382,10 @@ export const handlers = [
         skip: null,
       },
       hasFeedback: false,
-      project: { id: "project1", name: "Project 1" },
+      // Mirrors the API: a list under `projectIds`, keyed by `projectId`.
+      projectIds: [
+        { projectId: "project-1", name: "SprintStart Project", description: null },
+      ],
     }),
   ),
 
@@ -396,6 +402,9 @@ export const handlers = [
         progressPercentage: 80,
         currentStep: { startedAt: "2023-01-01T10:00:00Z" },
         skills: [],
+        projectIds: [
+          { projectId: "project-1", name: "SprintStart Project", description: null },
+        ],
       },
       {
         userId: "user2",
@@ -406,6 +415,9 @@ export const handlers = [
         progressPercentage: 20,
         currentStep: { startedAt: "2023-01-02T10:00:00Z" },
         skills: [],
+        projectIds: [
+          { projectId: "project-1", name: "SprintStart Project", description: null },
+        ],
       },
     ];
     const filtered = roleId

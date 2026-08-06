@@ -33,7 +33,7 @@ vi.mock('../../../src/services/teamManagementService', () => ({
             skip: null,
         },
         hasFeedback: false,
-        project: { id: 'proj1', name: 'Project 1' },
+        projects: [{ id: 'proj1', name: 'Project 1' }],
     }),
     getProjectRoles: vi.fn().mockResolvedValue([
         { id: 'role1', name: 'Backend', description: 'Backend developer' },

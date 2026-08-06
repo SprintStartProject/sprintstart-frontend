@@ -12,6 +12,9 @@ import {
     type ProjectSource,
     type ProjectUser,
 } from '../../../services/projectService';
+import { ProjectInsightsPanel } from './ProjectInsightsPanel';
+import { ProjectOverviewSummary } from './ProjectOverviewSummary';
+import { EMPTY_INSIGHTS, useProjectInsights } from '../useProjectInsights';
 
 /** A move the user has picked but not confirmed yet. */
 type PendingMove = {
@@ -53,9 +56,9 @@ function sourceVariant(status: ProjectSource['status']) {
  *
  * Grouped by project rather than shown as one flat member list: a manager reads
  * this page per project ("who is on Alpha, what is connected to it"), and the
- * move is the exception, not the main axis. Each project therefore leads with
- * its own description, roles in use and connected sources, and the member rows
- * follow underneath.
+ * move is the exception, not the main axis. Each project is one stacked widget
+ * with its people on the left and everything about the project on the right,
+ * under a summary of all projects at once.
  *
  * The manager is pulled out of the member list and rendered as a highlighted
  * row of its own — they are the one person here who cannot be moved, so showing
@@ -92,6 +95,11 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
         setDetails(loaded);
     }, [projectIds]);
 
+    // Loaded separately from the project details: these figures come from three
+    // other modules, are allowed to fail one by one, and must not hold up the
+    // member list that this tab exists for.
+    const insights = useProjectInsights(projectIds);
+
     useEffect(() => {
         let active = true;
 
@@ -124,9 +132,9 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
     );
 
     /**
-     * Biggest project first, so the two-column grid puts the one with the most
-     * people on the left. Name breaks ties, otherwise two equally sized
-     * projects would swap sides on every reload.
+     * Biggest project first, so the one with the most people to manage is at
+     * the top of the stack. Name breaks ties, otherwise two equally sized
+     * projects would swap places on every reload.
      */
     const orderedProjects = useMemo(
         () =>
@@ -206,16 +214,24 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
     }
 
     return (
-        // `items-start` so a short project card does not stretch to the height
-        // of a long one next to it.
-        <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-2">
+        // Projects stacked, each one a widget split into members on the left and
+        // everything about the project on the right.
+        <div className="flex min-w-0 flex-col gap-4">
+            <ProjectOverviewSummary
+                projects={orderedProjects}
+                insights={insights}
+            />
+
             {orderedProjects.map((project) => {
                 const managerId = project.manager?.id;
                 const members = project.users
                     .filter((user) => user.id !== managerId)
-                    .sort((a, b) =>
-                        fullName(a).localeCompare(fullName(b)),
-                    );
+                    .sort((a, b) => fullName(a).localeCompare(fullName(b)));
+                // The manager has a membership row like everyone else, which is
+                // where their roles live — the manager DTO does not carry them.
+                const managerRoles =
+                    project.users.find((user) => user.id === managerId)
+                        ?.projectRoles ?? [];
                 const rolesInUse = [
                     ...new Set(
                         project.users.flatMap((user) => user.projectRoles),
@@ -226,36 +242,165 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
                     <section
                         key={project.id}
                         aria-labelledby={`project-${project.id}-heading`}
-                        className="rounded-3xl border border-app-border bg-app-surface p-5"
+                        className="rounded-2xl border border-app-border bg-app-surface p-4"
                     >
-                        <div className="mb-4 border-b border-app-border pb-4">
-                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                <h3
-                                    id={`project-${project.id}-heading`}
-                                    className="text-base font-semibold text-app-text"
-                                >
-                                    {project.name}
-                                </h3>
-                                <span className="text-xs text-app-text-muted">
-                                    {project.users.length}{' '}
-                                    {project.users.length === 1
-                                        ? 'member'
-                                        : 'members'}
-                                </span>
+                        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-app-border pb-2.5">
+                            <h3
+                                id={`project-${project.id}-heading`}
+                                className="text-base font-semibold text-app-text"
+                            >
+                                {project.name}
+                            </h3>
+                            <span className="text-xs text-app-text-muted">
+                                {project.users.length}{' '}
+                                {project.users.length === 1
+                                    ? 'member'
+                                    : 'members'}
+                            </span>
+                        </div>
+
+                        {/* One column below `lg`: the member rows carry an avatar,
+                            a name, roles and a project picker, which stops being
+                            readable in half a narrow viewport. */}
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div className="min-w-0">
+                                {project.manager && (
+                                    <div className="mb-2 flex flex-col gap-2 rounded-xl border border-app-brand-border bg-app-brand-soft px-3 py-2 sm:flex-row sm:items-center sm:gap-3">
+                                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                                            <UserAvatar
+                                                fallbackName={fullName(
+                                                    project.manager,
+                                                )}
+                                                seed={project.manager.id}
+                                                size={32}
+                                            />
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-app-brand-text">
+                                                    {fullName(project.manager)}
+                                                </p>
+                                                <p className="truncate text-xs text-app-brand-text/80">
+                                                    {project.manager.email}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {managerRoles.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 sm:shrink-0">
+                                                {managerRoles.map((role) => (
+                                                    <Badge
+                                                        key={role}
+                                                        variant="neutral"
+                                                    >
+                                                        {role}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <Badge
+                                            variant="brand"
+                                            className="self-start sm:shrink-0"
+                                        >
+                                            <Crown
+                                                className="mr-1.5 h-3 w-3"
+                                                aria-hidden="true"
+                                            />
+                                            Project manager
+                                        </Badge>
+                                    </div>
+                                )}
+
+                                {members.length === 0 ? (
+                                    <p className="px-1 py-3 text-sm text-app-text-muted">
+                                        No other members in this project.
+                                    </p>
+                                ) : (
+                                    <ul className="flex flex-col gap-1.5">
+                                        {members.map((user) => (
+                                            <li
+                                                key={user.id}
+                                                className="flex flex-col gap-2 rounded-xl border border-app-border px-3 py-2 sm:flex-row sm:items-center sm:gap-3"
+                                            >
+                                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                                    <UserAvatar
+                                                        profileIcon={
+                                                            user.profileIcon
+                                                        }
+                                                        fallbackName={fullName(
+                                                            user,
+                                                        )}
+                                                        seed={user.id}
+                                                        size={32}
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-medium text-app-text">
+                                                            {fullName(user)}
+                                                        </p>
+                                                        <p className="truncate text-xs text-app-text-muted">
+                                                            {user.email}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Its own column between the
+                                                    person and the project
+                                                    picker, so the roles read as
+                                                    a property of the row rather
+                                                    than as part of the address. */}
+                                                {user.projectRoles.length >
+                                                    0 && (
+                                                    <div className="flex flex-wrap gap-1.5 sm:shrink-0">
+                                                        {user.projectRoles.map(
+                                                            (role) => (
+                                                                <Badge
+                                                                    key={role}
+                                                                    variant="neutral"
+                                                                >
+                                                                    {role}
+                                                                </Badge>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <FilterSelect
+                                                    label={`Move ${fullName(user)} to another project`}
+                                                    value={project.id}
+                                                    options={projectOptions}
+                                                    onChange={(
+                                                        targetProjectId,
+                                                    ) =>
+                                                        requestMove(
+                                                            user,
+                                                            project,
+                                                            targetProjectId,
+                                                        )
+                                                    }
+                                                    className="sm:w-48"
+                                                />
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
 
-                            {project.description && (
-                                <p className="mt-1 text-sm text-app-text-muted">
-                                    {project.description}
-                                </p>
-                            )}
+                            <dl className="flex min-w-0 flex-col gap-2.5 lg:border-l lg:border-app-border lg:pl-4">
+                                {project.description && (
+                                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                        <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-app-text-muted">
+                                            About
+                                        </dt>
+                                        <dd className="min-w-0 text-sm text-app-text-muted">
+                                            {project.description}
+                                        </dd>
+                                    </div>
+                                )}
 
-                            <dl className="mt-4 flex flex-col gap-3">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <dt className="text-xs font-medium uppercase tracking-wide text-app-text-muted">
+                                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                    <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-app-text-muted">
                                         Roles
                                     </dt>
-                                    <dd className="flex flex-wrap gap-2">
+                                    <dd className="flex min-w-0 flex-wrap gap-1.5">
                                         {rolesInUse.length === 0 ? (
                                             <span className="text-sm text-app-text-muted">
                                                 None assigned yet
@@ -273,11 +418,11 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
                                     </dd>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <dt className="text-xs font-medium uppercase tracking-wide text-app-text-muted">
+                                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                    <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-app-text-muted">
                                         Sources
                                     </dt>
-                                    <dd className="flex flex-wrap gap-2">
+                                    <dd className="flex min-w-0 flex-wrap gap-1.5">
                                         {project.sources.length === 0 ? (
                                             <span className="text-sm text-app-text-muted">
                                                 Nothing connected
@@ -300,97 +445,14 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
                                         )}
                                     </dd>
                                 </div>
+
+                                <ProjectInsightsPanel
+                                    insights={
+                                        insights[project.id] ?? EMPTY_INSIGHTS
+                                    }
+                                />
                             </dl>
                         </div>
-
-                        {project.manager && (
-                            <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex min-w-0 items-center gap-3">
-                                    <UserAvatar
-                                        fallbackName={fullName(project.manager)}
-                                        seed={project.manager.id}
-                                        size={36}
-                                    />
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-semibold text-app-brand-text">
-                                            {fullName(project.manager)}
-                                        </p>
-                                        <p className="truncate text-xs text-app-brand-text/80">
-                                            {project.manager.email}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <Badge variant="brand" className="self-start">
-                                    <Crown
-                                        className="mr-1.5 h-3 w-3"
-                                        aria-hidden="true"
-                                    />
-                                    Project manager
-                                </Badge>
-                            </div>
-                        )}
-
-                        {members.length === 0 ? (
-                            <p className="px-1 py-3 text-sm text-app-text-muted">
-                                No other members in this project.
-                            </p>
-                        ) : (
-                            <ul className="flex flex-col gap-2">
-                                {members.map((user) => (
-                                    <li
-                                        key={user.id}
-                                        className="flex flex-col gap-3 rounded-2xl border border-app-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                                    >
-                                        <div className="flex min-w-0 items-center gap-3">
-                                            <UserAvatar
-                                                profileIcon={user.profileIcon}
-                                                fallbackName={fullName(user)}
-                                                seed={user.id}
-                                                size={36}
-                                            />
-                                            <div className="min-w-0">
-                                                <p className="truncate text-sm font-medium text-app-text">
-                                                    {fullName(user)}
-                                                </p>
-                                                <p className="truncate text-xs text-app-text-muted">
-                                                    {user.email}
-                                                </p>
-                                                {user.projectRoles.length >
-                                                    0 && (
-                                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                        {user.projectRoles.map(
-                                                            (role) => (
-                                                                <Badge
-                                                                    key={role}
-                                                                    variant="neutral"
-                                                                >
-                                                                    {role}
-                                                                </Badge>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <FilterSelect
-                                            label={`Move ${fullName(user)} to another project`}
-                                            value={project.id}
-                                            options={projectOptions}
-                                            onChange={(targetProjectId) =>
-                                                requestMove(
-                                                    user,
-                                                    project,
-                                                    targetProjectId,
-                                                )
-                                            }
-                                            className="sm:w-60"
-                                        />
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
                     </section>
                 );
             })}

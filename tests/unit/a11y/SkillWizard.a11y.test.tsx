@@ -14,7 +14,7 @@ const user: TeamOverviewUser = {
     roles: [{ id: 'r1', name: 'Developer', description: '' }],
     skills: [],
     progressPercentage: 0.5,
-    project: { id: 'p1', name: 'SprintStart' },
+    projects: [{ id: 'p1', name: 'SprintStart' }],
     currentPhase: { id: 'phase1', title: 'Phase 1' },
     currentStep: null,
     hasFeedback: false

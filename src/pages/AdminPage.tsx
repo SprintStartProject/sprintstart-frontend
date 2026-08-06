@@ -682,6 +682,7 @@ export function AdminPage() {
       <CreateProjectWizard
         isOpen={isCreateWizardOpen}
         tokenNames={tokenNames}
+        users={users}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
       />

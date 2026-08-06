@@ -1,5 +1,6 @@
-import { ChevronRight, FileText, Folder, Users } from "lucide-react";
+import { ChevronRight, FileText, Folder, UserCog, Users } from "lucide-react";
 import { getProjectSourcesCount, getProjectUsersCount } from "../data";
+import type { ProjectManager } from "../../../services/projectService";
 import type { ProjectOverview, ProjectSource } from "../types";
 import { AccessBadge } from "./Badges";
 
@@ -9,6 +10,15 @@ type ProjectsTabProps = {
   hasSearchQuery?: boolean;
   totalCount?: number;
 };
+
+/** Manager display name, falling back to the username when no name is set. */
+function getManagerName(manager: ProjectManager) {
+  const fullName = [manager.firstName, manager.lastName]
+    .filter(Boolean)
+    .join(" ");
+
+  return fullName || manager.username;
+}
 
 function formatSourceType(type: string) {
   return type
@@ -140,6 +150,16 @@ export function ProjectsTab({
                   <span className="flex items-center gap-1.5">
                     <FileText className="h-3.5 w-3.5" />
                     {getProjectSourcesCount(project)} sources
+                  </span>
+                  {/* Spelled out even when unset: a project without a manager
+                      is the state an admin most needs to spot from the list. */}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <UserCog className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {project.manager
+                        ? getManagerName(project.manager)
+                        : "No manager"}
+                    </span>
                   </span>
                 </div>
               </div>

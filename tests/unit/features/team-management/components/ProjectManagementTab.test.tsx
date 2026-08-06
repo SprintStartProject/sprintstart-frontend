@@ -120,7 +120,9 @@ describe('ProjectManagementTab', () => {
         expect(
             within(alphaSection).getByText('The alpha project'),
         ).toBeInTheDocument();
-        expect(within(alphaSection).getByText('Developer')).toBeInTheDocument();
+        // Twice: once in the project's role summary, once on the member holding
+        // it.
+        expect(within(alphaSection).getAllByText('Developer')).toHaveLength(2);
         expect(within(alphaSection).getByText('alpha-repo')).toBeInTheDocument();
 
         const betaSection = screen.getByRole('region', { name: 'Beta' });

@@ -23,26 +23,41 @@ import {
   SourceTypeStep,
 } from "../../data-ingestion/components/SourceTypeStep";
 import type { SourceSystem } from "../../data-ingestion/types";
+import { MemberPicker } from "./MemberPicker";
 import { StagedSourceList } from "./StagedSourceList";
+import { toggleSelectedUserId, toggleVisibleUserSelection } from "../data";
+import type { AdminUser } from "../types";
 
 type CreateProjectWizardProps = {
   isOpen: boolean;
   tokenNames: string[];
+  /**
+   * The user directory, already loaded by the admin page. Passed in rather than
+   * fetched here so opening the wizard does not repeat a request the page has
+   * made anyway.
+   */
+  users: AdminUser[];
   onClose: () => void;
   /** Fired once the project exists, before any source finished connecting. */
   onProjectCreated: (project: AdminProjectDetails) => void;
 };
 
-type WizardStep = "details" | "sources";
+type WizardStep = "details" | "people" | "sources";
 // Within the sources step, the source-type choice and the type-specific detail
 // are shown one after another (like the Data Ingestion "Add source" flow).
 type SourceStep = "type" | "detail";
 
 /**
- * Two-step flow for creating a project and optionally attaching sources to it.
+ * Three-step flow for creating a project: its metadata, who works on it, and
+ * optionally the sources to attach.
  *
- * The project is created when the wizard finishes, not when step 1 is left, so
- * cancelling out of step 2 leaves nothing behind. Sources are connected one by
+ * People get a step of their own rather than sitting under the metadata fields:
+ * picking a manager and ticking members off a list is a different kind of work
+ * than typing a name, and putting both on one screen made the first step long
+ * enough to scroll.
+ *
+ * The project is created when the wizard finishes, not when a step is left, so
+ * cancelling out later leaves nothing behind. Sources are connected one by
  * one afterwards against the new project id; because creation and connecting
  * are separate backend calls, a source failure cannot roll the project back —
  * the wizard therefore stays open on a partial failure and offers a retry
@@ -51,6 +66,7 @@ type SourceStep = "type" | "detail";
 export function CreateProjectWizard({
   isOpen,
   tokenNames,
+  users,
   onClose,
   onProjectCreated,
 }: CreateProjectWizardProps) {
@@ -63,6 +79,9 @@ export function CreateProjectWizard({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [managerId, setManagerId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const [managerCandidates, setManagerCandidates] = useState<ProjectManager[]>(
     [],
@@ -128,6 +147,7 @@ export function CreateProjectWizard({
     setName("");
     setDescription("");
     setManagerId("");
+    setSelectedUserIds(new Set());
     setSelectedType("GITHUB");
     setSelection([]);
     setSources([]);
@@ -154,6 +174,13 @@ export function CreateProjectWizard({
   const selectedCount = selection.length;
   const hasFailures = hasFailedSources(sources);
 
+  const goToPeople = () => {
+    if (!isNameValid) return;
+
+    setSubmitError("");
+    setStep("people");
+  };
+
   const goToSources = () => {
     if (!isNameValid) return;
 
@@ -171,12 +198,24 @@ export function CreateProjectWizard({
       description: description.trim() || undefined,
     });
 
+    // Members before the manager, mirroring `applyPeopleChanges`: assigning a
+    // manager also makes them a member, so doing it the other way round would
+    // depend on the order the ids happen to be in.
+    let members = project.users;
+    if (selectedUserIds.size > 0) {
+      members = await projectService.assignUsersToProject(project.id, {
+        userIds: [...selectedUserIds],
+      });
+    }
+
     if (managerId) {
       await projectService.setProjectManager(project.id, managerId);
     }
 
     setCreatedProjectId(project.id);
-    onProjectCreated(project);
+    // The created-project response predates both calls above, so the members
+    // are folded back in before the page adds the project to its list.
+    onProjectCreated({ ...project, users: members });
 
     return project.id;
   };
@@ -263,6 +302,7 @@ export function CreateProjectWizard({
   };
 
   const isDetailsStep = step === "details";
+  const isPeopleStep = step === "people";
   // Once the project exists there is nothing left to cancel and going back
   // would misrepresent the details as still editable, so the secondary button
   // turns into a plain way out.
@@ -273,9 +313,10 @@ export function CreateProjectWizard({
   const isDetailStep =
     step === "sources" && !isProjectCreated && sourceStep === "detail";
 
-  // Details → source type → repositories. The post-create staged list stays on
-  // the last step, which is where the repositories were being connected.
-  const stepIndex = isDetailsStep ? 0 : isTypeStep ? 1 : 2;
+  // Details → people → source type → repositories. The post-create staged list
+  // stays on the last step, which is where the repositories were being
+  // connected.
+  const stepIndex = isDetailsStep ? 0 : isPeopleStep ? 1 : isTypeStep ? 2 : 3;
 
   return (
     <Modal
@@ -283,7 +324,7 @@ export function CreateProjectWizard({
       title="New Project"
       description={
         <Stepper
-          steps={["Details", "Source type", "Connect"]}
+          steps={["Details", "People", "Source type", "Connect"]}
           current={stepIndex}
         />
       }
@@ -300,7 +341,9 @@ export function CreateProjectWizard({
                 ? closeWizard
                 : isDetailStep
                   ? () => setSourceStep("type")
-                  : () => setStep("details")
+                  : isPeopleStep
+                    ? () => setStep("details")
+                    : () => setStep("people")
             }
             disabled={isSubmitting}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
@@ -331,10 +374,16 @@ export function CreateProjectWizard({
             </button>
           )}
 
-          {isDetailsStep || isTypeStep ? (
+          {isDetailsStep || isPeopleStep || isTypeStep ? (
             <button
               type="button"
-              onClick={isDetailsStep ? goToSources : () => setSourceStep("detail")}
+              onClick={
+                isDetailsStep
+                  ? goToPeople
+                  : isPeopleStep
+                    ? goToSources
+                    : () => setSourceStep("detail")
+              }
               disabled={(isDetailsStep && !isNameValid) || isSubmitting}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -378,7 +427,7 @@ export function CreateProjectWizard({
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            goToSources();
+            goToPeople();
           }}
         >
           <div>
@@ -412,6 +461,16 @@ export function CreateProjectWizard({
             />
           </div>
 
+        </form>
+      ) : isPeopleStep ? (
+        <form
+          id="create-project-people-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            goToSources();
+          }}
+        >
           <div>
             <label
               htmlFor={managerSelectId}
@@ -448,7 +507,29 @@ export function CreateProjectWizard({
                 <span>{candidatesError}</span>
               </p>
             )}
+
+            <p className="mt-2 text-xs text-app-text-muted">
+              The manager becomes a member automatically, so they do not have to
+              be ticked below.
+            </p>
           </div>
+
+          <MemberPicker
+            users={users}
+            selectedUserIds={selectedUserIds}
+            disabled={isSubmitting}
+            label="Members"
+            onToggleUser={(userId) =>
+              setSelectedUserIds((current) =>
+                toggleSelectedUserId(current, userId),
+              )
+            }
+            onToggleVisible={(visibleUsers, allSelected) =>
+              setSelectedUserIds((current) =>
+                toggleVisibleUserSelection(current, visibleUsers, allSelected),
+              )
+            }
+          />
         </form>
       ) : isProjectCreated ? (
         // The project exists (e.g. after a partial failure): show the connect

@@ -58,6 +58,31 @@ describe('ProjectsTab', () => {
         expect(screen.getByText('2 sources')).toBeInTheDocument();
     });
 
+    it('names the assigned project manager on the card', () => {
+        const withManager: ProjectOverview[] = [
+            {
+                ...projects[0],
+                manager: {
+                    id: 'user-7',
+                    username: 'jane.doe',
+                    email: 'jane@example.com',
+                    firstName: 'Jane',
+                    lastName: 'Doe',
+                },
+            },
+        ];
+
+        render(<ProjectsTab filteredProjects={withManager} onOpenProjectDetails={vi.fn()} />);
+
+        expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    });
+
+    it('marks a project without a manager', () => {
+        render(<ProjectsTab filteredProjects={projects} onOpenProjectDetails={vi.fn()} />);
+
+        expect(screen.getAllByText('No manager')).toHaveLength(2);
+    });
+
     it('calls onOpenProjectDetails with the project when a card is clicked', async () => {
         const user = userEvent.setup();
         const onOpenProjectDetails = vi.fn();

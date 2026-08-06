@@ -18,10 +18,18 @@ export type TeamOverviewUser = {
     firstname: string;
     lastname: string;
     profileIcon?: string;
-    project: {
+    /**
+     * Projects the member is assigned to.
+     *
+     * The API sends these as `projectIds`, a list of objects keyed by
+     * `projectId` — not a single `project`, which is what this type used to
+     * claim. `getTeamOverview` normalizes it; anything reading it straight off
+     * an API response has to normalize too.
+     */
+    projects: {
         id: string;
         name: string;
-    };
+    }[];
     roles: ProjectRole[];
     skills: Skill[];
     progressPercentage: number;

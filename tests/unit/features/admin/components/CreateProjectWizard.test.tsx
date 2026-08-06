@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CreateProjectWizard } from '../../../../../src/features/admin/components/CreateProjectWizard';
 import type { AdminProjectDetails } from '../../../../../src/services/projectService';
+import type { AdminUser } from '../../../../../src/features/admin/types';
 import type { DiscoveredRepository } from '../../../../../src/services/sources/githubService';
 import type { SourceInstanceIngestionStatus } from '../../../../../src/features/data-ingestion/types';
 
@@ -11,6 +12,7 @@ vi.mock('../../../../../src/services/projectService', () => ({
         createProject: vi.fn(),
         getManagerCandidates: vi.fn(),
         setProjectManager: vi.fn(),
+        assignUsersToProject: vi.fn(),
     },
 }));
 
@@ -41,6 +43,24 @@ const createdProject: AdminProjectDetails = {
     users: [],
 };
 
+function adminUser(id: string, firstName: string): AdminUser {
+    return {
+        id,
+        authId: `auth-${id}`,
+        username: firstName.toLowerCase(),
+        email: `${firstName.toLowerCase()}@example.com`,
+        firstName,
+        lastName: 'Mustermann',
+        roles: [],
+        permissionGroup: 'User',
+        projects: [],
+        projectIds: [],
+        enabled: true,
+        profileIcon: '',
+        hasCompletedOnboarding: true,
+    };
+}
+
 function repo(overrides: Partial<DiscoveredRepository> = {}): DiscoveredRepository {
     return {
         name: 'widgets',
@@ -70,6 +90,7 @@ function renderWizard(overrides: Partial<Parameters<typeof CreateProjectWizard>[
         <CreateProjectWizard
             isOpen
             tokenNames={['team-pat']}
+            users={[]}
             onClose={onClose}
             onProjectCreated={onProjectCreated}
             {...overrides}
@@ -92,10 +113,16 @@ async function settleModalFocus() {
     });
 }
 
-/** Fills in the name on step 1 and moves to the source-type step. */
-async function goToSourcesStep(user: ReturnType<typeof userEvent.setup>) {
+/** Fills in the name on step 1 and moves to the people step. */
+async function goToPeopleStep(user: ReturnType<typeof userEvent.setup>) {
     await settleModalFocus();
     await user.type(screen.getByLabelText('Name'), 'Apollo');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+}
+
+/** Walks past details and people to the source-type step. */
+async function goToSourcesStep(user: ReturnType<typeof userEvent.setup>) {
+    await goToPeopleStep(user);
     await user.click(screen.getByRole('button', { name: /continue/i }));
 }
 
@@ -126,6 +153,7 @@ describe('CreateProjectWizard', () => {
             resolvedOwnerType: 'org',
         });
         vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
+        vi.mocked(projectService.assignUsersToProject).mockResolvedValue([]);
     });
 
     it('blocks the step-1 continue button until a name is entered', async () => {
@@ -189,13 +217,12 @@ describe('CreateProjectWizard', () => {
         ]);
         const user = userEvent.setup();
         renderWizard();
-        await settleModalFocus();
+        await goToPeopleStep(user);
 
         await waitFor(() =>
             expect(screen.getByRole('option', { name: 'Jane Doe' })).toBeInTheDocument(),
         );
 
-        await user.type(screen.getByLabelText('Name'), 'Apollo');
         await user.selectOptions(screen.getByLabelText('Project manager'), 'user-7');
         await user.click(screen.getByRole('button', { name: /continue/i }));
         await goToGithubDetail(user);
@@ -306,5 +333,77 @@ describe('CreateProjectWizard', () => {
 
         expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
         expect(onClose).toHaveBeenCalled();
+    });
+
+    it('keeps the member picker off the first step', async () => {
+        const user = userEvent.setup();
+        renderWizard({ users: [adminUser('u1', 'Max')] });
+        await settleModalFocus();
+
+        expect(screen.getByLabelText('Name')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Members')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Project manager')).not.toBeInTheDocument();
+
+        await goToPeopleStep(user);
+
+        expect(screen.getByLabelText('Members')).toBeInTheDocument();
+        expect(screen.getByLabelText('Project manager')).toBeInTheDocument();
+    });
+
+    it('assigns every picked member to the new project in one request', async () => {
+        const user = userEvent.setup();
+        renderWizard({ users: [adminUser('u1', 'Max'), adminUser('u2', 'Lena')] });
+
+        await goToPeopleStep(user);
+        await user.click(
+            screen.getByRole('checkbox', { name: 'Add Max Mustermann to the project' }),
+        );
+        await user.click(
+            screen.getByRole('checkbox', { name: 'Add Lena Mustermann to the project' }),
+        );
+
+        await user.click(screen.getByRole('button', { name: /continue/i }));
+        await user.click(screen.getByRole('button', { name: /continue/i }));
+        await user.click(screen.getByRole('button', { name: /create without sources/i }));
+
+        await waitFor(() => {
+            expect(projectService.assignUsersToProject).toHaveBeenCalledWith('proj-new', {
+                userIds: ['u1', 'u2'],
+            });
+        });
+        expect(projectService.assignUsersToProject).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not assign anyone when no member was picked', async () => {
+        const user = userEvent.setup();
+        renderWizard({ users: [adminUser('u1', 'Max')] });
+
+        await goToSourcesStep(user);
+        await goToGithubDetail(user);
+        await user.click(screen.getByRole('button', { name: /create without sources/i }));
+
+        await waitFor(() => {
+            expect(projectService.createProject).toHaveBeenCalled();
+        });
+        expect(projectService.assignUsersToProject).not.toHaveBeenCalled();
+    });
+
+    it('filters the member list without losing what is already picked', async () => {
+        const user = userEvent.setup();
+        renderWizard({ users: [adminUser('u1', 'Max'), adminUser('u2', 'Lena')] });
+
+        await goToPeopleStep(user);
+        await user.click(
+            screen.getByRole('checkbox', { name: 'Add Max Mustermann to the project' }),
+        );
+        await user.type(
+            screen.getByLabelText('Members'),
+            'lena',
+        );
+
+        expect(
+            screen.queryByRole('checkbox', { name: 'Add Max Mustermann to the project' }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
     });
 });

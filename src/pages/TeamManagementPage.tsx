@@ -21,6 +21,7 @@ import {
     projectService,
     type ManagedProject,
 } from '../services/projectService';
+import { ApiError } from '../services/apiClient';
 import { PageHeader } from '../components/layout/PageHeader';
 import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
 import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
@@ -30,6 +31,7 @@ export function TeamManagementPage() {
     const [users, setUsers] = useState<TeamOverviewUser[]>([]);
     const [roles, setRoles] = useState<ProjectRole[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<TeamManagementTab>('members');
     const [managedProjects, setManagedProjects] = useState<ManagedProject[]>([]);
     const [filters, setFilters] = useState<TeamOverviewFilters>({
@@ -49,17 +51,30 @@ export function TeamManagementPage() {
 
     useEffect(() => {
         async function loadInitialData() {
-            // The managed projects decide whether the projects tab exists at
-            // all, so they are needed before the tab bar can be rendered — not
-            // only once that tab is opened. A failure here must not take the
-            // page down: the other two tabs do not depend on it.
-            const [, projects] = await Promise.all([
-                loadTeamOverview(),
-                projectService.getManagedProjects().catch(() => []),
-            ]);
+            try {
+                // The managed projects decide whether the projects tab exists
+                // at all, so they are needed before the tab bar can be rendered
+                // — not only once that tab is opened. A failure there must not
+                // take the page down: the other two tabs do not depend on it,
+                // and a manager-only endpoint answers 403 for HR.
+                const [, projects] = await Promise.all([
+                    loadTeamOverview(),
+                    projectService.getManagedProjects().catch(() => []),
+                ]);
 
-            setManagedProjects(projects);
-            setLoading(false);
+                setManagedProjects(projects);
+                setLoadError(null);
+            } catch (error) {
+                // Without this the page would sit on its loading text forever,
+                // which looks like a blank screen rather than a failed request.
+                setLoadError(
+                    error instanceof ApiError
+                        ? error.message
+                        : 'The team overview could not be loaded.',
+                );
+            } finally {
+                setLoading(false);
+            }
         }
 
         void loadInitialData();
@@ -147,6 +162,14 @@ export function TeamManagementPage() {
                 <p className="text-sm text-app-text-muted">
                     Loading team overview...
                 </p>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="min-h-screen bg-app-bg flex items-center justify-center px-6">
+                <p className="text-sm text-app-danger-text">{loadError}</p>
             </div>
         );
     }
