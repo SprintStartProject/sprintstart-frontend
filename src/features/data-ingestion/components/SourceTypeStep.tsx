@@ -35,7 +35,7 @@ export function SourceTypeStep({
             const meta = SOURCE_META[sourceSystem];
             const Icon = meta.icon;
             const isSelected = selectedType === sourceSystem;
-            const isAvailable = sourceSystem === "GITHUB";
+            const isAvailable = sourceSystem === "GITHUB" || sourceSystem === "UPLOAD";
 
             return (
               <button

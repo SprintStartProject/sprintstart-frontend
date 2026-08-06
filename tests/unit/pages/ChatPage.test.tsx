@@ -15,6 +15,10 @@ vi.mock('../../../src/context/useChatPreferences', () => ({
     useChatPreferences: vi.fn(),
 }));
 
+vi.mock('../../../src/features/projects/useProjectContext', () => ({
+    useProjectContext: () => ({ selectedProjectId: 'project1' }),
+}));
+
 import { useChatPreferences } from '../../../src/context/useChatPreferences';
 
 const mockHandleSubmit = vi.fn();

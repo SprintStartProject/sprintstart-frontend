@@ -6,6 +6,7 @@ import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useChatPreferences } from "../context/useChatPreferences";
 import { useAuth } from "../context/useAuth";
+import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
 import { MessageRow } from "../features/chatbot/components/MessageRow.tsx";
 import { ThinkingIndicator } from "../features/chatbot/components/ThinkingIndicator.tsx";
@@ -31,6 +32,7 @@ type CitationArtifactOpen = {
  */
 export function ChatPage() {
     const { profile } = useAuth();
+    const { selectedProjectId } = useProjectContext();
     const {
         messages,
         chatId,
@@ -68,7 +70,7 @@ export function ChatPage() {
 
     const { showThoughtProcess } = useChatPreferences();
 
-    const projectId = profile?.projectIds?.[0] ?? null;
+    const projectId = selectedProjectId || (profile?.projectIds?.[0] ?? null);
     const [viewingCitationArtifact, setViewingCitationArtifact] =
         useState<CitationArtifactOpen | null>(null);
 
