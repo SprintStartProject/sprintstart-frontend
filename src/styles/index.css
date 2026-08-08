@@ -86,9 +86,9 @@
     --glass-border: rgba(255, 255, 255, 0.55);
 
     /* Ambient glow (box-shadows / aurora blobs) */
-    --glow: rgba(37, 99, 235, 0.22);
-    --glow-accent: rgba(124, 58, 237, 0.16);
-    --glow-alt: rgba(8, 145, 178, 0.14);
+    --glow: rgba(37, 99, 235, 0.35);
+        --glow-accent: rgba(124, 58, 237, 0.28);
+        --glow-alt: rgba(8, 145, 178, 0.25);
 
     /* Fonts */
     --sans: system-ui, "Segoe UI", Roboto, sans-serif;
@@ -175,9 +175,9 @@
     --glass-border: rgba(148, 163, 184, 0.16);
 
     /* Ambient glow */
-    --glow: rgba(59, 130, 246, 0.3);
-    --glow-accent: rgba(139, 92, 246, 0.22);
-    --glow-alt: rgba(34, 211, 238, 0.16);
+    --glow: rgba(59, 130, 246, 0.45);
+        --glow-accent: rgba(139, 92, 246, 0.38);
+        --glow-alt: rgba(34, 211, 238, 0.30);
 
     /* Progress */
   --progress-track: #243044;      /* slightly lighter than gray-800, but still calm */
@@ -625,28 +625,14 @@ body {
 /* Glassmorphism reverted to flat surfaces. */
 .style-classic .app-glass {
   background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
+    border: 1px solid var(--border) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 
-/* ── Aurora toggle: hide aurora layers independently via settings ── */
-
-/* Background blobs + grid disabled */
-:root.aurora-bg-disabled .app-aurora,
-:root.aurora-bg-disabled .app-aurora-alt,
-:root.aurora-bg-disabled .app-bg-grid {
-  display: none !important;
-}
-
-/* Interactive hover spotlight disabled */
-:root.aurora-hover-disabled .aurora-canvas {
-  display: none !important;
-}
-
-@keyframes barrelRoll {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  @keyframes barrelRoll {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .barrel-roll-active {

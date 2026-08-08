@@ -17,10 +17,10 @@ function AppContent() {
 
     return (
         <div className="flex min-h-screen w-full bg-app-bg text-app-text">
-                    <AuroraBackground />
-                    {showSidebar && <SideBar />}
+            <AuroraBackground />
+            {showSidebar && <SideBar />}
 
-            <main className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
+            <main className="relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0">
                 <AppRouter />
             </main>
 

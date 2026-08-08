@@ -80,7 +80,7 @@ export function SkillWizardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center px-4 py-10">
+            <div className="min-h-screen flex items-center justify-center px-4 py-10">
                 <p className="text-sm text-app-text-muted">
                     Loading skill assessment...
                 </p>
@@ -90,7 +90,7 @@ export function SkillWizardPage() {
 
     if (error || !user) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center px-4 py-10">
+            <div className="min-h-screen flex items-center justify-center px-4 py-10">
                 <div className="w-full max-w-lg rounded-3xl border border-app-border bg-app-surface p-6 text-center shadow-xl">
                     <p className="text-sm text-app-text-muted">
                         {error ?? 'Unknown error.'}

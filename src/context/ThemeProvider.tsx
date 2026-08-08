@@ -5,6 +5,7 @@ import { ThemeContext } from './ThemeContext';
 
 const STORAGE_KEY = 'theme';
 const STYLE_STORAGE_KEY = 'style-mode';
+const AURORA_STORAGE_KEY = 'sprintstart:aurora-enabled';
 
 /**
  * Reads the user's stored theme preference, falling back to the OS
@@ -94,6 +95,23 @@ function applyStyleMode(mode: StyleMode) {
 }
 
 /**
+ * Reads the user's stored aurora background preference.
+ * Defaults to `false` (off) when nothing is stored.
+ */
+function getInitialAuroraEnabled(): boolean {
+    let stored: string | null = null;
+    try {
+        stored = window.localStorage.getItem(AURORA_STORAGE_KEY);
+    } catch {
+        // localStorage unavailable.
+    }
+    if (stored !== null) {
+        return stored === 'true';
+    }
+    return false;
+}
+
+/**
  * Provider component that manages the application's visual theme.
  *
  * Supports an explicit 'system' preference that follows the OS
@@ -115,6 +133,7 @@ function applyStyleMode(mode: StyleMode) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
     const [styleMode, setStyleModeState] = useState<StyleMode>(() => getInitialStyleMode());
+    const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() => getInitialAuroraEnabled());
 
     // Sync before paint to avoid a FOUC of the default light palette.
     useLayoutEffect(() => {
@@ -188,20 +207,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
 
     const isDarkMode = resolveDark(theme);
-    const isClassicMode = styleMode === 'classic';
+        const isClassicMode = styleMode === 'classic';
 
-    return (
-        <ThemeContext.Provider
-            value={{
-                theme,
-                setTheme,
-                toggleTheme,
-                isDarkMode,
-                styleMode,
-                setStyleMode,
-                toggleStyleMode,
-                isClassicMode,
-            }}
+        const setIsAuroraEnabled = (enabled: boolean) => {
+            setIsAuroraEnabledState(enabled);
+            try {
+                window.localStorage.setItem(AURORA_STORAGE_KEY, enabled ? 'true' : 'false');
+            } catch {
+                // localStorage unavailable.
+            }
+        };
+
+        return (
+            <ThemeContext.Provider
+                value={{
+                    theme,
+                    setTheme,
+                    toggleTheme,
+                    isDarkMode,
+                    styleMode,
+                    setStyleMode,
+                    toggleStyleMode,
+                    isClassicMode,
+                    isAuroraEnabled,
+                    setIsAuroraEnabled,
+                }}
         >
             {children}
         </ThemeContext.Provider>

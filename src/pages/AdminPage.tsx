@@ -443,7 +443,7 @@ export function AdminPage() {
     loadingState === "idle" || loadingState === "loading";
 
   return (
-    <div className="h-dvh overflow-y-scroll overscroll-contain bg-app-bg">
+    <div className="h-dvh overflow-y-scroll overscroll-contain">
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">
           <PageHeader

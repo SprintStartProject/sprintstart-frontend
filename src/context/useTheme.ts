@@ -10,15 +10,17 @@ export function useTheme(): ThemeContextType {
     const context = useContext(ThemeContext);
     if (context === undefined) {
         return {
-            theme: 'light',
-            setTheme: () => {},
-            toggleTheme: () => {},
-            isDarkMode: false,
-            styleMode: 'ultra',
-            setStyleMode: () => {},
-            toggleStyleMode: () => {},
-            isClassicMode: false,
-        };
+                    theme: 'light',
+                    setTheme: () => {},
+                    toggleTheme: () => {},
+                    isDarkMode: false,
+                    styleMode: 'ultra',
+                    setStyleMode: () => {},
+                    toggleStyleMode: () => {},
+                    isClassicMode: false,
+                    isAuroraEnabled: false,
+                    setIsAuroraEnabled: () => {},
+                };
     }
     return context;
 }

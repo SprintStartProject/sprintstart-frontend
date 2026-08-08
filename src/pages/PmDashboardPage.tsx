@@ -19,7 +19,7 @@ export function PmDashboardPage() {
   const [rolesModalOpen, setRolesModalOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-app-bg">
+    <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader

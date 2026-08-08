@@ -221,14 +221,14 @@ export function TeamManagementPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center">
                 <p className="text-sm text-app-text-muted">Loading team overview...</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-app-bg">
+        <div className="min-h-screen">
             {/* Opaque and above the collapsed rail, so the rail never bleeds
                 into the header area. */}
             <header className="relative z-40 border-b border-app-border bg-app-bg">

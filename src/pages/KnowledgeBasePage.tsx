@@ -65,7 +65,7 @@ export function KnowledgeBasePage() {
     [artifacts, selectedArtifactId]);
 
     return (
-        <div className="min-h-screen bg-app-bg text-app-text flex flex-col">
+        <div className="min-h-screen text-app-text flex flex-col">
             <header className="border-b border-app-border bg-app-bg">
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}

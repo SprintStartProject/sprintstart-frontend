@@ -352,7 +352,7 @@ export function OnBoardingPage() {
   // ── RENDER: LOADING STATE ──────────────────────────────────
   if (loadingState === "loading" || loadingState === "idle") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-app-text-muted">
           <Loader2 className="w-8 h-8 animate-spin text-app-brand" />
           <p className="text-sm">Loading onboarding path...</p>
@@ -364,7 +364,7 @@ export function OnBoardingPage() {
   // ── RENDER: GENERATING STATE ───────────────────────────────
   if (loadingState === "generating") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+      <div className="min-h-screen flex items-center justify-center p-8">
         <div className={gameActive ? "w-full max-w-2xl text-center" : "max-w-md text-center"}>
           <Sparkles className="w-10 h-10 text-app-brand mx-auto mb-4 animate-pulse" />
           <h2 className="text-xl font-semibold text-app-text mb-2">
@@ -392,7 +392,7 @@ export function OnBoardingPage() {
   // ── RENDER: ERROR STATE ────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+      <div className="min-h-screen flex items-center justify-center p-8">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-app-text mb-2">
@@ -415,7 +415,7 @@ export function OnBoardingPage() {
   // ── RENDER: EMPTY STATE ────────────────────────────────────
   if (!OnBoardingPathEndpoint || !currentPhase) {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <p className="text-app-text-muted text-sm">
           No onboarding path found.
         </p>
@@ -434,7 +434,7 @@ export function OnBoardingPage() {
 
   // ── RENDER: SUCCESS STATE ──────────────────────────────────
   return (
-    <div className="min-h-screen bg-app-bg">
+    <div className="min-h-screen">
       {/* ── HEADER ───────────────────────────────────────── */}
       <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-content py-4">

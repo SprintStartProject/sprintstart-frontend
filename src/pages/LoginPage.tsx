@@ -14,7 +14,7 @@ export function LoginPage() {
     };
 
     return (
-        <div className="relative flex min-h-screen items-center justify-center bg-app-bg p-4 text-app-text sm:p-6">
+        <div className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
             <div className="absolute right-4 top-4 sm:right-8 sm:top-8">
                 <ThemeToggle showLabel={false} className="bg-app-surface border border-app-border shadow-sm" />
             </div>

@@ -71,7 +71,7 @@ export function DashboardPage() {
     else if (hour < 17) greeting = 'Good afternoon';
 
     return (
-        <div className="min-h-screen bg-app-bg">
+        <div className="min-h-screen">
             <header className="border-b border-app-border bg-app-bg">
                 <div className="app-page-frame py-6">
                     <PageHeader

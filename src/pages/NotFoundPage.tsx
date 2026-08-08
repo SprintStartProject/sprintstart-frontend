@@ -11,7 +11,7 @@ export function NotFoundPage() {
     const [invadersOpen, setInvadersOpen] = useState(true);
 
     return (
-        <div className="flex h-screen w-full flex-col bg-app-bg text-app-text overflow-hidden">
+        <div className="flex h-screen w-full flex-col text-app-text overflow-hidden">
             <PageHeader
                 title="404 Not Found"
                 subtitle="The page you are looking for does not exist."
