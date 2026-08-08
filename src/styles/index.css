@@ -73,14 +73,28 @@
   --progress-fill-end: #4f46e5;    /* indigo-600 */
 
   /* Overlay / Focus */
-  --overlay: rgba(0, 0, 0, 0.6);
-  --focus: #2563eb;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --focus: #2563eb;
 
-  /* Fonts */
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --heading: system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-}
+    /* Accent (secondary gradient stops for premium surfaces) */
+    --accent: #7c3aed;              /* violet-600 */
+    --accent-alt: #0891b2;          /* cyan-600 */
+    --accent-soft: rgba(124, 58, 237, 0.08);
+
+    /* Glassmorphism */
+    --glass: rgba(255, 255, 255, 0.62);
+    --glass-border: rgba(255, 255, 255, 0.55);
+
+    /* Ambient glow (box-shadows / aurora blobs) */
+    --glow: rgba(37, 99, 235, 0.22);
+    --glow-accent: rgba(124, 58, 237, 0.16);
+    --glow-alt: rgba(8, 145, 178, 0.14);
+
+    /* Fonts */
+    --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+    --heading: system-ui, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, Consolas, monospace;
+  }
 
 .dark {
   /* Backgrounds */
@@ -148,10 +162,24 @@
   --neutral-text: #d1d5db;
 
   /* Overlay / Focus */
-  --overlay: rgba(0, 0, 0, 0.6);
-  --focus: #3b82f6;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --focus: #3b82f6;
 
-  /* Progress */
+    /* Accent */
+    --accent: #a78bfa;              /* violet-400 */
+    --accent-alt: #22d3ee;          /* cyan-400 */
+    --accent-soft: rgba(167, 139, 250, 0.12);
+
+    /* Glassmorphism */
+    --glass: rgba(17, 24, 39, 0.55);
+    --glass-border: rgba(148, 163, 184, 0.16);
+
+    /* Ambient glow */
+    --glow: rgba(59, 130, 246, 0.3);
+    --glow-accent: rgba(139, 92, 246, 0.22);
+    --glow-alt: rgba(34, 211, 238, 0.16);
+
+    /* Progress */
   --progress-track: #243044;      /* slightly lighter than gray-800, but still calm */
   --progress-fill: #3b82f6;       /* blue-500, close to the original dark mode */
   --progress-fill-end: #4f46e5;   /* indigo-600 */
@@ -208,9 +236,17 @@
   --color-app-neutral-text: var(--neutral-text);
 
   --color-app-focus: var(--focus);
-  --color-app-overlay: var(--overlay);
+    --color-app-overlay: var(--overlay);
 
-  --color-app-progress-track: var(--progress-track);
+    --color-app-accent: var(--accent);
+    --color-app-accent-soft: var(--accent-soft);
+    --color-app-glow: var(--glow);
+    --color-app-glow-accent: var(--glow-accent);
+    --color-app-glow-alt: var(--glow-alt);
+    --color-app-glass: var(--glass);
+    --color-app-glass-border: var(--glass-border);
+
+    --color-app-progress-track: var(--progress-track);
   --color-app-progress-fill: var(--progress-fill);
   --color-app-progress-fill-end: var(--progress-fill-end);
 
@@ -463,6 +499,143 @@ body {
 #root {
   min-height: 100vh;
   box-sizing: border-box;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Ambient "Aurora Glass" layer
+   Reusable background primitives for premium page surfaces.
+   All colors are driven by the semantic token variables above,
+   so light/dark themes stay consistent automatically.
+   ──────────────────────────────────────────────────────────── */
+
+@keyframes app-aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(5%, -7%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-6%, 5%, 0) scale(0.94);
+  }
+}
+
+@keyframes app-aurora-drift-alt {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(-7%, 8%, 0) scale(0.9);
+  }
+}
+
+/* Soft, slowly drifting gradient blobs. Position/size via utilities. */
+.app-aurora {
+  pointer-events: none;
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  animation: app-aurora-drift 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.app-aurora-alt {
+  animation: app-aurora-drift-alt 24s ease-in-out infinite;
+}
+
+/* Subtle blueprint grid that fades out towards the bottom. */
+.app-bg-grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 70%);
+}
+
+/* Translucent panel with backdrop blur — the core glass surface. */
+@utility app-glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+/* ── Mouse-follow spotlight (decorative, applied via AuroraBackground) ─── */
+
+.app-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle 320px at
+    var(--spot-x, 50%) var(--spot-y, 90%),
+    color-mix(in srgb, var(--color-app-glow) 90%, transparent), transparent 30%
+  );
+  mix-blend-mode: plus-lighter;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-spotlight { display: none; }
+}
+
+/* Respect users who prefer reduced motion: collapse ALL decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────
+   "Dev Classic" style mode
+   Activated by the `.style-classic` class on <html> (managed by
+   ThemeProvider). Disables all glassmorphic glow, ambient animations,
+   and decorative layers, giving a flat surface matching the original look.
+   ──────────────────────────────────────────────────────────── */
+
+/* ── Decorative layers disabled ── */
+
+/* Mouse-follow spotlight. */
+.style-classic .app-spotlight {
+  display: none !important;
+}
+
+/* Aurora drift blobs. */
+.style-classic .app-aurora,
+.style-classic .app-aurora-alt {
+  display: none !important;
+}
+
+/* Blueprint grid overlay. */
+.style-classic .app-bg-grid {
+  display: none !important;
+}
+
+/* Glassmorphism reverted to flat surfaces. */
+.style-classic .app-glass {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── Aurora toggle: hide all aurora layers when the user disables via settings ── */
+body.aurora-disabled .app-aurora,
+body.aurora-disabled .app-aurora-alt,
+body.aurora-disabled .app-bg-grid,
+body.aurora-disabled .app-spotlight {
+  display: none !important;
 }
 
 @keyframes barrelRoll {

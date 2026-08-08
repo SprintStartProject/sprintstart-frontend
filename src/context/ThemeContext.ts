@@ -4,6 +4,13 @@ import { createContext } from 'react';
 export type Theme = 'light' | 'dark' | 'system';
 
 /**
+ * Visual motion mode for the application.
+ * - `'ultra'` — full glassmorphic glows, animated aurora drift, and spotlight effects.
+ * - `'classic'` — flat surfaces, standard borders, no ambient glow or floating animations.
+ */
+export type StyleMode = 'ultra' | 'classic';
+
+/**
  * Shape of the theme context.
  */
 export interface ThemeContextType {
@@ -15,6 +22,14 @@ export interface ThemeContextType {
     toggleTheme: () => void;
     /** Convenience boolean for dark mode checks (resolved, never 'system'). */
     isDarkMode: boolean;
+    /** Currently active style mode ('ultra' or 'classic'). */
+    styleMode: StyleMode;
+    /** Sets the style mode explicitly. */
+    setStyleMode: (mode: StyleMode) => void;
+    /** Toggles between 'ultra' and 'classic' style modes. */
+    toggleStyleMode: () => void;
+    /** Convenience boolean — true when classic (flat) mode is active. */
+    isClassicMode: boolean;
 }
 
 /**

@@ -1,16 +1,24 @@
 import { useContext } from 'react';
-import { ThemeContext } from './ThemeContext';
+import { ThemeContext, type ThemeContextType } from './ThemeContext';
 
 /**
  * Hook to access the global theme context.
- * 
+ *
  * @returns The theme context value.
- * @throws Error if used outside of a ThemeProvider.
  */
-export function useTheme() {
+export function useTheme(): ThemeContextType {
     const context = useContext(ThemeContext);
     if (context === undefined) {
-        throw new Error('useTheme must be used within a ThemeProvider');
+        return {
+            theme: 'light',
+            setTheme: () => {},
+            toggleTheme: () => {},
+            isDarkMode: false,
+            styleMode: 'ultra',
+            setStyleMode: () => {},
+            toggleStyleMode: () => {},
+            isClassicMode: false,
+        };
     }
     return context;
 }
