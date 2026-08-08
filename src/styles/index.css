@@ -630,11 +630,17 @@ body {
   -webkit-backdrop-filter: none !important;
 }
 
-/* ── Aurora toggle: hide all aurora layers when the user disables via settings ── */
-:root.aurora-disabled .app-aurora,
-:root.aurora-disabled .app-aurora-alt,
-:root.aurora-disabled .app-bg-grid,
-:root.aurora-disabled .app-spotlight {
+/* ── Aurora toggle: hide aurora layers independently via settings ── */
+
+/* Background blobs + grid disabled */
+:root.aurora-bg-disabled .app-aurora,
+:root.aurora-bg-disabled .app-aurora-alt,
+:root.aurora-bg-disabled .app-bg-grid {
+  display: none !important;
+}
+
+/* Interactive hover spotlight disabled */
+:root.aurora-hover-disabled .aurora-canvas {
   display: none !important;
 }
 

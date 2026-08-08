@@ -76,11 +76,19 @@ const variantBlobs: Record<AuroraVariant, BlobConfig> = {
     ],
 };
 
+/** Reads whether a :root class is currently set (for settings-driven toggles). */
+function isRootClassActive(className: string): boolean {
+    return document.documentElement.classList.contains(className);
+}
+
 /**
  * Shared "Aurora Glass" page background.
  *
  * Renders slowly-drifting blurred gradient blobs (CSS keyframe-based)
  * and an optional interactive canvas spotlight that follows the cursor.
+ *
+ * The entire layer sits at `z-index: -1` so it layers strictly behind all
+ * page content — no UI element should appear under the aurora.
  *
  * When `interactive` is true (default), a subtle spotlight glow follows the
  * cursor across the background — implemented with rAF-throttled DOM-only
@@ -89,8 +97,9 @@ const variantBlobs: Record<AuroraVariant, BlobConfig> = {
  * In Classic mode (`isClassicMode` from ThemeContext), the entire layer
  * is hidden — the CSS `.style-classic` rules handle the display:none.
  *
- * Render as the first child of a page root, with page content in a sibling
- * `relative z-10` container.
+ * Two independent CSS kill-switch classes on <html> control each layer:
+ *   - `aurora-bg-disabled`  → hides blobs + grid
+ *   - `aurora-hover-disabled` → hides the canvas spotlight
  *
  * The interactive canvas is oversized by OVERSCAN px on each side so the
  * glow stroke (max 160px wide) isn't clipped at the viewport edges.
@@ -112,10 +121,14 @@ export function AuroraBackground({
 
     // How many extra pixels to extend the canvas beyond the viewport on each
     // side, so the interactive glow trail isn't clipped at the screen edges.
+    // Half the maximum line width (160px) is enough.
     const OVERSCAN = 80;
 
     useEffect(() => {
         if (!effectiveInteractive) return;
+
+        // If the user has toggled the hover effect off in settings, skip.
+        if (isRootClassActive('aurora-hover-disabled')) return;
 
         const container = containerRef.current;
         const canvas = canvasRef.current;
@@ -219,6 +232,7 @@ export function AuroraBackground({
             transition={enterTransition}
             aria-hidden={children === undefined ? true : undefined}
             className={`pointer-events-none fixed inset-0 ${className}`.trim()}
+            style={{ zIndex: -1 }}
         >
             {effectiveInteractive ? (
                 <canvas
@@ -231,7 +245,7 @@ export function AuroraBackground({
                         width: `calc(100% + ${OVERSCAN * 2}px)`,
                         height: `calc(100% + ${OVERSCAN * 2}px)`,
                     }}
-                    className="pointer-events-none blur-3xl dark:mix-blend-plus-lighter"
+                    className="pointer-events-none blur-3xl dark:mix-blend-plus-lighter aurora-canvas"
                 />
             ) : null}
             {blobs.map((blob, index) => (
