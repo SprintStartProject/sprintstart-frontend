@@ -7,6 +7,7 @@ import { ThemeProvider } from './context/ThemeProvider';
 import { ProjectProvider } from './features/projects/ProjectProvider';
 import { MomentsProvider, RocketPet } from './features/moments';
 import { useAuth } from './context/useAuth';
+import { AuroraBackground } from './components/layout/AuroraBackground';
 
 function AppContent() {
     const { status } = useAuth();
@@ -16,7 +17,8 @@ function AppContent() {
 
     return (
         <div className="flex min-h-screen w-full bg-app-bg text-app-text">
-            {showSidebar && <SideBar />}
+                    <AuroraBackground />
+                    {showSidebar && <SideBar />}
 
             <main className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
                 <AppRouter />

@@ -631,10 +631,10 @@ body {
 }
 
 /* ── Aurora toggle: hide all aurora layers when the user disables via settings ── */
-body.aurora-disabled .app-aurora,
-body.aurora-disabled .app-aurora-alt,
-body.aurora-disabled .app-bg-grid,
-body.aurora-disabled .app-spotlight {
+:root.aurora-disabled .app-aurora,
+:root.aurora-disabled .app-aurora-alt,
+:root.aurora-disabled .app-bg-grid,
+:root.aurora-disabled .app-spotlight {
   display: none !important;
 }
 
