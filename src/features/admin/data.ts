@@ -104,6 +104,18 @@ export function getAvailableProjects(
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
+/**
+ * Fills in each user's assigned projects with their names.
+ *
+ * The user endpoint only returns `projectIds`, so the names have to come from
+ * the separately loaded project list — `projects` on a freshly mapped
+ * `AdminUser` is always empty. It is still used as a fallback, because the
+ * drawers update it optimistically after assigning or removing a project.
+ *
+ * An id without a matching project keeps a readable placeholder rather than
+ * disappearing: it means the project list is stale or the project was deleted,
+ * and silently dropping the row would hide that.
+ */
 export function enrichUsersWithProjectNames(
   users: AdminUser[],
   projects: ProjectSummary[],
@@ -112,12 +124,24 @@ export function enrichUsersWithProjectNames(
     projects.map((project) => [project.id, project]),
   );
 
-  return users.map((user) => ({
-    ...user,
-    projects: user.projects.map(
-      (project) => projectsById.get(project.id) ?? project,
-    ),
-  }));
+  return users.map((user) => {
+    const assignedIds =
+      user.projectIds.length > 0
+        ? user.projectIds
+        : user.projects.map((project) => project.id);
+
+    return {
+      ...user,
+      projects: assignedIds.map(
+        (projectId) =>
+          projectsById.get(projectId) ??
+          user.projects.find((project) => project.id === projectId) ?? {
+            id: projectId,
+            name: `Project ${projectId.slice(0, 8)}`,
+          },
+      ),
+    };
+  });
 }
 
 export function filterAdminUsers(

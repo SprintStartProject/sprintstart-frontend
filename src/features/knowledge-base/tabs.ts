@@ -1,4 +1,5 @@
-export type KnowledgeTab = 'ALL' | 'UPLOADS' | 'PR' | 'ISSUES' | 'FILES' | 'COMMITS';
+export type KnowledgeTab =
+    'ALL' | 'UPLOADS' | 'PR' | 'ISSUES' | 'FILES' | 'COMMITS';
 
 /**
  * Left-to-right order of the artifact type tabs.
@@ -18,3 +19,9 @@ export const TABS: { id: KnowledgeTab; label: string }[] = [
     { id: 'FILES', label: 'Files' },
     { id: 'COMMITS', label: 'Commits' },
 ];
+
+/**
+ * Just the ids, in the same order. Kept beside `TABS` so the swipe gesture and
+ * the bar can never disagree about what comes next.
+ */
+export const KNOWLEDGE_TAB_ORDER: KnowledgeTab[] = TABS.map((tab) => tab.id);

@@ -15,7 +15,7 @@ function createUser(overrides: Partial<TeamOverviewUser> = {}): TeamOverviewUser
         currentPhase: { id: 'p1', title: 'Phase 1' },
         currentStep: null,
         hasFeedback: false,
-        project: { id: 'proj1', name: 'Project 1' },
+        projects: [{ id: 'proj1', name: 'Project 1' }],
         ...overrides,
     };
 }

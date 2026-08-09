@@ -17,7 +17,7 @@ vi.mock('../../../src/services/teamManagementService', () => ({
             roles: [{ id: 'r1', name: 'Developer', description: '' }],
             skills: [],
             progressPercentage: 0.5,
-            project: { id: 'p1', name: 'SprintStart' },
+            projects: [{ id: 'p1', name: 'SprintStart' }],
             currentPhase: { id: 'phase1', title: 'Phase 1' },
             currentStep: {
                 id: 's1',
@@ -34,7 +34,7 @@ vi.mock('../../../src/services/teamManagementService', () => ({
             roles: [],
             skills: [],
             progressPercentage: 0.2,
-            project: { id: 'p1', name: 'SprintStart' },
+            projects: [{ id: 'p1', name: 'SprintStart' }],
             currentPhase: { id: 'phase1', title: 'Phase 1' },
             currentStep: null,
             hasFeedback: true

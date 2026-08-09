@@ -115,7 +115,7 @@ function createMockUser(overrides: Partial<TeamOverviewUser> = {}): TeamOverview
             skip: { id: 'skip1', stepId: 'step1', status: 'PENDING', reason: 'Already know this', reviewComment: null, reviewedAt: null },
         },
         hasFeedback: false,
-        project: { id: 'proj1', name: 'Project 1' },
+        projects: [{ id: 'proj1', name: 'Project 1' }],
         ...overrides,
     };
 }

@@ -18,10 +18,18 @@ export type TeamOverviewUser = {
     firstname: string;
     lastname: string;
     profileIcon?: string;
-    project: {
+    /**
+     * Projects the member is assigned to.
+     *
+     * The API sends these as `projectIds`, a list of objects keyed by
+     * `projectId` — not a single `project`, which is what this type used to
+     * claim. `getTeamOverview` normalizes it; anything reading it straight off
+     * an API response has to normalize too.
+     */
+    projects: {
         id: string;
         name: string;
-    };
+    }[];
     roles: ProjectRole[];
     skills: Skill[];
     progressPercentage: number;
@@ -69,6 +77,24 @@ export function isSkillLinkedToRole(skill: Skill, roleId: string): boolean {
      skillId: string;
      level: SkillLevel;
  };
+
+export type TeamManagementTab = 'members' | 'roles' | 'projects';
+
+/**
+ * Left-to-right order of the Team Management tabs. Single source of truth:
+ * `TeamManagementTabSwitcher` renders in this order and `TeamManagementPage`
+ * derives the slide direction from it, so the content always travels the same
+ * way the active pill does.
+ *
+ * Not every tab is always available — `projects` only appears for a manager who
+ * runs more than one project, since moving people between projects is the only
+ * thing it offers. The visible subset keeps this order.
+ */
+export const TEAM_MANAGEMENT_TAB_ORDER: TeamManagementTab[] = [
+    'members',
+    'roles',
+    'projects',
+];
 
 export type TeamOverviewFilters = {
     roleId: string;

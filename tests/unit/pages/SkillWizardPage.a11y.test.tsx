@@ -27,7 +27,7 @@ vi.mock('../../../src/services/teamManagementService', () => ({
         currentPhase: { id: 'p1', title: 'Phase 1' },
         currentStep: null,
         hasFeedback: false,
-        project: { id: 'proj1', name: 'Project 1' },
+        projects: [{ id: 'proj1', name: 'Project 1' }],
     }),
     getSkills: vi.fn().mockResolvedValue([
         { id: 'skill1', name: 'TypeScript', roleIds: ['role1'], status: 'ACTIVE' },

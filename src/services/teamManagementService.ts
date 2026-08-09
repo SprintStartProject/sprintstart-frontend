@@ -16,7 +16,11 @@ import type {
   StepType,
 } from "../features/onboarding/types";
 
-let mockUsers = teamOverviewMock.users as TeamOverviewUser[];
+// The fixture predates the `projects` list and still carries a single
+// `project`, so it goes through the same normalization as an API response.
+let mockUsers = (
+  teamOverviewMock.users as unknown as BackendTeamOverviewUser[]
+).map((user) => ({ ...user, projects: toTeamOverviewProjects(user) }));
 
 let mockProjectRoles: ProjectRole[] = Array.from(
   new Map(
@@ -45,6 +49,35 @@ function normalizeSkill(skill: LegacySkill): Skill {
 
 let mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
 
+/**
+ * Team-overview user as the API actually sends it.
+ *
+ * The projects arrive under `projectIds` as objects keyed by `projectId`. The
+ * older single `project` shape is still accepted because fixtures and the
+ * `me/team-overview` endpoint use it.
+ */
+type BackendTeamOverviewUser = Omit<TeamOverviewUser, "projects"> & {
+  projectIds?: { projectId?: string; id?: string; name?: string }[];
+  project?: { id?: string; name?: string };
+};
+
+/** Normalizes whichever project shape the API returned into `projects`. */
+function toTeamOverviewProjects(
+  user: BackendTeamOverviewUser,
+): TeamOverviewUser["projects"] {
+  const fromList = (user.projectIds ?? []).flatMap((project) => {
+    const id = project.projectId ?? project.id;
+
+    return id ? [{ id, name: project.name ?? "" }] : [];
+  });
+
+  if (fromList.length > 0) return fromList;
+
+  return user.project?.id
+    ? [{ id: user.project.id, name: user.project.name ?? "" }]
+    : [];
+}
+
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,
@@ -60,12 +93,13 @@ export async function getTeamOverview(
     const query = params.toString();
     const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
 
-    const response = await apiClient.fetch<{ content: TeamOverviewUser[] }>(
-      url,
-    );
+    const response = await apiClient.fetch<{
+      content: BackendTeamOverviewUser[];
+    }>(url);
 
     const users = response.content.map((user) => ({
       ...user,
+      projects: toTeamOverviewProjects(user),
       roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
         ...role,
         id: role.id || role.roleId || "",
@@ -103,11 +137,12 @@ export async function getTeamMember(
 
 export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
   try {
-    const user = await apiClient.fetch<TeamOverviewUser>(
+    const user = await apiClient.fetch<BackendTeamOverviewUser>(
       "/api/v1/onboarding/me/team-overview",
     );
     return {
       ...user,
+      projects: toTeamOverviewProjects(user),
       roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
         ...role,
         id: role.id || role.roleId || "",

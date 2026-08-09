@@ -58,6 +58,7 @@ import type {
   SourceSystem,
 } from "../features/data-ingestion/types.ts";
 import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
 import {
   getIngestionRunsPage,
@@ -1056,6 +1057,14 @@ export function DataIngestionPage() {
 
   const isLoading = loadingState === "loading";
 
+  // Two-finger swipe between the sections, for people who would rather not aim
+  // at the bar.
+  const swipeRef = useSwipeableTabs<SectionKey, HTMLElement>({
+    order: SECTION_ORDER,
+    value: activeSection,
+    onChange: handleSectionChange,
+  });
+
   const showOverview = activeSection === "overview";
   const showSources = activeSection === "overview" || activeSection === "sources";
   const showRuns = activeSection === "overview" || activeSection === "runs";
@@ -1109,7 +1118,7 @@ export function DataIngestionPage() {
           }}
         />
 
-        <main className="app-page-shell">
+        <main ref={swipeRef} className="app-page-shell">
           <div className="space-y-8">
             {errorMessage && (
               <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-5 py-4 text-sm text-app-warning-text">

@@ -11,6 +11,7 @@ import {
     getProjectSourcesCount,
     getUserEditFormState,
     getDraftDisplayName,
+    enrichUsersWithProjectNames,
 } from '../../../../src/features/admin/data';
 import type { AdminUser, UserEditFormState } from '../../../../src/features/admin/types';
 
@@ -175,6 +176,46 @@ describe('admin data helpers', () => {
                 enabled: true,
             };
             expect(getDraftDisplayName(user, draft)).toBe('fallback@x.com');
+        });
+    });
+
+    describe('enrichUsersWithProjectNames', () => {
+        it('resolves the assigned project ids into named projects', () => {
+            const user = createAdminUser({ projectIds: ['p2', 'p1'] });
+
+            const [enriched] = enrichUsersWithProjectNames(
+                [user],
+                [
+                    { id: 'p1', name: 'Alpha' },
+                    { id: 'p2', name: 'Beta' },
+                ],
+            );
+
+            expect(enriched.projects).toEqual([
+                { id: 'p2', name: 'Beta' },
+                { id: 'p1', name: 'Alpha' },
+            ]);
+        });
+
+        it('keeps an unknown project id visible with a placeholder name', () => {
+            const user = createAdminUser({ projectIds: ['deleted-1234-5678'] });
+
+            const [enriched] = enrichUsersWithProjectNames([user], []);
+
+            expect(enriched.projects).toEqual([
+                { id: 'deleted-1234-5678', name: 'Project deleted-' },
+            ]);
+        });
+
+        it('falls back to already resolved projects when no ids are set', () => {
+            const user = createAdminUser({
+                projectIds: [],
+                projects: [{ id: 'p1', name: 'Alpha' }],
+            });
+
+            const [enriched] = enrichUsersWithProjectNames([user], []);
+
+            expect(enriched.projects).toEqual([{ id: 'p1', name: 'Alpha' }]);
         });
     });
 });

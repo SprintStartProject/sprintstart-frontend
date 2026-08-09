@@ -204,9 +204,12 @@ export function UserDetailsDrawer({
     );
     nextProjectIds.add(projectId);
 
+    // `projectIds` is what the enrichment on the next full load reads, so both
+    // have to move together or the optimistic change would be undone by it.
     onUserUpdated({
       ...user,
       projects: getProjectSummariesById(nextProjectIds),
+      projectIds: [...nextProjectIds],
     });
   };
 
@@ -221,6 +224,7 @@ export function UserDetailsDrawer({
     onUserUpdated({
       ...user,
       projects: getProjectSummariesById(nextProjectIds),
+      projectIds: [...nextProjectIds],
     });
   };
 

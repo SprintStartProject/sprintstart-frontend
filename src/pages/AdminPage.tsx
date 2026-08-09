@@ -41,6 +41,7 @@ import type {
   UserFilter,
 } from "../features/admin/types";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { adminUserService } from "../services/adminUserService";
 import { projectService } from "../services/projectService";
 
@@ -439,11 +440,25 @@ export function AdminPage() {
     }
   };
 
+  // Two-finger swipe between the sections, for people who would rather not aim
+  // at the bar.
+  const swipeRef = useSwipeableTabs<AdminTab, HTMLElement>({
+    order: ADMIN_TAB_ORDER,
+    value: activeTab,
+    onChange: handleTabChange,
+  });
+
   const showInitialLoading =
     loadingState === "idle" || loadingState === "loading";
 
   return (
-    <div className="h-dvh overflow-y-scroll overscroll-contain">
+    // The swipe listens on the page rather than the panel: needing to be over
+    // the content to change section makes the gesture feel like it only works
+    // in some places.
+    <div
+      ref={swipeRef}
+      className="h-dvh overflow-y-scroll overscroll-contain"
+    >
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">
           <PageHeader
@@ -461,119 +476,124 @@ export function AdminPage() {
       </header>
 
       <main className="admin-page-frame py-4 sm:py-6">
-        <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm sm:rounded-3xl">
-          <div className="flex flex-col gap-4 border-b border-app-border px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-            <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
+        {/* No card around the sections, matching the other tabbed pages: the
+            box drew a second frame inside the page frame and made the tab bar
+            look like it belonged to a widget rather than to the page. */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
 
-            <button
-              type="button"
-              onClick={() => void refreshAdminData()}
-              disabled={isRefreshing}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:w-11"
-              aria-label="Refresh admin data"
+          <button
+            type="button"
+            onClick={() => void refreshAdminData()}
+            disabled={isRefreshing}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:w-11"
+            aria-label="Refresh admin data"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+          </button>
+        </div>
+
+        {/* Clipped horizontally because the section content slides in from
+              the side; without it the travel briefly widens the page. `clip`
+              rather than `hidden`, so this does not become a scroll container
+              and swallow sticky positioning inside the sections. */}
+        <div className="overflow-x-clip">
+          {showInitialLoading ? (
+            <div className="flex min-h-96 items-center justify-center">
+              <div className="flex flex-col items-center gap-3 text-app-text-muted">
+                <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+                <p className="text-sm">Loading admin data...</p>
+              </div>
+            </div>
+          ) : loadingState === "error" ? (
+            <div className="flex min-h-96 items-center justify-center px-6 text-center">
+              <div className="max-w-md">
+                <AlertCircle className="mx-auto mb-4 h-10 w-10 text-app-danger-solid" />
+                <h3 className="text-base font-semibold text-app-text">
+                  Admin data could not be loaded
+                </h3>
+                <p className="mt-2 text-sm text-app-text-muted">
+                  {errorMessage}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void refreshAdminData()}
+                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-app-text px-5 py-2.5 text-sm font-medium text-app-text-inverse transition-colors hover:opacity-90"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Only the tab content slides; the loading and error states above
+            // are not tabs and would otherwise animate on their way in too.
+            <SlidingTabPanel
+              activeKey={activeTab}
+              index={ADMIN_TAB_ORDER.indexOf(activeTab)}
             >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </button>
-          </div>
-
-          <div className="p-3 sm:p-6">
-            {showInitialLoading ? (
-              <div className="flex min-h-96 items-center justify-center">
-                <div className="flex flex-col items-center gap-3 text-app-text-muted">
-                  <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-                  <p className="text-sm">Loading admin data...</p>
-                </div>
-              </div>
-            ) : loadingState === "error" ? (
-              <div className="flex min-h-96 items-center justify-center px-6 text-center">
-                <div className="max-w-md">
-                  <AlertCircle className="mx-auto mb-4 h-10 w-10 text-app-danger-solid" />
-                  <h3 className="text-base font-semibold text-app-text">
-                    Admin data could not be loaded
-                  </h3>
-                  <p className="mt-2 text-sm text-app-text-muted">
-                    {errorMessage}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void refreshAdminData()}
-                    className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-app-text px-5 py-2.5 text-sm font-medium text-app-text-inverse transition-colors hover:opacity-90"
-                  >
-                    Try again
-                  </button>
-                </div>
-              </div>
-            ) : (
-              // Only the tab content slides; the loading and error states above
-              // are not tabs and would otherwise animate on their way in too.
-              <SlidingTabPanel
-                activeKey={activeTab}
-                index={ADMIN_TAB_ORDER.indexOf(activeTab)}
-              >
-                {activeTab === "users" ? (
-              <>
-                <AdminUsersToolbar
-                  userCount={filteredUsers.length}
-                  selectedUserCount={selectedUserIds.size}
-                  searchValue={searchValue}
-                  userFilter={userFilter}
-                  onSearchChange={(value) => {
-                    setSearchValue(value);
-                    setPage(1);
-                  }}
-                  onFilterChange={(value) => {
-                    setUserFilter(value);
-                    setPage(1);
-                  }}
-                  onRequestBulkDelete={requestBulkUserDelete}
-                />
-
-                <UsersTab
-                  paginatedUsers={paginatedUsers}
-                  selectedUserIds={selectedUserIds}
-                  allVisibleUsersSelected={allVisibleUsersSelected}
-                  openUserMenuId={openUserMenuId}
-                  onToggleAllVisibleUsers={toggleAllVisibleUsers}
-                  onToggleUserSelection={toggleUserSelection}
-                  onOpenUserDetails={openUserDetails}
-                  onToggleUserContextMenu={toggleUserContextMenu}
-                  onOpenUserDetailsFromMenu={openUserDetailsFromMenu}
-                  onRequestUserDeleteFromMenu={requestUserDeleteFromMenu}
-                />
-
-                <AdminPagination
-                  safePage={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                />
-              </>
-                ) : activeTab === "projects" ? (
-              <>
-                <AdminProjectsToolbar
-                  projectCount={filteredProjects.length}
-                  projectSearchValue={projectSearchValue}
-                  onProjectSearchChange={setProjectSearchValue}
-                  onCreateProject={openCreateWizard}
-                />
-
-                <ProjectsTab
-                  filteredProjects={filteredProjects}
-                  hasSearchQuery={projectSearchValue.trim().length > 0}
-                  totalCount={projects.length}
-                  onOpenProjectDetails={openProjectDetails}
-                />
-              </>
-                ) : (
-                  <TokensTab
-                    tokenNames={tokenNames}
-                    onRefresh={() => void loadTokenNames()}
+              {activeTab === "users" ? (
+                <>
+                  <AdminUsersToolbar
+                    userCount={filteredUsers.length}
+                    selectedUserCount={selectedUserIds.size}
+                    searchValue={searchValue}
+                    userFilter={userFilter}
+                    onSearchChange={(value) => {
+                      setSearchValue(value);
+                      setPage(1);
+                    }}
+                    onFilterChange={(value) => {
+                      setUserFilter(value);
+                      setPage(1);
+                    }}
+                    onRequestBulkDelete={requestBulkUserDelete}
                   />
-                )}
-              </SlidingTabPanel>
-            )}
-          </div>
+
+                  <UsersTab
+                    paginatedUsers={paginatedUsers}
+                    selectedUserIds={selectedUserIds}
+                    allVisibleUsersSelected={allVisibleUsersSelected}
+                    openUserMenuId={openUserMenuId}
+                    onToggleAllVisibleUsers={toggleAllVisibleUsers}
+                    onToggleUserSelection={toggleUserSelection}
+                    onOpenUserDetails={openUserDetails}
+                    onToggleUserContextMenu={toggleUserContextMenu}
+                    onOpenUserDetailsFromMenu={openUserDetailsFromMenu}
+                    onRequestUserDeleteFromMenu={requestUserDeleteFromMenu}
+                  />
+
+                  <AdminPagination
+                    safePage={safePage}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
+                </>
+              ) : activeTab === "projects" ? (
+                <>
+                  <AdminProjectsToolbar
+                    projectCount={filteredProjects.length}
+                    projectSearchValue={projectSearchValue}
+                    onProjectSearchChange={setProjectSearchValue}
+                    onCreateProject={openCreateWizard}
+                  />
+
+                  <ProjectsTab
+                    filteredProjects={filteredProjects}
+                    hasSearchQuery={projectSearchValue.trim().length > 0}
+                    totalCount={projects.length}
+                    onOpenProjectDetails={openProjectDetails}
+                  />
+                </>
+              ) : (
+                <TokensTab
+                  tokenNames={tokenNames}
+                  onRefresh={() => void loadTokenNames()}
+                />
+              )}
+            </SlidingTabPanel>
+          )}
         </div>
       </main>
 
@@ -662,6 +682,7 @@ export function AdminPage() {
       <CreateProjectWizard
         isOpen={isCreateWizardOpen}
         tokenNames={tokenNames}
+        users={users}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
       />

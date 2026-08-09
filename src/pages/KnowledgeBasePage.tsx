@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ArtifactFilters, ArtifactList, ArtifactViewerDrawer } from '../features/knowledge-base/components';
-import { TABS } from '../features/knowledge-base/tabs';
+import { KNOWLEDGE_TAB_ORDER, TABS, type KnowledgeTab } from '../features/knowledge-base/tabs';
 import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
+import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
 import { Pagination } from '../components/ui/Pagination';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/useAuth';
@@ -64,6 +65,14 @@ export function KnowledgeBasePage() {
         artifacts.find(a => a.id === selectedArtifactId) ?? null,
     [artifacts, selectedArtifactId]);
 
+    // Two-finger swipe between the artifact-type tabs, for people who would
+    // rather not aim at the bar.
+    const swipeRef = useSwipeableTabs<KnowledgeTab, HTMLElement>({
+        order: KNOWLEDGE_TAB_ORDER,
+        value: activeTab,
+        onChange: handleTabChange,
+    });
+
     return (
         <div className="min-h-screen text-app-text flex flex-col">
             <header className="border-b border-app-border bg-app-bg">
@@ -80,7 +89,7 @@ export function KnowledgeBasePage() {
                 </motion.div>
             </header>
 
-            <main className="flex-1 flex flex-col app-page-frame py-6 sm:space-y-10 lg:py-8 overflow-y-auto">
+            <main ref={swipeRef} className="flex-1 flex flex-col app-page-frame py-6 sm:space-y-10 lg:py-8 overflow-y-auto">
                 <div className="max-w-7xl mx-auto w-full">
                     {!projectId && !isLoading ? (
                         <div className="flex flex-col items-center justify-center py-12 text-app-text-muted">
