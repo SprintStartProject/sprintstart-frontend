@@ -153,7 +153,16 @@ export function ChatComposer({
             )}
 
             <form
-                onSubmit={onSubmit}
+                // The hint below is not enough on its own: Enter submits the
+                // form directly, so an inverted range would still reach the
+                // backend and come back as a validation error.
+                onSubmit={(e) => {
+                    if (rangeInvalid) {
+                        e.preventDefault();
+                        return;
+                    }
+                    onSubmit(e);
+                }}
                 className="flex items-end gap-2 rounded-2xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
             >
                 <button
@@ -207,7 +216,7 @@ export function ChatComposer({
                         type="submit"
                         aria-label="Send message"
                         data-testid="chat-send-button"
-                        disabled={!value.trim()}
+                        disabled={!value.trim() || rangeInvalid}
                         className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         <Send size={18} />

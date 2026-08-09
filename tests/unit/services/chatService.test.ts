@@ -100,6 +100,49 @@ describe('chatService', () => {
             expect(onError).not.toHaveBeenCalled();
         });
 
+        it('sends date filters as local day boundaries and never a future upper bound', async () => {
+            let capturedBody: { filters?: { from?: string; to?: string } } | null = null;
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+                    controller.close();
+                },
+            });
+
+            server.use(
+                http.post('/api/v1/chats/me/prompt', async ({ request }) => {
+                    capturedBody = await request.json() as typeof capturedBody;
+                    return new HttpResponse(stream, {
+                        headers: { 'Content-Type': 'text/event-stream' },
+                    });
+                }),
+            );
+
+            // Today as the upper bound is the case that used to fail: the
+            // backend validates it with @PastOrPresent, and the end of today
+            // is a future instant.
+            const now = new Date();
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+            await streamMessage('chat1', 'hello', [], '2026-01-15', today, {
+                onToken: vi.fn(),
+                onReasoning: vi.fn(),
+                onCitation: vi.fn(),
+                onToolUse: vi.fn(),
+                onDone: vi.fn(),
+                onError: vi.fn(),
+            });
+
+            const { from, to } = capturedBody!.filters!;
+
+            // Built from local date parts, so this holds in any timezone —
+            // appending "Z" to the raw value would shift it by the offset.
+            expect(from).toBe(new Date(2026, 0, 15, 0, 0, 0, 0).toISOString());
+            expect(new Date(to!).getTime()).toBeLessThanOrEqual(Date.now());
+        });
+
         it('calls onError and skips streaming if token refresh fails', async () => {
             let promptRequested = false;
             mockKeycloakInstance.updateToken.mockRejectedValueOnce(new Error('Refresh failed'));

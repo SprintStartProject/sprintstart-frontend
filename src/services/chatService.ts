@@ -73,6 +73,32 @@ type ChatEvent =
     | { type: "error"; message: string };
 
 /**
+ * Turns a `yyyy-mm-dd` value from a date input into the UTC instant at which
+ * that day starts *in the user's timezone*.
+ *
+ * Appending `Z` to the raw value treats the locally picked date as if it were
+ * UTC, which shifts the boundary by the offset — in CEST that silently dropped
+ * the first two hours of the selected day.
+ */
+function localDayStart(date: string): string | undefined {
+    const parsed = new Date(`${date}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+/**
+ * The counterpart to {@link localDayStart}, clamped to the current time.
+ *
+ * The backend validates this bound with `@PastOrPresent`, so the end of *today*
+ * is a future instant and gets rejected — picking today as the upper bound
+ * failed the whole prompt with a 400.
+ */
+function localDayEnd(date: string): string | undefined {
+    const parsed = new Date(`${date}T23:59:59.999`);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    return new Date(Math.min(parsed.getTime(), Date.now())).toISOString();
+}
+
+/**
  * Creates a new prompt and handles the chat response.
  *
  * @param chatId The chat the prompt is created in.
@@ -114,8 +140,8 @@ export async function streamMessage(
         sourceSystems.length || from || to
             ? {
                 sourceSystems: sourceSystems.length ? sourceSystems : undefined,
-                from: from ? `${from}T00:00:00Z` : undefined,
-                to: to ? `${to}T23:59:59Z` : undefined,
+                from: from ? localDayStart(from) : undefined,
+                to: to ? localDayEnd(to) : undefined,
             }
             : undefined;
 
