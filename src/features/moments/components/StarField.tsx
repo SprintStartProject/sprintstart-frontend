@@ -7,10 +7,14 @@ interface StarFieldProps {
      * How far the field travels while `moving` is true, as a multiple of each
      * star's own depth-derived distance. Positive slides down (the viewer is
      * climbing), negative slides up (the viewer is descending).
+     *
+     * Omit it for a sky that holds still. That renders plain spans with no
+     * animation attached at all — seventy idle motion components are seventy
+     * spring subscriptions the scene pays for without anything moving.
      */
-    travel: number;
-    /** Whether the field is currently sliding. */
-    moving: boolean;
+    travel?: number;
+    /** Whether the field is currently sliding. Only read when `travel` is set. */
+    moving?: boolean;
     /** How long the slide takes, in seconds. */
     duration?: number;
     /** Distinguishes two fields on screen so they are not the same sky twice. */
@@ -34,11 +38,12 @@ interface Star {
  * The sky both space scenes are set in: the launch away from Earth and the
  * landing on the Moon.
  *
- * The stars are what make either of those read as *travel* rather than as a
- * rocket sliding across a backdrop. They move at different speeds depending on
- * a per-star depth, and that parallax is the cheapest honest signal of distance
- * there is — with a field that moves as one, the rocket is just an icon being
- * animated.
+ * On the launch the stars are what make it read as *travel* rather than as a
+ * rocket sliding across a backdrop: they move at different speeds depending on
+ * a per-star depth, and that parallax is the cheapest honest signal of
+ * distance there is. The landing keeps them still — the viewer is coming down
+ * onto ground that is already in frame, and a sky that moves behind a fixed
+ * horizon reads as the sky being broken, not as descent.
  *
  * Positions are seeded rather than random, so the sky does not visibly reshuffle
  * when the component re-renders between beats.
@@ -49,7 +54,7 @@ interface Star {
  */
 export function StarField({
     travel,
-    moving,
+    moving = false,
     duration = 1.6,
     seedOffset = 0,
 }: StarFieldProps) {
@@ -69,6 +74,26 @@ export function StarField({
             }),
         [seedOffset],
     );
+
+    if (travel === undefined) {
+        return (
+            <>
+                {stars.map((star, index) => (
+                    <span
+                        key={index}
+                        className="absolute rounded-full bg-app-text"
+                        style={{
+                            left: `${star.left}%`,
+                            top: `${star.top}%`,
+                            width: star.size,
+                            height: star.size,
+                            opacity: star.opacity,
+                        }}
+                    />
+                ))}
+            </>
+        );
+    }
 
     return (
         <>

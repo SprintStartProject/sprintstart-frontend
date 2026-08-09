@@ -5,6 +5,7 @@ import { RocketGlyph } from "./RocketGlyph.tsx";
 import { StarField } from "./StarField.tsx";
 import { ConfettiBurst } from "./ConfettiBurst.tsx";
 import { rocketSizeFor } from "../flightGeometry.ts";
+import { momentStageRect } from "../momentStage.ts";
 import { celebrationSpringToken } from "../../../styles/tokens.ts";
 
 interface MissionCompleteProps {
@@ -46,6 +47,11 @@ const STAGE_ORDER: Stage[] = ["approach", "touchdown", "arrival"];
  *
  * Landings are slow where launches are violent, and the timing follows that:
  * the descent takes its time, the touchdown settles rather than lands hard.
+ * The stars hold still throughout — the ground is already in frame, and a sky
+ * that slides behind a fixed horizon reads as broken, not as descending.
+ *
+ * Covers the content area rather than the screen (see `momentStage`), so the
+ * sidebar stays put: the page the journey happened on is where it ends.
  *
  * Skippable at any point — a sequence you cannot escape stops being a reward
  * the second time someone sees it — and reduced to the arrival card alone under
@@ -57,7 +63,10 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
         reduceMotion ? "arrival" : "approach",
     );
 
-    const rocketSize = useMemo(() => rocketSizeFor(window.innerWidth) * 1.4, []);
+    // Resolved once: the landing is over in seconds, so a resize or sidebar
+    // toggle mid-sequence is not worth re-deriving for.
+    const stageRect = useMemo(() => momentStageRect(), []);
+    const rocketSize = useMemo(() => rocketSizeFor(stageRect.width) * 1.4, [stageRect]);
     const actionRef = useRef<HTMLButtonElement>(null);
 
     // Focus lands on the dismiss button once the card arrives, so a keyboard
@@ -96,7 +105,15 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
     const hasLanded = stage === "touchdown" || stage === "arrival";
 
     return createPortal(
-        <div className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-app-bg">
+        <div
+            className="fixed z-[95] flex items-center justify-center overflow-hidden bg-app-bg"
+            style={{
+                left: stageRect.left,
+                top: stageRect.top,
+                width: stageRect.width,
+                height: stageRect.height,
+            }}
+        >
             {!reduceMotion && (
                 <motion.div
                     aria-hidden="true"
@@ -106,15 +123,12 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
                     animate={{ opacity: stage === "arrival" ? 0.4 : 1 }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
                 >
-                    {/* Sliding *up*, unlike the launch: the viewer is coming
-                        down, and the sky has to move the other way for that to
-                        read as descending rather than as hovering. */}
-                    <StarField
-                        travel={-0.55}
-                        moving={hasLanded}
-                        duration={1.5}
-                        seedOffset={3}
-                    />
+                    {/* Held still, unlike the launch's parallax: the surface is
+                        already in frame, so a sliding sky reads as the sky
+                        being broken rather than as descent — and seventy
+                        concurrently animated stars were where the touchdown
+                        dropped its frames. */}
+                    <StarField seedOffset={3} />
 
                     {/* Earth, small and far behind: where this started. Nothing
                         else in the frame says how far someone has come. */}
@@ -191,7 +205,7 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
                             marginTop: -rocketSize,
                             filter: "drop-shadow(0 0 26px var(--brand-glow))",
                         }}
-                        initial={{ y: "-95vh", scale: 0.5, opacity: 0 }}
+                        initial={{ y: -0.95 * stageRect.height, scale: 0.5, opacity: 0 }}
                         animate={{
                             y: 0,
                             scale: 1,

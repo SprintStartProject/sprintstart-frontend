@@ -4,6 +4,7 @@ import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../../src/context/ThemeProvider';
 import { ChatPreferencesProvider } from '../../../src/context/ChatPreferencesProvider';
+import { MomentsProvider } from '../../../src/features/moments/MomentsProvider';
 import { SettingsPage } from '../../../src/pages/SettingsPage';
 
 vi.mock('../../../src/context/useAuth', () => ({
@@ -30,7 +31,9 @@ describe('SettingsPage Accessibility', () => {
             <MemoryRouter>
                 <ThemeProvider>
                     <ChatPreferencesProvider>
-                        <SettingsPage />
+                        <MomentsProvider>
+                            <SettingsPage />
+                        </MomentsProvider>
                     </ChatPreferencesProvider>
                 </ThemeProvider>
             </MemoryRouter>,

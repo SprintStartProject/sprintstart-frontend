@@ -7,7 +7,9 @@ import type {
     StepStatus,
 } from '../../../../src/features/onboarding/types';
 
-const mockRevealPath = vi.hoisted(() => vi.fn());
+const mockRevealPath = vi.hoisted(() =>
+    vi.fn<(handlers?: { onLaunched?: () => void }) => void>(),
+);
 
 vi.mock('../../../../src/features/moments', () => ({
     useMoments: () => ({
@@ -86,6 +88,12 @@ describe('usePathRevealMoment', () => {
         window.localStorage.clear();
     });
 
+    /** Stands in for the user pressing a key to set the rocket off. */
+    function fireLaunch() {
+        const handlers = mockRevealPath.mock.calls.at(-1)?.[0];
+        handlers?.onLaunched?.();
+    }
+
     it('reveals a freshly generated path the first time it is shown', () => {
         render(<Harness path={freshPath()} />);
 
@@ -98,21 +106,45 @@ describe('usePathRevealMoment', () => {
         expect(mockRevealPath).not.toHaveBeenCalled();
     });
 
-    it('never reveals the same path twice, even in a later session', () => {
+    it('never reveals the same path twice once the user has launched it', () => {
         const { unmount } = render(<Harness path={freshPath()} />);
         expect(mockRevealPath).toHaveBeenCalledTimes(1);
+        fireLaunch();
         unmount();
 
         // A fresh mount stands in for the next visit: only localStorage carries
-        // over, which is exactly what has to keep the reveal from replaying.
+        // over, which is exactly what has to keep the launch from replaying.
         mockRevealPath.mockClear();
         render(<Harness path={freshPath()} />);
 
         expect(mockRevealPath).not.toHaveBeenCalled();
     });
 
+    it('offers it again on the next visit when it was never launched', () => {
+        const { unmount } = render(<Harness path={freshPath()} />);
+        expect(mockRevealPath).toHaveBeenCalledTimes(1);
+
+        // Clicked through to another page without setting the rocket off. A
+        // launch nobody fired is not one they have had, so coming back has to
+        // find it still on the pad.
+        unmount();
+
+        mockRevealPath.mockClear();
+        const { unmount: unmountSecond } = render(<Harness path={freshPath()} />);
+        expect(mockRevealPath).toHaveBeenCalledTimes(1);
+
+        // And it is still only spent by launching, however many visits later.
+        fireLaunch();
+        unmountSecond();
+
+        mockRevealPath.mockClear();
+        render(<Harness path={freshPath()} />);
+        expect(mockRevealPath).not.toHaveBeenCalled();
+    });
+
     it('reveals again once a new path is generated', () => {
         const { unmount } = render(<Harness path={freshPath('path1')} />);
+        fireLaunch();
         unmount();
 
         mockRevealPath.mockClear();

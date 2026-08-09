@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { BotGlyph, DIZZY_DURATION_S } from "./BotGlyph";
 import { useIdleSleep } from "../hooks/useIdleSleep";
 import { usePointerGaze } from "../hooks/usePointerGaze";
@@ -75,7 +75,10 @@ const ZS = [
  * Purely decorative — it is `aria-hidden` and announces nothing, because a
  * screen reader user has no idea there is a cartoon here and does not need a
  * running commentary on its eyelids. Clicking it wakes it, but so does typing
- * anywhere, so the click is a bonus rather than the way out.
+ * anywhere, so the click is a bonus rather than the way out. A press also
+ * gets a little jump — direct, immediate proof that the click landed on the
+ * bot — except when it is the one thing that wakes it up from properly
+ * asleep, where the built-in startle already is that proof.
  *
  * Under `prefers-reduced-motion` the bot still falls asleep — the state is the
  * joke — but holds a static pose: no blinking, no drifting Z's.
@@ -90,6 +93,7 @@ export function SleepyBot({
     const { stage, isWaking, wake } = useIdleSleep({ enabled: canSleep });
     const botRef = useRef<HTMLSpanElement>(null);
     const [isDizzy, setIsDizzy] = useState(false);
+    const bounceControls = useAnimationControls();
 
     const handleOrbit = useCallback(() => {
         // Circling is unmistakably deliberate, so it counts as activity even
@@ -99,9 +103,41 @@ export function SleepyBot({
         setIsDizzy(true);
     }, [wake]);
 
+    // Direct feedback for a plain press: waking up from asleep already gets
+    // its own startle (jolt, overshoot, wobble) inside `BotGlyph`, but nothing
+    // happens if you press an already-awake or drowsy bot — there is no state
+    // transition for the eyes or antenna to react to. This is that reaction,
+    // for exactly the presses the built-in startle does not cover.
+    //
+    // Lives on the wrapping span rather than as a `BotGlyph` prop: it is a
+    // separate physical reaction on a separate element, the same reasoning
+    // that already puts the dizzy stun-stars outside the glyph. Composes
+    // cleanly with whatever `BotGlyph` is doing on its own root (blinking,
+    // the dizzy spin) since the two never touch the same transform.
+    //
+    // `useAnimationControls` rather than a boolean+timeout: a second press
+    // mid-bounce should restart the jump from wherever it currently is, not
+    // queue behind the first one, which is exactly what `.start()` does when
+    // called again on a component it already controls.
+    const handlePress = useCallback(() => {
+        wake();
+        if (stage !== "asleep" && !reduceMotion) {
+            // Same curve as `BotGlyph`'s wake startle — one physical vocabulary
+            // for "the bot just noticed a press," reused rather than
+            // reinvented, and safe to share since the two never fire together
+            // (this is skipped exactly when that one is about to run).
+            void bounceControls.start(
+                { y: [0, -size * 0.16, size * 0.03, 0], scale: [1, 1.16, 0.95, 1] },
+                { duration: 0.5, times: [0, 0.22, 0.55, 1], ease: "easeOut" },
+            );
+        }
+    }, [wake, stage, reduceMotion, bounceControls, size]);
+
     // Tracking is off while dizzy: the roll drives the pupils through `animate`,
     // and the gaze drives them through `style`. Only one of the two can own them.
-    const gaze = usePointerGaze(
+    // The same gaze also snaps to any rocket crossing the screen, and
+    // `isWatchingRocket` is what turns the rest of the face along with it.
+    const { gaze, isWatchingRocket } = usePointerGaze(
         botRef,
         tracksPointer && stage === "awake" && !isDizzy,
         handleOrbit,
@@ -125,14 +161,20 @@ export function SleepyBot({
             {/* Not a button: it is decoration, and putting it in the tab order
                 would hand keyboard users a control that does nothing they need.
                 Pointer presses anywhere already wake it. */}
-            <span ref={botRef} onPointerDown={wake} className="inline-flex">
+            <motion.span
+                ref={botRef}
+                onPointerDown={handlePress}
+                className="inline-flex"
+                animate={bounceControls}
+            >
                 <BotGlyph
                     size={size}
                     state={isDizzy ? "dizzy" : stage}
                     isWaking={isWaking}
                     gaze={tracksPointer ? gaze : undefined}
+                    awed={isWatchingRocket}
                 />
-            </span>
+            </motion.span>
 
             {/* Comic stun stars, circling the head while the room spins.
                 Rendered out here rather than inside the glyph so they can orbit

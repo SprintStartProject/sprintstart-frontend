@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
     launchGeometry,
     petFlight,
+    PET_EXIT_STEPS,
+    PET_PERCH_INSET,
     PET_ROCKET_SIZE,
 } from "../../../../src/features/moments/flightGeometry.ts";
 import { loopFlight, MIN_LOOP_RATIO } from "../../../../src/features/moments/loopFlight.ts";
+import { FLIGHT_DURATION_S } from "../../../../src/styles/tokens.ts";
 
 /**
  * Worst-case half-extent of the rocket about its path point: it rotates through
@@ -143,47 +146,87 @@ describe("launch sequence geometry", () => {
 });
 
 describe("rocket pet flight", () => {
-    /** Where the pet perches: bottom-right, inset by its own margin. */
-    const PERCH_INSET = 34;
-
     /** Matches the `scale` keyframes the pet's flight animates with. */
     function petScaleAt(progress: number): number {
-        return 1 - 0.55 * progress * progress;
+        return 1 - 0.35 * progress * progress;
     }
 
-    it.each(VIEWPORTS)("keeps the whole flight on screen at %s", (_label, width, height) => {
-        const flight = petFlight(width, height);
-        const x0 = width - PERCH_INSET;
-        const y0 = height - PERCH_INSET;
+    it.each(VIEWPORTS)(
+        "keeps the loop leg on screen at %s",
+        (_label, width, height) => {
+            const { path } = petFlight(width, height);
+            const x0 = width - PET_PERCH_INSET;
+            const y0 = height - PET_PERCH_INSET;
 
-        // Skip the very first sample: that is the rocket sitting on its perch in
-        // the corner, which is deliberately tight against the edge.
-        for (let i = 1; i < flight.x.length; i++) {
-            const pad = halfDiagonal(PET_ROCKET_SIZE) * petScaleAt(flight.progress[i]);
+            // Only the loop leg: the exit leg is *supposed* to leave. Skip the
+            // very first sample too — that is the rocket sitting on its perch,
+            // deliberately tight against the edge.
+            const loopEnd = path.x.length - PET_EXIT_STEPS;
+            for (let i = 1; i < loopEnd; i++) {
+                const pad = halfDiagonal(PET_ROCKET_SIZE) * petScaleAt(path.progress[i]);
 
-            expect(x0 + flight.x[i] - pad).toBeGreaterThanOrEqual(0);
-            expect(x0 + flight.x[i] + pad).toBeLessThanOrEqual(width);
-            expect(y0 + flight.y[i] - pad).toBeGreaterThanOrEqual(0);
-            expect(y0 + flight.y[i] + pad).toBeLessThanOrEqual(height);
-        }
-    });
+                expect(x0 + path.x[i] - pad).toBeGreaterThanOrEqual(0);
+                expect(x0 + path.x[i] + pad).toBeLessThanOrEqual(width);
+                expect(y0 + path.y[i] - pad).toBeGreaterThanOrEqual(0);
+                expect(y0 + path.y[i] + pad).toBeLessThanOrEqual(height);
+            }
+        },
+    );
+
+    it.each(VIEWPORTS)(
+        "ends fully past the screen edge at %s",
+        (_label, width, height) => {
+            const { path } = petFlight(width, height);
+            const last = path.x.length - 1;
+            const x0 = width - PET_PERCH_INSET;
+            const y0 = height - PET_PERCH_INSET;
+            const pad = halfDiagonal(PET_ROCKET_SIZE) * petScaleAt(path.progress[last]);
+
+            // The flight exits, it does not fade: the final keyframe has to put
+            // the whole glyph beyond the left or top edge, whichever its
+            // heading reaches first.
+            const beyondLeft = x0 + path.x[last] + pad < 0;
+            const beyondTop = y0 + path.y[last] + pad < 0;
+            expect(beyondLeft || beyondTop).toBe(true);
+
+            // And never through the edges it started against.
+            for (let i = 1; i <= last; i++) {
+                expect(x0 + path.x[i]).toBeLessThanOrEqual(width);
+                expect(y0 + path.y[i]).toBeLessThanOrEqual(height);
+            }
+        },
+    );
+
+    it.each(VIEWPORTS)(
+        "takes longer than the loop alone, within reason, at %s",
+        (_label, width, height) => {
+            const { durationS } = petFlight(width, height);
+
+            // The exit leg buys its time honestly: more flight, more clock —
+            // but bounded, so an ultrawide's long run out never drags.
+            expect(durationS).toBeGreaterThan(FLIGHT_DURATION_S + 0.3);
+            expect(durationS).toBeLessThanOrEqual(FLIGHT_DURATION_S + 0.95);
+        },
+    );
 
     it.each(VIEWPORTS)("still closes a real loop at %s", (_label, width, height) => {
-        const flight = petFlight(width, height);
+        const { path } = petFlight(width, height);
 
-        expect(Math.abs(pathTurning(flight.x, flight.y))).toBeGreaterThan(350);
-        expect(Math.abs(pathTurning(flight.x, flight.y))).toBeLessThan(370);
+        // The straight exit leg adds no turning, so the sum is still the loop's.
+        expect(Math.abs(pathTurning(path.x, path.y))).toBeGreaterThan(350);
+        expect(Math.abs(pathTurning(path.x, path.y))).toBeLessThan(370);
     });
 
     it("stays shallow on a tall phone, so the loop bulges up and not off the edge", () => {
         // A steep climb to the left swings the loop out to the right, and the pet
-        // launches from the right-hand edge with nothing on that side.
+        // launches from the right-hand edge with nothing on that side. The exit
+        // leg follows the same heading, so the end point still measures it.
         const phone = petFlight(390, 844);
         const desktop = petFlight(1920, 1080);
 
-        const climbOf = (flight: ReturnType<typeof petFlight>) => {
-            const endX = flight.x[flight.x.length - 1];
-            const endY = flight.y[flight.y.length - 1];
+        const climbOf = ({ path }: ReturnType<typeof petFlight>) => {
+            const endX = path.x[path.x.length - 1];
+            const endY = path.y[path.y.length - 1];
             return (Math.atan2(Math.abs(endY), Math.abs(endX)) * 180) / Math.PI;
         };
 

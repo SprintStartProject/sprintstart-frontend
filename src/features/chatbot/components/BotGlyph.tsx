@@ -23,6 +23,13 @@ interface BotGlyphProps {
      * a bot that tracks the cursor in its sleep is just a bot that is awake.
      */
     gaze?: Gaze;
+    /**
+     * Starstruck: eyes held wide, mouth a round little "o". For the beat while
+     * a rocket crosses the screen and the gaze is glued to it. Only read while
+     * awake — the other states have their own faces, and an astonished
+     * expression on a sleeping bot is a bot having a nightmare.
+     */
+    awed?: boolean;
     className?: string;
 }
 
@@ -130,6 +137,7 @@ export function BotGlyph({
     state,
     isWaking = false,
     gaze,
+    awed = false,
     className,
 }: BotGlyphProps) {
     const reduceMotion = useReducedMotion();
@@ -137,6 +145,7 @@ export function BotGlyph({
     const thinking = state === "thinking" && !reduceMotion;
     const cheering = state === "cheering" && !reduceMotion;
     const dizzy = state === "dizzy" && !reduceMotion;
+    const isAwed = awed && state === "awake" && !isWaking;
 
     // Gaze rides on `style` as motion values while every other eye movement is
     // an `animate` keyframe. The two cannot both own x/y, so the tracking is
@@ -176,24 +185,31 @@ export function BotGlyph({
 
     // Startled: eyes snap wider than normal before settling. This is the whole
     // "wait, what?" beat, and it only reads if it overshoots.
+    //
+    // Awed: held wide with no blink loop — nobody blinks at a rocket. Distinct
+    // from the startle, which overshoots and settles; awe just stays.
     const eyeAnimation = isWaking
         ? { scaleY: [1.45, 1] }
-        : {
-              scaleY: reduceMotion ? [EYE[state].keyframes.at(-1) ?? 1] : EYE[state].keyframes,
-              ...(thinking
-                  ? EYE_DRIFT
-                  : dizzy
-                    ? EYE_ROLL
-                    : isTracking
-                      ? {}
-                      : { x: 0, y: 0 }),
-          };
+        : isAwed
+          ? { scaleY: [1.3] }
+          : {
+                scaleY: reduceMotion ? [EYE[state].keyframes.at(-1) ?? 1] : EYE[state].keyframes,
+                ...(thinking
+                    ? EYE_DRIFT
+                    : dizzy
+                      ? EYE_ROLL
+                      : isTracking
+                        ? {}
+                        : { x: 0, y: 0 }),
+            };
 
     const eyeTransition: Transition = isWaking
         ? { duration: 0.45, ease: "easeOut" }
-        : reduceMotion
-          ? { duration: 0 }
-          : thinking
+        : isAwed
+          ? { duration: 0.25, ease: "easeOut" }
+          : reduceMotion
+            ? { duration: 0 }
+            : thinking
             ? {
                   ...EYE[state].transition,
                   x: { duration: 2.6, repeat: Infinity, ease: "easeInOut" },
@@ -326,24 +342,44 @@ export function BotGlyph({
                 shouting on a loop while cheering — the mouth doing the work is
                 what keeps the cheer readable at 30px, where a bouncing body
                 alone could just as well be a loading spinner. */}
-            <motion.rect
-                x="10.3"
-                y="13"
-                width="3.4"
-                height="0.85"
-                rx="0.42"
-                fill="currentColor"
-                opacity="0.55"
-                style={{ transformOrigin: "12px 13.4px" }}
-                animate={{
-                    scaleY: cheering ? [1, 2.8, 1] : isWaking ? 2.2 : 1,
-                }}
-                transition={
-                    cheering
-                        ? { duration: 0.55, repeat: Infinity, ease: "easeInOut" }
-                        : { duration: 0.4, ease: "easeOut" }
-                }
-            />
+            {isAwed ? (
+                // Awe gets its own round mouth rather than a scaled-up bar: a
+                // rect stretched tall enough to gape stops reading as a mouth
+                // and starts reading as a slot. Swapped, not morphed — the pop
+                // from flat to "ooo" *is* the take.
+                <motion.ellipse
+                    data-testid="bot-awe-mouth"
+                    cx="12"
+                    cy="13.55"
+                    rx="0.95"
+                    ry="1.05"
+                    fill="currentColor"
+                    opacity="0.55"
+                    style={{ transformOrigin: "12px 13.55px" }}
+                    initial={reduceMotion ? false : { scale: 0.3 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                />
+            ) : (
+                <motion.rect
+                    x="10.3"
+                    y="13"
+                    width="3.4"
+                    height="0.85"
+                    rx="0.42"
+                    fill="currentColor"
+                    opacity="0.55"
+                    style={{ transformOrigin: "12px 13.4px" }}
+                    animate={{
+                        scaleY: cheering ? [1, 2.8, 1] : isWaking ? 2.2 : 1,
+                    }}
+                    transition={
+                        cheering
+                            ? { duration: 0.55, repeat: Infinity, ease: "easeInOut" }
+                            : { duration: 0.4, ease: "easeOut" }
+                    }
+                />
+            )}
         </motion.svg>
     );
 }
