@@ -6,6 +6,7 @@ import { KNOWLEDGE_TAB_ORDER, TABS, type KnowledgeTab } from '../features/knowle
 import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
 import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
 import { Pagination } from '../components/ui/Pagination';
+import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/useAuth';
 import { PermissionGroup } from '../services/types';
@@ -119,13 +120,14 @@ export function KnowledgeBasePage() {
                                     {filteredArtifacts.length} {filteredArtifacts.length === 1 ? 'result' : 'results'}
                                 </p>
                                 {hasActiveFilters && (
-                                    <button
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={handleClearFilters}
                                         data-testid="kb-clear-filters"
-                                        className="text-sm font-medium text-app-brand hover:underline"
                                     >
                                         Clear filters
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
 
@@ -140,14 +142,15 @@ export function KnowledgeBasePage() {
                                         <AlertTriangle className="h-5 w-5 shrink-0" />
                                         <span className="text-sm font-medium">{fetchError}</span>
                                     </div>
-                                    <button
+                                    <Button
+                                        variant="dangerSoft"
+                                        size="sm"
                                         onClick={() => void fetchArtifacts()}
                                         data-testid="kb-retry-fetch"
-                                        className="flex items-center gap-2 rounded-lg border border-app-danger-border px-3 py-1.5 text-sm font-medium hover:bg-app-surface-hover"
+                                        icon={<RefreshCw className="h-4 w-4" />}
                                     >
-                                        <RefreshCw className="h-4 w-4" />
                                         Retry
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
 

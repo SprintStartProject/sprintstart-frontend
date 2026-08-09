@@ -1,4 +1,5 @@
 import { AlertCircle, Check, GitBranch, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import type { DraftSource, DraftSourceStatus } from "../projectSourcesDraft";
 
 type StagedSourceListProps = {
@@ -90,27 +91,28 @@ export function StagedSourceList({
 
           <div className="flex shrink-0 gap-2 sm:justify-end">
             {source.status === "failed" && onRetry && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => onRetry(source.id)}
                 disabled={disabled}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+                icon={<RefreshCw className="h-3.5 w-3.5" />}
               >
-                <RefreshCw className="h-3.5 w-3.5" />
                 Retry
-              </button>
+              </Button>
             )}
 
             {source.status !== "connected" && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
+                iconOnly
                 onClick={() => onRemove(source.id)}
                 disabled={disabled}
                 aria-label={`Remove ${source.owner}/${source.name}`}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-danger-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             )}
           </div>
         </li>

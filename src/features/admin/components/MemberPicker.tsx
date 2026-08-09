@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import { Search, Users } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { SelectionCheckbox } from "./SelectionCheckbox";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -85,16 +86,17 @@ export function MemberPicker({
       </div>
 
       {visibleUsers.length > 0 && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={disabled}
           onClick={() => onToggleVisible(visibleUsers, allVisibleSelected)}
-          className="mt-2 text-xs font-semibold text-app-brand-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-2"
         >
           {allVisibleSelected
             ? "Clear these"
             : `Select these ${visibleUsers.length}`}
-        </button>
+        </Button>
       )}
 
       <ul className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-app-border">

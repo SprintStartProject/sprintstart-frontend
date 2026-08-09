@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
 import { useFetch } from "../../../hooks/useFetch";
+import { Button } from "../../../components/ui/Button";
 
 import {
   TrendingUp,
@@ -47,14 +48,15 @@ export function FaqPage() {
   };
 
   const refreshButton = (
-    <button
+    <Button
+      variant="primary"
       onClick={() => void handleRefresh()}
-      disabled={refreshing}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:opacity-60 shrink-0"
+      loading={refreshing}
+      icon={<RefreshCw className="h-4 w-4" />}
+      className="shrink-0"
     >
-      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
       {refreshing ? "Refreshing…" : "Refresh"}
-    </button>
+    </Button>
   );
 
   if (loading) {
@@ -111,13 +113,14 @@ export function FaqPage() {
       {/* Header */}
       <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => void navigate("/pm-dashboard")}
-            className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
             Back to PM-Dashboard
-          </button>
+          </Button>
 
           <div className="flex items-start justify-between gap-4 mb-6">
             <PageHeader

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useId } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { getModalDialogVariants, modalBackdropVariants } from '../../../styles/tokens';
 import { X } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import { UploadArtifactPanel } from './UploadArtifactPanel';
 
 /**
@@ -126,15 +127,17 @@ export function UploadArtifactModal({ isOpen, onClose, projectId, onUploadSucces
                     >
                         <div className="flex items-center justify-between border-b border-app-border px-6 py-4">
                             <h2 id={titleId} className="text-xl font-semibold text-app-text">{title}</h2>
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
                                 onClick={onClose}
                                 disabled={isUploading}
-                                className="rounded-lg p-2 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus:outline-none focus:ring-2 focus:ring-app-focus disabled:opacity-50"
                                 aria-label="Close upload modal"
                                 data-testid="upload-modal-close"
                             >
                                 <X className="h-5 w-5" />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="p-6 overflow-y-auto">

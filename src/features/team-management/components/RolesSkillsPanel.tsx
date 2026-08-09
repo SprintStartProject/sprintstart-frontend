@@ -8,9 +8,8 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Badge } from '../../../components/ui/Badge';
-import { buttonHoverMotion, hoverSpringToken } from '../../../styles/tokens';
+import { Button } from '../../../components/ui/Button';
 import { ProjectRolesModal } from './ProjectRolesModal';
 import { getProjectRoles, getSkills } from '../../../services/teamManagementService';
 import { isSkillLinkedToRole } from '../types';
@@ -89,14 +88,16 @@ export function RolesSkillsPanel({
                 <div className="mb-1 flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1">
                         {onCollapse && (
-                            <button
-                                type="button"
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
                                 onClick={onCollapse}
                                 aria-label="Collapse role management"
-                                className="-ml-1 shrink-0 rounded-lg p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                                className="-ml-1 shrink-0"
                             >
                                 <ChevronsRight className="h-4 w-4" />
-                            </button>
+                            </Button>
                         )}
 
                         <h3 className="truncate text-sm font-semibold text-app-text">
@@ -104,18 +105,18 @@ export function RolesSkillsPanel({
                         </h3>
                     </div>
 
-                    <motion.button
-                        type="button"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => {
                             setRolesModalOpen(true);
                             onModalOpenChange?.(true);
                         }}
-                        {...buttonHoverMotion}
-                        className="flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border px-2.5 py-1 text-xs text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:text-app-text"
+                        icon={<Settings className="h-3.5 w-3.5" />}
+                        className="shrink-0"
                     >
-                        <Settings className="h-3.5 w-3.5" />
                         Manage
-                    </motion.button>
+                    </Button>
                 </div>
 
                 <p className="mb-3 text-xs leading-relaxed text-app-text-muted">
@@ -165,38 +166,40 @@ export function RolesSkillsPanel({
                                                 {selectedCount}
                                             </span>
 
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                iconOnly
                                                 onClick={onConfirmAssign}
                                                 disabled={!hasChanges || assigning}
                                                 aria-label={`Save ${role.name} assignment changes`}
-                                                className="rounded-lg p-1 text-app-brand transition-colors hover:bg-app-brand/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                                className="text-app-brand"
                                             >
                                                 <Check className="h-4 w-4" />
-                                            </button>
+                                            </Button>
 
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                iconOnly
                                                 onClick={onCancelAssign}
                                                 disabled={assigning}
                                                 aria-label="Cancel assignment"
-                                                className="rounded-lg p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
                                             >
                                                 <X className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     ) : (
-                                        <motion.button
-                                            type="button"
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            iconOnly
                                             onClick={() => onStartAssign(role.id)}
                                             aria-label={`Assign ${role.name} to members`}
-                                            whileHover={{ scale: 1.15 }}
-                                            whileTap={{ scale: 0.9 }}
-                                            transition={hoverSpringToken}
-                                            className="shrink-0 rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-brand-soft hover:text-app-brand-text"
+                                            className="shrink-0 hover:bg-app-brand-soft hover:text-app-brand-text"
                                         >
                                             <UserPlus className="h-3.5 w-3.5" />
-                                        </motion.button>
+                                        </Button>
                                     )}
                                 </div>
 

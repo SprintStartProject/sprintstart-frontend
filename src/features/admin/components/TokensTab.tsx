@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Key, Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Key, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient";
 import {
     addGithubPat,
@@ -146,14 +147,14 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                 </span>
 
                 {!isAddOpen && (
-                    <button
-                        type="button"
+                    <Button
+                        variant="primary"
                         onClick={handleAddOpen}
-                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
+                        icon={<Plus className="h-4 w-4" />}
+                        className="w-full sm:w-auto"
                     >
-                        <Plus className="h-4 w-4" />
                         Add Token
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -164,15 +165,16 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                 >
                     <div className="mb-4 flex items-center justify-between">
                         <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
                             onClick={handleAddCancel}
                             disabled={isAdding}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                             aria-label="Cancel"
                         >
                             <X className="h-4 w-4" />
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="space-y-3">
@@ -212,28 +214,16 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                         )}
 
                         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
-                            <button
-                                type="button"
+                            <Button
+                                variant="secondary"
                                 onClick={handleAddCancel}
                                 disabled={isAdding}
-                                className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                             >
                                 Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isAdding}
-                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {isAdding ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        Adding...
-                                    </>
-                                ) : (
-                                    "Add Token"
-                                )}
-                            </button>
+                            </Button>
+                            <Button variant="primary" type="submit" loading={isAdding}>
+                                {isAdding ? "Adding..." : "Add Token"}
+                            </Button>
                         </div>
                     </div>
                 </form>
@@ -267,22 +257,24 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
 
                                 {pendingDeleteName !== name && rotatingName !== name && (
                                     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={() => handleRotateOpen(name)}
-                                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text sm:flex-none"
+                                            icon={<RefreshCw className="h-3.5 w-3.5" />}
+                                            className="flex-1 sm:flex-none"
                                         >
-                                            <RefreshCw className="h-3.5 w-3.5" />
                                             Rotate
-                                        </button>
-                                        <button
-                                            type="button"
+                                        </Button>
+                                        <Button
+                                            variant="dangerSoft"
+                                            size="sm"
                                             onClick={() => handleDeleteRequest(name)}
-                                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-danger-bg bg-app-danger-bg px-3 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white sm:flex-none"
+                                            icon={<Trash2 className="h-3.5 w-3.5" />}
+                                            className="flex-1 sm:flex-none"
                                         >
-                                            <Trash2 className="h-3.5 w-3.5" />
                                             Delete
-                                        </button>
+                                        </Button>
                                     </div>
                                 )}
                             </div>
@@ -296,29 +288,22 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                         <p className="mb-2 text-sm text-app-danger-text">{deleteError}</p>
                                     )}
                                     <div className="flex flex-col gap-2 sm:flex-row">
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
                                             onClick={() => void handleDeleteConfirm()}
-                                            disabled={isDeleting}
-                                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-app-danger-solid px-4 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                                            loading={isDeleting}
                                         >
-                                            {isDeleting ? (
-                                                <>
-                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                    Deleting...
-                                                </>
-                                            ) : (
-                                                "Delete"
-                                            )}
-                                        </button>
-                                        <button
-                                            type="button"
+                                            {isDeleting ? "Deleting..." : "Delete"}
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={handleDeleteCancel}
                                             disabled={isDeleting}
-                                            className="inline-flex h-9 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                                         >
                                             Cancel
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             )}
@@ -357,27 +342,22 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
-                                            <button
+                                            <Button
+                                                variant="primary"
                                                 type="submit"
-                                                disabled={isRotating}
-                                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                                                loading={isRotating}
+                                                icon={<RefreshCw className="h-4 w-4" />}
                                             >
-                                                {isRotating ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <RefreshCw className="h-4 w-4" />
-                                                )}
                                                 {isRotating ? "Rotating..." : "Confirm"}
-                                            </button>
+                                            </Button>
 
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="secondary"
                                                 onClick={handleRotateCancel}
                                                 disabled={isRotating}
-                                                className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                                             >
                                                 Cancel
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
 

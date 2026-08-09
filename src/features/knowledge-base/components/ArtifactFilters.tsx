@@ -1,7 +1,6 @@
 import { Search, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Button } from '../../../components/ui/Button';
 import { SegmentedTabs } from '../../../components/ui/SegmentedTabs';
-import { buttonHoverMotion, buttonHoverMotionDisabled } from '../../../styles/tokens';
 
 import { TABS, type KnowledgeTab } from '../tabs';
 
@@ -52,16 +51,18 @@ export function ArtifactFilters({
                     aria-label="Search knowledge base"
                 />
                 {onRefresh && (
-                    <motion.button
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
                         onClick={onRefresh}
                         disabled={isRefreshing}
-                        {...(isRefreshing ? buttonHoverMotionDisabled : buttonHoverMotion)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-surface-hover rounded-md transition-colors disabled:opacity-50"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2"
                         title="Refresh Knowledge Base"
                         aria-label="Refresh knowledge base"
                     >
-                        <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-app-brand' : ''}`} />
-                    </motion.button>
+                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-app-brand' : ''}`} />
+                    </Button>
                 )}
             </div>
 

@@ -1,5 +1,6 @@
 import { Check, Filter, Send, Square } from "lucide-react";
 import type { FormEvent, RefObject } from "react";
+import { Button } from "../../../components/ui/Button";
 import { SOURCE_SYSTEMS, type SourceSystem } from "../types";
 
 type ChatComposerProps = {
@@ -105,13 +106,13 @@ export function ChatComposer({
                                     Systems
                                 </span>
                                 {activeFilterCount > 0 && (
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={clearFilters}
-                                        className="text-xs font-semibold text-app-text-muted hover:text-app-brand transition-colors"
                                     >
                                         Clear All
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
 
@@ -156,13 +157,15 @@ export function ChatComposer({
                 onSubmit={onSubmit}
                 className="flex items-end gap-2 rounded-2xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
             >
-                <button
-                    type="button"
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    iconOnly
                     aria-label="Toggle source filters"
                     aria-expanded={showFilters}
                     data-testid="chat-filters-toggle"
                     onClick={onToggleFilters}
-                    className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-surface border border-app-border-muted text-app-text-muted hover:bg-app-surface-hover hover:text-app-text transition-colors"
+                    className="relative shrink-0"
                 >
                     <Filter size={18} />
                     {activeFilterCount > 0 && (
@@ -170,7 +173,7 @@ export function ChatComposer({
                             {activeFilterCount}
                         </span>
                     )}
-                </button>
+                </Button>
                 <textarea
                     ref={textareaRef}
                     aria-label="Message"
@@ -193,25 +196,30 @@ export function ChatComposer({
                 />
 
                 {isBusy ? (
-                    <button
-                        type="button"
+                    <Button
+                        variant="danger"
+                        size="sm"
+                        iconOnly
                         aria-label="Stop generation"
                         data-testid="chat-stop-button"
                         onClick={onStop}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
+                        className="shrink-0"
                     >
                         <Square size={16} className="fill-current" />
-                    </button>
+                    </Button>
                 ) : (
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        iconOnly
                         type="submit"
                         aria-label="Send message"
                         data-testid="chat-send-button"
                         disabled={!value.trim()}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
+                        className="shrink-0"
                     >
                         <Send size={18} />
-                    </button>
+                    </Button>
                 )}
             </form>
 

@@ -1,3 +1,4 @@
+import { Button } from '../../../components/ui/Button';
 import keycloak from '../../../config/keycloak';
 
 /**
@@ -19,12 +20,9 @@ export function PasswordForm() {
             </p>
             
             <div className="pt-2">
-                <button
-                    onClick={handleRedirect}
-                    className="rounded-lg bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand/90"
-                >
+                <Button variant="primary" onClick={handleRedirect}>
                     Update Password
-                </button>
+                </Button>
             </div>
         </div>
     );

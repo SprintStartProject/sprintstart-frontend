@@ -5,6 +5,7 @@ import {
   ListTree,
   XCircle,
 } from "lucide-react";
+import { Button } from "../../../components/ui/Button.tsx";
 import { formatConfiguredAt } from "../data.ts";
 import type { ConnectorListItem } from "../types.ts";
 import { ConnectorSourcesSection } from "./ConnectorSourcesSection.tsx";
@@ -104,38 +105,35 @@ export function ConnectorList({
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
+              <Button
+                variant={connector.enabled ? "dangerSoft" : "primary"}
                 onClick={() => onToggleEnabled(connector)}
-                disabled={isToggling}
-                className={[
-                  "flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-                  connector.enabled
-                    ? "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:bg-app-danger-solid hover:text-white"
-                    : "border-app-brand-border-strong bg-app-brand text-white hover:bg-app-brand-hover",
-                ].join(" ")}
+                loading={isToggling}
+                className="flex-1"
               >
                 {isToggling
                   ? "Saving..."
                   : connector.enabled
                     ? "Disable connector"
                     : "Enable connector"}
-              </button>
+              </Button>
 
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => onToggleSources(connector)}
                 aria-expanded={isExpanded}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface-muted px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover"
+                icon={<ListTree className="h-4 w-4" />}
+                trailingIcon={
+                  isExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )
+                }
+                className="flex-1"
               >
-                <ListTree className="h-4 w-4" />
                 {isExpanded ? "Hide sources" : "Manage sources"}
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </button>
+              </Button>
             </div>
 
             {isExpanded && (

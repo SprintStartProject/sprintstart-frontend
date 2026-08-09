@@ -8,6 +8,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import type { ProjectSummary } from "../types";
 
 export type ProjectAccessPanelProps = {
@@ -161,19 +162,15 @@ export function ProjectAccessPanel({
         </div>
 
         <div className="relative">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={toggleProjectPicker}
-            disabled={hasPendingProjectChange}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            loading={hasPendingProjectChange}
+            icon={<Plus className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
-            {hasPendingProjectChange ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
             Add project
-          </button>
+          </Button>
 
           {openProjectPicker && (
             <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-xl">
@@ -253,29 +250,30 @@ export function ProjectAccessPanel({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={() => onOpenProjectDetails(project.id)}
                     disabled={hasPendingProjectChange}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-disabled transition-colors hover:bg-app-brand-soft hover:text-app-brand-text disabled:cursor-not-allowed disabled:opacity-60"
+                    className="hover:bg-app-brand-soft hover:text-app-brand-text"
                     aria-label={`Open ${project.name} project details`}
                   >
                     <ExternalLink className="h-4 w-4" />
-                  </button>
+                  </Button>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={() => void removeProject(project.id)}
                     disabled={hasPendingProjectChange}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-disabled transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-60"
+                    loading={pendingProjectId === project.id}
+                    className="hover:bg-app-danger-bg hover:text-app-danger-text"
                     aria-label={`Remove ${project.name}`}
                   >
-                    {pendingProjectId === project.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>

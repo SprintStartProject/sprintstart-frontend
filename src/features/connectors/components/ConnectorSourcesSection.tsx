@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, RefreshCw, XCircle } from "lucide-react";
+import { Button } from "../../../components/ui/Button.tsx";
 import { connectorService } from "../../../services/connectorService.ts";
 import { buildSourceKey } from "../data.ts";
 import type {
@@ -221,13 +222,14 @@ export function ConnectorSourcesSection({
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           <p>{errorMessage}</p>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={retryLoadSources}
-            className="mt-2 font-semibold underline hover:no-underline"
+            className="mt-2"
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -321,27 +323,27 @@ export function ConnectorSourcesSection({
 
       {hasPendingChanges && (
         <div className="flex gap-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={discardChanges}
             disabled={isSaving}
-            className="flex-1 rounded-xl border border-app-border bg-app-surface-muted px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1"
           >
             Discard
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => {
               void saveChanges();
             }}
-            disabled={isSaving}
-            className="flex-1 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+            loading={isSaving}
+            className="flex-1"
           >
             {isSaving
               ? "Saving..."
               : `Save ${activeDraft.changedSourceIds.size} change${activeDraft.changedSourceIds.size === 1 ? "" : "s"}`}
-          </button>
+          </Button>
         </div>
       )}
     </div>

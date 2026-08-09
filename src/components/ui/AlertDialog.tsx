@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "./Button";
 import { Modal } from "./Modal";
 
 export type AlertDialogVariant = "danger" | "default";
@@ -30,11 +31,6 @@ export function AlertDialog({
     onClose,
     onConfirm,
 }: AlertDialogProps) {
-    const confirmButtonClassName =
-        variant === "danger"
-            ? "border-app-danger-border bg-app-danger-solid text-white hover:opacity-90"
-            : "border-app-brand bg-app-brand text-app-text-inverse hover:border-app-brand-hover hover:bg-app-brand-hover";
-
     return (
         <Modal
             isOpen={isOpen}
@@ -48,23 +44,17 @@ export function AlertDialog({
             onClose={onClose}
             footer={
                 <>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={isLoading}
-                        className="inline-flex min-h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <Button variant="secondary" onClick={onClose} disabled={isLoading}>
                         {cancelLabel}
-                    </button>
+                    </Button>
 
-                    <button
-                        type="button"
+                    <Button
+                        variant={variant === "danger" ? "danger" : "primary"}
                         onClick={onConfirm}
-                        disabled={isLoading}
-                        className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${confirmButtonClassName}`}
+                        loading={isLoading}
                     >
                         {isLoading ? loadingLabel : confirmLabel}
-                    </button>
+                    </Button>
                 </>
             }
         >

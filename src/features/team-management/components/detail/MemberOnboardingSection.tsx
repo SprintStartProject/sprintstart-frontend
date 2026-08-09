@@ -8,6 +8,7 @@ import {
     SkipForward,
 } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
+import { Button } from '../../../../components/ui/Button';
 import { DragHandle } from '../../../../components/ui/DragHandle';
 import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
 import type {
@@ -283,19 +284,20 @@ function StepList({
             <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-5 text-sm text-app-text-muted">
                 <p>This phase has no steps yet.</p>
                 {selectedPhase && (
-                    <button
-                        type="button"
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() =>
                             onAddStep({
                                 phaseId: selectedPhase.id,
                                 position: 0,
                             })
                         }
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-2 text-xs font-medium text-app-text-inverse hover:bg-app-brand-hover"
+                        icon={<Plus className="h-3.5 w-3.5" />}
+                        className="mt-3"
                     >
-                        <Plus className="h-3.5 w-3.5" />
                         Add first step
-                    </button>
+                    </Button>
                 )}
             </div>
         );

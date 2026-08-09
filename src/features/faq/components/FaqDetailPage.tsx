@@ -10,6 +10,7 @@ import type {
   FAQDocument,
 } from "../../../features/faq/types";
 import { insightsService } from "../../../services/faqService";
+import { Button } from "../../../components/ui/Button";
 import { useFetch } from "../../../hooks/useFetch";
 
 import {
@@ -66,12 +67,9 @@ export function FaqDetailPage() {
           <p className="text-sm text-app-text-muted mb-6">
             This FAQ group may no longer exist.
           </p>
-          <button
-            onClick={() => void navigate(-1)}
-            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
-          >
+          <Button variant="primary" onClick={() => void navigate(-1)}>
             Go back
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -84,13 +82,14 @@ export function FaqDetailPage() {
       {/* ── HEADER ────────────────────────────────────────── */}
       <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-content py-4">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => void navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text transition-colors mb-4"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
             Back
-          </button>
+          </Button>
 
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-xl font-bold text-app-text leading-snug">

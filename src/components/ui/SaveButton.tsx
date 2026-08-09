@@ -1,5 +1,6 @@
-import { Check, Loader2 } from "lucide-react";
+import { Check } from "lucide-react";
 import type { ButtonHTMLAttributes } from "react";
+import { Button } from "./Button";
 
 type SaveButtonProps = {
   /** Whether there are unsaved changes. Drives the enabled/highlighted look. */
@@ -43,27 +44,17 @@ export function SaveButton({
   type = "button",
   ...rest
 }: SaveButtonProps) {
-  const isDisabled = !dirty || saving || disabled;
-
-  const stateClassName =
-    dirty && !saving
-      ? "border-app-brand bg-app-brand text-white hover:border-app-brand-hover hover:bg-app-brand-hover"
-      : "border-app-border bg-app-surface text-app-text-muted";
-
   return (
-    <button
+    <Button
+      variant={dirty && !saving ? "primary" : "secondary"}
       type={type}
-      disabled={isDisabled}
-      aria-disabled={isDisabled}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed ${stateClassName} ${className}`}
+      disabled={!dirty || disabled}
+      loading={saving}
+      icon={<Check className="h-4 w-4" aria-hidden="true" />}
+      className={className}
       {...rest}
     >
-      {saving ? (
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-      ) : (
-        <Check className="h-4 w-4" aria-hidden="true" />
-      )}
       {saving ? savingLabel : dirty ? label : cleanLabel}
-    </button>
+    </Button>
   );
 }

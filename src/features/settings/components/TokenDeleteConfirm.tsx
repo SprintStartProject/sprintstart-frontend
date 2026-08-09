@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import { parseApiError, describeRefreshFailure } from '../../../services/apiError';
 import { deleteGithubPat } from '../../../services/sources/githubService';
 
@@ -70,31 +70,24 @@ export function TokenDeleteConfirm({
                 </p>
             )}
             <div className="flex flex-col gap-2 sm:flex-row">
-                <button
+                <Button
                     ref={confirmRef}
-                    type="button"
+                    variant="danger"
+                    size="sm"
                     onClick={() => void handleConfirm()}
                     data-testid={`settings-delete-confirm-${name}`}
-                    disabled={isDeleting}
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-app-danger-solid px-4 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    loading={isDeleting}
                 >
-                    {isDeleting ? (
-                        <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                            Deleting...
-                        </>
-                    ) : (
-                        'Delete'
-                    )}
-                </button>
-                <button
-                    type="button"
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                </Button>
+                <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={handleClose}
                     disabled={isDeleting}
-                    className="inline-flex h-9 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                 >
                     Cancel
-                </button>
+                </Button>
             </div>
         </div>
     );

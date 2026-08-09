@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from "react";
 import { onboardingService } from "../../../services/onboardingService";
+import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import type {
   PhaseCheckEndpoint,
@@ -125,30 +126,27 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       result ? (
         <>
           {!result.passed && (
-            <button
+            <Button
+              variant="secondary"
               onClick={retry}
-              className="px-5 py-2.5 rounded-xl border border-app-border hover:border-app-border-strong text-app-text-muted hover:text-app-text text-sm font-medium transition-all flex items-center justify-center gap-2"
+              icon={<RotateCcw className="h-4 w-4" />}
             >
-              <RotateCcw className="w-4 h-4" />
               Try again
-            </button>
+            </Button>
           )}
-          <button
-            onClick={close}
-            className="px-6 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
-          >
+          <Button variant="primary" onClick={close}>
             Done
-          </button>
+          </Button>
         </>
       ) : (
-        <button
+        <Button
+          variant="primary"
           onClick={() => void submit()}
-          disabled={!allAnswered || submitting}
-          className="px-6 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!allAnswered}
+          loading={submitting}
         >
-          {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
           Submit answers
-        </button>
+        </Button>
       )
     ) : undefined;
 

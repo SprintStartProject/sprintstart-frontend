@@ -1,5 +1,6 @@
-import { Loader2, Trash2, Users } from "lucide-react";
+import { Trash2, Users } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { Button } from "../../../components/ui/Button";
 import type { ProjectUser, ProjectUserSummary } from "../types";
 import { RoleBadgeList } from "./RoleBadgeList";
 
@@ -87,19 +88,18 @@ export function ProjectUserList({
               </div>
 
               {onRemoveUser && (
-                <button
-                  type="button"
+                <Button
+                  variant="dangerGhost"
+                  size="sm"
+                  iconOnly
                   onClick={() => onRemoveUser(user.id)}
                   disabled={pendingUserId !== null}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-app-text-disabled transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-60"
+                  loading={isPending}
+                  className="shrink-0"
                   aria-label={`Remove ${displayName} from project`}
                 >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </button>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               )}
             </div>
           </div>

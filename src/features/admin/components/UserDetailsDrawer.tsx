@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Check, Edit, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Edit, Trash2 } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { adminUserService } from "../../../services/adminUserService";
 import { projectService } from "../../../services/projectService";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
@@ -311,52 +312,41 @@ export function UserDetailsDrawer({
       }
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={startEditing}
             disabled={isEditing || isSaving}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+            icon={<Edit className="h-4 w-4" />}
           >
-            <Edit className="h-4 w-4" />
             Edit User
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="dangerGhost"
+            iconOnly
             onClick={() => onRequestDelete(user)}
             disabled={isSaving}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-app-surface text-app-danger-text transition-colors hover:bg-app-danger-bg disabled:cursor-not-allowed disabled:opacity-60"
             aria-label={`Delete ${getDisplayName(user)}`}
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       }
       footer={
         isEditing ? (
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={cancelEditing}
-              disabled={isSaving}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-            >
+            <Button variant="secondary" onClick={cancelEditing} disabled={isSaving}>
               Cancel
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => void saveUserChanges()}
-              disabled={isSaving}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              loading={isSaving}
+              icon={<Check className="h-4 w-4" />}
             >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
               Save
-            </button>
+            </Button>
           </div>
         ) : undefined
       }

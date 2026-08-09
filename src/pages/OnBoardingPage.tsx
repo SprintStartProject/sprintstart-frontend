@@ -9,8 +9,7 @@ import type {
   OnboardingStepEndpoint,
 } from "../features/onboarding/types";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { buttonHoverMotion } from "../styles/tokens";
+import { Button } from "../components/ui/Button";
 import { onboardingService } from "../services/onboardingService";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/apiClient";
@@ -392,12 +391,9 @@ export function OnBoardingPage() {
           <p className="text-sm text-app-text-muted mb-6">
             {errorMessage}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
-          >
+          <Button variant="primary" onClick={() => window.location.reload()}>
             Try again
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -436,13 +432,15 @@ export function OnBoardingPage() {
             className="mb-4"
             actions={
               <>
-                <button
+                <Button
+                  variant="secondary"
+                  iconOnly
                   onClick={() => void generatePath()}
+                  aria-label="Regenerate path with AI"
                   title="Regenerate path with AI"
-                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft hover:text-app-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
                 >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
 
                 <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
                   <div className="text-3xl font-bold text-app-brand">
@@ -539,14 +537,14 @@ export function OnBoardingPage() {
                 {recommendedStep.description}
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-6">
-                <motion.button
+                <Button
+                  variant="primary"
+                  size="lg"
                   onClick={() => handleActiveStep(recommendedStep)}
-                  {...buttonHoverMotion}
-                  className="flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
+                  trailingIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   {recommendedStep.status === "IN_PROGRESS" ? "Continue" : "Start now"}
-                  <ChevronRight className="w-4 h-4" />
-                </motion.button>
+                </Button>
               </div>
             </div>
           </div>
@@ -570,14 +568,14 @@ export function OnBoardingPage() {
                 unlock the next phase.
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-6">
-                <motion.button
+                <Button
+                  variant="primary"
+                  size="lg"
                   onClick={() => setCheckPhase(pendingCheckPhase)}
-                  {...buttonHoverMotion}
-                  className="flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
+                  trailingIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   Start knowledge check
-                  <ChevronRight className="w-4 h-4" />
-                </motion.button>
+                </Button>
               </div>
             </div>
           </div>
@@ -666,13 +664,13 @@ export function OnBoardingPage() {
                             locked -> status chip only (cannot be started yet) */}
                         <div className="shrink-0 self-start sm:self-center">
                           {mode === "active" ? (
-                            <button
+                            <Button
+                              variant="primary"
                               onClick={() => handleActiveStep(step)}
-                              className="px-6 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center gap-2"
+                              trailingIcon={<ChevronRight className="h-4 w-4" />}
                             >
                               {step.status === "IN_PROGRESS" ? "Continue" : "Start now"}
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
+                            </Button>
                           ) : mode === "completed" ? (
                             <div className="flex items-center gap-3">
                               <span
@@ -774,15 +772,15 @@ export function OnBoardingPage() {
                                 Locked
                               </span>
                             ) : (
-                              <button
+                              <Button
+                                variant="primary"
                                 onClick={() => setCheckPhase(currentPhase)}
-                                className="px-6 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center gap-2"
+                                trailingIcon={<ChevronRight className="h-4 w-4" />}
                               >
                                 {currentPhase.checkSummary.latestAttemptId
                                   ? "Try again"
                                   : "Start check"}
-                                <ChevronRight className="w-4 h-4" />
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </div>

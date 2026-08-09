@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SpaceInvadersModal } from "../features/space-invaders/components/SpaceInvadersModal.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { Button } from "../components/ui/Button.tsx";
 import { Rocket } from "lucide-react";
 
 export function NotFoundPage() {
@@ -28,12 +29,14 @@ export function NotFoundPage() {
                     </p>
                 </div>
 
-                <button
+                <Button
+                    variant="secondary"
+                    size="lg"
                     onClick={() => { void navigate("/"); }}
-                    className="mt-12 px-8 py-3 bg-app-surface border border-app-border rounded-full hover:bg-app-hover transition-colors font-medium shadow-sm"
+                    className="mt-12"
                 >
                     Return to Dashboard
-                </button>
+                </Button>
             </div>
 
             <SpaceInvadersModal open={invadersOpen} onClose={() => setInvadersOpen(false)} />

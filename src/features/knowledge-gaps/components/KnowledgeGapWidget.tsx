@@ -12,6 +12,7 @@ import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { ClickableCard } from "../../../components/common/ClickableCard";
+import { Button } from "../../../components/ui/Button";
 
 import {
   ShieldAlert,
@@ -73,21 +74,23 @@ export function KnowledgeGapWidget() {
           No knowledge gaps yet. Trigger a refresh to detect them.
         </p>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => void handleRefresh()}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-app-brand hover:bg-app-brand-hover text-white text-xs font-medium transition-all disabled:opacity-60"
+            loading={refreshing}
+            icon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => void navigate("/insights/knowledge-gaps")}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors"
+            trailingIcon={<ArrowRight className="h-3.5 w-3.5" />}
           >
             Open page
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
         {refreshError && (
           <p className="text-xs text-app-danger-text max-w-xs">{refreshError}</p>
@@ -122,29 +125,31 @@ export function KnowledgeGapWidget() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={(event) => {
               event.stopPropagation();
               void handleRefresh();
             }}
             disabled={refreshing}
+            aria-label="Refresh"
             title="Refresh"
-            className="flex items-center text-app-text-muted hover:text-app-text transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            type="button"
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={(event) => {
               event.stopPropagation();
               void navigate("/insights/knowledge-gaps");
             }}
-            className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+            trailingIcon={<ArrowRight className="h-3.5 w-3.5" />}
           >
             See all ({gapCount})
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       </div>
 

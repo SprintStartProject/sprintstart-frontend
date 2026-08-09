@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { AlertCircle, Plus } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { parseGithubRepositoryInput } from "../../../services/sources/githubRepositoryInput";
 import { createDraftSource, type DraftSource } from "../projectSourcesDraft";
 import { StagedSourceList } from "./StagedSourceList";
@@ -153,15 +154,14 @@ export function ProjectSourcesStep({
             </select>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={addSource}
             disabled={disabled || !hasTokens}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            icon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" />
             Add repository
-          </button>
+          </Button>
         </div>
 
         {!hasTokens && (

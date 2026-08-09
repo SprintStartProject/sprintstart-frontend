@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
@@ -269,26 +270,22 @@ export function SourceDetailsPanel({
       }
       footer={
         <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => {
               void handleUpdateSource();
             }}
-            disabled={!canUpdateRepository || isUpdating || isRefreshing}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canUpdateRepository || isRefreshing}
+            loading={isUpdating}
+            icon={<GitBranch className="h-4 w-4" />}
             title={
               canUpdateRepository
                 ? undefined
                 : "Repository updates need GitHub owner and repository name."
             }
           >
-            {isUpdating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <GitBranch className="h-4 w-4" />
-            )}
             Update repo
-          </button>
+          </Button>
 
           <button
             type="button"
@@ -436,19 +433,15 @@ export function SourceDetailsPanel({
               its artifacts are kept. You can
               re-link it later.
             </p>
-            <button
-              type="button"
+            <Button
+              variant="dangerSoft"
               onClick={() => setIsUnlinkDialogOpen(true)}
-              disabled={isUnlinking}
-              className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-danger-border bg-app-danger-bg px-5 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              loading={isUnlinking}
+              icon={<Unlink className="h-4 w-4" />}
+              className="mt-3"
             >
-              {isUnlinking ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Unlink className="h-4 w-4" />
-              )}
               Remove from project
-            </button>
+            </Button>
           </div>
         </Section>
       )}

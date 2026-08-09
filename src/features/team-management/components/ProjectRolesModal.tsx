@@ -1,6 +1,7 @@
 import { RotateCcw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AlertDialog } from '../../../components/ui/AlertDialog';
+import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import {
     createProjectRole,
@@ -155,13 +156,9 @@ export function ProjectRolesModal({
                 size="lg"
                 onClose={onClose}
                 footer={
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-xl border border-app-border bg-app-surface px-4 py-2 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
-                    >
+                    <Button variant="secondary" onClick={onClose}>
                         Done
-                    </button>
+                    </Button>
                 }
             >
                 <div className="border-t border-app-border pt-6">
@@ -194,14 +191,13 @@ export function ProjectRolesModal({
                         />
 
                         <div className="flex justify-end">
-                            <button
-                                type="button"
+                            <Button
+                                variant="primary"
                                 onClick={() => void handleCreateRole()}
                                 disabled={!roleName.trim()}
-                                className="rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Create Role
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -241,16 +237,18 @@ export function ProjectRolesModal({
                                             </p>
                                         </button>
 
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            iconOnly
                                             aria-label={`Delete ${role.name}`}
                                             onClick={() =>
                                                 setDeleteRoleId(role.id)
                                             }
-                                            className="rounded-lg p-1 text-app-text-muted hover:bg-app-surface-hover hover:text-app-danger-text"
+                                            className="hover:text-app-danger-text"
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 );
                             })}
@@ -348,16 +346,15 @@ export function ProjectRolesModal({
                                         />
                                     </div>
 
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="primary"
                                         onClick={() =>
                                             void handleCreateSkill()
                                         }
                                         disabled={!skillName.trim()}
-                                        className="rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         Add
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         )}

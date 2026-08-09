@@ -1,6 +1,5 @@
 import { ChevronRight, Plus } from "lucide-react";
-import { motion } from "framer-motion";
-import { buttonHoverMotion } from "../../../styles/tokens.ts";
+import { Button } from "../../../components/ui/Button.tsx";
 import { formatNumber } from "../data.ts";
 import type { DataSource } from "../types.ts";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
@@ -41,15 +40,15 @@ export function SourceList({
           </p>
 
           {onAddSource && (
-            <motion.button
-              type="button"
+            <Button
+              variant="primary"
+              size="lg"
               onClick={onAddSource}
-              {...buttonHoverMotion}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
+              icon={<Plus className="h-4 w-4" />}
+              className="mt-6"
             >
-              <Plus className="h-4 w-4" />
               Add sources
-            </motion.button>
+            </Button>
           )}
         </div>
       </div>

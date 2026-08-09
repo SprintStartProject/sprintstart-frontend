@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import { Stepper } from "../../../components/ui/Stepper";
 import {
@@ -334,8 +335,8 @@ export function CreateProjectWizard({
       closeLabel="Close new project wizard"
       footer={
         <>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={
               isDetailsStep || isProjectCreated
                 ? closeWizard
@@ -346,37 +347,30 @@ export function CreateProjectWizard({
                     : () => setStep("people")
             }
             disabled={isSubmitting}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isDetailsStep ? (
-              "Cancel"
-            ) : isProjectCreated ? (
-              "Done"
-            ) : (
-              <>
+            icon={
+              isDetailsStep || isProjectCreated ? undefined : (
                 <ArrowLeft className="h-4 w-4" />
-                Back
-              </>
-            )}
-          </button>
+              )
+            }
+          >
+            {isDetailsStep ? "Cancel" : isProjectCreated ? "Done" : "Back"}
+          </Button>
 
           {isTypeStep && (
             // Lets the user create the project straight away, choosing to attach
             // sources later from its Data Ingestion page instead of now.
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => void finish()}
-              disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              loading={isSubmitting}
             >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Skip for now
-            </button>
+            </Button>
           )}
 
           {isDetailsStep || isPeopleStep || isTypeStep ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={
                 isDetailsStep
                   ? goToPeople
@@ -385,23 +379,17 @@ export function CreateProjectWizard({
                     : () => setSourceStep("detail")
               }
               disabled={(isDetailsStep && !isNameValid) || isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              trailingIcon={<ArrowRight className="h-4 w-4" />}
             >
               Continue
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            </Button>
           ) : !isProjectCreated || hasFailures ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => void finish()}
-              disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              loading={isSubmitting}
+              icon={<Check className="h-4 w-4" />}
             >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
               {isProjectCreated
                 ? "Retry failed sources"
                 : selectedCount === 0
@@ -409,7 +397,7 @@ export function CreateProjectWizard({
                   : `Create and connect ${selectedCount} ${
                       selectedCount === 1 ? "repository" : "repositories"
                     }`}
-            </button>
+            </Button>
           ) : null}
         </>
       }

@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from './Button';
 
 interface PaginationProps {
     currentPage: number;
@@ -35,62 +36,57 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
             className={`flex items-center justify-center space-x-1 mt-6 ${className || ''}`}
             aria-label="Pagination"
         >
-            <button
+            <Button
+                variant="secondary"
+                size="sm"
+                iconOnly
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-app-border bg-app-surface text-app-text transition-colors hover:bg-app-background focus:outline-none focus:ring-2 focus:ring-app-brand/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-app-surface"
                 aria-label="Previous page"
             >
-                <ChevronLeft className="w-5 h-5" />
-            </button>
+                <ChevronLeft className="h-4 w-4" />
+            </Button>
 
             {pages[0] > 1 && (
                 <>
-                    <button
-                        onClick={() => onPageChange(1)}
-                        className="px-4 py-2 text-sm font-medium rounded-lg border border-transparent text-app-text-muted transition-colors hover:bg-app-surface hover:text-app-text focus:outline-none focus:ring-2 focus:ring-app-brand/50"
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => onPageChange(1)}>
                         1
-                    </button>
+                    </Button>
                     {pages[0] > 2 && <span className="px-2 text-app-text-muted">...</span>}
                 </>
             )}
 
             {pages.map((page) => (
-                <button
+                <Button
                     key={page}
+                    variant={currentPage === page ? "primary" : "ghost"}
+                    size="sm"
                     onClick={() => onPageChange(page)}
                     aria-current={currentPage === page ? "page" : undefined}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-app-brand/50 ${
-                        currentPage === page
-                            ? "bg-app-brand text-white shadow-md shadow-app-brand/20"
-                            : "border border-transparent text-app-text-muted hover:bg-app-surface hover:text-app-text"
-                    }`}
                 >
                     {page}
-                </button>
+                </Button>
             ))}
 
             {pages[pages.length - 1] < totalPages && (
                 <>
                     {pages[pages.length - 1] < totalPages - 1 && <span className="px-2 text-app-text-muted">...</span>}
-                    <button
-                        onClick={() => onPageChange(totalPages)}
-                        className="px-4 py-2 text-sm font-medium rounded-lg border border-transparent text-app-text-muted transition-colors hover:bg-app-surface hover:text-app-text focus:outline-none focus:ring-2 focus:ring-app-brand/50"
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => onPageChange(totalPages)}>
                         {totalPages}
-                    </button>
+                    </Button>
                 </>
             )}
 
-            <button
+            <Button
+                variant="secondary"
+                size="sm"
+                iconOnly
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-app-border bg-app-surface text-app-text transition-colors hover:bg-app-background focus:outline-none focus:ring-2 focus:ring-app-brand/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-app-surface"
                 aria-label="Next page"
             >
-                <ChevronRight className="w-5 h-5" />
-            </button>
+                <ChevronRight className="h-4 w-4" />
+            </Button>
         </nav>
     );
 }

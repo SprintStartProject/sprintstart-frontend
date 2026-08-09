@@ -1,5 +1,5 @@
-import { RefreshCw } from "lucide-react";
 import type { FormEvent } from "react";
+import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import type {
     ConnectState,
@@ -70,30 +70,23 @@ export function SourceConnectModal({
             closeLabel="Close source connect modal"
             footer={
                 <>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={isLoading}
-                        className="rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <Button variant="secondary" onClick={onClose} disabled={isLoading}>
                         Cancel
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
+                        variant="primary"
                         type="submit"
                         form="source-connect-form"
                         disabled={isSubmitDisabled}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                        loading={isLoading}
                     >
-                        {isLoading && (
-                            <RefreshCw size={16} className="animate-spin" />
-                        )}
                         {isLoading
                             ? "Connecting..."
                             : isGithubSelected
                               ? "Connect Source"
                               : "Not Available Yet"}
-                    </button>
+                    </Button>
                 </>
             }
         >

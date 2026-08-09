@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { AlertCircle, Folder, Loader2, Trash2 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
+import { Button } from "../../../components/ui/Button";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { projectService } from "../../../services/projectService";
 import {
@@ -268,14 +269,9 @@ export function ProjectDetailsDrawer({
               </p>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={discardChanges}
-                  disabled={isSaving}
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                >
+                <Button variant="secondary" onClick={discardChanges} disabled={isSaving}>
                   Discard
-                </button>
+                </Button>
 
                 <SaveButton
                   dirty={hasPendingChanges}
@@ -401,18 +397,18 @@ export function ProjectDetailsDrawer({
                     other projects.
                   </p>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="dangerSoft"
                     onClick={() => {
                       setDeleteErrorMessage("");
                       setIsDeleteDialogOpen(true);
                     }}
                     disabled={isSaving}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-app-danger-border bg-app-surface px-4 py-2.5 text-sm font-semibold text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+                    icon={<Trash2 className="h-4 w-4" />}
+                    className="mt-4"
                   >
-                    <Trash2 className="h-4 w-4" />
                     Delete project
-                  </button>
+                  </Button>
                 </div>
               </Section>
             )}

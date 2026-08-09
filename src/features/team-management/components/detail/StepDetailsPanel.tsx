@@ -9,6 +9,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
+import { Button } from '../../../../components/ui/Button';
 import { DragHandle } from '../../../../components/ui/DragHandle';
 import { SidePanel } from '../../../../components/ui/SidePanel';
 import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
@@ -138,28 +139,28 @@ export function StepDetailsPanel({
                                 Cancel
                             </button>
 
-                            <button
-                                type="button"
+                            <Button
+                                variant="danger"
+                                size="sm"
                                 onClick={() => onConfirmDeleteStep(step)}
-                                disabled={stepActionId === step.id}
-                                className="rounded-xl bg-app-danger-solid px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                loading={stepActionId === step.id}
                             >
                                 {stepActionId === step.id
                                     ? 'Deleting...'
                                     : 'Delete'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ) : (
-                    <button
-                        type="button"
+                    <Button
+                        variant="dangerSoft"
+                        fullWidth
                         onClick={() => onRequestDeleteStep(step)}
                         disabled={stepActionId !== null}
-                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-2 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        icon={<Trash2 className="h-4 w-4" />}
                     >
-                        <Trash2 className="h-4 w-4" />
                         Delete step
-                    </button>
+                    </Button>
                 )
             }
         >
@@ -193,19 +194,20 @@ export function StepDetailsPanel({
                     {tasks.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
                             <p>No tasks for this step.</p>
-                            <button
-                                type="button"
+                            <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={() =>
                                     onTaskInsertTargetChange({
                                         stepId: step.id,
                                         position: 0,
                                     })
                                 }
-                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-2 text-xs font-medium text-app-text-inverse hover:bg-app-brand-hover"
+                                icon={<Plus className="h-3.5 w-3.5" />}
+                                className="mt-3"
                             >
-                                <Plus className="h-3.5 w-3.5" />
                                 Add first task
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         tasks.map((task, index) => (
@@ -550,16 +552,16 @@ function TaskItem({
                             Cancel
                         </button>
 
-                        <button
-                            type="button"
+                        <Button
+                            variant="danger"
+                            size="sm"
                             onClick={() => onConfirmDeleteTask(task)}
-                            disabled={stepActionId === task.stepId}
-                            className="rounded-xl bg-app-danger-solid px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            loading={stepActionId === task.stepId}
                         >
                             {stepActionId === task.stepId
                                 ? 'Deleting...'
                                 : 'Delete'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
@@ -697,15 +699,16 @@ function NewTaskForm({
                 >
                     Cancel
                 </button>
-                <button
-                    type="button"
+                <Button
+                    variant="primary"
+                    size="sm"
                     onClick={onSubmit}
-                    disabled={addingTask || title.trim().length === 0}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-2 text-xs font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={title.trim().length === 0}
+                    loading={addingTask}
+                    icon={<Plus className="h-3.5 w-3.5" />}
                 >
-                    <Plus className="h-3.5 w-3.5" />
                     {addingTask ? 'Adding...' : 'Add task'}
-                </button>
+                </Button>
             </div>
         </div>
     );

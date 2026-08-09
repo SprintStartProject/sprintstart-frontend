@@ -1,6 +1,7 @@
 import { BriefcaseBusiness, Plus } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "../components/layout/PageHeader";
+import { Button } from "../components/ui/Button";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
 import { FaqWidget } from "../features/faq/components/FaqWidget";
 import { KnowledgeGapWidget } from "../features/knowledge-gaps/components/KnowledgeGapWidget";
@@ -44,14 +45,15 @@ export function PmDashboardPage() {
               </p>
             </div>
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setRolesModalOpen(true)}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-app-border px-3 py-1.5 text-sm font-medium text-app-text-muted transition-colors hover:border-app-brand-border-strong hover:text-app-text"
+              icon={<Plus className="h-4 w-4" />}
+              className="shrink-0"
             >
-              <Plus className="h-4 w-4" />
               Manage role
-            </button>
+            </Button>
           </div>
 
           <TeamManagementWidget projectId={selectedProjectId} />

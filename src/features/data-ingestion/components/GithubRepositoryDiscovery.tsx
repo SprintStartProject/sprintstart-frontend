@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
   discoverRepositories,
@@ -389,18 +390,15 @@ export function GithubRepositoryDiscovery({
           </select>
         </div>
 
-        <button
+        <Button
+          variant="primary"
           type="submit"
           disabled={isBusy || !hasTokens}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-4 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          loading={discoverState === "loading"}
+          icon={<Search className="h-4 w-4" />}
         >
-          {discoverState === "loading" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Search className="h-4 w-4" />
-          )}
           Discover
-        </button>
+        </Button>
       </form>
 
       {discoverError && (

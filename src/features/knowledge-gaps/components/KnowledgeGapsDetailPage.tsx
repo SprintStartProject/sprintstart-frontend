@@ -4,8 +4,7 @@
 // ============================================================
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { buttonHoverMotion, hoverSpringToken } from "../../../styles/tokens";
+import { Button } from "../../../components/ui/Button";
 import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { getTeamOverview } from "../../../services/teamManagementService";
@@ -78,13 +77,9 @@ export function KnowledgeGapsDetailPage() {
           <p className="text-sm text-app-text-muted mb-6">
             This knowledge gap may no longer exist.
           </p>
-          <motion.button
-            onClick={() => void navigate(-1)}
-            {...buttonHoverMotion}
-            className="rounded-xl bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
-          >
+          <Button variant="primary" onClick={() => void navigate(-1)}>
             Go back
-          </motion.button>
+          </Button>
         </div>
       </div>
     );
@@ -126,16 +121,14 @@ export function KnowledgeGapsDetailPage() {
       {/* ── HEADER ──────────────────────────────────────── */}
       <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-content py-4">
-          <motion.button
+          <Button
+            variant="ghost"
             onClick={() => void navigate(-1)}
-            whileHover={{ x: -3 }}
-            whileTap={{ scale: 0.97 }}
-            transition={hoverSpringToken}
-            className="mb-4 flex items-center gap-1.5 text-sm text-app-text-muted transition-colors hover:text-app-text"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
             Back
-          </motion.button>
+          </Button>
 
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -321,14 +314,14 @@ export function KnowledgeGapsDetailPage() {
                 Last analyzed {formatDateTime(gap.refreshedAt)}
               </div>
             </div>
-            <motion.button
+            <Button
+              variant="primary"
               onClick={() => void navigate("/data-ingestion")}
-              {...buttonHoverMotion}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)]"
+              icon={<Database className="h-4 w-4" />}
+              className="shrink-0"
             >
-              <Database className="w-4 h-4" />
               Update data source
-            </motion.button>
+            </Button>
           </div>
           {isStale && (
             <div className="mt-3 flex items-center gap-2 text-xs text-app-warning-text bg-app-warning-bg border border-app-warning-border rounded-lg px-3 py-2">

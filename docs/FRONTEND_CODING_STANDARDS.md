@@ -98,6 +98,23 @@ only this repository gets the full set of frontend rules here.
   managed by `ThemeProvider`. Every color must work in both themes — which is
   automatic when you use tokens.
 
+- **Every action control is [`ui/Button`](../src/components/ui/Button.tsx) — do not
+  hand-roll a `<button>` with its own classes.** Pick `variant` by intent
+  (`primary` | `secondary` | `ghost` | `danger` | `dangerSoft` | `dangerGhost`)
+  and `size` by density (`sm` | `md` | `lg`, default `md`); height, radius, type
+  scale, hover, focus ring and disabled treatment then follow automatically.
+  Use `loading` rather than wiring up your own spinner, and `iconOnly` (plus an
+  `aria-label`) for square icon buttons. If a variant you need is missing, add it
+  to the component instead of patching it at the call site.
+
+  Legitimate exceptions — these are *not* action buttons and stay hand-written:
+  clickable cards and list rows, `aria-pressed` toggles and filter chips,
+  `role="menuitem"` / combobox triggers, and the game surfaces.
+
+- **Radius scale.** `rounded-lg` for dense controls (`sm` buttons, chips),
+  `rounded-xl` for standard controls and small cards, `rounded-2xl` for content
+  cards and panels. Reserve `rounded-full` for avatars, badges, and pills.
+
 ---
 
 ## 5. Accessibility (WCAG 2.1 AA)
@@ -132,6 +149,23 @@ only this repository gets the full set of frontend rules here.
 - **Wrap dynamically added/removed elements** (lists, drawers) in `<AnimatePresence>`
   to avoid clipping on exit. Use `mode="popLayout"` when the wrapper affects
   document reflow.
+
+- **Do not apply `buttonHoverMotion` by hand.**
+  [`ui/Button`](../src/components/ui/Button.tsx) already carries it, for every
+  variant and size, and swaps to `buttonHoverMotionDisabled` when the button is
+  disabled or loading. Reaching for `<motion.button {...buttonHoverMotion}>` is
+  how the app ended up with a "Refresh" icon button that magnified on one page
+  header and sat dead on the next.
+
+  The token stays public for the controls that are *not* `Button` and still need
+  to feel the same — the `role="combobox"` trigger in `FilterSelect` and the
+  `aria-pressed` filter chips. Those, and only those.
+
+- **The brand lift shadow (`hover:shadow-app-brand-lift`) belongs to `primary`
+  and to nothing else.** It marks the one action a screen wants; if every button
+  glowed, the cue would carry no information. It is a token in `index.css` with
+  separate light and dark values — never an arbitrary `shadow-[…]` value, which
+  cannot adapt to the theme.
 
 - See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
   for the full animation system.

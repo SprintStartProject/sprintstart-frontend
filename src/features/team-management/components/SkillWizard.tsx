@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { isSkillLinkedToRole } from '../types';
 import type { Skill, SkillLevel, TeamOverviewUser } from '../types';
@@ -82,27 +83,18 @@ export function SkillWizard({
             onClose={onClose}
             footer={
                 <>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={saving}
-                        className="rounded-xl border border-app-border bg-app-surface px-4 py-2.5 text-xs font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
-                    >
+                    <Button variant="secondary" onClick={onClose} disabled={saving}>
                         Later
-                    </button>
+                    </Button>
 
-                    <button
-                        type="button"
+                    <Button
+                        variant="primary"
                         onClick={() => void handleSubmit()}
-                        disabled={!allSkillsRated || saving}
-                        className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
-                            allSkillsRated && !saving
-                                ? 'bg-app-brand text-app-text-inverse shadow-lg hover:bg-app-brand-hover'
-                                : 'cursor-not-allowed bg-app-surface-muted text-app-text-disabled'
-                        }`}
+                        disabled={!allSkillsRated}
+                        loading={saving}
                     >
                         {requiredSkills.length === 0 ? 'Continue' : 'Save Assessment'}
-                    </button>
+                    </Button>
                 </>
             }
         >

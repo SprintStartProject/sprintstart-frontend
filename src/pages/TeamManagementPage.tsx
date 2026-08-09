@@ -1,6 +1,7 @@
 import { Users, ArrowLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/ui/Button';
 import { TeamMemberFilters } from '../features/team-management/components/TeamMemberFilters';
 import { TeamMemberCard } from '../features/team-management/components/TeamMemberCard';
 import { RoleManagementTab } from '../features/team-management/components/RoleManagementTab';
@@ -178,13 +179,14 @@ export function TeamManagementPage() {
         <div className="min-h-screen bg-app-bg">
             <header className="relative z-40 border-b border-app-border bg-app-bg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={() => void navigate('/pm-dashboard')}
-                        className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
+                        icon={<ArrowLeft className="h-4 w-4" />}
+                        className="mb-4"
                     >
-                        <ArrowLeft className="w-4 h-4" />
                         Back to PM-Dashboard
-                    </button>
+                    </Button>
 
                     <PageHeader
                         icon={Users}

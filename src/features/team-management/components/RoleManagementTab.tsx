@@ -14,9 +14,9 @@ import {
     useReducedMotion,
 } from 'framer-motion';
 import { AlertDialog } from '../../../components/ui/AlertDialog';
+import { Button } from '../../../components/ui/Button';
 import { UserAvatar } from '../../../components/common/UserAvatar';
 import { RoleCard } from './RoleCard';
-import { buttonHoverMotion } from '../../../styles/tokens';
 import {
     assignProjectRoleToUser,
     createProjectRole,
@@ -566,20 +566,17 @@ export function RoleManagementTab({
                                 </div>
 
                                 <div className="flex justify-end">
-                                    <motion.button
-                                        type="button"
+                                    <Button
+                                        variant="primary"
                                         onClick={() => void handleCreateRole()}
-                                        disabled={
-                                            !roleName.trim() || creatingRole
-                                        }
-                                        {...buttonHoverMotion}
-                                        className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                        disabled={!roleName.trim()}
+                                        loading={creatingRole}
+                                        icon={<Plus className="h-4 w-4" />}
                                     >
-                                        <Plus className="h-4 w-4" />
                                         {creatingRole
                                             ? 'Creating...'
                                             : 'Create role'}
-                                    </motion.button>
+                                    </Button>
                                 </div>
                             </div>
                         </motion.section>
@@ -798,16 +795,13 @@ export function RoleManagementTab({
                                                 Reset
                                             </button>
 
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="primary"
                                                 onClick={() =>
                                                     void handleSaveAssignment()
                                                 }
-                                                disabled={
-                                                    !hasAssignChanges ||
-                                                    savingAssignment
-                                                }
-                                                className="rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                                disabled={!hasAssignChanges}
+                                                loading={savingAssignment}
                                             >
                                                 {savingAssignment
                                                     ? 'Saving...'
@@ -819,7 +813,7 @@ export function RoleManagementTab({
                                                                 : 'changes'
                                                         }`
                                                       : 'Save changes'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
 
@@ -910,21 +904,18 @@ export function RoleManagementTab({
                                             />
 
                                             <div className="flex justify-end">
-                                                <button
-                                                    type="button"
+                                                <Button
+                                                    variant="primary"
                                                     onClick={() =>
                                                         void handleAddSkill()
                                                     }
-                                                    disabled={
-                                                        !skillName.trim() ||
-                                                        addingSkill
-                                                    }
-                                                    className="rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                                    disabled={!skillName.trim()}
+                                                    loading={addingSkill}
                                                 >
                                                     {addingSkill
                                                         ? 'Adding...'
                                                         : 'Add skill'}
-                                                </button>
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>

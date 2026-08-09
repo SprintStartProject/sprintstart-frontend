@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import { parseApiError, describeRefreshFailure } from '../../../services/apiError';
 import { addGithubPat } from '../../../services/sources/githubService';
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from '../utils/patValidation';
@@ -75,15 +76,16 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
         >
             <div className="mb-4 flex items-center justify-between">
                 <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
-                <button
-                    type="button"
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={handleClose}
                     disabled={isSaving}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                     aria-label="Cancel add token"
                 >
                     <X className="h-4 w-4" aria-hidden />
-                </button>
+                </Button>
             </div>
 
             <div className="space-y-3">
@@ -139,29 +141,17 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
                 )}
 
                 <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
-                    <button
-                        type="button"
-                        onClick={handleClose}
-                        disabled={isSaving}
-                        className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-                    >
+                    <Button variant="secondary" onClick={handleClose} disabled={isSaving}>
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="primary"
                         type="submit"
                         data-testid="settings-add-token-submit"
-                        disabled={isSaving}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                        loading={isSaving}
                     >
-                        {isSaving ? (
-                            <>
-                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                                Adding...
-                            </>
-                        ) : (
-                            'Add Token'
-                        )}
-                    </button>
+                        {isSaving ? 'Adding...' : 'Add Token'}
+                    </Button>
                 </div>
             </div>
         </form>

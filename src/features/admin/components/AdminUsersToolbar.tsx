@@ -1,7 +1,6 @@
 import { Search, Trash2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { Button } from "../../../components/ui/Button";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
-import { buttonHoverMotion } from "../../../styles/tokens";
 import { USER_FILTER_OPTIONS } from "../data";
 import type { UserFilter } from "../types";
 
@@ -38,15 +37,14 @@ export function AdminUsersToolbar({
                 )}
 
                 {selectedUserCount > 0 && (
-                    <motion.button
-                        type="button"
+                    <Button
+                        variant="dangerSoft"
+                        size="sm"
                         onClick={onRequestBulkDelete}
-                        {...buttonHoverMotion}
-                        className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-app-danger-border/40 bg-app-danger-bg/70 px-3 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white"
+                        icon={<Trash2 className="h-3.5 w-3.5" />}
                     >
-                        <Trash2 className="h-3.5 w-3.5" />
                         Delete All
-                    </motion.button>
+                    </Button>
                 )}
             </div>
 

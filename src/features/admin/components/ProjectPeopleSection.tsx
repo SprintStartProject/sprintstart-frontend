@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
 import type { ProjectManager } from "../../../services/projectService";
 import {
   resolvePeopleDraft,
@@ -308,20 +309,24 @@ export function ProjectPeopleSection({
               <span className="flex shrink-0 items-center gap-1">
                 {canAssignManager &&
                   (row.isManager ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
                       onClick={() => onDraftChange(stageManager(activeDraft, null))}
                       disabled={disabled}
                       aria-label={`Remove ${row.displayName} as project manager`}
                       title="Remove as manager"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-app-brand transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                      className="text-app-brand"
                     >
                       <Shield className="h-4 w-4" />
-                    </button>
+                    </Button>
                   ) : (
                     !row.isPendingRemove && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
                         onClick={() =>
                           onDraftChange(stageManager(activeDraft, row.id))
                         }
@@ -336,15 +341,17 @@ export function ProjectPeopleSection({
                             ? "Make manager"
                             : "User needs the Project Manager (PM) role first"
                         }
-                        className="flex h-9 w-9 items-center justify-center rounded-xl text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+                        className="hover:text-app-brand"
                       >
                         <ShieldCheck className="h-4 w-4" />
-                      </button>
+                      </Button>
                     )
                   ))}
 
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   onClick={() =>
                     onDraftChange(stageToggleRemoveUser(activeDraft, row.id))
                   }
@@ -359,14 +366,14 @@ export function ProjectPeopleSection({
                       ? "Remove as manager first"
                       : undefined
                   }
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-40"
+                  className="hover:bg-app-danger-bg hover:text-app-danger-text"
                 >
                   {row.isPendingRemove ? (
                     <Undo2 className="h-4 w-4" />
                   ) : (
                     <UserMinus className="h-4 w-4" />
                   )}
-                </button>
+                </Button>
               </span>
             </li>
           ))}

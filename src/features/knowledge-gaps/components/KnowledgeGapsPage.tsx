@@ -8,6 +8,7 @@ import { useFetch } from "../../../hooks/useFetch";
 import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
+import { Button } from "../../../components/ui/Button";
 
 import {
   ShieldAlert,
@@ -27,11 +28,7 @@ import {
   FilterSelect,
   type FilterSelectOption,
 } from "../../../components/ui/FilterSelect";
-import {
-  buttonHoverMotion,
-  buttonHoverMotionDisabled,
-  hoverSpringToken,
-} from "../../../styles/tokens";
+import { buttonHoverMotion } from "../../../styles/tokens";
 
 type GapSortOption = "severity" | "date" | "component";
 
@@ -82,15 +79,15 @@ export function KnowledgeGapsPage() {
   };
 
   const refreshButton = (
-    <motion.button
+    <Button
+      variant="primary"
       onClick={() => void handleRefresh()}
-      disabled={refreshing}
-      {...(refreshing ? buttonHoverMotionDisabled : buttonHoverMotion)}
-      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)] disabled:opacity-60"
+      loading={refreshing}
+      icon={<RefreshCw className="h-4 w-4" />}
+      className="shrink-0"
     >
-      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
       {refreshing ? "Refreshing…" : "Refresh"}
-    </motion.button>
+    </Button>
   );
 
   if (loading) {
@@ -160,16 +157,14 @@ export function KnowledgeGapsPage() {
     <div className="min-h-screen bg-app-bg">
       <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
-          <motion.button
+          <Button
+            variant="ghost"
             onClick={() => void navigate("/pm-dashboard")}
-            whileHover={{ x: -3 }}
-            whileTap={{ scale: 0.97 }}
-            transition={hoverSpringToken}
-            className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-muted transition-colors hover:text-app-text"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
             Back to PM-Dashboard
-          </motion.button>
+          </Button>
           <div className="flex items-start justify-between gap-4 mb-6">
             <PageHeader
               icon={ShieldAlert}
@@ -240,18 +235,18 @@ export function KnowledgeGapsPage() {
 
           <div className="ml-auto flex items-center gap-2">
             {(severityFilter.length < 3 || sortBy !== "severity") && (
-              <motion.button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setSeverityFilter(["high", "medium", "low"]);
                   setSortBy("severity");
                 }}
-                {...buttonHoverMotion}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-transparent px-2.5 text-sm font-medium text-app-brand-text transition-colors hover:border-app-brand-border hover:bg-app-surface-hover"
+                icon={<X className="h-3.5 w-3.5" />}
+                className="text-app-brand-text"
               >
-                <X className="h-3.5 w-3.5" />
                 Reset
-              </motion.button>
+              </Button>
             )}
 
             <FilterSelect

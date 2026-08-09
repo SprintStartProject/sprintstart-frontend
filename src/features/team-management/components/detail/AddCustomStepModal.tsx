@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
 import { AutoResizeTextarea } from '../../../../components/ui/AutoResizeTextarea';
+import { Button } from '../../../../components/ui/Button';
 import { DragHandle } from '../../../../components/ui/DragHandle';
 import { Modal } from '../../../../components/ui/Modal';
 
@@ -71,24 +72,19 @@ export function AddCustomStepModal({
             onClose={onClose}
             footer={
                 <>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={addingStep}
-                        className="rounded-xl border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
-                    >
+                    <Button variant="secondary" onClick={onClose} disabled={addingStep}>
                         Cancel
-                    </button>
+                    </Button>
 
-                    <button
-                        type="button"
+                    <Button
+                        variant="primary"
                         onClick={onSubmit}
-                        disabled={addingStep || title.trim().length === 0}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={title.trim().length === 0}
+                        loading={addingStep}
+                        icon={<Plus className="h-4 w-4" />}
                     >
-                        <Plus className="h-4 w-4" />
                         {addingStep ? 'Adding...' : 'Add step'}
-                    </button>
+                    </Button>
                 </>
             }
         >
@@ -167,19 +163,20 @@ export function AddCustomStepModal({
                                 Optional breakdown of this step into smaller tasks
                             </p>
                         </div>
-                        <button
-                            type="button"
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() =>
                                 onTasksChange((current) => [
                                     ...current,
                                     { title: '', description: '' },
                                 ])
                             }
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-brand transition-colors hover:bg-app-brand-soft hover:text-app-brand-text"
+                            icon={<Plus className="h-3.5 w-3.5" />}
+                            className="text-app-brand hover:bg-app-brand-soft hover:text-app-brand-text"
                         >
-                            <Plus className="h-3.5 w-3.5" />
                             Add task
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="mt-3 space-y-2">
@@ -231,8 +228,10 @@ export function AddCustomStepModal({
                                     </span>
 
                                     {tasks.length > 1 && (
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            iconOnly
                                             onClick={() =>
                                                 onTasksChange((current) =>
                                                     current.filter(
@@ -240,11 +239,11 @@ export function AddCustomStepModal({
                                                     ),
                                                 )
                                             }
-                                            className="rounded-lg p-0.5 text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text"
+                                            className="hover:bg-app-danger-bg hover:text-app-danger-text"
                                             aria-label={`Remove task ${index + 1}`}
                                         >
                                             <X className="h-4 w-4" />
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
 

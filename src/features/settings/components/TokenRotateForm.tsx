@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import { parseApiError, describeRefreshFailure } from '../../../services/apiError';
 import { updateGithubPat } from '../../../services/sources/githubService';
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from '../utils/patValidation';
@@ -101,28 +102,19 @@ export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
-                    <button
+                    <Button
+                        variant="primary"
                         type="submit"
                         data-testid={`settings-rotate-submit-${name}`}
-                        disabled={isSaving}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                        loading={isSaving}
+                        icon={<RefreshCw className="h-4 w-4" aria-hidden />}
                     >
-                        {isSaving ? (
-                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                        ) : (
-                            <RefreshCw className="h-4 w-4" aria-hidden />
-                        )}
                         {isSaving ? 'Rotating...' : 'Confirm'}
-                    </button>
+                    </Button>
 
-                    <button
-                        type="button"
-                        onClick={handleClose}
-                        disabled={isSaving}
-                        className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-                    >
+                    <Button variant="secondary" onClick={handleClose} disabled={isSaving}>
                         Cancel
-                    </button>
+                    </Button>
                 </div>
             </div>
 

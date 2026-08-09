@@ -1,6 +1,7 @@
 import { Trash2, Users } from 'lucide-react';
 import { motion, type Transition } from 'framer-motion';
 import { UserAvatar } from '../../../components/common/UserAvatar';
+import { Button } from '../../../components/ui/Button';
 import type { ProjectRole, Skill, TeamOverviewUser } from '../types';
 
 /** Beyond this the avatars stop being scannable and start being a wall. */
@@ -106,14 +107,16 @@ export function RoleCard({
                     </span>
                 )}
 
-                <button
-                    type="button"
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     aria-label={`Delete ${role.name}`}
                     onClick={() => onRequestDelete(role.id)}
-                    className="pointer-events-auto shrink-0 rounded-lg p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-danger-text"
+                    className="pointer-events-auto shrink-0 hover:text-app-danger-text"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
             </div>
 
             {!compact && (

@@ -1,6 +1,7 @@
 import { useAuth } from '../context/useAuth';
 import { Rocket, LogIn } from 'lucide-react';
 import { ThemeToggle } from '../components/common/ThemeToggle';
+import { Button } from '../components/ui/Button';
 
 /**
  * The authentication entry point.
@@ -45,18 +46,17 @@ export function LoginPage() {
                         </p>
                     </div>
 
-                    <button
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        fullWidth
                         onClick={handleLogin}
-                        disabled={status === 'loading'}
-                        className="flex w-full items-center justify-center gap-3 rounded-xl bg-app-brand px-6 py-4 text-base font-semibold text-white shadow-md transition-all hover:bg-opacity-90 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-app-focus disabled:opacity-50 disabled:hover:scale-100"
+                        loading={status === 'loading'}
+                        icon={<LogIn className="h-5 w-5" />}
+                        className="shadow-md"
                     >
-                        {status === 'loading' ? (
-                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        ) : (
-                            <LogIn className="h-5 w-5" />
-                        )}
                         Sign in with SSO
-                    </button>
+                    </Button>
 
                     <p className="text-xs text-app-text-disabled">
                         Securely managed by Keycloak OpenID Connect

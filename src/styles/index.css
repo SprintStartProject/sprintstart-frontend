@@ -38,6 +38,12 @@
   --brand-text: #1d4ed8;
   --brand-glow: rgba(37, 99, 235, 0.1);
 
+  /* Cast shadow under a hovered primary button, in the brand color.
+     Offset down and heavily inset (-10px spread) so it reads as the button
+     lifting off the page rather than as a blurred halo around it. Only the
+     primary action gets this -- if every button glowed, none would. */
+  --shadow-brand-lift: 0 10px 26px -10px var(--brand);
+
   /* Success */
   --success-bg: #ecfdf5;
   --success-border: #a7f3d0;
@@ -118,6 +124,11 @@
   --brand-border-strong: #3b82f6; /* blue-500 */
   --brand-text: #60a5fa;          /* blue-400 */
   --brand-glow: rgba(59, 130, 246, 0.1);
+
+  /* Stronger on dark: a shadow cast onto a near-black background is almost
+     invisible at the light-theme opacity, so the lift is carried by a visible
+     brand-colored bloom instead. */
+  --shadow-brand-lift: 0 10px 30px -8px rgba(59, 130, 246, 0.45);
 
   /* Success */
   --success-bg: rgba(6, 78, 59, 0.25);
@@ -213,6 +224,9 @@
   --color-app-progress-track: var(--progress-track);
   --color-app-progress-fill: var(--progress-fill);
   --color-app-progress-fill-end: var(--progress-fill-end);
+
+  /* Enables `shadow-app-brand-lift` as a Tailwind utility. */
+  --shadow-app-brand-lift: var(--shadow-brand-lift);
 
   --font-sans: var(--sans);
   --font-heading: var(--heading);

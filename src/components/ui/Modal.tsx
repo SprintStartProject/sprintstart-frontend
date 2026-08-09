@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, type ReactNode } from "react";
 import { getModalDialogVariants, modalBackdropVariants } from "../../styles/tokens";
+import { Button } from "./Button";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
@@ -201,15 +202,16 @@ export function Modal({
                             <div className="flex shrink-0 items-center gap-2">
                                 {headerActions}
 
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    iconOnly
                                     onClick={onClose}
                                     disabled={isDismissDisabled}
-                                    className="rounded-lg border border-app-border p-2 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
                                     aria-label={closeLabel}
                                 >
                                     <X className="h-4 w-4" />
-                                </button>
+                                </Button>
                             </div>
                         </div>
 

@@ -1,4 +1,5 @@
 import { Plus, Search } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 
 type AdminProjectsToolbarProps = {
   projectCount: number;
@@ -31,14 +32,14 @@ export function AdminProjectsToolbar({
           />
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={onCreateProject}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
+          icon={<Plus className="h-4 w-4" />}
+          className="w-full sm:w-auto"
         >
-          <Plus className="h-4 w-4" />
           New Project
-        </button>
+        </Button>
       </div>
     </div>
   );

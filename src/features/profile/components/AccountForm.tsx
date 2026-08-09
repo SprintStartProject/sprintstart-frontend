@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '../../../components/ui/Button';
 import { UserAvatar } from '../../../components/common/UserAvatar';
 import type { UserProfile } from '../../../services/types';
 
@@ -66,13 +67,9 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                             ? profile.projectRoles.map((role) => role.name).join(', ')
                             : 'NO ROLE ASSIGNED'}
                     </p>
-                    <button
-                        type="button"
-                        onClick={handleOpenIconPicker}
-                        className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus:outline-none focus:ring-2 focus:ring-app-brand"
-                    >
+                    <Button variant="secondary" size="sm" onClick={handleOpenIconPicker}>
                         {isChoosingIcon ? 'Cancel' : 'Choose Icon'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -80,7 +77,9 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                 <div className="mb-6 rounded-lg border border-app-border bg-app-bg p-4 shadow-sm animate-in fade-in slide-in-from-top-2">
                     <div className="mb-3 flex items-center justify-between">
                         <span className="text-sm font-medium text-app-text">Select an Avatar</span>
-                        <button type="button" onClick={generateOptions} className="text-xs font-medium text-app-brand hover:underline">Shuffle Options</button>
+                        <Button variant="ghost" size="sm" onClick={generateOptions}>
+                            Shuffle Options
+                        </Button>
                     </div>
                     <div className="flex gap-4 overflow-x-auto pb-2">
                         {iconOptions.map(seed => (
@@ -137,13 +136,9 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                 </div>
 
                 <div className="pt-4">
-                    <button
-                        type="submit"
-                        disabled={isSaving}
-                        className="rounded-lg bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
+                    <Button variant="primary" type="submit" loading={isSaving}>
                         {isSaving ? 'Saving...' : 'Save Changes'}
-                    </button>
+                    </Button>
                 </div>
             </form>
         </div>

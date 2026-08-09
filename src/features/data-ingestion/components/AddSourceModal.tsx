@@ -1,5 +1,6 @@
-import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "../../../components/ui/Button.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { Stepper } from "../../../components/ui/Stepper.tsx";
 import {
@@ -282,14 +283,13 @@ export function AddSourceModal({
               Cancel
             </button>
 
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => setStep("detail")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover"
+              trailingIcon={<ChevronRight className="h-4 w-4" />}
             >
               Continue
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </>
         ) : (
           <>
@@ -313,40 +313,32 @@ export function AddSourceModal({
             </button>
 
             {isSingleRepo && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void handleConnectSingle()}
-                disabled={connectState === "loading" || !canIngest}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canIngest}
+                loading={connectState === "loading"}
               >
-                {connectState === "loading" && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
                 {connectState === "loading"
                   ? "Connecting…"
                   : "Connect repository"}
-              </button>
+              </Button>
             )}
 
             {isGithub && !isSingleRepo && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void handleConnect()}
-                disabled={
-                  selectedCount === 0 || connectState === "loading" || !canIngest
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={selectedCount === 0 || !canIngest}
+                loading={connectState === "loading"}
               >
-                {connectState === "loading" && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
                 {connectState === "loading"
                   ? "Connecting…"
                   : `Connect ${selectedCount > 0 ? selectedCount : ""} selected`.replace(
                       /\s+/g,
                       " ",
                     )}
-              </button>
+              </Button>
             )}
           </>
         )

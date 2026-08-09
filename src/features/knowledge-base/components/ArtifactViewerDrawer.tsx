@@ -10,6 +10,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from '../types';
 import { preprocessMarkdown } from '../markdown';
 import { knowledgeService } from '../../../services/knowledgeService';
+import { Button } from '../../../components/ui/Button';
 import { ApiError } from '../../../services/apiClient';
 import { SidePanel } from '../../../components/ui/SidePanel';
 import { Modal } from '../../../components/ui/Modal';
@@ -422,14 +423,15 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
 
     const actionsContent = viewMode === 'raw' && (
         <div className="flex items-center gap-2">
-            <button
+            <Button
+                variant="primary"
+                size="sm"
                 onClick={() => void handleSummarize()}
                 data-testid="summarise-btn"
-                className="flex items-center gap-2 px-3 py-1.5 bg-app-brand text-white rounded-md text-sm font-medium hover:bg-app-brand/90 transition-colors shadow-sm"
+                icon={<Sparkles className="h-4 w-4" />}
             >
-                <Sparkles className="w-4 h-4" />
                 Summarise
-            </button>
+            </Button>
             {canDeleteThisArtifact && (
                 <button
                     onClick={openDeleteConfirm}
@@ -530,14 +532,14 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                         <div className="flex flex-col items-center gap-4 py-8">
                             <p className="text-sm text-app-text-muted text-center max-w-sm">{error}</p>
                             <div className="flex items-center gap-3">
-                                <button
+                                <Button
+                                    variant="primary"
                                     onClick={() => void handleSummarize()}
                                     data-testid="retry-summary-btn"
-                                    className="flex items-center gap-2 px-4 py-2 bg-app-brand text-white rounded-md text-sm font-medium hover:bg-app-brand/90 transition-colors"
+                                    icon={<RefreshCw className="h-4 w-4" />}
                                 >
-                                    <RefreshCw className="w-4 h-4" />
                                     Retry
-                                </button>
+                                </Button>
                                 <button
                                     onClick={() => dispatch({ type: 'showRaw' })}
                                     className="flex items-center gap-2 px-4 py-2 text-app-text-muted rounded-md text-sm font-medium hover:bg-app-surface-muted transition-colors border border-app-border"

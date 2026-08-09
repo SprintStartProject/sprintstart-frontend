@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from '../components/ui/Button';
 import type {
     OnboardingPathEndpoint,
     OnboardingStepEndpoint,
@@ -1212,17 +1213,16 @@ export function TeamMemberDetailPage() {
                                 ))}
                             </select>
 
-                            <button
-                                type="button"
+                            <Button
+                                variant="primary"
                                 onClick={() => void handleAddRole()}
                                 disabled={
                                     !selectedRoleId || savingRoleId !== null
                                 }
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                icon={<Plus className="h-4 w-4" />}
                             >
-                                <Plus className="h-4 w-4" />
                                 Add
-                            </button>
+                            </Button>
                         </div>
 
                         {unassignedRoles.length === 0 && (

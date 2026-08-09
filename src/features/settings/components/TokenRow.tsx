@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Key, RefreshCw, Trash2 } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import { centralSpringToken } from '../../../styles/tokens';
 import { TokenDeleteConfirm } from './TokenDeleteConfirm';
 import { TokenRotateForm } from './TokenRotateForm';
@@ -47,26 +48,28 @@ export function TokenRow({ name, onSaved }: TokenRowProps) {
 
                 {panel === 'none' && (
                     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-                        <button
-                            type="button"
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={openRotate}
                             data-testid={`settings-rotate-open-${name}`}
-                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text sm:flex-none"
+                            icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+                            className="flex-1 sm:flex-none"
                             aria-label={`Rotate token ${name}`}
                         >
-                            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                             Rotate
-                        </button>
-                        <button
-                            type="button"
+                        </Button>
+                        <Button
+                            variant="dangerSoft"
+                            size="sm"
                             onClick={openDelete}
                             data-testid={`settings-delete-open-${name}`}
-                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-danger-bg bg-app-danger-bg px-3 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white sm:flex-none"
+                            icon={<Trash2 className="h-3.5 w-3.5" aria-hidden />}
+                            className="flex-1 sm:flex-none"
                             aria-label={`Delete token ${name}`}
                         >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
                             Delete
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>

@@ -4,6 +4,7 @@ import type { MouseEvent } from "react";
 import { ExternalLink, MoreVertical, Trash2 } from "lucide-react";
 import { getDisplayName } from "../data";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { Button } from "../../../components/ui/Button";
 import type { AdminUser } from "../types";
 import { PermissionGroupBadge } from "./Badges";
 import { ProjectList } from "./ProjectList";
@@ -204,16 +205,16 @@ export function UsersTab({
                             className="relative z-10 col-start-3 row-start-1 flex items-center justify-end sm:col-auto sm:row-auto"
                             data-user-row-action="true"
                         >
-                            <button
-                                type="button"
+                            <Button
+                                variant="ghost"
+                                iconOnly
                                 onClick={(event) => handleToggleUserContextMenu(event, user.id)}
-                                className="flex h-11 w-11 items-center justify-center rounded-xl text-app-text-muted transition-colors hover:bg-app-surface-muted hover:text-app-text"
                                 aria-label={`Open context menu for ${getDisplayName(user)}`}
                                 aria-haspopup="menu"
                                 aria-expanded={openUserMenuId === user.id}
                             >
                                 <MoreVertical className="h-4 w-4" />
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ))}

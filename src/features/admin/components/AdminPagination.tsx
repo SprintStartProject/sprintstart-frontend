@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 
 type AdminPaginationProps = {
     safePage: number;
@@ -15,42 +16,39 @@ export function AdminPagination({
 
     return (
         <div className="mt-4 flex items-center justify-start gap-1 overflow-x-auto pb-1 sm:justify-center">
-            <button
-                type="button"
+            <Button
+                variant="ghost"
+                iconOnly
                 onClick={() => onPageChange(Math.max(1, safePage - 1))}
                 disabled={safePage === 1}
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-app-text-muted"
                 aria-label="Previous page"
             >
                 <ChevronLeft className="h-4 w-4" />
-            </button>
+            </Button>
 
             {Array.from({ length: totalPages }, (_, index) => index + 1).map(
                 (pageNumber) => (
-                    <button
+                    <Button
                         key={pageNumber}
-                        type="button"
+                        variant={safePage === pageNumber ? "primary" : "ghost"}
+                        iconOnly
                         onClick={() => onPageChange(pageNumber)}
-                        className={`flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium transition-colors ${
-                            safePage === pageNumber
-                                ? "bg-app-surface-muted text-app-text"
-                                : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                        }`}
+                        aria-current={safePage === pageNumber ? "page" : undefined}
                     >
                         {pageNumber}
-                    </button>
+                    </Button>
                 ),
             )}
 
-            <button
-                type="button"
+            <Button
+                variant="ghost"
+                iconOnly
                 onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
                 disabled={safePage === totalPages}
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-app-text-muted"
                 aria-label="Next page"
             >
                 <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
         </div>
     );
 }

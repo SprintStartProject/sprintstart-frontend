@@ -1,5 +1,6 @@
 import { Plug, RefreshCw } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader.tsx";
+import { Button } from "../../../components/ui/Button.tsx";
 
 type ConnectorsHeaderProps = {
   isLoading: boolean;
@@ -18,18 +19,19 @@ export function ConnectorsHeader({
           title="Connectors"
           subtitle="Enable connectors and choose which of their sources are in scope for ingestion."
           actions={
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={onRefresh}
               disabled={isLoading}
-              className="flex items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+              icon={
+                <RefreshCw
+                  size={16}
+                  className={isLoading ? "animate-spin" : ""}
+                />
+              }
             >
-              <RefreshCw
-                size={16}
-                className={isLoading ? "animate-spin" : ""}
-              />
               Refresh
-            </button>
+            </Button>
           }
         />
       </div>

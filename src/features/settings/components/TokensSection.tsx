@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Key, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import { centralSpringToken } from '../../../styles/tokens';
 import { useGithubTokens } from '../hooks/useGithubTokens';
 import { TokenAddForm } from './TokenAddForm';
@@ -43,31 +44,32 @@ export function TokensSection() {
                         {tokenNames.length}{' '}
                         {tokenNames.length === 1 ? 'token' : 'tokens'}
                     </span>
-                    <button
-                        type="button"
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        iconOnly
                         onClick={() => void loadTokenNames()}
                         disabled={isRefreshing}
                         data-testid="settings-tokens-refresh"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
                         aria-label="Refresh tokens"
                     >
                         <RefreshCw
                             className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
                             aria-hidden
                         />
-                    </button>
+                    </Button>
                 </div>
 
                 {!isAddOpen && (
-                    <button
-                        type="button"
+                    <Button
+                        variant="primary"
                         onClick={() => setIsAddOpen(true)}
                         data-testid="settings-add-token-open"
-                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
+                        icon={<Plus className="h-4 w-4" aria-hidden />}
+                        className="w-full sm:w-auto"
                     >
-                        <Plus className="h-4 w-4" aria-hidden />
                         Add Token
-                    </button>
+                    </Button>
                 )}
             </div>
 

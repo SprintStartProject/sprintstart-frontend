@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
+import { Button } from "../../../components/ui/Button";
 import { getTeamOverview } from "../../../services/teamManagementService";
 import type { TeamOverviewUser } from "../types";
 import { TeamMemberCard } from "./TeamMemberCard";
@@ -131,17 +132,17 @@ export function TeamManagementWidget({
           </span>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={(event) => {
             event.stopPropagation();
             void navigate("/team-management");
           }}
-          className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+          trailingIcon={<ArrowRight className="h-3.5 w-3.5" />}
         >
           See all ({users.length})
-          <ArrowRight className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       </div>
 
       {(pendingFeedbackCount > 0 || pendingSkipCount > 0) && (

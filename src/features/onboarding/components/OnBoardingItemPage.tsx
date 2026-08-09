@@ -13,6 +13,7 @@ import type {
   StepStatus,
 } from "../types";
 import { onboardingService } from "../../../services/onboardingService";
+import { Button } from "../../../components/ui/Button";
 import { StepOriginBadge } from "./StepOriginBadge";
 import { TaskCheckItem } from "./TaskCheckItem";
 import { useMoments } from "../../moments";
@@ -304,12 +305,9 @@ export function OnBoardingItemPage() {
           <p className="text-sm text-app-text-muted mb-6">
             {errorMessage}
           </p>
-          <button
-            onClick={() => void navigate("/onboarding")}
-            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
-          >
+          <Button variant="primary" onClick={() => void navigate("/onboarding")}>
             Back to Onboarding Overview
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -323,12 +321,9 @@ export function OnBoardingItemPage() {
           <p className="text-app-text-muted text-sm mb-4">
             Step not found.
           </p>
-          <button
-            onClick={() => void navigate("/onboarding")}
-            className="px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
-          >
+          <Button variant="primary" onClick={() => void navigate("/onboarding")}>
             Back to Onboarding Overview
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -497,23 +492,20 @@ export function OnBoardingItemPage() {
                   jump straight to the next pending step. */}
               {(stepDetail.status === "FINISHED" ||
                 stepDetail.status === "SKIPPED") && (
-                <button
+                <Button
+                  variant="primary"
+                  fullWidth
                   onClick={() => void goToNextStep()}
-                  disabled={nextLoading}
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-app-border"
+                  loading={nextLoading}
+                  trailingIcon={
+                    nextLoading ? undefined : (
+                      <CircleArrowRight className="h-4 w-4" />
+                    )
+                  }
+                  className="mt-3"
                 >
-                  {nextLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      Continue to next step
-                      <CircleArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+                  {nextLoading ? "Loading..." : "Continue to next step"}
+                </Button>
               )}
             </div>
           </div>
@@ -631,11 +623,12 @@ export function OnBoardingItemPage() {
                   hasPendingSkipRequest
                 }
               />
-              <button
-                className="mt-3 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-app-border"
+              <Button
+                variant="primary"
+                className="mt-3"
                 onClick={() => void skipCurrentStep()}
+                loading={skipLoading}
                 disabled={
-                  skipLoading ||
                   !skipReason.trim() ||
                   stepDetail.status === "SKIPPED" ||
                   hasPendingSkipRequest
@@ -648,7 +641,7 @@ export function OnBoardingItemPage() {
                   : stepDetail.status === "SKIPPED"
                     ? "Step Skipped"
                     : "Skip Step"}
-              </button>
+              </Button>
             </div>
 
             {/* FEEDBACK */}
@@ -711,17 +704,17 @@ export function OnBoardingItemPage() {
                     placeholder="Tell us what worked or what was missing..."
                     className="w-full h-24 p-3 rounded-xl border border-app-border bg-app-surface text-sm text-app-text focus:outline-none focus:ring-2 focus:ring-app-focus transition-all resize-none"
                   />
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => void submitFeedback()}
                     disabled={
-                      feedbackHelpful === null ||
-                      !feedbackComment.trim() ||
-                      feedbackLoading
+                      feedbackHelpful === null || !feedbackComment.trim()
                     }
-                    className="mt-3 px-4 py-2 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-app-border"
+                    loading={feedbackLoading}
+                    className="mt-3"
                   >
                     {feedbackLoading ? "Submitting..." : "Submit feedback"}
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
