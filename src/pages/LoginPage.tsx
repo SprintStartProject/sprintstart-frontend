@@ -1,6 +1,7 @@
 import { useAuth } from '../context/useAuth';
 import { Rocket, LogIn } from 'lucide-react';
 import { ThemeToggle } from '../components/common/ThemeToggle';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
 
 /**
  * The authentication entry point.
@@ -19,7 +20,8 @@ export function LoginPage() {
                 <ThemeToggle showLabel={false} className="bg-app-surface border border-app-border shadow-sm" />
             </div>
 
-            <div className="w-full max-w-md space-y-8 rounded-2xl border border-app-border bg-app-surface p-6 shadow-2xl backdrop-blur-sm sm:p-10 text-center">
+            <SpotlightCard roundedClassName="rounded-2xl" className="w-full max-w-md">
+                <div className="space-y-8 rounded-2xl border border-app-border bg-app-surface p-6 shadow-2xl backdrop-blur-sm sm:p-10 text-center">
                 <div className="flex flex-col items-center space-y-4">
                     <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-brand shadow-lg">
                         <Rocket className="h-9 w-9 text-white" />
@@ -59,10 +61,11 @@ export function LoginPage() {
                     </button>
 
                     <p className="text-xs text-app-text-disabled">
-                        Securely managed by Keycloak OpenID Connect
-                    </p>
-                </div>
-            </div>
-        </div>
+                                            Securely managed by Keycloak OpenID Connect
+                                        </p>
+                                    </div>
+                                </div>
+                                </SpotlightCard>
+                            </div>
     );
 }

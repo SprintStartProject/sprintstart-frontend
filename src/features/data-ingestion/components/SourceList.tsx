@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { buttonHoverMotion } from "../../../styles/tokens.ts";
 import { formatNumber } from "../data.ts";
 import type { DataSource } from "../types.ts";
+import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceSyncBadge } from "./SourceSyncBadge.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
@@ -27,7 +28,8 @@ export function SourceList({
 }: SourceListProps) {
   if (sources.length === 0) {
     return (
-      <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
+      <SpotlightCard roundedClassName="rounded-3xl">
+        <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
         <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-app-brand-soft blur-3xl" />
 
         <div className="relative z-10 flex flex-col items-center">
@@ -53,6 +55,7 @@ export function SourceList({
           )}
         </div>
       </div>
+      </SpotlightCard>
     );
   }
 
@@ -197,4 +200,3 @@ function InfoBlock({
     </div>
   );
 }
-

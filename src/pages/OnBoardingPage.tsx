@@ -36,6 +36,7 @@ import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckModal";
 import { useMoments } from "../features/moments";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
+import { SpotlightCard } from "../components/ui/SpotlightCard";
 //import type {UserProfile} from "../services/types.ts";
 
 type LoadingState = "idle" | "loading" | "generating" | "success" | "error";
@@ -568,9 +569,10 @@ export function OnBoardingPage() {
       <main className="app-page-content py-6 pb-24 pt-8">
         {/* "Up Next" Banner — nur wenn es einen empfohlenen Step gibt */}
         {recommendedStep && (
-          <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
-            <div className="relative z-10">
+                  <SpotlightCard roundedClassName="rounded-3xl" className="mb-6">
+                    <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 overflow-hidden relative">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
+                      <div className="relative z-10">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-app-brand-soft text-app-brand-text text-xs font-medium mb-4">
                 <PlayCircle className="w-3.5 h-3.5" />
                 {recommendedStep.status === "IN_PROGRESS" ? "In progress" : "Up Next"}
@@ -595,13 +597,15 @@ export function OnBoardingPage() {
                 </motion.button>
               </div>
             </div>
-          </div>
-        )}
+                      </div>
+                      </SpotlightCard>
+                    )}
 
-        {/* "Knowledge check pending" banner — all steps of the phase are done,
-            only the check still blocks the next phase */}
-        {!recommendedStep && pendingCheckPhase && (
-          <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
+                    {/* "Knowledge check pending" banner — all steps of the phase are done,
+                        only the check still blocks the next phase */}
+                    {!recommendedStep && pendingCheckPhase && (
+                      <SpotlightCard roundedClassName="rounded-3xl" className="mb-6">
+                        <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
             <div className="relative z-10">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-app-brand-soft text-app-brand-text text-xs font-medium mb-4">
@@ -625,11 +629,12 @@ export function OnBoardingPage() {
                   <ChevronRight className="w-4 h-4" />
                 </motion.button>
               </div>
-            </div>
-          </div>
-        )}
+                            </div>
+                          </div>
+                        </SpotlightCard>
+                      )}
 
-        {/* Phase description */}
+                      {/* Phase description */}
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-app-text">
             {currentPhase.title}

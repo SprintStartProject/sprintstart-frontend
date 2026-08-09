@@ -15,6 +15,7 @@ import { NextStepWidget } from '../features/dashboard/components/NextStepWidget'
 import { KnowledgeBaseWidget } from '../features/dashboard/components/KnowledgeBaseWidget';
 import { QuickChatWidget } from '../features/dashboard/components/QuickChatWidget';
 import { SkillsStrip } from '../features/dashboard/components/SkillsStrip';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
 
 /**
  * Central hub displayed after login.
@@ -84,47 +85,57 @@ export function DashboardPage() {
 
             <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
                 <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={centralSpringToken}
-                >
-                    <DashboardHero
-                        greeting={greeting}
-                        displayName={displayName}
-                        formattedDate={formattedDate}
-                        formattedTime={formattedTime}
-                        profileIcon={profile?.profileIcon}
-                        fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
-                        seed={profile?.id}
-                    />
-                </motion.div>
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={centralSpringToken}
+                                >
+                                    <SpotlightCard roundedClassName="rounded-3xl">
+                                        <DashboardHero
+                                            greeting={greeting}
+                                            displayName={displayName}
+                                            formattedDate={formattedDate}
+                                            formattedTime={formattedTime}
+                                            profileIcon={profile?.profileIcon}
+                                            fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
+                                            seed={profile?.id}
+                                        />
+                                    </SpotlightCard>
+                                </motion.div>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...centralSpringToken, delay: 0.08 }}
-                    className="grid grid-cols-1 gap-5 lg:grid-cols-2"
-                >
-                    <NextStepWidget />
-                    <KnowledgeBaseWidget />
-                </motion.div>
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ ...centralSpringToken, delay: 0.08 }}
+                                    className="grid grid-cols-1 gap-5 lg:grid-cols-2"
+                                >
+                                    <SpotlightCard roundedClassName="rounded-3xl">
+                                        <NextStepWidget />
+                                    </SpotlightCard>
+                                    <SpotlightCard roundedClassName="rounded-3xl">
+                                        <KnowledgeBaseWidget />
+                                    </SpotlightCard>
+                                </motion.div>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...centralSpringToken, delay: 0.16 }}
-                >
-                    <QuickChatWidget />
-                </motion.div>
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ ...centralSpringToken, delay: 0.16 }}
+                                >
+                                    <SpotlightCard roundedClassName="rounded-3xl">
+                                        <QuickChatWidget />
+                                    </SpotlightCard>
+                                </motion.div>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...centralSpringToken, delay: 0.24 }}
-                >
-                    <SkillsStrip />
-                </motion.div>
-            </main>
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ ...centralSpringToken, delay: 0.24 }}
+                                >
+                                    <SpotlightCard roundedClassName="rounded-3xl">
+                                        <SkillsStrip />
+                                    </SpotlightCard>
+                                </motion.div>
+                            </main>
 
             <Game2048Modal open={game2048Open} onClose={() => setGame2048Open(false)} />
             <DinoGameModal open={dinoOpen} onClose={() => setDinoOpen(false)} />

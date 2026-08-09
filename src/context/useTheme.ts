@@ -19,7 +19,9 @@ export function useTheme(): ThemeContextType {
                     toggleStyleMode: () => {},
                     isClassicMode: false,
                     isAuroraEnabled: false,
-                    setIsAuroraEnabled: () => {},
+                                        setIsAuroraEnabled: () => {},
+                                        isTiltEnabled: true,
+                                        setIsTiltEnabled: () => {},
                 };
     }
     return context;

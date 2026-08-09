@@ -6,6 +6,7 @@ import { ThemeContext } from './ThemeContext';
 const STORAGE_KEY = 'theme';
 const STYLE_STORAGE_KEY = 'style-mode';
 const AURORA_STORAGE_KEY = 'sprintstart:aurora-enabled';
+const TILT_STORAGE_KEY = 'sprintstart:tilt-enabled';
 
 /**
  * Reads the user's stored theme preference, falling back to the OS
@@ -109,9 +110,26 @@ function getInitialAuroraEnabled(): boolean {
         return stored === 'true';
     }
     return false;
-}
+    }
 
-/**
+    /**
+     * Reads the user's stored tilt effect preference.
+     * Defaults to `true` (on) when nothing is stored.
+     */
+    function getInitialTiltEnabled(): boolean {
+        let stored: string | null = null;
+        try {
+            stored = window.localStorage.getItem(TILT_STORAGE_KEY);
+        } catch {
+            // localStorage unavailable.
+        }
+        if (stored !== null) {
+                return stored === 'true';
+            }
+            return false;
+        }
+
+        /**
  * Provider component that manages the application's visual theme.
  *
  * Supports an explicit 'system' preference that follows the OS
@@ -134,6 +152,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
     const [styleMode, setStyleModeState] = useState<StyleMode>(() => getInitialStyleMode());
     const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() => getInitialAuroraEnabled());
+    const [isTiltEnabled, setIsTiltEnabledState] = useState<boolean>(() => getInitialTiltEnabled());
 
     // Sync before paint to avoid a FOUC of the default light palette.
     useLayoutEffect(() => {
@@ -218,6 +237,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             }
         };
 
+        const setIsTiltEnabled = (enabled: boolean) => {
+            setIsTiltEnabledState(enabled);
+            try {
+                window.localStorage.setItem(TILT_STORAGE_KEY, enabled ? 'true' : 'false');
+            } catch {
+                // localStorage unavailable.
+            }
+        };
+
         return (
             <ThemeContext.Provider
                 value={{
@@ -231,9 +259,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                     isClassicMode,
                     isAuroraEnabled,
                     setIsAuroraEnabled,
+                    isTiltEnabled,
+                    setIsTiltEnabled,
                 }}
-        >
-            {children}
-        </ThemeContext.Provider>
-    );
+            >
+                {children}
+            </ThemeContext.Provider>
+        );
 }

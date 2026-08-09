@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sparkles, Sun } from 'lucide-react';
+import { Monitor, Moon, Pointer, Sparkles, Sun } from 'lucide-react';
 import { useTheme } from '../../../context/useTheme';
 import type { Theme } from '../../../context/ThemeContext';
 
@@ -17,7 +17,7 @@ const OPTIONS: ReadonlyArray<{ value: Theme; label: string; icon: typeof Sun }> 
  * meaning never conveyed by colour alone).
  */
 export function AppearanceSection() {
-    const { theme, setTheme, isAuroraEnabled, setIsAuroraEnabled } = useTheme();
+    const { theme, setTheme, isAuroraEnabled, setIsAuroraEnabled, isTiltEnabled, setIsTiltEnabled } = useTheme();
 
     return (
         <div className="flex flex-col gap-6">
@@ -73,7 +73,36 @@ export function AppearanceSection() {
                         ].join(' ')}
                     />
                 </button>
-            </div>
-        </div>
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-xl border border-app-border bg-app-bg p-4">
+                                <div className="flex items-center gap-3">
+                                    <Pointer className="h-4 w-4 text-app-brand shrink-0" />
+                                    <div>
+                                        <div id="tilt-toggle-title" className="text-sm font-medium text-app-text">Card Tilt Effect</div>
+                                        <div className="text-xs text-app-text-muted">3D perspective tilt and spotlight glow when hovering over cards.</div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-label="Toggle Card Tilt Effect"
+                                    aria-labelledby="tilt-toggle-title"
+                                    aria-checked={isTiltEnabled}
+                                    onClick={() => setIsTiltEnabled(!isTiltEnabled)}
+                                    className={[
+                                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus',
+                                        isTiltEnabled ? 'bg-app-brand' : 'bg-app-border-strong',
+                                    ].join(' ')}
+                                >
+                                    <span
+                                        className={[
+                                            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
+                                            isTiltEnabled ? 'translate-x-5' : 'translate-x-0',
+                                        ].join(' ')}
+                                    />
+                                </button>
+                            </div>
+                        </div>
     );
 }

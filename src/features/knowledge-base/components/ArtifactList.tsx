@@ -1,8 +1,8 @@
 import { memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { FileText, FileCode, CircleDot, GitPullRequest, ChevronRight } from 'lucide-react';
 import type { Artifact, ArtifactType } from '../types';
-import { centralSpringToken } from '../../../styles/tokens';
+import { SpotlightCard } from '../../../components/ui/SpotlightCard';
 
 /**
  * Props for the ArtifactList component.
@@ -38,13 +38,9 @@ interface ArtifactCardProps {
  */
 const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: ArtifactCardProps) {
     return (
-        <motion.div
-            key={artifact.id}
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={centralSpringToken}
+        <SpotlightCard
+            className="p-4"
+            roundedClassName="rounded-xl"
             role="button"
             tabIndex={0}
             aria-label={`View ${artifact.title ?? 'artifact'}`}
@@ -56,29 +52,30 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
                     onSelect(artifact.id);
                 }
             }}
-            className="group flex cursor-pointer items-start gap-4 rounded-xl border border-app-border bg-app-surface p-4 transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
         >
-            <div className="p-2 bg-app-bg-soft rounded-lg shrink-0 border border-app-border">
-                {getIcon(artifact.artifactType)}
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-app-text truncate">{artifact.title ?? 'Untitled'}</h3>
-                    <span className="px-2 py-0.5 text-[10px] uppercase font-bold rounded-md bg-app-bg-soft border border-app-border text-app-text-muted">
-                        {artifact.artifactType}
-                    </span>
-                    <span className="px-2 py-0.5 text-[10px] uppercase font-bold rounded-md bg-app-bg-soft border border-app-border text-app-text-muted">
-                        {artifact.sourceSystem}
-                    </span>
+            <div className="flex items-start gap-4">
+                <div className="p-2 bg-app-bg-soft rounded-lg shrink-0 border border-app-border">
+                    {getIcon(artifact.artifactType)}
                 </div>
-                <div className="flex items-center gap-4 text-xs font-medium text-app-text-muted mt-2">
-                    <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-app-text truncate">{artifact.title ?? 'Untitled'}</h3>
+                        <span className="px-2 py-0.5 text-[10px] uppercase font-bold rounded-md bg-app-bg-soft border border-app-border text-app-text-muted">
+                            {artifact.artifactType}
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] uppercase font-bold rounded-md bg-app-bg-soft border border-app-border text-app-text-muted">
+                            {artifact.sourceSystem}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-medium text-app-text-muted mt-2">
+                        <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
+                    </div>
+                </div>
+                <div className="shrink-0 pt-2">
+                    <ChevronRight className="w-5 h-5 text-app-text-muted group-hover:text-app-brand transition-colors" />
                 </div>
             </div>
-            <div className="shrink-0 pt-2">
-                <ChevronRight className="w-5 h-5 text-app-text-muted group-hover:text-app-brand transition-colors" />
-            </div>
-        </motion.div>
+        </SpotlightCard>
     );
 });
 

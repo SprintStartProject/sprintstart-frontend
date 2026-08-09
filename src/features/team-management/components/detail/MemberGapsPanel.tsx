@@ -1,5 +1,6 @@
 import type { KnowledgeGap } from '../../../knowledge-gaps/types';
 import type { UserSkillLevel } from '../../../../services/teamManagementService';
+import { SpotlightCard } from '../../../../components/ui/SpotlightCard';
 
 type MemberGapsPanelProps = {
     skillLevels: UserSkillLevel[];
@@ -33,51 +34,51 @@ export function MemberGapsPanel({
 
     return (
         <>
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-                <h2 className="text-lg font-semibold text-app-text">
-                    Skill Assessment
-                </h2>
+            <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
+                            <h2 className="text-lg font-semibold text-app-text">
+                                Skill Assessment
+                            </h2>
 
-                {skillLevels.length === 0 ? (
-                    <p className="mt-3 text-sm text-app-text-muted">
-                        No completed skill assessment.
-                    </p>
-                ) : (
-                    <div className="mt-4 space-y-4">
-                        {Object.entries(skillsByRole).map(([roleName, skills]) => (
-                            <div key={roleName}>
-                                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-app-text-muted">
-                                    {roleName}
+                            {skillLevels.length === 0 ? (
+                                <p className="mt-3 text-sm text-app-text-muted">
+                                    No completed skill assessment.
                                 </p>
+                            ) : (
+                                <div className="mt-4 space-y-4">
+                                    {Object.entries(skillsByRole).map(([roleName, skills]) => (
+                                        <div key={roleName}>
+                                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-app-text-muted">
+                                                {roleName}
+                                            </p>
 
-                                <div className="space-y-1">
-                                    {skills.map((skill) => (
-                                        <SkillAssessmentRow
-                                            key={skill.id}
-                                            skill={skill}
-                                        />
+                                            <div className="space-y-1">
+                                                {skills.map((skill) => (
+                                                    <SkillAssessmentRow
+                                                        key={skill.id}
+                                                        skill={skill}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
+                            )}
+                        </SpotlightCard>
+
+            <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
+                            <h2 className="text-lg font-semibold text-app-text">
+                                Gaps
+                            </h2>
+
+                            <div className="mt-4 space-y-4">
+                                <SkillGapsSection skillGaps={skillGaps} />
+
+                                <KnowledgeGapsSection
+                                    knowledgeGaps={knowledgeGaps}
+                                    onOpenKnowledgeGap={onOpenKnowledgeGap}
+                                />
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-                <h2 className="text-lg font-semibold text-app-text">
-                    Gaps
-                </h2>
-
-                <div className="mt-4 space-y-4">
-                    <SkillGapsSection skillGaps={skillGaps} />
-
-                    <KnowledgeGapsSection
-                        knowledgeGaps={knowledgeGaps}
-                        onOpenKnowledgeGap={onOpenKnowledgeGap}
-                    />
-                </div>
-            </div>
+                        </SpotlightCard>
         </>
     );
 }

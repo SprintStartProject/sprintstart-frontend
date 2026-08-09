@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
 import { DragHandle } from '../../../../components/ui/DragHandle';
+import { SpotlightCard } from '../../../../components/ui/SpotlightCard';
 import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
 import type {
     OnboardingPhaseEndpoint,
@@ -81,7 +82,8 @@ export function MemberOnboardingSection({
     getStepStatusStyles,
 }: MemberOnboardingSectionProps) {
     return (
-        <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+        <SpotlightCard roundedClassName="rounded-3xl">
+            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <div className="flex items-center gap-2">
@@ -153,6 +155,7 @@ export function MemberOnboardingSection({
                 </>
             )}
         </div>
+        </SpotlightCard>
     );
 }
 

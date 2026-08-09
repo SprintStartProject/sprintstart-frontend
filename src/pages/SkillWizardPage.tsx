@@ -11,6 +11,7 @@ import {
 } from '../services/teamManagementService';
 import type { CreateSkillAssessmentRequest } from '../services/teamManagementService';
 import type { Skill, TeamOverviewUser } from '../features/team-management/types';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { useAuth } from '../context/useAuth';
 
 export function SkillWizardPage() {
@@ -91,7 +92,7 @@ export function SkillWizardPage() {
     if (error || !user) {
         return (
             <div className="min-h-screen flex items-center justify-center px-4 py-10">
-                <div className="w-full max-w-lg rounded-3xl border border-app-border bg-app-surface p-6 text-center shadow-xl">
+                <SpotlightCard roundedClassName="rounded-3xl" className="w-full max-w-lg p-6 text-center shadow-xl">
                     <p className="text-sm text-app-text-muted">
                         {error ?? 'Unknown error.'}
                     </p>
@@ -104,7 +105,7 @@ export function SkillWizardPage() {
                             Back to onboarding
                         </Link>
                     </div>
-                </div>
+                </SpotlightCard>
             </div>
         );
     }

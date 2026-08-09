@@ -29,12 +29,16 @@ export interface ThemeContextType {
     /** Toggles between 'ultra' and 'classic' style modes. */
     toggleStyleMode: () => void;
     /** Convenience boolean — true when classic (flat) mode is active. */
-        isClassicMode: boolean;
-        /** Whether the aurora background effect is currently enabled. */
-        isAuroraEnabled: boolean;
-        /** Enables or disables the aurora background effect (persisted to localStorage). */
-        setIsAuroraEnabled: (enabled: boolean) => void;
-    }
+            isClassicMode: boolean;
+            /** Whether the aurora background effect is currently enabled. */
+            isAuroraEnabled: boolean;
+            /** Enables or disables the aurora background effect (persisted to localStorage). */
+            setIsAuroraEnabled: (enabled: boolean) => void;
+            /** Whether the 3D tilt / spotlight hover effect on cards is enabled. */
+            isTiltEnabled: boolean;
+            /** Enables or disables the card tilt effect (persisted to localStorage). */
+            setIsTiltEnabled: (enabled: boolean) => void;
+        }
 
 /**
  * Context for managing UI appearance preferences.

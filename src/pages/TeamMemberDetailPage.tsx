@@ -64,6 +64,7 @@ function getElapsedDays(startedAt: string): number {
 import { UserAvatar } from '../components/common/UserAvatar';
 import { Modal } from '../components/ui/Modal';
 import { PanelPresence } from '../components/ui/PanelPresence';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { AddCustomStepModal } from '../features/team-management/components/detail/AddCustomStepModal';
 import { MemberDetailDialogs } from '../features/team-management/components/detail/MemberDetailDialogs';
 import { MemberGapsPanel } from '../features/team-management/components/detail/MemberGapsPanel';
@@ -722,11 +723,11 @@ export function TeamMemberDetailPage() {
                         Back
                     </button>
 
-                    <div className="mt-6 rounded-3xl border border-app-border bg-app-surface p-8">
-                        <p className="text-sm text-app-text">
-                            Team member not found.
-                        </p>
-                    </div>
+                    <SpotlightCard roundedClassName="rounded-3xl" className="mt-6 p-8">
+                                            <p className="text-sm text-app-text">
+                                                Team member not found.
+                                            </p>
+                                        </SpotlightCard>
                 </main>
             </div>
         );
@@ -941,10 +942,10 @@ export function TeamMemberDetailPage() {
                         getStepStatusStyles={getStepStatusStyles}
                     />
                     <aside aria-label="Member insights" className="space-y-4">
-                    <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-                        <h2 className="text-lg font-semibold text-app-text">
-                            Feedback & Skip Requests
-                        </h2>
+                    <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
+                                            <h2 className="text-lg font-semibold text-app-text">
+                                                Feedback & Skip Requests
+                                            </h2>
 
                         <div className="mt-4 space-y-3">
                             <div className="flex items-center justify-between gap-3">
@@ -1146,8 +1147,8 @@ export function TeamMemberDetailPage() {
                                 </p>
                             )}
                         </div>
-                    </div>
-                    <MemberGapsPanel
+                                            </SpotlightCard>
+                                            <MemberGapsPanel
                         skillLevels={skillLevels}
                         skillGaps={skillGaps}
                         knowledgeGaps={topKnowledgeGaps}

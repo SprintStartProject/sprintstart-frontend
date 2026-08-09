@@ -25,6 +25,7 @@ import { ApiError } from '../services/apiClient';
 import { PageHeader } from '../components/layout/PageHeader';
 import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
 import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
 
 export function TeamManagementPage() {
     const navigate = useNavigate();
@@ -245,11 +246,13 @@ export function TeamManagementPage() {
                             </div>
 
                             {filteredUsers.length === 0 ? (
-                                <div className="rounded-3xl border border-app-border bg-app-surface p-8 text-center">
-                                    <p className="text-sm text-app-text-muted">
-                                        No team members found for this filter.
-                                    </p>
-                                </div>
+                                <SpotlightCard roundedClassName="rounded-3xl">
+                                    <div className="rounded-3xl border border-app-border bg-app-surface p-8 text-center">
+                                        <p className="text-sm text-app-text-muted">
+                                            No team members found for this filter.
+                                        </p>
+                                    </div>
+                                </SpotlightCard>
                             ) : (
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                     {filteredUsers.map((user) => (
