@@ -4,24 +4,34 @@ import keycloak from "../config/keycloak";
 import type { Chat, ChatMessage, StreamHandlers } from "../features/chatbot/types";
 
 /**
- * Retrieves created chats for the current user (personal `/me` endpoint).
+ * Retrieves the current user's chats within one project (personal `/me` endpoint).
  *
+ * Scoped, so the sidebar follows the project switcher like the rest of the app.
+ * Chats created before the backend scoped them belong to no project and are
+ * therefore in no list; they stay reachable by id.
+ *
+ * @param projectId The project whose chats to list.
  * @throws Error if the backend request fails
  */
-export async function getMyChats() {
-    const response = await apiClient.fetch<{ chats: Chat[] }>(`/api/v1/chats/me`);
+export async function getMyChats(projectId: string) {
+    const response = await apiClient.fetch<{ chats: Chat[] }>(
+        `/api/v1/chats/me?projectId=${encodeURIComponent(projectId)}`,
+    );
     return response;
 }
 
 /**
- * Creates a new chat for the authenticated user.
+ * Creates a new chat for the authenticated user inside a project.
  *
- * @param _userId Ignored parameter kept for signature compatibility (owner derived from JWT).
+ * @param projectId The project the chat belongs to. The backend rejects a project
+ *   the caller has no access to, and every prompt is answered from that project's
+ *   corpus only.
  * @returns The backend returns `{ id }`.
  */
-export async function createChat(_userId?: string) {
+export async function createChat(projectId: string) {
     return await apiClient.fetch<{ id: string }>(`/api/v1/chats/me`, {
         method: "POST",
+        body: JSON.stringify({ projectId }),
     });
 }
 
@@ -161,6 +171,15 @@ export async function streamMessage(
     });
 
     if (!res.ok) {
+        // 409 is the backend's answer for a chat that predates project scoping: it
+        // has no project, so it can be read but never prompted. Worth saying plainly
+        // — the raw status reads like a bug rather than a property of that chat.
+        if (res.status === 409) {
+            handlers.onError?.(
+                "This conversation was started before projects were separated and can no longer be continued. Please start a new chat.",
+            );
+            return;
+        }
         handlers.onError?.(`HTTP error! status: ${res.status}`);
         return;
     }

@@ -25,12 +25,14 @@ import {
   User,
 } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
+import { useProjectContext } from "../../projects/useProjectContext";
 
 // ------------------------------------------------------------------
 // PAGE
 // ------------------------------------------------------------------
 
 export function KnowledgeGapsPage() {
+    const { selectedProjectId } = useProjectContext();
   const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([
     "high",
     "medium",
@@ -51,13 +53,13 @@ export function KnowledgeGapsPage() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(), [refreshKey]);
+  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId), [refreshKey, selectedProjectId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setRefreshError(null);
     try {
-      await knowledgeGapService.refreshKnowledgeGaps();
+      await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);

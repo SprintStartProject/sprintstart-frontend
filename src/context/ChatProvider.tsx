@@ -7,6 +7,7 @@ import {
     streamMessage
 } from "../services/chatService";
 import { useAuth } from "./useAuth";
+import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
 import type { ChatContextValue, SelectedCitation } from "./ChatContext";
 import type { Chat, ChatMessage, Citation, SourceSystem } from "../features/chatbot/types";
@@ -51,6 +52,12 @@ function deriveTitle(text: string): string {
 export function ChatProvider({ children }: { children: ReactNode }) {
     const { profile } = useAuth();
     const userId = profile?.id ?? "";
+
+    // Chats live inside a project: the list is scoped to it and a new chat is created
+    // in it. Switching projects therefore has to reset chat state the same way a user
+    // change does — otherwise the previous project's chats and cached messages stay on
+    // screen while the sidebar has already moved on.
+    const { selectedProjectId } = useProjectContext();
 
     const [chats, setChats] = useState<Chat[]>([]);
     const [messagesByChat, setMessagesByChat] = useState<MessagesByChat>({});
@@ -180,21 +187,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }, []);
 
     /**
-     * Loads the user's chats once auth is ready (profile.id available).
+     * Loads the user's chats for the selected project once auth is ready.
      * Gated on `userId` so the fetch doesn't fire before Keycloak has
-     * initialized — which would 401 and trigger a login redirect loop.
-     * Also resets all chat state when the authenticated user changes so a
-     * previous user's messages/chats are never visible to the next one.
+     * initialized — which would 401 and trigger a login redirect loop — and on
+     * `selectedProjectId` because the listing is project-scoped.
+     * Resets all chat state when either changes, so neither a previous user's nor
+     * a previous project's messages are ever visible afterwards.
      */
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !selectedProjectId) return;
 
         // Reset + fetch run inside an async callback so the synchronous resets
         // (before the first await) don't trip the "setState in effect body"
         // lint rule — they execute in the same tick, just outside the effect
         // body's direct call frame.
         void (async () => {
-            // Reset stale state from a previous session whenever the user changes.
+            // Reset stale state whenever the user or the selected project changes.
             abortControllerRef.current?.abort();
             abortControllerRef.current = null;
             clearStreamTimeout();
@@ -213,14 +221,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setMessagesByChat({});
 
             try {
-                const data = await getMyChats();
+                const data = await getMyChats(selectedProjectId);
                 setChats(data?.chats ?? []);
             } catch (e) {
                 console.error("Failed to load chats", e);
                 setChats([]);
             }
         })();
-    }, [userId, clearStreamTimeout]);
+    }, [userId, selectedProjectId, clearStreamTimeout]);
 
     const sortedChats = useMemo(
         () =>
@@ -232,9 +240,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     );
 
     const refreshChats = useCallback(async () => {
-        const data = await getMyChats();
+        if (!selectedProjectId) return;
+        const data = await getMyChats(selectedProjectId);
         setChats(data?.chats ?? []);
-    }, []);
+    }, [selectedProjectId]);
 
     const loadMessages = useCallback(async (chatId: string) => {
         // Mark this chat as the latest requested so a slow earlier response
@@ -302,7 +311,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         let chatForMessages: Chat | undefined;
 
         if (!currentChatId) {
-            const created = await createChat(userId);
+            // A chat is always created inside a project. Without one there is nothing
+            // to scope retrieval to, so the backend would reject the request anyway.
+            if (!selectedProjectId) {
+                console.error("Cannot create a chat without a selected project");
+                return;
+            }
+            const created = await createChat(selectedProjectId);
 
             const newChat: Chat = {
                 id: created.id,
@@ -310,6 +325,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 // meaningful immediately; the backend may overwrite it later.
                 title: deriveTitle(text),
                 userId,
+                projectId: selectedProjectId,
                 createdAt: new Date().toISOString(),
             };
 
@@ -547,7 +563,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 )
             }));
         }
-    }, [refreshChats, userId, cancelDraft, flushDraft, scheduleDraftFlush, clearStreamTimeout]);
+    }, [refreshChats, userId, selectedProjectId, cancelDraft, flushDraft, scheduleDraftFlush, clearStreamTimeout]);
 
     /**
      * Aborts the in-flight chat stream (if any). The partial content already

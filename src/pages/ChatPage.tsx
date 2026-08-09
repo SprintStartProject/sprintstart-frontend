@@ -37,6 +37,7 @@ export function ChatPage() {
         messages,
         chatId,
         chats,
+        activeChat,
         handleSubmit,
         stopStreaming,
         isThinking,
@@ -70,7 +71,12 @@ export function ChatPage() {
 
     const { showThoughtProcess } = useChatPreferences();
 
-    const projectId = selectedProjectId || (profile?.projectIds?.[0] ?? null);
+    // Resolved from the chat, not from the switcher: a citation points at an artifact
+    // of the project the conversation belongs to. Taking the currently selected project
+    // instead made citations in an older chat 404 as soon as the user switched projects.
+    // Only the empty state (no chat open yet) falls back to the selection.
+    const projectId =
+        activeChat?.projectId ?? selectedProjectId ?? profile?.projectIds?.[0] ?? null;
     const [viewingCitationArtifact, setViewingCitationArtifact] =
         useState<CitationArtifactOpen | null>(null);
 
