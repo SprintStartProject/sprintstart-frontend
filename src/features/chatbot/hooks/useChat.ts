@@ -44,6 +44,7 @@ export function useChat() {
 
     const prevChatIdRef = useRef<string | undefined>(undefined);
     const prevMessageCountRef = useRef(0);
+    const prevLastContentLengthRef = useRef(0);
 
     const {
         messagesByChat,
@@ -182,8 +183,14 @@ export function useChat() {
         // entire thread.
         const wasEmpty = prevMessageCountRef.current === 0;
 
+        // A streaming answer grows the last message instead of adding one, so tracking the
+        // count alone left the view behind on any reply longer than the viewport.
+        const lastContentLength = messages[messages.length - 1]?.content.length ?? 0;
+        const contentGrew = lastContentLength > prevLastContentLengthRef.current;
+
         prevChatIdRef.current = chatId;
         prevMessageCountRef.current = messages.length;
+        prevLastContentLengthRef.current = lastContentLength;
 
         if (chatChanged || (messageAdded && wasEmpty)) {
             bottomRef.current?.scrollIntoView({ behavior: "auto" });
@@ -192,8 +199,27 @@ export function useChat() {
 
         if (messageAdded && isAtBottom) {
             bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+            return;
+        }
+
+        // Instant, not smooth: this fires once per animation frame while tokens arrive, and
+        // successive smooth scrolls would restart each other's animation and visibly stutter.
+        if (contentGrew && isAtBottom) {
+            bottomRef.current?.scrollIntoView({ behavior: "auto" });
         }
     }, [chatId, messages, isAtBottom]);
+
+    /**
+     * The most recent question the user asked in this chat, for the composer's history recall.
+     * Reads from the rendered messages rather than a separate store, so it survives a reload
+     * and always matches what is on screen.
+     */
+    const lastUserPrompt = useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === "USER") return messages[i].content;
+        }
+        return "";
+    }, [messages]);
 
     const scrollToBottom = useCallback(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -291,6 +317,8 @@ export function useChat() {
         // rejects a chat that has none. Surfaced so the composer can say so instead of letting
         // the prompt vanish.
         hasProject: selectedProjectId !== "",
+
+        lastUserPrompt,
 
         isThinking: isThinking && isActiveChatStreaming,
         isStreaming: isStreaming && isActiveChatStreaming,

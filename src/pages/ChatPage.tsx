@@ -39,6 +39,7 @@ export function ChatPage() {
         chats,
         activeChat,
         hasProject,
+        lastUserPrompt,
         handleSubmit,
         stopStreaming,
         isThinking,
@@ -154,6 +155,18 @@ export function ChatPage() {
         setPrevTurn({ chatId, busy });
         setAnnouncement(finished ? "Response complete." : "");
     }
+
+    // Submitting blurs the composer so Space can start the dino game while the assistant
+    // works. Once the turn is over that reason is gone, so focus goes back — otherwise every
+    // follow-up question needs a click first. Skipped when something else already holds focus,
+    // so this never steals the caret from wherever the user went in the meantime.
+    useEffect(() => {
+        if (busy) return;
+        if (!chatId) return;
+        const active = document.activeElement;
+        if (active && active !== document.body) return;
+        textareaRef.current?.focus();
+    }, [busy, chatId, textareaRef]);
 
     // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
     useEffect(() => {
@@ -427,6 +440,7 @@ export function ChatPage() {
                     onStop={stopStreaming}
                     isBusy={isThinking || isStreaming}
                     hasProject={hasProject}
+                    lastUserPrompt={lastUserPrompt}
                     textareaRef={textareaRef}
                     showFilters={showFilters}
                     onToggleFilters={() => setShowFilters((v) => !v)}

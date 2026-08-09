@@ -18,6 +18,11 @@ type ChatComposerProps = {
      * sending is blocked here rather than failing silently after the fact.
      */
     hasProject: boolean;
+    /**
+     * The last question asked in this chat. Arrow-up in an empty composer recalls it, the way
+     * a shell recalls the previous command.
+     */
+    lastUserPrompt: string;
 
     /** Ref to the textarea, so the parent can focus / autosize it. */
     textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -47,6 +52,7 @@ export function ChatComposer({
     onStop,
     isBusy,
     hasProject,
+    lastUserPrompt,
     textareaRef,
     showFilters,
     onToggleFilters,
@@ -208,6 +214,20 @@ export function ChatComposer({
                         if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             e.currentTarget.form?.requestSubmit();
+                            return;
+                        }
+
+                        // Only from an empty composer: with text present, arrow-up has to keep
+                        // moving the caret, or editing a multi-line draft becomes impossible.
+                        if (e.key === "ArrowUp" && !value && lastUserPrompt) {
+                            e.preventDefault();
+                            onChange(lastUserPrompt);
+                            const el = e.currentTarget;
+                            el.style.height = "auto";
+                            requestAnimationFrame(() => {
+                                el.style.height = `${el.scrollHeight}px`;
+                                el.setSelectionRange(el.value.length, el.value.length);
+                            });
                         }
                     }}
                 />
