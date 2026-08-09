@@ -58,11 +58,25 @@ describe('accessPolicy', () => {
             expect(canAccessRoute(pmProfile, '/data-ingestion', true)).toBe(true);
         });
 
-        it('does not gate a PM out of other permitted routes by project management', () => {
+        it('gates a PM out of the team and insights routes of a project they only belong to', () => {
             const pmProfile = createMockProfile(PermissionGroup.PM);
 
-            expect(canAccessRoute(pmProfile, '/team-management', false)).toBe(true);
-            expect(canAccessRoute(pmProfile, '/insights/faq', false)).toBe(true);
+            // These show the selected project's members, questions and documentation gaps.
+            // The backend enforces the same rule, so leaving them reachable would only
+            // produce 403s.
+            expect(canAccessRoute(pmProfile, '/team-management', false)).toBe(false);
+            expect(canAccessRoute(pmProfile, '/insights/faq', false)).toBe(false);
+            expect(canAccessRoute(pmProfile, '/insights/knowledge-gaps', false)).toBe(false);
+
+            expect(canAccessRoute(pmProfile, '/team-management', true)).toBe(true);
+            expect(canAccessRoute(pmProfile, '/insights/faq', true)).toBe(true);
+            expect(canAccessRoute(pmProfile, '/insights/knowledge-gaps', true)).toBe(true);
+        });
+
+        it('leaves routes outside the manager-scoped set ungated for a PM', () => {
+            const pmProfile = createMockProfile(PermissionGroup.PM);
+
+            expect(canAccessRoute(pmProfile, '/chat', false)).toBe(true);
         });
 
         it('keeps HR and ADMIN access to manager-scoped routes independent of project management', () => {

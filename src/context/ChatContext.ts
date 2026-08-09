@@ -22,6 +22,15 @@ export type SelectedCitation = {
 export type ChatContextValue = {
     chats: Chat[];
     sortedChats: Chat[];
+
+    /**
+     * The project `chats` was loaded for, or `null` while a load is pending. Lets consumers
+     * distinguish "this project has no such chat" from "the list has not arrived yet".
+     */
+    chatsProjectId: string | null;
+
+    /** The globally selected project, mirrored here so chat consumers need only one context. */
+    selectedProjectId: string;
     messagesByChat: MessagesByChat;
 
     isThinking: boolean;

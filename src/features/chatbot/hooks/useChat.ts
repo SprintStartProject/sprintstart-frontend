@@ -50,6 +50,8 @@ export function useChat() {
         loadMessages,
         chats,
         sortedChats,
+        chatsProjectId,
+        selectedProjectId,
         isThinking,
         isStreaming,
         streamingMessageId,
@@ -87,6 +89,21 @@ export function useChat() {
         if (sortedChats.length === 0) return;
         void navigate(`/chat/${sortedChats[0].id}`, { replace: true });
     }, [chatId, isNewChatRequest, newRequest, sortedChats, navigate]);
+
+    /**
+     * Leaves a chat that does not belong to the selected project.
+     *
+     * Switching projects reloads the sidebar but leaves the route pointing at the chat that was
+     * open, so it stayed on screen while being absent from the list. Gated on the list having
+     * arrived for the *current* project — redirecting while it is still loading would throw the
+     * user out of a chat that is perfectly valid.
+     */
+    useEffect(() => {
+        if (!chatId) return;
+        if (chatsProjectId !== selectedProjectId) return;
+        if (chats.some(chat => chat.id === chatId)) return;
+        void navigate("/chat", { replace: true, state: { newChat: true } });
+    }, [chatId, chats, chatsProjectId, selectedProjectId, navigate]);
 
     const messages = useMemo(() => {
         if (!chatId) return [];
@@ -141,7 +158,12 @@ export function useChat() {
                 // it's within the scroll viewport → the user is at the bottom.
                 setIsAtBottom(entries[0]?.isIntersecting ?? true);
             },
-            { root: container, threshold: 0 },
+            // The generous bottom margin is what keeps the "jump to latest" button from
+            // flashing while sitting at the bottom: streamed content grows the container
+            // faster than the smooth scroll follows, so an exact anchor drops out of view
+            // for a frame or two on every token. Anything within this band still counts
+            // as "at the bottom".
+            { root: container, threshold: 0, rootMargin: "0px 0px 120px 0px" },
         );
         observer.observe(anchor);
         return () => observer.disconnect();
@@ -265,6 +287,11 @@ export function useChat() {
 
         // Gated on `isActiveChatStreaming` — see the note above. Consumers get
         // "is *this* chat working", never "is any chat working".
+        // Nothing can be asked without a project: retrieval is scoped to one, and the backend
+        // rejects a chat that has none. Surfaced so the composer can say so instead of letting
+        // the prompt vanish.
+        hasProject: selectedProjectId !== "",
+
         isThinking: isThinking && isActiveChatStreaming,
         isStreaming: isStreaming && isActiveChatStreaming,
 

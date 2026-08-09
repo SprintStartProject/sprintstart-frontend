@@ -60,6 +60,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const { selectedProjectId } = useProjectContext();
 
     const [chats, setChats] = useState<Chat[]>([]);
+    // The project `chats` was last loaded for. Consumers need it to tell "this project has no
+    // such chat" apart from "the list has not arrived yet" — the difference between redirecting
+    // away from a foreign chat and flickering away from a legitimate one.
+    const [chatsProjectId, setChatsProjectId] = useState<string | null>(null);
     const [messagesByChat, setMessagesByChat] = useState<MessagesByChat>({});
 
     const [isThinking, setIsThinking] = useState(false);
@@ -219,13 +223,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setThinkingState(null);
             setStreamingChatId(null);
             setMessagesByChat({});
+            setChatsProjectId(null);
 
             try {
                 const data = await getMyChats(selectedProjectId);
                 setChats(data?.chats ?? []);
+                setChatsProjectId(selectedProjectId);
             } catch (e) {
                 console.error("Failed to load chats", e);
                 setChats([]);
+                setChatsProjectId(selectedProjectId);
             }
         })();
     }, [userId, selectedProjectId, clearStreamTimeout]);
@@ -243,6 +250,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         if (!selectedProjectId) return;
         const data = await getMyChats(selectedProjectId);
         setChats(data?.chats ?? []);
+        setChatsProjectId(selectedProjectId);
     }, [selectedProjectId]);
 
     const loadMessages = useCallback(async (chatId: string) => {
@@ -612,6 +620,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const value: ChatContextValue = {
         chats,
         sortedChats,
+        chatsProjectId,
+        selectedProjectId,
         messagesByChat,
         isThinking,
         isStreaming,

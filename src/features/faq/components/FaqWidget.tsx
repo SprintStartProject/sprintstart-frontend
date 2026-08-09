@@ -37,7 +37,7 @@ export function FaqWidget() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [refreshKey]);
+  } = useFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [refreshKey, selectedProjectId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

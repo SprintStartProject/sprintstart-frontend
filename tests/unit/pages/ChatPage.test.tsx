@@ -39,9 +39,11 @@ const mockChatState = {
         },
     ] as ChatMessage[],
     chatId: 'chat1',
-    activeChat: { id: 'chat1', userId: 'u1', title: 'Chat 1', createdAt: '' },
-    chats: [{ id: 'chat1', userId: 'u1', title: 'Chat 1', createdAt: '' }],
+    activeChat: { id: 'chat1', userId: 'u1', projectId: 'project1', title: 'Chat 1', createdAt: '' },
+    chats: [{ id: 'chat1', userId: 'u1', projectId: 'project1', title: 'Chat 1', createdAt: '' }],
     handleSubmit: mockHandleSubmit,
+    // Without a project the composer blocks sending, so the send-button test needs one.
+    hasProject: true,
     addMessage: vi.fn(),
     isThinking: false,
     isStreaming: false,

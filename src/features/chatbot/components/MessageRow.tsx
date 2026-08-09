@@ -92,6 +92,10 @@ function MessageRowImpl({
     const showStreamingCaret =
         !isRequest && isStreaming && message.id === streamingMessageId;
 
+    // An assistant turn that carries an error and no text: the error banner is the whole
+    // message, so it replaces the bubble instead of hanging underneath an empty one.
+    const isEmptyErrorTurn = !isRequest && !!message.error && message.content === "";
+
     return (
         <>
             {showDivider && (
@@ -151,38 +155,48 @@ function MessageRowImpl({
                         </details>
                     )}
 
-                    <div
-                        // E5: mark the actively-streaming message as busy so
-                        // screen readers don't announce partial content mid-stream.
-                        aria-busy={showStreamingCaret || undefined}
-                        className={`chat-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
-                            isRequest
-                                ? "chat-md-user rounded-tr-sm bg-app-brand text-white"
-                                : "rounded-tl-sm border border-app-border-muted bg-app-surface-muted text-app-text"
-                        }`}
-                    >
-                        <MessageMarkdown
-                            content={message.content}
-                            isRequest={isRequest}
-                            citations={citations}
-                            onCitationClick={onCitationClick}
-                        />
-
-                        {showStreamingCaret && (
-                            <span className="streaming-caret" aria-hidden="true" />
-                        )}
-
-                        {!isRequest && citations.length > 0 && (
-                            <MessageCitations
+                    {/* A turn that produced no text at all — stopped, interrupted, or failed
+                        before the first token — has nothing to put in a bubble. Rendering one
+                        anyway left a stray empty pill above the error, which is what made a
+                        cancelled chat look broken rather than cancelled. */}
+                    {!(isEmptyErrorTurn) && (
+                        <div
+                            // E5: mark the actively-streaming message as busy so
+                            // screen readers don't announce partial content mid-stream.
+                            aria-busy={showStreamingCaret || undefined}
+                            className={`chat-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+                                isRequest
+                                    ? "chat-md-user rounded-tr-sm bg-app-brand text-white"
+                                    : "rounded-tl-sm border border-app-border-muted bg-app-surface-muted text-app-text"
+                            }`}
+                        >
+                            <MessageMarkdown
+                                content={message.content}
+                                isRequest={isRequest}
                                 citations={citations}
-                                onOpenArtifact={onOpenArtifact}
+                                onCitationClick={onCitationClick}
                             />
-                        )}
-                    </div>
+
+                            {showStreamingCaret && (
+                                <span className="streaming-caret" aria-hidden="true" />
+                            )}
+
+                            {!isRequest && citations.length > 0 && (
+                                <MessageCitations
+                                    citations={citations}
+                                    onOpenArtifact={onOpenArtifact}
+                                />
+                            )}
+                        </div>
+                    )}
 
                     {!isRequest && message.error && (
-                        <div className="flex items-center gap-2 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm text-app-danger-text">
-                            <AlertCircle size={14} className="shrink-0" />
+                        <div
+                            className={`flex w-full items-start gap-2.5 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm leading-relaxed text-app-danger-text ${
+                                isEmptyErrorTurn ? "" : "mt-2"
+                            }`}
+                        >
+                            <AlertCircle size={16} className="mt-0.5 shrink-0" />
                             <span>{message.error}</span>
                         </div>
                     )}

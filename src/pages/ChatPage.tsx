@@ -38,6 +38,7 @@ export function ChatPage() {
         chatId,
         chats,
         activeChat,
+        hasProject,
         handleSubmit,
         stopStreaming,
         isThinking,
@@ -425,6 +426,7 @@ export function ChatPage() {
                     onSubmit={handleChatSubmit}
                     onStop={stopStreaming}
                     isBusy={isThinking || isStreaming}
+                    hasProject={hasProject}
                     textareaRef={textareaRef}
                     showFilters={showFilters}
                     onToggleFilters={() => setShowFilters((v) => !v)}

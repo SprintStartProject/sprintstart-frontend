@@ -39,7 +39,7 @@ export function KnowledgeGapWidget() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId), [refreshKey]);
+  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId), [refreshKey, selectedProjectId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

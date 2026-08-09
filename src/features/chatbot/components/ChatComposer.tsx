@@ -13,6 +13,11 @@ type ChatComposerProps = {
     onStop: () => void;
     /** True while the assistant is thinking or streaming. */
     isBusy: boolean;
+    /**
+     * Whether a project is selected. Without one there is nothing to scope retrieval to, so
+     * sending is blocked here rather than failing silently after the fact.
+     */
+    hasProject: boolean;
 
     /** Ref to the textarea, so the parent can focus / autosize it. */
     textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -41,6 +46,7 @@ export function ChatComposer({
     onSubmit,
     onStop,
     isBusy,
+    hasProject,
     textareaRef,
     showFilters,
     onToggleFilters,
@@ -55,6 +61,7 @@ export function ChatComposer({
 }: ChatComposerProps) {
     // E7: surface a hint when the date range is inverted.
     const rangeInvalid = !!from && !!to && from > to;
+    const blocked = rangeInvalid || !hasProject;
 
     return (
         <footer className="shrink-0 border-t border-app-border bg-app-bg app-page-frame py-4">
@@ -157,7 +164,7 @@ export function ChatComposer({
                 // form directly, so an inverted range would still reach the
                 // backend and come back as a validation error.
                 onSubmit={(e) => {
-                    if (rangeInvalid) {
+                    if (blocked) {
                         e.preventDefault();
                         return;
                     }
@@ -184,7 +191,11 @@ export function ChatComposer({
                     ref={textareaRef}
                     aria-label="Message"
                     data-testid="chat-input"
-                    placeholder="Ask anything about the project..."
+                    placeholder={
+                        hasProject
+                            ? "Ask anything about the project..."
+                            : "Select a project to start asking questions"
+                    }
                     className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
                     value={value}
                     rows={1}
@@ -216,13 +227,19 @@ export function ChatComposer({
                         type="submit"
                         aria-label="Send message"
                         data-testid="chat-send-button"
-                        disabled={!value.trim() || rangeInvalid}
+                        disabled={!value.trim() || blocked}
                         className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         <Send size={18} />
                     </button>
                 )}
             </form>
+
+            {!hasProject && (
+                <p className="mt-2 text-center text-[11px] text-app-danger-text" role="alert">
+                    No project selected — pick one in the header to ask a question.
+                </p>
+            )}
 
             <p className="mt-2 text-center text-[11px] text-app-text-disabled">
                 Enter to send · Shift + Enter for a new line
