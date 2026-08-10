@@ -111,12 +111,10 @@ export function GithubRepositoryDiscovery({
   const [hasMore, setHasMore] = useState(false);
   // "owner/name" (lowercased) -> repository id, for every repo connected anywhere,
   // plus the subset already belonging to the current project.
-  const [repositoryIdsByFullName, setRepositoryIdsByFullName] = useState<
-    Map<string, string>
-  >(new Map());
-  const [projectFullNames, setProjectFullNames] = useState<Set<string>>(
-    new Set(),
+  const [repositoryIdsByFullName, setRepositoryIdsByFullName] = useState<Map<string, string>>(
+    new Map(),
   );
+  const [projectFullNames, setProjectFullNames] = useState<Set<string>>(new Set());
 
   const [discoverState, setDiscoverState] = useState<
     "idle" | "loading" | "loadingMore" | "loaded" | "error"
@@ -136,17 +134,10 @@ export function GithubRepositoryDiscovery({
       ]);
 
       setRepositoryIdsByFullName(
-        new Map(
-          allConnected.map((status) => [
-            status.sourceId.toLowerCase(),
-            status.repositoryId,
-          ]),
-        ),
+        new Map(allConnected.map((status) => [status.sourceId.toLowerCase(), status.repositoryId])),
       );
       setProjectFullNames(
-        new Set(
-          connectedToProject.map((status) => status.sourceId.toLowerCase()),
-        ),
+        new Set(connectedToProject.map((status) => status.sourceId.toLowerCase())),
       );
     } catch {
       // Degrades gracefully: without ids, already-connected repos stay
@@ -198,9 +189,7 @@ export function GithubRepositoryDiscovery({
         setHasMore(result.hasMore);
         setPage(nextPage);
         setRepositories((current) =>
-          loadingMore
-            ? [...current, ...result.repositories]
-            : result.repositories,
+          loadingMore ? [...current, ...result.repositories] : result.repositories,
         );
         setDiscoverState("loaded");
 
@@ -218,14 +207,10 @@ export function GithubRepositoryDiscovery({
             `No GitHub organization or user "${owner}" was found for the selected token.`,
           );
         } else if (error instanceof ApiError && error.status === 429) {
-          setDiscoverError(
-            "GitHub rate limit reached. Please wait a moment and try again.",
-          );
+          setDiscoverError("GitHub rate limit reached. Please wait a moment and try again.");
         } else {
           setDiscoverError(
-            error instanceof Error
-              ? error.message
-              : "Repositories could not be discovered.",
+            error instanceof Error ? error.message : "Repositories could not be discovered.",
           );
         }
       }
@@ -237,9 +222,7 @@ export function GithubRepositoryDiscovery({
     const normalized = filter.trim().toLowerCase();
     if (!normalized) return repositories;
 
-    return repositories.filter((repository) =>
-      repository.name.toLowerCase().includes(normalized),
-    );
+    return repositories.filter((repository) => repository.name.toLowerCase().includes(normalized));
   }, [filter, repositories]);
 
   const linkStateByName = useMemo(() => {
@@ -315,13 +298,7 @@ export function GithubRepositoryDiscovery({
           repositoryId: repositoryIdsByFullName.get(fullName),
         };
       });
-  }, [
-    linkStateByName,
-    repositories,
-    repositoryIdsByFullName,
-    resolvedOwner,
-    selected,
-  ]);
+  }, [linkStateByName, repositories, repositoryIdsByFullName, resolvedOwner, selected]);
 
   // Report the resolved selection up. `onSelectionChange` must be stable (a
   // useState setter or a memoised callback) so this only fires when the
@@ -339,8 +316,8 @@ export function GithubRepositoryDiscovery({
     <div className="space-y-5">
       {!hasTokens && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Add a GitHub personal access token in Settings first, then come back to
-          discover repositories.
+          Add a GitHub personal access token in Settings first, then come back to discover
+          repositories.
         </div>
       )}
 
@@ -352,10 +329,7 @@ export function GithubRepositoryDiscovery({
         }}
       >
         <div>
-          <label
-            htmlFor="discovery-owner"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="discovery-owner" className="text-sm font-medium text-app-text">
             Organization, user, or URL
           </label>
           <Input
@@ -369,10 +343,7 @@ export function GithubRepositoryDiscovery({
         </div>
 
         <div>
-          <label
-            htmlFor="discovery-token"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="discovery-token" className="text-sm font-medium text-app-text">
             Access token
           </label>
           <Select
@@ -427,13 +398,9 @@ export function GithubRepositoryDiscovery({
       )}
 
       {discoverState === "loaded" && repositories.length === 0 && (
-        <EmptyState
-          icon={<GitBranch className="h-8 w-8" />}
-          title="No repositories found"
-        >
-          The token may only see public repositories. Private repositories
-          require a token with broader scope (e.g. <code>read:org</code> / repo
-          access).
+        <EmptyState icon={<GitBranch className="h-8 w-8" />} title="No repositories found">
+          The token may only see public repositories. Private repositories require a token with
+          broader scope (e.g. <code>read:org</code> / repo access).
         </EmptyState>
       )}
 
@@ -467,10 +434,10 @@ export function GithubRepositoryDiscovery({
           {selectedLinkCount > 0 && (
             <p className="rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-2.5 text-xs text-app-brand-text">
               {selectedLinkCount} of the selected{" "}
-              {selectedLinkCount === 1 ? "repository is" : "repositories are"}{" "}
-              already ingested and will be linked to
-              {projectName ? ` ${projectName}` : " this project"} without fetching
-              or ingesting again.
+              {selectedLinkCount === 1 ? "repository is" : "repositories are"} already ingested and
+              will be linked to
+              {projectName ? ` ${projectName}` : " this project"} without fetching or ingesting
+              again.
             </p>
           )}
 
@@ -514,12 +481,8 @@ export function GithubRepositoryDiscovery({
                     {repository.alreadyConnected && (
                       <span
                         role="img"
-                        aria-label={
-                          repository.isEnabled === false ? "Disabled" : "Enabled"
-                        }
-                        title={
-                          repository.isEnabled === false ? "Disabled" : "Enabled"
-                        }
+                        aria-label={repository.isEnabled === false ? "Disabled" : "Enabled"}
+                        title={repository.isEnabled === false ? "Disabled" : "Enabled"}
                         className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                           repository.isEnabled === false
                             ? "bg-app-text-disabled"
@@ -537,9 +500,7 @@ export function GithubRepositoryDiscovery({
                       size="sm"
                       className="gap-1"
                     >
-                      {repository.isPrivate && (
-                        <Lock className="h-3 w-3" aria-hidden="true" />
-                      )}
+                      {repository.isPrivate && <Lock className="h-3 w-3" aria-hidden="true" />}
                       {repository.isPrivate ? "Private" : "Public"}
                     </Badge>
 

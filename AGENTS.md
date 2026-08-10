@@ -4,6 +4,7 @@ Shared, committed guide for humans and AI agents working in `sprintstart-fronten
 Keep it current: if a rule here stops matching reality, fix the rule in the same PR.
 
 > **Related docs**
+>
 > - [docs/FRONTEND_ARCHITECTURE.md](./docs/FRONTEND_ARCHITECTURE.md) — system architecture (frontend-only; replaces the frontend section of root ARCHITECTURE.md): feature-first structure, routing, state, design system, animation.
 > - [docs/FRONTEND_CODING_STANDARDS.md](./docs/FRONTEND_CODING_STANDARDS.md) — TS / React / Tailwind / a11y rules (frontend-only; replaces the frontend section of root CODING_STANDARDS.md).
 > - [docs/FRONTEND_DOCUMENTATION_GUIDELINES.md](./docs/FRONTEND_DOCUMENTATION_GUIDELINES.md) — the full, committed documentation standards (summarized in §6).
@@ -28,16 +29,16 @@ React SPA, feature-first architecture, with Keycloak SSO and a Framer Motion ani
 
 Copy `.env.example` → `.env` and point Keycloak at the right IAM instance before running.
 
-| Purpose | Command |
-|---|---|
-| Install | `npm install` |
-| Dev server (`:5173`) | `npm run dev` |
-| Production build | `npm run build` (runs `tsc -b` + `vite build`) |
-| Lint | `npm run lint` |
-| Unit tests | `npm run test` |
-| Storybook | `npm run storybook` |
-| Keycloak theme dev / build | `npm run dev-keycloak-theme` / `npm run build-keycloak-theme` |
-| Full stack via Docker (`:3000`) | `docker compose up --build` |
+| Purpose                         | Command                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| Install                         | `npm install`                                                 |
+| Dev server (`:5173`)            | `npm run dev`                                                 |
+| Production build                | `npm run build` (runs `tsc -b` + `vite build`)                |
+| Lint                            | `npm run lint`                                                |
+| Unit tests                      | `npm run test`                                                |
+| Storybook                       | `npm run storybook`                                           |
+| Keycloak theme dev / build      | `npm run dev-keycloak-theme` / `npm run build-keycloak-theme` |
+| Full stack via Docker (`:3000`) | `docker compose up --build`                                   |
 
 **Definition of Done (frontend):** `npm run lint` **and** `npm run build` pass, relevant unit tests pass, and new/changed code is documented per §6.
 
@@ -74,6 +75,7 @@ Enforced by ESLint (flat config: `typescript-eslint` recommended **+ type-checke
 - Prettier owns formatting — don't fight it; run lint before finishing.
 
 Conventions:
+
 - Code, identifiers and comments in **English**.
 - Keep components focused; extract hooks for non-trivial logic/state.
 - Services return typed responses and surface backend failures (don't silently swallow — no empty `catch`).
@@ -92,7 +94,7 @@ Conventions:
 
 ---
 
-## 6. Documentation (the *why*, not the obvious *what*)
+## 6. Documentation (the _why_, not the obvious _what_)
 
 Follow the documentation playbook — the full rules live in [docs/FRONTEND_DOCUMENTATION_GUIDELINES.md](./docs/FRONTEND_DOCUMENTATION_GUIDELINES.md). In short — use **TSDoc** blocks on exported symbols:
 
@@ -114,7 +116,7 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 - **Always use the palette tokens; never hardcode colors** (no `#2563eb`, no raw Tailwind colors like `text-blue-500`). Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-surface`, `bg-app-surface-muted`), text (`text-app-text`, `text-app-text-muted`, `text-app-text-subtle`), borders (`border-app-border`, …), brand (`bg-app-brand`, `text-app-brand`, …), and status (`success` / `warning` / `danger` / `neutral`, e.g. `bg-app-success-bg text-app-success-text`).
 - **Stay consistent beyond color, too:** use the shared Tailwind scale for spacing, radius and sizing instead of arbitrary one-off pixel values, so padding/margins/gaps match the rest of the app.
 - **Light/Dark:** controlled via the `.dark` class (`@custom-variant dark`), managed by `ThemeProvider`. Every color must work in both themes — which is automatic when you use tokens.
-- **Color-blind friendly (required):** never rely on color **alone** to convey meaning. Always back it with an **icon, text label, or shape** (e.g. status = chip text + icon, not just red/green) — this is why finished/skipped/locked steps use distinct icons *and* labels. Keep color pairs distinguishable for common color-vision deficiencies.
+- **Color-blind friendly (required):** never rely on color **alone** to convey meaning. Always back it with an **icon, text label, or shape** (e.g. status = chip text + icon, not just red/green) — this is why finished/skipped/locked steps use distinct icons _and_ labels. Keep color pairs distinguishable for common color-vision deficiencies.
 - **Contrast:** meet **WCAG 2.1 AA** for text and interactive elements.
 - **Focus:** keep visible focus via the `--app-focus` token (`focus-visible:ring-app-focus`) — don't remove outlines.
 
@@ -122,9 +124,9 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 
 ## 8. Responsive design
 
-- **Primary target is desktop** — that's where the app is mainly used, so design for the desktop layout first. (This is *not* mobile-first.)
+- **Primary target is desktop** — that's where the app is mainly used, so design for the desktop layout first. (This is _not_ mobile-first.)
 - But every page must still be **responsive**: it has to react to the viewport and look good down to phone size — widgets get narrower / stack vertically, the sidebar collapses, and tables/dialogs must not overflow.
-- Use Tailwind breakpoints (`sm:`, `md:`, `lg:`) to scale the desktop layout *down*. The app shell already does this: sticky sidebar on desktop → slide-out drawer + top bar below `lg` (see `components/layout/SideBar.tsx`; global token adjustments at `@media (max-width: 1024px)`).
+- Use Tailwind breakpoints (`sm:`, `md:`, `lg:`) to scale the desktop layout _down_. The app shell already does this: sticky sidebar on desktop → slide-out drawer + top bar below `lg` (see `components/layout/SideBar.tsx`; global token adjustments at `@media (max-width: 1024px)`).
 - Prefer fluid layouts (`flex`/`grid`, `max-w-*`, `min-w-0` to allow truncation) over fixed pixel widths.
 - **Test desktop (primary), then tablet and mobile** before finishing UI work — check that widgets reflow, the sidebar collapses, and nothing overflows.
 

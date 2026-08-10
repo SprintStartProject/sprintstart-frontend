@@ -21,12 +21,7 @@ import { buttonHoverMotion, buttonHoverMotionDisabled } from "../../styles/token
  *   trash icon in a dense list.
  */
 export type ButtonVariant =
-    | "primary"
-    | "secondary"
-    | "ghost"
-    | "danger"
-    | "dangerSoft"
-    | "dangerGhost";
+  "primary" | "secondary" | "ghost" | "danger" | "dangerSoft" | "dangerGhost";
 
 /**
  * Size scale. `md` is the default and the only size that is guaranteed to meet
@@ -36,29 +31,29 @@ export type ButtonVariant =
 export type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonOwnProps = {
-    variant?: ButtonVariant;
-    size?: ButtonSize;
-    /**
-     * Renders a square button sized to `size`, with no horizontal padding.
-     * Requires `aria-label` — an icon button has no accessible name otherwise.
-     */
-    iconOnly?: boolean;
-    /** Stretches the button to the width of its container. */
-    fullWidth?: boolean;
-    /**
-     * Shows a spinner in place of `icon` and disables the button. Also sets
-     * `aria-busy`, so the state is announced rather than only drawn.
-     */
-    loading?: boolean;
-    /**
-     * Leading icon. Pass the element, not the component:
-     * `icon={<Plus className="h-4 w-4" />}`. Swapped for the spinner while
-     * `loading`. Sized by the caller so a 16px and a 14px icon can coexist.
-     */
-    icon?: ReactNode;
-    /** Trailing icon, e.g. a chevron. Never replaced by the spinner. */
-    trailingIcon?: ReactNode;
-    children?: ReactNode;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /**
+   * Renders a square button sized to `size`, with no horizontal padding.
+   * Requires `aria-label` — an icon button has no accessible name otherwise.
+   */
+  iconOnly?: boolean;
+  /** Stretches the button to the width of its container. */
+  fullWidth?: boolean;
+  /**
+   * Shows a spinner in place of `icon` and disables the button. Also sets
+   * `aria-busy`, so the state is announced rather than only drawn.
+   */
+  loading?: boolean;
+  /**
+   * Leading icon. Pass the element, not the component:
+   * `icon={<Plus className="h-4 w-4" />}`. Swapped for the spinner while
+   * `loading`. Sized by the caller so a 16px and a 14px icon can coexist.
+   */
+  icon?: ReactNode;
+  /** Trailing icon, e.g. a chevron. Never replaced by the spinner. */
+  trailingIcon?: ReactNode;
+  children?: ReactNode;
 };
 
 /**
@@ -67,20 +62,20 @@ type ButtonOwnProps = {
  * business being dragged.
  */
 type ForwardedButtonAttributes = Omit<
-    ButtonHTMLAttributes<HTMLButtonElement>,
-    | "children"
-    | "onAnimationStart"
-    | "onAnimationEnd"
-    | "onAnimationIteration"
-    | "onDrag"
-    | "onDragStart"
-    | "onDragEnd"
-    | "onDragEnter"
-    | "onDragExit"
-    | "onDragLeave"
-    | "onDragOver"
-    | "onDrop"
-    | "style"
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  | "children"
+  | "onAnimationStart"
+  | "onAnimationEnd"
+  | "onAnimationIteration"
+  | "onDrag"
+  | "onDragStart"
+  | "onDragEnd"
+  | "onDragEnter"
+  | "onDragExit"
+  | "onDragLeave"
+  | "onDragOver"
+  | "onDrop"
+  | "style"
 >;
 
 export type ButtonProps = ButtonOwnProps & ForwardedButtonAttributes;
@@ -94,9 +89,9 @@ export type ButtonProps = ButtonOwnProps & ForwardedButtonAttributes;
  * a "Cancel"/"Save" pair sitting side by side would not line up.
  */
 const baseClasses =
-    "inline-flex select-none items-center justify-center whitespace-nowrap border font-medium " +
-    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus " +
-    "disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex select-none items-center justify-center whitespace-nowrap border font-medium " +
+  "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
 
 /**
  * Only `primary` casts the brand-colored lift shadow on hover. It is the badge
@@ -104,18 +99,14 @@ const baseClasses =
  * would carry no information.
  */
 const variantClasses: Record<ButtonVariant, string> = {
-    primary:
-        "border-transparent bg-app-brand text-white hover:bg-app-brand-hover hover:shadow-app-brand-lift",
-    secondary:
-        "border-app-border bg-app-surface text-app-text hover:bg-app-surface-hover",
-    ghost:
-        "border-transparent bg-transparent text-app-text-muted hover:bg-app-surface-hover hover:text-app-text",
-    danger:
-        "border-transparent bg-app-danger-solid text-white hover:opacity-90",
-    dangerSoft:
-        "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:opacity-90",
-    dangerGhost:
-        "border-transparent bg-transparent text-app-danger-text hover:bg-app-danger-bg",
+  primary:
+    "border-transparent bg-app-brand text-white hover:bg-app-brand-hover hover:shadow-app-brand-lift",
+  secondary: "border-app-border bg-app-surface text-app-text hover:bg-app-surface-hover",
+  ghost:
+    "border-transparent bg-transparent text-app-text-muted hover:bg-app-surface-hover hover:text-app-text",
+  danger: "border-transparent bg-app-danger-solid text-white hover:opacity-90",
+  dangerSoft: "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:opacity-90",
+  dangerGhost: "border-transparent bg-transparent text-app-danger-text hover:bg-app-danger-bg",
 };
 
 /**
@@ -126,23 +117,23 @@ const variantClasses: Record<ButtonVariant, string> = {
  * looks like a box.
  */
 const sizeClasses: Record<ButtonSize, string> = {
-    sm: "h-9 gap-1.5 rounded-lg px-3 text-xs",
-    md: "h-11 gap-2 rounded-xl px-5 text-sm",
-    lg: "h-12 gap-2 rounded-xl px-6 text-sm",
+  sm: "h-9 gap-1.5 rounded-lg px-3 text-xs",
+  md: "h-11 gap-2 rounded-xl px-5 text-sm",
+  lg: "h-12 gap-2 rounded-xl px-6 text-sm",
 };
 
 /** Square counterparts to {@link sizeClasses} — same heights, no side padding. */
 const iconOnlySizeClasses: Record<ButtonSize, string> = {
-    sm: "h-9 w-9 rounded-lg",
-    md: "h-11 w-11 rounded-xl",
-    lg: "h-12 w-12 rounded-xl",
+  sm: "h-9 w-9 rounded-lg",
+  md: "h-11 w-11 rounded-xl",
+  lg: "h-12 w-12 rounded-xl",
 };
 
 /** Spinner size per button size, so the icon slot does not change width. */
 const spinnerClasses: Record<ButtonSize, string> = {
-    sm: "h-3.5 w-3.5",
-    md: "h-4 w-4",
-    lg: "h-4 w-4",
+  sm: "h-3.5 w-3.5",
+  md: "h-4 w-4",
+  lg: "h-4 w-4",
 };
 
 /**
@@ -179,71 +170,67 @@ const spinnerClasses: Record<ButtonSize, string> = {
  * styling one as a button does not make it keyboard- or screen-reader-correct.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    {
-        variant = "secondary",
-        size = "md",
-        iconOnly = false,
-        fullWidth = false,
-        loading = false,
-        icon,
-        trailingIcon,
-        disabled = false,
-        type = "button",
-        className = "",
-        children,
-        ...rest
-    },
-    ref,
+  {
+    variant = "secondary",
+    size = "md",
+    iconOnly = false,
+    fullWidth = false,
+    loading = false,
+    icon,
+    trailingIcon,
+    disabled = false,
+    type = "button",
+    className = "",
+    children,
+    ...rest
+  },
+  ref,
 ) {
-    const isDisabled = disabled || loading;
-    const prefersReducedMotion = useReducedMotion();
+  const isDisabled = disabled || loading;
+  const prefersReducedMotion = useReducedMotion();
 
-    const hoverMotion =
-        isDisabled || prefersReducedMotion
-            ? buttonHoverMotionDisabled
-            : buttonHoverMotion;
+  const hoverMotion =
+    isDisabled || prefersReducedMotion ? buttonHoverMotionDisabled : buttonHoverMotion;
 
-    const classes = [
-        baseClasses,
-        variantClasses[variant],
-        iconOnly ? iconOnlySizeClasses[size] : sizeClasses[size],
-        fullWidth ? "w-full" : "",
-        className,
-    ]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+  const classes = [
+    baseClasses,
+    variantClasses[variant],
+    iconOnly ? iconOnlySizeClasses[size] : sizeClasses[size],
+    fullWidth ? "w-full" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
-    const spinner = (
-        <Loader2 className={`${spinnerClasses[size]} animate-spin`} aria-hidden="true" />
-    );
+  const spinner = <Loader2 className={`${spinnerClasses[size]} animate-spin`} aria-hidden="true" />;
 
-    return (
-        <motion.button
-            ref={ref}
-            type={type}
-            disabled={isDisabled}
-            aria-disabled={isDisabled || undefined}
-            aria-busy={loading || undefined}
-            className={classes}
-            {...hoverMotion}
-            {...rest}
-        >
-            {iconOnly ? (
-                /* The icon *is* the content here, so the spinner replaces it
+  return (
+    <motion.button
+      ref={ref}
+      type={type}
+      disabled={isDisabled}
+      aria-disabled={isDisabled || undefined}
+      aria-busy={loading || undefined}
+      className={classes}
+      {...hoverMotion}
+      {...rest}
+    >
+      {iconOnly ? (
+        /* The icon *is* the content here, so the spinner replaces it
                    rather than joining it. */
-                loading ? (
-                    spinner
-                ) : (
-                    children
-                )
-            ) : (
-                <>
-                    {loading ? spinner : icon}
-                    {children}
-                    {trailingIcon}
-                </>
-            )}
-        </motion.button>
-    );
+        loading ? (
+          spinner
+        ) : (
+          children
+        )
+      ) : (
+        <>
+          {loading ? spinner : icon}
+          {children}
+          {trailingIcon}
+        </>
+      )}
+    </motion.button>
+  );
 });

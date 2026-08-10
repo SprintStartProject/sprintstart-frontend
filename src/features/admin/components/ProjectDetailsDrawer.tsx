@@ -8,11 +8,7 @@ import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { projectService } from "../../../services/projectService";
-import {
-  getProjectEditFormState,
-  getProjectSourcesCount,
-  getProjectUsersCount,
-} from "../data";
+import { getProjectEditFormState, getProjectSourcesCount, getProjectUsersCount } from "../data";
 import {
   applyPeopleChanges,
   buildPeopleSnapshotKey,
@@ -47,10 +43,7 @@ type ProjectDetailsDrawerProps = {
 
 const EMPTY_PROJECT_USERS: ProjectUser[] = [];
 
-function isSameDetails(
-  left: ProjectEditFormState,
-  right: ProjectEditFormState,
-) {
+function isSameDetails(left: ProjectEditFormState, right: ProjectEditFormState) {
   return left.name === right.name && left.description === right.description;
 }
 
@@ -77,8 +70,7 @@ export function ProjectDetailsDrawer({
   const nameInputId = useId();
   const descriptionInputId = useId();
 
-  const [projectDetails, setProjectDetails] =
-    useState<AdminProjectDetails | null>(null);
+  const [projectDetails, setProjectDetails] = useState<AdminProjectDetails | null>(null);
   const [detailsError, setDetailsError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
@@ -89,9 +81,7 @@ export function ProjectDetailsDrawer({
   const [draftProject, setDraftProject] = useState<ProjectEditFormState>(() =>
     getProjectEditFormState(project),
   );
-  const [peopleDraft, setPeopleDraft] = useState<PeopleDraft>(() =>
-    createEmptyPeopleDraft(""),
-  );
+  const [peopleDraft, setPeopleDraft] = useState<PeopleDraft>(() => createEmptyPeopleDraft(""));
   // Tracks whether the detail fields were touched, so the initial fetch can
   // populate them without clobbering in-progress edits.
   const hasEditedDetailsRef = useRef(false);
@@ -119,9 +109,7 @@ export function ProjectDetailsDrawer({
 
         setProjectDetails(null);
         setDetailsError(
-          error instanceof Error
-            ? error.message
-            : "Project details could not be loaded.",
+          error instanceof Error ? error.message : "Project details could not be loaded.",
         );
       });
 
@@ -138,10 +126,7 @@ export function ProjectDetailsDrawer({
   const savedDetails = getProjectEditFormState(visibleProject);
   const hasDetailsChanges = !isSameDetails(draftProject, savedDetails);
 
-  const peopleSnapshotKey = buildPeopleSnapshotKey(
-    visibleUsers,
-    projectDetails?.manager ?? null,
-  );
+  const peopleSnapshotKey = buildPeopleSnapshotKey(visibleUsers, projectDetails?.manager ?? null);
   const activePeopleDraft = resolvePeopleDraft(peopleDraft, peopleSnapshotKey);
   const peopleChangeCount = countPeopleChanges(activePeopleDraft);
 
@@ -167,10 +152,7 @@ export function ProjectDetailsDrawer({
     resetDrafts(visibleProject);
   };
 
-  const updateDraftField = (
-    field: keyof ProjectEditFormState,
-    value: string,
-  ) => {
+  const updateDraftField = (field: keyof ProjectEditFormState, value: string) => {
     hasEditedDetailsRef.current = true;
     setSaveErrorMessage("");
     setDraftProject((current) => ({ ...current, [field]: value }));
@@ -209,9 +191,7 @@ export function ProjectDetailsDrawer({
       resetDrafts(updatedProject);
     } catch (error) {
       setSaveErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Project changes could not be saved.",
+        error instanceof Error ? error.message : "Project changes could not be saved.",
       );
     } finally {
       setIsSaving(false);
@@ -229,9 +209,7 @@ export function ProjectDetailsDrawer({
       onClose();
     } catch (error) {
       setDeleteErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Project could not be deleted.",
+        error instanceof Error ? error.message : "Project could not be deleted.",
       );
     } finally {
       setIsDeleting(false);
@@ -310,13 +288,11 @@ export function ProjectDetailsDrawer({
                     <AlertCircle className="h-4 w-4" />
                     Project changes could not be saved
                   </div>
-                  <p className="mt-1 text-sm text-app-danger-text">
-                    {saveErrorMessage}
-                  </p>
+                  <p className="mt-1 text-sm text-app-danger-text">{saveErrorMessage}</p>
                 </div>
               )}
 
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+              <p className="mb-4 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
                 Details
               </p>
 
@@ -324,22 +300,14 @@ export function ProjectDetailsDrawer({
                 <Field label="Name" controlId={nameInputId} disabled={isSaving}>
                   <Input
                     value={draftProject.name}
-                    onChange={(event) =>
-                      updateDraftField("name", event.target.value)
-                    }
+                    onChange={(event) => updateDraftField("name", event.target.value)}
                   />
                 </Field>
 
-                <Field
-                  label="Description"
-                  controlId={descriptionInputId}
-                  disabled={isSaving}
-                >
+                <Field label="Description" controlId={descriptionInputId} disabled={isSaving}>
                   <Textarea
                     value={draftProject.description}
-                    onChange={(event) =>
-                      updateDraftField("description", event.target.value)
-                    }
+                    onChange={(event) => updateDraftField("description", event.target.value)}
                     minRows={4}
                     maxRows={12}
                     placeholder="No project description yet."
@@ -362,7 +330,7 @@ export function ProjectDetailsDrawer({
             </Section>
 
             <Section>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
                 Connected sources
               </p>
               <SourceList
@@ -378,13 +346,12 @@ export function ProjectDetailsDrawer({
             {canManageLifecycle && (
               <Section>
                 <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-app-danger-text">
+                  <p className="text-xs font-semibold tracking-wide text-app-danger-text uppercase">
                     Danger zone
                   </p>
                   <p className="mt-2 text-sm text-app-danger-text">
-                    Deleting a project removes it and all of its user
-                    assignments. Connected sources are kept and stay available to
-                    other projects.
+                    Deleting a project removes it and all of its user assignments. Connected sources
+                    are kept and stay available to other projects.
                   </p>
 
                   <Button
@@ -411,12 +378,9 @@ export function ProjectDetailsDrawer({
         title="Delete project?"
         description={
           <>
-            <span className="font-semibold text-app-text">
-              {visibleProject.name}
-            </span>{" "}
-            and its {memberCount} user assignment
-            {memberCount === 1 ? "" : "s"} are deleted permanently. This cannot
-            be undone.
+            <span className="font-semibold text-app-text">{visibleProject.name}</span> and its{" "}
+            {memberCount} user assignment
+            {memberCount === 1 ? "" : "s"} are deleted permanently. This cannot be undone.
           </>
         }
         confirmLabel="Delete project"

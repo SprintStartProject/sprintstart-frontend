@@ -113,9 +113,7 @@ function normalizeRunStatus(
   }
 }
 
-function inferRunStatus(
-  run: CanonicalIngestionRunResponse,
-): IngestionRunStatus {
+function inferRunStatus(run: CanonicalIngestionRunResponse): IngestionRunStatus {
   const normalizedStatus = normalizeRunStatus(run.status);
 
   if (normalizedStatus) return normalizedStatus;
@@ -215,8 +213,7 @@ function mapRunPageMetadata(
   const number = page?.number ?? 1;
   const size = page?.size ?? Math.max(itemCount, 1);
   const totalElements = page?.totalElements ?? itemCount;
-  const totalPages =
-    page?.totalPages ?? (size > 0 ? Math.ceil(totalElements / size) : 1);
+  const totalPages = page?.totalPages ?? (size > 0 ? Math.ceil(totalElements / size) : 1);
 
   return {
     number,
@@ -335,16 +332,13 @@ export async function getIngestionRun(runId: string): Promise<IngestionRun> {
 export async function getIngestionSourceStatuses(
   projectId?: string,
 ): Promise<SourceInstanceIngestionStatus[]> {
-  const query = projectId
-    ? `?${new URLSearchParams({ projectId }).toString()}`
-    : "";
-  const data = await apiClient.fetch<
-    CanonicalSourceInstanceIngestionStatusResponse[]
-  >(`/api/v1/ingestion-sources/status${query}`);
+  const query = projectId ? `?${new URLSearchParams({ projectId }).toString()}` : "";
+  const data = await apiClient.fetch<CanonicalSourceInstanceIngestionStatusResponse[]>(
+    `/api/v1/ingestion-sources/status${query}`,
+  );
 
   return data.map(mapSourceInstanceStatus);
 }
-
 
 export async function getProjectArtifacts(
   projectId: string,
@@ -352,9 +346,7 @@ export async function getProjectArtifacts(
 ): Promise<ArtifactPage> {
   const query = buildArtifactQuery(options);
 
-  return apiClient.fetch<ArtifactPage>(
-    `/api/v1/projects/${projectId}/artifacts?${query}`,
-  );
+  return apiClient.fetch<ArtifactPage>(`/api/v1/projects/${projectId}/artifacts?${query}`);
 }
 
 export async function getProjectArtifactSnapshot(
@@ -380,10 +372,7 @@ export async function getProjectArtifactSnapshot(
   );
 
   return {
-    artifacts: [
-      ...firstPage.items,
-      ...remainingPages.flatMap((page) => page.items),
-    ],
+    artifacts: [...firstPage.items, ...remainingPages.flatMap((page) => page.items)],
     totalElements: firstPage.page.totalElements,
   };
 }

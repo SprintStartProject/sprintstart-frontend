@@ -55,7 +55,7 @@ function formatMinutes(minutes: number): string {
 
 /**
  * Detail view for a specific onboarding step.
- * 
+ *
  * This component is responsible for:
  * - Fetching detailed step data, tasks, and resources on mount.
  * - Managing local completion state for individual tasks.
@@ -66,9 +66,7 @@ export function OnBoardingItemPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const navigate = useNavigate();
 
-  const [stepDetail, setStepDetail] = useState<OnboardingStepDetail | null>(
-    null,
-  );
+  const [stepDetail, setStepDetail] = useState<OnboardingStepDetail | null>(null);
   const [tasks, setTasks] = useState<OnboardingTaskEndpoint[]>([]);
   const [resources, setResources] = useState<OnboardingResourceEndpoint[]>([]);
 
@@ -112,9 +110,7 @@ export function OnBoardingItemPage() {
         .flatMap((phase) => phase.steps)
         .find(
           (step) =>
-            step.id !== stepDetail?.id &&
-            step.status !== "FINISHED" &&
-            step.status !== "SKIPPED",
+            step.id !== stepDetail?.id && step.status !== "FINISHED" && step.status !== "SKIPPED",
         );
 
       if (nextStep) {
@@ -158,9 +154,7 @@ export function OnBoardingItemPage() {
     if (!task) return;
     try {
       await onboardingService.updateTask(task, finished);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, finished } : t)),
-      );
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, finished } : t)));
       setLocalFinished((prev) => {
         const next = new Set(prev);
         if (finished) {
@@ -272,22 +266,17 @@ export function OnBoardingItemPage() {
   const sortedTasks = [...tasks].sort((a, b) => a.position - b.position);
   const doneTasks = sortedTasks.filter((t) => localFinished.has(t.id)).length;
   // The step-detail skip block exposes `accepted` (null = pending review).
-  const hasPendingSkipRequest = stepDetail?.skip
-    ? stepDetail.skip.accepted === null
-    : false;
-  const allTasksDone =
-    sortedTasks.length === 0 || doneTasks === sortedTasks.length;
+  const hasPendingSkipRequest = stepDetail?.skip ? stepDetail.skip.accepted === null : false;
+  const allTasksDone = sortedTasks.length === 0 || doneTasks === sortedTasks.length;
   const taskPercentage =
-    sortedTasks.length > 0
-      ? Math.round((doneTasks / sortedTasks.length) * 100)
-      : 0;
+    sortedTasks.length > 0 ? Math.round((doneTasks / sortedTasks.length) * 100) : 0;
 
   // ── LOADING ───────────────────────────────────────────────
   if (loadingState === "loading" || loadingState === "idle") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
         <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="w-8 h-8 animate-spin text-app-brand" />
+          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
           <p className="text-sm">Loading step...</p>
         </div>
       </div>
@@ -297,15 +286,11 @@ export function OnBoardingItemPage() {
   // ── ERROR ─────────────────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
         <div className="max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-app-text mb-2">
-            Could not load step
-          </h2>
-          <p className="text-sm text-app-text-muted mb-6">
-            {errorMessage}
-          </p>
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+          <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load step</h2>
+          <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
           <Button variant="primary" onClick={() => void navigate("/onboarding")}>
             Back to Onboarding Overview
           </Button>
@@ -317,11 +302,9 @@ export function OnBoardingItemPage() {
   // ── EMPTY ─────────────────────────────────────────────────
   if (!stepDetail) {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
         <div className="text-center">
-          <p className="text-app-text-muted text-sm mb-4">
-            Step not found.
-          </p>
+          <p className="mb-4 text-sm text-app-text-muted">Step not found.</p>
           <Button variant="primary" onClick={() => void navigate("/onboarding")}>
             Back to Onboarding Overview
           </Button>
@@ -334,13 +317,16 @@ export function OnBoardingItemPage() {
   return (
     <div className="min-h-screen bg-app-bg">
       {/* HEADER */}
-      <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+      <section
+        aria-label="Page header"
+        className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl"
+      >
         <div className="app-page-content py-4">
           <button
             onClick={() => void navigate("/onboarding")}
-            className="inline-flex items-center gap-2 text-sm text-app-text-muted hover:text-app-text transition-all mb-4"
+            className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-muted transition-all hover:text-app-text"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
             Back to Onboarding Overview
           </button>
 
@@ -348,7 +334,7 @@ export function OnBoardingItemPage() {
             <div>
               {/* Status-Badge */}
               <div
-                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-3 ${
+                className={`mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
                   stepDetail.status === "FINISHED"
                     ? "bg-app-success-bg text-app-success-text"
                     : stepDetail.status === "IN_PROGRESS"
@@ -367,20 +353,16 @@ export function OnBoardingItemPage() {
                       : "Open"}
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold text-app-text">
-                {stepDetail.title}
-              </h1>
+              <h1 className="text-2xl font-bold text-app-text sm:text-3xl">{stepDetail.title}</h1>
               <div className="mt-3">
                 <StepOriginBadge step={stepDetail} />
               </div>
-              <p className="text-app-text-muted mt-2 text-sm">
-                {stepDetail.description}
-              </p>
+              <p className="mt-2 text-sm text-app-text-muted">{stepDetail.description}</p>
             </div>
 
             {stepDetail.estimatedMinutes > 0 && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-app-surface-muted text-sm text-app-text-muted shrink-0">
-                <Clock3 className="w-4 h-4" />
+              <div className="hidden shrink-0 items-center gap-2 rounded-xl bg-app-surface-muted px-3 py-2 text-sm text-app-text-muted sm:flex">
+                <Clock3 className="h-4 w-4" />
                 {formatMinutes(stepDetail.estimatedMinutes)}
               </div>
             )}
@@ -390,22 +372,20 @@ export function OnBoardingItemPage() {
 
       {/* MAIN CONTENT */}
       <main className="app-page-content py-6 pb-24">
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid gap-6 lg:grid-cols-3">
           {/* LEFT COLUMN */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6 lg:col-span-2">
             {/* Expected Outcomes */}
             {stepDetail.expectedOutcomes && stepDetail.expectedOutcomes.length > 0 && (
               <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Lightbulb className="w-5 h-5 text-app-brand" />
-                  <h2 className="font-semibold text-app-text">
-                    Expected Outcomes
-                  </h2>
+                <div className="mb-4 flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-app-brand" />
+                  <h2 className="font-semibold text-app-text">Expected Outcomes</h2>
                 </div>
                 <ul className="space-y-3">
                   {stepDetail.expectedOutcomes.map((outcome, index) => (
                     <li key={index} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-app-success-solid shrink-0 mt-0.5" />
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-app-success-solid" />
                       <span className="text-sm text-app-text">{outcome}</span>
                     </li>
                   ))}
@@ -416,12 +396,10 @@ export function OnBoardingItemPage() {
             {/* TASKS (Step by Step) */}
             {sortedTasks.length > 0 && (
               <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-app-warning-solid" />
-                    <h2 className="font-semibold text-app-text">
-                      Tasks
-                    </h2>
+                    <Target className="h-5 w-5 text-app-warning-solid" />
+                    <h2 className="font-semibold text-app-text">Tasks</h2>
                   </div>
                   <span className="text-xs text-app-text-muted">
                     {doneTasks}/{sortedTasks.length} completed
@@ -431,9 +409,9 @@ export function OnBoardingItemPage() {
                 {/* Progress Bar. Sprung rather than tweened so it overshoots a
                     hair on each tick — the bar reacts to the click instead of
                     catching up to it half a second later. */}
-                <div className="bg-app-border-muted rounded-full h-1.5 mb-5 overflow-hidden">
+                <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-app-border-muted">
                   <motion.div
-                    className="h-full bg-gradient-to-r from-app-brand to-app-progress-fill-end rounded-full"
+                    className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end"
                     initial={false}
                     animate={{ width: `${taskPercentage}%` }}
                     transition={centralSpringToken}
@@ -457,30 +435,26 @@ export function OnBoardingItemPage() {
 
             {/* mark step as done */}
             <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="font-semibold text-app-text text-sm mb-3">
-                Complete Step
-              </h3>
+              <h3 className="mb-3 text-sm font-semibold text-app-text">Complete Step</h3>
               <button
                 onClick={() =>
-                  stepDetail.status === "FINISHED"
-                    ? undefined
-                    : void updateStepStatus("FINISHED")
+                  stepDetail.status === "FINISHED" ? undefined : void updateStepStatus("FINISHED")
                 }
                 disabled={stepDetail.status === "FINISHED" || !allTasksDone}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
+                className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all duration-200 ${
                   stepDetail.status === "FINISHED"
-                    ? "border-app-success-border bg-app-success-bg text-app-success-text cursor-default"
+                    ? "cursor-default border-app-success-border bg-app-success-bg text-app-success-text"
                     : allTasksDone
-                      ? "border-dashed border-app-border-strong hover:border-app-brand-border-strong text-app-text-muted hover:text-app-brand"
-                      : "border-dashed border-app-border text-app-text-disabled cursor-not-allowed"
+                      ? "border-dashed border-app-border-strong text-app-text-muted hover:border-app-brand-border-strong hover:text-app-brand"
+                      : "cursor-not-allowed border-dashed border-app-border text-app-text-disabled"
                 }`}
               >
                 {stepDetail.status === "FINISHED" ? (
-                  <Trophy className="w-5 h-5 shrink-0" />
+                  <Trophy className="h-5 w-5 shrink-0" />
                 ) : (
-                  <Circle className="w-5 h-5 shrink-0" />
+                  <Circle className="h-5 w-5 shrink-0" />
                 )}
-                <span className="text-sm font-medium flex-1 text-left">
+                <span className="flex-1 text-left text-sm font-medium">
                   {stepDetail.status === "FINISHED"
                     ? "Finished!"
                     : allTasksDone
@@ -491,18 +465,13 @@ export function OnBoardingItemPage() {
 
               {/* Once this step is behind the user (finished or skipped),
                   jump straight to the next pending step. */}
-              {(stepDetail.status === "FINISHED" ||
-                stepDetail.status === "SKIPPED") && (
+              {(stepDetail.status === "FINISHED" || stepDetail.status === "SKIPPED") && (
                 <Button
                   variant="primary"
                   fullWidth
                   onClick={() => void goToNextStep()}
                   loading={nextLoading}
-                  trailingIcon={
-                    nextLoading ? undefined : (
-                      <CircleArrowRight className="h-4 w-4" />
-                    )
-                  }
+                  trailingIcon={nextLoading ? undefined : <CircleArrowRight className="h-4 w-4" />}
                   className="mt-3"
                 >
                   {nextLoading ? "Loading..." : "Continue to next step"}
@@ -513,14 +482,11 @@ export function OnBoardingItemPage() {
 
           {/* RIGHT COLUMN */}
           <div className="space-y-6">
-
             {/* STATUS */}
             <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="font-semibold text-app-text text-sm mb-3">
-                Status
-              </h3>
+              <h3 className="mb-3 text-sm font-semibold text-app-text">Status</h3>
               <div
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
                   stepDetail.status === "FINISHED"
                     ? "bg-app-success-bg text-app-success-text"
                     : stepDetail.status === "SKIPPED"
@@ -529,11 +495,11 @@ export function OnBoardingItemPage() {
                 }`}
               >
                 {stepDetail.status === "FINISHED" ? (
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="h-4 w-4" />
                 ) : stepDetail.status === "SKIPPED" ? (
-                  <CircleArrowRight className="w-4 h-4" />
+                  <CircleArrowRight className="h-4 w-4" />
                 ) : (
-                  <Circle className="w-4 h-4" />
+                  <Circle className="h-4 w-4" />
                 )}
                 {stepDetail.status === "FINISHED"
                   ? "Finished"
@@ -544,19 +510,19 @@ export function OnBoardingItemPage() {
                       : "Open"}
               </div>
               {stepDetail.status === "FINISHED" && stepDetail.completedAt && (
-                <p className="text-xs text-app-text-muted mt-3">
+                <p className="mt-3 text-xs text-app-text-muted">
                   Completed on{" "}
-                  {new Date(stepDetail.completedAt).toLocaleDateString(
-                    "en-US",
-                    { year: "numeric", month: "short", day: "numeric" },
-                  )}
+                  {new Date(stepDetail.completedAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
                 </p>
               )}
               {stepDetail.startedAt && (
-                <p className="flex items-center gap-1.5 text-xs text-app-text-muted mt-3">
-                  <Clock3 className="w-3.5 h-3.5" />
-                  {stepDetail.status === "FINISHED" ||
-                  stepDetail.status === "SKIPPED"
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-app-text-muted">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  {stepDetail.status === "FINISHED" || stepDetail.status === "SKIPPED"
                     ? "Time spent: "
                     : "Time on step: "}
                   {formatMinutes(
@@ -578,9 +544,7 @@ export function OnBoardingItemPage() {
             {/* RESOURCES */}
             {resources.length > 0 && (
               <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-                <h3 className="font-semibold text-app-text text-sm mb-3">
-                  Resources
-                </h3>
+                <h3 className="mb-3 text-sm font-semibold text-app-text">Resources</h3>
                 <div className="space-y-2">
                   {resources.map((resource) => (
                     <a
@@ -588,19 +552,19 @@ export function OnBoardingItemPage() {
                       href={resource.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 rounded-xl border border-app-border hover:border-app-brand-border-strong transition-all group"
+                      className="group flex items-center justify-between rounded-xl border border-app-border p-3 transition-all hover:border-app-brand-border-strong"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-app-text truncate">
+                        <p className="truncate text-sm font-medium text-app-text">
                           {resource.title}
                         </p>
                         {resource.description && (
-                          <p className="text-xs text-app-text-subtle truncate mt-0.5">
+                          <p className="mt-0.5 truncate text-xs text-app-text-subtle">
                             {resource.description}
                           </p>
                         )}
                       </div>
-                      <ExternalLink className="w-4 h-4 text-app-text-subtle group-hover:text-app-brand transition-all shrink-0 ml-2" />
+                      <ExternalLink className="ml-2 h-4 w-4 shrink-0 text-app-text-subtle transition-all group-hover:text-app-brand" />
                     </a>
                   ))}
                 </div>
@@ -609,8 +573,8 @@ export function OnBoardingItemPage() {
 
             {/*SKIP STEP */}
             <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-app-text text-sm mb-3">
-                <CircleArrowRight className="w-4 h-4 text-app-danger-solid" />
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
+                <CircleArrowRight className="h-4 w-4 text-app-danger-solid" />
                 Skip Step
               </h3>
               <Textarea
@@ -620,11 +584,7 @@ export function OnBoardingItemPage() {
                 aria-label="Reason for skipping"
                 minRows={3}
                 maxRows={10}
-                disabled={
-                  skipLoading ||
-                  stepDetail.status === "SKIPPED" ||
-                  hasPendingSkipRequest
-                }
+                disabled={skipLoading || stepDetail.status === "SKIPPED" || hasPendingSkipRequest}
               />
               <Button
                 variant="primary"
@@ -632,72 +592,70 @@ export function OnBoardingItemPage() {
                 onClick={() => void skipCurrentStep()}
                 loading={skipLoading}
                 disabled={
-                  !skipReason.trim() ||
-                  stepDetail.status === "SKIPPED" ||
-                  hasPendingSkipRequest
+                  !skipReason.trim() || stepDetail.status === "SKIPPED" || hasPendingSkipRequest
                 }
               >
                 {skipLoading
                   ? "Skipping..."
                   : hasPendingSkipRequest
                     ? "Skip Requested"
-                  : stepDetail.status === "SKIPPED"
-                    ? "Step Skipped"
-                    : "Skip Step"}
+                    : stepDetail.status === "SKIPPED"
+                      ? "Step Skipped"
+                      : "Skip Step"}
               </Button>
             </div>
 
             {/* FEEDBACK */}
             <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-app-text text-sm mb-3">
-                <MessageSquareCheck className="w-4 h-4 text-app-brand" />
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
+                <MessageSquareCheck className="h-4 w-4 text-app-brand" />
                 Feedback
               </h3>
               {feedbackSubmitted ? (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2 text-sm text-app-text-muted">
                     {feedbackHelpful ? (
-                      <ThumbsUp className="w-4 h-4 text-app-success-solid" />
+                      <ThumbsUp className="h-4 w-4 text-app-success-solid" />
                     ) : (
-                      <ThumbsDown className="w-4 h-4 text-app-danger-solid" />
+                      <ThumbsDown className="h-4 w-4 text-app-danger-solid" />
                     )}
                     <span>{feedbackHelpful ? "Marked as helpful" : "Marked as not helpful"}</span>
                   </div>
                   {feedbackComment && (
-                    <p className="text-sm text-app-text bg-app-surface-muted rounded-xl p-3">
+                    <p className="rounded-xl bg-app-surface-muted p-3 text-sm text-app-text">
                       {feedbackComment}
                     </p>
                   )}
                   <button
                     onClick={() => setFeedbackSubmitted(false)}
-                    className="text-xs text-app-text-muted hover:text-app-text transition-all text-left"
+                    className="text-left text-xs text-app-text-muted transition-all hover:text-app-text"
                   >
                     Edit feedback
                   </button>
                 </div>
               ) : (
                 <>
-                  <div className="flex gap-2 mb-3">
+                  <div className="mb-3 flex gap-2">
                     <button
                       onClick={() => setFeedbackHelpful(true)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
+                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                         feedbackHelpful === true
                           ? "border-app-success-border bg-app-success-bg text-app-success-text"
                           : "border-app-border text-app-text-muted hover:border-app-brand-border-strong"
                       }`}
                     >
-                      <ThumbsUp className="w-4 h-4" />
+                      <ThumbsUp className="h-4 w-4" />
                       Helpful
                     </button>
                     <button
                       onClick={() => setFeedbackHelpful(false)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
+                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                         feedbackHelpful === false
                           ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
                           : "border-app-border text-app-text-muted hover:border-app-brand-border-strong"
                       }`}
                     >
-                      <ThumbsDown className="w-4 h-4" />
+                      <ThumbsDown className="h-4 w-4" />
                       Not helpful
                     </button>
                   </div>
@@ -712,9 +670,7 @@ export function OnBoardingItemPage() {
                   <Button
                     variant="primary"
                     onClick={() => void submitFeedback()}
-                    disabled={
-                      feedbackHelpful === null || !feedbackComment.trim()
-                    }
+                    disabled={feedbackHelpful === null || !feedbackComment.trim()}
                     loading={feedbackLoading}
                     className="mt-3"
                   >

@@ -17,20 +17,20 @@ let lockCount = 0;
 let restoreStyles: (() => void) | null = null;
 
 function lockElement(element: HTMLElement, scrollbarWidth: number): () => void {
-    const previousOverflow = element.style.overflow;
-    const previousPaddingRight = element.style.paddingRight;
+  const previousOverflow = element.style.overflow;
+  const previousPaddingRight = element.style.paddingRight;
 
-    element.style.overflow = "hidden";
+  element.style.overflow = "hidden";
 
-    if (scrollbarWidth > 0) {
-        const current = parseFloat(window.getComputedStyle(element).paddingRight) || 0;
-        element.style.paddingRight = `${current + scrollbarWidth}px`;
-    }
+  if (scrollbarWidth > 0) {
+    const current = parseFloat(window.getComputedStyle(element).paddingRight) || 0;
+    element.style.paddingRight = `${current + scrollbarWidth}px`;
+  }
 
-    return () => {
-        element.style.overflow = previousOverflow;
-        element.style.paddingRight = previousPaddingRight;
-    };
+  return () => {
+    element.style.overflow = previousOverflow;
+    element.style.paddingRight = previousPaddingRight;
+  };
 }
 
 /**
@@ -53,37 +53,34 @@ function lockElement(element: HTMLElement, scrollbarWidth: number): () => void {
  * close.
  */
 export function useScrollLock(locked: boolean) {
-    useLayoutEffect(() => {
-        if (!locked) return;
+  useLayoutEffect(() => {
+    if (!locked) return;
 
-        if (lockCount === 0) {
-            const scrollbarWidth =
-                window.innerWidth - document.documentElement.clientWidth;
+    if (lockCount === 0) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
-            const restores = [lockElement(document.body, scrollbarWidth)];
+      const restores = [lockElement(document.body, scrollbarWidth)];
 
-            document
-                .querySelectorAll<HTMLElement>(`[${SCROLL_CONTAINER_ATTRIBUTE}]`)
-                .forEach((element) => {
-                    // Its own scrollbar is inside the element, so it is measured
-                    // on the element rather than on the viewport.
-                    restores.push(
-                        lockElement(element, element.offsetWidth - element.clientWidth),
-                    );
-                });
+      document
+        .querySelectorAll<HTMLElement>(`[${SCROLL_CONTAINER_ATTRIBUTE}]`)
+        .forEach((element) => {
+          // Its own scrollbar is inside the element, so it is measured
+          // on the element rather than on the viewport.
+          restores.push(lockElement(element, element.offsetWidth - element.clientWidth));
+        });
 
-            restoreStyles = () => restores.forEach((restore) => restore());
-        }
+      restoreStyles = () => restores.forEach((restore) => restore());
+    }
 
-        lockCount += 1;
+    lockCount += 1;
 
-        return () => {
-            lockCount -= 1;
+    return () => {
+      lockCount -= 1;
 
-            if (lockCount === 0) {
-                restoreStyles?.();
-                restoreStyles = null;
-            }
-        };
-    }, [locked]);
+      if (lockCount === 0) {
+        restoreStyles?.();
+        restoreStyles = null;
+      }
+    };
+  }, [locked]);
 }

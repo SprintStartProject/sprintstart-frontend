@@ -10,9 +10,7 @@ import {
   connectGithubRepository,
   connectRepositories,
 } from "../../../services/sources/githubService.ts";
-import {
-  parseGithubRepositoryInput,
-} from "../../../services/sources/githubRepositoryInput.ts";
+import { parseGithubRepositoryInput } from "../../../services/sources/githubRepositoryInput.ts";
 import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel.tsx";
 import { SOURCE_META } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
@@ -56,9 +54,7 @@ export function AddSourceModal({
   const [step, setStep] = useState<WizardStep>("type");
   const [selectedType, setSelectedType] = useState<SourceSystem>("GITHUB");
   // Within the GitHub step: browse an org/user, or add one known repository.
-  const [githubMode, setGithubMode] = useState<"discover" | "single">(
-    "discover",
-  );
+  const [githubMode, setGithubMode] = useState<"discover" | "single">("discover");
   const [singleOwner, setSingleOwner] = useState("");
   const [singleName, setSingleName] = useState("");
   // Locks Back/Cancel while an upload batch is in flight.
@@ -87,9 +83,7 @@ export function AddSourceModal({
   // Resolved multi-select from the discovery picker.
   const [selection, setSelection] = useState<DiscoverySelection[]>([]);
 
-  const [connectState, setConnectState] = useState<
-    "idle" | "loading" | "error"
-  >("idle");
+  const [connectState, setConnectState] = useState<"idle" | "loading" | "error">("idle");
   const [connectError, setConnectError] = useState<string | null>(null);
 
   const isGithub = selectedType === "GITHUB";
@@ -105,8 +99,7 @@ export function AddSourceModal({
     if (!canIngest) {
       setConnectState("error");
       setConnectError(
-        ingestBlockedReason ??
-          "You can only connect sources to projects you manage.",
+        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
       );
       return;
     }
@@ -122,12 +115,8 @@ export function AddSourceModal({
 
     // Repos already ingested elsewhere are linked to this project (reusing their
     // artifacts); only genuinely new ones go through fetch + ingestion.
-    const toLink = selection.filter(
-      (repository) => repository.linkState === "linkable",
-    );
-    const toIngest = selection.filter(
-      (repository) => repository.linkState !== "linkable",
-    );
+    const toLink = selection.filter((repository) => repository.linkState === "linkable");
+    const toIngest = selection.filter((repository) => repository.linkState !== "linkable");
 
     try {
       for (const repository of toLink) {
@@ -178,8 +167,7 @@ export function AddSourceModal({
     if (!canIngest) {
       setConnectState("error");
       setConnectError(
-        ingestBlockedReason ??
-          "You can only connect sources to projects you manage.",
+        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
       );
       return;
     }
@@ -216,9 +204,7 @@ export function AddSourceModal({
     } catch (error) {
       setConnectState("error");
       setConnectError(
-        error instanceof Error
-          ? error.message
-          : "The repository could not be connected.",
+        error instanceof Error ? error.message : "The repository could not be connected.",
       );
     }
   };
@@ -238,12 +224,7 @@ export function AddSourceModal({
     <Modal
       isOpen
       title={modalTitle}
-      description={
-        <Stepper
-          steps={["Source type", "Connect"]}
-          current={step === "type" ? 0 : 1}
-        />
-      }
+      description={<Stepper steps={["Source type", "Connect"]} current={step === "type" ? 0 : 1} />}
       size="xl"
       isDismissDisabled={connectState === "loading" || isUploadingFiles}
       onClose={onClose}
@@ -321,9 +302,7 @@ export function AddSourceModal({
                 disabled={!canIngest}
                 loading={connectState === "loading"}
               >
-                {connectState === "loading"
-                  ? "Connecting…"
-                  : "Connect repository"}
+                {connectState === "loading" ? "Connecting…" : "Connect repository"}
               </Button>
             )}
 
@@ -347,10 +326,7 @@ export function AddSourceModal({
       }
     >
       {step === "type" ? (
-        <SourceTypeStep
-          selectedType={selectedType}
-          onSelectType={setSelectedType}
-        />
+        <SourceTypeStep selectedType={selectedType} onSelectType={setSelectedType} />
       ) : isUpload ? (
         projectId ? (
           <UploadArtifactPanel
@@ -383,8 +359,7 @@ export function AddSourceModal({
         <div className="space-y-5">
           {!canIngest && (
             <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-              {ingestBlockedReason ??
-                "You can only connect sources to projects you manage."}
+              {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
             </div>
           )}
 
@@ -450,24 +425,20 @@ function SingleRepositoryStep({
     >
       {!canIngest && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          {ingestBlockedReason ??
-            "You can only connect sources to projects you manage."}
+          {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
         </div>
       )}
 
       {!hasTokens && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Add a GitHub personal access token in Settings first, then come back to
-          connect a repository.
+          Add a GitHub personal access token in Settings first, then come back to connect a
+          repository.
         </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor="single-repo-owner"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="single-repo-owner" className="text-sm font-medium text-app-text">
             Repository owner
           </label>
           <Input
@@ -481,10 +452,7 @@ function SingleRepositoryStep({
         </div>
 
         <div>
-          <label
-            htmlFor="single-repo-name"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="single-repo-name" className="text-sm font-medium text-app-text">
             Repository name
           </label>
           <Input
@@ -499,10 +467,7 @@ function SingleRepositoryStep({
       </div>
 
       <div>
-        <label
-          htmlFor="single-repo-token"
-          className="text-sm font-medium text-app-text"
-        >
+        <label htmlFor="single-repo-token" className="text-sm font-medium text-app-text">
           Access token
         </label>
         <Select
@@ -525,8 +490,8 @@ function SingleRepositoryStep({
       </div>
 
       <p className="text-xs text-app-text-subtle">
-        Paste a full GitHub URL or <code>owner/name</code> into the owner field
-        and the repository name is filled in for you.
+        Paste a full GitHub URL or <code>owner/name</code> into the owner field and the repository
+        name is filled in for you.
       </p>
 
       {errorMessage && (

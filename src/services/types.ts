@@ -4,8 +4,7 @@ export const PermissionGroup = {
   HR: "HR",
   ADMIN: "ADMIN",
 } as const;
-export type PermissionGroup =
-  (typeof PermissionGroup)[keyof typeof PermissionGroup];
+export type PermissionGroup = (typeof PermissionGroup)[keyof typeof PermissionGroup];
 
 export const DocumentStatus = {
   PENDING: "PENDING",
@@ -13,8 +12,7 @@ export const DocumentStatus = {
   COMPLETED: "COMPLETED",
   FAILED: "FAILED",
 } as const;
-export type DocumentStatus =
-  (typeof DocumentStatus)[keyof typeof DocumentStatus];
+export type DocumentStatus = (typeof DocumentStatus)[keyof typeof DocumentStatus];
 
 export type DocumentMetadata = {
   id: string;

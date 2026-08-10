@@ -9,9 +9,9 @@ import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 const RETAIN_WHILE_CLOSING_MS = SIDE_PANEL_SLIDE_MS + 30;
 
 type PanelPresenceProps<T> = {
-    /** The entity the panel is showing, or `null`/`undefined` when it should close. */
-    value: T | null | undefined;
-    children: (value: T) => ReactNode;
+  /** The entity the panel is showing, or `null`/`undefined` when it should close. */
+  value: T | null | undefined;
+  children: (value: T) => ReactNode;
 };
 
 /**
@@ -33,35 +33,35 @@ type PanelPresenceProps<T> = {
  * ```
  */
 export function PanelPresence<T>({ value, children }: PanelPresenceProps<T>) {
-    const isOpen = value !== null && value !== undefined;
-    const [retained, setRetained] = useState<T | null>(value ?? null);
+  const isOpen = value !== null && value !== undefined;
+  const [retained, setRetained] = useState<T | null>(value ?? null);
 
-    // Deriving state from props during render is the supported pattern here:
-    // React discards this render and immediately re-runs it, so no extra
-    // commit is ever painted.
-    if (isOpen && value !== retained) {
-        setRetained(value);
-    }
+  // Deriving state from props during render is the supported pattern here:
+  // React discards this render and immediately re-runs it, so no extra
+  // commit is ever painted.
+  if (isOpen && value !== retained) {
+    setRetained(value);
+  }
 
-    useEffect(() => {
-        if (isOpen) return;
+  useEffect(() => {
+    if (isOpen) return;
 
-        const timeoutId = window.setTimeout(() => {
-            setRetained(null);
-        }, RETAIN_WHILE_CLOSING_MS);
+    const timeoutId = window.setTimeout(() => {
+      setRetained(null);
+    }, RETAIN_WHILE_CLOSING_MS);
 
-        return () => {
-            window.clearTimeout(timeoutId);
-        };
-    }, [isOpen]);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen]);
 
-    if (retained === null) {
-        return null;
-    }
+  if (retained === null) {
+    return null;
+  }
 
-    return (
-        <PanelPresenceContext.Provider value={{ isOpen }}>
-            {children(retained)}
-        </PanelPresenceContext.Provider>
-    );
+  return (
+    <PanelPresenceContext.Provider value={{ isOpen }}>
+      {children(retained)}
+    </PanelPresenceContext.Provider>
+  );
 }

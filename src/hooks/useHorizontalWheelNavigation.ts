@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RefCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RefCallback } from "react";
 
 /**
  * How much horizontal travel a gesture needs before it counts as a swipe.
@@ -31,10 +31,10 @@ const REACCELERATION_FACTOR = 1.25;
 const REACCELERATION_FLOOR_PX = 2;
 
 type UseHorizontalWheelNavigationOptions = {
-    onNext: () => void;
-    onPrevious: () => void;
-    /** Set false to leave the gesture alone, e.g. while a dialog is open. */
-    enabled?: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  /** Set false to leave the gesture alone, e.g. while a dialog is open. */
+  enabled?: boolean;
 };
 
 /**
@@ -42,25 +42,22 @@ type UseHorizontalWheelNavigationOptions = {
  * on its own -- a tab bar that overflows, a wide table. Those keep their own
  * gesture; stealing it would make them unreachable on a trackpad.
  */
-function startedInHorizontalScroller(
-    target: EventTarget | null,
-    boundary: HTMLElement,
-): boolean {
-    let node = target instanceof HTMLElement ? target : null;
+function startedInHorizontalScroller(target: EventTarget | null, boundary: HTMLElement): boolean {
+  let node = target instanceof HTMLElement ? target : null;
 
-    while (node && node !== boundary) {
-        // A few pixels of overflow is rounding, not a scroller. Treating it as
-        // one would silently swallow gestures over ordinary content.
-        if (node.scrollWidth - node.clientWidth > 4) {
-            const { overflowX } = window.getComputedStyle(node);
+  while (node && node !== boundary) {
+    // A few pixels of overflow is rounding, not a scroller. Treating it as
+    // one would silently swallow gestures over ordinary content.
+    if (node.scrollWidth - node.clientWidth > 4) {
+      const { overflowX } = window.getComputedStyle(node);
 
-            if (overflowX === 'auto' || overflowX === 'scroll') return true;
-        }
-
-        node = node.parentElement;
+      if (overflowX === "auto" || overflowX === "scroll") return true;
     }
 
-    return false;
+    node = node.parentElement;
+  }
+
+  return false;
 }
 
 /**
@@ -77,109 +74,107 @@ function startedInHorizontalScroller(
  * markup appears -- the listener would simply never be attached.
  */
 export function useHorizontalWheelNavigation<T extends HTMLElement>({
-    onNext,
-    onPrevious,
-    enabled = true,
+  onNext,
+  onPrevious,
+  enabled = true,
 }: UseHorizontalWheelNavigationOptions): RefCallback<T> {
-    const [element, setElement] = useState<T | null>(null);
+  const [element, setElement] = useState<T | null>(null);
 
-    // Read through refs so the listener is attached once, instead of being torn
-    // down and rebuilt on every render that changes a handler identity.
-    const onNextRef = useRef(onNext);
-    const onPreviousRef = useRef(onPrevious);
+  // Read through refs so the listener is attached once, instead of being torn
+  // down and rebuilt on every render that changes a handler identity.
+  const onNextRef = useRef(onNext);
+  const onPreviousRef = useRef(onPrevious);
 
-    useEffect(() => {
-        onNextRef.current = onNext;
-        onPreviousRef.current = onPrevious;
-    }, [onNext, onPrevious]);
+  useEffect(() => {
+    onNextRef.current = onNext;
+    onPreviousRef.current = onPrevious;
+  }, [onNext, onPrevious]);
 
-    useEffect(() => {
-        if (!element || !enabled) return;
+  useEffect(() => {
+    if (!element || !enabled) return;
 
-        let travelled = 0;
-        /** -1 previous, 1 next, 0 nothing yet -- for this gesture. */
-        let lastFired = 0;
-        let previousMagnitude = 0;
-        let horizontalGesture = false;
-        let endTimer = 0;
+    let travelled = 0;
+    /** -1 previous, 1 next, 0 nothing yet -- for this gesture. */
+    let lastFired = 0;
+    let previousMagnitude = 0;
+    let horizontalGesture = false;
+    let endTimer = 0;
 
-        function handleWheel(event: WheelEvent) {
-            if (!element) return;
+    function handleWheel(event: WheelEvent) {
+      if (!element) return;
 
-            // The axis is decided once, on the first event of the gesture, and
-            // then held: a real swipe drifts vertically halfway through, and
-            // re-deciding per event would keep dropping it back out of the
-            // gesture and losing the travel accumulated so far.
-            if (!horizontalGesture) {
-                if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
-                if (startedInHorizontalScroller(event.target, element)) return;
+      // The axis is decided once, on the first event of the gesture, and
+      // then held: a real swipe drifts vertically halfway through, and
+      // re-deciding per event would keep dropping it back out of the
+      // gesture and losing the travel accumulated so far.
+      if (!horizontalGesture) {
+        if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+        if (startedInHorizontalScroller(event.target, element)) return;
 
-                horizontalGesture = true;
-            }
+        horizontalGesture = true;
+      }
 
-            event.preventDefault();
+      event.preventDefault();
 
-            window.clearTimeout(endTimer);
-            endTimer = window.setTimeout(() => {
-                travelled = 0;
-                lastFired = 0;
-                previousMagnitude = 0;
-                horizontalGesture = false;
-            }, GESTURE_END_MS);
+      window.clearTimeout(endTimer);
+      endTimer = window.setTimeout(() => {
+        travelled = 0;
+        lastFired = 0;
+        previousMagnitude = 0;
+        horizontalGesture = false;
+      }, GESTURE_END_MS);
 
-            // Swiping again before the last flick has finished coasting is the
-            // normal way to move two tabs over, and waiting for the momentum to
-            // die first is what made that feel stuck. A flick that speeds back
-            // up is a new one, so the direction lock is dropped and the count
-            // starts over.
-            const magnitude = Math.abs(event.deltaX);
+      // Swiping again before the last flick has finished coasting is the
+      // normal way to move two tabs over, and waiting for the momentum to
+      // die first is what made that feel stuck. A flick that speeds back
+      // up is a new one, so the direction lock is dropped and the count
+      // starts over.
+      const magnitude = Math.abs(event.deltaX);
 
-            if (
-                lastFired !== 0 &&
-                magnitude >
-                    previousMagnitude * REACCELERATION_FACTOR +
-                        REACCELERATION_FLOOR_PX
-            ) {
-                lastFired = 0;
-                travelled = 0;
-            }
+      if (
+        lastFired !== 0 &&
+        magnitude > previousMagnitude * REACCELERATION_FACTOR + REACCELERATION_FLOOR_PX
+      ) {
+        lastFired = 0;
+        travelled = 0;
+      }
 
-            previousMagnitude = magnitude;
-            travelled += event.deltaX;
+      previousMagnitude = magnitude;
+      travelled += event.deltaX;
 
-            // Blocked per direction rather than per gesture. A flick keeps
-            // coasting in the direction it was thrown, so repeating the same
-            // direction has to be refused -- but swiping straight back the
-            // other way is a new intent, and waiting out the momentum of the
-            // first flick before accepting it is what felt unresponsive.
-            if (travelled >= SWIPE_THRESHOLD_PX && lastFired !== 1) {
-                lastFired = 1;
-                travelled = 0;
-                onNextRef.current();
-            } else if (travelled <= -SWIPE_THRESHOLD_PX && lastFired !== -1) {
-                lastFired = -1;
-                travelled = 0;
-                onPreviousRef.current();
-            }
-        }
+      // Blocked per direction rather than per gesture. A flick keeps
+      // coasting in the direction it was thrown, so repeating the same
+      // direction has to be refused -- but swiping straight back the
+      // other way is a new intent, and waiting out the momentum of the
+      // first flick before accepting it is what felt unresponsive.
+      if (travelled >= SWIPE_THRESHOLD_PX && lastFired !== 1) {
+        lastFired = 1;
+        travelled = 0;
+        onNextRef.current();
+      } else if (travelled <= -SWIPE_THRESHOLD_PX && lastFired !== -1) {
+        lastFired = -1;
+        travelled = 0;
+        onPreviousRef.current();
+      }
+    }
 
-        element.addEventListener('wheel', handleWheel, { passive: false });
+    element.addEventListener("wheel", handleWheel, { passive: false });
 
-        return () => {
-            element.removeEventListener('wheel', handleWheel);
-            window.clearTimeout(endTimer);
-        };
-    }, [element, enabled]);
+    return () => {
+      element.removeEventListener("wheel", handleWheel);
+      window.clearTimeout(endTimer);
+    };
+  }, [element, enabled]);
 
-    return useCallback((node: T | null) => setElement(node), []);
+  return useCallback((node: T | null) => setElement(node), []);
 }
 
 type UseSwipeableTabsOptions<TTab extends string> = {
-    /** Left-to-right order of the tabs, the same list the bar renders from. */
-    order: readonly TTab[];
-    value: TTab;
-    onChange: (tab: TTab) => void;
-    enabled?: boolean;
+  /** Left-to-right order of the tabs, the same list the bar renders from. */
+  order: readonly TTab[];
+  value: TTab;
+  onChange: (tab: TTab) => void;
+  enabled?: boolean;
 };
 
 /**
@@ -191,20 +186,20 @@ type UseSwipeableTabsOptions<TTab extends string> = {
  * the end.
  */
 export function useSwipeableTabs<TTab extends string, T extends HTMLElement>({
-    order,
-    value,
-    onChange,
-    enabled,
+  order,
+  value,
+  onChange,
+  enabled,
 }: UseSwipeableTabsOptions<TTab>): RefCallback<T> {
-    function step(offset: number) {
-        const next = order[order.indexOf(value) + offset];
+  function step(offset: number) {
+    const next = order[order.indexOf(value) + offset];
 
-        if (next !== undefined && next !== value) onChange(next);
-    }
+    if (next !== undefined && next !== value) onChange(next);
+  }
 
-    return useHorizontalWheelNavigation<T>({
-        onNext: () => step(1),
-        onPrevious: () => step(-1),
-        enabled,
-    });
+  return useHorizontalWheelNavigation<T>({
+    onNext: () => step(1),
+    onPrevious: () => step(-1),
+    enabled,
+  });
 }

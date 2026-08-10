@@ -23,10 +23,7 @@ import {
   GithubRepositoryDiscovery,
   type DiscoverySelection,
 } from "../../data-ingestion/components/GithubRepositoryDiscovery";
-import {
-  ComingSoonStep,
-  SourceTypeStep,
-} from "../../data-ingestion/components/SourceTypeStep";
+import { ComingSoonStep, SourceTypeStep } from "../../data-ingestion/components/SourceTypeStep";
 import type { SourceSystem } from "../../data-ingestion/types";
 import { MemberPicker } from "./MemberPicker";
 import { StagedSourceList } from "./StagedSourceList";
@@ -84,13 +81,9 @@ export function CreateProjectWizard({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [managerId, setManagerId] = useState("");
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
 
-  const [managerCandidates, setManagerCandidates] = useState<ProjectManager[]>(
-    [],
-  );
+  const [managerCandidates, setManagerCandidates] = useState<ProjectManager[]>([]);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState("");
 
@@ -129,9 +122,7 @@ export function CreateProjectWizard({
       setManagerCandidates(await projectService.getManagerCandidates());
     } catch (error) {
       setCandidatesError(
-        error instanceof Error
-          ? error.message
-          : "Manager candidates could not be loaded.",
+        error instanceof Error ? error.message : "Manager candidates could not be loaded.",
       );
     } finally {
       setIsLoadingCandidates(false);
@@ -236,9 +227,7 @@ export function CreateProjectWizard({
       // attempt; a retry reuses `sources`, which already carries per-repo status.
       let toConnect = sources;
       if (sources.length === 0 && selection.length > 0) {
-        toConnect = selection.map((item) =>
-          createDraftSourceFromDiscovery(item, tokenName),
-        );
+        toConnect = selection.map((item) => createDraftSourceFromDiscovery(item, tokenName));
         setSources(toConnect);
       }
 
@@ -250,27 +239,19 @@ export function CreateProjectWizard({
         return;
       }
 
-      const connectedSources = await connectDraftSources(
-        projectId,
-        toConnect,
-        setSources,
-      );
+      const connectedSources = await connectDraftSources(projectId, toConnect, setSources);
 
       if (hasFailedSources(connectedSources)) {
         // The project is already saved; keep the wizard open so the failed
         // repositories can be retried or dropped without losing the list.
-        setSubmitError(
-          "The project was created, but some repositories could not be connected.",
-        );
+        setSubmitError("The project was created, but some repositories could not be connected.");
         return;
       }
 
       resetWizard();
       onClose();
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Project could not be created.",
-      );
+      setSubmitError(error instanceof Error ? error.message : "Project could not be created.");
     } finally {
       setIsSubmitting(false);
     }
@@ -291,9 +272,8 @@ export function CreateProjectWizard({
           setSources((current) =>
             current.map(
               (currentSource) =>
-                progressSources.find(
-                  (progressSource) => progressSource.id === currentSource.id,
-                ) ?? currentSource,
+                progressSources.find((progressSource) => progressSource.id === currentSource.id) ??
+                currentSource,
             ),
           ),
       );
@@ -313,10 +293,8 @@ export function CreateProjectWizard({
   // turns into a plain way out.
   const isProjectCreated = Boolean(createdProjectId);
   // The two halves of the sources step, shown only before the project exists.
-  const isTypeStep =
-    step === "sources" && !isProjectCreated && sourceStep === "type";
-  const isDetailStep =
-    step === "sources" && !isProjectCreated && sourceStep === "detail";
+  const isTypeStep = step === "sources" && !isProjectCreated && sourceStep === "type";
+  const isDetailStep = step === "sources" && !isProjectCreated && sourceStep === "detail";
 
   // Details → people → source type → repositories. The post-create staged list
   // stays on the last step, which is where the repositories were being
@@ -328,10 +306,7 @@ export function CreateProjectWizard({
       isOpen={isOpen}
       title="New Project"
       description={
-        <Stepper
-          steps={["Details", "People", "Source type", "Connect"]}
-          current={stepIndex}
-        />
+        <Stepper steps={["Details", "People", "Source type", "Connect"]} current={stepIndex} />
       }
       size="xl"
       isDismissDisabled={isSubmitting}
@@ -351,11 +326,7 @@ export function CreateProjectWizard({
                     : () => setStep("people")
             }
             disabled={isSubmitting}
-            icon={
-              isDetailsStep || isProjectCreated ? undefined : (
-                <ArrowLeft className="h-4 w-4" />
-              )
-            }
+            icon={isDetailsStep || isProjectCreated ? undefined : <ArrowLeft className="h-4 w-4" />}
           >
             {isDetailsStep ? "Cancel" : isProjectCreated ? "Done" : "Back"}
           </Button>
@@ -363,11 +334,7 @@ export function CreateProjectWizard({
           {isTypeStep && (
             // Lets the user create the project straight away, choosing to attach
             // sources later from its Data Ingestion page instead of now.
-            <Button
-              variant="secondary"
-              onClick={() => void finish()}
-              loading={isSubmitting}
-            >
+            <Button variant="secondary" onClick={() => void finish()} loading={isSubmitting}>
               Skip for now
             </Button>
           )}
@@ -423,10 +390,7 @@ export function CreateProjectWizard({
           }}
         >
           <Field label="Name" controlId={nameInputId}>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
+            <Input value={name} onChange={(event) => setName(event.target.value)} />
           </Field>
 
           <Field label="Description" controlId={descriptionInputId}>
@@ -437,7 +401,6 @@ export function CreateProjectWizard({
               maxRows={12}
             />
           </Field>
-
         </form>
       ) : isPeopleStep ? (
         <form
@@ -478,8 +441,7 @@ export function CreateProjectWizard({
             )}
 
             <p className="text-xs text-app-text-muted">
-              The manager becomes a member automatically, so they do not have to
-              be ticked below.
+              The manager becomes a member automatically, so they do not have to be ticked below.
             </p>
           </Field>
 
@@ -489,9 +451,7 @@ export function CreateProjectWizard({
             disabled={isSubmitting}
             label="Members"
             onToggleUser={(userId) =>
-              setSelectedUserIds((current) =>
-                toggleSelectedUserId(current, userId),
-              )
+              setSelectedUserIds((current) => toggleSelectedUserId(current, userId))
             }
             onToggleVisible={(visibleUsers, allSelected) =>
               setSelectedUserIds((current) =>
@@ -506,9 +466,7 @@ export function CreateProjectWizard({
         <StagedSourceList
           sources={sources}
           disabled={isSubmitting}
-          onRemove={(sourceId) =>
-            setSources((current) => removeDraftSource(current, sourceId))
-          }
+          onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
           onRetry={(sourceId) => void retrySource(sourceId)}
         />
       ) : isTypeStep ? (
@@ -531,8 +489,8 @@ export function CreateProjectWizard({
         <ComingSoonStep sourceSystem="JIRA" />
       ) : (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Files can be uploaded once the project exists. Create the project
-          first, then add uploads from its Data Ingestion page.
+          Files can be uploaded once the project exists. Create the project first, then add uploads
+          from its Data Ingestion page.
         </div>
       )}
     </Modal>

@@ -45,7 +45,7 @@ const ROCKET_MAX = 64;
 
 /** Resolves the rocket's on-screen size against the viewport it is drawn in. */
 export function rocketSizeFor(width: number): number {
-    return Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH));
+  return Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH));
 }
 
 /**
@@ -68,18 +68,18 @@ const FLYBY_PEAK_MIN = 180;
 const FLYBY_TRAIL_RATIO = 2.4;
 
 export interface FlybyGeometry {
-    /** Edge length of the rocket at the middle of the pass, in px. */
-    peakSize: number;
-    /** Start offset from the viewport centre, in px. */
-    fromX: number;
-    fromY: number;
-    /** End offset from the viewport centre, in px. */
-    toX: number;
-    toY: number;
-    /** Nose angle, in degrees clockwise from "up". */
-    rotate: number;
-    /** Length of the exhaust trail at the peak, in px. */
-    trailLength: number;
+  /** Edge length of the rocket at the middle of the pass, in px. */
+  peakSize: number;
+  /** Start offset from the viewport centre, in px. */
+  fromX: number;
+  fromY: number;
+  /** End offset from the viewport centre, in px. */
+  toX: number;
+  toY: number;
+  /** Nose angle, in degrees clockwise from "up". */
+  rotate: number;
+  /** Length of the exhaust trail at the peak, in px. */
+  trailLength: number;
 }
 
 /**
@@ -89,23 +89,23 @@ export interface FlybyGeometry {
  * ends with a rocket visibly parked outside the frame on a wide monitor.
  */
 export function flybyGeometry(width: number, height: number): FlybyGeometry {
-    const peakSize = Math.max(FLYBY_PEAK_MIN, Math.min(width, height) * FLYBY_PEAK_OF_MIN);
+  const peakSize = Math.max(FLYBY_PEAK_MIN, Math.min(width, height) * FLYBY_PEAK_OF_MIN);
 
-    // Bottom-left to top-right, through the centre.
-    const fromX = -(width / 2 + peakSize);
-    const fromY = height / 2 + peakSize;
-    const toX = -fromX;
-    const toY = -fromY;
+  // Bottom-left to top-right, through the centre.
+  const fromX = -(width / 2 + peakSize);
+  const fromY = height / 2 + peakSize;
+  const toX = -fromX;
+  const toY = -fromY;
 
-    return {
-        peakSize,
-        fromX,
-        fromY,
-        toX,
-        toY,
-        rotate: (Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI,
-        trailLength: peakSize * FLYBY_TRAIL_RATIO,
-    };
+  return {
+    peakSize,
+    fromX,
+    fromY,
+    toX,
+    toY,
+    rotate: (Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI,
+    trailLength: peakSize * FLYBY_TRAIL_RATIO,
+  };
 }
 
 /**
@@ -132,17 +132,17 @@ const PET_MAX_CLIMB = 0.34;
 export const PET_ROCKET_SIZE = 40;
 
 export interface LaunchGeometry {
-    /** Edge length of the rocket, in px. */
-    rocketSize: number;
-    /** Launch pad, in px from the left of the viewport. */
-    padX: number;
-    /** Launch pad, in px from the top of the viewport. */
-    padY: number;
-    /** Length of the exhaust trail at full stretch, in px. */
-    trailLength: number;
-    /** Angle of the exhaust trail, in degrees from horizontal. */
-    trailAngle: number;
-    flight: FlightPath;
+  /** Edge length of the rocket, in px. */
+  rocketSize: number;
+  /** Launch pad, in px from the left of the viewport. */
+  padX: number;
+  /** Launch pad, in px from the top of the viewport. */
+  padY: number;
+  /** Length of the exhaust trail at full stretch, in px. */
+  trailLength: number;
+  /** Angle of the exhaust trail, in degrees from horizontal. */
+  trailAngle: number;
+  flight: FlightPath;
 }
 
 /**
@@ -159,26 +159,23 @@ export interface LaunchGeometry {
  * on nine different monitors is not a plan.
  */
 export function launchGeometry(width: number, height: number): LaunchGeometry {
-    const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
+  const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
 
-    const dx = FLIGHT_X * band;
-    const dy = FLIGHT_Y * height;
+  const dx = FLIGHT_X * band;
+  const dy = FLIGHT_Y * height;
 
-    return {
-        rocketSize: Math.min(
-            ROCKET_MAX,
-            Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH),
-        ),
-        // Band centred, so an ultrawide launches across the middle of the screen
-        // rather than out of its left third.
-        padX: (width - band) / 2 + PAD_X * band,
-        padY: PAD_Y * height,
-        trailLength: Math.hypot(dx, dy),
-        trailAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
-        // Entered from 0°, so the rocket leaves the pad pointing straight up and
-        // tips into its heading as it climbs, the way a launch actually looks.
-        flight: loopFlight({ dx, dy, entryRotate: 0 }),
-    };
+  return {
+    rocketSize: Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH)),
+    // Band centred, so an ultrawide launches across the middle of the screen
+    // rather than out of its left third.
+    padX: (width - band) / 2 + PAD_X * band,
+    padY: PAD_Y * height,
+    trailLength: Math.hypot(dx, dy),
+    trailAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
+    // Entered from 0°, so the rocket leaves the pad pointing straight up and
+    // tips into its heading as it climbs, the way a launch actually looks.
+    flight: loopFlight({ dx, dy, entryRotate: 0 }),
+  };
 }
 
 /**
@@ -190,15 +187,15 @@ export function launchGeometry(width: number, height: number): LaunchGeometry {
  * a window resize.
  */
 export function petFlight(width: number, height: number): FlightPath {
-    // Same band as the launch, for the same reason: past 16:9 the width drives a
-    // loop bigger than the screen is tall.
-    const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
+  // Same band as the launch, for the same reason: past 16:9 the width drives a
+  // loop bigger than the screen is tall.
+  const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
 
-    return loopFlight({
-        dx: -PET_X * band,
-        dy: -Math.min(PET_Y * height, PET_MAX_CLIMB * band),
-        // Entered from 0°: the pet rests upright on its perch and leans into the
-        // climb rather than snapping to its heading on the first frame.
-        entryRotate: 0,
-    });
+  return loopFlight({
+    dx: -PET_X * band,
+    dy: -Math.min(PET_Y * height, PET_MAX_CLIMB * band),
+    // Entered from 0°: the pet rests upright on its perch and leans into the
+    // climb rather than snapping to its heading on the first frame.
+    entryRotate: 0,
+  });
 }

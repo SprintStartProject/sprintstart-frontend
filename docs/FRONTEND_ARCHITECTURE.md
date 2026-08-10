@@ -6,6 +6,7 @@ repository is self-sufficient: a developer cloning only `sprintstart-frontend/` 
 the full architecture picture without needing root files.
 
 > **Related docs**
+>
 > - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — TS / React / Tailwind / a11y rules.
 > - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
@@ -32,21 +33,21 @@ and uses **Keycloak** for identity and access management.
 
 ## 2. Tech stack
 
-| Area | Technology |
-| --- | --- |
-| UI framework | **React 19** |
-| Routing | **React Router v7** (`react-router-dom` ^7) |
-| Language | **TypeScript** (strict, `verbatimModuleSyntax`) |
-| Build tooling | **Vite 8** |
-| Styling | **Tailwind CSS v4** (semantic design tokens, light/dark themes) |
-| Animation | **Framer Motion 12** (centralized spring tokens) |
-| Authentication | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11** |
-| Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter` |
-| Icons | `lucide-react` |
-| Avatars | `boring-avatars` |
-| Unit testing | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`) |
-| Component dev | **Storybook 10** |
-| Linting / formatting | **ESLint 9** (flat config: `typescript-eslint`, `react`, `react-hooks`, `jsx-a11y`, `prettier`) |
+| Area                      | Technology                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| UI framework              | **React 19**                                                                                    |
+| Routing                   | **React Router v7** (`react-router-dom` ^7)                                                     |
+| Language                  | **TypeScript** (strict, `verbatimModuleSyntax`)                                                 |
+| Build tooling             | **Vite 8**                                                                                      |
+| Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes)                                 |
+| Animation                 | **Framer Motion 12** (centralized spring tokens)                                                |
+| Authentication            | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11**           |
+| Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter`       |
+| Icons                     | `lucide-react`                                                                                  |
+| Avatars                   | `boring-avatars`                                                                                |
+| Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`)                               |
+| Component dev             | **Storybook 10**                                                                                |
+| Linting / formatting      | **ESLint 9** (flat config: `typescript-eslint`, `react`, `react-hooks`, `jsx-a11y`, `prettier`) |
 
 ---
 
@@ -137,12 +138,12 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
 
 **Four permission groups** (defined in `src/services/types.ts` as `PermissionGroup`):
 
-| Group | Intended for |
-| --- | --- |
-| `USER` | Regular onboarding users |
-| `PM` | Project managers (team overview, dashboards) |
-| `HR` | People ops (admin-style surfaces) |
-| `ADMIN` | Full system administration |
+| Group   | Intended for                                 |
+| ------- | -------------------------------------------- |
+| `USER`  | Regular onboarding users                     |
+| `PM`    | Project managers (team overview, dashboards) |
+| `HR`    | People ops (admin-style surfaces)            |
+| `ADMIN` | Full system administration                   |
 
 > **New protected routes must be added to `AppRoute` + `routePermissions`**, or they
 > won't type-check and won't be access-controlled.
@@ -170,12 +171,12 @@ Declared in `AppRouter.tsx` (17 routes):
 There is **no global store** (no Redux, Zustand, etc.). Cross-cutting state is
 handled by React Context providers in `src/context/`:
 
-| Provider / hook | File | Responsibility |
-| --- | --- | --- |
-| `AuthProvider` + `useAuth` | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts` | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
-| `ThemeProvider` + `useTheme` | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts` | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice. |
-| `ChatProvider` | `ChatProvider.tsx`, `ChatContext.ts` | Active conversation state for the chatbot feature. |
-| `ChatPreferencesProvider` + `useChatPreferences` | `ChatPreferencesProvider.tsx`, `ChatPreferencesContext.ts`, `useChatPreferences.ts` | Per-user chat UI preferences. |
+| Provider / hook                                  | File                                                                                | Responsibility                                                                               |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `AuthProvider` + `useAuth`                       | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts`                                  | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
+| `ThemeProvider` + `useTheme`                     | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts`                               | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice.    |
+| `ChatProvider`                                   | `ChatProvider.tsx`, `ChatContext.ts`                                                | Active conversation state for the chatbot feature.                                           |
+| `ChatPreferencesProvider` + `useChatPreferences` | `ChatPreferencesProvider.tsx`, `ChatPreferencesContext.ts`, `useChatPreferences.ts` | Per-user chat UI preferences.                                                                |
 
 Feature-local state stays inside the feature (e.g. `onboarding` step state lives in
 `features/onboarding/`).
@@ -212,30 +213,30 @@ line-splitting / JSON-parsing logic lives in exactly one place.
 One module per domain. Each exports typed functions and surfaces backend failures
 (no empty `catch`, no silent swallow):
 
-| Module | Domain |
-| --- | --- |
-| `adminUserService.ts` | Admin user management |
-| `apiClient.ts` | Shared fetch wrapper |
-| `chatService.ts` | Chatbot (SSE streaming) |
-| `connectorService.ts` | Connectors + source allow/deny lists |
-| `faqService.ts` | Insights FAQ clusters |
-| `ingestionService.ts` | Data ingestion runs + artifacts |
-| `knowledgeGapService.ts` | Insights knowledge gaps |
-| `knowledgeService.ts` | Knowledge base + streamed summaries |
-| `onboardingService.ts` | Onboarding paths, steps, tasks, feedback |
-| `projectService.ts` | Project selection |
-| `sse.ts` | Shared SSE stream parser |
-| `teamManagementService.ts` | Team overview, member detail, skills |
-| `userService.ts` | Current user profile |
-| `types.ts` | Backend DTO types (the closest thing to a global types folder) |
-| `sources/` | Per-source services (e.g. `githubService`) |
+| Module                     | Domain                                                         |
+| -------------------------- | -------------------------------------------------------------- |
+| `adminUserService.ts`      | Admin user management                                          |
+| `apiClient.ts`             | Shared fetch wrapper                                           |
+| `chatService.ts`           | Chatbot (SSE streaming)                                        |
+| `connectorService.ts`      | Connectors + source allow/deny lists                           |
+| `faqService.ts`            | Insights FAQ clusters                                          |
+| `ingestionService.ts`      | Data ingestion runs + artifacts                                |
+| `knowledgeGapService.ts`   | Insights knowledge gaps                                        |
+| `knowledgeService.ts`      | Knowledge base + streamed summaries                            |
+| `onboardingService.ts`     | Onboarding paths, steps, tasks, feedback                       |
+| `projectService.ts`        | Project selection                                              |
+| `sse.ts`                   | Shared SSE stream parser                                       |
+| `teamManagementService.ts` | Team overview, member detail, skills                           |
+| `userService.ts`           | Current user profile                                           |
+| `types.ts`                 | Backend DTO types (the closest thing to a global types folder) |
+| `sources/`                 | Per-source services (e.g. `githubService`)                     |
 
 ### 6.4 Vite dev proxy (`vite.config.ts`)
 
-| Path | Target |
-| --- | --- |
-| `/api` | `http://127.0.0.1:8080` (backend) |
-| `/v1` | `http://127.0.0.1:8080` (backend) |
+| Path    | Target                             |
+| ------- | ---------------------------------- |
+| `/api`  | `http://127.0.0.1:8080` (backend)  |
+| `/v1`   | `http://127.0.0.1:8080` (backend)  |
 | `/auth` | `http://127.0.0.1:8081` (Keycloak) |
 
 ---
@@ -268,7 +269,7 @@ works in both themes automatically when you use tokens.
 
 Never rely on color **alone** to convey meaning. Always back it with an
 **icon, text label, or shape** (e.g. status = chip text + icon, not just red/green)
-— this is why finished/skipped/locked steps use distinct icons *and* labels. Keep
+— this is why finished/skipped/locked steps use distinct icons _and_ labels. Keep
 color pairs distinguishable for common color-vision deficiencies.
 
 ### 7.4 Contrast & focus
@@ -298,17 +299,17 @@ import type { Transition } from "framer-motion";
 /** Default spring for layout transitions, list enter/exit, and general motion.
  *  Snappy but not stiff — settles quickly without overshooting violently. */
 export const centralSpringToken: Transition = {
-    type: "spring",
-    stiffness: 300,
-    damping: 25,
-    mass: 0.8,
+  type: "spring",
+  stiffness: 300,
+  damping: 25,
+  mass: 0.8,
 };
 
 /** Lighter spring for hover/tap micro-interactions — faster, slightly bouncier. */
 export const hoverSpringToken: Transition = {
-    type: "spring",
-    stiffness: 400,
-    damping: 15,
+  type: "spring",
+  stiffness: 400,
+  damping: 15,
 };
 ```
 
@@ -333,24 +334,24 @@ import { motion, AnimatePresence } from "framer-motion";
 import { centralSpringToken } from "@/styles/tokens";
 
 export function TaskList({ tasks, onDelete }) {
-    return (
-        <div className="grid gap-4">
-            <AnimatePresence mode="popLayout">
-                {tasks.map(task => (
-                    <motion.div
-                        layout
-                        key={task.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={centralSpringToken}
-                    >
-                        <TaskCard task={task} onDelete={onDelete} />
-                    </motion.div>
-                ))}
-            </AnimatePresence>
-        </div>
-    );
+  return (
+    <div className="grid gap-4">
+      <AnimatePresence mode="popLayout">
+        {tasks.map((task) => (
+          <motion.div
+            layout
+            key={task.id}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={centralSpringToken}
+          >
+            <TaskCard task={task} onDelete={onDelete} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
 }
 ```
 
@@ -372,20 +373,20 @@ export function TaskList({ tasks, onDelete }) {
 
 ### 9.1 Commands
 
-| Purpose | Command |
-| --- | --- |
-| Install deps (runs `keycloakify sync-extensions` postinstall) | `npm install` |
-| Dev server (`:5173`) | `npm run dev` |
-| Production build (`tsc -b` + `vite build`) | `npm run build` |
-| Lint | `npm run lint` |
-| All unit tests (CI-friendly, non-watch) | `npm run test` |
-| Unit tests only (excludes a11y) | `npm run unit` |
-| A11y tests only | `npm run a11y` |
-| **Definition of Done (one command)** | `npm run try` (install + build + lint + unit + a11y) |
-| Storybook (`:6006`) | `npm run storybook` |
-| Build Keycloak theme | `npm run build-keycloak-theme` |
-| Dev Keycloak theme | `npm run dev-keycloak-theme` |
-| Full stack via Docker (`:3000`) | `docker compose up --build` |
+| Purpose                                                       | Command                                              |
+| ------------------------------------------------------------- | ---------------------------------------------------- |
+| Install deps (runs `keycloakify sync-extensions` postinstall) | `npm install`                                        |
+| Dev server (`:5173`)                                          | `npm run dev`                                        |
+| Production build (`tsc -b` + `vite build`)                    | `npm run build`                                      |
+| Lint                                                          | `npm run lint`                                       |
+| All unit tests (CI-friendly, non-watch)                       | `npm run test`                                       |
+| Unit tests only (excludes a11y)                               | `npm run unit`                                       |
+| A11y tests only                                               | `npm run a11y`                                       |
+| **Definition of Done (one command)**                          | `npm run try` (install + build + lint + unit + a11y) |
+| Storybook (`:6006`)                                           | `npm run storybook`                                  |
+| Build Keycloak theme                                          | `npm run build-keycloak-theme`                       |
+| Dev Keycloak theme                                            | `npm run dev-keycloak-theme`                         |
+| Full stack via Docker (`:3000`)                               | `docker compose up --build`                          |
 
 ### 9.2 Vite config
 

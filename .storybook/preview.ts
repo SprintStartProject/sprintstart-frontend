@@ -48,11 +48,7 @@ const customStorySort = (a: StoryContext, b: StoryContext) => {
 
   function getHardCodedWeight(title: string) {
     for (let i = 0; i < orderedPagesPrefix.length; i++) {
-      if (
-        title
-          .toLowerCase()
-          .startsWith(orderedPagesPrefix[i].toLowerCase())
-      ) {
+      if (title.toLowerCase().startsWith(orderedPagesPrefix[i].toLowerCase())) {
         return orderedPagesPrefix.length - i;
       }
     }

@@ -14,20 +14,20 @@ Die Punkte sind nach Hebelwirkung sortiert. Jeder ist für sich abschließbar.
 **Befund.** 246 `<button>` plus 28 `<motion.button>`, verteilt auf 92 Dateien,
 ohne gemeinsame Komponente. Jeder Aufrufer hat sein eigenes Styling erfunden:
 
-| Eigenschaft | Ausgangsverteilung |
-| --- | --- |
-| `rounded` | `xl` 121 · `lg` 49 · keins 39 · `full` 12 · `md` 11 · `2xl` 11 · `rounded` 2 |
-| Höhe | `h-11` 37 · `h-9` 15 · `h-8` 6 · `h-10` 4 · Rest über `py-*` |
-| Padding | `px-2` … `px-8`, 13 Kombinationen |
-| `font-*` | `medium` 117 · `semibold` 27 · `bold` 1 · keins 101 |
-| `text-*` | `sm` 112 · `xs` 41 · `base` 1 · keins 92 |
-| `transition` | `-colors` 142 · `-all` 38 · `transition` 26 · keins 34 |
-| `disabled:` | keins 138 · `opacity-60` 61 · `opacity-50` 33 · `opacity-40` 4 |
+| Eigenschaft  | Ausgangsverteilung                                                           |
+| ------------ | ---------------------------------------------------------------------------- |
+| `rounded`    | `xl` 121 · `lg` 49 · keins 39 · `full` 12 · `md` 11 · `2xl` 11 · `rounded` 2 |
+| Höhe         | `h-11` 37 · `h-9` 15 · `h-8` 6 · `h-10` 4 · Rest über `py-*`                 |
+| Padding      | `px-2` … `px-8`, 13 Kombinationen                                            |
+| `font-*`     | `medium` 117 · `semibold` 27 · `bold` 1 · keins 101                          |
+| `text-*`     | `sm` 112 · `xs` 41 · `base` 1 · keins 92                                     |
+| `transition` | `-colors` 142 · `-all` 38 · `transition` 26 · keins 34                       |
+| `disabled:`  | keins 138 · `opacity-60` 61 · `opacity-50` 33 · `opacity-40` 4               |
 
 Allein die 60 Primary-Buttons (`bg-app-brand`) hatten **28 verschiedene
 Style-Signaturen**; der schlichte "Cancel"-Button existierte in 6 Varianten.
 
-**Zusätzlich:** 196 von 246 Buttons hatten *keinen* Focus-Ring — ein Verstoß
+**Zusätzlich:** 196 von 246 Buttons hatten _keinen_ Focus-Ring — ein Verstoß
 gegen [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §5
 ("keep visible focus via `focus-visible:ring-app-focus`"). Wo einer vorhanden
 war, in 5 unterschiedlichen Ausführungen (`ring-app-focus`, `ring-app-brand`,
@@ -52,13 +52,13 @@ Dateien. Alle Primary-, Secondary- und Danger-Aktionen sind migriert.
 
 **Was bewusst roh geblieben ist** (kein Handlungsbedarf, aber begründet):
 
-| Kategorie | Anzahl | Warum |
-| --- | ---: | --- |
-| Klickbare Karten und Listenzeilen | 20 | Sind Navigationsziele, keine Aktionen. Gehören auf `ClickableCard`, nicht auf `Button` — siehe Folgepunkt unten. |
-| Toggles, Switches, Filter-Chips | 9 | `aria-pressed` / `role="switch"`-Semantik mit eigenem An/Aus-Zustand. |
-| Menü-Items, Combobox-Trigger | 5 | `role="menuitem"` bzw. `aria-haspopup="listbox"` — anderes Interaktionsmodell. |
-| Karten-Overlay (`absolute inset-0`) | 1 | Unsichtbare Klickfläche über einer Card. |
-| Chat-Mikro-Affordances, Spiele, Stories | 77 | 11px-Inline-Buttons im Chat, Spielfelder (2048, Dino, Space Invaders) und Storybook-Dateien. |
+| Kategorie                               | Anzahl | Warum                                                                                                            |
+| --------------------------------------- | -----: | ---------------------------------------------------------------------------------------------------------------- |
+| Klickbare Karten und Listenzeilen       |     20 | Sind Navigationsziele, keine Aktionen. Gehören auf `ClickableCard`, nicht auf `Button` — siehe Folgepunkt unten. |
+| Toggles, Switches, Filter-Chips         |      9 | `aria-pressed` / `role="switch"`-Semantik mit eigenem An/Aus-Zustand.                                            |
+| Menü-Items, Combobox-Trigger            |      5 | `role="menuitem"` bzw. `aria-haspopup="listbox"` — anderes Interaktionsmodell.                                   |
+| Karten-Overlay (`absolute inset-0`)     |      1 | Unsichtbare Klickfläche über einer Card.                                                                         |
+| Chat-Mikro-Affordances, Spiele, Stories |     77 | 11px-Inline-Buttons im Chat, Spielfelder (2048, Dino, Space Invaders) und Storybook-Dateien.                     |
 
 ### 1a. Hover-Verhalten — **erledigt**
 
@@ -150,11 +150,12 @@ waren für Screenreader nicht vorhanden.
   Einheit. Erzeugt die id, bindet das Label, sammelt Hint und Fehler in
   `aria-describedby` und setzt `aria-invalid`; die Verdrahtung läuft über
   [`fieldContext`](../src/components/ui/fieldContext.ts), damit der Aufrufer sie
-  nicht vergessen *kann*.
+  nicht vergessen _kann_.
+
 ### 2a. Mehrzeilen-Verhalten — **erledigt**
 
 **Befund (im Review aufgefallen, nicht in der ersten Analyse).** Es gab zwei
-Mehrzeilen-Komponenten mit unterschiedlichem *Verhalten*: ein handgeschriebenes
+Mehrzeilen-Komponenten mit unterschiedlichem _Verhalten_: ein handgeschriebenes
 `AutoResizeTextarea`, das beim Tippen mitwuchs (nur im Add-Custom-Step-Dialog),
 und `Textarea` mit fester Höhe und Ziehgriff (überall sonst). Dazu eine
 **dritte** Implementierung inline im Chat-Composer.
@@ -249,11 +250,11 @@ genutzt, daneben gab es 10 eigene `fixed inset-0`-Overlays.
 Beim Durchsehen zerfielen die in drei Gruppen — und nur eine davon war
 tatsächlich ein Fehler:
 
-| | | |
-| --- | --- | --- |
-| **Echte Dialoge** | `UploadArtifactModal` | Hatte Focus-Trap, Escape, Focus-Rückgabe und `aria-modal` — alles von Hand nachgebaut, rund 100 Zeilen, die mit dem Original von Hand synchron gehalten werden mussten. → auf `Modal` migriert. |
-| **Drawer-Backdrops** | `SideBar`, `AdminPage` | Kein Dialog, sondern die abdunkelnde Fläche hinter einer Schublade. Kein Handlungsbedarf. |
-| **Vollbild-Inszenierungen** | die 3 Spiele, die 4 Moments-Overlays | Bewusst kein `Modal`: bei den Spielen gehört die Tastatur dem Spiel, und Modals Focus-Trap würde sich mit ihm um die Pfeiltasten streiten. Bleiben, sind jetzt im Code als Ausnahme begründet. |
+|                             |                                      |                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Echte Dialoge**           | `UploadArtifactModal`                | Hatte Focus-Trap, Escape, Focus-Rückgabe und `aria-modal` — alles von Hand nachgebaut, rund 100 Zeilen, die mit dem Original von Hand synchron gehalten werden mussten. → auf `Modal` migriert. |
+| **Drawer-Backdrops**        | `SideBar`, `AdminPage`               | Kein Dialog, sondern die abdunkelnde Fläche hinter einer Schublade. Kein Handlungsbedarf.                                                                                                       |
+| **Vollbild-Inszenierungen** | die 3 Spiele, die 4 Moments-Overlays | Bewusst kein `Modal`: bei den Spielen gehört die Tastatur dem Spiel, und Modals Focus-Trap würde sich mit ihm um die Pfeiltasten streiten. Bleiben, sind jetzt im Code als Ausnahme begründet.  |
 
 **Der eigentliche Fund war ein anderer.** `document.body.style` kam im gesamten
 Projekt **kein einziges Mal** vor: **niemand sperrte das Hintergrund-Scrollen**,
@@ -313,11 +314,11 @@ stehen in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §4.
 
 **Stand:**
 
-| | vorher | jetzt |
-| --- | --- | --- |
-| Karten-Radius | 2xl 51 · 3xl 15 · xl 13 · lg 3 | **2xl 83**, keine Ausreißer |
-| Shadow | sm · lg · md · xl · 2xl | **sm · hover:lg · 2xl**, plus 5× `lg` als Akzent auf gefüllten Brand-Flächen |
-| Headings | `h2` von `text-sm` bis `text-4xl` | vier Stufen, 24 Überschriften angeglichen |
+|               | vorher                            | jetzt                                                                        |
+| ------------- | --------------------------------- | ---------------------------------------------------------------------------- |
+| Karten-Radius | 2xl 51 · 3xl 15 · xl 13 · lg 3    | **2xl 83**, keine Ausreißer                                                  |
+| Shadow        | sm · lg · md · xl · 2xl           | **sm · hover:lg · 2xl**, plus 5× `lg` als Akzent auf gefüllten Brand-Flächen |
+| Headings      | `h2` von `text-sm` bis `text-4xl` | vier Stufen, 24 Überschriften angeglichen                                    |
 
 **Was bewusst außerhalb der Skala steht:** die `404` auf der Fehlerseite
 (`text-5xl`), die große Kennzahl in `IngestionMetrics` (`text-4xl`, ein
@@ -335,12 +336,12 @@ berührt die Dokumentstruktur der Seite und gehört in einen eigenen Schritt.
 **Befund.** 47 handgeschriebene `animate-spin`-Stellen und 26 Blöcke mit
 gestricheltem Rahmen. Nach Kontext sortiert:
 
-| Muster | Anzahl |
-| --- | ---: |
-| Ganzflächiger Ladezustand (`flex justify-center py-N` + `Loader2`) | 13 |
-| Icon, das beim Aktualisieren dreht (kein Spinner, sondern ein Refresh-Symbol) | 8 |
-| Sonstiges inline | 24 |
-| Leerzustände mit gestricheltem Rahmen | 26 |
+| Muster                                                                        | Anzahl |
+| ----------------------------------------------------------------------------- | -----: |
+| Ganzflächiger Ladezustand (`flex justify-center py-N` + `Loader2`)            |     13 |
+| Icon, das beim Aktualisieren dreht (kein Spinner, sondern ein Refresh-Symbol) |      8 |
+| Sonstiges inline                                                              |     24 |
+| Leerzustände mit gestricheltem Rahmen                                         |     26 |
 
 Die Leerzustände zerfielen in zwei Formen: die reiche (Icon, Titel, Text,
 manchmal eine Aktion) und die knappe (ein Satz im gestrichelten Kasten). Die
@@ -374,21 +375,53 @@ Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) 
 
 ---
 
-## 7. Formatter erzwingen
+## 7. Formatter erzwingen — **erledigt**
 
-**Befund.** Prettier ist als Dependency vorhanden, aber es existiert **keine
+**Befund.** Prettier war als Dependency vorhanden, aber es existierte **keine
 `.prettierrc`**. `eslint.config.js` bindet nur `eslint-config-prettier` ein,
-das Regeln lediglich *abschaltet*, statt zu formatieren.
+das Regeln lediglich _abschaltet_, statt zu formatieren.
 
 Ergebnis: 131 Dateien mit 4-Space-Indent, 52 mit 2-Space — teils innerhalb
 desselben Ordners (`ui/Badge.tsx` 4er, `ui/SaveButton.tsx` 2er). Auch die
-Reihenfolge der Tailwind-Klassen driftet (`w-3.5 h-3.5` vs. `h-4 w-4`).
+Reihenfolge der Tailwind-Klassen driftete (`w-3.5 h-3.5` vs. `h-4 w-4`).
 
-**Vorschlag.** `.prettierrc` anlegen, `prettier-plugin-tailwindcss`
-ergänzen, einmalig über die Codebase laufen lassen und den Formatier-Commit
-in `.git-blame-ignore-revs` eintragen, damit `git blame` brauchbar bleibt.
-Reihenfolge beachten: **nach** der Button-Migration, sonst kollidiert der
-Reformat mit den offenen Änderungen.
+**Gemacht.**
+
+- [`.prettierrc`](../.prettierrc): 2 Spaces, doppelte Anführungszeichen,
+  `printWidth: 100`. Dazu `prettier-plugin-tailwindcss`, das die
+  Klassen-Reihenfolge sortiert.
+- `"tailwindStylesheet": "./src/styles/index.css"` ist dabei **nicht
+  optional**: Tailwind v4 hat keine `tailwind.config.js` mehr, das Plugin
+  findet die Konfiguration sonst nicht und sortiert unsere `app-*`-Utilities
+  falsch einsortiert ans Ende.
+- [`.prettierignore`](../.prettierignore) hält Build-Output und
+  `package-lock.json` heraus — und, wichtiger, das **Keycloakify-Theme**.
+  `keycloakify sync-extensions` läuft als Postinstall und schreibt fast alles
+  unter `src/keycloak-theme/` neu; formatierter Code dort überlebt kein
+  `npm install`. Ignoriert ist deshalb der ganze Baum, wieder eingeschlossen
+  sind nur die sieben Dateien, die uns gehören (die „owned files" aus
+  `src/keycloak-theme/.gitignore`). `public/keycloak-theme` und
+  `public/keycloakify-dev-resources` sind aus demselben Grund draußen: fremde,
+  teils minifizierte Assets.
+- `npm run format` (schreibt) und `npm run format:check` (prüft) in
+  `package.json`; `format:check` hängt zusätzlich in `npm run try`, damit ein
+  unformatierter Stand die Definition of Done nicht passiert.
+- Einmaliger Reformat über das **ganze Repo**, nicht nur `src/` und `tests/` —
+  `format:check` prüft ja auch alles. Betroffen waren neben ~360 TS/TSX-Dateien
+  noch Doku, Mock-JSONs, `vite.config.ts`, die Workflows und die K8s-Manifeste.
+  Danach `tsc -b`, `eslint` und die Suite ohne neue Fehler.
+- Der Formatier-Commit gehört in
+  [`.git-blame-ignore-revs`](../.git-blame-ignore-revs) — die Datei liegt
+  bereit, der SHA muss nach dem Commit noch eingetragen werden. Lokal einmal
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs`, GitHub liest sie
+  von selbst.
+
+Rein mechanisch: Prettier verschiebt Zeilenumbrüche und Anführungszeichen,
+das Plugin sortiert Klassen um. Beides ändert kein Markup und kein Styling.
+Einzige inhaltliche Änderung im ganzen Reformat: ein Klammerpaar um ein
+mehrzeiliges `return` in `public/easter-eggs/2048.html`.
+
+Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §11.
 
 ---
 

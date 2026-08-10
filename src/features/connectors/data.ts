@@ -34,9 +34,7 @@ export function getConnectorMeta(connector: ConnectorDto): ConnectorMeta {
   };
 }
 
-export function toConnectorListItems(
-  connectors: ConnectorDto[],
-): ConnectorListItem[] {
+export function toConnectorListItems(connectors: ConnectorDto[]): ConnectorListItem[] {
   return connectors.map((connector) => ({
     ...connector,
     meta: getConnectorMeta(connector),
@@ -60,9 +58,7 @@ export function formatConfiguredAt(value: string | null): string {
   });
 }
 
-export function buildSourceKey(
-  sources: { id: string; enabled: boolean }[],
-): string {
+export function buildSourceKey(sources: { id: string; enabled: boolean }[]): string {
   return sources
     .map((source) => `${source.id}:${source.enabled}`)
     .sort()

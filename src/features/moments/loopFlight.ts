@@ -27,49 +27,49 @@ const TIP_IN = 0.18;
 export const MIN_LOOP_RATIO = 1 / (2 * Math.PI);
 
 export interface FlightPath {
-    /** Offset from the starting point along the flight, in px. */
-    x: number[];
-    /** Offset from the starting point across the flight, in px. */
-    y: number[];
-    /** Absolute rotation, in degrees. */
-    rotate: number[];
-    /** Uniform keyframe positions, 0..1. */
-    times: number[];
-    /**
-     * Eased progress along the flight at each keyframe, 0..1.
-     *
-     * Drive `scale`, `opacity` and anything else off this rather than off
-     * `times`, so they speed up and slow down with the rocket instead of
-     * running to their own clock.
-     */
-    progress: number[];
+  /** Offset from the starting point along the flight, in px. */
+  x: number[];
+  /** Offset from the starting point across the flight, in px. */
+  y: number[];
+  /** Absolute rotation, in degrees. */
+  rotate: number[];
+  /** Uniform keyframe positions, 0..1. */
+  times: number[];
+  /**
+   * Eased progress along the flight at each keyframe, 0..1.
+   *
+   * Drive `scale`, `opacity` and anything else off this rather than off
+   * `times`, so they speed up and slow down with the rocket instead of
+   * running to their own clock.
+   */
+  progress: number[];
 }
 
 interface LoopFlightOptions {
-    /** Horizontal flight vector, in px. Negative travels left. */
-    dx: number;
-    /** Vertical flight vector, in px. Negative travels up. */
-    dy: number;
-    /**
-     * Loop radius as a fraction of the flight distance. Must exceed
-     * `MIN_LOOP_RATIO` (~0.16) or the path will not close into a loop; the
-     * default leaves comfortable headroom above it.
-     *
-     * Expressed as a fraction rather than in px on purpose: the flight is sized
-     * in viewport units, so a fixed radius would loop on a laptop and barely
-     * wobble on a 4K monitor.
-     */
-    loopRatio?: number;
-    /**
-     * Rotation the rocket holds before it tips into the flight path, in degrees.
-     * Defaults to no tip-over. Pass the rocket's resting angle to have it lean
-     * into the climb instead of snapping to its heading on the first frame.
-     */
-    entryRotate?: number;
+  /** Horizontal flight vector, in px. Negative travels left. */
+  dx: number;
+  /** Vertical flight vector, in px. Negative travels up. */
+  dy: number;
+  /**
+   * Loop radius as a fraction of the flight distance. Must exceed
+   * `MIN_LOOP_RATIO` (~0.16) or the path will not close into a loop; the
+   * default leaves comfortable headroom above it.
+   *
+   * Expressed as a fraction rather than in px on purpose: the flight is sized
+   * in viewport units, so a fixed radius would loop on a laptop and barely
+   * wobble on a 4K monitor.
+   */
+  loopRatio?: number;
+  /**
+   * Rotation the rocket holds before it tips into the flight path, in degrees.
+   * Defaults to no tip-over. Pass the rocket's resting angle to have it lean
+   * into the climb instead of snapping to its heading on the first frame.
+   */
+  entryRotate?: number;
 }
 
 function round(value: number): number {
-    return Number(value.toFixed(2));
+  return Number(value.toFixed(2));
 }
 
 /**
@@ -78,12 +78,12 @@ function round(value: number): number {
  * twice the average speed and makes the middle of the flight feel snatched.
  */
 function smoothstep(t: number): number {
-    return t * t * (3 - 2 * t);
+  return t * t * (3 - 2 * t);
 }
 
 /** Direction of a screen-space vector, in degrees clockwise from "up". */
 function bearing(dx: number, dy: number): number {
-    return (Math.atan2(dx, -dy) * 180) / Math.PI;
+  return (Math.atan2(dx, -dy) * 180) / Math.PI;
 }
 
 /**
@@ -113,55 +113,55 @@ function bearing(dx: number, dy: number): number {
  * ground.
  */
 export function loopFlight({
-    dx,
-    dy,
-    loopRatio = 0.2,
-    entryRotate,
+  dx,
+  dy,
+  loopRatio = 0.2,
+  entryRotate,
 }: LoopFlightOptions): FlightPath {
-    const distance = Math.hypot(dx, dy) || 1;
+  const distance = Math.hypot(dx, dy) || 1;
 
-    // Unit vector along the flight, in screen coordinates (y grows downward).
-    const forwardX = dx / distance;
-    const forwardY = dy / distance;
+  // Unit vector along the flight, in screen coordinates (y grows downward).
+  const forwardX = dx / distance;
+  const forwardY = dy / distance;
 
-    const heading = bearing(forwardX, forwardY);
+  const heading = bearing(forwardX, forwardY);
 
-    // -1 loops anticlockwise, +1 clockwise; either way the nose goes towards
-    // vertical first rather than starting the trick by aiming at the ground.
-    const spin = heading > 0 ? -1 : 1;
+  // -1 loops anticlockwise, +1 clockwise; either way the nose goes towards
+  // vertical first rather than starting the trick by aiming at the ground.
+  const spin = heading > 0 ? -1 : 1;
 
-    // Perpendicular to the flight, on the side the loop bulges towards.
-    const perpX = -spin * forwardY;
-    const perpY = spin * forwardX;
+  // Perpendicular to the flight, on the side the loop bulges towards.
+  const perpX = -spin * forwardY;
+  const perpY = spin * forwardX;
 
-    const radius = loopRatio * distance;
+  const radius = loopRatio * distance;
 
-    const x: number[] = [];
-    const y: number[] = [];
-    const times: number[] = [];
-    const progress: number[] = [];
+  const x: number[] = [];
+  const y: number[] = [];
+  const times: number[] = [];
+  const progress: number[] = [];
 
-    for (let step = 0; step <= FLIGHT_STEPS; step++) {
-        const t = step / FLIGHT_STEPS;
-        const s = smoothstep(t);
-        const angle = s * Math.PI * 2;
+  for (let step = 0; step <= FLIGHT_STEPS; step++) {
+    const t = step / FLIGHT_STEPS;
+    const s = smoothstep(t);
+    const angle = s * Math.PI * 2;
 
-        const along = radius * Math.sin(angle);
-        const across = radius * (1 - Math.cos(angle));
+    const along = radius * Math.sin(angle);
+    const across = radius * (1 - Math.cos(angle));
 
-        x.push(round(dx * s + forwardX * along + perpX * across));
-        y.push(round(dy * s + forwardY * along + perpY * across));
-        times.push(Number(t.toFixed(4)));
-        progress.push(Number(s.toFixed(4)));
-    }
+    x.push(round(dx * s + forwardX * along + perpX * across));
+    y.push(round(dy * s + forwardY * along + perpY * across));
+    times.push(Number(t.toFixed(4)));
+    progress.push(Number(s.toFixed(4)));
+  }
 
-    return {
-        x,
-        y,
-        rotate: noseAlongPath(x, y, entryRotate),
-        times,
-        progress,
-    };
+  return {
+    x,
+    y,
+    rotate: noseAlongPath(x, y, entryRotate),
+    times,
+    progress,
+  };
 }
 
 /**
@@ -176,39 +176,35 @@ export function loopFlight({
  * Angles are unwrapped as they go, so a flight that loops accumulates a full
  * ±360° instead of snapping across the ±180° boundary halfway round.
  */
-function noseAlongPath(
-    x: number[],
-    y: number[],
-    entryRotate: number | undefined,
-): number[] {
-    const rotate: number[] = [];
-    let previous: number | null = null;
+function noseAlongPath(x: number[], y: number[], entryRotate: number | undefined): number[] {
+  const rotate: number[] = [];
+  let previous: number | null = null;
 
-    for (let i = 0; i < x.length; i++) {
-        // Central difference, one-sided at the ends.
-        const before = Math.max(0, i - 1);
-        const after = Math.min(x.length - 1, i + 1);
+  for (let i = 0; i < x.length; i++) {
+    // Central difference, one-sided at the ends.
+    const before = Math.max(0, i - 1);
+    const after = Math.min(x.length - 1, i + 1);
 
-        let angle = bearing(x[after] - x[before], y[after] - y[before]);
+    let angle = bearing(x[after] - x[before], y[after] - y[before]);
 
-        if (previous !== null) {
-            // Unwrap onto the same revolution as the previous sample.
-            angle += Math.round((previous - angle) / 360) * 360;
-        }
-        previous = angle;
+    if (previous !== null) {
+      // Unwrap onto the same revolution as the previous sample.
+      angle += Math.round((previous - angle) / 360) * 360;
+    }
+    previous = angle;
 
-        if (entryRotate !== undefined) {
-            const t = i / (x.length - 1);
-            if (t < TIP_IN) {
-                // Lean out of the resting angle rather than snapping onto the
-                // path on the first frame.
-                const lean = 1 - t / TIP_IN;
-                angle = angle * (1 - lean) + entryRotate * lean;
-            }
-        }
-
-        rotate.push(round(angle));
+    if (entryRotate !== undefined) {
+      const t = i / (x.length - 1);
+      if (t < TIP_IN) {
+        // Lean out of the resting angle rather than snapping onto the
+        // path on the first frame.
+        const lean = 1 - t / TIP_IN;
+        angle = angle * (1 - lean) + entryRotate * lean;
+      }
     }
 
-    return rotate;
+    rotate.push(round(angle));
+  }
+
+  return rotate;
 }

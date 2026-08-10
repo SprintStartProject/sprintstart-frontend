@@ -7,6 +7,7 @@ codebase. This file is the frontend-only companion to the root-level
 only this repository gets the full set of frontend rules here.
 
 > **Related docs**
+>
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — feature-first structure, routing, state, design system, animation.
 > - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
@@ -31,7 +32,7 @@ only this repository gets the full set of frontend rules here.
 - **`verbatimModuleSyntax: true`** — type imports MUST be `import type { ... }`:
 
   ```typescript
-  import type { TaskDto } from '../types';
+  import type { TaskDto } from "../types";
   ```
 
 - **Explicit `.ts`/`.tsx` extensions on relative imports are allowed and encouraged**
@@ -98,7 +99,7 @@ only this repository gets the full set of frontend rules here.
   five right, and the one that existed got four — which is four more chances to
   drift than anyone needs.
 
-  Full-screen surfaces that are *not* dialogs may stay hand-written: the game
+  Full-screen surfaces that are _not_ dialogs may stay hand-written: the game
   overlays, where the game owns the keyboard and a focus trap would fight it
   for the arrow keys, and the Moments celebrations. Those still share the
   scroll lock via [`useScrollLock`](../src/components/ui/useScrollLock.ts) —
@@ -139,12 +140,12 @@ only this repository gets the full set of frontend rules here.
   `aria-label`) for square icon buttons. If a variant you need is missing, add it
   to the component instead of patching it at the call site.
 
-  Legitimate exceptions — these are *not* action buttons and stay hand-written:
+  Legitimate exceptions — these are _not_ action buttons and stay hand-written:
   clickable cards and list rows, `aria-pressed` toggles and filter chips,
   `role="menuitem"` / combobox triggers, and the game surfaces.
 
 - **Radius scale.** `rounded-lg` for dense controls (`sm` buttons, chips),
-  `rounded-xl` for standard controls and for surfaces *nested inside* a card —
+  `rounded-xl` for standard controls and for surfaces _nested inside_ a card —
   a clickable row, a status box — where the inner corner has to stay tighter
   than the outer one. `rounded-2xl` for the card or panel itself. Reserve
   `rounded-full` for avatars, badges, and pills. `rounded-3xl` and larger belong
@@ -153,27 +154,27 @@ only this repository gets the full set of frontend rules here.
 
 - **Shadow scale — three rungs, and they mean different things.**
 
-  | | when |
-  | --- | --- |
-  | `shadow-sm` | a card at rest, to lift it off the page background |
-  | `hover:shadow-lg` | that same card while hovered, paired with the hover border |
-  | `shadow-2xl` | dialogs, drawers, popovers, menus, toasts — anything that floats above the page |
+  |                   | when                                                                            |
+  | ----------------- | ------------------------------------------------------------------------------- |
+  | `shadow-sm`       | a card at rest, to lift it off the page background                              |
+  | `hover:shadow-lg` | that same card while hovered, paired with the hover border                      |
+  | `shadow-2xl`      | dialogs, drawers, popovers, menus, toasts — anything that floats above the page |
 
   `shadow-md` and `shadow-xl` say nothing these three do not; don't reach for
-  them. The one thing outside the ladder is a `shadow-lg` used as *emphasis* on
+  them. The one thing outside the ladder is a `shadow-lg` used as _emphasis_ on
   a filled brand surface — a selected tab, the logo tile. That is decoration on
   a coloured shape, not elevation, and it stays.
 
 - **Heading scale — pick the rung by role, not by how big it should look.**
 
-  | role | size | example |
-  | --- | --- | --- |
-  | Hero | `text-2xl sm:text-3xl font-bold` | login, dashboard hero, the onboarding "up next" card |
-  | Page title | `text-xl sm:text-2xl font-semibold` | `PageHeader` — do not hand-roll one |
-  | Section title | `text-lg font-semibold` | a titled block inside a page |
-  | Card / sub-section | `text-sm font-semibold` | the label above a list, a card's own title |
+  | role               | size                                | example                                              |
+  | ------------------ | ----------------------------------- | ---------------------------------------------------- |
+  | Hero               | `text-2xl sm:text-3xl font-bold`    | login, dashboard hero, the onboarding "up next" card |
+  | Page title         | `text-xl sm:text-2xl font-semibold` | `PageHeader` — do not hand-roll one                  |
+  | Section title      | `text-lg font-semibold`             | a titled block inside a page                         |
+  | Card / sub-section | `text-sm font-semibold`             | the label above a list, a card's own title           |
 
-  The heading *level* follows the document outline and is chosen independently:
+  The heading _level_ follows the document outline and is chosen independently:
   an `<h2>` is an `<h2>` because of what sits above it, not because of its size.
   Before this scale existed, `<h2>` ranged from `text-sm` to `text-4xl` in the
   same app, which is the giveaway that the two were being conflated.
@@ -193,7 +194,7 @@ only this repository gets the full set of frontend rules here.
 
   ```tsx
   <Field label="Token name" hint="Shown in the token list." error={nameError}>
-      <Input value={name} onChange={(e) => setName(e.target.value)} />
+    <Input value={name} onChange={(e) => setName(e.target.value)} />
   </Field>
   ```
 
@@ -256,7 +257,7 @@ only this repository gets the full set of frontend rules here.
   how the app ended up with a "Refresh" icon button that magnified on one page
   header and sat dead on the next.
 
-  The token stays public for the controls that are *not* `Button` and still need
+  The token stays public for the controls that are _not_ `Button` and still need
   to feel the same — the `role="combobox"` trigger in `FilterSelect` and the
   `aria-pressed` filter chips. Those, and only those.
 
@@ -316,7 +317,7 @@ only this repository gets the full set of frontend rules here.
 
 ---
 
-## 9. Documentation (the *why*, not the obvious *what*)
+## 9. Documentation (the _why_, not the obvious _what_)
 
 - Use **TSDoc** blocks on exported symbols — see
   [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md)
@@ -373,4 +374,26 @@ npm run test        # full Vitest suite (unit + a11y)
 npm run try         # install + build + lint + unit + a11y
 ```
 
-Prettier owns formatting — don't fight it; run lint before finishing.
+### Formatting
+
+Prettier owns formatting — don't fight it, don't hand-align, don't argue with
+the class order. The config lives in [`.prettierrc`](../.prettierrc):
+2 spaces, double quotes, `printWidth: 100`.
+
+```bash
+npm run format        # rewrite
+npm run format:check  # verify (also part of `npm run try`)
+```
+
+`prettier-plugin-tailwindcss` sorts Tailwind classes. It needs
+`"tailwindStylesheet": "./src/styles/index.css"` because Tailwind v4 has no
+`tailwind.config.js` — without that line the plugin cannot resolve our
+`app-*` utilities and sorts them wrongly. Don't remove it.
+
+Formatting-only commits belong in
+[`.git-blame-ignore-revs`](../.git-blame-ignore-revs) so `git blame` keeps
+pointing at whoever wrote the line. Enable it once per clone:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```

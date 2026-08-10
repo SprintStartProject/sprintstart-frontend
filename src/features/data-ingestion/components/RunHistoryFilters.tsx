@@ -1,9 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
-import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "../../../components/ui/FilterSelect.tsx";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import type { IngestionRunStatus } from "../types.ts";
 
 /** `"ALL"` means "no status filter", i.e. the query param is omitted. */
@@ -63,11 +60,7 @@ export function RunHistoryFilters({
   ];
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      role="group"
-      aria-label="Filter runs"
-    >
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter runs">
       <FilterSelect
         label="Filter runs by status"
         value={status}

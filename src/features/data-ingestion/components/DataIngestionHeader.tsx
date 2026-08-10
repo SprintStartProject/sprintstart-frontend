@@ -29,11 +29,7 @@ export function DataIngestionHeader({
           subtitle="Manage connected sources, indexed artifacts and ingestion runs."
           actions={
             <>
-              <Button
-                variant="primary"
-                onClick={onAddSource}
-                icon={<Plus size={16} />}
-              >
+              <Button variant="primary" onClick={onAddSource} icon={<Plus size={16} />}>
                 Add sources
               </Button>
 

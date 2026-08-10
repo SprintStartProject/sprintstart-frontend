@@ -1,10 +1,4 @@
-import {
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  ListTree,
-  XCircle,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle2, ListTree, XCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
 import { EmptyState } from "../../../components/ui/EmptyState.tsx";
 import { formatConfiguredAt } from "../data.ts";
@@ -66,15 +60,9 @@ export function ConnectorList({
                 </div>
 
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-app-text">
-                    {connector.meta.label}
-                  </p>
-                  <p className="mt-1 font-mono text-xs text-app-text-muted">
-                    {connector.id}
-                  </p>
-                  <p className="mt-2 text-sm text-app-text-muted">
-                    {connector.meta.description}
-                  </p>
+                  <p className="truncate font-semibold text-app-text">{connector.meta.label}</p>
+                  <p className="mt-1 font-mono text-xs text-app-text-muted">{connector.id}</p>
+                  <p className="mt-2 text-sm text-app-text-muted">{connector.meta.description}</p>
                 </div>
               </div>
 
@@ -94,8 +82,7 @@ export function ConnectorList({
                 )}
 
                 <p className="text-xs text-app-text-subtle">
-                  Last configured:{" "}
-                  {formatConfiguredAt(connector.lastConfiguredAt)}
+                  Last configured: {formatConfiguredAt(connector.lastConfiguredAt)}
                 </p>
               </div>
             </div>

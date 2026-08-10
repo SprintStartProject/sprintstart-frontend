@@ -19,10 +19,10 @@ export type FieldSize = "sm" | "md" | "lg";
  * caret alone is too small a cue to locate at a glance.
  */
 const baseFieldClasses =
-    "w-full border bg-app-surface text-app-text outline-none transition-colors " +
-    "placeholder:text-app-text-disabled " +
-    "focus:ring-2 focus:ring-app-focus " +
-    "disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full border bg-app-surface text-app-text outline-none transition-colors " +
+  "placeholder:text-app-text-disabled " +
+  "focus:ring-2 focus:ring-app-focus " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
 
 const normalBorderClasses = "border-app-border focus:border-app-brand-border-strong";
 
@@ -33,66 +33,66 @@ const normalBorderClasses = "border-app-border focus:border-app-brand-border-str
 const invalidBorderClasses = "border-app-danger-border focus:border-app-danger-solid";
 
 const sizeClasses: Record<FieldSize, string> = {
-    sm: "h-9 rounded-lg px-3 text-sm",
-    md: "h-11 rounded-xl px-3 text-sm",
-    lg: "h-12 rounded-xl px-4 text-sm",
+  sm: "h-9 rounded-lg px-3 text-sm",
+  md: "h-11 rounded-xl px-3 text-sm",
+  lg: "h-12 rounded-xl px-4 text-sm",
 };
 
 /** Left padding that clears a leading icon, per size. */
 const leadingIconPadding: Record<FieldSize, string> = {
-    sm: "pl-9",
-    md: "pl-10",
-    lg: "pl-11",
+  sm: "pl-9",
+  md: "pl-10",
+  lg: "pl-11",
 };
 
 /** Right padding that clears a trailing element, per size. */
 const trailingPadding: Record<FieldSize, string> = {
-    sm: "pr-9",
-    md: "pr-10",
-    lg: "pr-11",
+  sm: "pr-9",
+  md: "pr-10",
+  lg: "pr-11",
 };
 
 /** Where the leading icon sits, per size. */
 export const leadingIconPosition: Record<FieldSize, string> = {
-    sm: "left-2.5",
-    md: "left-3",
-    lg: "left-3.5",
+  sm: "left-2.5",
+  md: "left-3",
+  lg: "left-3.5",
 };
 
 /** Where a trailing element sits, per size. */
 export const trailingPosition: Record<FieldSize, string> = {
-    sm: "right-1",
-    md: "right-1.5",
-    lg: "right-2",
+  sm: "right-1",
+  md: "right-1.5",
+  lg: "right-2",
 };
 
 type FieldClassOptions = {
-    size: FieldSize;
-    invalid: boolean;
-    hasLeadingIcon: boolean;
-    hasTrailing: boolean;
-    className: string;
+  size: FieldSize;
+  invalid: boolean;
+  hasLeadingIcon: boolean;
+  hasTrailing: boolean;
+  className: string;
 };
 
 /** Builds the class list for a single-line control (`input`, `select`). */
 export function fieldClasses({
-    size,
-    invalid,
-    hasLeadingIcon,
-    hasTrailing,
-    className,
+  size,
+  invalid,
+  hasLeadingIcon,
+  hasTrailing,
+  className,
 }: FieldClassOptions): string {
-    return [
-        baseFieldClasses,
-        invalid ? invalidBorderClasses : normalBorderClasses,
-        sizeClasses[size],
-        hasLeadingIcon ? leadingIconPadding[size] : "",
-        hasTrailing ? trailingPadding[size] : "",
-        className,
-    ]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+  return [
+    baseFieldClasses,
+    invalid ? invalidBorderClasses : normalBorderClasses,
+    sizeClasses[size],
+    hasLeadingIcon ? leadingIconPadding[size] : "",
+    hasTrailing ? trailingPadding[size] : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 }
 
 /**
@@ -103,19 +103,19 @@ export function fieldClasses({
  * border, focus and placeholder stay identical to the single-line control.
  */
 export function textareaClasses({
-    invalid,
-    className,
+  invalid,
+  className,
 }: {
-    invalid: boolean;
-    className: string;
+  invalid: boolean;
+  className: string;
 }): string {
-    return [
-        baseFieldClasses,
-        invalid ? invalidBorderClasses : normalBorderClasses,
-        "rounded-xl px-3 py-2 text-sm leading-relaxed",
-        className,
-    ]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+  return [
+    baseFieldClasses,
+    invalid ? invalidBorderClasses : normalBorderClasses,
+    "rounded-xl px-3 py-2 text-sm leading-relaxed",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 }

@@ -9,8 +9,7 @@ export function useAdminData() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [projects, setProjects] = useState<ProjectOverview[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [selectedProject, setSelectedProject] =
-    useState<ProjectOverview | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectOverview | null>(null);
 
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -26,10 +25,7 @@ export function useAdminData() {
         projectService.getProjects(),
       ]);
       const nextProjectSummaries = getAvailableProjects(nextProjects);
-      const nextEnrichedUsers = enrichUsersWithProjectNames(
-        nextUsers,
-        nextProjectSummaries,
-      );
+      const nextEnrichedUsers = enrichUsersWithProjectNames(nextUsers, nextProjectSummaries);
 
       setUsers(nextEnrichedUsers);
       setProjects(nextProjects);
@@ -39,9 +35,8 @@ export function useAdminData() {
         if (!currentSelectedUser) return null;
 
         return (
-          nextEnrichedUsers.find(
-            (user) => user.id === currentSelectedUser.id,
-          ) ?? currentSelectedUser
+          nextEnrichedUsers.find((user) => user.id === currentSelectedUser.id) ??
+          currentSelectedUser
         );
       });
 
@@ -49,18 +44,13 @@ export function useAdminData() {
         if (!currentSelectedProject) return null;
 
         return (
-          nextProjects.find(
-            (project) => project.id === currentSelectedProject.id,
-          ) ?? currentSelectedProject
+          nextProjects.find((project) => project.id === currentSelectedProject.id) ??
+          currentSelectedProject
         );
       });
     } catch (error) {
       setLoadingState("error");
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Admin data could not be loaded.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Admin data could not be loaded.");
     }
   }, []);
 

@@ -18,10 +18,9 @@ type SaveButtonProps = {
    * is disabled when clean, saving, or this is true.
    */
   disabled?: boolean;
-} & Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  "disabled" | "children" | "className"
-> & { className?: string };
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "disabled" | "children" | "className"> & {
+    className?: string;
+  };
 
 /**
  * The app's single Save affordance. It always reflects whether there are unsaved

@@ -12,7 +12,7 @@ export type ThinkingState = "retrieve" | "synthesis" | "grep";
  * adding a new {@link ThinkingState} value without a label is a type error.
  */
 export const THINKING_LABELS: Record<ThinkingState, string> = {
-    retrieve: "Searching knowledge base...",
-    synthesis: "Synthesizing answer...",
-    grep: "Scanning documents...",
+  retrieve: "Searching knowledge base...",
+  synthesis: "Synthesizing answer...",
+  grep: "Scanning documents...",
 };

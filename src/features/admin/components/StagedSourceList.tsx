@@ -77,9 +77,7 @@ export function StagedSourceList({
               </p>
               <p
                 className={`mt-0.5 text-xs ${
-                  source.status === "failed"
-                    ? "text-app-danger-text"
-                    : "text-app-text-muted"
+                  source.status === "failed" ? "text-app-danger-text" : "text-app-text-muted"
                 }`}
               >
                 {source.status === "failed" && source.errorMessage

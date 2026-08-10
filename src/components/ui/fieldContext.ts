@@ -1,17 +1,17 @@
 import { createContext } from "react";
 
 export type FieldContextValue = {
-    /** `id` the control must carry so the `<label htmlFor>` points at it. */
-    controlId: string;
-    /**
-     * Space-separated ids of the hint and error text, or `undefined` when the
-     * field has neither. Goes straight into the control's `aria-describedby`.
-     */
-    describedBy: string | undefined;
-    /** Whether the field is currently showing an error. */
-    invalid: boolean;
-    /** Mirrors `Field`'s `disabled`, so the control does not need it passed twice. */
-    disabled: boolean;
+  /** `id` the control must carry so the `<label htmlFor>` points at it. */
+  controlId: string;
+  /**
+   * Space-separated ids of the hint and error text, or `undefined` when the
+   * field has neither. Goes straight into the control's `aria-describedby`.
+   */
+  describedBy: string | undefined;
+  /** Whether the field is currently showing an error. */
+  invalid: boolean;
+  /** Mirrors `Field`'s `disabled`, so the control does not need it passed twice. */
+  disabled: boolean;
 };
 
 /**

@@ -17,13 +17,7 @@ import type { ReactNode } from "react";
  * (standards §1: no abstractions for potential future use).
  */
 export type BadgeVariant =
-    | "success"
-    | "brand"
-    | "warning"
-    | "neutral"
-    | "danger"
-    | "purple"
-    | "orange";
+  "success" | "brand" | "warning" | "neutral" | "danger" | "purple" | "orange";
 
 /**
  * `sm` for badges inside dense rows and cards, `md` when the badge is a element
@@ -32,31 +26,31 @@ export type BadgeVariant =
 export type BadgeSize = "sm" | "md";
 
 export type BadgeProps = {
-    children: ReactNode;
-    variant?: BadgeVariant;
-    size?: BadgeSize;
-    /**
-     * Native tooltip. Used by the ingestion run badges to surface a failure
-     * reason whose full text lives in the drawer — never for information the
-     * user needs, since a tooltip is invisible on touch and to screen readers.
-     */
-    title?: string;
-    className?: string;
+  children: ReactNode;
+  variant?: BadgeVariant;
+  size?: BadgeSize;
+  /**
+   * Native tooltip. Used by the ingestion run badges to surface a failure
+   * reason whose full text lives in the drawer — never for information the
+   * user needs, since a tooltip is invisible on touch and to screen readers.
+   */
+  title?: string;
+  className?: string;
 };
 
 const badgeVariantClasses: Record<BadgeVariant, string> = {
-    success: "border-app-success-border bg-app-success-bg text-app-success-text",
-    brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
-    warning: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
-    neutral: "border-app-neutral-border bg-app-neutral-bg text-app-neutral-text",
-    danger: "border-app-danger-border bg-app-danger-bg text-app-danger-text",
-    purple: "border-app-purple-border bg-app-purple-bg text-app-purple-text",
-    orange: "border-app-orange-border bg-app-orange-bg text-app-orange-text",
+  success: "border-app-success-border bg-app-success-bg text-app-success-text",
+  brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
+  warning: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
+  neutral: "border-app-neutral-border bg-app-neutral-bg text-app-neutral-text",
+  danger: "border-app-danger-border bg-app-danger-bg text-app-danger-text",
+  purple: "border-app-purple-border bg-app-purple-bg text-app-purple-text",
+  orange: "border-app-orange-border bg-app-orange-bg text-app-orange-text",
 };
 
 const badgeSizeClasses: Record<BadgeSize, string> = {
-    sm: "px-2 py-0.5",
-    md: "px-3 py-1",
+  sm: "px-2 py-0.5",
+  md: "px-3 py-1",
 };
 
 /**
@@ -72,18 +66,18 @@ const badgeSizeClasses: Record<BadgeSize, string> = {
  * ```
  */
 export function Badge({
-    children,
-    variant = "brand",
-    size = "md",
-    title,
-    className = "",
+  children,
+  variant = "brand",
+  size = "md",
+  title,
+  className = "",
 }: BadgeProps) {
-    return (
-        <span
-            title={title}
-            className={`inline-flex items-center rounded-full border text-xs font-semibold leading-none ${badgeSizeClasses[size]} ${badgeVariantClasses[variant]} ${className}`.trim()}
-        >
-            {children}
-        </span>
-    );
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center rounded-full border text-xs leading-none font-semibold ${badgeSizeClasses[size]} ${badgeVariantClasses[variant]} ${className}`.trim()}
+    >
+      {children}
+    </span>
+  );
 }

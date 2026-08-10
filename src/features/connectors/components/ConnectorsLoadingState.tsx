@@ -8,10 +8,7 @@ import { Spinner } from "../../../components/ui/Spinner.tsx";
  */
 export function ConnectorsLoadingState() {
   return (
-    <EmptyState
-      icon={<Spinner size="lg" silent />}
-      title="Loading connectors"
-    >
+    <EmptyState icon={<Spinner size="lg" silent />} title="Loading connectors">
       Fetching registered connectors and their configuration from the backend.
     </EmptyState>
   );

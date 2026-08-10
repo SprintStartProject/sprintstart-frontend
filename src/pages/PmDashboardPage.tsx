@@ -37,9 +37,7 @@ export function PmDashboardPage() {
         <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-app-text">
-                Team overview
-              </h2>
+              <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
               <p className="text-sm text-app-text-muted">
                 Track the current status of your team and onboarding progress.
               </p>
@@ -59,10 +57,7 @@ export function PmDashboardPage() {
           <TeamManagementWidget projectId={selectedProjectId} />
         </section>
 
-        <ProjectRolesModal
-          open={rolesModalOpen}
-          onClose={() => setRolesModalOpen(false)}
-        />
+        <ProjectRolesModal open={rolesModalOpen} onClose={() => setRolesModalOpen(false)} />
 
         <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
           <div className="mb-4">

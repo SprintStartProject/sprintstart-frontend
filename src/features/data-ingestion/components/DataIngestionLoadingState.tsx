@@ -6,12 +6,9 @@ import { Spinner } from "../../../components/ui/Spinner.tsx";
  * that may follow, so the page does not reshape when the answer arrives.
  */
 export function DataIngestionLoadingState() {
-    return (
-        <EmptyState
-            icon={<Spinner size="lg" silent />}
-            title="Loading ingestion data"
-        >
-            Fetching source statuses and recent ingestion runs from the backend.
-        </EmptyState>
-    );
+  return (
+    <EmptyState icon={<Spinner size="lg" silent />} title="Loading ingestion data">
+      Fetching source statuses and recent ingestion runs from the backend.
+    </EmptyState>
+  );
 }

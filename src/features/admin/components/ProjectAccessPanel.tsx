@@ -1,13 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  AlertCircle,
-  ExternalLink,
-  Folder,
-  Loader2,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import type { ProjectSummary } from "../types";
@@ -47,12 +39,11 @@ export function ProjectAccessPanel({
     [assignedProjects],
   );
 
-  const [projectPickerState, setProjectPickerState] =
-    useState<ProjectPickerState>(() => ({
-      sourceKey: assignedProjectKey,
-      search: "",
-      isOpen: false,
-    }));
+  const [projectPickerState, setProjectPickerState] = useState<ProjectPickerState>(() => ({
+    sourceKey: assignedProjectKey,
+    search: "",
+    isOpen: false,
+  }));
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -122,9 +113,7 @@ export function ProjectAccessPanel({
       closeProjectPicker();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Project assignment could not be saved.",
+        error instanceof Error ? error.message : "Project assignment could not be saved.",
       );
     } finally {
       setPendingProjectId(null);
@@ -141,9 +130,7 @@ export function ProjectAccessPanel({
       await onRemoveProject(projectId);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Project assignment could not be removed.",
+        error instanceof Error ? error.message : "Project assignment could not be removed.",
       );
     } finally {
       setPendingProjectId(null);
@@ -154,12 +141,8 @@ export function ProjectAccessPanel({
     <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:p-4">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="items-center align-middle">
-          <p className="text-xl font-semibold text-app-text sm:text-2xl">
-            Projects
-          </p>
-          <p className="mt-1 text-sm text-app-text-muted">
-            Changes are saved immediately.
-          </p>
+          <p className="text-xl font-semibold text-app-text sm:text-2xl">Projects</p>
+          <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
         </div>
 
         <div className="relative">
@@ -241,10 +224,8 @@ export function ProjectAccessPanel({
                   </div>
 
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-app-text">
-                      {project.name}
-                    </p>
-                    <p className="mt-1 break-all font-mono text-xs text-app-text-muted">
+                    <p className="truncate font-semibold text-app-text">{project.name}</p>
+                    <p className="mt-1 font-mono text-xs break-all text-app-text-muted">
                       {project.id}
                     </p>
                   </div>
@@ -281,9 +262,7 @@ export function ProjectAccessPanel({
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-app-border bg-app-surface px-4 py-8 text-center lg:col-span-2">
-            <p className="text-sm font-medium text-app-text">
-              No projects assigned
-            </p>
+            <p className="text-sm font-medium text-app-text">No projects assigned</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Add a project to assign this user to a project.
             </p>

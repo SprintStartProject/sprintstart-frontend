@@ -23,41 +23,39 @@
  *   propagates to the consumer — wrap the `for await` loop in a `try/catch`
  *   to distinguish aborts from connection drops.
  */
-export async function* parseSSEStream<T>(
-    stream: ReadableStream<Uint8Array>,
-): AsyncGenerator<T> {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+export async function* parseSSEStream<T>(stream: ReadableStream<Uint8Array>): AsyncGenerator<T> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
 
-    try {
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-            for (const line of lines) {
-                if (!line.startsWith("data:")) continue;
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
 
-                const payload = line.replace("data:", "").trim();
-                if (!payload) continue;
+        const payload = line.replace("data:", "").trim();
+        if (!payload) continue;
 
-                try {
-                    yield JSON.parse(payload) as T;
-                } catch {
-                    console.warn("SSE: skipping malformed data line", payload);
-                }
-            }
-        }
-    } finally {
         try {
-            reader.releaseLock();
+          yield JSON.parse(payload) as T;
         } catch {
-            // Lock may already be released — safe to ignore.
+          console.warn("SSE: skipping malformed data line", payload);
         }
+      }
     }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // Lock may already be released — safe to ignore.
+    }
+  }
 }

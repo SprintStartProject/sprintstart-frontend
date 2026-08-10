@@ -1,36 +1,30 @@
 import { forwardRef, useContext } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { FieldContext } from "./fieldContext";
-import {
-    fieldClasses,
-    leadingIconPosition,
-    trailingPosition,
-    type FieldSize,
-} from "./fieldStyles";
+import { fieldClasses, leadingIconPosition, trailingPosition, type FieldSize } from "./fieldStyles";
 
 type InputOwnProps = {
-    size?: FieldSize;
-    /**
-     * Decorative icon shown inside the left edge. Pass the element:
-     * `icon={<Search className="h-4 w-4" />}`. It is marked `aria-hidden` and
-     * click-through, so it never steals focus from the field.
-     */
-    icon?: ReactNode;
-    /**
-     * Interactive element pinned inside the right edge — a clear button, a
-     * password toggle, a refresh action. Unlike `icon` it stays clickable.
-     */
-    trailing?: ReactNode;
-    /**
-     * Marks the field as failing validation. Sets `aria-invalid` and switches
-     * the border to danger. Inside a `Field` this is inherited from the error
-     * prop and does not need to be passed.
-     */
-    invalid?: boolean;
+  size?: FieldSize;
+  /**
+   * Decorative icon shown inside the left edge. Pass the element:
+   * `icon={<Search className="h-4 w-4" />}`. It is marked `aria-hidden` and
+   * click-through, so it never steals focus from the field.
+   */
+  icon?: ReactNode;
+  /**
+   * Interactive element pinned inside the right edge — a clear button, a
+   * password toggle, a refresh action. Unlike `icon` it stays clickable.
+   */
+  trailing?: ReactNode;
+  /**
+   * Marks the field as failing validation. Sets `aria-invalid` and switches
+   * the border to danger. Inside a `Field` this is inherited from the error
+   * prop and does not need to be passed.
+   */
+  invalid?: boolean;
 };
 
-export type InputProps = InputOwnProps &
-    Omit<InputHTMLAttributes<HTMLInputElement>, "size">;
+export type InputProps = InputOwnProps & Omit<InputHTMLAttributes<HTMLInputElement>, "size">;
 
 /**
  * The app's single-line text control.
@@ -61,66 +55,64 @@ export type InputProps = InputOwnProps &
  * them the wrong height.
  */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-    {
-        size = "md",
-        icon,
-        trailing,
-        invalid,
-        className = "",
-        id,
-        disabled,
-        "aria-describedby": ariaDescribedBy,
-        ...rest
-    },
-    ref,
+  {
+    size = "md",
+    icon,
+    trailing,
+    invalid,
+    className = "",
+    id,
+    disabled,
+    "aria-describedby": ariaDescribedBy,
+    ...rest
+  },
+  ref,
 ) {
-    const field = useContext(FieldContext);
+  const field = useContext(FieldContext);
 
-    const isInvalid = invalid ?? field?.invalid ?? false;
-    const resolvedId = id ?? field?.controlId;
-    const resolvedDescribedBy = ariaDescribedBy ?? field?.describedBy;
-    const isDisabled = disabled ?? field?.disabled ?? false;
+  const isInvalid = invalid ?? field?.invalid ?? false;
+  const resolvedId = id ?? field?.controlId;
+  const resolvedDescribedBy = ariaDescribedBy ?? field?.describedBy;
+  const isDisabled = disabled ?? field?.disabled ?? false;
 
-    const control = (
-        <input
-            ref={ref}
-            id={resolvedId}
-            disabled={isDisabled}
-            aria-invalid={isInvalid || undefined}
-            aria-describedby={resolvedDescribedBy}
-            className={fieldClasses({
-                size,
-                invalid: isInvalid,
-                hasLeadingIcon: Boolean(icon),
-                hasTrailing: Boolean(trailing),
-                className,
-            })}
-            {...rest}
-        />
-    );
+  const control = (
+    <input
+      ref={ref}
+      id={resolvedId}
+      disabled={isDisabled}
+      aria-invalid={isInvalid || undefined}
+      aria-describedby={resolvedDescribedBy}
+      className={fieldClasses({
+        size,
+        invalid: isInvalid,
+        hasLeadingIcon: Boolean(icon),
+        hasTrailing: Boolean(trailing),
+        className,
+      })}
+      {...rest}
+    />
+  );
 
-    if (!icon && !trailing) return control;
+  if (!icon && !trailing) return control;
 
-    return (
-        <div className="relative w-full">
-            {icon && (
-                <span
-                    aria-hidden="true"
-                    className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-app-text-disabled ${leadingIconPosition[size]}`}
-                >
-                    {icon}
-                </span>
-            )}
+  return (
+    <div className="relative w-full">
+      {icon && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-app-text-disabled ${leadingIconPosition[size]}`}
+        >
+          {icon}
+        </span>
+      )}
 
-            {control}
+      {control}
 
-            {trailing && (
-                <span
-                    className={`absolute top-1/2 -translate-y-1/2 ${trailingPosition[size]}`}
-                >
-                    {trailing}
-                </span>
-            )}
-        </div>
-    );
+      {trailing && (
+        <span className={`absolute top-1/2 -translate-y-1/2 ${trailingPosition[size]}`}>
+          {trailing}
+        </span>
+      )}
+    </div>
+  );
 });

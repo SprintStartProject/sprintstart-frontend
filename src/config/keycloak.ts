@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import Keycloak from 'keycloak-js';
+import Keycloak from "keycloak-js";
 
 /**
  * Keycloak configuration for the SprintStart frontend.
@@ -8,12 +8,12 @@ import Keycloak from 'keycloak-js';
  * /auth (see nginx.conf / frontend-nginx-config), so the URL never needs
  * per-environment configuration.
  */
-const clientId = String(import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'sprintstart-frontend');
+const clientId = String(import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "sprintstart-frontend");
 
 const keycloak = new Keycloak({
-    url: `${window.location.origin}/auth`,
-    realm: 'sprintstart',
-    clientId,
+  url: `${window.location.origin}/auth`,
+  realm: "sprintstart",
+  clientId,
 });
 
 export default keycloak;

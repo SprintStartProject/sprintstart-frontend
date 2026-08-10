@@ -78,9 +78,7 @@ export function SourceDetailsPanel({
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
   const canUpdateRepository =
-    source.sourceSystem === "GITHUB" &&
-    repository !== null &&
-    onUpdateSource !== undefined;
+    source.sourceSystem === "GITHUB" && repository !== null && onUpdateSource !== undefined;
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -126,11 +124,7 @@ export function SourceDetailsPanel({
         );
       } catch (error) {
         setEnabledState("error");
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Failed to update the source.",
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Failed to update the source.");
       }
     },
     [onSetSourceEnabled, repository],
@@ -146,11 +140,7 @@ export function SourceDetailsPanel({
 
   const saveRepositoryConfig = useCallback(
     async (request: ConfigureGithubRepositoryRequest) => {
-      if (
-        !canManageRepositoryConfig ||
-        !repository ||
-        !onSaveRepositoryConfig
-      ) {
+      if (!canManageRepositoryConfig || !repository || !onSaveRepositoryConfig) {
         throw new Error("Repository sync config is not available.");
       }
 
@@ -169,16 +159,10 @@ export function SourceDetailsPanel({
     try {
       await onUpdateSource(source);
       setUpdateState("success");
-      setMessage(
-        "Repository update started. Details will refresh while ingestion runs.",
-      );
+      setMessage("Repository update started. Details will refresh while ingestion runs.");
     } catch (error) {
       setUpdateState("error");
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to start repository update",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to start repository update");
     }
   }, [canUpdateRepository, onUpdateSource, source]);
 
@@ -216,9 +200,7 @@ export function SourceDetailsPanel({
     } catch (error) {
       setRefreshState("error");
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to refresh repository details",
+        error instanceof Error ? error.message : "Failed to refresh repository details",
       );
     }
   }, [onRefreshDetails]);
@@ -261,10 +243,7 @@ export function SourceDetailsPanel({
           {/* The chip conveys connection state; this adds the sync freshness it
               collapses away, matching the pair shown on the source cards. */}
           {source.ingestionStatusLabel !== source.statusView.label && (
-            <SourceSyncBadge
-              label={source.ingestionStatusLabel}
-              status={source.ingestionStatus}
-            />
+            <SourceSyncBadge label={source.ingestionStatusLabel} status={source.ingestionStatus} />
           )}
         </>
       }
@@ -342,22 +321,15 @@ export function SourceDetailsPanel({
           <InfoRow label="Full name" value={repository?.fullName} />
           <InfoRow label="Owner" value={repository?.owner} />
           <InfoLinkRow label="URL" value={repository?.url} />
-          <InfoRow
-            label="Repository ID"
-            value={repository?.repositoryId ?? source.sourceId}
-            mono
-          />
+          <InfoRow label="Repository ID" value={repository?.repositoryId ?? source.sourceId} mono />
           {canToggleEnabled && repository ? (
             <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5">
-              <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">
-                Source
-              </dt>
+              <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
               <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
                 <span className="text-[13px] font-semibold text-app-text">
                   {repository.enabled === false ? "Disabled" : "Enabled"}
                   <span className="ml-1 font-normal text-app-text-subtle">
-                    · {repository.enabled === false ? "excluded from" : "included in"}{" "}
-                    ingestion
+                    · {repository.enabled === false ? "excluded from" : "included in"} ingestion
                   </span>
                 </span>
                 <AccountEnabledToggle
@@ -379,18 +351,9 @@ export function SourceDetailsPanel({
       {hasArtifactTypeSyncTimes && (
         <Section title="Last Synced">
           <dl className="overflow-hidden rounded-xl border border-app-border">
-            <InfoRow
-              label="Commits"
-              value={formatDateTime(source.lastCommitsSyncAt)}
-            />
-            <InfoRow
-              label="Issues"
-              value={formatDateTime(source.lastIssuesSyncAt)}
-            />
-            <InfoRow
-              label="Pull requests"
-              value={formatDateTime(source.lastPullRequestsSyncAt)}
-            />
+            <InfoRow label="Commits" value={formatDateTime(source.lastCommitsSyncAt)} />
+            <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
+            <InfoRow label="Pull requests" value={formatDateTime(source.lastPullRequestsSyncAt)} />
           </dl>
         </Section>
       )}
@@ -413,12 +376,10 @@ export function SourceDetailsPanel({
                 key={`${item.artifactIdentifier}-${item.reason}`}
                 className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
               >
-                <p className="wrap-break-word text-sm font-medium text-app-warning-text">
+                <p className="text-sm font-medium wrap-break-word text-app-warning-text">
                   {item.artifactIdentifier}
                 </p>
-                <p className="mt-1 text-sm text-app-text-muted">
-                  {item.reason}
-                </p>
+                <p className="mt-1 text-sm text-app-text-muted">{item.reason}</p>
               </div>
             ))}
           </div>
@@ -429,9 +390,8 @@ export function SourceDetailsPanel({
         <Section title="Project link">
           <div className="rounded-xl border border-app-border px-4 py-3">
             <p className="text-sm text-app-text-muted">
-              Remove this repository from the current project. The repository and
-              its artifacts are kept. You can
-              re-link it later.
+              Remove this repository from the current project. The repository and its artifacts are
+              kept. You can re-link it later.
             </p>
             <Button
               variant="dangerSoft"
@@ -475,7 +435,7 @@ export function SourceDetailsPanel({
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-8 border-t border-app-border pt-6 first:mt-0 first:border-t-0 first:pt-0">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-app-text-subtle">
+      <h3 className="mb-3 text-sm font-semibold tracking-wide text-app-text-subtle uppercase">
         {title}
       </h3>
       {children}
@@ -501,7 +461,7 @@ function Tile({
         {label}
       </p>
       <p
-        className={`mt-1.5 break-words text-lg font-bold tabular-nums ${
+        className={`mt-1.5 text-lg font-bold break-words tabular-nums ${
           warn ? "text-app-danger-text" : "text-app-text"
         }`}
       >
@@ -522,11 +482,9 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3 border-t border-app-border px-4 py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">
-        {label}
-      </dt>
+      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
       <dd
-        className={`min-w-0 wrap-break-word text-[13px] font-semibold text-app-text ${
+        className={`min-w-0 text-[13px] font-semibold wrap-break-word text-app-text ${
           mono ? "font-mono text-xs font-medium" : ""
         }`}
       >
@@ -539,10 +497,8 @@ function InfoRow({
 function InfoLinkRow({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex items-start gap-3 border-t border-app-border px-4 py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">
-        {label}
-      </dt>
-      <dd className="min-w-0 wrap-break-word text-[13px] font-semibold">
+      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
+      <dd className="min-w-0 text-[13px] font-semibold wrap-break-word">
         {value ? (
           <a
             href={value}
@@ -566,22 +522,11 @@ function formatEnabled(value?: boolean | null) {
   return "Not available";
 }
 
-function Message({
-  tone,
-  children,
-}: {
-  tone: "success" | "warning";
-  children: ReactNode;
-}) {
+function Message({ tone, children }: { tone: "success" | "warning"; children: ReactNode }) {
   const className =
     tone === "success"
       ? "border-app-success-border bg-app-success-bg text-app-success-text"
       : "border-app-warning-border bg-app-warning-bg text-app-warning-text";
 
-  return (
-    <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${className}`}>{children}</div>;
 }
-

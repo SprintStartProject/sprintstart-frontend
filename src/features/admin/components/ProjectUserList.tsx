@@ -12,11 +12,7 @@ type ProjectUserListProps = {
 
 function getProjectUserDisplayName(user: ProjectUser | ProjectUserSummary) {
   if ("firstName" in user && "lastName" in user) {
-    return (
-      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.username ||
-      user.email
-    );
+    return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || user.email;
   }
 
   return user.username || user.email;
@@ -61,12 +57,8 @@ export function ProjectUserList({
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-app-text">
-                  {displayName}
-                </p>
-                <p className="truncate text-xs text-app-text-muted">
-                  {user.email}
-                </p>
+                <p className="truncate text-sm font-semibold text-app-text">{displayName}</p>
+                <p className="truncate text-xs text-app-text-muted">{user.email}</p>
               </div>
 
               <div className="flex w-full flex-wrap items-center gap-2 rounded-lg px-0 py-1 sm:w-auto sm:shrink-0 sm:gap-3 sm:px-3 sm:py-2">

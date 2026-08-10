@@ -2,10 +2,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/useAuth";
 import { PermissionGroup } from "../../services/types";
-import {
-  projectService,
-  type AdminProject,
-} from "../../services/projectService";
+import { projectService, type AdminProject } from "../../services/projectService";
 import { userService } from "../../services/userService";
 import { ProjectContext, type SelectableProject } from "./ProjectContext";
 
@@ -77,19 +74,13 @@ function sortProjects(projects: SelectableProject[]): SelectableProject[] {
  * is what an HR user hits — the backend restricts `/api/v1/admin/projects` to
  * ADMIN, while the frontend groups HR with admins.
  */
-async function loadAdminProjects(
-  currentUserId: string | null,
-): Promise<SelectableProject[]> {
+async function loadAdminProjects(currentUserId: string | null): Promise<SelectableProject[]> {
   const projects = await projectService.getProjects();
   return projects.map((project) =>
-    toSelectableProject(
-      project,
-      currentUserId !== null && project.manager?.id === currentUserId,
-      {
-        memberCount: project.users.length,
-        sourceCount: project.sources.length,
-      },
-    ),
+    toSelectableProject(project, currentUserId !== null && project.manager?.id === currentUserId, {
+      memberCount: project.users.length,
+      sourceCount: project.sources.length,
+    }),
   );
 }
 
@@ -154,8 +145,7 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { profile, status } = useAuth();
   const [projects, setProjects] = useState<SelectableProject[]>([]);
-  const [selectedProjectId, setSelectedProjectIdState] =
-    useState(readStoredProjectId);
+  const [selectedProjectId, setSelectedProjectIdState] = useState(readStoredProjectId);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -210,23 +200,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjects(sortedProjects);
 
       setSelectedProjectIdState((currentProjectId) => {
-        const hasCurrentProject = sortedProjects.some(
-          (project) => project.id === currentProjectId,
-        );
+        const hasCurrentProject = sortedProjects.some((project) => project.id === currentProjectId);
 
-        const nextProjectId = hasCurrentProject
-          ? currentProjectId
-          : (sortedProjects[0]?.id ?? "");
+        const nextProjectId = hasCurrentProject ? currentProjectId : (sortedProjects[0]?.id ?? "");
 
         storeProjectId(nextProjectId);
         return nextProjectId;
       });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Projects could not be loaded.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Projects could not be loaded.");
     } finally {
       setIsLoading(false);
     }
@@ -250,8 +232,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       selectedProjectId,
       canManageSelected: selectedProject?.isManaged ?? false,
       isSwitcherEnabled:
-        permissionGroup !== null &&
-        PROJECT_SWITCHER_ROLES.includes(permissionGroup),
+        permissionGroup !== null && PROJECT_SWITCHER_ROLES.includes(permissionGroup),
       isLoading,
       errorMessage,
       setSelectedProjectId,
@@ -269,7 +250,5 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>
-  );
+  return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }

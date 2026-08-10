@@ -10,31 +10,31 @@ import type { CSSProperties } from "react";
  * @param width Desired popover width in px (defaults to 320).
  */
 export function getCitationPopoverStyle(rect: DOMRect, width = 320): CSSProperties {
-    const WIDTH = width;
-    const GAP = 8;
-    const EST_HEIGHT = 120;
-    const MARGIN = 16;
+  const WIDTH = width;
+  const GAP = 8;
+  const EST_HEIGHT = 120;
+  const MARGIN = 16;
 
-    let top = rect.bottom + GAP;
-    let left = rect.left;
+  let top = rect.bottom + GAP;
+  let left = rect.left;
 
-    if (left + WIDTH > window.innerWidth - MARGIN) {
-        left = window.innerWidth - WIDTH - MARGIN;
+  if (left + WIDTH > window.innerWidth - MARGIN) {
+    left = window.innerWidth - WIDTH - MARGIN;
+  }
+  if (left < MARGIN) left = MARGIN;
+
+  if (top + EST_HEIGHT > window.innerHeight - MARGIN) {
+    const aboveTop = rect.top - EST_HEIGHT - GAP;
+    if (aboveTop >= MARGIN) {
+      top = aboveTop;
     }
-    if (left < MARGIN) left = MARGIN;
+  }
 
-    if (top + EST_HEIGHT > window.innerHeight - MARGIN) {
-        const aboveTop = rect.top - EST_HEIGHT - GAP;
-        if (aboveTop >= MARGIN) {
-            top = aboveTop;
-        }
-    }
-
-    return {
-        position: "fixed",
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${WIDTH}px`,
-        zIndex: 50,
-    };
+  return {
+    position: "fixed",
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${WIDTH}px`,
+    zIndex: 50,
+  };
 }

@@ -71,18 +71,14 @@ export function GithubRepositorySyncSettings({
   const [scheduleType, setScheduleType] = useState<ScheduleType>("INTERVAL");
   const [everyMinutes, setEveryMinutes] = useState("60");
   const [time, setTime] = useState("02:00:00");
-  const [daysOfWeek, setDaysOfWeek] = useState<GithubScheduleDayOfWeek[]>([
-    "MONDAY",
-  ]);
+  const [daysOfWeek, setDaysOfWeek] = useState<GithubScheduleDayOfWeek[]>(["MONDAY"]);
   const [dayOfMonth, setDayOfMonth] = useState("1");
   const [cron, setCron] = useState("0 0 2 * * *");
   const [nextSyncAt, setNextSyncAt] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "idle" | "error">(
     loadConfig ? "loading" : "idle",
   );
-  const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">(
-    "idle",
-  );
+  const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Serialized snapshot of the last saved/loaded form values. Comparing the live
@@ -114,9 +110,7 @@ export function GithubRepositorySyncSettings({
         setCron,
       });
       setBaseline(
-        serializeFormValues(
-          toFormValues(initialConfig.autoUpdate, initialConfig.schedule),
-        ),
+        serializeFormValues(toFormValues(initialConfig.autoUpdate, initialConfig.schedule)),
       );
     });
   }, [initialConfig, loadConfig]);
@@ -156,18 +150,14 @@ export function GithubRepositorySyncSettings({
           setDayOfMonth,
           setCron,
         });
-        setBaseline(
-          serializeFormValues(toFormValues(config.autoUpdate, config.spec)),
-        );
+        setBaseline(serializeFormValues(toFormValues(config.autoUpdate, config.spec)));
         setNextSyncAt(config.nextSyncAt);
         setLoadState("idle");
       } catch (error) {
         if (!isMounted) return;
 
         setLoadState("error");
-        setErrorMessage(
-          error instanceof Error ? error.message : "Failed to load sync config",
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load sync config");
       }
     });
 
@@ -210,9 +200,7 @@ export function GithubRepositorySyncSettings({
           setDayOfMonth,
           setCron,
         });
-        setBaseline(
-          serializeFormValues(toFormValues(config.autoUpdate, config.spec)),
-        );
+        setBaseline(serializeFormValues(toFormValues(config.autoUpdate, config.spec)));
         setNextSyncAt(config.nextSyncAt);
       }
 
@@ -220,9 +208,7 @@ export function GithubRepositorySyncSettings({
       setMessage("Sync settings saved.");
     } catch (error) {
       setSaveState("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to save sync config",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save sync config");
     }
   };
 
@@ -292,10 +278,7 @@ export function GithubRepositorySyncSettings({
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor={scheduleTypeId}
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor={scheduleTypeId} className="text-sm font-medium text-app-text">
             Schedule
           </label>
           <Select
@@ -315,10 +298,7 @@ export function GithubRepositorySyncSettings({
 
         {scheduleType === "INTERVAL" && (
           <div>
-            <label
-              htmlFor={intervalInputId}
-              className="text-sm font-medium text-app-text"
-            >
+            <label htmlFor={intervalInputId} className="text-sm font-medium text-app-text">
               Minutes
             </label>
             <div className="mt-2 flex min-h-10 items-center rounded-xl border border-app-border bg-app-surface focus-within:border-app-brand focus-within:ring-2 focus-within:ring-app-focus">
@@ -657,10 +637,7 @@ function normalizeTimeOutput(value: string) {
   throw new Error("Time must use HH:mm:ss.");
 }
 
-function toggleDay(
-  selectedDays: GithubScheduleDayOfWeek[],
-  day: GithubScheduleDayOfWeek,
-) {
+function toggleDay(selectedDays: GithubScheduleDayOfWeek[], day: GithubScheduleDayOfWeek) {
   if (selectedDays.includes(day)) {
     return selectedDays.filter((selectedDay) => selectedDay !== day);
   }
@@ -669,7 +646,8 @@ function toggleDay(
 }
 
 function formatDayLabel(day: GithubScheduleDayOfWeek) {
-  return day.slice(0, 3).toLowerCase().replace(/^\w/, (char) =>
-    char.toUpperCase(),
-  );
+  return day
+    .slice(0, 3)
+    .toLowerCase()
+    .replace(/^\w/, (char) => char.toUpperCase());
 }

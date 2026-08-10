@@ -30,13 +30,11 @@ export function SourceList({
         <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-app-brand-soft blur-3xl" />
 
         <div className="relative z-10 flex flex-col items-center">
-          <h3 className="text-lg font-semibold text-app-text">
-            Connect your first source
-          </h3>
+          <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
 
           <p className="mt-2 max-w-md text-sm text-app-text-muted">
-            Discover repositories from a GitHub organization or user and connect
-            them to start ingesting artifacts into the knowledge base.
+            Discover repositories from a GitHub organization or user and connect them to start
+            ingesting artifacts into the knowledge base.
           </p>
 
           {onAddSource && (
@@ -69,7 +67,7 @@ export function SourceList({
             // Same hover language as the dashboard widgets: a small lift, a
             // brand-coloured edge and a shadow, so "this is clickable" reads
             // identically wherever it appears in the app.
-            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg motion-reduce:hover:translate-y-0 sm:p-6 ${
+            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 sm:p-6 ${
               isSelected
                 ? "border-app-brand shadow-sm"
                 : "border-app-border hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg"
@@ -83,12 +81,12 @@ export function SourceList({
 
                 <div className="min-w-0">
                   <div>
-                    <h3 className="break-words text-lg font-semibold text-app-text">
+                    <h3 className="text-lg font-semibold break-words text-app-text">
                       {source.name}
                     </h3>
 
                     {source.githubRepository?.owner && (
-                      <p className="mt-0.5 break-words text-xs text-app-text-subtle">
+                      <p className="mt-0.5 text-xs break-words text-app-text-subtle">
                         {source.githubRepository.owner}
                       </p>
                     )}
@@ -107,9 +105,7 @@ export function SourceList({
               <ChevronRight
                 size={20}
                 className={`shrink-0 text-app-text-disabled transition ${
-                  isSelected
-                    ? "rotate-180 text-app-brand"
-                    : "group-hover:translate-x-1"
+                  isSelected ? "rotate-180 text-app-brand" : "group-hover:translate-x-1"
                 }`}
               />
             </div>
@@ -122,10 +118,7 @@ export function SourceList({
 
               <InfoBlock label="Last Sync" value={source.lastSync} />
 
-              <InfoBlock
-                label="Latest Updated"
-                value={formatNumber(source.latestUpdatedCount)}
-              />
+              <InfoBlock label="Latest Updated" value={formatNumber(source.latestUpdatedCount)} />
 
               <InfoBlock
                 label="Errors"
@@ -142,8 +135,8 @@ export function SourceList({
                 </p>
 
                 <p className="mt-1 text-sm text-app-text-muted">
-                  Open the source details or check the backend response for
-                  failed artifact identifiers and reasons.
+                  Open the source details or check the backend response for failed artifact
+                  identifiers and reasons.
                 </p>
               </div>
             )}
@@ -161,10 +154,7 @@ export function SourceList({
 function SyncStatusBadge({ source }: { source: DataSource }) {
   const label = source.ingestionStatusLabel;
 
-  if (
-    source.statusView.state === "syncing" ||
-    label === source.statusView.label
-  ) {
+  if (source.statusView.state === "syncing" || label === source.statusView.label) {
     return null;
   }
 
@@ -182,12 +172,10 @@ function InfoBlock({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-app-text-subtle">
-        {label}
-      </p>
+      <p className="text-xs tracking-wide text-app-text-subtle uppercase">{label}</p>
 
       <p
-        className={`mt-2 break-words text-lg font-semibold ${
+        className={`mt-2 text-lg font-semibold break-words ${
           danger ? "text-app-danger-text" : "text-app-text"
         }`}
       >
@@ -196,4 +184,3 @@ function InfoBlock({
     </div>
   );
 }
-

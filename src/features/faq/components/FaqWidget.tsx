@@ -14,13 +14,7 @@ import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 
-import {
-  TrendingUp,
-  FileText,
-  ArrowRight,
-  AlertCircle,
-  RefreshCw,
-} from "lucide-react";
+import { TrendingUp, FileText, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: FaqWidget
@@ -59,7 +53,7 @@ export function FaqWidget() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex items-center justify-center min-h-48">
+      <div className="flex min-h-48 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
         <Spinner size="lg" label="Loading" />
       </div>
     );
@@ -69,8 +63,8 @@ export function FaqWidget() {
 
   if (error || !overview || overview.groups.length === 0) {
     return (
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-3 min-h-48 text-center">
-        <AlertCircle className="w-5 h-5 text-app-text-muted" />
+      <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
+        <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-sm text-app-text-muted">
           No FAQ groups yet. Trigger a refresh to generate them.
         </p>
@@ -93,24 +87,19 @@ export function FaqWidget() {
             Open FAQ page
           </Button>
         </div>
-        {refreshError && (
-          <p className="text-xs text-app-danger-text max-w-xs">{refreshError}</p>
-        )}
+        {refreshError && <p className="max-w-xs text-xs text-app-danger-text">{refreshError}</p>}
       </div>
     );
   }
 
   // Sort by count descending, take top 5
-  const sorted = [...overview.groups]
-    .sort((a, b) => b.count - a.count);
+  const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
 
-  const sliced = sorted.slice(0,5);
-
+  const sliced = sorted.slice(0, 5);
 
   const [hero, ...rest] = sliced;
 
-  const goToDetail = (group: FAQGroup) =>
-    void navigate(`/insights/faq/${group.groupId}`);
+  const goToDetail = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
 
   // ── RENDER ───────────────────────────────────────────────
 
@@ -118,15 +107,13 @@ export function FaqWidget() {
     <ClickableCard
       onClick={() => void navigate("/insights/faq")}
       interactive={false}
-      className="rounded-2xl border border-app-border bg-app-surface p-5 cursor-pointer transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[button:hover]:!border-app-border has-[button:hover]:!bg-app-surface"
+      className="cursor-pointer rounded-2xl border border-app-border bg-app-surface p-5 transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[button:hover]:!border-app-border has-[button:hover]:!bg-app-surface"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* <Messages className="w-4 h-4 text-app-brand" /> */}
-          <span className="text-sm font-semibold text-app-text">
-            Recurring questions
-          </span>
+          <span className="text-sm font-semibold text-app-text">Recurring questions</span>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -163,7 +150,7 @@ export function FaqWidget() {
           event.stopPropagation();
           goToDetail(hero);
         }}
-        className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4 mb-3 relative overflow-hidden"
+        className="relative mb-3 w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
       >
         {/* Big count in the corner */}
         <span className="absolute top-4 right-4 text-3xl font-semibold text-app-brand">
@@ -175,7 +162,7 @@ export function FaqWidget() {
           Most asked
         </Badge>
 
-        <p className="text-sm font-semibold text-app-text leading-snug mb-3 pr-12">
+        <p className="mb-3 pr-12 text-sm leading-snug font-semibold text-app-text">
           {hero.question}
         </p>
 
@@ -198,17 +185,13 @@ export function FaqWidget() {
               event.stopPropagation();
               goToDetail(group);
             }}
-            className="text-left rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-3"
+            className="rounded-xl border border-app-border bg-app-surface p-3 text-left transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
           >
-            <div className="text-xl font-semibold text-app-brand mb-1">
-              {group.count}
-            </div>
-            <p className="text-xs text-app-text leading-snug line-clamp-2 mb-2">
-              {group.question}
-            </p>
+            <div className="mb-1 text-xl font-semibold text-app-brand">{group.count}</div>
+            <p className="mb-2 line-clamp-2 text-xs leading-snug text-app-text">{group.question}</p>
             {group.topDocuments[0] && (
-              <div className="flex items-center gap-1 text-xs text-app-text-muted overflow-hidden">
-                <FileText className="w-3 h-3 shrink-0" />
+              <div className="flex items-center gap-1 overflow-hidden text-xs text-app-text-muted">
+                <FileText className="h-3 w-3 shrink-0" />
                 <span className="truncate">{group.topDocuments[0].title}</span>
               </div>
             )}

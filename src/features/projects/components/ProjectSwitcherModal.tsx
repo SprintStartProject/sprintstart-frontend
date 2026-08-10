@@ -1,12 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import {
-  Check,
-  Database,
-  FolderKanban,
-  Loader2,
-  Search,
-  Users,
-} from "lucide-react";
+import { Check, Database, FolderKanban, Loader2, Search, Users } from "lucide-react";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import type { SelectableProject } from "../ProjectContext";
@@ -47,8 +40,7 @@ function matchesSearch(project: SelectableProject, search: string): boolean {
   if (!term) return true;
 
   return (
-    project.name.toLowerCase().includes(term) ||
-    project.description.toLowerCase().includes(term)
+    project.name.toLowerCase().includes(term) || project.description.toLowerCase().includes(term)
   );
 }
 
@@ -91,7 +83,7 @@ function ProjectCard({
       onClick={onSelect}
       className={[
         "group relative flex h-full flex-col gap-3 overflow-hidden rounded-2xl border p-4 text-left transition-all",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+        "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
         isSelected
           ? "border-app-brand bg-app-brand-soft"
           : "border-app-border bg-app-surface hover:border-app-border-strong hover:shadow-lg",
@@ -110,9 +102,7 @@ function ProjectCard({
         </span>
 
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-semibold text-app-text">
-            {project.name}
-          </span>
+          <span className="truncate text-sm font-semibold text-app-text">{project.name}</span>
 
           {managerLabel ? (
             <span
@@ -128,9 +118,7 @@ function ProjectCard({
           ) : null}
         </span>
 
-        {isSelected ? (
-          <Check className="h-4 w-4 shrink-0 text-app-brand" />
-        ) : null}
+        {isSelected ? <Check className="h-4 w-4 shrink-0 text-app-brand" /> : null}
       </div>
 
       {project.description ? (
@@ -141,11 +129,7 @@ function ProjectCard({
 
       <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
         <CountChip icon={Users} count={project.memberCount} singular="member" />
-        <CountChip
-          icon={Database}
-          count={project.sourceCount}
-          singular="source"
-        />
+        <CountChip icon={Database} count={project.sourceCount} singular="source" />
       </div>
     </button>
   );
@@ -189,9 +173,7 @@ export function ProjectSwitcherModal({
 
   // Enter from the search field picks the only remaining match, so filtering to
   // one project and confirming never needs the mouse.
-  const handleSearchKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter" || visibleProjects.length !== 1) return;
 
     event.preventDefault();
@@ -233,9 +215,7 @@ export function ProjectSwitcherModal({
           {errorMessage}
         </div>
       ) : !projects.length ? (
-        <p className="py-12 text-center text-sm text-app-text-muted">
-          No projects available yet.
-        </p>
+        <p className="py-12 text-center text-sm text-app-text-muted">No projects available yet.</p>
       ) : !visibleProjects.length ? (
         <p className="py-12 text-center text-sm text-app-text-muted">
           No projects match &ldquo;{search.trim()}&rdquo;.
@@ -248,7 +228,7 @@ export function ProjectSwitcherModal({
         >
           {groups.map((group) => (
             <div key={group.label}>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+              <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
                 {group.label}
               </p>
 

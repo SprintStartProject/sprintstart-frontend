@@ -54,9 +54,7 @@ export function ProjectSourcesStep({
     const parsedRepository = parseGithubRepositoryInput(owner, repositoryName);
 
     if (!parsedRepository) {
-      setFormError(
-        "Enter a repository as owner/name, a GitHub URL, or fill in both fields.",
-      );
+      setFormError("Enter a repository as owner/name, a GitHub URL, or fill in both fields.");
       return;
     }
 
@@ -72,19 +70,11 @@ export function ProjectSourcesStep({
     );
 
     if (alreadyStaged) {
-      setFormError(
-        `${parsedRepository.owner}/${parsedRepository.name} is already on the list.`,
-      );
+      setFormError(`${parsedRepository.owner}/${parsedRepository.name} is already on the list.`);
       return;
     }
 
-    onAdd(
-      createDraftSource(
-        parsedRepository.owner,
-        parsedRepository.name,
-        effectiveTokenName,
-      ),
-    );
+    onAdd(createDraftSource(parsedRepository.owner, parsedRepository.name, effectiveTokenName));
 
     setOwner("");
     setRepositoryName("");
@@ -95,11 +85,7 @@ export function ProjectSourcesStep({
     <div className="space-y-5">
       <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="Repository owner"
-            controlId={ownerInputId}
-            disabled={disabled}
-          >
+          <Field label="Repository owner" controlId={ownerInputId} disabled={disabled}>
             <Input
               value={owner}
               onChange={(event) => setOwner(event.target.value)}
@@ -107,11 +93,7 @@ export function ProjectSourcesStep({
             />
           </Field>
 
-          <Field
-            label="Repository name"
-            controlId={nameInputId}
-            disabled={disabled}
-          >
+          <Field label="Repository name" controlId={nameInputId} disabled={disabled}>
             <Input
               value={repositoryName}
               onChange={(event) => setRepositoryName(event.target.value)}
@@ -155,8 +137,7 @@ export function ProjectSourcesStep({
 
         {!hasTokens && (
           <p className="mt-3 text-sm text-app-warning-text">
-            Add a GitHub personal access token first, then come back to connect
-            repositories.
+            Add a GitHub personal access token first, then come back to connect repositories.
           </p>
         )}
 

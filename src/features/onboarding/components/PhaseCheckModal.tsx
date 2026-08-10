@@ -19,13 +19,7 @@ import type {
   PhaseCheckAttemptResult,
   PhaseCheckAnswerResult,
 } from "../types";
-import {
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  XCircle,
-  RotateCcw,
-} from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
 
 interface PhaseCheckModalProps {
   phaseId: string;
@@ -128,11 +122,7 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       result ? (
         <>
           {!result.passed && (
-            <Button
-              variant="secondary"
-              onClick={retry}
-              icon={<RotateCcw className="h-4 w-4" />}
-            >
+            <Button variant="secondary" onClick={retry} icon={<RotateCcw className="h-4 w-4" />}>
               Try again
             </Button>
           )}
@@ -165,13 +155,13 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       {/* Loading / load error */}
       {!check && !loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-app-text-muted">
-          <Loader2 className="w-6 h-6 animate-spin text-app-brand" />
+          <Loader2 className="h-6 w-6 animate-spin text-app-brand" />
           <p className="text-sm">Loading knowledge check...</p>
         </div>
       )}
       {loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <AlertCircle className="w-8 h-8 text-app-danger-solid" />
+          <AlertCircle className="h-8 w-8 text-app-danger-solid" />
           <p className="text-sm text-app-text-muted">{loadError}</p>
         </div>
       )}
@@ -179,22 +169,22 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       {/* Result banner */}
       {result && (
         <div
-          className={`mb-6 rounded-2xl border p-4 flex items-center gap-3 ${
+          className={`mb-6 flex items-center gap-3 rounded-2xl border p-4 ${
             result.passed
               ? "border-app-success-solid/30 bg-app-success-bg"
               : "border-app-danger-solid/30 bg-app-surface-muted"
           }`}
         >
           {result.passed ? (
-            <CheckCircle2 className="w-6 h-6 shrink-0 text-app-success-solid" />
+            <CheckCircle2 className="h-6 w-6 shrink-0 text-app-success-solid" />
           ) : (
-            <XCircle className="w-6 h-6 shrink-0 text-app-danger-solid" />
+            <XCircle className="h-6 w-6 shrink-0 text-app-danger-solid" />
           )}
           <div>
-            <div className="font-semibold text-app-text text-sm">
+            <div className="text-sm font-semibold text-app-text">
               {result.passed ? "Check passed!" : "Not passed yet"}
             </div>
-            <div className="text-xs text-app-text-muted mt-0.5">
+            <div className="mt-0.5 text-xs text-app-text-muted">
               {result.correctCount}/{result.questionCount} correct (
               {Math.round((result.correctCount / Math.max(result.questionCount, 1)) * 100)}% ·{" "}
               {result.requiredPercent}% required).
@@ -223,8 +213,8 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       )}
 
       {submitError && (
-        <p className="mt-4 text-sm text-app-danger-solid flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <p className="mt-4 flex items-center gap-2 text-sm text-app-danger-solid">
+          <AlertCircle className="h-4 w-4 shrink-0" />
           {submitError}
         </p>
       )}
@@ -246,7 +236,14 @@ interface QuestionCardProps {
   onTextChange: (text: string) => void;
 }
 
-function QuestionCard({ question, index, draft, result, onToggleOption, onTextChange }: QuestionCardProps) {
+function QuestionCard({
+  question,
+  index,
+  draft,
+  result,
+  onToggleOption,
+  onTextChange,
+}: QuestionCardProps) {
   const graded = result !== null;
 
   return (
@@ -260,10 +257,10 @@ function QuestionCard({ question, index, draft, result, onToggleOption, onTextCh
       }`}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-brand-soft text-app-brand text-xs font-bold mt-0.5">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-brand-soft text-xs font-bold text-app-brand">
           {index + 1}
         </span>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           {/* Carried-over repeat question from an earlier phase */}
           {question.review && (
             <Badge variant="neutral" size="sm" className="mb-1.5 gap-1.5">
@@ -274,12 +271,12 @@ function QuestionCard({ question, index, draft, result, onToggleOption, onTextCh
             </Badge>
           )}
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-semibold text-app-text text-sm">{question.question}</h3>
+            <h3 className="text-sm font-semibold text-app-text">{question.question}</h3>
             {graded &&
               (result.correct ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-app-success-solid" />
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-app-success-solid" />
               ) : (
-                <XCircle className="w-5 h-5 shrink-0 text-app-danger-solid" />
+                <XCircle className="h-5 w-5 shrink-0 text-app-danger-solid" />
               ))}
           </div>
 
@@ -300,8 +297,8 @@ function QuestionCard({ question, index, draft, result, onToggleOption, onTextCh
                             ? "border-app-danger-solid/50 text-app-text"
                             : "border-app-border text-app-text-muted"
                         : selected
-                          ? "border-app-brand bg-app-brand-soft text-app-text cursor-pointer"
-                          : "border-app-border text-app-text hover:border-app-border-strong cursor-pointer"
+                          ? "cursor-pointer border-app-brand bg-app-brand-soft text-app-text"
+                          : "cursor-pointer border-app-border text-app-text hover:border-app-border-strong"
                     }`}
                   >
                     <input
@@ -344,7 +341,7 @@ function QuestionCard({ question, index, draft, result, onToggleOption, onTextCh
 
           {/* Explanation after grading */}
           {graded && result.explanation && (
-            <p className="mt-3 text-xs text-app-text-muted rounded-xl bg-app-surface-muted px-3 py-2">
+            <p className="mt-3 rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
               {result.explanation}
             </p>
           )}

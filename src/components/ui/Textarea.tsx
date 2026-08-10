@@ -5,28 +5,28 @@ import { textareaClasses } from "./fieldStyles";
 import { useAutoResize } from "./useAutoResize";
 
 type TextareaOwnProps = {
-    /**
-     * Marks the field as failing validation. Inside a `Field` this is inherited
-     * from the error prop and does not need to be passed.
-     */
-    invalid?: boolean;
-    /**
-     * Height in lines before the field has any content, and the ceiling it may
-     * grow to. Past `maxRows` it scrolls internally instead of pushing the rest
-     * of the dialog off screen.
-     */
-    minRows?: number;
-    maxRows?: number;
-    /**
-     * Turns off growing and gives the user a drag handle instead. Only for the
-     * rare field whose height must stay put — one whose container is measured,
-     * or one sitting next to something that must not move.
-     */
-    autoResize?: boolean;
+  /**
+   * Marks the field as failing validation. Inside a `Field` this is inherited
+   * from the error prop and does not need to be passed.
+   */
+  invalid?: boolean;
+  /**
+   * Height in lines before the field has any content, and the ceiling it may
+   * grow to. Past `maxRows` it scrolls internally instead of pushing the rest
+   * of the dialog off screen.
+   */
+  minRows?: number;
+  maxRows?: number;
+  /**
+   * Turns off growing and gives the user a drag handle instead. Only for the
+   * rare field whose height must stay put — one whose container is measured,
+   * or one sitting next to something that must not move.
+   */
+  autoResize?: boolean;
 };
 
 export type TextareaProps = TextareaOwnProps &
-    Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "rows">;
+  Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "rows">;
 
 /**
  * The app's multi-line text control. Shares border, radius, focus ring,
@@ -55,67 +55,63 @@ export type TextareaProps = TextareaOwnProps &
  * </Field>
  * ```
  */
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-    function Textarea(
-        {
-            invalid,
-            minRows = 3,
-            maxRows = 10,
-            autoResize = true,
-            className = "",
-            id,
-            disabled,
-            value,
-            "aria-describedby": ariaDescribedBy,
-            ...rest
-        },
-        forwardedRef,
-    ) {
-        const field = useContext(FieldContext);
-        const isInvalid = invalid ?? field?.invalid ?? false;
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+  {
+    invalid,
+    minRows = 3,
+    maxRows = 10,
+    autoResize = true,
+    className = "",
+    id,
+    disabled,
+    value,
+    "aria-describedby": ariaDescribedBy,
+    ...rest
+  },
+  forwardedRef,
+) {
+  const field = useContext(FieldContext);
+  const isInvalid = invalid ?? field?.invalid ?? false;
 
-        const innerRef = useRef<HTMLTextAreaElement | null>(null);
+  const innerRef = useRef<HTMLTextAreaElement | null>(null);
 
-        /**
-         * Keeps the caller's ref working while the component holds its own —
-         * the measuring needs the element, and `forwardRef` alone would hand it
-         * away.
-         */
-        const setRef = useCallback(
-            (element: HTMLTextAreaElement | null) => {
-                innerRef.current = element;
+  /**
+   * Keeps the caller's ref working while the component holds its own —
+   * the measuring needs the element, and `forwardRef` alone would hand it
+   * away.
+   */
+  const setRef = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      innerRef.current = element;
 
-                if (typeof forwardedRef === "function") forwardedRef(element);
-                else if (forwardedRef) forwardedRef.current = element;
-            },
-            [forwardedRef],
-        );
-
-        useAutoResize({
-            ref: innerRef,
-            value: typeof value === "string" ? value : "",
-            minRows,
-            maxRows,
-            enabled: autoResize,
-        });
-
-        return (
-            <textarea
-                ref={setRef}
-                id={id ?? field?.controlId}
-                rows={minRows}
-                value={value}
-                disabled={disabled ?? field?.disabled ?? false}
-                aria-invalid={isInvalid || undefined}
-                aria-describedby={ariaDescribedBy ?? field?.describedBy}
-                className={textareaClasses({
-                    invalid: isInvalid,
-                    className: `${
-                        autoResize ? "resize-none overflow-hidden" : "resize-y"
-                    } ${className}`.trim(),
-                })}
-                {...rest}
-            />
-        );
+      if (typeof forwardedRef === "function") forwardedRef(element);
+      else if (forwardedRef) forwardedRef.current = element;
     },
-);
+    [forwardedRef],
+  );
+
+  useAutoResize({
+    ref: innerRef,
+    value: typeof value === "string" ? value : "",
+    minRows,
+    maxRows,
+    enabled: autoResize,
+  });
+
+  return (
+    <textarea
+      ref={setRef}
+      id={id ?? field?.controlId}
+      rows={minRows}
+      value={value}
+      disabled={disabled ?? field?.disabled ?? false}
+      aria-invalid={isInvalid || undefined}
+      aria-describedby={ariaDescribedBy ?? field?.describedBy}
+      className={textareaClasses({
+        invalid: isInvalid,
+        className: `${autoResize ? "resize-none overflow-hidden" : "resize-y"} ${className}`.trim(),
+      })}
+      {...rest}
+    />
+  );
+});

@@ -1,7 +1,7 @@
 import { createContext } from "react";
 
 type PanelPresenceContextValue = {
-    isOpen: boolean;
+  isOpen: boolean;
 };
 
 /**

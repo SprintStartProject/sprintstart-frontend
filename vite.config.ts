@@ -21,15 +21,15 @@ export default defineConfig({
         target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
-      '/auth': {
-        target: 'http://127.0.0.1:8081',
+      "/auth": {
+        target: "http://127.0.0.1:8081",
         changeOrigin: true,
       },
     },
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    setupFiles: './tests/unit/setup/vitest.setup.ts',
-  }
+    setupFiles: "./tests/unit/setup/vitest.setup.ts",
+  },
 });

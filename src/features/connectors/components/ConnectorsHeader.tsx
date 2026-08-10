@@ -7,10 +7,7 @@ type ConnectorsHeaderProps = {
   onRefresh: () => void;
 };
 
-export function ConnectorsHeader({
-  isLoading,
-  onRefresh,
-}: ConnectorsHeaderProps) {
+export function ConnectorsHeader({ isLoading, onRefresh }: ConnectorsHeaderProps) {
   return (
     <header className="border-b border-app-border bg-app-bg">
       <div className="app-page-frame py-6">
@@ -23,12 +20,7 @@ export function ConnectorsHeader({
               variant="secondary"
               onClick={onRefresh}
               disabled={isLoading}
-              icon={
-                <RefreshCw
-                  size={16}
-                  className={isLoading ? "animate-spin" : ""}
-                />
-              }
+              icon={<RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />}
             >
               Refresh
             </Button>

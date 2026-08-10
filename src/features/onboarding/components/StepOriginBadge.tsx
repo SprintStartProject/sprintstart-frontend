@@ -1,6 +1,6 @@
-import { UserRound } from 'lucide-react';
-import { Badge } from '../../../components/ui/Badge';
-import type { OnboardingStepEndpoint } from '../types';
+import { UserRound } from "lucide-react";
+import { Badge } from "../../../components/ui/Badge";
+import type { OnboardingStepEndpoint } from "../types";
 
 type StepOriginBadgeProps = {
   step: OnboardingStepEndpoint;

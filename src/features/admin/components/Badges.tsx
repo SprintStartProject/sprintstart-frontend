@@ -4,27 +4,27 @@ import { getPermissionGroupVariant, getSourceStatusVariant } from "../data";
 export type { BadgeVariant } from "../../../components/ui/Badge";
 
 export function AccessBadge(props: BadgeProps) {
-    return <Badge {...props} />;
+  return <Badge {...props} />;
 }
 
 type PermissionGroupBadgeProps = {
-    permissionGroup: string;
+  permissionGroup: string;
 };
 
 export function PermissionGroupBadge({ permissionGroup }: PermissionGroupBadgeProps) {
-    return (
-        <div className="flex min-w-0 items-center">
-            <AccessBadge variant={getPermissionGroupVariant(permissionGroup)}>
-                {permissionGroup}
-            </AccessBadge>
-        </div>
-    );
+  return (
+    <div className="flex min-w-0 items-center">
+      <AccessBadge variant={getPermissionGroupVariant(permissionGroup)}>
+        {permissionGroup}
+      </AccessBadge>
+    </div>
+  );
 }
 
 type SourceStatusBadgeProps = {
-    status: string;
+  status: string;
 };
 
 export function SourceStatusBadge({ status }: SourceStatusBadgeProps) {
-    return <AccessBadge variant={getSourceStatusVariant(status)}>{status}</AccessBadge>;
+  return <AccessBadge variant={getSourceStatusVariant(status)}>{status}</AccessBadge>;
 }

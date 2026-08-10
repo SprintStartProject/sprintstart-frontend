@@ -1,5 +1,4 @@
-export type KnowledgeTab =
-    'ALL' | 'UPLOADS' | 'PR' | 'ISSUES' | 'FILES' | 'COMMITS';
+export type KnowledgeTab = "ALL" | "UPLOADS" | "PR" | "ISSUES" | "FILES" | "COMMITS";
 
 /**
  * Left-to-right order of the artifact type tabs.
@@ -12,12 +11,12 @@ export type KnowledgeTab =
  * constants (`react-refresh/only-export-components`).
  */
 export const TABS: { id: KnowledgeTab; label: string }[] = [
-    { id: 'ALL', label: 'All' },
-    { id: 'UPLOADS', label: 'Uploads' },
-    { id: 'PR', label: 'PR' },
-    { id: 'ISSUES', label: 'Issues' },
-    { id: 'FILES', label: 'Files' },
-    { id: 'COMMITS', label: 'Commits' },
+  { id: "ALL", label: "All" },
+  { id: "UPLOADS", label: "Uploads" },
+  { id: "PR", label: "PR" },
+  { id: "ISSUES", label: "Issues" },
+  { id: "FILES", label: "Files" },
+  { id: "COMMITS", label: "Commits" },
 ];
 
 /**

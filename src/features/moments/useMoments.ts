@@ -8,9 +8,9 @@ import { MomentsContext } from "./MomentsContext.ts";
  * @throws Error if used outside of a `MomentsProvider`.
  */
 export function useMoments() {
-    const context = useContext(MomentsContext);
-    if (context === undefined) {
-        throw new Error("useMoments must be used within a MomentsProvider");
-    }
-    return context;
+  const context = useContext(MomentsContext);
+  if (context === undefined) {
+    throw new Error("useMoments must be used within a MomentsProvider");
+  }
+  return context;
 }

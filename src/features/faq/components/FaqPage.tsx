@@ -71,43 +71,33 @@ export function FaqPage() {
   if (error || !overview || overview.groups.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-20">
-        <AlertCircle className="w-5 h-5 text-app-text-muted" />
+        <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-app-text-muted">
           No FAQ groups yet. Trigger a refresh to generate them.
         </p>
         {refreshButton}
         {refreshError && (
-          <p className="text-sm text-app-danger-text max-w-md text-center">
-            {refreshError}
-          </p>
+          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
         )}
       </div>
     );
   }
 
-  const sorted = [...overview.groups].sort(
-    (a, b) => b.count - a.count,
-  );
+  const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
 
   const [hero, ...rest] = sorted;
 
   const totalGroups = overview.groups.length;
 
-  const totalQuestions = overview.groups.reduce(
-    (sum, group) => sum + group.count,
-    0,
-  );
+  const totalQuestions = overview.groups.reduce((sum, group) => sum + group.count, 0);
 
   const mostAskedCount = hero?.count ?? 0;
 
   const totalDocuments = new Set(
-    overview.groups.flatMap((group) =>
-      group.topDocuments.map((doc) => doc.id),
-    ),
+    overview.groups.flatMap((group) => group.topDocuments.map((doc) => doc.id)),
   ).size;
 
-  const goToDetail = (group: FAQGroup) =>
-    void navigate(`/insights/faq/${group.groupId}`);
+  const goToDetail = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
 
   return (
     <div className="min-h-screen bg-app-bg">
@@ -123,7 +113,7 @@ export function FaqPage() {
             Back to PM-Dashboard
           </Button>
 
-          <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="mb-6 flex items-start justify-between gap-4">
             <PageHeader
               icon={MessageSquareMore}
               title="Recurring Questions"
@@ -131,64 +121,52 @@ export function FaqPage() {
             />
             {refreshButton}
           </div>
-          {refreshError && (
-            <p className="text-sm text-app-danger-text mb-4">{refreshError}</p>
-          )}
+          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
 
           {/* Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-app-brand" />
+                <Users className="h-5 w-5 text-app-brand" />
                 <div>
-                  <div className="text-2xl font-semibold text-app-brand">
-                    {totalGroups}
-                  </div>
-                  <div className="text-xs text-app-text-muted">
-                    Question groups
-                  </div>
+                  <div className="text-2xl font-semibold text-app-brand">{totalGroups}</div>
+                  <div className="text-xs text-app-text-muted">Question groups</div>
                 </div>
               </div>
             </div>
 
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <MessageSquareMore className="w-5 h-5 text-app-success-solid" />
+                <MessageSquareMore className="h-5 w-5 text-app-success-solid" />
                 <div>
                   <div className="text-2xl font-semibold text-app-success-solid">
                     {totalQuestions}
                   </div>
-                  <div className="text-xs text-app-text-muted">
-                    Total questions
-                  </div>
+                  <div className="text-xs text-app-text-muted">Total questions</div>
                 </div>
               </div>
             </div>
 
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <TrendingUp className="w-5 h-5 text-app-danger-solid" />
+                <TrendingUp className="h-5 w-5 text-app-danger-solid" />
                 <div>
                   <div className="text-2xl font-semibold text-app-danger-solid">
                     {mostAskedCount}
                   </div>
-                  <div className="text-xs text-app-text-muted">
-                    Top frequency
-                  </div>
+                  <div className="text-xs text-app-text-muted">Top frequency</div>
                 </div>
               </div>
             </div>
 
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-app-warning-solid" />
+                <FileText className="h-5 w-5 text-app-warning-solid" />
                 <div>
                   <div className="text-2xl font-semibold text-app-warning-solid">
                     {totalDocuments}
                   </div>
-                  <div className="text-xs text-app-text-muted">
-                    Linked documents
-                  </div>
+                  <div className="text-xs text-app-text-muted">Linked documents</div>
                 </div>
               </div>
             </div>
@@ -205,14 +183,14 @@ export function FaqPage() {
             // The hero had no hover state at all despite being clickable.
             // 1.01 rather than the 1.02 used on grid cards: these rows span the
             // full content column, so the same percentage travels much further.
-            className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-5 mb-2 relative overflow-hidden"
+            className="relative mb-2 w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface p-5 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
           >
             <div className="absolute top-4 right-4 flex items-center gap-2 text-app-text-muted">
-              <TrendingUp className="w-5 h-5 text-app-brand" />
+              <TrendingUp className="h-5 w-5 text-app-brand" />
               <span className="text-2xl font-semibold text-app-brand">{hero.count}</span>
             </div>
 
-            <p className="text-lg font-semibold text-app-text leading-snug mb-4 pr-16">
+            <p className="mb-4 pr-16 text-lg leading-snug font-semibold text-app-text">
               {hero.question}
             </p>
 
@@ -225,7 +203,6 @@ export function FaqPage() {
               ))}
             </div>
           </button>
-
         </div>
 
         {/* FAQ List */}
@@ -234,16 +211,12 @@ export function FaqPage() {
             <button
               key={group.groupId}
               onClick={() => goToDetail(group)}
-              className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
+              className="w-full rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
             >
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <p className="text-sm font-medium text-app-text">
-                  {group.question}
-                </p>
+              <div className="mb-2 flex items-start justify-between gap-4">
+                <p className="text-sm font-medium text-app-text">{group.question}</p>
 
-                <span className="text-lg font-semibold text-app-brand shrink-0">
-                  {group.count}
-                </span>
+                <span className="shrink-0 text-lg font-semibold text-app-brand">{group.count}</span>
               </div>
 
               <div className="flex flex-wrap gap-1.5">

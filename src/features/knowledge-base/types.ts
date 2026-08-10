@@ -2,13 +2,13 @@
  * Defines the specific entity type of an artifact.
  * Used by the UI to determine icon representations and filtering logic.
  */
-export type ArtifactType = 'COMMIT' | 'FILE' | 'ISSUE' | 'PULL_REQUEST';
+export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST";
 
 /**
  * Origin source of the artifact data.
  * Used to route API calls (e.g., Github vs internal Uploads).
  */
-export type SourceSystem = 'GITHUB' | 'JIRA' | 'UPLOAD';
+export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD";
 
 /**
  * Core business entity representing any indexed piece of knowledge.
@@ -16,29 +16,29 @@ export type SourceSystem = 'GITHUB' | 'JIRA' | 'UPLOAD';
  * searchable and summariable format.
  */
 export interface Artifact {
-    id: string;
-    title: string | null;
-    artifactType: ArtifactType;
-    sourceSystem: SourceSystem;
-    sourceId: string;
-    sourceUrl: string | null;
-    mime: string | null;
-    language: string | null;
-    ingestedAt: string;
-    createdAtSource: string | null;
-    updatedAtSource: string | null;
-    contentHash: string | null;
-    ingestionRunId: string | null;
+  id: string;
+  title: string | null;
+  artifactType: ArtifactType;
+  sourceSystem: SourceSystem;
+  sourceId: string;
+  sourceUrl: string | null;
+  mime: string | null;
+  language: string | null;
+  ingestedAt: string;
+  createdAtSource: string | null;
+  updatedAtSource: string | null;
+  contentHash: string | null;
+  ingestionRunId: string | null;
 }
 
 /**
- * The raw content of an artifact retrieved from the backend, 
+ * The raw content of an artifact retrieved from the backend,
  * along with its MIME type for correct rendering (Markdown vs plain text).
  */
 export interface ArtifactContent {
-    content: string;
-    mimeType: string;
-    isObjectUrl?: boolean;
+  content: string;
+  mimeType: string;
+  isObjectUrl?: boolean;
 }
 
 /**
@@ -46,9 +46,9 @@ export interface ArtifactContent {
  * and passed through the backend unchanged.
  */
 export interface ArtifactSummaryCitation {
-    artifactId: string;
-    filename: string;
-    sourceUrl: string | null;
+  artifactId: string;
+  filename: string;
+  sourceUrl: string | null;
 }
 
 /**
@@ -56,14 +56,14 @@ export interface ArtifactSummaryCitation {
  * summary events over Server-Sent Events.
  */
 export interface SummaryStreamHandlers {
-    /** Called for each incremental token chunk of the generated summary. */
-    onToken: (chunk: string) => void;
-    /** Called when the AI transitions to a new generation stage (e.g. Analyzing...). */
-    onStage?: (name: string, detail: string) => void;
-    /** Called when the backend emits a citation (source reference). */
-    onCitation: (citation: ArtifactSummaryCitation) => void;
-    /** Called once the stream has completed successfully. */
-    onDone: () => void;
-    /** Called when an in-stream error event is received (non-HTTP failure). */
-    onError?: (error: string) => void;
+  /** Called for each incremental token chunk of the generated summary. */
+  onToken: (chunk: string) => void;
+  /** Called when the AI transitions to a new generation stage (e.g. Analyzing...). */
+  onStage?: (name: string, detail: string) => void;
+  /** Called when the backend emits a citation (source reference). */
+  onCitation: (citation: ArtifactSummaryCitation) => void;
+  /** Called once the stream has completed successfully. */
+  onDone: () => void;
+  /** Called when an in-stream error event is received (non-HTTP failure). */
+  onError?: (error: string) => void;
 }

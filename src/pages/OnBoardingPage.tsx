@@ -56,9 +56,9 @@ function ProgressBar({ value, max }: ProgressBarProps) {
   const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
 
   return (
-    <div className="bg-app-border-muted rounded-full h-2 overflow-hidden">
+    <div className="h-2 overflow-hidden rounded-full bg-app-border-muted">
       <div
-        className="h-full bg-gradient-to-r from-app-brand to-app-progress-fill-end rounded-full transition-all duration-500"
+        className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
         style={{ width: `${percentage}%` }}
       />
     </div>
@@ -72,9 +72,7 @@ function ProgressBar({ value, max }: ProgressBarProps) {
  */
 function findActivePhaseIndex(path: OnboardingPathEndpoint): number {
   const index = path.phases.findIndex((phase) =>
-    phase.steps.some(
-      (step) => step.status !== "FINISHED" && step.status !== "SKIPPED",
-    ),
+    phase.steps.some((step) => step.status !== "FINISHED" && step.status !== "SKIPPED"),
   );
   return index === -1 ? Math.max(0, path.phases.length - 1) : index;
 }
@@ -92,8 +90,7 @@ export function OnBoardingPage() {
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
 
   // Onboarding data (null = not loaded yet)
-  const [OnBoardingPathEndpoint, setOnBoardingPath] =
-    useState<OnboardingPathEndpoint | null>(null);
+  const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
 
   // Loading state: 'idle' (before load), 'loading' (while loading), 'success' (loaded), 'error' (error)
   const [loadingState, setLoadingState] = useState<LoadingState>("idle");
@@ -102,12 +99,14 @@ export function OnBoardingPage() {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Current AI generation stage, shown while loadingState === "generating"
-  const [generationStage, setGenerationStage] = useState<{ name: string; detail?: string } | null>(null);
+  const [generationStage, setGenerationStage] = useState<{ name: string; detail?: string } | null>(
+    null,
+  );
 
   // Dino easter egg: pressing Space while the path is being generated starts a
   // tiny endless runner. It unmounts by itself once generation finishes.
   const [gameActive, setGameActive] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(localStorage.getItem('dinoUnlocked') === 'true');
+  const [isUnlocked, setIsUnlocked] = useState(localStorage.getItem("dinoUnlocked") === "true");
 
   // Phase whose knowledge check is currently open in the modal (null = closed)
   const [checkPhase, setCheckPhase] = useState<OnboardingPhaseEndpoint | null>(null);
@@ -184,17 +183,17 @@ export function OnBoardingPage() {
   // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
   useEffect(() => {
     const handleUnlockChange = () => {
-      const unlocked = localStorage.getItem('dinoUnlocked') === 'true';
+      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
       setIsUnlocked(unlocked);
       if (!unlocked) {
         setGameActive(false);
       }
     };
-    window.addEventListener('dinoUnlockChanged', handleUnlockChange);
-    window.addEventListener('storage', handleUnlockChange);
+    window.addEventListener("dinoUnlockChanged", handleUnlockChange);
+    window.addEventListener("storage", handleUnlockChange);
     return () => {
-      window.removeEventListener('dinoUnlockChanged', handleUnlockChange);
-      window.removeEventListener('storage', handleUnlockChange);
+      window.removeEventListener("dinoUnlockChanged", handleUnlockChange);
+      window.removeEventListener("storage", handleUnlockChange);
     };
   }, []);
 
@@ -209,9 +208,7 @@ export function OnBoardingPage() {
       const active = document.activeElement;
       const typing =
         active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" ||
-          active.tagName === "INPUT" ||
-          active.isContentEditable);
+        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable);
       if (typing) return;
 
       e.preventDefault();
@@ -249,8 +246,7 @@ export function OnBoardingPage() {
     void loadOnBoardingPath();
   }, []);
 
-  const currentPhase =
-    OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
+  const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
   // Helper function for phase progress
   const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
@@ -260,10 +256,7 @@ export function OnBoardingPage() {
     return {
       completed,
       total: phase.steps.length,
-      percentage:
-        phase.steps.length > 0
-          ? Math.round((completed / phase.steps.length) * 100)
-          : 0,
+      percentage: phase.steps.length > 0 ? Math.round((completed / phase.steps.length) * 100) : 0,
     };
   };
 
@@ -280,9 +273,7 @@ export function OnBoardingPage() {
   ) ?? { completed: 0, total: 0 };
 
   const totalPercentage =
-    totalProgress.total > 0
-      ? Math.round((totalProgress.completed / totalProgress.total) * 100)
-      : 0;
+    totalProgress.total > 0 ? Math.round((totalProgress.completed / totalProgress.total) * 100) : 0;
 
   // Recommended next step (first not-yet-finished/skipped step across all
   // unlocked phases). Steps in locked phases can never be recommended.
@@ -300,9 +291,7 @@ export function OnBoardingPage() {
         !phase.locked &&
         phase.checkSummary?.required &&
         !phase.checkSummary.passed &&
-        phase.steps.every(
-          (step) => step.status === "FINISHED" || step.status === "SKIPPED",
-        ),
+        phase.steps.every((step) => step.status === "FINISHED" || step.status === "SKIPPED"),
     ) ?? null;
 
   // How a single step in the list should behave:
@@ -343,9 +332,9 @@ export function OnBoardingPage() {
   // ── RENDER: LOADING STATE ──────────────────────────────────
   if (loadingState === "loading" || loadingState === "idle") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
         <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="w-8 h-8 animate-spin text-app-brand" />
+          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
           <p className="text-sm">Loading onboarding path...</p>
         </div>
       </div>
@@ -355,17 +344,17 @@ export function OnBoardingPage() {
   // ── RENDER: GENERATING STATE ───────────────────────────────
   if (loadingState === "generating") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
         <div className={gameActive ? "w-full max-w-2xl text-center" : "max-w-md text-center"}>
-          <Sparkles className="w-10 h-10 text-app-brand mx-auto mb-4 animate-pulse" />
-          <h2 className="text-lg font-semibold text-app-text mb-2">
+          <Sparkles className="mx-auto mb-4 h-10 w-10 animate-pulse text-app-brand" />
+          <h2 className="mb-2 text-lg font-semibold text-app-text">
             Generating your personalized onboarding path...
           </h2>
-          <p className="text-sm text-app-text-muted mb-2">
+          <p className="mb-2 text-sm text-app-text-muted">
             {generationStage?.name ?? "Starting up"}
           </p>
           {generationStage?.detail && (
-            <p className="text-xs text-app-text-subtle mb-6">{generationStage.detail}</p>
+            <p className="mb-6 text-xs text-app-text-subtle">{generationStage.detail}</p>
           )}
 
           {gameActive ? (
@@ -373,7 +362,7 @@ export function OnBoardingPage() {
               <DinoGame onExit={() => setGameActive(false)} />
             </div>
           ) : (
-            <Loader2 className="w-6 h-6 animate-spin text-app-brand mx-auto mt-4" />
+            <Loader2 className="mx-auto mt-4 h-6 w-6 animate-spin text-app-brand" />
           )}
         </div>
       </div>
@@ -383,15 +372,13 @@ export function OnBoardingPage() {
   // ── RENDER: ERROR STATE ────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
         <div className="max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-app-text mb-2">
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+          <h2 className="mb-2 text-lg font-semibold text-app-text">
             Onboarding could not be loaded
           </h2>
-          <p className="text-sm text-app-text-muted mb-6">
-            {errorMessage}
-          </p>
+          <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
           <Button variant="primary" onClick={() => window.location.reload()}>
             Try again
           </Button>
@@ -403,10 +390,8 @@ export function OnBoardingPage() {
   // ── RENDER: EMPTY STATE ────────────────────────────────────
   if (!OnBoardingPathEndpoint || !currentPhase) {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
-        <p className="text-app-text-muted text-sm">
-          No onboarding path found.
-        </p>
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
+        <p className="text-sm text-app-text-muted">No onboarding path found.</p>
       </div>
     );
   }
@@ -417,8 +402,7 @@ export function OnBoardingPage() {
   const allStepsDone = currentPhase.steps.every(
     (step) => step.status === "FINISHED" || step.status === "SKIPPED",
   );
-  const isFinalPhase =
-    OnBoardingPathEndpoint.phases.at(-1)?.id === currentPhase.id;
+  const isFinalPhase = OnBoardingPathEndpoint.phases.at(-1)?.id === currentPhase.id;
 
   // ── RENDER: SUCCESS STATE ──────────────────────────────────
   return (
@@ -444,25 +428,18 @@ export function OnBoardingPage() {
                 </Button>
 
                 <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
-                  <div className="text-3xl font-bold text-app-brand">
-                    {totalPercentage}%
-                  </div>
-                  <div className="text-xs font-medium text-app-brand-text">
-                    overall
-                  </div>
+                  <div className="text-3xl font-bold text-app-brand">{totalPercentage}%</div>
+                  <div className="text-xs font-medium text-app-brand-text">overall</div>
                 </div>
               </>
             }
           />
 
           {/* Total progress bar */}
-          <ProgressBar
-            value={totalProgress.completed}
-            max={totalProgress.total}
-          />
+          <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
 
           {/* Phase tabs */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             {OnBoardingPathEndpoint.phases.map((phase, index) => {
               const progress = getPhaseProgress(phase);
               const isSelected = selectedPhaseIndex === index;
@@ -477,14 +454,14 @@ export function OnBoardingPage() {
                       : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
                   }`}
                 >
-                  <div className="font-semibold text-app-text text-sm mb-1 flex items-center gap-1.5">
+                  <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-app-text">
                     {phase.locked && (
-                      <Lock className="w-3.5 h-3.5 shrink-0 text-app-text-disabled" />
+                      <Lock className="h-3.5 w-3.5 shrink-0 text-app-text-disabled" />
                     )}
                     <span className="truncate">{phase.title}</span>
                     {phase.checkSummary?.required && (
                       <ClipboardCheck
-                        className={`w-3.5 h-3.5 shrink-0 ${
+                        className={`h-3.5 w-3.5 shrink-0 ${
                           phase.checkSummary.passed
                             ? "text-app-success-solid"
                             : "text-app-text-disabled"
@@ -492,16 +469,13 @@ export function OnBoardingPage() {
                       />
                     )}
                   </div>
-                  <ProgressBar
-                    value={progress.completed}
-                    max={progress.total}
-                  />
-                  <div className="flex justify-between mt-2">
+                  <ProgressBar value={progress.completed} max={progress.total} />
+                  <div className="mt-2 flex justify-between">
                     <span className="text-xs text-app-text-muted">
                       {progress.completed}/{progress.total} Tasks
                     </span>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
+                      className={`rounded-full px-2 py-0.5 text-xs ${
                         progress.percentage === 100
                           ? "bg-app-success-bg text-app-success-text"
                           : "bg-app-surface-muted text-app-text-muted"
@@ -518,26 +492,24 @@ export function OnBoardingPage() {
       </div>
 
       {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main className="app-page-content py-6 pb-24 pt-8">
+      <main className="app-page-content py-6 pt-8 pb-24">
         {/* "Up Next" Banner — nur wenn es einen empfohlenen Step gibt */}
         {recommendedStep && (
-          <div className="rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
+          <div className="relative mb-6 overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8">
+            <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
             <div className="relative z-10">
               <Badge variant="brand" className="mb-4 gap-2">
                 <PlayCircle className="h-3.5 w-3.5" />
                 {recommendedStep.status === "IN_PROGRESS" ? "In progress" : "Up Next"}
               </Badge>
-              <h2 className="text-2xl sm:text-3xl font-bold text-app-text">
+              <h2 className="text-2xl font-bold text-app-text sm:text-3xl">
                 {recommendedStep.title}
               </h2>
               <div className="mt-3">
                 <StepOriginBadge step={recommendedStep} />
               </div>
-              <p className="text-app-text-muted mt-2 max-w-2xl">
-                {recommendedStep.description}
-              </p>
-              <div className="flex flex-wrap items-center gap-4 mt-6">
+              <p className="mt-2 max-w-2xl text-app-text-muted">{recommendedStep.description}</p>
+              <div className="mt-6 flex flex-wrap items-center gap-4">
                 <Button
                   variant="primary"
                   size="lg"
@@ -554,21 +526,21 @@ export function OnBoardingPage() {
         {/* "Knowledge check pending" banner — all steps of the phase are done,
             only the check still blocks the next phase */}
         {!recommendedStep && pendingCheckPhase && (
-          <div className="rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
+          <div className="relative mb-6 overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8">
+            <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
             <div className="relative z-10">
               <Badge variant="brand" className="mb-4 gap-2">
                 <ClipboardCheck className="h-3.5 w-3.5" />
                 Knowledge check
               </Badge>
-              <h2 className="text-2xl sm:text-3xl font-bold text-app-text">
+              <h2 className="text-2xl font-bold text-app-text sm:text-3xl">
                 Ready for the {pendingCheckPhase.title} check?
               </h2>
-              <p className="text-app-text-muted mt-2 max-w-2xl">
-                You finished all steps of this phase. Pass the knowledge check to
-                unlock the next phase.
+              <p className="mt-2 max-w-2xl text-app-text-muted">
+                You finished all steps of this phase. Pass the knowledge check to unlock the next
+                phase.
               </p>
-              <div className="flex flex-wrap items-center gap-4 mt-6">
+              <div className="mt-6 flex flex-wrap items-center gap-4">
                 <Button
                   variant="primary"
                   size="lg"
@@ -584,18 +556,14 @@ export function OnBoardingPage() {
 
         {/* Phase description */}
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-app-text">
-            {currentPhase.title}
-          </h2>
-          <p className="text-sm text-app-text-muted mt-1">
-            {currentPhase.description}
-          </p>
+          <h2 className="text-lg font-semibold text-app-text">{currentPhase.title}</h2>
+          <p className="mt-1 text-sm text-app-text-muted">{currentPhase.description}</p>
         </div>
 
         {/* Locked phase notice */}
         {currentPhase.locked && (
-          <div className="mb-4 rounded-2xl border border-app-border bg-app-surface-muted p-4 flex items-center gap-3">
-            <Lock className="w-5 h-5 shrink-0 text-app-text-muted" />
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4">
+            <Lock className="h-5 w-5 shrink-0 text-app-text-muted" />
             <p className="text-sm text-app-text-muted">
               {currentPhase.unlockReason === "PREVIOUS_PHASE_CHECK_NOT_PASSED"
                 ? "This phase unlocks once you pass the knowledge check of the previous phase."
@@ -624,29 +592,29 @@ export function OnBoardingPage() {
               >
                 <div className="p-5">
                   <div className="flex gap-4">
-                    <div className="pt-0.5 shrink-0">
+                    <div className="shrink-0 pt-0.5">
                       {step.status === "FINISHED" ? (
-                        <CheckCircle2 className="w-5 h-5 text-app-success-solid" />
+                        <CheckCircle2 className="h-5 w-5 text-app-success-solid" />
                       ) : step.status === "SKIPPED" ? (
-                        <CircleArrowRight className="w-5 h-5 text-app-danger-solid" />
+                        <CircleArrowRight className="h-5 w-5 text-app-danger-solid" />
                       ) : step.status === "IN_PROGRESS" ? (
-                        <CircleDot className="w-5 h-5 text-app-brand" />
+                        <CircleDot className="h-5 w-5 text-app-brand" />
                       ) : mode === "locked" ? (
-                        <Lock className="w-5 h-5 text-app-text-disabled" />
+                        <Lock className="h-5 w-5 text-app-text-disabled" />
                       ) : (
-                        <Circle className="w-5 h-5 text-app-text-disabled" />
+                        <Circle className="h-5 w-5 text-app-text-disabled" />
                       )}
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         {/* Text */}
                         <div>
                           <h3
-                            className={`font-semibold text-base ${
+                            className={`text-base font-semibold ${
                               mode === "completed"
-                                ? "line-through text-app-text-subtle"
+                                ? "text-app-text-subtle line-through"
                                 : "text-app-text"
                             }`}
                           >
@@ -655,7 +623,7 @@ export function OnBoardingPage() {
                           <div className="mt-2">
                             <StepOriginBadge step={step} />
                           </div>
-                          <p className="text-sm text-app-text-muted mt-1 leading-relaxed">
+                          <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
                             {step.description}
                           </p>
                         </div>
@@ -675,7 +643,7 @@ export function OnBoardingPage() {
                           ) : mode === "completed" ? (
                             <div className="flex items-center gap-3">
                               <span
-                                className={`text-xs px-3 py-1 rounded-full font-medium ${
+                                className={`rounded-full px-3 py-1 text-xs font-medium ${
                                   step.status === "FINISHED"
                                     ? "bg-app-success-bg text-app-success-text"
                                     : "bg-app-surface-muted text-app-text-muted"
@@ -685,9 +653,9 @@ export function OnBoardingPage() {
                               </span>
                               <button
                                 onClick={() => openStep(step.id)}
-                                className="px-4 py-2 rounded-xl border border-app-border hover:border-app-border-strong text-app-text-muted hover:text-app-text text-sm font-medium transition-all flex items-center gap-2"
+                                className="flex items-center gap-2 rounded-xl border border-app-border px-4 py-2 text-sm font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="h-4 w-4" />
                                 View
                               </button>
                             </div>
@@ -714,7 +682,7 @@ export function OnBoardingPage() {
               const locked = currentPhase.locked || !allStepsDone;
               return (
                 <div
-                  className={`group rounded-2xl border transition-all bg-app-surface ${
+                  className={`group rounded-2xl border bg-app-surface transition-all ${
                     passed
                       ? "border-app-border opacity-60"
                       : locked
@@ -724,9 +692,9 @@ export function OnBoardingPage() {
                 >
                   <div className="p-5">
                     <div className="flex gap-4">
-                      <div className="pt-0.5 shrink-0">
+                      <div className="shrink-0 pt-0.5">
                         <ClipboardCheck
-                          className={`w-5 h-5 ${
+                          className={`h-5 w-5 ${
                             passed
                               ? "text-app-success-solid"
                               : locked
@@ -736,19 +704,17 @@ export function OnBoardingPage() {
                         />
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <h3
-                              className={`font-semibold text-base ${
-                                passed
-                                  ? "line-through text-app-text-subtle"
-                                  : "text-app-text"
+                              className={`text-base font-semibold ${
+                                passed ? "text-app-text-subtle line-through" : "text-app-text"
                               }`}
                             >
                               Knowledge check
                             </h3>
-                            <p className="text-sm text-app-text-muted mt-1 leading-relaxed">
+                            <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
                               {currentPhase.checkSummary.questionCount}{" "}
                               {currentPhase.checkSummary.questionCount === 1
                                 ? "question"
@@ -800,7 +766,6 @@ export function OnBoardingPage() {
           onClose={closeCheckModal}
         />
       )}
-
     </div>
   );
 }

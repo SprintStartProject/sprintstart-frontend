@@ -14,20 +14,20 @@ with a separate [backend](http://localhost:8080) API and an AI service, and uses
 
 ## Tech Stack
 
-| Area | Technology |
-| --- | --- |
-| UI framework | **React 19** |
-| Routing | **React Router v7** |
-| Language | **TypeScript** (strict) |
-| Build tooling | **Vite 8** |
-| Styling | **Tailwind CSS v4** (semantic design tokens, light/dark themes) |
-| Animation | **Framer Motion 12** (centralized spring tokens) |
-| Authentication | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11** |
-| Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter` |
-| Icons | `lucide-react` |
-| Unit testing | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`) |
-| Component dev | **Storybook 10** |
-| Linting / formatting | **ESLint 9** (flat config: `typescript-eslint`, `react`, `react-hooks`, `jsx-a11y`, `prettier`) |
+| Area                      | Technology                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| UI framework              | **React 19**                                                                                    |
+| Routing                   | **React Router v7**                                                                             |
+| Language                  | **TypeScript** (strict)                                                                         |
+| Build tooling             | **Vite 8**                                                                                      |
+| Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes)                                 |
+| Animation                 | **Framer Motion 12** (centralized spring tokens)                                                |
+| Authentication            | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11**           |
+| Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter`       |
+| Icons                     | `lucide-react`                                                                                  |
+| Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`)                               |
+| Component dev             | **Storybook 10**                                                                                |
+| Linting / formatting      | **ESLint 9** (flat config: `typescript-eslint`, `react`, `react-hooks`, `jsx-a11y`, `prettier`) |
 
 > The project pins a custom Keycloak login theme. Running `npm install`
 > automatically executes `keycloakify sync-extensions` (see `postinstall`).
@@ -198,7 +198,6 @@ npm run dev
 
 The application will be accessible in your browser at: **http://localhost:5173/**
 
-
 ### One Command Start
 
 To start the local deployment via docker compose in command, run:
@@ -220,14 +219,15 @@ The application uses **Keycloak** for Identity and Access Management. There are 
 #### Option A: Create a Real User (Full Flow)
 
 To test the full login experience:
+
 1.  **Access Keycloak Admin**: Go to [http://localhost:8081](http://localhost:8081/admin).
-    *   **Username**: `admin`
-    *   **Password**: `admin` (or as set in your `.env`)
+    - **Username**: `admin`
+    - **Password**: `admin` (or as set in your `.env`)
 2.  **Create User**:
-    *   Switch to the `sprintstart` realm.
-    *   Go to **Users** -> **Add user**.
-    *   After creating, go to the **Credentials** tab and set a password (turn off "Temporary").
+    - Switch to the `sprintstart` realm.
+    - Go to **Users** -> **Add user**.
+    - After creating, go to the **Credentials** tab and set a password (turn off "Temporary").
 3.  **Role Assignment**: Go to the **Role mapping** tab.
-    *   **For regular users**: Ensure the user has the `USER` role.
-    *   **For administrators**: Click **Assign role**, change the filter dropdown to **Filter by realm roles**, select `ADMIN`, and save.
+    - **For regular users**: Ensure the user has the `USER` role.
+    - **For administrators**: Click **Assign role**, change the filter dropdown to **Filter by realm roles**, select `ADMIN`, and save.
 4.  **Login**: Now, when you open the frontend, you will be redirected to the Keycloak login page (8081). Once logged in, it will redirect back to the app, which then communicates with the **Backend** ([http://localhost:8080](http://localhost:8080)).

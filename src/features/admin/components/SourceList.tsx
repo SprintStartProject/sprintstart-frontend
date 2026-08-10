@@ -61,7 +61,7 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-semibold leading-5 text-app-text">
+                <p className="text-sm leading-5 font-semibold break-words text-app-text">
                   {source.name}
                 </p>
 

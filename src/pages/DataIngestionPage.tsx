@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarClock, Plug } from "lucide-react";
 import { Badge } from "../components/ui/Badge.tsx";
@@ -60,10 +52,7 @@ import type {
 import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
-import {
-  getIngestionRunsPage,
-  getIngestionSourceStatuses,
-} from "../services/ingestionService.ts";
+import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/ingestionService.ts";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import {
@@ -75,13 +64,8 @@ import {
   updateGithubRepository,
   type ConfigureGithubRepositoryRequest,
 } from "../services/sources/githubService.ts";
-import {
-  projectService,
-  type ProjectSource,
-} from "../services/projectService.ts";
-import {
-  parseGithubRepositoryReference,
-} from "../services/sources/githubRepositoryInput.ts";
+import { projectService, type ProjectSource } from "../services/projectService.ts";
+import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
 const DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
   autoUpdate: true,
@@ -103,15 +87,10 @@ const DEFAULT_RUN_FILTER: RunFilterState = {
   repositoryId: "ALL",
 };
 
-
 function toSourceSystem(value: string): SourceSystem | null {
   const normalized = value.toUpperCase();
 
-  if (
-    normalized === "GITHUB" ||
-    normalized === "JIRA" ||
-    normalized === "UPLOAD"
-  ) {
+  if (normalized === "GITHUB" || normalized === "JIRA" || normalized === "UPLOAD") {
     return normalized;
   }
 
@@ -140,9 +119,7 @@ function matchSourceInstance(
   projectSource: ProjectSource,
   instances: SourceInstanceIngestionStatus[],
 ): SourceInstanceIngestionStatus | null {
-  const byRepositoryId = instances.find(
-    (instance) => instance.repositoryId === projectSource.id,
-  );
+  const byRepositoryId = instances.find((instance) => instance.repositoryId === projectSource.id);
   if (byRepositoryId) return byRepositoryId;
 
   const reference =
@@ -153,12 +130,8 @@ function matchSourceInstance(
   const fullName = `${reference.owner}/${reference.name}`.toLowerCase();
 
   return (
-    instances.find(
-      (instance) => instance.sourceId.toLowerCase() === fullName,
-    ) ??
-    instances.find(
-      (instance) => `${instance.owner}/${instance.name}`.toLowerCase() === fullName,
-    ) ??
+    instances.find((instance) => instance.sourceId.toLowerCase() === fullName) ??
+    instances.find((instance) => `${instance.owner}/${instance.name}`.toLowerCase() === fullName) ??
     null
   );
 }
@@ -199,10 +172,7 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return;
 
-    sourceCountBySystem.set(
-      sourceSystem,
-      (sourceCountBySystem.get(sourceSystem) ?? 0) + 1,
-    );
+    sourceCountBySystem.set(sourceSystem, (sourceCountBySystem.get(sourceSystem) ?? 0) + 1);
   });
 
   // Runs arrive newest-first, so the first hit per key is the latest.
@@ -227,13 +197,9 @@ function buildProjectDataSources(
     const meta = SOURCE_META[sourceSystem];
     const latestRun = latestRunBySource.get(sourceSystem);
     const sharesSourceSystem = (sourceCountBySystem.get(sourceSystem) ?? 1) > 1;
-    const connectorEnabled = connectorEnabledById.get(
-      sourceSystem.toLowerCase(),
-    );
+    const connectorEnabled = connectorEnabledById.get(sourceSystem.toLowerCase());
     const instance =
-      sourceSystem === "GITHUB"
-        ? matchSourceInstance(projectSource, sourceInstances)
-        : null;
+      sourceSystem === "GITHUB" ? matchSourceInstance(projectSource, sourceInstances) : null;
 
     if (instance) {
       const effectiveBackendStatus: BackendProjectSourceStatus =
@@ -263,11 +229,7 @@ function buildProjectDataSources(
           backendStatus: effectiveBackendStatus,
           statusLabel: getBackendSourceStatusLabel(effectiveBackendStatus),
           ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, runStatus),
-          ingestionStatusLabel: getIngestionStatusLabel(
-            hasNeverSynced,
-            hasErrors,
-            runStatus,
-          ),
+          ingestionStatusLabel: getIngestionStatusLabel(hasNeverSynced, hasErrors, runStatus),
           statusView: deriveSourceStatus({
             backendStatus: effectiveBackendStatus,
             runStatus,
@@ -320,11 +282,7 @@ function buildProjectDataSources(
         backendStatus,
         statusLabel: getBackendSourceStatusLabel(backendStatus),
         ingestionStatus: getSourceStatus(hasNeverSynced, errors > 0, runStatus),
-        ingestionStatusLabel: getIngestionStatusLabel(
-          hasNeverSynced,
-          errors > 0,
-          runStatus,
-        ),
+        ingestionStatusLabel: getIngestionStatusLabel(hasNeverSynced, errors > 0, runStatus),
         statusView: deriveSourceStatus({
           backendStatus,
           runStatus,
@@ -359,11 +317,9 @@ function hasSourceId(sources: DataSource[], sourceId: string) {
 }
 
 const STATUS_BADGE_TONE = {
-  success:
-    "border-app-success-border bg-app-success-bg text-app-success-text",
+  success: "border-app-success-border bg-app-success-bg text-app-success-text",
   brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
-  warning:
-    "border-app-warning-border bg-app-warning-bg text-app-warning-text",
+  warning: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
   neutral: "border-app-border bg-app-neutral-bg text-app-neutral-text",
 } as const;
 
@@ -392,8 +348,7 @@ export function DataIngestionPage() {
   // The selected run is captured as an object, not just an id: paging the
   // history replaces the loaded rows, and looking it up only in the current page
   // would snap an open run drawer shut as soon as the user moved to another page.
-  const [selectedRunSnapshot, setSelectedRunSnapshot] =
-    useState<IngestionRun | null>(null);
+  const [selectedRunSnapshot, setSelectedRunSnapshot] = useState<IngestionRun | null>(null);
 
   const [runs, setRuns] = useState<IngestionRun[]>([]);
   const [runPageMeta, setRunPageMeta] = useState<PageMetadata | null>(null);
@@ -403,55 +358,34 @@ export function DataIngestionPage() {
   const runRequestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
   const [projectSources, setProjectSources] = useState<ProjectSource[]>([]);
-  const [sourceInstances, setSourceInstances] = useState<
-    SourceInstanceIngestionStatus[]
-  >([]);
+  const [sourceInstances, setSourceInstances] = useState<SourceInstanceIngestionStatus[]>([]);
   const [projectDataVersion, setProjectDataVersion] = useState(0);
-  const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<
-    string | null
-  >(null);
-  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] =
-    useState<string | null>(null);
+  const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<string | null>(null);
+  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<string | null>(null);
   const [isProjectDataLoading, setIsProjectDataLoading] = useState(false);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
-  const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] =
-    useState(false);
+  const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] = useState(false);
   const [globalGithubSyncConfig, setGlobalGithubSyncConfig] =
-    useState<ConfigureGithubRepositoryRequest>(
-      DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG,
-    );
+    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG);
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
-  const [connectSuccessMessage, setConnectSuccessMessage] = useState<
-    string | null
-  >(null);
+  const [connectSuccessMessage, setConnectSuccessMessage] = useState<string | null>(null);
   const [pollingUntil, setPollingUntil] = useState<number | null>(null);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
-  const [connectorsLoadingState, setConnectorsLoadingState] =
-    useState<LoadingState>("idle");
-  const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<
-    string | null
-  >(null);
+  const [connectorsLoadingState, setConnectorsLoadingState] = useState<LoadingState>("idle");
+  const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<string | null>(null);
   const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
-  const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(
-    null,
-  );
-  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(
-    null,
-  );
+  const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
   // search param is still honoured so deep links from the admin view land on
   // the right project — it writes into the global selection below.
-  const {
-    selectedProject,
-    selectedProjectId,
-    setSelectedProjectId,
-    reloadProjects,
-  } = useProjectContext();
+  const { selectedProject, selectedProjectId, setSelectedProjectId, reloadProjects } =
+    useProjectContext();
 
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
@@ -481,13 +415,7 @@ export function DataIngestionPage() {
       nextSearchParams.delete("projectId");
       setSearchParams(nextSearchParams, { replace: true });
     });
-  }, [
-    requestedProjectId,
-    searchParams,
-    selectedProjectId,
-    setSearchParams,
-    setSelectedProjectId,
-  ]);
+  }, [requestedProjectId, searchParams, selectedProjectId, setSearchParams, setSelectedProjectId]);
 
   // A project's connected sources come from the project-scoped detail endpoint
   // any member may reach, not from the admin-only project listing behind the
@@ -570,8 +498,7 @@ export function DataIngestionPage() {
       page,
       size: RUN_PAGE_SIZE,
       projectId: selectedProjectId || undefined,
-      repositoryId:
-        runFilter.repositoryId !== "ALL" ? runFilter.repositoryId : undefined,
+      repositoryId: runFilter.repositoryId !== "ALL" ? runFilter.repositoryId : undefined,
       status: runFilter.status !== "ALL" ? runFilter.status : undefined,
     }),
     [runFilter.repositoryId, runFilter.status, selectedProjectId],
@@ -619,11 +546,7 @@ export function DataIngestionPage() {
         if (showLoading) {
           setLoadingState("error");
         }
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Failed to load ingestion data",
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load ingestion data");
       }
     },
     [loadRuns, runPageNumber],
@@ -658,11 +581,9 @@ export function DataIngestionPage() {
     void loadData(showLoading);
   }, [loadData]);
 
-
   useEffect(() => {
     const hasRunningRun = runs.some((run) => isRunInProgress(run.status));
-    const isPollingWindowActive =
-      pollingUntil !== null && Date.now() < pollingUntil;
+    const isPollingWindowActive = pollingUntil !== null && Date.now() < pollingUntil;
 
     if (!hasRunningRun && !isPollingWindowActive) {
       return undefined;
@@ -686,23 +607,12 @@ export function DataIngestionPage() {
   }, [loadData, pollingUntil, runs]);
 
   const connectorEnabledById = useMemo(
-    () =>
-      new Map(
-        connectors.map((connector) => [
-          connector.id.toLowerCase(),
-          connector.enabled,
-        ]),
-      ),
+    () => new Map(connectors.map((connector) => [connector.id.toLowerCase(), connector.enabled])),
     [connectors],
   );
 
   const sources = useMemo<DataSource[]>(() => {
-    return buildProjectDataSources(
-      projectSources,
-      sourceInstances,
-      runs,
-      connectorEnabledById,
-    );
+    return buildProjectDataSources(projectSources, sourceInstances, runs, connectorEnabledById);
   }, [connectorEnabledById, projectSources, runs, sourceInstances]);
 
   const totalArtifactCount = useMemo(
@@ -771,13 +681,9 @@ export function DataIngestionPage() {
   // instead: only the assigned project manager (or an admin) may connect a
   // source to a project.
   const canIngestIntoSelectedProject =
-    profile?.permissionGroup === "ADMIN" ||
-    (selectedProject?.isManaged ?? false);
+    profile?.permissionGroup === "ADMIN" || (selectedProject?.isManaged ?? false);
 
-  const runSourceLabels = useMemo(
-    () => buildRunSourceLabels(sources),
-    [sources],
-  );
+  const runSourceLabels = useMemo(() => buildRunSourceLabels(sources), [sources]);
 
   // Repositories offered in the run filter, from the project's connected sources.
   const runRepositoryOptions = useMemo(
@@ -795,8 +701,7 @@ export function DataIngestionPage() {
     [sources],
   );
 
-  const isRunFilterActive =
-    runFilter.status !== "ALL" || runFilter.repositoryId !== "ALL";
+  const isRunFilterActive = runFilter.status !== "ALL" || runFilter.repositoryId !== "ALL";
 
   const handleResetRunFilter = useCallback(() => {
     setRunFilter(DEFAULT_RUN_FILTER);
@@ -851,48 +756,33 @@ export function DataIngestionPage() {
     }
   }, [connectorsLoadingState, hasLoadedConnectors, loadConnectors]);
 
-  const handleToggleConnectorEnabled = useCallback(
-    async (connector: ConnectorListItem) => {
-      setTogglingConnectorId(connector.id);
-      setConnectorsErrorMessage(null);
+  const handleToggleConnectorEnabled = useCallback(async (connector: ConnectorListItem) => {
+    setTogglingConnectorId(connector.id);
+    setConnectorsErrorMessage(null);
 
-      try {
-        const response = await connectorService.setConnectorEnabled(
-          connector.id,
-          !connector.enabled,
-        );
+    try {
+      const response = await connectorService.setConnectorEnabled(connector.id, !connector.enabled);
 
-        setConnectors((current) =>
-          current.map((item) =>
-            item.id === connector.id ? { ...item, ...response } : item,
-          ),
-        );
-      } catch (error) {
-        setConnectorsErrorMessage(
-          error instanceof Error ? error.message : "Failed to update connector",
-        );
-      } finally {
-        setTogglingConnectorId(null);
-      }
-    },
-    [],
-  );
-
-  const handleToggleConnectorSources = useCallback(
-    (connector: ConnectorListItem) => {
-      setSelectedConnectorId((current) =>
-        current === connector.id ? null : connector.id,
+      setConnectors((current) =>
+        current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
       );
-    },
-    [],
-  );
+    } catch (error) {
+      setConnectorsErrorMessage(
+        error instanceof Error ? error.message : "Failed to update connector",
+      );
+    } finally {
+      setTogglingConnectorId(null);
+    }
+  }, []);
+
+  const handleToggleConnectorSources = useCallback((connector: ConnectorListItem) => {
+    setSelectedConnectorId((current) => (current === connector.id ? null : connector.id));
+  }, []);
 
   const selectedSource = useMemo(() => {
     if (!selectedSourceId) return null;
 
-    return (
-      sources.find((source) => source.sourceId === selectedSourceId) ?? null
-    );
+    return sources.find((source) => source.sourceId === selectedSourceId) ?? null;
   }, [selectedSourceId, sources]);
 
   const loadGithubTokenNames = useCallback(() => {
@@ -921,11 +811,9 @@ export function DataIngestionPage() {
     setPollingUntil(Date.now() + 60000);
     setActiveSection("sources");
 
-    void Promise.all([
-      loadData(false),
-      reloadProjects(),
-      reloadSourceStatuses(),
-    ]).then(() => setProjectDataVersion((version) => version + 1));
+    void Promise.all([loadData(false), reloadProjects(), reloadSourceStatuses()]).then(() =>
+      setProjectDataVersion((version) => version + 1),
+    );
 
     window.setTimeout(() => {
       void loadData(false);
@@ -933,27 +821,18 @@ export function DataIngestionPage() {
       void reloadSourceStatuses();
       setProjectDataVersion((version) => version + 1);
     }, 1500);
-  }, [
-    loadData,
-    reloadSourceStatuses,
-    reloadProjects,
-    selectedProject,
-  ]);
+  }, [loadData, reloadSourceStatuses, reloadProjects, selectedProject]);
 
   const handleUpdateSource = useCallback(
     async (source: DataSource) => {
       if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
-        throw new Error(
-          "Repository details are not available for this source.",
-        );
+        throw new Error("Repository details are not available for this source.");
       }
 
       await updateGithubRepository(source.githubRepository);
 
       setPollingUntil(Date.now() + 60000);
-      setConnectSuccessMessage(
-        `Update for ${source.githubRepository.fullName} started.`,
-      );
+      setConnectSuccessMessage(`Update for ${source.githubRepository.fullName} started.`);
 
       await Promise.all([loadData(false), reloadSourceStatuses()]);
       setProjectDataVersion((version) => version + 1);
@@ -989,10 +868,7 @@ export function DataIngestionPage() {
   );
 
   const handleSaveGithubRepositoryConfig = useCallback(
-    async (
-      repository: GithubRepositoryDetails,
-      request: ConfigureGithubRepositoryRequest,
-    ) => {
+    async (repository: GithubRepositoryDetails, request: ConfigureGithubRepositoryRequest) => {
       await configureGithubRepository(repository, request);
       // No reloadProjects(): see refreshSourceDetails — a per-repo sync-schedule
       // change never alters the project switcher, and reloading it can reset the
@@ -1034,14 +910,8 @@ export function DataIngestionPage() {
     async (source: DataSource) => {
       const repositoryId = source.githubRepository?.repositoryId;
 
-      if (
-        source.sourceSystem !== "GITHUB" ||
-        !repositoryId ||
-        !selectedProjectId
-      ) {
-        throw new Error(
-          "This repository cannot be removed from the project.",
-        );
+      if (source.sourceSystem !== "GITHUB" || !repositoryId || !selectedProjectId) {
+        throw new Error("This repository cannot be removed from the project.");
       }
 
       await removeRepositoryFromProject(repositoryId, selectedProjectId);
@@ -1070,8 +940,7 @@ export function DataIngestionPage() {
   const showRuns = activeSection === "overview" || activeSection === "runs";
 
   const shouldShowInitialLoading =
-    (isLoading || (isProjectDataLoading && showSources)) &&
-    sources.length === 0;
+    (isLoading || (isProjectDataLoading && showSources)) && sources.length === 0;
 
   // Prefers the row from the currently loaded page, so an open drawer keeps
   // updating while polling refreshes the list, and falls back to the captured
@@ -1079,10 +948,7 @@ export function DataIngestionPage() {
   const selectedRun = useMemo(() => {
     if (!selectedRunSnapshot) return null;
 
-    return (
-      runs.find((run) => run.runId === selectedRunSnapshot.runId) ??
-      selectedRunSnapshot
-    );
+    return runs.find((run) => run.runId === selectedRunSnapshot.runId) ?? selectedRunSnapshot;
   }, [runs, selectedRunSnapshot]);
 
   const selectedRunId = selectedRun?.runId ?? null;
@@ -1191,9 +1057,7 @@ export function DataIngestionPage() {
                           </StatusBadge>
                         )}
                         {sourceHealth.syncing > 0 && (
-                          <StatusBadge tone="brand">
-                            {sourceHealth.syncing} syncing
-                          </StatusBadge>
+                          <StatusBadge tone="brand">{sourceHealth.syncing} syncing</StatusBadge>
                         )}
                         {sourceHealth.attention > 0 && (
                           <StatusBadge tone="warning">
@@ -1202,9 +1066,7 @@ export function DataIngestionPage() {
                           </StatusBadge>
                         )}
                         {sourceHealth.disabled > 0 && (
-                          <StatusBadge tone="neutral">
-                            {sourceHealth.disabled} disabled
-                          </StatusBadge>
+                          <StatusBadge tone="neutral">{sourceHealth.disabled} disabled</StatusBadge>
                         )}
                       </div>
 
@@ -1248,9 +1110,7 @@ export function DataIngestionPage() {
                   <section aria-label="Runs">
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-semibold tracking-tight text-app-text">
-                          Runs
-                        </h2>
+                        <h2 className="text-lg font-semibold tracking-tight text-app-text">Runs</h2>
                         {runPageMeta ? (
                           <Badge variant="neutral" size="sm" className="tabular-nums">
                             {runPageMeta.totalElements} total
@@ -1302,19 +1162,17 @@ export function DataIngestionPage() {
 
       <PanelPresence value={selectedSource}>
         {(source) => (
-        <SourceDetailsPanel
-          source={source}
-          onUpdateSource={handleUpdateSource}
-          onRefreshDetails={refreshSourceDetails}
-          canManageSyncSettings={canManageGithubSyncSettings}
-          onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
-          onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
-          onSetSourceEnabled={handleSetSourceEnabled}
-          onUnlinkSource={
-            canIngestIntoSelectedProject ? handleUnlinkSource : undefined
-          }
-          onClose={closeSourceDetails}
-        />
+          <SourceDetailsPanel
+            source={source}
+            onUpdateSource={handleUpdateSource}
+            onRefreshDetails={refreshSourceDetails}
+            canManageSyncSettings={canManageGithubSyncSettings}
+            onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
+            onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
+            onSetSourceEnabled={handleSetSourceEnabled}
+            onUnlinkSource={canIngestIntoSelectedProject ? handleUnlinkSource : undefined}
+            onClose={closeSourceDetails}
+          />
         )}
       </PanelPresence>
 

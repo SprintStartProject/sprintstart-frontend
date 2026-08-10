@@ -12,12 +12,7 @@ import type {
 } from "../../services/projectService";
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
-export type UserFilter =
-  | "all"
-  | "enabled"
-  | "disabled"
-  | "onboarded"
-  | "not-onboarded";
+export type UserFilter = "all" | "enabled" | "disabled" | "onboarded" | "not-onboarded";
 export type AdminTab = "users" | "projects" | "tokens";
 
 /**

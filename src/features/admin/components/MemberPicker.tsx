@@ -53,21 +53,15 @@ export function MemberPicker({
   }, [search, users]);
 
   const allVisibleSelected =
-    visibleUsers.length > 0 &&
-    visibleUsers.every((user) => selectedUserIds.has(user.id));
+    visibleUsers.length > 0 && visibleUsers.every((user) => selectedUserIds.has(user.id));
 
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <label
-          htmlFor={searchInputId}
-          className="block text-sm text-app-text-muted"
-        >
+        <label htmlFor={searchInputId} className="block text-sm text-app-text-muted">
           {label}
         </label>
-        <span className="text-xs text-app-text-muted">
-          {selectedUserIds.size} selected
-        </span>
+        <span className="text-xs text-app-text-muted">{selectedUserIds.size} selected</span>
       </div>
 
       <Input
@@ -88,9 +82,7 @@ export function MemberPicker({
           onClick={() => onToggleVisible(visibleUsers, allVisibleSelected)}
           className="mt-2"
         >
-          {allVisibleSelected
-            ? "Clear these"
-            : `Select these ${visibleUsers.length}`}
+          {allVisibleSelected ? "Clear these" : `Select these ${visibleUsers.length}`}
         </Button>
       )}
 
@@ -116,12 +108,8 @@ export function MemberPicker({
                   ariaLabel={`Add ${displayName} to the project`}
                 />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-app-text">
-                    {displayName}
-                  </p>
-                  <p className="truncate text-xs text-app-text-muted">
-                    {user.email}
-                  </p>
+                  <p className="truncate text-sm font-medium text-app-text">{displayName}</p>
+                  <p className="truncate text-xs text-app-text-muted">{user.email}</p>
                 </div>
               </li>
             );

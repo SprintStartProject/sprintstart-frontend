@@ -1,12 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Search,
-  Shield,
-  ShieldCheck,
-  UserMinus,
-  UserPlus,
-  Undo2,
-} from "lucide-react";
+import { Search, Shield, ShieldCheck, UserMinus, UserPlus, Undo2 } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -49,12 +42,7 @@ type PersonRow = {
 // Both spellings the two data sources use for the manager-granting roles: members
 // carry raw `GlobalUserRole` codes, while `AdminUser` exposes the humanized
 // permission-group label.
-const MANAGER_ELIGIBLE_ROLES = new Set([
-  "PM",
-  "ADMIN",
-  "PROJECT MANAGER",
-  "PROJECT_MANAGER",
-]);
+const MANAGER_ELIGIBLE_ROLES = new Set(["PM", "ADMIN", "PROJECT MANAGER", "PROJECT_MANAGER"]);
 
 /**
  * Whether any of the given role signals grants project-manager eligibility.
@@ -65,9 +53,7 @@ const MANAGER_ELIGIBLE_ROLES = new Set([
  */
 function isManagerEligible(...roleSignals: Array<string | undefined>): boolean {
   return roleSignals.some(
-    (signal) =>
-      signal !== undefined &&
-      MANAGER_ELIGIBLE_ROLES.has(signal.trim().toUpperCase()),
+    (signal) => signal !== undefined && MANAGER_ELIGIBLE_ROLES.has(signal.trim().toUpperCase()),
   );
 }
 
@@ -112,9 +98,7 @@ export function ProjectPeopleSection({
   const activeDraft = resolvePeopleDraft(draft, snapshotKey);
 
   const effectiveManagerId =
-    activeDraft.managerId === undefined
-      ? (manager?.id ?? null)
-      : activeDraft.managerId;
+    activeDraft.managerId === undefined ? (manager?.id ?? null) : activeDraft.managerId;
 
   const availableUsersById = useMemo(
     () => new Map(availableUsers.map((user) => [user.id, user])),
@@ -133,25 +117,23 @@ export function ProjectPeopleSection({
       isPendingRemove: activeDraft.removedUserIds.has(member.id),
     }));
 
-    const staged: PersonRow[] = [...activeDraft.addedUserIds].flatMap(
-      (userId) => {
-        const user = availableUsersById.get(userId);
-        if (!user) return [];
+    const staged: PersonRow[] = [...activeDraft.addedUserIds].flatMap((userId) => {
+      const user = availableUsersById.get(userId);
+      if (!user) return [];
 
-        return [
-          {
-            id: user.id,
-            displayName: getDisplayName(user),
-            secondaryLabel: user.email || user.username,
-            profileIcon: user.profileIcon ?? null,
-            isManager: user.id === effectiveManagerId,
-            isManagerEligible: isManagerEligible(user.permissionGroup),
-            isPendingAdd: true,
-            isPendingRemove: false,
-          },
-        ];
-      },
-    );
+      return [
+        {
+          id: user.id,
+          displayName: getDisplayName(user),
+          secondaryLabel: user.email || user.username,
+          profileIcon: user.profileIcon ?? null,
+          isManager: user.id === effectiveManagerId,
+          isManagerEligible: isManagerEligible(user.permissionGroup),
+          isPendingAdd: true,
+          isPendingRemove: false,
+        },
+      ];
+    });
 
     const combined = [...assigned, ...staged];
 
@@ -160,8 +142,7 @@ export function ProjectPeopleSection({
     // invisible here despite still owning the project.
     if (effectiveManagerId && !combined.some((row) => row.isManager)) {
       const knownUser = availableUsersById.get(effectiveManagerId);
-      const managerUser =
-        knownUser ?? (manager?.id === effectiveManagerId ? manager : null);
+      const managerUser = knownUser ?? (manager?.id === effectiveManagerId ? manager : null);
 
       if (managerUser) {
         combined.push({
@@ -198,18 +179,13 @@ export function ProjectPeopleSection({
     () =>
       rows.filter(
         (row) =>
-          matchesSearch(row.displayName, search) ||
-          matchesSearch(row.secondaryLabel, search),
+          matchesSearch(row.displayName, search) || matchesSearch(row.secondaryLabel, search),
       ),
     [rows, search],
   );
 
   const assignedIds = useMemo(
-    () =>
-      new Set([
-        ...members.map((member) => member.id),
-        ...activeDraft.addedUserIds,
-      ]),
+    () => new Set([...members.map((member) => member.id), ...activeDraft.addedUserIds]),
     [members, activeDraft.addedUserIds],
   );
 
@@ -239,9 +215,7 @@ export function ProjectPeopleSection({
   return (
     <div>
       <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">
-          People
-        </p>
+        <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">People</p>
         <p className="mt-1 text-sm text-app-text-muted">
           {peopleCount} {peopleCount === 1 ? "person" : "people"}
           {managerCount > 0 ? " · 1 manager" : " · no manager"}
@@ -326,9 +300,7 @@ export function ProjectPeopleSection({
                         variant="ghost"
                         size="sm"
                         iconOnly
-                        onClick={() =>
-                          onDraftChange(stageManager(activeDraft, row.id))
-                        }
+                        onClick={() => onDraftChange(stageManager(activeDraft, row.id))}
                         disabled={disabled || !row.isManagerEligible}
                         aria-label={
                           row.isManagerEligible
@@ -351,9 +323,7 @@ export function ProjectPeopleSection({
                   variant="ghost"
                   size="sm"
                   iconOnly
-                  onClick={() =>
-                    onDraftChange(stageToggleRemoveUser(activeDraft, row.id))
-                  }
+                  onClick={() => onDraftChange(stageToggleRemoveUser(activeDraft, row.id))}
                   disabled={disabled || (row.isManager && !row.isPendingRemove)}
                   aria-label={
                     row.isPendingRemove
@@ -361,9 +331,7 @@ export function ProjectPeopleSection({
                       : `Remove ${row.displayName} from project`
                   }
                   title={
-                    row.isManager && !row.isPendingRemove
-                      ? "Remove as manager first"
-                      : undefined
+                    row.isManager && !row.isPendingRemove ? "Remove as manager first" : undefined
                   }
                   className="hover:bg-app-danger-bg hover:text-app-danger-text"
                 >
@@ -387,7 +355,7 @@ export function ProjectPeopleSection({
 
       {addableUsers.length > 0 && (
         <div className="mt-5">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
             Add to project
           </p>
 

@@ -46,11 +46,7 @@ describe("projectService", () => {
   });
 
   it("getProjects maps backend project summaries", async () => {
-    server.use(
-      http.get("/api/v1/admin/projects", () =>
-        HttpResponse.json([backendProject]),
-      ),
-    );
+    server.use(http.get("/api/v1/admin/projects", () => HttpResponse.json([backendProject])));
 
     const projects = await projectService.getProjects();
 
@@ -82,13 +78,8 @@ describe("projectService", () => {
 
   it("falls back to current-user project ids when admin projects are forbidden", async () => {
     server.use(
-      http.get(
-        "/api/v1/admin/projects",
-        () => new HttpResponse("Forbidden", { status: 403 }),
-      ),
-      http.get("/api/v1/users/me", () =>
-        HttpResponse.json({ projectIds: ["12345678-abcd"] }),
-      ),
+      http.get("/api/v1/admin/projects", () => new HttpResponse("Forbidden", { status: 403 })),
+      http.get("/api/v1/users/me", () => HttpResponse.json({ projectIds: ["12345678-abcd"] })),
     );
 
     const projects = await projectService.getProjects();
@@ -107,9 +98,7 @@ describe("projectService", () => {
 
   it("getProjectById returns detailed project users", async () => {
     server.use(
-      http.get("/api/v1/admin/projects/project-1", () =>
-        HttpResponse.json(backendProjectDetails),
-      ),
+      http.get("/api/v1/admin/projects/project-1", () => HttpResponse.json(backendProjectDetails)),
     );
 
     const details = await projectService.getProjectById("project-1");
@@ -179,13 +168,10 @@ describe("projectService", () => {
   it("assignUsersToProject returns backend response without a follow-up fetch", async () => {
     let capturedBody: unknown;
     server.use(
-      http.post(
-        "/api/v1/admin/projects/project-1/users",
-        async ({ request }) => {
-          capturedBody = await request.json();
-          return HttpResponse.json(backendProjectDetails.users);
-        },
-      ),
+      http.post("/api/v1/admin/projects/project-1/users", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json(backendProjectDetails.users);
+      }),
     );
 
     const users = await projectService.assignUsersToProject("project-1", {

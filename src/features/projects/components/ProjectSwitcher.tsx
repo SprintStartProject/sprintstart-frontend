@@ -78,18 +78,16 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         transition={hoverSpringToken}
-        className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+        className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-app-brand-soft transition-colors group-hover:bg-app-brand group-hover:text-white">
           <FolderKanban className="h-[18px] w-[18px] text-app-brand transition-colors group-hover:text-white" />
         </span>
 
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold text-app-text">
-            {triggerLabel}
-          </span>
+          <span className="truncate text-sm font-semibold text-app-text">{triggerLabel}</span>
 
-          <span className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-app-text-muted">
+          <span className="truncate text-[10px] font-medium tracking-[0.18em] text-app-text-muted uppercase">
             {triggerHint}
           </span>
         </span>

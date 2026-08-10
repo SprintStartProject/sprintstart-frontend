@@ -16,10 +16,7 @@ type StepperProps = {
  */
 export function Stepper({ steps, current }: StepperProps) {
   return (
-    <ol
-      className="flex flex-wrap items-center gap-x-2 gap-y-1"
-      aria-label="Progress"
-    >
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-1" aria-label="Progress">
       {steps.map((label, index) => {
         const isCompleted = index < current;
         const isCurrent = index === current;
@@ -27,32 +24,22 @@ export function Stepper({ steps, current }: StepperProps) {
         return (
           <Fragment key={label}>
             {index > 0 && (
-              <ChevronRight
-                className="h-4 w-4 shrink-0 text-app-text-muted"
-                aria-hidden="true"
-              />
+              <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
             )}
 
-            <li
-              className="flex items-center gap-1.5"
-              aria-current={isCurrent ? "step" : undefined}
-            >
+            <li className="flex items-center gap-1.5" aria-current={isCurrent ? "step" : undefined}>
               <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold leading-none transition-colors ${
+                className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs leading-none font-semibold transition-colors ${
                   isCompleted || isCurrent
                     ? "border-app-brand bg-app-brand text-white"
                     : "border-app-border bg-app-surface text-app-text-muted"
                 }`}
               >
-                {isCompleted ? (
-                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                ) : (
-                  index + 1
-                )}
+                {isCompleted ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : index + 1}
               </span>
 
               <span
-                className={`whitespace-nowrap text-sm ${
+                className={`text-sm whitespace-nowrap ${
                   isCurrent
                     ? "font-medium text-app-text"
                     : isCompleted

@@ -59,18 +59,14 @@ export function AddProjectSourcesSection({
     setStatusMessage("");
 
     try {
-      const result = await connectDraftSources(
-        projectId,
-        sourcesToConnect,
-        (progressSources) =>
-          setSources((current) =>
-            current.map(
-              (currentSource) =>
-                progressSources.find(
-                  (progressSource) => progressSource.id === currentSource.id,
-                ) ?? currentSource,
-            ),
+      const result = await connectDraftSources(projectId, sourcesToConnect, (progressSources) =>
+        setSources((current) =>
+          current.map(
+            (currentSource) =>
+              progressSources.find((progressSource) => progressSource.id === currentSource.id) ??
+              currentSource,
           ),
+        ),
       );
 
       if (result.some((source) => source.status === "connected")) {
@@ -98,7 +94,7 @@ export function AddProjectSourcesSection({
 
   return (
     <div>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+      <p className="mb-3 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
         Add sources
       </p>
 
@@ -106,18 +102,12 @@ export function AddProjectSourcesSection({
         sources={sources}
         tokenNames={tokenNames}
         disabled={isBusy}
-        onAdd={(source) =>
-          setSources((current) => addDraftSource(current, source))
-        }
-        onRemove={(sourceId) =>
-          setSources((current) => removeDraftSource(current, sourceId))
-        }
+        onAdd={(source) => setSources((current) => addDraftSource(current, source))}
+        onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
         onRetry={retrySource}
       />
 
-      {statusMessage && (
-        <p className="mt-3 text-sm text-app-text-muted">{statusMessage}</p>
-      )}
+      {statusMessage && <p className="mt-3 text-sm text-app-text-muted">{statusMessage}</p>}
 
       {pendingCount > 0 && (
         <Button
@@ -126,11 +116,7 @@ export function AddProjectSourcesSection({
           disabled={isBusy}
           loading={isConnecting}
           icon={
-            hasFailedSources(sources) ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )
+            hasFailedSources(sources) ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />
           }
           className="mt-4"
         >

@@ -59,7 +59,7 @@ function ReadonlyEditRow({
     <div className="grid grid-cols-1 items-start gap-1 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
       <span className="text-sm text-app-text-muted">{label}</span>
       <span
-        className={`wrap-break-word text-sm font-medium text-app-text ${
+        className={`text-sm font-medium wrap-break-word text-app-text ${
           mono ? "font-mono text-xs" : ""
         }`}
       >
@@ -88,13 +88,10 @@ export function UserDetailsDrawer({
 
   const isEditing = isOpen && editingUserId === user.id;
   const isSaving = savingUserId === user.id;
-  const saveErrorMessage =
-    saveError?.userId === user.id ? saveError.message : "";
+  const saveErrorMessage = saveError?.userId === user.id ? saveError.message : "";
 
   const draftUser =
-    draftUserState.userId === user.id
-      ? draftUserState.draftUser
-      : getUserEditFormState(user);
+    draftUserState.userId === user.id ? draftUserState.draftUser : getUserEditFormState(user);
 
   const enrichedAssignedProjects = useMemo(
     () =>
@@ -105,13 +102,9 @@ export function UserDetailsDrawer({
     [user.projects, availableProjects],
   );
 
-  const visibleTitle = isEditing
-    ? getDraftDisplayName(user, draftUser)
-    : getDisplayName(user);
+  const visibleTitle = isEditing ? getDraftDisplayName(user, draftUser) : getDisplayName(user);
 
-  const visiblePermissionGroup = isEditing
-    ? draftUser.permissionGroup
-    : user.permissionGroup;
+  const visiblePermissionGroup = isEditing ? draftUser.permissionGroup : user.permissionGroup;
 
   const visibleEnabled = isEditing ? draftUser.enabled : user.enabled;
 
@@ -139,10 +132,7 @@ export function UserDetailsDrawer({
     setEditingUserId(null);
   };
 
-  const updateDraftField = (
-    field: Exclude<keyof UserEditFormState, "enabled">,
-    value: string,
-  ) => {
+  const updateDraftField = (field: Exclude<keyof UserEditFormState, "enabled">, value: string) => {
     setDraftUserState((currentDraftUserState) => {
       const currentDraftUser =
         currentDraftUserState.userId === user.id
@@ -178,10 +168,7 @@ export function UserDetailsDrawer({
 
   const getProjectSummariesById = (projectIds: Set<string>) => {
     const projectsById = new Map(
-      [...availableProjects, ...enrichedAssignedProjects].map((project) => [
-        project.id,
-        project,
-      ]),
+      [...availableProjects, ...enrichedAssignedProjects].map((project) => [project.id, project]),
     );
 
     return Array.from(projectIds)
@@ -200,9 +187,7 @@ export function UserDetailsDrawer({
       userIds: [user.id],
     });
 
-    const nextProjectIds = new Set(
-      enrichedAssignedProjects.map((project) => project.id),
-    );
+    const nextProjectIds = new Set(enrichedAssignedProjects.map((project) => project.id));
     nextProjectIds.add(projectId);
 
     // `projectIds` is what the enrichment on the next full load reads, so both
@@ -217,9 +202,7 @@ export function UserDetailsDrawer({
   const removeProjectFromUser = async (projectId: string) => {
     await projectService.removeUserFromProject(projectId, user.id);
 
-    const nextProjectIds = new Set(
-      enrichedAssignedProjects.map((project) => project.id),
-    );
+    const nextProjectIds = new Set(enrichedAssignedProjects.map((project) => project.id));
     nextProjectIds.delete(projectId);
 
     onUserUpdated({
@@ -276,10 +259,7 @@ export function UserDetailsDrawer({
     } catch (error) {
       setSaveError({
         userId: user.id,
-        message:
-          error instanceof Error
-            ? error.message
-            : "User changes could not be saved.",
+        message: error instanceof Error ? error.message : "User changes could not be saved.",
       });
     } finally {
       setSavingUserId((currentSavingUserId) =>
@@ -304,9 +284,7 @@ export function UserDetailsDrawer({
         </div>
       }
       badge={
-        <AccessBadge
-          variant={getPermissionGroupVariant(visiblePermissionGroup)}
-        >
+        <AccessBadge variant={getPermissionGroupVariant(visiblePermissionGroup)}>
           {visiblePermissionGroup}
         </AccessBadge>
       }
@@ -366,9 +344,7 @@ export function UserDetailsDrawer({
               <AlertCircle className="h-4 w-4" />
               User changes could not be saved
             </div>
-            <p className="mt-1 text-sm text-app-danger-text">
-              {saveErrorMessage}
-            </p>
+            <p className="mt-1 text-sm text-app-danger-text">{saveErrorMessage}</p>
           </div>
         )}
 

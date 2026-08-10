@@ -1,24 +1,24 @@
 import type { ReactNode } from "react";
 
 export type EmptyStateProps = {
-    /**
-     * Illustrative glyph above the title — a lucide icon, or a `Spinner` when
-     * the emptiness is temporary and something is being fetched.
-     */
-    icon?: ReactNode;
-    /**
-     * Headline. Leave it out for the one-line form: a bare sentence in a dashed
-     * box, which is right for a small slot inside a card where a headline would
-     * be more chrome than content.
-     */
-    title?: ReactNode;
-    /** The sentence itself — what is missing, and what would fill it. */
-    children: ReactNode;
-    /** A single call to action. Anything more belongs on the page, not in here. */
-    action?: ReactNode;
-    /** `sm` for a slot inside a card, `md` for a whole panel or page section. */
-    size?: "sm" | "md";
-    className?: string;
+  /**
+   * Illustrative glyph above the title — a lucide icon, or a `Spinner` when
+   * the emptiness is temporary and something is being fetched.
+   */
+  icon?: ReactNode;
+  /**
+   * Headline. Leave it out for the one-line form: a bare sentence in a dashed
+   * box, which is right for a small slot inside a card where a headline would
+   * be more chrome than content.
+   */
+  title?: ReactNode;
+  /** The sentence itself — what is missing, and what would fill it. */
+  children: ReactNode;
+  /** A single call to action. Anything more belongs on the page, not in here. */
+  action?: ReactNode;
+  /** `sm` for a slot inside a card, `md` for a whole panel or page section. */
+  size?: "sm" | "md";
+  className?: string;
 };
 
 /**
@@ -45,46 +45,38 @@ export type EmptyStateProps = {
  * ```
  */
 export function EmptyState({
-    icon,
-    title,
-    children,
-    action,
-    size = "md",
-    className = "",
+  icon,
+  title,
+  children,
+  action,
+  size = "md",
+  className = "",
 }: EmptyStateProps) {
-    const isCompact = size === "sm";
+  const isCompact = size === "sm";
 
-    return (
-        <div
-            className={`rounded-2xl border border-dashed border-app-border bg-app-surface-muted text-center ${
-                isCompact ? "px-4 py-4" : "px-6 py-8"
-            } ${className}`.trim()}
-        >
-            {icon && (
-                <div className="mb-3 flex justify-center text-app-text-disabled">
-                    {icon}
-                </div>
-            )}
+  return (
+    <div
+      className={`rounded-2xl border border-dashed border-app-border bg-app-surface-muted text-center ${
+        isCompact ? "px-4 py-4" : "px-6 py-8"
+      } ${className}`.trim()}
+    >
+      {icon && <div className="mb-3 flex justify-center text-app-text-disabled">{icon}</div>}
 
-            {title && (
-                <p
-                    className={`font-semibold text-app-text ${
-                        isCompact ? "text-sm" : "text-lg"
-                    }`}
-                >
-                    {title}
-                </p>
-            )}
+      {title && (
+        <p className={`font-semibold text-app-text ${isCompact ? "text-sm" : "text-lg"}`}>
+          {title}
+        </p>
+      )}
 
-            <p
-                className={`text-sm text-app-text-muted ${title ? "mt-1" : ""} ${
-                    isCompact ? "" : "mx-auto max-w-md"
-                }`.trim()}
-            >
-                {children}
-            </p>
+      <p
+        className={`text-sm text-app-text-muted ${title ? "mt-1" : ""} ${
+          isCompact ? "" : "mx-auto max-w-md"
+        }`.trim()}
+      >
+        {children}
+      </p>
 
-            {action && <div className="mt-5 flex justify-center">{action}</div>}
-        </div>
-    );
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
+    </div>
+  );
 }

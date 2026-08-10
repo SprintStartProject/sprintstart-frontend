@@ -17,9 +17,7 @@ export function AdminProjectsToolbar({
 }: AdminProjectsToolbarProps) {
   return (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-sm font-semibold text-app-text">
-        {projectCount} projects
-      </span>
+      <span className="text-sm font-semibold text-app-text">{projectCount} projects</span>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="w-full sm:w-64">

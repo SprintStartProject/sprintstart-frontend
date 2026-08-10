@@ -118,20 +118,17 @@ describe("githubService config endpoints", () => {
     expect.assertions(2);
 
     server.use(
-      http.put(
-        "/api/v1/github/config/:owner/:name",
-        async ({ params, request }) => {
-          const body = await request.json();
+      http.put("/api/v1/github/config/:owner/:name", async ({ params, request }) => {
+        const body = await request.json();
 
-          expect(params).toMatchObject({ owner: "sprint", name: "frontend" });
-          expect(body).toEqual({
-            autoUpdate: false,
-            schedule: { type: "INTERVAL", everyMinutes: 60 },
-          });
+        expect(params).toMatchObject({ owner: "sprint", name: "frontend" });
+        expect(body).toEqual({
+          autoUpdate: false,
+          schedule: { type: "INTERVAL", everyMinutes: 60 },
+        });
 
-          return new HttpResponse(null, { status: 204 });
-        },
-      ),
+        return new HttpResponse(null, { status: 204 });
+      }),
     );
 
     await configureGithubRepository(
