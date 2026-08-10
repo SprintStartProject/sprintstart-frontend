@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { AlertCircle, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
+import { Select } from "../../../components/ui/Select";
+import { Textarea } from "../../../components/ui/Textarea";
 import { Stepper } from "../../../components/ui/Stepper";
 import {
   projectService,
@@ -418,36 +422,21 @@ export function CreateProjectWizard({
             goToPeople();
           }}
         >
-          <div>
-            <label
-              htmlFor={nameInputId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Name
-            </label>
-            <input
-              id={nameInputId}
+          <Field label="Name" controlId={nameInputId}>
+            <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label
-              htmlFor={descriptionInputId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Description
-            </label>
-            <textarea
-              id={descriptionInputId}
+          <Field label="Description" controlId={descriptionInputId}>
+            <Textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              className="min-h-28 w-full resize-y rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-medium leading-relaxed text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+              minRows={4}
+              maxRows={12}
             />
-          </div>
+          </Field>
 
         </form>
       ) : isPeopleStep ? (
@@ -459,19 +448,11 @@ export function CreateProjectWizard({
             goToSources();
           }}
         >
-          <div>
-            <label
-              htmlFor={managerSelectId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Project manager
-            </label>
-            <select
-              id={managerSelectId}
+          <Field label="Project manager" controlId={managerSelectId}>
+            <Select
               value={managerId}
               onChange={(event) => setManagerId(event.target.value)}
               disabled={isLoadingCandidates || managerCandidates.length === 0}
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-colors focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">
                 {isLoadingCandidates
@@ -487,20 +468,20 @@ export function CreateProjectWizard({
                     : candidate.username}
                 </option>
               ))}
-            </select>
+            </Select>
 
             {candidatesError && (
-              <p className="mt-2 flex items-start gap-2 text-sm text-app-danger-text">
+              <p className="flex items-start gap-2 text-sm text-app-danger-text">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{candidatesError}</span>
               </p>
             )}
 
-            <p className="mt-2 text-xs text-app-text-muted">
+            <p className="text-xs text-app-text-muted">
               The manager becomes a member automatically, so they do not have to
               be ticked below.
             </p>
-          </div>
+          </Field>
 
           <MemberPicker
             users={users}

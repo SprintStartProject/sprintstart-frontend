@@ -1,6 +1,7 @@
 import { Check, Filter, Send, Square } from "lucide-react";
 import type { FormEvent, RefObject } from "react";
 import { Button } from "../../../components/ui/Button";
+import { useAutoResize } from "../../../components/ui/useAutoResize";
 import { SOURCE_SYSTEMS, type SourceSystem } from "../types";
 
 type ChatComposerProps = {
@@ -54,6 +55,11 @@ export function ChatComposer({
     activeFilterCount,
     clearFilters,
 }: ChatComposerProps) {
+    // Grows with the draft, and — unlike the previous inline version, which only
+    // ran while the user typed — shrinks back once the message is sent and
+    // `value` is cleared from the outside.
+    useAutoResize({ ref: textareaRef, value, minRows: 1, maxRows: 8 });
+
     // E7: surface a hint when the date range is inverted.
     const rangeInvalid = !!from && !!to && from > to;
 
@@ -174,19 +180,18 @@ export function ChatComposer({
                         </span>
                     )}
                 </Button>
+                {/* Not a `Textarea`: this one is borderless and lives inside the
+                    composer's own box, so it needs the growing behaviour without
+                    the field styling. It shares the behaviour via the hook. */}
                 <textarea
                     ref={textareaRef}
                     aria-label="Message"
                     data-testid="chat-input"
                     placeholder="Ask anything about the project..."
-                    className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+                    className="flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
                     value={value}
                     rows={1}
-                    onChange={(e) => {
-                        onChange(e.currentTarget.value);
-                        e.currentTarget.style.height = "auto";
-                        e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-                    }}
+                    onChange={(e) => onChange(e.currentTarget.value)}
                     onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();

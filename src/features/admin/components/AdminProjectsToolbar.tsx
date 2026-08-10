@@ -1,5 +1,6 @@
 import { Plus, Search } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 
 type AdminProjectsToolbarProps = {
   projectCount: number;
@@ -21,14 +22,13 @@ export function AdminProjectsToolbar({
       </span>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
-          <input
+        <div className="w-full sm:w-64">
+          <Input
             value={projectSearchValue}
             onChange={(event) => onProjectSearchChange(event.target.value)}
             placeholder="Search projects..."
             aria-label="Search projects"
-            className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-10 pr-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+            icon={<Search className="h-4 w-4" />}
           />
         </div>
 

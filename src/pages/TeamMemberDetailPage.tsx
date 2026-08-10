@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
+import { Select } from '../components/ui/Select';
 import type {
     OnboardingPathEndpoint,
     OnboardingStepEndpoint,
@@ -1197,12 +1198,13 @@ export function TeamMemberDetailPage() {
                         </div>
 
                         <div className="mt-6 flex gap-2">
-                            <select
+                            <Select
                                 value={selectedRoleId}
+                                aria-label="Choose role"
                                 onChange={(event) =>
                                     setSelectedRoleId(event.target.value)
                                 }
-                                className="min-w-0 flex-1 rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
+                                className="min-w-0 flex-1"
                             >
                                 <option value="">Choose role</option>
 
@@ -1211,7 +1213,7 @@ export function TeamMemberDetailPage() {
                                         {role.name}
                                     </option>
                                 ))}
-                            </select>
+                            </Select>
 
                             <Button
                                 variant="primary"

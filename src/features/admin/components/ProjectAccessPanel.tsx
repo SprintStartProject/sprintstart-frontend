@@ -9,6 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import type { ProjectSummary } from "../types";
 
 export type ProjectAccessPanelProps = {
@@ -174,16 +175,16 @@ export function ProjectAccessPanel({
 
           {openProjectPicker && (
             <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-xl">
-              <div className="relative mb-2">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-app-text-disabled" />
-                <input
-                  value={projectSearch}
-                  onChange={(event) => updateProjectSearch(event.target.value)}
-                  placeholder="Search projects..."
-                  disabled={hasPendingProjectChange}
-                  className="h-9 w-full rounded-xl border border-app-border bg-app-surface-muted pl-9 pr-3 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
+              <Input
+                size="sm"
+                value={projectSearch}
+                onChange={(event) => updateProjectSearch(event.target.value)}
+                placeholder="Search projects..."
+                aria-label="Search projects"
+                disabled={hasPendingProjectChange}
+                icon={<Search className="h-3.5 w-3.5" />}
+                className="mb-2"
+              />
 
               <div className="max-h-64 space-y-1 overflow-auto">
                 {projectOptions.length > 0 ? (

@@ -2,6 +2,8 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AlertDialog } from '../../../components/ui/AlertDialog';
 import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { Textarea } from '../../../components/ui/Textarea';
 import { Modal } from '../../../components/ui/Modal';
 import {
     createProjectRole,
@@ -171,23 +173,24 @@ export function ProjectRolesModal({
                     </p>
 
                     <div className="space-y-3">
-                        <input
+                        <Input
                             value={roleName}
                             onChange={(event) =>
                                 setRoleName(event.target.value)
                             }
                             placeholder="Role name"
-                            className="w-full rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong"
+                            aria-label="Role name"
                         />
 
-                        <textarea
+                        <Textarea
                             value={roleDescription}
                             onChange={(event) =>
                                 setRoleDescription(event.target.value)
                             }
                             placeholder="Description"
-                            rows={2}
-                            className="w-full resize-none rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong"
+                            aria-label="Role description"
+                            minRows={2}
+                            maxRows={8}
                         />
 
                         <div className="flex justify-end">
@@ -336,13 +339,13 @@ export function ProjectRolesModal({
 
                                 <div className="mt-4 flex gap-2">
                                     <div className="min-w-0 flex-1">
-                                        <input
+                                        <Input
                                             value={skillName}
                                             onChange={(event) =>
                                                 setSkillName(event.target.value)
                                             }
                                             placeholder="Add skill, e.g. React"
-                                            className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong"
+                                            aria-label="Skill name"
                                         />
                                     </div>
 

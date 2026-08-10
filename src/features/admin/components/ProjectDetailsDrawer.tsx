@@ -3,6 +3,9 @@ import { AlertCircle, Folder, Loader2, Trash2 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
+import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { projectService } from "../../../services/projectService";
 import {
@@ -318,43 +321,30 @@ export function ProjectDetailsDrawer({
               </p>
 
               <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor={nameInputId}
-                    className="mb-1.5 block text-sm text-app-text-muted"
-                  >
-                    Name
-                  </label>
-                  <input
-                    id={nameInputId}
+                <Field label="Name" controlId={nameInputId} disabled={isSaving}>
+                  <Input
                     value={draftProject.name}
                     onChange={(event) =>
                       updateDraftField("name", event.target.value)
                     }
-                    disabled={isSaving}
-                    className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
                   />
-                </div>
+                </Field>
 
-                <div>
-                  <label
-                    htmlFor={descriptionInputId}
-                    className="mb-1.5 block text-sm text-app-text-muted"
-                  >
-                    Description
-                  </label>
-                  <textarea
-                    id={descriptionInputId}
+                <Field
+                  label="Description"
+                  controlId={descriptionInputId}
+                  disabled={isSaving}
+                >
+                  <Textarea
                     value={draftProject.description}
                     onChange={(event) =>
                       updateDraftField("description", event.target.value)
                     }
-                    rows={4}
-                    disabled={isSaving}
+                    minRows={4}
+                    maxRows={12}
                     placeholder="No project description yet."
-                    className="min-h-24 w-full resize-y rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-medium leading-relaxed text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
                   />
-                </div>
+                </Field>
               </div>
             </Section>
 

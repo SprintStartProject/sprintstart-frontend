@@ -116,21 +116,80 @@ Hover-Effekt fehlte dort schlicht.
 
 ---
 
-## 2. Input / Select / Textarea vereinheitlichen
+## 2. Input / Select / Textarea vereinheitlichen — **erledigt**
 
-**Befund.** 45 `<input>`, 9 `<select>`, 8 `<textarea>` — dasselbe Muster wie
-bei den Buttons, nur kleiner:
+**Befund.** 62 Textfelder (45 `<input>`, 9 `<select>`, 8 `<textarea>`) —
+dasselbe Muster wie bei den Buttons, nur kleiner:
 
-- Höhe: `h-11` (16) · `h-10` (7) · `h-9` (2) · 20 ganz ohne feste Höhe
-- Focus in **6 Varianten**: `focus:ring-2 ring-app-brand-glow` (16) ·
-  nur `focus:border-app-brand` ohne Ring (9) · `focus:ring-1` (3) · gar
-  nichts (5) · …
-- `<select>` und `<textarea>` folgen jeweils anderen Mustern als `<input>`
+- Höhe: `h-11` (20) · `h-10` (8) · `h-9` (2) · 27 ganz ohne feste Höhe
+- Focus in **10 Ausprägungen**, u. a. `ring-2 ring-app-brand-glow` (20) ·
+  nur `focus:border-app-brand` ohne Ring (14) · `focus:ring-1` (3) · gar
+  nichts (9)
+- Placeholder-Farbe bei **34 von 62** überhaupt nicht gesetzt
+- `disabled`-Behandlung bei 34 von 62 nicht gesetzt
+- `<select>` und `<textarea>` folgten jeweils anderen Regeln als `<input>`
 
-**Vorschlag.** `ui/Input.tsx`, `ui/Textarea.tsx` und ein `ui/Field.tsx`
-(Label + Hint + Fehlermeldung + `aria-describedby`-Verdrahtung). Für
-`<select>` prüfen, ob `ui/FilterSelect.tsx` die verbleibenden Fälle
-abdeckt, statt eine zweite Select-Komponente zu bauen.
+**Der wichtigste Befund war aber kein optischer.** Der häufigste Focus-Ring war
+`ring-app-brand-glow` — ein Blau mit **10 % Deckkraft**, praktisch unsichtbar.
+Und die Codebase hatte 65 `htmlFor`-Attribute, aber nur **3 Dateien mit
+`aria-describedby`**: Fehlermeldungen standen visuell neben ihrem Feld und
+waren für Screenreader nicht vorhanden.
+
+**Lösung.**
+
+- [`ui/fieldStyles.ts`](../src/components/ui/fieldStyles.ts) — eine Quelle für
+  Rahmen, Radius, Höhe, Placeholder, `disabled` und Focus. Der Ring ist jetzt
+  `--app-focus`, derselbe Token wie beim Button und der, den §5 der Standards
+  ohnehin vorschreibt. Auf `:focus`, nicht `:focus-visible`: ein Textfeld muss
+  seinen Fokus auch beim Klick zeigen, der Cursor allein ist zu klein.
+- [`ui/Input`](../src/components/ui/Input.tsx),
+  [`ui/Textarea`](../src/components/ui/Textarea.tsx),
+  [`ui/Select`](../src/components/ui/Select.tsx) — `size` teilt sich die Skala
+  mit `Button`, dazu `icon`/`trailing`-Slots statt handgesetzter Absolut-Positionen.
+- [`ui/Field`](../src/components/ui/Field.tsx) — Label, Hint und Fehler als eine
+  Einheit. Erzeugt die id, bindet das Label, sammelt Hint und Fehler in
+  `aria-describedby` und setzt `aria-invalid`; die Verdrahtung läuft über
+  [`fieldContext`](../src/components/ui/fieldContext.ts), damit der Aufrufer sie
+  nicht vergessen *kann*.
+### 2a. Mehrzeilen-Verhalten — **erledigt**
+
+**Befund (im Review aufgefallen, nicht in der ersten Analyse).** Es gab zwei
+Mehrzeilen-Komponenten mit unterschiedlichem *Verhalten*: ein handgeschriebenes
+`AutoResizeTextarea`, das beim Tippen mitwuchs (nur im Add-Custom-Step-Dialog),
+und `Textarea` mit fester Höhe und Ziehgriff (überall sonst). Dazu eine
+**dritte** Implementierung inline im Chat-Composer.
+
+Solange die drei auch unterschiedlich aussahen, fiel das kaum auf. Nachdem sie
+sich Rahmen, Radius und Focus teilten, wurde daraus ein Bug: gleiches Aussehen,
+unterschiedliches Verhalten je nach Bildschirm.
+
+**Lösung.** Mitwachsen ist jetzt das Standardverhalten von `Textarea`, begrenzt
+durch `minRows`/`maxRows` — danach wird intern gescrollt, damit ein
+eingefügter Textblock keinen Dialog-Footer aus dem Bild schiebt. Die Höhenlogik
+liegt in [`useAutoResize`](../src/components/ui/useAutoResize.ts), damit auch
+der Chat-Composer sie nutzen kann, der randlos in seiner eigenen Box sitzt und
+deshalb kein `Textarea` sein kann.
+
+**Dabei gefunden und behoben:** Die Inline-Variante im Chat-Composer setzte die
+Höhe nur beim Tippen. Nach dem Absenden einer mehrzeiligen Nachricht wurde
+`value` von außen geleert, die Höhe blieb aber stehen — das Eingabefeld blieb
+dauerhaft aufgebläht. Der Hook misst auch bei Änderungen von außen neu.
+
+**Zu löschen:** `src/components/ui/AutoResizeTextarea.tsx` wird nicht mehr
+importiert und kann weg (die Sandbox darf keine Dateien löschen).
+
+**Stand:** 62 → 16 rohe Textfelder, davon 6 in den ui-Komponenten selbst.
+Bleiben 10 bewusste Ausnahmen: zusammengesetzte Controls, bei denen mehrere
+Elemente sich einen Rahmen teilen (die „Every _n_ minutes"-Zeile, der
+Chat-Composer, das randlose QuickChat-Feld, die Datumsfelder im Chat-Filter),
+plus die Task-Titel-Zeile in `AddCustomStepModal`. Regel steht in
+[`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §4.
+
+**Offen geblieben:** `FilterSelect` und das neue `Select` existieren
+nebeneinander. Das ist vertretbar — `FilterSelect` baut das Popup in React nach
+und kann dadurch aussehen wie ein Dropdown im App-Stil, `Select` überlässt es
+dem Betriebssystem und ist dafür barrierefrei und mobiltauglich ohne Zutun.
+Wer welches nimmt, steht im TSDoc von `Select`.
 
 ---
 

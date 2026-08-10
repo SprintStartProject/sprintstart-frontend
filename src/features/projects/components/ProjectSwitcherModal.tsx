@@ -7,6 +7,7 @@ import {
   Search,
   Users,
 } from "lucide-react";
+import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import type { SelectableProject } from "../ProjectContext";
 
@@ -209,21 +210,18 @@ export function ProjectSwitcherModal({
       closeLabel="Close project switcher"
       bodyClassName="px-7 pb-7 pt-5"
     >
-      <div className="relative mb-5">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
-
-        <input
-          ref={searchRef}
-          type="search"
-          aria-label="Search projects"
-          autoComplete="off"
-          placeholder="Search projects..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onKeyDown={handleSearchKeyDown}
-          className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-10 pr-4 text-sm text-app-text placeholder:text-app-text-muted focus:border-app-brand-border-strong focus:outline-none focus:ring-2 focus:ring-app-brand-glow"
-        />
-      </div>
+      <Input
+        ref={searchRef}
+        type="search"
+        aria-label="Search projects"
+        autoComplete="off"
+        placeholder="Search projects..."
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        onKeyDown={handleSearchKeyDown}
+        icon={<Search className="h-4 w-4" />}
+        className="mb-5"
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-app-text-muted">

@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
-import { AutoResizeTextarea } from '../../../../components/ui/AutoResizeTextarea';
+import { Textarea } from '../../../../components/ui/Textarea';
+import { Input } from '../../../../components/ui/Input';
 import { Button } from '../../../../components/ui/Button';
 import { DragHandle } from '../../../../components/ui/DragHandle';
 import { Modal } from '../../../../components/ui/Modal';
@@ -95,12 +96,12 @@ export function AddCustomStepModal({
                         <label htmlFor="custom-step-title" className="text-xs font-medium text-app-text-muted">
                             Step title *
                         </label>
-                        <input
+                        <Input
                             id="custom-step-title"
                             value={title}
                             onChange={(event) => onTitleChange(event.target.value)}
                             placeholder="e.g., Meet your colleagues"
-                            className="mt-1 w-full rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
+                            className="mt-1"
                         />
                     </div>
 
@@ -108,14 +109,14 @@ export function AddCustomStepModal({
                         <label htmlFor="custom-step-minutes" className="text-xs font-medium text-app-text-muted">
                             Est. minutes *
                         </label>
-                        <input
+                        <Input
                             id="custom-step-minutes"
                             type="number"
                             min="1"
                             value={estimatedMinutes}
                             onChange={(event) => onEstimatedMinutesChange(event.target.value)}
                             placeholder="30"
-                            className="mt-1 w-full rounded-xl border border-app-border bg-app-bg px-2 py-1.5 text-center text-sm text-app-text outline-none focus:border-app-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className="mt-1 px-2 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                     </div>
                 </div>
@@ -126,10 +127,10 @@ export function AddCustomStepModal({
                         Description
                     </label>
                     <div className="mt-1">
-                        <AutoResizeTextarea
+                        <Textarea
                             id="custom-step-description"
                             value={description}
-                            onChange={onDescriptionChange}
+                            onChange={(event) => onDescriptionChange(event.target.value)}
                             placeholder="Describe what the member should do. Keep it clear and actionable."
                             minRows={3}
                             maxRows={10}
@@ -143,10 +144,10 @@ export function AddCustomStepModal({
                         Expected outcome
                     </label>
                     <div className="mt-1">
-                        <AutoResizeTextarea
+                        <Textarea
                             id="custom-step-expected-outcome"
                             value={expectedOutcome}
-                            onChange={onExpectedOutcomeChange}
+                            onChange={(event) => onExpectedOutcomeChange(event.target.value)}
                             placeholder="What should the member achieve by completing this step?"
                             minRows={2}
                             maxRows={8}
@@ -279,16 +280,18 @@ export function AddCustomStepModal({
                                         <label htmlFor={`custom-task-description-${index}`} className="mb-1 block text-xs font-medium text-app-text-muted">
                                             Task description (optional)
                                         </label>
-                                        <AutoResizeTextarea
+                                        <Textarea
                                             id={`custom-task-description-${index}`}
                                             value={task.description}
-                                            onChange={(value) =>
+                                            onChange={(event) =>
                                                 onTasksChange((current) =>
                                                     current.map((item, itemIndex) =>
                                                         itemIndex === index
                                                             ? {
                                                                   ...item,
-                                                                  description: value,
+                                                                  description:
+                                                                      event.target
+                                                                          .value,
                                                               }
                                                             : item,
                                                     ),

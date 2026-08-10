@@ -1,6 +1,7 @@
 import { Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
+import { Input } from "../../../components/ui/Input";
 import { USER_FILTER_OPTIONS } from "../data";
 import type { UserFilter } from "../types";
 
@@ -49,14 +50,13 @@ export function AdminUsersToolbar({
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative w-full sm:w-64">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
-                    <input
+                <div className="w-full sm:w-64">
+                    <Input
                         value={searchValue}
                         onChange={(event) => onSearchChange(event.target.value)}
                         placeholder="Search users..."
                         aria-label="Search users"
-                        className="h-11 w-full rounded-xl border border-app-border/70 bg-app-surface/70 pl-10 pr-4 text-sm text-app-text outline-none backdrop-blur-md transition-colors placeholder:text-app-text-disabled hover:border-app-brand-border-strong focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+                        icon={<Search className="h-4 w-4" />}
                     />
                 </div>
 

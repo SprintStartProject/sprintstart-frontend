@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { Field } from '../../../components/ui/Field';
+import { Input } from '../../../components/ui/Input';
 import { parseApiError, describeRefreshFailure } from '../../../services/apiError';
 import { updateGithubPat } from '../../../services/sources/githubService';
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from '../utils/patValidation';
@@ -73,33 +75,24 @@ export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps
             <p className="mb-3 text-sm font-semibold text-app-text">Rotate token</p>
 
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                <div className="min-w-0 flex-1">
-                    <label
-                        htmlFor="settings-rotate-token-value"
-                        className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                    >
-                        New GitHub PAT
-                    </label>
-                    <div className="relative">
-                        <RefreshCw
-                            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled"
-                            aria-hidden
-                        />
-                        <input
-                            ref={inputRef}
-                            id="settings-rotate-token-value"
-                            data-testid={`settings-rotate-token-${name}`}
-                            type="password"
-                            value={token}
-                            onChange={(e) => setToken(e.target.value)}
-                            placeholder="ghp_... or github_pat_..."
-                            required
-                            autoComplete="off"
-                            disabled={isSaving}
-                            className="h-11 w-full rounded-xl border border-app-brand-border bg-app-surface pl-11 pr-4 text-sm font-medium text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
-                        />
-                    </div>
-                </div>
+                <Field
+                    label="New GitHub PAT"
+                    controlId="settings-rotate-token-value"
+                    disabled={isSaving}
+                    className="min-w-0 flex-1"
+                >
+                    <Input
+                        ref={inputRef}
+                        data-testid={`settings-rotate-token-${name}`}
+                        type="password"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="ghp_... or github_pat_..."
+                        required
+                        autoComplete="off"
+                        icon={<RefreshCw className="h-4 w-4" />}
+                    />
+                </Field>
 
                 <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
                     <Button

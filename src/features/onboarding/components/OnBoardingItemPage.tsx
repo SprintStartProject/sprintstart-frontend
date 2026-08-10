@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { onboardingService } from "../../../services/onboardingService";
 import { Button } from "../../../components/ui/Button";
+import { Textarea } from "../../../components/ui/Textarea";
 import { StepOriginBadge } from "./StepOriginBadge";
 import { TaskCheckItem } from "./TaskCheckItem";
 import { useMoments } from "../../moments";
@@ -612,11 +613,13 @@ export function OnBoardingItemPage() {
                 <CircleArrowRight className="w-4 h-4 text-app-danger-solid" />
                 Skip Step
               </h3>
-              <textarea
+              <Textarea
                 value={skipReason}
                 onChange={(e) => setSkipReason(e.target.value)}
                 placeholder="Reason for skipping..."
-                className="w-full h-24 p-3 rounded-xl border border-app-border bg-app-surface text-sm text-app-text focus:outline-none focus:ring-2 focus:ring-app-focus transition-all resize-none"
+                aria-label="Reason for skipping"
+                minRows={3}
+                maxRows={10}
                 disabled={
                   skipLoading ||
                   stepDetail.status === "SKIPPED" ||
@@ -698,11 +701,13 @@ export function OnBoardingItemPage() {
                       Not helpful
                     </button>
                   </div>
-                  <textarea
+                  <Textarea
                     value={feedbackComment}
                     onChange={(e) => setFeedbackComment(e.target.value)}
                     placeholder="Tell us what worked or what was missing..."
-                    className="w-full h-24 p-3 rounded-xl border border-app-border bg-app-surface text-sm text-app-text focus:outline-none focus:ring-2 focus:ring-app-focus transition-all resize-none"
+                    aria-label="Feedback comment"
+                    minRows={3}
+                    maxRows={10}
                   />
                   <Button
                     variant="primary"

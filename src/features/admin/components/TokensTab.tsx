@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Key, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
 import { ApiError } from "../../../services/apiClient";
 import {
     addGithubPat,
@@ -178,36 +180,28 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                     </div>
 
                     <div className="space-y-3">
-                        <div>
-                            <label htmlFor="add-token-name" className="mb-1.5 block text-xs font-medium text-app-text-muted">
-                                Token name
-                            </label>
-                            <input
-                                id="add-token-name"
+                        <Field label="Token name" controlId="add-token-name" disabled={isAdding}>
+                            <Input
                                 value={addName}
                                 onChange={(e) => setAddName(e.target.value)}
                                 placeholder="e.g. default"
                                 required
-                                disabled={isAdding}
-                                className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                             />
-                        </div>
+                        </Field>
 
-                        <div>
-                            <label htmlFor="add-token-value" className="mb-1.5 block text-xs font-medium text-app-text-muted">
-                                Token (ghp_...)
-                            </label>
-                            <input
-                                id="add-token-value"
+                        <Field
+                            label="Token (ghp_...)"
+                            controlId="add-token-value"
+                            disabled={isAdding}
+                        >
+                            <Input
                                 type="password"
                                 value={addToken}
                                 onChange={(e) => setAddToken(e.target.value)}
                                 placeholder="ghp_... or github_pat_..."
                                 required
-                                disabled={isAdding}
-                                className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                             />
-                        </div>
+                        </Field>
 
                         {addError && (
                             <p className="text-sm text-app-danger-text">{addError}</p>
@@ -322,24 +316,21 @@ export function TokensTab({ tokenNames, onRefresh }: TokensTabProps) {
                                     </div>
 
                                     <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                                        <div className="min-w-0 flex-1">
-                                            <label htmlFor="rotate-token-value" className="mb-1.5 block text-xs font-medium text-app-text-muted">
-                                                New GitHub PAT
-                                            </label>
-                                            <div className="relative">
-                                                <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
-                                                <input
-                                                    id="rotate-token-value"
-                                                    type="password"
-                                                    value={rotateToken}
-                                                    onChange={(event) => setRotateToken(event.target.value)}
-                                                    placeholder="ghp_... or github_pat_..."
-                                                    required
-                                                    disabled={isRotating}
-                                                    className="h-11 w-full rounded-xl border border-app-brand-border bg-app-surface pl-11 pr-4 text-sm font-medium text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
-                                                />
-                                            </div>
-                                        </div>
+                                        <Field
+                                            label="New GitHub PAT"
+                                            controlId="rotate-token-value"
+                                            disabled={isRotating}
+                                            className="min-w-0 flex-1"
+                                        >
+                                            <Input
+                                                type="password"
+                                                value={rotateToken}
+                                                onChange={(event) => setRotateToken(event.target.value)}
+                                                placeholder="ghp_... or github_pat_..."
+                                                required
+                                                icon={<Key className="h-4 w-4" />}
+                                            />
+                                        </Field>
 
                                         <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
                                             <Button

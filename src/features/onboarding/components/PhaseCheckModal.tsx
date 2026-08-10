@@ -9,6 +9,7 @@
 import { useState, useEffect } from "react";
 import { onboardingService } from "../../../services/onboardingService";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import type {
   PhaseCheckEndpoint,
@@ -319,13 +320,13 @@ function QuestionCard({ question, index, draft, result, onToggleOption, onTextCh
           {/* Short text answer */}
           {question.type === "SHORT_TEXT" && (
             <div className="mt-3">
-              <input
+              <Input
                 type="text"
                 value={draft.textAnswer}
                 disabled={graded}
                 onChange={(event) => onTextChange(event.target.value)}
                 placeholder="Your answer..."
-                className="w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none disabled:opacity-70"
+                aria-label="Your answer"
               />
               {/* AI feedback on the free-text answer (both correct and incorrect) */}
               {graded && result.feedback && (

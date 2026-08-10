@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
   discoverRepositories,
@@ -354,13 +356,13 @@ export function GithubRepositoryDiscovery({
           >
             Organization, user, or URL
           </label>
-          <input
+          <Input
             id="discovery-owner"
             value={ownerInput}
             onChange={(event) => setOwnerInput(event.target.value)}
             disabled={isBusy || !hasTokens}
             placeholder="octocat, github.com/octocat, or a repo URL"
-            className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           />
         </div>
 
@@ -371,12 +373,12 @@ export function GithubRepositoryDiscovery({
           >
             Access token
           </label>
-          <select
+          <Select
             id="discovery-token"
             value={tokenName}
             onChange={(event) => onTokenNameChange(event.target.value)}
             disabled={isBusy || !hasTokens}
-            className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           >
             {hasTokens ? (
               tokenNames.map((name) => (
@@ -387,7 +389,7 @@ export function GithubRepositoryDiscovery({
             ) : (
               <option value="">No saved tokens</option>
             )}
-          </select>
+          </Select>
         </div>
 
         <Button
@@ -439,14 +441,14 @@ export function GithubRepositoryDiscovery({
       {repositories.length > 0 && (
         <div className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative sm:max-w-xs sm:flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
-              <input
+            <div className="sm:max-w-xs sm:flex-1">
+              <Input
+                size="sm"
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
                 placeholder="Filter repositories"
                 aria-label="Filter repositories"
-                className="h-10 w-full rounded-xl border border-app-border bg-app-surface pl-9 pr-3 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand"
+                icon={<Search className="h-4 w-4" />}
               />
             </div>
 

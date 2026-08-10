@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
+import { Select } from "../../../components/ui/Select";
 import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { getTeamOverview } from "../../../services/teamManagementService";
@@ -272,11 +273,13 @@ export function KnowledgeGapsDetailPage() {
           {/* Assign / change owner */}
           <div className="mt-3 flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-app-text-muted shrink-0" />
-            <select
+            <Select
+              size="sm"
               value=""
+              aria-label={currentOwner ? "Change owner" : "Assign owner"}
               disabled={savingOwners || assignableUsers.length === 0}
               onChange={(e) => setOwner(e.target.value)}
-              className="flex-1 text-sm rounded-lg border border-app-border bg-app-bg text-app-text px-3 py-2 disabled:opacity-60"
+              className="flex-1"
             >
               <option value="" disabled>
                 {currentOwner ? "Change owner…" : "Assign owner…"}
@@ -286,7 +289,7 @@ export function KnowledgeGapsDetailPage() {
                   {u.firstname} {u.lastname}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 

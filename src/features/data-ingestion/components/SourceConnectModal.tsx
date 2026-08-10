@@ -1,6 +1,8 @@
 import type { FormEvent } from "react";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
+import { Select } from "../../../components/ui/Select";
 import type {
     ConnectState,
     SourceConnectMeta,
@@ -191,7 +193,7 @@ export function SourceConnectModal({
                                     Repository owner
                                 </label>
 
-                                <input
+                                <Input
                                     id="github-owner"
                                     value={owner}
                                     onChange={(event) =>
@@ -199,7 +201,7 @@ export function SourceConnectModal({
                                     }
                                     disabled={isLoading}
                                     placeholder="SprintStartProject, SprintStartProject/sprintstart-backend, or GitHub URL"
-                                    className="mt-2 w-full rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="mt-2"
                                 />
                             </div>
 
@@ -211,7 +213,7 @@ export function SourceConnectModal({
                                     Repository name
                                 </label>
 
-                                <input
+                                <Input
                                     id="github-repository-name"
                                     value={repositoryName}
                                     onChange={(event) =>
@@ -221,7 +223,7 @@ export function SourceConnectModal({
                                     }
                                     disabled={isLoading}
                                     placeholder="sprintstart-backend (optional when owner field contains owner/repo)"
-                                    className="mt-2 w-full rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="mt-2"
                                 />
                             </div>
 
@@ -233,14 +235,14 @@ export function SourceConnectModal({
                                     GitHub access token
                                 </label>
 
-                                <select
+                                <Select
                                     id="github-token-name"
                                     value={tokenName}
                                     onChange={(event) =>
                                         onTokenNameChange(event.target.value)
                                     }
                                     disabled={isLoading || !hasGithubTokens}
-                                    className="mt-2 w-full rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="mt-2"
                                 >
                                     {hasGithubTokens ? (
                                         tokenNames.map((name) => (
@@ -253,7 +255,7 @@ export function SourceConnectModal({
                                             No saved tokens available
                                         </option>
                                     )}
-                                </select>
+                                </Select>
 
                                 {!hasGithubTokens && (
                                     <p className="mt-2 text-sm text-app-warning-text">

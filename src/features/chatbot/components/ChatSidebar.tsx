@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { MessageSquareText, Plus, Search } from "lucide-react";
+import { Input } from "../../../components/ui/Input";
 import type { ChatSidebarProps } from "../types";
 import { dateBucketLabel, formatRelativeDate } from "../format";
 
@@ -73,20 +74,15 @@ export function ChatSidebar({ chats, setSidebarOpen }: ChatSidebarProps) {
             </NavLink>
 
             {chats.length > 0 && (
-                <div className="relative">
-                    <Search
-                        size={14}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-app-text-subtle pointer-events-none"
-                    />
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        aria-label="Search conversations"
-                        placeholder="Search..."
-                        className="w-full rounded-lg border border-app-border bg-app-bg pl-8 pr-3 py-2 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus-visible:ring-2 focus-visible:ring-app-focus/50"
-                    />
-                </div>
+                <Input
+                    size="sm"
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    aria-label="Search conversations"
+                    placeholder="Search..."
+                    icon={<Search size={14} />}
+                />
             )}
 
             {chats.length === 0 ? (

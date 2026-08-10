@@ -115,6 +115,42 @@ only this repository gets the full set of frontend rules here.
   `rounded-xl` for standard controls and small cards, `rounded-2xl` for content
   cards and panels. Reserve `rounded-full` for avatars, badges, and pills.
 
+- **Text controls are [`ui/Input`](../src/components/ui/Input.tsx),
+  [`ui/Textarea`](../src/components/ui/Textarea.tsx) and
+  [`ui/Select`](../src/components/ui/Select.tsx).** They share `FieldSize` with
+  `Button`, so a control and a button in the same row are the same height. Use
+  `icon` for a leading search/key glyph and `trailing` for an action pinned
+  inside the right edge, rather than positioning them absolutely by hand.
+
+- **Wrap a labelled control in [`ui/Field`](../src/components/ui/Field.tsx).**
+  It generates the id, binds the `<label>`, collects `hint` and `error` into
+  `aria-describedby` and sets `aria-invalid` — the wiring hand-written forms
+  keep forgetting. Pass the message to `error`; do not render your own `<p>`
+  below the field, or screen readers will never hear it.
+
+  ```tsx
+  <Field label="Token name" hint="Shown in the token list." error={nameError}>
+      <Input value={name} onChange={(e) => setName(e.target.value)} />
+  </Field>
+  ```
+
+  Hand-written markup stays right for composite controls where the box is
+  shared — the "Every _n_ minutes" row, the chat composer, the borderless quick
+  chat field — and for checkboxes, radios and file pickers, which are a
+  different anatomy.
+
+- **A `Textarea` grows with its content.** That is the default; set `minRows`
+  and `maxRows` rather than a fixed `h-*` or a `rows`. Reach for
+  `autoResize={false}` only when a height genuinely must not move, and say why
+  in a comment. A control that is styled identically to its neighbour but
+  behaves differently is worse than one that looks different too.
+
+  A textarea that cannot use `Textarea` — borderless, inside a shared box —
+  still shares the behaviour via
+  [`useAutoResize`](../src/components/ui/useAutoResize.ts). Do not re-implement
+  the height maths inline: every hand-rolled copy so far forgot to shrink the
+  field again when the value was reset from the outside.
+
 ---
 
 ## 5. Accessibility (WCAG 2.1 AA)

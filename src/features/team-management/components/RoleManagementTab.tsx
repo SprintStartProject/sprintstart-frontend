@@ -15,6 +15,8 @@ import {
 } from 'framer-motion';
 import { AlertDialog } from '../../../components/ui/AlertDialog';
 import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { Textarea } from '../../../components/ui/Textarea';
 import { UserAvatar } from '../../../components/common/UserAvatar';
 import { RoleCard } from './RoleCard';
 import {
@@ -385,8 +387,6 @@ export function RoleManagementTab({
     const roleToDelete = roles.find((role) => role.id === deleteRoleId);
     const skillToRetire = skills.find((skill) => skill.id === retireSkillId);
 
-    const inputClassName =
-        'w-full rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong';
 
     return (
         <>
@@ -533,14 +533,13 @@ export function RoleManagementTab({
                                     >
                                         Name
                                     </label>
-                                    <input
+                                    <Input
                                         id="new-role-name"
                                         value={roleName}
                                         onChange={(event) =>
                                             setRoleName(event.target.value)
                                         }
                                         placeholder="e.g. Backend"
-                                        className={inputClassName}
                                     />
                                 </div>
 
@@ -551,7 +550,7 @@ export function RoleManagementTab({
                                     >
                                         Description
                                     </label>
-                                    <textarea
+                                    <Textarea
                                         id="new-role-description"
                                         value={roleDescription}
                                         onChange={(event) =>
@@ -559,9 +558,9 @@ export function RoleManagementTab({
                                                 event.target.value,
                                             )
                                         }
-                                        rows={2}
+                                        minRows={2}
+                                        maxRows={8}
                                         placeholder="What this role is responsible for"
-                                        className={`${inputClassName} resize-none`}
                                     />
                                 </div>
 
@@ -891,7 +890,7 @@ export function RoleManagementTab({
                                             >
                                                 Add skill to {selectedRole.name}
                                             </label>
-                                            <input
+                                            <Input
                                                 id="new-skill-name"
                                                 value={skillName}
                                                 onChange={(event) =>
@@ -900,7 +899,6 @@ export function RoleManagementTab({
                                                     )
                                                 }
                                                 placeholder="Add skill, e.g. React"
-                                                className={inputClassName}
                                             />
 
                                             <div className="flex justify-end">

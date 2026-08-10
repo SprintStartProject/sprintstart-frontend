@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { Field } from '../../../components/ui/Field';
+import { Input } from '../../../components/ui/Input';
 import { parseApiError, describeRefreshFailure } from '../../../services/apiError';
 import { addGithubPat } from '../../../services/sources/githubService';
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from '../utils/patValidation';
@@ -89,36 +91,25 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
             </div>
 
             <div className="space-y-3">
-                <div>
-                    <label
-                        htmlFor="settings-add-token-name"
-                        className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                    >
-                        Token name
-                    </label>
-                    <input
+                <Field label="Token name" controlId="settings-add-token-name" disabled={isSaving}>
+                    <Input
                         ref={nameInputRef}
-                        id="settings-add-token-name"
                         data-testid="settings-add-token-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="e.g. default"
                         required
                         maxLength={64}
-                        disabled={isSaving}
-                        className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                     />
-                </div>
+                </Field>
 
-                <div>
-                    <label
-                        htmlFor="settings-add-token-value"
-                        className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                    >
-                        Token (ghp_...)
-                    </label>
-                    <input
-                        id="settings-add-token-value"
+                <Field
+                    label="Token (ghp_...)"
+                    controlId="settings-add-token-value"
+                    hint="The token value is stored encrypted and cannot be retrieved after saving."
+                    disabled={isSaving}
+                >
+                    <Input
                         data-testid="settings-add-token-value"
                         type="password"
                         value={token}
@@ -126,13 +117,8 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
                         placeholder="ghp_... or github_pat_..."
                         required
                         autoComplete="off"
-                        disabled={isSaving}
-                        className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                     />
-                    <p className="mt-1.5 text-xs text-app-text-subtle">
-                        The token value is stored encrypted and cannot be retrieved after saving.
-                    </p>
-                </div>
+                </Field>
 
                 {error && (
                     <p role="alert" className="text-sm text-app-danger-text">

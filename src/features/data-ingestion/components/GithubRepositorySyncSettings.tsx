@@ -1,6 +1,8 @@
 import { CalendarClock } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
+import { Select } from "../../../components/ui/Select.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
 import type {
@@ -296,19 +298,19 @@ export function GithubRepositorySyncSettings({
           >
             Schedule
           </label>
-          <select
+          <Select
             id={scheduleTypeId}
             value={scheduleType}
             disabled={isBusy}
             onChange={(event) => setScheduleType(event.target.value as ScheduleType)}
-            className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           >
             {SCHEDULE_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
                 {type.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {scheduleType === "INTERVAL" && (
@@ -336,30 +338,30 @@ export function GithubRepositorySyncSettings({
         )}
 
         {usesTimeInput && (
-          <label className="block">
+          <label htmlFor={timeInputId} className="block">
             <span className="text-sm font-medium text-app-text">Time</span>
-            <input
+            <Input
               id={timeInputId}
               type="time"
               step="1"
               value={time}
               disabled={isBusy}
               onChange={(event) => setTime(event.target.value)}
-              className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2"
             />
           </label>
         )}
 
         {scheduleType === "CUSTOM" && (
-          <label className="block">
+          <label htmlFor={cronInputId} className="block">
             <span className="text-sm font-medium text-app-text">Cron</span>
-            <input
+            <Input
               id={cronInputId}
               type="text"
               value={cron}
               disabled={isBusy}
               onChange={(event) => setCron(event.target.value)}
-              className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 font-mono text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 font-mono"
             />
           </label>
         )}
@@ -395,9 +397,9 @@ export function GithubRepositorySyncSettings({
       )}
 
       {scheduleType === "MONTHLY" && (
-        <label className="mt-4 block max-w-48">
+        <label htmlFor={dayOfMonthInputId} className="mt-4 block max-w-48">
           <span className="text-sm font-medium text-app-text">Day of month</span>
-          <input
+          <Input
             id={dayOfMonthInputId}
             type="number"
             min="1"
@@ -405,7 +407,7 @@ export function GithubRepositorySyncSettings({
             value={dayOfMonth}
             disabled={isBusy}
             onChange={(event) => setDayOfMonth(event.target.value)}
-            className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           />
         </label>
       )}

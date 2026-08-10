@@ -1,5 +1,6 @@
 import { Search, RefreshCw } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
 import { SegmentedTabs } from '../../../components/ui/SegmentedTabs';
 
 import { TABS, type KnowledgeTab } from '../tabs';
@@ -39,32 +40,30 @@ export function ArtifactFilters({
 }: ArtifactFiltersProps) {
     return (
         <div className="flex flex-col gap-6 mb-6">
-            <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted" />
-                <input
-                    type="text"
-                    placeholder="Search knowledge base..."
-                    value={searchQuery}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    className="w-full rounded-xl border border-app-border/70 bg-app-surface/70 py-2 pl-9 pr-12 text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-brand/20"
-                    data-testid="kb-search-input"
-                    aria-label="Search knowledge base"
-                />
-                {onRefresh && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        iconOnly
-                        onClick={onRefresh}
-                        disabled={isRefreshing}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2"
-                        title="Refresh Knowledge Base"
-                        aria-label="Refresh knowledge base"
-                    >
-                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-app-brand' : ''}`} />
-                    </Button>
-                )}
-            </div>
+            <Input
+                type="text"
+                placeholder="Search knowledge base..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                data-testid="kb-search-input"
+                aria-label="Search knowledge base"
+                icon={<Search className="h-4 w-4" />}
+                trailing={
+                    onRefresh && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            onClick={onRefresh}
+                            disabled={isRefreshing}
+                            title="Refresh Knowledge Base"
+                            aria-label="Refresh knowledge base"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-app-brand' : ''}`} />
+                        </Button>
+                    )
+                }
+            />
 
             <SegmentedTabs
                 value={activeTab}

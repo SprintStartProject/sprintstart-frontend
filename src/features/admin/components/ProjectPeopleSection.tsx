@@ -10,6 +10,7 @@ import {
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import type { ProjectManager } from "../../../services/projectService";
 import {
   resolvePeopleDraft,
@@ -247,17 +248,15 @@ export function ProjectPeopleSection({
         </p>
       </div>
 
-      <div className="relative mb-4">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search or add people..."
-          aria-label="Search or add people"
-          disabled={disabled}
-          className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-10 pr-3 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
-        />
-      </div>
+      <Input
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Search or add people..."
+        aria-label="Search or add people"
+        disabled={disabled}
+        icon={<Search className="h-4 w-4" />}
+        className="mb-4"
+      />
 
       {visibleRows.length > 0 ? (
         <ul className="space-y-2">

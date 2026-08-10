@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { Search, Users } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "./SelectionCheckbox";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -69,21 +70,15 @@ export function MemberPicker({
         </span>
       </div>
 
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled"
-          aria-hidden="true"
-        />
-        <input
-          id={searchInputId}
-          type="search"
-          value={search}
-          disabled={disabled}
-          placeholder="Filter by name, username or email"
-          onChange={(event) => setSearch(event.target.value)}
-          className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-9 pr-3 text-sm font-medium text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
-        />
-      </div>
+      <Input
+        id={searchInputId}
+        type="search"
+        value={search}
+        disabled={disabled}
+        placeholder="Filter by name, username or email"
+        onChange={(event) => setSearch(event.target.value)}
+        icon={<Search className="h-4 w-4" />}
+      />
 
       {visibleUsers.length > 0 && (
         <Button

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../../components/ui/Button';
+import { Field } from '../../../components/ui/Field';
+import { Input } from '../../../components/ui/Input';
 import { UserAvatar } from '../../../components/common/UserAvatar';
 import type { UserProfile } from '../../../services/types';
 
@@ -99,41 +101,32 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
 
             <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-1">
-                        <label htmlFor="firstName" className="text-sm font-medium text-app-text">First Name</label>
-                        <input
-                            id="firstName"
+                    <Field label="First Name" controlId="firstName">
+                        <Input
                             type="text"
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
-                            className="w-full rounded-lg border border-app-border bg-app-bg px-3 py-2 text-app-text transition-colors focus:border-app-brand focus:outline-none focus:ring-1 focus:ring-app-brand"
                             required
                         />
-                    </div>
-                    <div className="space-y-1">
-                        <label htmlFor="lastName" className="text-sm font-medium text-app-text">Last Name</label>
-                        <input
-                            id="lastName"
+                    </Field>
+                    <Field label="Last Name" controlId="lastName">
+                        <Input
                             type="text"
                             value={lastName}
                             onChange={(e) => setLastName(e.target.value)}
-                            className="w-full rounded-lg border border-app-border bg-app-bg px-3 py-2 text-app-text transition-colors focus:border-app-brand focus:outline-none focus:ring-1 focus:ring-app-brand"
                             required
                         />
-                    </div>
+                    </Field>
                 </div>
-                
-                <div className="space-y-1">
-                    <label htmlFor="email" className="text-sm font-medium text-app-text">Email Address</label>
-                    <input
-                        id="email"
+
+                <Field label="Email Address" controlId="email">
+                    <Input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-lg border border-app-border bg-app-bg px-3 py-2 text-app-text transition-colors focus:border-app-brand focus:outline-none focus:ring-1 focus:ring-app-brand"
                         required
                     />
-                </div>
+                </Field>
 
                 <div className="pt-4">
                     <Button variant="primary" type="submit" loading={isSaving}>

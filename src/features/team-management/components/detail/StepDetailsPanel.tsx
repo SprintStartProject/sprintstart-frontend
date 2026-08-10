@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
 import { Button } from '../../../../components/ui/Button';
+import { Input } from '../../../../components/ui/Input';
 import { DragHandle } from '../../../../components/ui/DragHandle';
 import { SidePanel } from '../../../../components/ui/SidePanel';
 import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
@@ -130,14 +131,14 @@ export function StepDetailsPanel({
                         </p>
 
                         <div className="mt-3 flex justify-end gap-2">
-                            <button
-                                type="button"
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={onCancelDeleteStep}
                                 disabled={stepActionId === step.id}
-                                className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-xs font-medium text-app-text hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Cancel
-                            </button>
+                            </Button>
 
                             <Button
                                 variant="danger"
@@ -678,17 +679,18 @@ function NewTaskForm({
 }) {
     return (
         <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft p-3">
-            <input
+            <Input
                 value={title}
                 onChange={(event) => onTitleChange(event.target.value)}
                 placeholder="Task title"
-                className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
+                aria-label="Task title"
             />
-            <input
+            <Input
                 value={description}
                 onChange={(event) => onDescriptionChange(event.target.value)}
                 placeholder="Optional description"
-                className="mt-2 w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
+                aria-label="Task description"
+                className="mt-2"
             />
             <div className="mt-3 flex justify-end gap-2">
                 <button

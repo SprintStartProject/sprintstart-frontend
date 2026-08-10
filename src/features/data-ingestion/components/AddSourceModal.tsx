@@ -1,7 +1,9 @@
 import { AlertTriangle, ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
+import { Input } from "../../../components/ui/Input.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
+import { Select } from "../../../components/ui/Select.tsx";
 import { Stepper } from "../../../components/ui/Stepper.tsx";
 import {
   addRepositoryToProject,
@@ -437,8 +439,6 @@ function SingleRepositoryStep({
   onSubmit: () => void;
 }) {
   const hasTokens = tokenNames.length > 0;
-  const fieldClassName =
-    "mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <form
@@ -470,13 +470,13 @@ function SingleRepositoryStep({
           >
             Repository owner
           </label>
-          <input
+          <Input
             id="single-repo-owner"
             value={owner}
             onChange={(event) => onOwnerChange(event.target.value)}
             disabled={isBusy || !hasTokens}
             placeholder="octocat or octocat/hello-world"
-            className={fieldClassName}
+            className="mt-2"
           />
         </div>
 
@@ -487,13 +487,13 @@ function SingleRepositoryStep({
           >
             Repository name
           </label>
-          <input
+          <Input
             id="single-repo-name"
             value={repositoryName}
             onChange={(event) => onRepositoryNameChange(event.target.value)}
             disabled={isBusy || !hasTokens}
             placeholder="hello-world"
-            className={fieldClassName}
+            className="mt-2"
           />
         </div>
       </div>
@@ -505,12 +505,12 @@ function SingleRepositoryStep({
         >
           Access token
         </label>
-        <select
+        <Select
           id="single-repo-token"
           value={tokenName}
           onChange={(event) => onTokenNameChange(event.target.value)}
           disabled={isBusy || !hasTokens}
-          className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-2"
         >
           {hasTokens ? (
             tokenNames.map((name) => (
@@ -521,7 +521,7 @@ function SingleRepositoryStep({
           ) : (
             <option value="">No saved tokens</option>
           )}
-        </select>
+        </Select>
       </div>
 
       <p className="text-xs text-app-text-subtle">
