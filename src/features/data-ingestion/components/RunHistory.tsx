@@ -15,8 +15,8 @@ type RunHistoryProps = {
     runs: IngestionRun[];
     selectedRunId?: string | null;
     onSelectRun?: (run: IngestionRun) => void;
-    /** Maps a run to its repository label; falls back to the source-system label. */
-    sourceLabelByRunId?: Map<string, string>;
+    /** Maps a run's source reference to its display name; falls back to the raw reference. */
+    sourceLabelBySourceRef?: Map<string, string>;
     /** Shown in the empty state when the emptiness is caused by active filters. */
     isFiltered?: boolean;
 };
@@ -29,7 +29,7 @@ export function RunHistory({
     runs,
     selectedRunId = null,
     onSelectRun,
-    sourceLabelByRunId,
+    sourceLabelBySourceRef,
     isFiltered = false,
 }: RunHistoryProps) {
     if (runs.length === 0) {
@@ -82,7 +82,7 @@ export function RunHistory({
                         >
                             <div>
                                 <p className="text-sm font-semibold text-app-text">
-                                    {getRunSourceLabel(run, sourceLabelByRunId)}
+                                    {getRunSourceLabel(run, sourceLabelBySourceRef)}
                                 </p>
 
                                 <p className="mt-1 break-all text-xs text-app-text-subtle">

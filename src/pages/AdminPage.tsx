@@ -595,6 +595,7 @@ export function AdminPage() {
                 <TokensTab
                   tokenNames={tokenNames}
                   onRefresh={() => void loadTokenNames()}
+                  userEmail={profile?.email ?? null}
                 />
               )}
             </SlidingTabPanel>
@@ -687,7 +688,6 @@ export function AdminPage() {
       <CreateProjectWizard
         isOpen={isCreateWizardOpen}
         tokenNames={tokenNames}
-        users={users}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
       />

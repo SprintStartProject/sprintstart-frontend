@@ -1,11 +1,15 @@
 import { ChevronRight, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { buttonHoverMotion } from "../../../styles/tokens.ts";
-import { formatNumber } from "../data.ts";
+import {
+  deriveConnectionStatus,
+  deriveSyncStatus,
+  formatJiraInstanceDomain,
+  formatNumber,
+} from "../data.ts";
 import type { DataSource } from "../types.ts";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
-import { SourceSyncBadge } from "./SourceSyncBadge.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
 type SourceListProps = {
@@ -97,12 +101,18 @@ export function SourceList({
                       </p>
                     )}
 
+                    {source.jiraInstance?.instanceUrl && (
+                      <p className="mt-0.5 break-words text-xs text-app-text-subtle">
+                        {formatJiraInstanceDomain(source.jiraInstance.instanceUrl)}
+                      </p>
+                    )}
+
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <SourceTypeBadge type={source.type} />
 
-                      <SourceStatusChip status={source.statusView} />
+                      <SourceStatusChip status={deriveConnectionStatus(source)} />
 
-                      <SyncStatusBadge source={source} />
+                      <SourceStatusChip status={deriveSyncStatus(source)} />
                     </div>
                   </div>
                 </div>
@@ -156,23 +166,6 @@ export function SourceList({
       })}
     </div>
   );
-}
-
-/**
- * Hides the sync badge when it would only repeat the status chip's own label
- * (e.g. an in-flight "Syncing"/"Running" pair, or a duplicated "Not synced").
- */
-function SyncStatusBadge({ source }: { source: DataSource }) {
-  const label = source.ingestionStatusLabel;
-
-  if (
-    source.statusView.state === "syncing" ||
-    label === source.statusView.label
-  ) {
-    return null;
-  }
-
-  return <SourceSyncBadge label={label} status={source.ingestionStatus} />;
 }
 
 function InfoBlock({
