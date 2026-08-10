@@ -35,12 +35,13 @@ Copy `.env.example` → `.env` and point Keycloak at the right IAM instance befo
 | Dev server (`:5173`)            | `npm run dev`                                                 |
 | Production build                | `npm run build` (runs `tsc -b` + `vite build`)                |
 | Lint                            | `npm run lint`                                                |
+| Format / check formatting       | `npm run format` / `npm run format:check`                     |
 | Unit tests                      | `npm run test`                                                |
 | Storybook                       | `npm run storybook`                                           |
 | Keycloak theme dev / build      | `npm run dev-keycloak-theme` / `npm run build-keycloak-theme` |
 | Full stack via Docker (`:3000`) | `docker compose up --build`                                   |
 
-**Definition of Done (frontend):** `npm run lint` **and** `npm run build` pass, relevant unit tests pass, and new/changed code is documented per §6.
+**Definition of Done (frontend):** `npm run lint`, `npm run format:check` **and** `npm run build` pass, relevant unit tests pass, and new/changed code is documented per §6. `npm run try` runs the whole chain in one go.
 
 ---
 
@@ -120,6 +121,28 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 - **Contrast:** meet **WCAG 2.1 AA** for text and interactive elements.
 - **Focus:** keep visible focus via the `--app-focus` token (`focus-visible:ring-app-focus`) — don't remove outlines.
 
+### Shared UI primitives — use them, don't rebuild them
+
+`src/components/ui/` holds the primitives. Every one of them exists because the same widget had drifted into a dozen slightly different versions. **Reach for the component first; if it can't do what you need, extend the component — never patch it at the call site.**
+
+| Need                   | Use                                        | Not                                             |
+| ---------------------- | ------------------------------------------ | ----------------------------------------------- |
+| Any action control     | `ui/Button`                                | a hand-styled `<button>` or `<motion.button>`   |
+| Text field / dropdown  | `ui/Input`, `ui/Select`, `ui/Textarea`     | a bare `<input>` / `<select>` / `<textarea>`    |
+| Label + hint + error   | `ui/Field`                                 | a `<label>` next to an input, wired by hand     |
+| Status pill            | `ui/Badge`                                 | `rounded-full … px-2 … text-xs` on a `<span>`   |
+| Dialog / drawer        | `ui/Modal`, `ui/SidePanel`                 | a hand-rolled `fixed inset-0` overlay           |
+| Waiting                | `ui/Spinner`, or `Button`'s `loading` prop | a bare `<Loader2 className="animate-spin" />`   |
+| Nothing to show        | `ui/EmptyState`                            | an ad-hoc centred `<p>`                         |
+| Background scroll lock | `ui/useScrollLock`                         | setting `document.body.style.overflow` yourself |
+
+The primitives already carry the focus ring, the 44px touch target, the `disabled` / `aria-busy` treatment, the hover motion, the `aria-describedby` wiring for errors, and the focus trap. Rebuilding one by hand means getting all of that right again, which is how the drift started.
+
+- **Radius scale:** `rounded-lg` dense controls · `rounded-xl` standard controls and surfaces nested inside a card · `rounded-2xl` the card itself · `rounded-full` avatars/badges/pills · `rounded-3xl`+ dialog chrome only.
+- **Shadow scale:** `shadow-sm` card at rest · `hover:shadow-lg` that card hovered · `shadow-xl`/`2xl` dialogs. `hover:shadow-app-brand-lift` belongs to `Button variant="primary"` alone.
+
+Legitimate exceptions are listed in [docs/FRONTEND_CODING_STANDARDS.md §4](./docs/FRONTEND_CODING_STANDARDS.md) — clickable cards and list rows, `aria-pressed` toggles and filter chips, `role="menuitem"` / combobox triggers, and the game surfaces. Everything else is a `Button`.
+
 ---
 
 ## 8. Responsive design
@@ -134,7 +157,8 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 
 ## 9. Accessibility (WCAG 2.1 AA)
 
-- Icon-only buttons need an `aria-label`.
+- Icon-only buttons need an `aria-label` (`ui/Button` with `iconOnly` still needs you to pass one).
+- Form fields need a label **and**, when they can show an error or a hint, an `aria-describedby` pointing at it — `ui/Field` wires both plus `aria-invalid` for you.
 - Keep semantic HTML and label form fields; respect the `jsx-a11y` lint rules (don't disable them casually).
 - Keyboard-navigable interactive elements with visible focus (see §7).
 
@@ -151,6 +175,7 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 ## 11. Animation (brief)
 
 - Use the **centralized spring transition tokens** (uniform velocity/stiffness) — don't inline ad-hoc spring configs. Canonical implementation: [`src/styles/tokens.ts`](./src/styles/tokens.ts), exporting `centralSpringToken` and `hoverSpringToken`.
+- **Don't add hover motion to buttons by hand.** `ui/Button` renders a `motion.button` with `buttonHoverMotion` built in, and honours `prefers-reduced-motion` and `disabled`. That it used to be opt-in is why half the refresh buttons reacted to hover and half didn't.
 - Wrap dynamically added/removed elements (lists, drawers) in `<AnimatePresence>` to avoid clipping on exit.
 - See [docs/FRONTEND_ARCHITECTURE.md §8](./docs/FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12) for the full animation system.
 
