@@ -38,7 +38,11 @@ export type ConnectionStatus =
  * from `IngestionRunStatus`. A run can show COMPLETED (fetched and saved locally)
  * while this is still PENDING or has moved to FAILED -- that gap is why this exists.
  */
-export type AiSyncStatus = "NOT_APPLICABLE" | "PENDING" | "SUCCEEDED" | "FAILED";
+export type AiSyncStatus =
+  | "NOT_APPLICABLE"
+  | "PENDING"
+  | "SUCCEEDED"
+  | "FAILED";
 
 export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST";
 
@@ -106,11 +110,19 @@ export type IngestionRun = {
  */
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
-  /** `"owner/name"`. */
+  /**
+   * Stable, connector-neutral key: GitHub `"owner/name"`, Jira the instance URL.
+   */
   sourceId: string;
-  repositoryId: string;
-  owner: string;
-  name: string;
+  /** Display name: GitHub `"owner/name"`, Jira the instance's display name. */
+  displayName: string;
+  /**
+   * GitHub-only repository identity. Null for connector-neutral rows such as
+   * Jira, which are identified by {@link sourceId} (the instance URL) instead.
+   */
+  repositoryId: string | null;
+  owner: string | null;
+  name: string | null;
   sourceUrl: string;
   /**
    * Connection health of the repo. Deliberately NOT called `status`: an
@@ -147,7 +159,14 @@ export type IngestionRunFilter = {
   page?: number;
   size?: number;
   sourceSystem?: SourceSystem;
+  /** GitHub repository UUID; matches runs of that repository. */
   repositoryId?: string;
+  /**
+   * Connector-neutral source-instance reference (the run's `sourceInstanceRef`).
+   * For Jira this is the instance URL, letting the history be scoped to a single
+   * Jira instance the way `repositoryId` scopes it to a GitHub repository.
+   */
+  sourceRef?: string;
   projectId?: string;
   status?: IngestionRunStatus;
   /** ISO datetime; inclusive lower bound on `startedAt`. */
@@ -169,6 +188,19 @@ export type GithubRepositoryDetails = GithubRepositoryReference & {
   fullName: string;
   url: string;
   enabled: boolean | null;
+};
+
+/**
+ * Jira-specific identity for a source card, mirroring
+ * {@link GithubRepositoryDetails} for the Jira connector. A connected Jira
+ * instance is identified by its URL (its primary key); the credential is the
+ * `(credentialUserEmail, credentialName)` pair used to authenticate.
+ */
+export type JiraInstanceSourceDetails = {
+  instanceUrl: string;
+  displayName: string;
+  credentialName: string;
+  credentialUserEmail: string;
 };
 
 export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
@@ -239,6 +271,8 @@ export type SourceDetailsSource = {
   sharesSourceSystem?: boolean;
   failedItems?: FailedArtifact[];
   githubRepository?: GithubRepositoryDetails | null;
+  /** Jira instance identity; null/absent for non-Jira sources. */
+  jiraInstance?: JiraInstanceSourceDetails | null;
   description?: string;
   nextSync?: string;
 };

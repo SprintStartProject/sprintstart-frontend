@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import {
   formatDateTime,
+  formatJiraInstanceDomain,
   formatNumber,
   getAiSyncStatusLabel,
   getRunStatusLabel,
@@ -60,6 +61,7 @@ export function RunDetailsPanel({
   const aiLabel = getAiSyncStatusLabel(run.aiSyncStatus);
   const duration = formatDuration(run.startedAt, run.finishedAt, run.status);
   const repoLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
+  const originRow = buildOriginRow(run);
 
   return (
     <DetailsSideDrawer
@@ -124,6 +126,9 @@ export function RunDetailsPanel({
       <Section title="Timing">
         <dl className="overflow-hidden rounded-xl border border-app-border">
           <InfoRow label="Repository" value={repoLabel} />
+          {originRow && (
+            <InfoRow label={originRow.label} value={originRow.value} />
+          )}
           <InfoRow label="Started" value={formatDateTime(run.startedAt)} />
           <InfoRow
             label="Finished"
@@ -161,6 +166,30 @@ export function RunDetailsPanel({
   );
 }
 
+/**
+ * The connector-specific origin of a run, shown next to the repository in the
+ * details panel: the GitHub owner (from `run.owner`, falling back to the first
+ * segment of `"owner/name"`) or the Jira instance domain (from the instance URL
+ * in `run.sourceId`). Both are already carried on the run, so no extra fetch is
+ * needed. Returns null for uploads and runs with no attributable origin.
+ */
+function buildOriginRow(
+  run: IngestionRun,
+): { label: string; value: string } | null {
+  if (run.sourceSystem === "JIRA") {
+    return run.sourceId
+      ? { label: "Domain", value: formatJiraInstanceDomain(run.sourceId) }
+      : null;
+  }
+
+  if (run.sourceSystem === "GITHUB") {
+    const owner = run.owner ?? run.sourceId?.split("/")[0] ?? null;
+    return owner ? { label: "Owner", value: owner } : null;
+  }
+
+  return null;
+}
+
 type StageState = "ok" | "run" | "warn" | "wait";
 type StageInfo = { title: string; meta: string; state: StageState };
 
@@ -170,7 +199,7 @@ function buildStages(run: IngestionRun): StageInfo[] {
     run.failedCount > 0 ? `, ${formatNumber(run.failedCount)} failed` : "";
 
   const fetchStage: StageInfo = {
-    title: "Fetched from GitHub",
+    title: `Fetched from ${getSourceLabel(run.sourceSystem)}`,
     meta: `${formatNumber(run.ingestedCount + run.failedCount)} items pulled`,
     state: "ok",
   };

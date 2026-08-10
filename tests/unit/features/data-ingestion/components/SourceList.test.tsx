@@ -73,6 +73,36 @@ describe('SourceList', () => {
         expect(screen.getAllByText('Connected').length).toBeGreaterThan(0);
     });
 
+    it('shows the Jira instance domain without the scheme under the name', () => {
+        const sources: DataSource[] = [
+            createMockSource({
+                sourceId: 'https://acme.atlassian.net',
+                sourceSystem: 'JIRA',
+                name: 'Jira Project Board',
+                type: 'Jira',
+                icon: Database,
+                githubRepository: null,
+                jiraInstance: {
+                    instanceUrl: 'https://acme.atlassian.net',
+                    displayName: 'Jira Project Board',
+                    credentialName: 'cred',
+                    credentialUserEmail: 'user@example.com',
+                },
+            }),
+        ];
+
+        render(
+            <SourceList
+                sources={sources}
+                selectedSourceId={null}
+                onSelectSource={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByText('acme.atlassian.net')).toBeInTheDocument();
+        expect(screen.queryByText('https://acme.atlassian.net')).not.toBeInTheDocument();
+    });
+
     it('renders info blocks with formatted values', () => {
         const sources: DataSource[] = [
             createMockSource({
