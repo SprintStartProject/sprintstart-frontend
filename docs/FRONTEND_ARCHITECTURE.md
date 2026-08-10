@@ -38,8 +38,8 @@ and uses **Keycloak** for identity and access management.
 | Routing | **React Router v7** (`react-router-dom` ^7) |
 | Language | **TypeScript** (strict, `verbatimModuleSyntax`) |
 | Build tooling | **Vite 8** |
-| Styling | **Tailwind CSS v4** (semantic design tokens, light/dark themes) |
-| Animation | **Framer Motion 12** (centralized spring tokens) |
+| Styling | **Tailwind CSS v4** (semantic design tokens, light/dark themes, `@tailwindcss/typography`) |
+| Animation | **Framer Motion 12** (centralized spring tokens, layout animations) |
 | Authentication | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11** |
 | Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter` |
 | Icons | `lucide-react` |
@@ -61,14 +61,20 @@ src/
 │   ├── admin/               # User, project & token management
 │   ├── chatbot/             # Streaming AI assistant
 │   ├── connectors/          # Connector + source allow/deny management
+│   ├── dashboard/           # Dashboard widgets (hero, widgets, quick chat)
 │   ├── data-ingestion/      # Sources, ingestion runs, artifacts
+│   ├── dino/                # Dino game (easter egg in chatbot)
+│   ├── easter-eggs/         # Easter egg integrations (keyboard commands, hidden features)
 │   ├── faq/                 # AI FAQ clusters (insights)
+│   ├── game2048/            # 2048 game (easter egg)
 │   ├── knowledge-base/      # Artifact browsing + streamed summaries
 │   ├── knowledge-gaps/      # AI-detected documentation gaps (insights)
+│   ├── moments/             # Celebratory animation layer (rocket, confetti, launch sequence, path reveal — see §8.3)
 │   ├── onboarding/          # AI onboarding paths, checks, skip workflow
 │   ├── profile/             # User profile view/edit
-│   ├── projects/            # Project selection
-│   ├── settings/            # User settings (chat preferences, etc.)
+│   ├── projects/            # Project selection (incl. ProjectProvider context)
+│   ├── settings/            # User settings (appearance, chat preferences, moments toggles)
+│   ├── space-invaders/      # Space Invaders game (easter egg)
 │   └── team-management/     # Team overview, member detail, Skill Wizard
 ├── pages/               # Route-level views (one per user-facing flow)
 ├── router/              # AppRouter.tsx + AuthGuard.tsx
@@ -76,10 +82,13 @@ src/
 ├── context/             # Global providers (Auth, Theme, Chat, ChatPreferences)
 ├── services/            # Backend communication (one module per domain; SSE streaming)
 ├── components/          # Shared UI: common/, layout/, ui/ primitives
+│   ├── common/              # App-level controls
+│   ├── layout/              # Shell, SideBar, drawers, AuroraBackground
+│   └── ui/                  # Low-level primitives (e.g. SpotlightCard, Badge, Modal)
 ├── config/              # Integration config (keycloak.ts)
 ├── hooks/               # Shared hooks
 ├── styles/              # Global CSS (index.css) + animation tokens (tokens.ts)
-├── mocks/               # Dev mock data
+├── mocks/               # Dev mock data (JSON fixtures)
 └── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
 ```
 
@@ -88,7 +97,8 @@ src/
 > for routing types).
 
 **Rule:** new feature work → a `features/<name>/` slice. Promote to `components/` or
-`context/` only when the code is truly shared across features.
+`context/` only when the code is truly shared across features. Games and easter eggs
+belong in `features/` (not a top-level `games/` folder), one per name.
 
 ---
 
@@ -104,6 +114,12 @@ codebase.
 `AppRouter` renders a single `<AuthGuard>` wrapping a `<Routes>` block. Every
 user-facing route is declared as a `<Route element={<Page />} />` entry. Auth is
 handled by the wrapper, not per-route loaders.
+
+Routes that require PM-level project-manager privileges (`/pm-dashboard`,
+`/data-ingestion`) are wrapped in a `ManagerAreaGuard` that checks
+`canManageSelected` from `useProjectContext()` in addition to the user's permission
+group. This blocks URL-based access to manager-only pages when the user is only a
+regular member of the selected project.
 
 ### 4.2 AuthGuard (`src/router/AuthGuard.tsx`)
 
@@ -149,33 +165,64 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
 
 ### 4.4 Actual route list
 
-Declared in `AppRouter.tsx` (17 routes):
+Declared in `AppRouter.tsx`:
 
 ```
 /login                          /team-management
 /skill-wizard                   /team/:userId
 /                               /pm-dashboard
 /chat                           /admin
-/chat/:id                       /insights/faq
-/onboarding                     /insights/faq/:groupId
-/onboarding/:stepId             /insights/knowledge-gaps
-/knowledge-base                 /insights/knowledge-gaps/:gapId
-/data-ingestion                 /profile
+/chat/:id                       /settings
+/onboarding                     /insights/faq
+/onboarding/:stepId             /insights/faq/:groupId
+/knowledge-base                 /insights/knowledge-gaps
+/data-ingestion                 /insights/knowledge-gaps/:gapId
+                                /* (NotFoundPage)
 ```
+
+Notes:
+- `/profile` redirects to `/settings` (they are unified).
+- `/settings` holds appearance controls (theme, aurora, card tilt), chat preferences,
+  and moments configuration.
+- `*` catch-all renders `<NotFoundPage>`.
+- `/data-ingestion` and `/pm-dashboard` are wrapped in `ManagerAreaGuard` — they
+  require both the correct `PermissionGroup` **and** `canManageSelected` on the
+  active project.
 
 ---
 
 ## 5. State management
 
 There is **no global store** (no Redux, Zustand, etc.). Cross-cutting state is
-handled by React Context providers in `src/context/`:
+handled by React Context providers in `src/context/`, arranged in a strict nesting
+order in `src/App.tsx`:
 
 | Provider / hook | File | Responsibility |
 | --- | --- | --- |
+| `ThemeProvider` + `useTheme` | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts` | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice. Also manages `styleMode` (`'ultra'` / `'classic'`), `isAuroraEnabled`, `isTiltEnabled`. |
 | `AuthProvider` + `useAuth` | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts` | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
-| `ThemeProvider` + `useTheme` | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts` | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice. |
+| `ProjectProvider` | `features/projects/ProjectProvider.tsx` | Loads the current project context and `canManageSelected`. Lives inside `AuthProvider` because which projects load depends on the user's permission group. |
 | `ChatProvider` | `ChatProvider.tsx`, `ChatContext.ts` | Active conversation state for the chatbot feature. |
 | `ChatPreferencesProvider` + `useChatPreferences` | `ChatPreferencesProvider.tsx`, `ChatPreferencesContext.ts`, `useChatPreferences.ts` | Per-user chat UI preferences. |
+| `MomentsProvider` | `features/moments/MomentsProvider.tsx` | Celebratory animation state — celebrate queue, flyby, path reveal, launch sequence, rocket pet toggle. Accessed via `useMoments()`. Feature-local but wraps the entire app shell. |
+
+Provider nesting in `App.tsx`:
+
+```
+<ThemeProvider>
+  <AuthProvider>
+    <ProjectProvider>
+      <ChatProvider>
+        <ChatPreferencesProvider>
+          <MomentsProvider>
+            <AppContent />
+          </MomentsProvider>
+        </ChatPreferencesProvider>
+      </ChatProvider>
+    </ProjectProvider>
+  </AuthProvider>
+</ThemeProvider>
+```
 
 Feature-local state stays inside the feature (e.g. `onboarding` step state lives in
 `features/onboarding/`).
@@ -190,7 +237,7 @@ The codebase uses the **native `fetch` API** (not axios). All HTTP calls go thro
 `apiClient.fetch<T>(endpoint, options)`, which:
 
 - Refreshes the Keycloak JWT if it expires in <30s (`keycloak.updateToken(30)`).
-- Injects `Authorization: Bearer <token>` header.
+- Injects `Authorization: Bearer ***` header.
 - Defaults `Content-Type` to `application/json` (unless body is `FormData`).
 - Throws `ApiError` (with `.status`) on non-2xx responses; forces re-auth on 401.
 - Parses JSON, returning `{}` for empty bodies.
@@ -250,34 +297,77 @@ never hardcode colors** (no `#2563eb`, no raw Tailwind colors like `text-blue-50
 
 Semantic roles:
 
-- **Surfaces**: `bg-app-bg`, `bg-app-surface`, `bg-app-surface-muted`
-- **Text**: `text-app-text`, `text-app-text-muted`, `text-app-text-subtle`
-- **Borders**: `border-app-border`, …
-- **Brand**: `bg-app-brand`, `text-app-brand`, …
-- **Status**: `success` / `warning` / `danger` / `neutral`
+- **Surfaces**: `bg-app-bg`, `bg-app-bg-soft`, `bg-app-surface`, `bg-app-surface-muted`, `bg-app-surface-hover`
+- **Text**: `text-app-text`, `text-app-text-muted`, `text-app-text-subtle`, `text-app-text-disabled`, `text-app-text-inverse`
+- **Borders**: `border-app-border`, `border-app-border-muted`, `border-app-border-strong`
+- **Brand**: `bg-app-brand`, `text-app-brand`, `border-app-brand`, `border-app-brand-strong`, `bg-app-brand-soft`, `text-app-brand-text`, `bg-app-brand-glow`
+- **Status**: `success` / `warning` / `danger` / `neutral` / `orange`
   (e.g. `bg-app-success-bg text-app-success-text`)
+- **Accent**: `text-app-accent`, `bg-app-accent-soft` (violet secondary accent)
+- **Glassmorphism**: `bg-app-glass` (utility class `app-glass`), `border-app-glass-border`
+- **Ambient glow**: `bg-app-glow`, `bg-app-glow-accent`, `bg-app-glow-alt`
+- **Progress**: `bg-app-progress-track`, `bg-app-progress-fill`, `bg-app-progress-fill-end`
+- **Overlay / focus**: `bg-app-overlay`, `ring-app-focus`
+- **Fonts**: `font-sans`, `font-heading`, `font-mono`
 
 ### 7.2 Light / dark theme
 
 Controlled via the `.dark` class on `document.documentElement`, managed by
 `ThemeProvider`. The entry CSS uses `@import "tailwindcss"`, `@custom-variant dark`,
 and `@theme inline` to map CSS custom properties into Tailwind tokens. Every color
-works in both themes automatically when you use tokens.
+value is mirrored in both `:root` (light) and `.dark` blocks — using tokens ensures
+automatic theme parity.
 
-### 7.3 Color-blind accessibility (required)
+### 7.3 Style modes: Ultra vs Classic
+
+The app supports two visual styles managed by `ThemeProvider`:
+
+- **`'ultra'`** (default, and the richer experience) — glassmorphic surfaces
+  (`backdrop-filter: blur(20px)`), ambient aurora blobs, cursor-driven spotlight
+  gradients, and blue-print grid overlays. The `.style-classic` class is absent.
+- **`'classic'`** — flat surfaces (`border: 1px solid var(--border)`), no decorative
+  glow or drift animations. Activated by setting `.style-classic` on `<html>`, which
+  CSS rules cascade to disable `.app-aurora`, `.app-spotlight`, `.app-bg-grid`, and
+  revert `.app-glass` to flat backgrounds.
+
+Auto-activation: `'classic'` is the default when the OS reports
+`prefers-reduced-motion: reduce`. The user can override this via the Settings page
+or the sidebar toggle.
+
+### 7.4 Shared CSS utilities (`src/styles/index.css`)
+
+| Utility | Purpose |
+| --- | --- |
+| `app-page-frame` | Responsive page width with `--app-page-gutter` padding |
+| `app-page-shell` | Full-page container (gutter + block padding) |
+| `app-page-content` | Centered content area with `--app-page-max-width` |
+| `app-glass` | Translucent panel with backdrop blur (ultra mode) |
+| `app-aurora` / `app-aurora-alt` | Slowly drifting gradient blobs (ultra mode) |
+| `app-bg-grid` | Blueprint grid overlay (ultra mode) |
+| `app-spotlight` | Mouse-follow radial gradient (ultra mode) |
+
+### 7.5 Reusable UI primitives (`src/components/ui/`)
+
+| Component | Description |
+| --- | --- |
+| `SpotlightCard` | Card wrapper with 3D perspective tilt and cursor-driven spotlight glow. Reads `isTiltEnabled` from ThemeContext; full tilt/spotlight only in ultra mode. |
+| `Badge` | Status/notification badge with semantic color mapping |
+| `Modal` | Dialog surface with shared backdrop + enter/exit animations |
+
+### 7.6 Color-blind accessibility (required)
 
 Never rely on color **alone** to convey meaning. Always back it with an
 **icon, text label, or shape** (e.g. status = chip text + icon, not just red/green)
 — this is why finished/skipped/locked steps use distinct icons *and* labels. Keep
 color pairs distinguishable for common color-vision deficiencies.
 
-### 7.4 Contrast & focus
+### 7.7 Contrast & focus
 
 - Meet **WCAG 2.1 AA** for text and interactive elements.
 - Keep visible focus via the `--app-focus` token (`focus-visible:ring-app-focus`) —
   don't remove outlines.
 
-### 7.5 Stay consistent beyond color
+### 7.8 Stay consistent beyond color
 
 Use the shared Tailwind scale for spacing, radius, and sizing instead of arbitrary
 one-off pixel values, so padding/margins/gaps match the rest of the app.
@@ -290,36 +380,57 @@ The codebase consumes `framer-motion` (^12) directly with inline `motion.` props
 
 ### 8.1 Centralized spring tokens
 
-Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts).
+Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts). All
+motion components should import from here — never inline ad-hoc spring values.
+
+#### Layout & general motion
+
+| Export | Type | When to use |
+| --- | --- | --- |
+| `centralSpringToken` | `Transition` (spring) | Default: layout transitions, list enter/exit, general motion. Settles quickly without overshooting. |
+| `hoverSpringToken` | `Transition` (spring) | Hover/tap micro-interactions. Faster, slightly bouncier. |
+
+#### Navigation & panels
+
+| Export | Type | When to use |
+| --- | --- | --- |
+| `dockMagnifySpringToken` | `Transition` (spring) | Sidebar dock magnification (macOS-style grow/shrink). Almost critically damped. |
+| `slidingIndicatorSpringToken` | `Transition` (spring) | Active indicator pill (`layoutId`). Stiffer to track navigation changes quickly. |
+| `sidePanelSlideToken` | `Transition` (tween) | Side panel slide in/out (tween, not spring — guarantees exact timing for unmount). |
+| `SIDE_PANEL_SLIDE_MS` | `number` | Side panel animation duration (420ms); used as single source of truth for mount/unmount timing. |
+
+#### Page-level & enter transitions
+
+| Export | Type | When to use |
+| --- | --- | --- |
+| `enterTransition` | `Transition` (tween) | Page-level enter (AuroraBackground, etc.). Smooth ease — pairs well with CSS-only layers. |
+| `idleDriftToken` | `Transition` (tween) | Slow decorative breathing loops (ambient glows, perched rocket). No competition for attention. |
+
+#### Celebrations & moments
+
+| Export | Type | When to use |
+| --- | --- | --- |
+| `celebrationSpringToken` | `Transition` (spring) | Celebration cards (knowledge check passed, phase unlocked). Under-damped — the small overshoot reads as reward. |
+| `FLIGHT_DURATION_S` | `number` | Rocket flight duration (1.15s). Shared between rocket and exhaust trail. |
+| `flightEaseToken` | `Transition` (tween) | Exhaust trails and ignition blooms alongside a rocket. |
+| `petPeekSpringToken` | `Transition` (spring) | Rocket pet ducking/leaning animation. Soft and heavy — never reads as a UI panel. |
+
+#### Modals & dialogs
+
+| Export | Type | When to use |
+| --- | --- | --- |
+| `modalBackdropVariants` | `Variants` | Backdrop fade shared by every dialog. Leaves faster than it arrives. |
+| `getModalDialogVariants(prefersReducedMotion)` | `Variants` | Dialog surface enter/exit. Enter: spring with mass (dialog has weight). Exit: short tween (no lag on dismiss). |
+| `buttonHoverMotion` / `buttonHoverMotionDisabled` | `{ whileHover, whileTap, transition }` | Spread onto `motion.button`. Gentle scale (1.03) — safe for dense toolbars. Disabled variant passes `undefined` motions. |
 
 ```typescript
-import type { Transition } from "framer-motion";
-
-/** Default spring for layout transitions, list enter/exit, and general motion.
- *  Snappy but not stiff — settles quickly without overshooting violently. */
-export const centralSpringToken: Transition = {
-    type: "spring",
-    stiffness: 300,
-    damping: 25,
-    mass: 0.8,
-};
-
-/** Lighter spring for hover/tap micro-interactions — faster, slightly bouncier. */
-export const hoverSpringToken: Transition = {
-    type: "spring",
-    stiffness: 400,
-    damping: 15,
-};
-```
-
-**Rule:** use these presets for ALL `motion` transitions — do not inline ad-hoc
-spring configs.
-
-Usage:
-
-```tsx
 import { centralSpringToken } from "@/styles/tokens";
 <motion.div transition={centralSpringToken} ... />
+```
+
+```typescript
+import { buttonHoverMotion } from "@/styles/tokens";
+<motion.button {...buttonHoverMotion}>Save</motion.button>
 ```
 
 ### 8.2 Layout transitions & list deletions
@@ -366,6 +477,29 @@ export function TaskList({ tasks, onDelete }) {
 3. **Key declarations** — the animated child must have a unique, stable `key`. Avoid
    index offsets; use database UUIDs.
 
+### 8.4 The Moments system
+
+The `moments` feature (`src/features/moments/`) is the app's celebratory animation
+layer — deliberately non-functional beats that reward progress. Every moment is
+skippable and the whole layer collapses when the user prefers reduced motion.
+
+| Component | Purpose |
+| --- | --- |
+| `MomentsProvider` | Context provider wrapping the app shell. Queues celebrations, manages flybys, path reveal, and launch sequence. |
+| `LaunchSequence` | Arcing rocket animation on sign-in (played once). |
+| `MomentCelebration` | Celebration card with configurable tone (`success` / `milestone` / `triumph`), optional progress ring, and confetti. |
+| `MissionComplete` | Once-per-person finale for completing the entire onboarding path. Louder than all other celebrations. |
+| `PathReveal` | Rocket-on-the-pad welcome for a newly generated onboarding path. Offers the user a launch, reports back through `onLaunched`. |
+| `RocketFlyby` | Small rocket streak across the screen for frequent wins (step completed). |
+| `RocketPet` | Decorative rocket that peeks from the page corner. Off by default — opt-in via Settings. |
+
+Integration points:
+- Call `useMoments().celebrate(input)` from any page after a completion event.
+- Call `useMoments().flyby()` for small, non-blocking wins.
+- Call `useMoments().revealPath(handlers)` from the onboarding page to offer a
+  path-launch moment.
+- All moments respect `prefers-reduced-motion` and the `'classic'` style mode.
+
 ---
 
 ## 9. Build & dev server
@@ -408,9 +542,40 @@ export function TaskList({ tasks, onDelete }) {
 
 ---
 
-## 10. Deployment
+## 10. Error handling & performance
 
-### 10.1 Docker
+### 10.1 Error handling strategy
+
+- **API errors** are surfaced through `apiClient.fetch<T>()`, which throws `ApiError`
+  (with `.status`). Service functions catch and re-throw typed errors — empty `catch`
+  blocks are forbidden.
+- **React error boundaries** should be placed at the page level in `AppRouter.tsx`.
+  Each page view is a boundary candidate. Global fallback: a minimal "Something went
+  wrong" view with a retry button.
+- **SSE stream errors** (malformed `data:` lines) are logged via `console.warn` and
+  skipped — the stream continues. Connection drops are surfaced to the caller via
+  the generator's `throw`.
+
+### 10.2 Performance patterns
+
+- **Code splitting**: lazy-loaded route pages use `React.lazy()` + default exports
+  (the *only* place default exports are allowed). Feature-local components are
+  eagerly imported.
+- **Memoization**: `React.memo`, `useMemo`, and `useCallback` are used sparingly —
+  only on expensive renders (long lists, animation-intensive surfaces) or when a
+  callback is a dependency of a child's `useEffect`/`useMemo`. Profile before
+  optimizing.
+- **Framer Motion layout animations** (`layout` prop) are preferred over manual
+  width/height transitions — Framer batches the reflow.
+- **Reduced motion**: the `'classic'` style mode (see §7.3) and
+  `prefers-reduced-motion` media query disable all decorative animations. The
+  `streaming-caret` and `.app-aurora` animations are explicitly halted.
+
+---
+
+## 11. Deployment
+
+### 11.1 Docker
 
 - `Dockerfile` — multi-stage build: Node base → builds the Vite app → serves static
   files via nginx.
@@ -418,19 +583,20 @@ export function TaskList({ tasks, onDelete }) {
   `:80`, adds `host.docker.internal` for backend/Keycloak reachability.
 - `nginx.conf` — static file serving + SPA fallback to `index.html`.
 
-### 10.2 Kubernetes
+### 11.2 Kubernetes
 
-`k8s/` (inside this repo, not a separate `sprintstart-k8s` repo) holds per-component
-Kubernetes manifests.
+`k8s/frontend/` (inside this repo, not a separate `sprintstart-k8s` repo) holds
+per-component Kubernetes manifests (configmap, deployment, service, ingress, and a
+backend placeholder).
 
-### 10.3 Keycloak theme
+### 11.3 Keycloak theme
 
 `npm run build-keycloak-theme` produces a Keycloak theme JAR/ZIP under
 `dist_keycloak/` (gitignored) deployable to a Keycloak instance.
 
 ---
 
-## 11. Reference
+## 12. Reference
 
 - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — TS / React / Tailwind / a11y conventions.
 - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.

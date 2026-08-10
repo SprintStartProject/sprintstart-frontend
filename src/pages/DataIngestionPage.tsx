@@ -384,6 +384,11 @@ function StatusBadge({
   );
 }
 
+/**
+ * Ingestion overview for the selected project. Bound to `/data-ingestion`
+ * (PM+HR/ADMIN; PM needs `canManageSelected`).
+ * Combines source cards with a per-source run history table.
+ */
 export function DataIngestionPage() {
   const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();

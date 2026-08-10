@@ -307,7 +307,17 @@ async function fetchAdminProjects(): Promise<AdminProject[]> {
   return projects.map(toAdminProject);
 }
 
+/**
+ * Project CRUD, membership and manager assignment.
+ * Admin-only endpoints throw ApiError 403 for non-admin callers.
+ * Falls back to user-scoped endpoints for PM-level operations.
+ */
 export const projectService = {
+  /**
+   * Lists all projects visible to the current user.
+   * Admins see everything; PMs see managed projects; falls back to the
+   * user's own project list on 401/403.
+   */
   async getProjects(): Promise<AdminProject[]> {
     try {
       return await fetchAdminProjects();
@@ -320,6 +330,9 @@ export const projectService = {
     }
   },
 
+  /**
+   * Fetches a single project's full details. Admin-only endpoint.
+   */
   async getProjectById(projectId: string): Promise<AdminProjectDetails> {
     const project = await apiClient.fetch<BackendAdminProjectDetails>(
       `/api/v1/admin/projects/${projectId}`,
@@ -345,6 +358,9 @@ export const projectService = {
     return toAdminProjectDetails(project);
   },
 
+  /**
+   * Creates a new project. Admin-only.
+   */
   async createProject(
     request: CreateProjectRequest,
   ): Promise<AdminProjectDetails> {
@@ -359,6 +375,9 @@ export const projectService = {
     return toAdminProjectDetails(project);
   },
 
+  /**
+   * Updates project metadata (name, description). Admin-only.
+   */
   async updateProject(
     projectId: string,
     request: UpdateProjectRequest,
@@ -374,6 +393,9 @@ export const projectService = {
     return toAdminProjectDetails(project);
   },
 
+  /**
+   * Permanently deletes a project. Admin-only.
+   */
   async deleteProject(projectId: string): Promise<DeleteProjectResponse> {
     return apiClient.fetch<DeleteProjectResponse>(
       `/api/v1/admin/projects/${projectId}`,
@@ -383,6 +405,9 @@ export const projectService = {
     );
   },
 
+  /**
+   * Returns the users assigned to a project. Admin-only.
+   */
   async getProjectUsers(projectId: string): Promise<ProjectUser[]> {
     const users = await apiClient.fetch<BackendProjectUser[]>(
       `/api/v1/admin/projects/${projectId}/users`,
@@ -391,6 +416,10 @@ export const projectService = {
     return users.map(toProjectUser);
   },
 
+  /**
+   * Assigns one or more users to a project. Admin-only.
+   * Returns the updated member list.
+   */
   async assignUsersToProject(
     projectId: string,
     request: AssignProjectUsersRequest,
@@ -406,6 +435,9 @@ export const projectService = {
     return users.map(toProjectUser);
   },
 
+  /**
+   * Removes a single user from a project. Admin-only.
+   */
   async removeUserFromProject(
     projectId: string,
     userId: string,

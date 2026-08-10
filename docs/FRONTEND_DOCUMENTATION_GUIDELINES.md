@@ -193,12 +193,12 @@ useEffect(() => {
 Document layout transitions, spring tokens, and why `<AnimatePresence>` is used in a specific context.
 
 > [!NOTE]
-> The centralized spring-token module is implemented at
-> [`src/styles/tokens.ts`](../src/styles/tokens.ts), exporting `centralSpringToken`
-> (default layout/list motion) and `hoverSpringToken` (micro-interactions). Use
-> these presets for all `motion` transitions — do not inline ad-hoc spring configs.
-> See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-> for the full animation system.
+> All Framer Motion transition presets are centralized in
+> [`src/styles/tokens.ts`](../src/styles/tokens.ts) — import the tokens you need
+> rather than inlining ad-hoc spring configs. See
+> [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
+> for the full reference (13 presets including `buttonHoverMotion` for consistent
+> button feedback, `modalBackdropVariants` for dialogs, etc.).
 
 ```tsx
 /**

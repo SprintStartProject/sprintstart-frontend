@@ -27,6 +27,10 @@ import { SlidingTabPanel } from '../components/ui/SlidingTabPanel';
 import { useSwipeableTabs } from '../hooks/useHorizontalWheelNavigation';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
 
+/**
+ * Team overview for PM/HR/ADMIN. Bound to `/team-management`.
+ * Tabbed: member list with search/filter, role management, project management.
+ */
 export function TeamManagementPage() {
     const navigate = useNavigate();
     const [users, setUsers] = useState<TeamOverviewUser[]>([]);

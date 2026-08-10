@@ -6,6 +6,10 @@ import type {
 import faqMock  from '../mocks/faqMock.json';
 import faqDetailMock  from '../mocks/faqDetailMock.json';
 
+/**
+ * FAQ insights — recurring question clusters detected by AI.
+ * Fetch methods fall back to mock data on failure; refresh propagates errors.
+ */
 export const insightsService = {
 
     /**

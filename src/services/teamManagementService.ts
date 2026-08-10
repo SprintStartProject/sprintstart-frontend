@@ -78,6 +78,7 @@ function toTeamOverviewProjects(
     : [];
 }
 
+/** Fetch the team overview with optional role, sort, and project filters. Falls back to mock data on error. */
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,
@@ -127,6 +128,7 @@ export async function getTeamOverview(
   }
 }
 
+/** Look up a single team member by user ID. */
 export async function getTeamMember(
   userId: string,
 ): Promise<TeamOverviewUser | undefined> {
@@ -135,6 +137,7 @@ export async function getTeamMember(
   return users.find((user) => user.userId === userId);
 }
 
+/** Fetch the team-overview profile of the currently authenticated user. Falls back to mock data on error. */
 export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
   try {
     const user = await apiClient.fetch<BackendTeamOverviewUser>(
@@ -154,6 +157,7 @@ export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
   }
 }
 
+/** Fetch all project roles. Falls back to mock data on error. */
 export async function getProjectRoles(): Promise<ProjectRole[]> {
   try {
     const response = await apiClient.fetch<
@@ -166,6 +170,7 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
   }
 }
 
+/** Create a new project role. Falls back to a mock role on error. */
 export async function createProjectRole(
   name: string,
   description: string,
@@ -191,6 +196,7 @@ export async function createProjectRole(
   }
 }
 
+/** Assign a project role to a user. Falls back to mock state on error. */
 export async function assignProjectRoleToUser(
   userId: string,
   roleId: string,
@@ -228,6 +234,7 @@ export async function assignProjectRoleToUser(
   }
 }
 
+/** Remove a project role from a user. Falls back to mock state on error. */
 export async function unassignProjectRoleFromUser(
   userId: string,
   roleId: string,
@@ -263,6 +270,7 @@ type PmAttentionListener = () => void;
 
 const pmAttentionListeners = new Set<PmAttentionListener>();
 
+/** Subscribe to PM-attention-state changes. Returns an unsubscribe function. */
 export function onPmAttentionChanged(listener: PmAttentionListener): () => void {
   pmAttentionListeners.add(listener);
   return () => {
@@ -276,6 +284,7 @@ function notifyPmAttentionChanged(): void {
   });
 }
 
+/** Approve an onboarding skip request. Notifies PM-attention listeners. */
 export async function acceptOnboardingSkipRequest(
   skipId: string,
   reviewComment = "",
@@ -290,6 +299,7 @@ export async function acceptOnboardingSkipRequest(
   notifyPmAttentionChanged();
 }
 
+/** Deny an onboarding skip request. Notifies PM-attention listeners. */
 export async function denyOnboardingSkipRequest(
   skipId: string,
   reviewComment = "",
@@ -317,6 +327,7 @@ export type OnboardingFeedback = {
   readAt?: string | null;
 };
 
+/** Fetch onboarding feedback for a specific user (admin). */
 export async function getUserOnboardingFeedback(
   userId: string,
 ): Promise<OnboardingFeedback[]> {
@@ -330,6 +341,7 @@ export async function getUserOnboardingFeedback(
   }));
 }
 
+/** Fetch all onboarding feedback (admin). */
 export async function getAllOnboardingFeedback(): Promise<
   OnboardingFeedback[]
 > {
@@ -343,6 +355,7 @@ export async function getAllOnboardingFeedback(): Promise<
   }));
 }
 
+/** Mark a piece of onboarding feedback as read. Notifies PM-attention listeners. */
 export async function markOnboardingFeedbackRead(
   feedbackId: string,
 ): Promise<void> {
@@ -356,6 +369,7 @@ export async function markOnboardingFeedbackRead(
   notifyPmAttentionChanged();
 }
 
+/** Fetch a user's full onboarding path with hydrated phases and steps. Returns null on error. */
 export async function getUserOnboardingPath(
   userId: string,
 ): Promise<OnboardingPathEndpoint | null> {
@@ -424,6 +438,7 @@ export type CreateOnboardingTaskRequest = {
   finished?: boolean;
 };
 
+/** Create a new onboarding step within a phase. */
 export async function createOnboardingStepForPhase(
   phaseId: string,
   request: CreateOnboardingStepRequest,
@@ -437,6 +452,7 @@ export async function createOnboardingStepForPhase(
   );
 }
 
+/** Update an existing onboarding step. */
 export async function updateOnboardingStep(
   stepId: string,
   request: UpdateOnboardingStepRequest,
@@ -447,6 +463,7 @@ export async function updateOnboardingStep(
   });
 }
 
+/** Create a new onboarding task within a step. */
 export async function createOnboardingTaskForStep(
   stepId: string,
   request: CreateOnboardingTaskRequest,
@@ -460,6 +477,7 @@ export async function createOnboardingTaskForStep(
   );
 }
 
+/** Delete an onboarding step. */
 export async function deleteOnboardingStep(stepId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/onboarding/steps/${stepId}`, {
     method: "DELETE",
@@ -488,6 +506,7 @@ export async function updateOnboardingTask(
   });
 }
 
+/** Fetch all onboarding tasks for a given step. Returns an empty array on error. */
 export async function getOnboardingTasksByStep(
   stepId: string,
 ): Promise<OnboardingTaskEndpoint[]> {
@@ -500,6 +519,7 @@ export async function getOnboardingTasksByStep(
   }
 }
 
+/** Delete an onboarding task. */
 export async function deleteOnboardingTask(taskId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/onboarding/tasks/${taskId}`, {
     method: "DELETE",
@@ -539,6 +559,7 @@ function toSkill(skill: SkillResponseDto): Skill {
   };
 }
 
+/** Fetch all skills. Falls back to mock data on error. */
 export async function getSkills(): Promise<Skill[]> {
   try {
     const response =
@@ -550,6 +571,7 @@ export async function getSkills(): Promise<Skill[]> {
   }
 }
 
+/** Fetch a single skill by its ID. */
 export async function getSkillById(skillId: string): Promise<Skill> {
   const response = await apiClient.fetch<SkillResponseDto>(
     `/api/v1/skills/${skillId}`,
@@ -558,6 +580,7 @@ export async function getSkillById(skillId: string): Promise<Skill> {
   return toSkill(response);
 }
 
+/** Update a skill's name and/or linked roles. */
 export async function updateSkill(
   skillId: string,
   data: { name?: string; roleIds?: string[] },
@@ -573,6 +596,7 @@ export async function updateSkill(
   return toSkill(response);
 }
 
+/** Fetch all skills linked to a specific project role. */
 export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
   const response = await apiClient.fetch<SkillResponseDto[]>(
     `/api/v1/projectRoles/${roleId}/skills`,
@@ -581,6 +605,7 @@ export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
   return response.map(toSkill);
 }
 
+/** Replace the set of skills linked to a project role. */
 export async function updateRoleSkills(
   roleId: string,
   skillIds: string[],
@@ -596,6 +621,7 @@ export async function updateRoleSkills(
   return response.map(toSkill);
 }
 
+/** Reactivate a retired skill by re-creating it. Falls back to mock state on error. */
 export async function reactivateSkill(
   skillId: string,
   name: string,
@@ -630,6 +656,7 @@ export async function reactivateSkill(
   }
 }
 
+/** Create a new skill. Reactivates a retired skill with the same name if one exists. Falls back to mock data on error. */
 export async function createSkill(
   name: string,
   roleIds: string[],
@@ -676,6 +703,7 @@ export async function createSkill(
   }
 }
 
+/** Delete a project role. Also cleans up linked skills and user assignments. Falls back to mock state on error. */
 export async function deleteProjectRole(roleId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/projectRoles/${roleId}`, {
@@ -698,6 +726,7 @@ export async function deleteProjectRole(roleId: string): Promise<void> {
   }
 }
 
+/** Retire (soft-delete) a skill. Falls back to mock state on error. */
 export async function deleteSkill(skillId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
@@ -730,6 +759,7 @@ function getSkillAssessmentPromptStateKey(userId: string) {
   return `${skillAssessmentPromptStatePrefix}:${userId}`;
 }
 
+/** Read the stored skill-assessment prompt state for a user from localStorage. */
 export function getSkillAssessmentPromptState(
   userId: string,
 ): SkillAssessmentPromptState | null {
@@ -742,6 +772,7 @@ export function getSkillAssessmentPromptState(
   return value === "dismissed" || value === "completed" ? value : null;
 }
 
+/** Persist that the skill-assessment prompt was dismissed for a user. */
 export function markSkillAssessmentPromptDismissed(userId: string): void {
   if (typeof window === "undefined") return;
 
@@ -751,6 +782,7 @@ export function markSkillAssessmentPromptDismissed(userId: string): void {
   );
 }
 
+/** Persist that the skill-assessment prompt was completed for a user. */
 export function markSkillAssessmentPromptCompleted(userId: string): void {
   if (typeof window === "undefined") return;
 
@@ -760,6 +792,7 @@ export function markSkillAssessmentPromptCompleted(userId: string): void {
   );
 }
 
+/** Check whether the user has completed at least one skill assessment. Falls back to mock state on error. */
 export async function hasCompletedSkillAssessment(
   userId: string,
 ): Promise<boolean> {
@@ -775,6 +808,7 @@ export async function hasCompletedSkillAssessment(
   }
 }
 
+/** Save one or more skill assessments for the current user. Falls back to mock state on error. */
 export async function saveUserSkillAssessments(
   assessments: CreateSkillAssessmentRequest[],
 ): Promise<void> {

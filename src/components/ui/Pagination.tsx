@@ -7,6 +7,10 @@ interface PaginationProps {
     className?: string;
 }
 
+/**
+ * Page navigation with ellipsis collapsing. Shows max 5 page buttons.
+ * Collapses entirely when totalPages <= 1.
+ */
 export function Pagination({ currentPage, totalPages, onPageChange, className }: PaginationProps) {
     if (totalPages <= 1) return null;
 

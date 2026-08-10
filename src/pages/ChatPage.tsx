@@ -27,7 +27,9 @@ type CitationArtifactOpen = {
 };
 
 /**
- * Displays the interface for communication with the chat.
+ * AI chat assistant with SSE streaming. Bound to `/chat` and `/chat/:id`.
+ * Accessible to all permission groups. Optional chat history sidebar,
+ * markdown rendering with KaTeX math and syntax highlighting.
  */
 export function ChatPage() {
     const { profile } = useAuth();

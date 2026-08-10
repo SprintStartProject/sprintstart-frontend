@@ -19,10 +19,18 @@ import type {
 } from '../features/onboarding/types';
 import onboardingStepMock from '../mocks/onboardingStepMock.json';
 
+/**
+ * Onboarding path, step, phase check and task CRUD.
+ * Streams AI path generation over SSE; falls back to mock data on fetch
+ * failures. Phase checks handle question/answer submission and review.
+ */
 export const onboardingService = {
 
     // ── PATH ─────────────────────────────────────────────────
 
+    /**
+     * Fetches the current user's full onboarding path from the backend.
+     */
     async fetchPath(): Promise<OnboardingPathEndpoint> {
         return await apiClient.fetch<OnboardingPathEndpoint>(`/api/v1/onboarding/me/path`);
     },
@@ -83,6 +91,9 @@ export const onboardingService = {
 
     // ── STEP ─────────────────────────────────────────────────
 
+    /**
+     * Fetches a single step's detail (resources, phase checks, tasks).
+     */
     async fetchStep(stepId: string): Promise<OnboardingStepDetail> {
         try {
             return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
@@ -103,6 +114,9 @@ export const onboardingService = {
         });
     },
 
+    /**
+     * Updates a step's status. Used by phase check completion flow.
+     */
     async updateStepStatus(step: OnboardingStepDetail, newStatus: StepStatus): Promise<void> {
         if (newStatus === 'FINISHED') {
             await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}/complete`, {
@@ -201,6 +215,9 @@ expectedOutcome: step.expectedOutcomes?.[0] ?? '',
 
     // ── FEEDBACK ──────────────────────────────────────────────
 
+    /**
+     * Submits user feedback for a step (helpful / not helpful + message).
+     */
     async submitFeedback(stepId: string, helpful: boolean, message: string): Promise<void> {
         await apiClient.fetch(`/api/v1/onboarding/me/feedback`, {
             method: 'POST',
@@ -210,10 +227,16 @@ expectedOutcome: step.expectedOutcomes?.[0] ?? '',
 
     // ── TASKS ─────────────────────────────────────────────────
 
+    /**
+     * Fetches the tasks belonging to a step.
+     */
     async fetchTasks(stepId: string): Promise<OnboardingTaskEndpoint[]> {
         return await apiClient.fetch<OnboardingTaskEndpoint[]>(`/api/v1/onboarding/me/steps/${stepId}/tasks`);
     },
 
+    /**
+     * Toggles a task's finished state.
+     */
     async updateTask(task: OnboardingTaskEndpoint, finished: boolean): Promise<void> {
         await apiClient.fetch(`/api/v1/onboarding/me/tasks/${task.id}`, {
             method: 'PUT',
@@ -228,6 +251,9 @@ expectedOutcome: step.expectedOutcomes?.[0] ?? '',
 
     // ── RESOURCES ─────────────────────────────────────────────
 
+    /**
+     * Fetches external resources linked to a step.
+     */
     async fetchResources(stepId: string): Promise<OnboardingResourceEndpoint[]> {
         return await apiClient.fetch<OnboardingResourceEndpoint[]>(`/api/v1/onboarding/me/steps/${stepId}/resources`);
     },

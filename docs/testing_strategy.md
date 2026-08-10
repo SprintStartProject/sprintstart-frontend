@@ -246,8 +246,7 @@ and `npm run storybook`.
 
 ## 9. A11y testing
 
-Accessibility tests live under `tests/unit/a11y/` and alongside page tests as
-`*.a11y.test.tsx` files. They render a component with `renderWithProviders` and
+Accessibility tests live under `tests/unit/a11y/`. They render a component with `renderWithProviders` and
 assert the output passes axe-core checks:
 
 ```tsx

@@ -26,6 +26,11 @@ type UploadResponseItem = {
     error?: string;
 };
 
+/**
+ * Knowledge base — project artifact listing, content retrieval, uploads and
+ * AI-powered streaming summaries. Upload methods accept File[] and report
+ * per-file status. SSE methods use parseSSEStream.
+ */
 export const knowledgeService = {
     /**
      * Fetches a single short page of project artifacts for at-a-glance views
@@ -59,6 +64,10 @@ export const knowledgeService = {
         return (response.items?.length ?? 0) > 0;
     },
 
+    /**
+ * Fetches recent artifacts for at-a-glance views (e.g. dashboard widget).
+ * Returns a short page; errors return an empty array silently.
+ */
     async getRecentArtifacts(projectId: string, limit = 4): Promise<Artifact[]> {
         try {
             const response = await apiClient.fetch<{ items?: Artifact[] }>(

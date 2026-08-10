@@ -4,8 +4,9 @@ import { ThemeToggle } from '../components/common/ThemeToggle';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
 
 /**
- * The authentication entry point.
- * Redirects users to the SSO identity provider and initiates the role selection upon first login.
+ * SSO login entry point. Bound to `/login`.
+ * AuthGuard preserves the pre-redirect route via `location.state.from`
+ * and redirects back there after Keycloak authentication.
  */
 export function LoginPage() {
     const { login, status } = useAuth();

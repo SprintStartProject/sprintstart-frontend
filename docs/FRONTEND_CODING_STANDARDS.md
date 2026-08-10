@@ -23,6 +23,9 @@ only this repository gets the full set of frontend rules here.
   necessitate it.
 - **Tool discipline** — use search and reading tools first to understand the
   existing design system before applying changes.
+- **Reduced motion first** — every animation must be safe to collapse. The
+  `'classic'` style mode and `prefers-reduced-motion` media query must never break
+  functionality.
 
 ---
 
@@ -31,7 +34,7 @@ only this repository gets the full set of frontend rules here.
 - **`verbatimModuleSyntax: true`** — type imports MUST be `import type { ... }`:
 
   ```typescript
-  import type { TaskDto } from '../types';
+  import type { TaskDto } from '../types.ts';
   ```
 
 - **Explicit `.ts`/`.tsx` extensions on relative imports are allowed and encouraged**
@@ -76,27 +79,62 @@ only this repository gets the full set of frontend rules here.
 - **Services return typed responses and surface backend failures** — don't silently
   swallow errors (no empty `catch`).
 
+- **Error boundaries** should wrap each page-level route in `AppRouter`. The global
+  fallback is a minimal "Something went wrong" view with a retry action.
+
 ---
 
 ## 4. Styling (Tailwind CSS v4)
 
 - **Always use the palette tokens; never hardcode colors.**
   - No `#2563eb`, no raw Tailwind colors like `text-blue-500`.
-  - Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-surface`,
-    `bg-app-surface-muted`), text (`text-app-text`, `text-app-text-muted`,
-    `text-app-text-subtle`), borders (`border-app-border`, …), brand
-    (`bg-app-brand`, `text-app-brand`, …), and status (`success` / `warning` /
-    `danger` / `neutral`, e.g. `bg-app-success-bg text-app-success-text`).
+  - Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-bg-soft`, `bg-app-surface`,
+    `bg-app-surface-muted`, `bg-app-surface-hover`), text (`text-app-text`,
+    `text-app-text-muted`, `text-app-text-subtle`, `text-app-text-disabled`),
+    borders (`border-app-border`, `border-app-border-muted`, `border-app-border-strong`),
+    brand (`bg-app-brand`, `text-app-brand`, `border-app-brand`, `bg-app-brand-soft`,
+    `text-app-brand-text`, `bg-app-brand-glow`), and status (`success` / `warning` /
+    `danger` / `neutral` / `orange`, e.g. `bg-app-success-bg text-app-success-text`).
+
+- **Glassmorphism & glow tokens** (ultra mode):
+  - `bg-app-glass`, `border-app-glass-border` (use via the `app-glass` utility class)
+  - `bg-app-glow`, `bg-app-glow-accent`, `bg-app-glow-alt` (aurora blobs)
+  - See `src/styles/index.css` for the full set.
+
+- **Font tokens**: `font-sans`, `font-heading`, `font-mono`.
+
+- **Reusable UI primitives**:
+  - `SpotlightCard` — card wrapper with cursor-driven tilt and spotlight glow.
+    Reads `isTiltEnabled` from `ThemeContext`; respects `'classic'` mode.
+    Usage:
+    ```tsx
+    import { SpotlightCard } from '@/components/ui/SpotlightCard';
+    <SpotlightCard roundedClassName="rounded-3xl">
+      <YourContent />
+    </SpotlightCard>
+    ```
+
+- **Shared CSS layout utilities**: `app-page-frame` (responsive gutter), `app-page-shell`
+  (full page container), `app-page-content` (centered with max-width). Prefer these
+  over manual `px-*` on page wrappers.
 
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
 
 - **No custom standalone `.css` classes** unless styling third-party widgets or
-  dealing with browser overrides.
+  dealing with browser overrides. Use `@utility` in `index.css` for reusable
+  combinations (e.g. `app-glass`).
 
 - **Light/dark theme** is controlled via the `.dark` class (`@custom-variant dark`),
   managed by `ThemeProvider`. Every color must work in both themes — which is
   automatic when you use tokens.
+
+- **Style modes**: the app supports `'ultra'` (default: glassmorphic glow, aurora
+  drift, spotlight) and `'classic'` (flat surfaces, no ambient animation). Activated
+  via `.style-classic` on `<html>`, managed by `ThemeProvider`. When `'classic'` is
+  active, decorative layers (`app-aurora`, `app-spotlight`, `app-bg-grid`) are
+  disabled by CSS. Respect this in custom components by checking
+  `useTheme().isClassicMode`.
 
 ---
 
@@ -120,21 +158,56 @@ only this repository gets the full set of frontend rules here.
 - **Focus** — keep visible focus via the `--app-focus` token
   (`focus-visible:ring-app-focus`); don't remove outlines.
 
+- **Reduced motion** — the `'classic'` style mode and `prefers-reduced-motion`
+  media query must disable all decorative animations. Check
+  `useReducedMotion()` from Framer Motion for component-level guards.
+
 ---
 
 ## 6. Animation (Framer Motion 12)
 
 - **Use the centralized spring transition tokens** — don't inline ad-hoc spring
-  configs. Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts),
-  exporting `centralSpringToken` (default layout/list motion) and `hoverSpringToken`
-  (micro-interactions).
+  configs. Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts).
+
+  Core presets:
+
+  | Token | Type | Use case |
+  | --- | --- | --- |
+  | `centralSpringToken` | spring | Layout transitions, list enter/exit, general motion |
+  | `hoverSpringToken` | spring | Hover/tap micro-interactions |
+  | `dockMagnifySpringToken` | spring | Sidebar dock magnification (grow/shrink) |
+  | `slidingIndicatorSpringToken` | spring | Active nav indicator pill (`layoutId`) |
+  | `sidePanelSlideToken` | tween | Side panel slide in/out (guaranteed timing) |
+  | `SIDE_PANEL_SLIDE_MS` | number | Panel animation duration (420ms) |
+  | `enterTransition` | tween | Page-level enter (AuroraBackground, etc.) |
+  | `idleDriftToken` | tween | Decorative breathing loops |
+  | `celebrationSpringToken` | spring | Celebration cards (under-damped overshoot) |
+  | `flightEaseToken` | tween | Rocket trail / ignition bloom |
+  | `petPeekSpringToken` | spring | Rocket pet duck/lean |
+  | `modalBackdropVariants` | variants | Backdrop fade for all dialogs |
+  | `getModalDialogVariants()` | variants | Dialog surface enter/exit |
+  | `buttonHoverMotion` | spread | `motion.button` hover/tap (1.03 scale) |
+
+  See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
+  for the complete reference.
+
+- **Use the `buttonHoverMotion` spread** for consistent button feedback:
+
+  ```tsx
+  import { buttonHoverMotion } from "@/styles/tokens";
+  <motion.button {...buttonHoverMotion}>Save</motion.button>
+  ```
 
 - **Wrap dynamically added/removed elements** (lists, drawers) in `<AnimatePresence>`
   to avoid clipping on exit. Use `mode="popLayout"` when the wrapper affects
   document reflow.
 
-- See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-  for the full animation system.
+- **Always specify `layout`** on the direct child of `<AnimatePresence>` so Framer
+  Motion interpolates reflow smoothly.
+
+- **The Moments system** (`features/moments/`) owns all celebratory animations.
+  Call `useMoments().celebrate(input)` for earned rewards, `useMoments().flyby()`
+  for small wins. Don't duplicate celebration patterns.
 
 ---
 
@@ -199,6 +272,9 @@ only this repository gets the full set of frontend rules here.
   - **Hooks/effects:** when timing or dependencies matter.
   - **Business logic:** permission/role rules, conditional flows, data transforms,
     backend-contract assumptions, and **temporary limitations / known backend gaps**.
+  - **Moments integration:** when calling `useMoments().celebrate()` or
+    `useMoments().flyby()`, document *what* event triggers it, so the tone
+    (`success` / `milestone` / `triumph`) stays consistent across the app.
 
 - Don't document obvious assignments, trivial state updates, plain JSX, or restate
   names. Keep comments current — update/remove them when behavior changes.
@@ -212,10 +288,15 @@ only this repository gets the full set of frontend rules here.
   `# type: ignore`, `@SuppressWarnings`-style escape hatches. Fix the underlying
   type mismatch instead.
 - **No hardcoded colors** — use the shared palette tokens.
-- **No ad-hoc spring configs** — use `src/styles/tokens.ts`.
+- **No ad-hoc spring configs** — use `src/styles/tokens.ts`. (Intentional
+  exceptions that are functionally identical to an existing token should be
+  refactored to use it; if the damping difference is deliberate, document why.)
 - **No empty `catch` blocks** — surface backend failures.
 - **No class components** — functional + hooks only.
 - **No default exports** except lazy-loaded route pages.
+- **No duplicate celebration patterns** — use `useMoments()` rather than
+  hand-rolling confetti or flybys.
+- **No color-only meaning** — always pair color with an icon, text, or shape.
 
 ---
 

@@ -7,9 +7,6 @@ export type BadgeVariant =
     | "neutral"
     | "danger"
     | "purple"
-    | "pink"
-    | "yellow"
-    | "navy"
     | "orange";
 
 export type BadgeProps = {
@@ -25,17 +22,16 @@ const badgeVariantClasses: Record<BadgeVariant, string> = {
     neutral: "border-app-neutral-border bg-app-neutral-bg text-app-neutral-text",
     danger: "border-app-danger-border bg-app-danger-bg text-app-danger-text",
     purple:
-        "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/40 dark:bg-purple-500/15 dark:text-purple-200",
-    pink:
-        "border-pink-200 bg-pink-50 text-pink-700 dark:border-pink-500/40 dark:bg-pink-500/15 dark:text-pink-200",
-    yellow:
-        "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-500/15 dark:text-yellow-200",
-    navy:
-        "border-blue-900/20 bg-blue-950 text-white dark:border-blue-400/40 dark:bg-blue-400/15 dark:text-blue-100",
+        "border-app-accent bg-app-accent-soft text-app-accent",
     orange:
-        "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200",
+        "border-app-orange-border bg-app-orange-bg text-app-orange-text",
 };
 
+/**
+ * Semantic status badge. 7 color variants mapping to semantic roles:
+ * success, brand, warning, neutral, danger (core), plus purple and orange
+ * (used by StatusChip for onboarding states).
+ */
 export function Badge({ children, variant = "brand", className = "" }: BadgeProps) {
     return (
         <span

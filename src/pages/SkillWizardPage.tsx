@@ -14,6 +14,11 @@ import type { Skill, TeamOverviewUser } from '../features/team-management/types'
 import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { useAuth } from '../context/useAuth';
 
+/**
+ * Skill assessment survey. Bound to `/skill-wizard` — the only route exempt
+ * from the skill-assessment gate in AuthGuard.
+ * POSTs completed assessments and redirects to the dashboard.
+ */
 export function SkillWizardPage() {
     const navigate = useNavigate();
     const { profile } = useAuth();

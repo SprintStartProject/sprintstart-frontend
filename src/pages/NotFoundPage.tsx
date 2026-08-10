@@ -4,6 +4,10 @@ import { SpaceInvadersModal } from "../features/space-invaders/components/SpaceI
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { Rocket } from "lucide-react";
 
+/**
+ * Catch-all 404 page. Shows a "not found" message with a dashboard link and
+ * auto-opens the Space Invaders easter egg.
+ */
 export function NotFoundPage() {
     const navigate = useNavigate();
     // Auto-open the game on the 404 page (the canonical easter-egg entry

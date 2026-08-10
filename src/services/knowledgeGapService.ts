@@ -9,8 +9,17 @@ import type {
 import knowledgeGapMock from '../mocks/knowledgeGapsMock.json';
 import knowledgeGapDetailMock from '../mocks/knowledgeGapsDetailMock.json';
 
+/**
+ * Knowledge gaps detected by AI — documentation areas needing coverage.
+ * Fetch methods fall back to mock data on failure; refresh and ownership
+ * methods propagate errors.
+ */
 export const knowledgeGapService = {
 
+    /**
+     * Fetches all knowledge gaps grouped by component.
+     * Falls back to mock data on failure.
+     */
     async fetchKnowledgeGaps(): Promise<KnowledgeGapOverview> {
         try {
             return await apiClient.fetch<KnowledgeGapOverview>(
@@ -25,6 +34,10 @@ export const knowledgeGapService = {
         }
     },
 
+    /**
+     * Fetches detailed information about a specific knowledge gap.
+     * Falls back to mock data on failure.
+     */
     async fetchKnowledgeGap(gapId: string): Promise<KnowledgeGap> {
         try {
             return await apiClient.fetch<KnowledgeGap>(

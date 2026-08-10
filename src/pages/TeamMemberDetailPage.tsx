@@ -112,6 +112,11 @@ function getStepStatusStyles(status: string) {
     return 'border-app-border bg-app-surface-muted text-app-text-muted';
 }
 
+/**
+ * Full member detail + onboarding management. Bound to `/team/:userId`
+ * (`userId` read via `useParams()`). Linked from TeamManagementPage cards.
+ * PM/HR/ADMIN.
+ */
 export function TeamMemberDetailPage() {
     const { userId } = useParams<{ userId: string }>();
 

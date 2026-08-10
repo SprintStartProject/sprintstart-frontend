@@ -45,6 +45,11 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { adminUserService } from "../services/adminUserService";
 import { projectService } from "../services/projectService";
 
+/**
+ * Admin dashboard. Bound to `/admin` (HR/ADMIN).
+ * Three-tab layout: users, projects, tokens.
+ * Delete-user opens a confirmation dialog.
+ */
 export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
