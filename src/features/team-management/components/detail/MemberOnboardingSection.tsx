@@ -8,6 +8,7 @@ import {
     SkipForward,
 } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
+import { Badge } from '../../../../components/ui/Badge';
 import { Button } from '../../../../components/ui/Button';
 import { DragHandle } from '../../../../components/ui/DragHandle';
 import { StepOriginBadge } from '../../../onboarding/components/StepOriginBadge';
@@ -493,9 +494,9 @@ function StepCard({
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                             {isNextStep && (
-                                <span className="mb-1 inline-flex items-center rounded-full bg-app-brand px-2 py-0.5 text-[11px] font-medium text-app-text-inverse">
+                                <Badge variant="brand" size="sm" className="mb-1">
                                     Up next
-                                </span>
+                                </Badge>
                             )}
                             <h4 className={`text-sm font-semibold ${
                                 step.status === 'FINISHED' ||

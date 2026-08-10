@@ -9,6 +9,7 @@ import {
     getRunStatusTone,
 } from "../data.ts";
 import { ChevronRight } from "lucide-react";
+import { Badge } from "../../../components/ui/Badge.tsx";
 import type { IngestionRun } from "../types.ts";
 
 type RunHistoryProps = {
@@ -184,27 +185,20 @@ function RunStatusBadge({
 
     if (tone === "success") {
         return (
-            <span className="rounded-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-medium text-app-success-text">
-                {label}
-            </span>
+            <Badge variant="success">{label}</Badge>
         );
     }
 
     if (tone === "running") {
         return (
-            <span className="rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text">
-                {label}
-            </span>
+            <Badge variant="brand">{label}</Badge>
         );
     }
 
     return (
-        <span
-            title={title}
-            className="rounded-full border border-app-danger-border bg-app-danger-bg px-3 py-1 text-xs font-medium text-app-danger-text"
-        >
+        <Badge variant="danger" title={title}>
             {label}
-        </span>
+        </Badge>
     );
 }
 
@@ -224,32 +218,23 @@ function AiSyncStatusBadge({
 
     if (tone === "success") {
         return (
-            <span
-                title={title}
-                className="rounded-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-medium text-app-success-text"
-            >
+            <Badge variant="success" title={title}>
                 {label}
-            </span>
+            </Badge>
         );
     }
 
     if (tone === "running") {
         return (
-            <span
-                title={title}
-                className="rounded-full bg-app-brand-soft px-3 py-1 text-xs font-medium text-app-brand-text"
-            >
+            <Badge variant="brand" title={title}>
                 {label}
-            </span>
+            </Badge>
         );
     }
 
     return (
-        <span
-            title={title}
-            className="rounded-full border border-app-danger-border bg-app-danger-bg px-3 py-1 text-xs font-medium text-app-danger-text"
-        >
+        <Badge variant="danger" title={title}>
             {label}
-        </span>
+        </Badge>
     );
 }

@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from "react";
 import { onboardingService } from "../../../services/onboardingService";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
@@ -265,12 +266,12 @@ function QuestionCard({ question, index, draft, result, onToggleOption, onTextCh
         <div className="flex-1 min-w-0">
           {/* Carried-over repeat question from an earlier phase */}
           {question.review && (
-            <div className="inline-flex items-center gap-1.5 mb-1.5 px-2 py-0.5 rounded-full bg-app-surface-muted text-app-text-muted text-[11px] font-medium">
-              <RotateCcw className="w-3 h-3" />
+            <Badge variant="neutral" size="sm" className="mb-1.5 gap-1.5">
+              <RotateCcw className="h-3 w-3" />
               {question.reviewSourcePhaseTitle
                 ? `Repeat from ${question.reviewSourcePhaseTitle}`
                 : "Repeat question"}
-            </div>
+            </Badge>
           )}
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold text-app-text text-sm">{question.question}</h3>

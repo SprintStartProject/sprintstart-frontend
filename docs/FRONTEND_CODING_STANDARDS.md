@@ -91,6 +91,15 @@ only this repository gets the full set of frontend rules here.
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
 
+- **Status pills are [`ui/Badge`](../src/components/ui/Badge.tsx).** Pick the
+  `variant` by meaning, not by colour, and `size="sm"` inside dense rows. A
+  hand-written `rounded-full … px-2 … text-xs` span is how the codebase ended up
+  with the same "Unread" chip in four slightly different sizes.
+
+  If a badge needs a colour that no variant covers, add a token pair to
+  `index.css` and a variant here — never a raw palette value at the call site,
+  which cannot follow the theme.
+
 - **No custom standalone `.css` classes** unless styling third-party widgets or
   dealing with browser overrides.
 

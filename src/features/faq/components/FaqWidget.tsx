@@ -10,6 +10,7 @@ import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
 import { useFetch } from "../../../hooks/useFetch";
 import { ClickableCard } from "../../../components/common/ClickableCard";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 
 import {
@@ -169,10 +170,10 @@ export function FaqWidget() {
           {hero.count}
         </span>
 
-        <div className="inline-flex items-center gap-1.5 bg-app-success-bg text-app-success-text text-xs font-medium px-2.5 py-1 rounded-full mb-3">
-          <TrendingUp className="w-3 h-3" />
+        <Badge variant="success" className="mb-3 gap-1.5">
+          <TrendingUp className="h-3 w-3" />
           Most asked
-        </div>
+        </Badge>
 
         <p className="text-sm font-semibold text-app-text leading-snug mb-3 pr-12">
           {hero.question}
@@ -180,13 +181,10 @@ export function FaqWidget() {
 
         <div className="flex flex-wrap gap-1.5">
           {hero.topDocuments.map((doc) => (
-            <span
-              key={doc.id}
-              className="flex items-center gap-1 text-xs text-app-text-muted bg-app-surface-muted border border-app-border rounded-full px-2 py-0.5"
-            >
-              <FileText className="w-3 h-3" />
+            <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
+              <FileText className="h-3 w-3" />
               {doc.title}
-            </span>
+            </Badge>
           ))}
         </div>
       </button>

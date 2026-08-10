@@ -9,6 +9,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
+import { Badge } from '../../../../components/ui/Badge';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { DragHandle } from '../../../../components/ui/DragHandle';
@@ -186,9 +187,9 @@ export function StepDetailsPanel({
                     <h3 className="text-sm font-semibold text-app-text">
                         Tasks
                     </h3>
-                    <span className="rounded-full bg-app-surface-muted px-2.5 py-1 text-xs text-app-text-muted">
+                    <Badge variant="neutral" size="sm">
                         {doneTaskCount}/{tasks.length} done
-                    </span>
+                    </Badge>
                 </div>
 
                 <div className="mt-3 space-y-2">
@@ -330,9 +331,9 @@ export function StepDetailsPanel({
                                                 {rating.label}
                                             </span>
                                             {feedback.read === false && (
-                                                <span className="rounded-full bg-app-warning-bg px-2 py-0.5 text-xs font-medium text-app-warning-text">
+                                                <Badge variant="warning" size="sm">
                                                     Unread
-                                                </span>
+                                                </Badge>
                                             )}
                                         </div>
 

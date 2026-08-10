@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import type {
@@ -958,9 +959,9 @@ export function TeamMemberDetailPage() {
                                 </div>
 
                                 {(unreadFeedback.length > 0 || pendingSkip) && (
-                                    <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
+                                    <Badge variant="warning" size="sm">
                                         {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
-                                    </span>
+                                    </Badge>
                                 )}
                             </div>
 
@@ -977,9 +978,9 @@ export function TeamMemberDetailPage() {
                                                     <p className="text-sm font-semibold text-app-text">
                                                         Skip request
                                                     </p>
-                                                    <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
+                                                    <Badge variant="warning" size="sm">
                                                         Pending
-                                                    </span>
+                                                    </Badge>
                                                 </div>
 
                                                 {user.currentStep?.title && (
@@ -1126,9 +1127,9 @@ export function TeamMemberDetailPage() {
                                                 <p className="text-sm font-semibold text-app-text">
                                                     Feedback
                                                 </p>
-                                                <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
+                                                <Badge variant="warning" size="sm">
                                                     Unread
-                                                </span>
+                                                </Badge>
                                             </div>
                                             <p className="mt-2 text-sm text-app-text">
                                                 {user.firstname} has left feedback on their onboarding path.
@@ -1179,15 +1180,17 @@ export function TeamMemberDetailPage() {
                                             {role.name}
                                         </span>
 
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            iconOnly
                                             onClick={() => setRoleToRemove(role)}
                                             disabled={savingRoleId === role.id}
-                                            className="rounded-lg p-1.5 text-app-text-muted hover:bg-app-surface-hover hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="hover:text-app-danger-text"
                                             aria-label={`Remove ${role.name}`}
                                         >
                                             <X className="h-4 w-4" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 ))
                             ) : (

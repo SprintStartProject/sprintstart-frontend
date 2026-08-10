@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarClock, Plug } from "lucide-react";
+import { Badge } from "../components/ui/Badge.tsx";
 import { Button } from "../components/ui/Button.tsx";
 import { Modal } from "../components/ui/Modal.tsx";
 import { PanelPresence } from "../components/ui/PanelPresence.tsx";
@@ -1251,9 +1252,9 @@ export function DataIngestionPage() {
                           Runs
                         </h2>
                         {runPageMeta ? (
-                          <span className="rounded-full border border-app-border bg-app-bg-soft px-2.5 py-0.5 text-xs font-semibold tabular-nums text-app-text-subtle">
+                          <Badge variant="neutral" size="sm" className="tabular-nums">
                             {runPageMeta.totalElements} total
-                          </span>
+                          </Badge>
                         ) : null}
                       </div>
 

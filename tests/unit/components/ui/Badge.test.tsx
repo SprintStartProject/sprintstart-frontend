@@ -22,4 +22,37 @@ describe('Badge', () => {
         render(<Badge className="custom-class">Custom</Badge>);
         expect(screen.getByText('Custom')).toHaveClass('custom-class');
     });
+
+    it('takes every colour from a token, never a raw palette value', () => {
+        const variants = [
+            'success',
+            'brand',
+            'warning',
+            'neutral',
+            'danger',
+            'purple',
+            'orange',
+        ] as const;
+
+        for (const variant of variants) {
+            const view = render(<Badge variant={variant}>{variant}</Badge>);
+            const className = screen.getByText(variant).className;
+
+            // No `bg-purple-50`, `text-pink-700` and friends, and no `dark:`
+            // override — both themes come from the CSS variables.
+            expect(className).not.toMatch(
+                /\b(bg|text|border)-(slate|gray|red|orange|amber|yellow|green|emerald|blue|indigo|purple|pink|rose)-\d{2,3}\b/,
+            );
+            expect(className).not.toContain('dark:');
+            view.unmount();
+        }
+    });
+
+    it('offers a smaller pill for dense rows', () => {
+        const { rerender } = render(<Badge size="sm">Small</Badge>);
+        expect(screen.getByText('Small')).toHaveClass('px-2');
+
+        rerender(<Badge size="md">Small</Badge>);
+        expect(screen.getByText('Small')).toHaveClass('px-3');
+    });
 });

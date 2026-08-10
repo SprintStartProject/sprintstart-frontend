@@ -10,6 +10,7 @@ import type {
   FAQDocument,
 } from "../../../features/faq/types";
 import { insightsService } from "../../../services/faqService";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { useFetch } from "../../../hooks/useFetch";
 
@@ -95,10 +96,10 @@ export function FaqDetailPage() {
             <h1 className="text-xl font-bold text-app-text leading-snug">
               {detail.questions[0].text}
             </h1>
-            <span className="inline-flex items-center gap-1.5 bg-app-success-bg text-app-success-text text-xs font-medium px-3 py-1.5 rounded-full shrink-0">
-              <ArrowUp className="w-3 h-3" />
+            <Badge variant="success" className="shrink-0 gap-1.5">
+              <ArrowUp className="h-3 w-3" />
               {detail.count} times asked
-            </span>
+            </Badge>
           </div>
         </div>
       </div>

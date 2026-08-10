@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
@@ -133,9 +134,9 @@ export function SourceConnectModal({
                                             </div>
 
                                             {!isAvailable && (
-                                                <span className="rounded-full bg-app-bg-soft px-2.5 py-1 text-xs font-medium text-app-text-subtle">
+                                                <Badge variant="neutral" size="sm">
                                                     Soon
-                                                </span>
+                                                </Badge>
                                             )}
                                         </div>
 

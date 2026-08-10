@@ -68,6 +68,13 @@
   --orange-border: rgba(249, 115, 22, 0.35);
   --orange-text: #c2410c;
 
+  /* Purple — the counterpart to Orange for a *reached* state that is not the
+     app's ordinary Success. "Onboarding: Done" uses it so it does not read as
+     the same thing as "Account: Active" sitting directly above it. */
+  --purple-bg: rgba(147, 51, 234, 0.12);
+  --purple-border: rgba(147, 51, 234, 0.35);
+  --purple-text: #7e22ce;
+
   /* Neutral */
   --neutral-bg: #f3f4f6;
   --neutral-border: #e5e7eb;
@@ -153,6 +160,11 @@
   --orange-border: rgba(249, 115, 22, 0.4);
   --orange-text: #fdba74;
 
+  /* Purple */
+  --purple-bg: rgba(168, 85, 247, 0.15);
+  --purple-border: rgba(168, 85, 247, 0.4);
+  --purple-text: #d8b4fe;
+
   /* Neutral */
   --neutral-bg: #1f2937;
   --neutral-border: #374151;
@@ -213,6 +225,10 @@
   --color-app-orange-bg: var(--orange-bg);
   --color-app-orange-border: var(--orange-border);
   --color-app-orange-text: var(--orange-text);
+
+  --color-app-purple-bg: var(--purple-bg);
+  --color-app-purple-border: var(--purple-border);
+  --color-app-purple-text: var(--purple-text);
 
   --color-app-neutral-bg: var(--neutral-bg);
   --color-app-neutral-border: var(--neutral-border);

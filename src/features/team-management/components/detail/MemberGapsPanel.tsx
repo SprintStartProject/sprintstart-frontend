@@ -1,3 +1,4 @@
+import { Badge } from '../../../../components/ui/Badge';
 import type { KnowledgeGap } from '../../../knowledge-gaps/types';
 import type { UserSkillLevel } from '../../../../services/teamManagementService';
 
@@ -140,9 +141,9 @@ function SkillGapsSection({ skillGaps }: { skillGaps: UserSkillLevel[] }) {
                                     {skill.roleName}
                                 </p>
                             </div>
-                            <span className="shrink-0 rounded-full bg-app-warning-bg px-2 py-0.5 text-xs font-medium text-app-warning-text capitalize">
+                            <Badge variant="warning" size="sm" className="shrink-0 capitalize">
                                 {skill.level.toLowerCase()}
-                            </span>
+                            </Badge>
                         </div>
                     ))
                 )}

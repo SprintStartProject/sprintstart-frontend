@@ -9,6 +9,7 @@ import type {
   OnboardingStepEndpoint,
 } from "../features/onboarding/types";
 import { useNavigate } from "react-router-dom";
+import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { onboardingService } from "../services/onboardingService";
 import { userService } from "../services/userService";
@@ -523,10 +524,10 @@ export function OnBoardingPage() {
           <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-app-brand-soft text-app-brand-text text-xs font-medium mb-4">
-                <PlayCircle className="w-3.5 h-3.5" />
+              <Badge variant="brand" className="mb-4 gap-2">
+                <PlayCircle className="h-3.5 w-3.5" />
                 {recommendedStep.status === "IN_PROGRESS" ? "In progress" : "Up Next"}
-              </div>
+              </Badge>
               <h2 className="text-2xl sm:text-3xl font-bold text-app-text">
                 {recommendedStep.title}
               </h2>
@@ -556,10 +557,10 @@ export function OnBoardingPage() {
           <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-app-brand-soft text-app-brand-text text-xs font-medium mb-4">
-                <ClipboardCheck className="w-3.5 h-3.5" />
+              <Badge variant="brand" className="mb-4 gap-2">
+                <ClipboardCheck className="h-3.5 w-3.5" />
                 Knowledge check
-              </div>
+              </Badge>
               <h2 className="text-2xl sm:text-3xl font-bold text-app-text">
                 Ready for the {pendingCheckPhase.title} check?
               </h2>
@@ -691,10 +692,10 @@ export function OnBoardingPage() {
                               </button>
                             </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium bg-app-surface-muted text-app-text-muted">
-                              <Lock className="w-3.5 h-3.5" />
+                            <Badge variant="neutral" className="gap-1.5">
+                              <Lock className="h-3.5 w-3.5" />
                               Locked
-                            </span>
+                            </Badge>
                           )}
                         </div>
                       </div>
@@ -763,14 +764,12 @@ export function OnBoardingPage() {
                               locked -> lock chip, otherwise start/retry the check. */}
                           <div className="shrink-0 self-start sm:self-center">
                             {passed ? (
-                              <span className="text-xs px-3 py-1 rounded-full font-medium bg-app-success-bg text-app-success-text">
-                                Passed
-                              </span>
+                              <Badge variant="success">Passed</Badge>
                             ) : locked ? (
-                              <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium bg-app-surface-muted text-app-text-muted">
-                                <Lock className="w-3.5 h-3.5" />
+                              <Badge variant="neutral" className="gap-1.5">
+                                <Lock className="h-3.5 w-3.5" />
                                 Locked
-                              </span>
+                              </Badge>
                             ) : (
                               <Button
                                 variant="primary"

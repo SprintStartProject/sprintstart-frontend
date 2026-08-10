@@ -193,21 +193,51 @@ Wer welches nimmt, steht im TSDoc von `Select`.
 
 ---
 
-## 3. Badge: Token-System reparieren und Komponente durchsetzen
+## 3. Badge: Token-System reparieren und Komponente durchsetzen — **erledigt**
 
-**Befund.** [`ui/Badge.tsx`](../src/components/ui/Badge.tsx) nutzt in 5 von 10
+**Befund.** [`ui/Badge.tsx`](../src/components/ui/Badge.tsx) nutzte in 5 von 10
 Varianten (`purple`, `pink`, `yellow`, `navy`, `orange`) rohe
-Tailwind-Paletten mit `dark:`-Prefixes statt CSS-Tokens. Das sind **30 der
+Tailwind-Paletten mit `dark:`-Prefixes statt CSS-Tokens. Das waren **30 der
 insgesamt nur 38 rohen Farbnutzungen im gesamten Projekt** — der Rest der
 Codebase hält sich vorbildlich an die Tokens aus `src/styles/index.css`.
 
-Außerdem wird `Badge` nur in 9 Dateien importiert, während es ~25 inline
-nachgebaute Badge-Spans gibt (`rounded-full … px-2 … text-xs`).
+Dazu 37 inline nachgebaute Badge-Spans, während `Badge` nur in 9 Dateien
+importiert wurde.
 
-**Vorschlag.** Entweder Tokens für die fehlenden Farben in `index.css`
-ergänzen (analog zum bereits vorhandenen `--orange-*`-Set) oder die
-Varianten streichen, falls sie keine eigene Semantik tragen. Danach die
-Inline-Spans migrieren.
+**Was die Analyse ergeben hat.** `pink`, `yellow` und `navy` waren
+**vollständig unbenutzt** — weder statisch noch über die beiden Funktionen, die
+dynamisch eine `BadgeVariant` liefern (`getPermissionGroupVariant`,
+`getSourceStatusVariant` geben nur `success`, `warning`, `danger`, `neutral`,
+`brand` zurück). `purple` und `orange` gab es genau einmal: der
+Onboarding-Status in `UserStatusSection` („Done" / „Pending").
+
+Das änderte die Aufgabe. Statt fünf Farbsätze zu tokenisieren:
+
+- **`pink`, `yellow`, `navy` gelöscht.** Toter Code, und Standards §1 sagt
+  ausdrücklich, keine Abstraktionen auf Vorrat zu bauen.
+- **`orange` auf die bestehenden `--orange-*`-Tokens umgestellt.** Die gab es
+  längst in `index.css` — `Badge` hatte sie nur nie benutzt.
+- **`--purple-*` neu angelegt** (hell und dunkel), nach demselben Muster. Die
+  Begründung steht am Token: „Onboarding: Done" darf nicht wie „Account: Active"
+  aussehen, das direkt darüber steht — beides grün liest sich als dieselbe
+  Aussage, ist es aber nicht.
+- **`size="sm"` ergänzt**, damit ein Badge in einer dichten Zeile nicht die
+  Größe eines eigenständigen Seitenelements hat.
+
+**Stand:** rohe Tailwind-Farben **38 → 0**. `dark:`-Prefixes 38 → 23, und die
+verbleibenden stecken alle in Storybook-Dateien, die die `.dark`-Klasse zur
+Vorschau umschalten — genau wofür sie da sind. Inline-Badges 37 → 11.
+
+Die 11 verbliebenen sind begründet: die HUD-Chips der beiden Spiele, zwei
+Vorschlags-Chips, die in Wahrheit Buttons sind (Chat-Leerzustand, QuickChat),
+und einige Karten-interne Marker. Ein `Badge` ist ein `<span>`; wo ein Chip
+geklickt wird, gehört er nicht dorthin.
+
+**Nebenbefund:** Eine letzte rohe Farbe steckte gar nicht im Badge, sondern als
+`hover:text-red-500` an einem Icon-Button in `TeamMemberDetailPage` — jetzt
+`Button variant="ghost"` mit `hover:text-app-danger-text`.
+
+Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §4.
 
 ---
 

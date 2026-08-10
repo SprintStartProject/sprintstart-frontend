@@ -1,3 +1,4 @@
+import { Badge } from "../../../components/ui/Badge.tsx";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 
@@ -59,9 +60,9 @@ export function SourceTypeStep({
                   </div>
 
                   {!isAvailable && (
-                    <span className="rounded-full bg-app-bg-soft px-2.5 py-1 text-xs font-medium text-app-text-subtle">
+                    <Badge variant="neutral" size="sm">
                       Soon
-                    </span>
+                    </Badge>
                   )}
                 </div>
 

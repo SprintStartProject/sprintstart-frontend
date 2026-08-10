@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
 import { useFetch } from "../../../hooks/useFetch";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 
 import {
@@ -217,13 +218,10 @@ export function FaqPage() {
 
             <div className="flex flex-wrap gap-2">
               {hero.topDocuments.map((doc) => (
-                <span
-                  key={doc.id}
-                  className="flex items-center gap-1 text-xs text-app-text-muted bg-app-surface-muted border border-app-border rounded-full px-2 py-1"
-                >
-                  <FileText className="w-3 h-3" />
+                <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
+                  <FileText className="h-3 w-3" />
                   {doc.title}
-                </span>
+                </Badge>
               ))}
             </div>
           </button>
@@ -250,13 +248,10 @@ export function FaqPage() {
 
               <div className="flex flex-wrap gap-1.5">
                 {group.topDocuments.map((doc) => (
-                  <span
-                    key={doc.id}
-                    className="flex items-center gap-1 text-xs text-app-text-muted bg-app-surface-muted border border-app-border rounded-full px-2 py-0.5"
-                  >
-                    <FileText className="w-3 h-3" />
+                  <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
+                    <FileText className="h-3 w-3" />
                     {doc.title}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             </button>

@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
@@ -533,44 +534,46 @@ export function GithubRepositoryDiscovery({
                       {repository.name}
                     </span>
 
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                        repository.isPrivate
-                          ? "border-app-orange-border bg-app-orange-bg text-app-orange-text"
-                          : "border-app-success-border bg-app-success-bg text-app-success-text"
-                      }`}
+                    <Badge
+                      variant={repository.isPrivate ? "orange" : "success"}
+                      size="sm"
+                      className="gap-1"
                     >
                       {repository.isPrivate && (
                         <Lock className="h-3 w-3" aria-hidden="true" />
                       )}
                       {repository.isPrivate ? "Private" : "Public"}
-                    </span>
+                    </Badge>
 
                     {linkState === "in-project" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-neutral-bg px-2 py-0.5 text-xs font-medium text-app-neutral-text">
+                      <Badge variant="neutral" size="sm" className="gap-1">
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         In this project
-                      </span>
+                      </Badge>
                     )}
 
                     {linkState === "linkable" && (
-                      <span
+                      <Badge
+                        variant="brand"
+                        size="sm"
+                        className="gap-1"
                         title="Already ingested — adding it here reuses its artifacts instead of ingesting again."
-                        className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text"
                       >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         Already ingested
-                      </span>
+                      </Badge>
                     )}
 
                     {linkState === "unresolved" && (
-                      <span
+                      <Badge
+                        variant="neutral"
+                        size="sm"
+                        className="gap-1"
                         title="Connected to another project, but its repository id could not be resolved."
-                        className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-neutral-bg px-2 py-0.5 text-xs font-medium text-app-neutral-text"
                       >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         Connected
-                      </span>
+                      </Badge>
                     )}
 
                     <a
