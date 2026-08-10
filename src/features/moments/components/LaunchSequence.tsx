@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { RocketGlyph } from "./RocketGlyph.tsx";
@@ -30,6 +31,10 @@ const HOLD = 1.85;
  *   and silently break modals and drawers, so all motion stays inside here.
  */
 export function LaunchSequence({ displayName, onDone }: LaunchSequenceProps) {
+    // A deliberate full-screen moment rather than a dialog, so it does not
+    // use `Modal` — but the page behind it must still hold still.
+    useScrollLock(true);
+
     // Resolved once: the sequence is over in under three seconds, so a resize
     // mid-flight is not worth re-deriving for.
     const { padX, padY, rocketSize, trailLength, trailAngle, flight } = useMemo(

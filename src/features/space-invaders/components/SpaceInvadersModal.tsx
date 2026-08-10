@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
 import { SpaceInvaders } from "../../easter-eggs/components/SpaceInvaders.tsx";
 
@@ -28,6 +29,11 @@ interface SpaceInvadersModalProps {
  * ({@link useSpaceInvadersShortcut}); also reused by the 404 page.
  */
 export function SpaceInvadersModal({ open, onClose }: SpaceInvadersModalProps) {
+    // Not a `Modal`: the game owns the keyboard, and Modal's focus trap
+    // would fight it for the arrow keys. The one thing every overlay needs
+    // regardless is the page behind it holding still.
+    useScrollLock(open);
+
     const prefersReducedMotion = useReducedMotion();
     const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
 

@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
 
@@ -31,6 +32,11 @@ interface Game2048ModalProps {
  * parent document.
  */
 export function Game2048Modal({ open, onClose }: Game2048ModalProps) {
+    // Not a `Modal`: the game owns the keyboard, and Modal's focus trap
+    // would fight it for the arrow keys. The one thing every overlay needs
+    // regardless is the page behind it holding still.
+    useScrollLock(open);
+
     const prefersReducedMotion = useReducedMotion();
     const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
 

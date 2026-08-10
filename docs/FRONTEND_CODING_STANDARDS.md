@@ -91,6 +91,19 @@ only this repository gets the full set of frontend rules here.
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
 
+- **Dialogs are [`ui/Modal`](../src/components/ui/Modal.tsx)** (or
+  [`ui/SidePanel`](../src/components/ui/SidePanel.tsx) for a drawer). It brings
+  the focus trap, Escape handling, focus restore, `aria-modal` and the
+  background scroll lock. A hand-written `fixed inset-0` overlay has to get all
+  five right, and the one that existed got four — which is four more chances to
+  drift than anyone needs.
+
+  Full-screen surfaces that are *not* dialogs may stay hand-written: the game
+  overlays, where the game owns the keyboard and a focus trap would fight it
+  for the arrow keys, and the Moments celebrations. Those still share the
+  scroll lock via [`useScrollLock`](../src/components/ui/useScrollLock.ts) —
+  a backdrop over a page that scrolls underneath is a bug regardless.
+
 - **Status pills are [`ui/Badge`](../src/components/ui/Badge.tsx).** Pick the
   `variant` by meaning, not by colour, and `size="sm"` inside dense rows. A
   hand-written `rounded-full … px-2 … text-xs` span is how the codebase ended up

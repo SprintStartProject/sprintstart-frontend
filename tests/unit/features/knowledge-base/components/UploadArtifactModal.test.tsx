@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UploadArtifactModal } from '../../../../../src/features/knowledge-base/components/UploadArtifactModal';
@@ -42,7 +42,13 @@ describe('UploadArtifactModal', () => {
 
         expect(screen.getByTestId('upload-modal')).toBeInTheDocument();
         expect(screen.getByText('Upload Artifacts')).toBeInTheDocument();
-        expect(screen.getByLabelText('Close upload modal')).toBeInTheDocument();
+        // Scoped to the dialog: `Modal` also renders a backdrop button with the
+        // same label, so an unscoped query matches two elements.
+        expect(
+            within(screen.getByTestId('upload-modal')).getByLabelText(
+                'Close upload modal',
+            ),
+        ).toBeInTheDocument();
     });
 
     it('calls onClose when the close button is clicked', async () => {
@@ -55,7 +61,11 @@ describe('UploadArtifactModal', () => {
             />,
         );
 
-        await userEvent.click(screen.getByLabelText('Close upload modal'));
+        await userEvent.click(
+            within(screen.getByTestId('upload-modal')).getByLabelText(
+                'Close upload modal',
+            ),
+        );
 
         expect(onClose).toHaveBeenCalledOnce();
     });

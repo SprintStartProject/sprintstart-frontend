@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { RocketGlyph } from "./RocketGlyph.tsx";
@@ -45,6 +46,10 @@ const STAGE_ORDER: Stage[] = ["ignition", "ascent", "arrival"];
  * `prefers-reduced-motion`.
  */
 export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps) {
+    // A deliberate full-screen moment rather than a dialog, so it does not
+    // use `Modal` — but the page behind it must still hold still.
+    useScrollLock(true);
+
     const reduceMotion = useReducedMotion();
     const [stage, setStage] = useState<Stage>(() =>
         reduceMotion ? "arrival" : "ignition",

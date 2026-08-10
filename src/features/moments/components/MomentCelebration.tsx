@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { CircleCheckBig, PartyPopper, Rocket } from "lucide-react";
@@ -60,6 +61,10 @@ export function MomentCelebration({
     celebration,
     onDismiss,
 }: MomentCelebrationProps) {
+    // A deliberate full-screen moment rather than a dialog, so it does not
+    // use `Modal` — but the page behind it must still hold still.
+    useScrollLock(true);
+
     const reduceMotion = useReducedMotion();
     const actionRef = useRef<HTMLButtonElement>(null);
     const previouslyFocused = useRef<HTMLElement | null>(null);

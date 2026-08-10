@@ -241,22 +241,43 @@ Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) 
 
 ---
 
-## 4. Modal: eine Implementierung statt neun
+## 4. Modal: eine Implementierung statt neun — **erledigt**
 
-**Befund.** [`ui/Modal.tsx`](../src/components/ui/Modal.tsx) wird in 11 Dateien
-genutzt, aber mindestens 8 Features bauen eigene `fixed inset-0`-Overlays:
-`Game2048Modal`, `DinoGameModal`, `SpaceInvadersModal`, `UploadArtifactModal`,
-`AddCustomStepModal`, `SourceConnectModal`, `AddSourceModal` sowie die
-Moments-Overlays (`LaunchSequence`, `MissionComplete`, `RocketFlyby`,
-`MomentCelebration`).
+**Befund.** [`ui/Modal.tsx`](../src/components/ui/Modal.tsx) wurde in 11 Dateien
+genutzt, daneben gab es 10 eigene `fixed inset-0`-Overlays.
 
-Jede dieser Stellen bringt ihre eigene Escape-Behandlung, Focus-Trap und
-Scroll-Lock mit — oder eben nicht.
+Beim Durchsehen zerfielen die in drei Gruppen — und nur eine davon war
+tatsächlich ein Fehler:
 
-**Vorschlag.** Die Dialog-artigen Fälle (Upload, Source, AddCustomStep) auf
-`Modal` migrieren. Die Moments-Overlays und Spiele sind bewusste
-Vollbild-Inszenierungen; die dürfen bleiben, sollten aber im Code als solche
-markiert sein, damit die Ausnahme nicht als Vorbild gelesen wird.
+| | | |
+| --- | --- | --- |
+| **Echte Dialoge** | `UploadArtifactModal` | Hatte Focus-Trap, Escape, Focus-Rückgabe und `aria-modal` — alles von Hand nachgebaut, rund 100 Zeilen, die mit dem Original von Hand synchron gehalten werden mussten. → auf `Modal` migriert. |
+| **Drawer-Backdrops** | `SideBar`, `AdminPage` | Kein Dialog, sondern die abdunkelnde Fläche hinter einer Schublade. Kein Handlungsbedarf. |
+| **Vollbild-Inszenierungen** | die 3 Spiele, die 4 Moments-Overlays | Bewusst kein `Modal`: bei den Spielen gehört die Tastatur dem Spiel, und Modals Focus-Trap würde sich mit ihm um die Pfeiltasten streiten. Bleiben, sind jetzt im Code als Ausnahme begründet. |
+
+**Der eigentliche Fund war ein anderer.** `document.body.style` kam im gesamten
+Projekt **kein einziges Mal** vor: **niemand sperrte das Hintergrund-Scrollen**,
+`Modal` eingeschlossen. Bei jedem offenen Dialog scrollte die Seite darunter
+weiter — auf einer langen Admin-Tabelle verliert man damit genau die Zeile, aus
+der man den Dialog geöffnet hat.
+
+**Lösung.** [`useScrollLock`](../src/components/ui/useScrollLock.ts): sperrt den
+Body, gibt die Breite der verschwundenen Scrollbar als Padding zurück (sonst
+springt jeder fixierte Header seitwärts, sobald ein Dialog aufgeht) und zählt
+die Sperren, damit ein Dialog im Dialog die Seite nicht vorzeitig freigibt.
+`Modal` nutzt ihn, die sieben Ausnahmen ebenfalls — ein Backdrop über einer
+scrollenden Seite ist unabhängig von der Bauart ein Fehler.
+
+`Modal` hat außerdem ein `testId` bekommen, das auch den Schließen-Button
+bedient (`${testId}-close`), damit migrierte Dialoge ihre E2E-Anker behalten.
+
+**Nebenbefund, nicht behoben:** `Modal` rendert **zwei** Elemente mit demselben
+`aria-label` — den Backdrop-Button und den Schließen-Button im Header. Ein
+Screenreader liest also zweimal „Close dialog". Beim Migrieren fiel das auf,
+weil ein `getByLabelText` plötzlich zwei Treffer hatte. Zu beheben wäre es
+leicht (Backdrop `aria-hidden`, Escape deckt Tastaturnutzer ohnehin ab), aber
+es ändert die Semantik jedes Dialogs und gehört deshalb entschieden, nicht
+nebenbei gemacht.
 
 ---
 

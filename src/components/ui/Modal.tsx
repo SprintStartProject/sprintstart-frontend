@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, type ReactNode } from "react";
 import { getModalDialogVariants, modalBackdropVariants } from "../../styles/tokens";
 import { Button } from "./Button";
+import { useScrollLock } from "./useScrollLock";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
@@ -25,6 +26,12 @@ type ModalProps = {
     isDismissDisabled?: boolean;
     titleId?: string;
     descriptionId?: string;
+    /**
+     * `data-testid` for the dialog itself, and — suffixed with `-close` — for
+     * its close button. Present because standards §5 requires E2E-targeted
+     * elements to carry one, and a dialog is the thing a test opens and closes.
+     */
+    testId?: string;
     onClose: () => void;
 };
 
@@ -66,11 +73,17 @@ export function Modal({
     isDismissDisabled = false,
     titleId = "modal-title",
     descriptionId = "modal-description",
+    testId,
     onClose,
 }: ModalProps) {
     const dialogRef = useRef<HTMLDivElement>(null);
     const previouslyFocusedElement = useRef<HTMLElement | null>(null);
     const prefersReducedMotion = useReducedMotion();
+
+    // Without this the page behind a dialog still scrolls under the pointer,
+    // which is disorienting and, on a long admin table, loses the row the user
+    // opened the dialog from.
+    useScrollLock(isOpen);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -167,6 +180,7 @@ export function Modal({
 
                     <motion.div
                         ref={dialogRef}
+                        data-testid={testId}
                         role={role}
                         aria-modal="true"
                         aria-labelledby={titleId}
@@ -209,6 +223,7 @@ export function Modal({
                                     onClick={onClose}
                                     disabled={isDismissDisabled}
                                     aria-label={closeLabel}
+                                    data-testid={testId ? `${testId}-close` : undefined}
                                 >
                                     <X className="h-4 w-4" />
                                 </Button>

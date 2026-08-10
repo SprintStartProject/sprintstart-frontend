@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
 import { DinoGame } from "../../chatbot/components/DinoGame";
 
@@ -28,6 +29,11 @@ interface DinoGameModalProps {
  * the dashboard chord is a true easter egg, always available.
  */
 export function DinoGameModal({ open, onClose }: DinoGameModalProps) {
+    // Not a `Modal`: the game owns the keyboard, and Modal's focus trap
+    // would fight it for the arrow keys. The one thing every overlay needs
+    // regardless is the page behind it holding still.
+    useScrollLock(open);
+
     const prefersReducedMotion = useReducedMotion();
     const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
 
