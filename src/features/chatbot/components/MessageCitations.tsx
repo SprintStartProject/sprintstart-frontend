@@ -211,7 +211,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                   <div
                     ref={popoverRef}
                     style={getCitationPopoverStyle(activeRect, 240)}
-                    className="rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5 shadow-2xl"
+                    className="rounded-md border border-app-border-muted bg-app-bg-soft px-2 py-1.5 shadow-lg"
                   >
                     {onOpenArtifact ? (
                       <button

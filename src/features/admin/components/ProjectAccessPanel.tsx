@@ -157,7 +157,7 @@ export function ProjectAccessPanel({
           </Button>
 
           {openProjectPicker && (
-            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-2xl">
+            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-lg">
               <Input
                 size="sm"
                 value={projectSearch}

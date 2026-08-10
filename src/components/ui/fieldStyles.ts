@@ -45,11 +45,18 @@ const leadingIconPadding: Record<FieldSize, string> = {
   lg: "pl-11",
 };
 
-/** Right padding that clears a trailing element, per size. */
+/**
+ * Right padding that clears a trailing element, per size.
+ *
+ * Sized for a `Button`, not for a bare icon: `trailing` is the clickable slot
+ * (refresh, password toggle), so what sits there is at least an `iconOnly`
+ * button — 36px wide — offset by {@link trailingPosition}. Padding that only
+ * cleared a 16px icon would let the text run underneath it.
+ */
 const trailingPadding: Record<FieldSize, string> = {
-  sm: "pr-9",
-  md: "pr-10",
-  lg: "pr-11",
+  sm: "pr-11",
+  md: "pr-12",
+  lg: "pr-14",
 };
 
 /** Where the leading icon sits, per size. */

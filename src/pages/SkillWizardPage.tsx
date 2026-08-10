@@ -83,7 +83,7 @@ export function SkillWizardPage() {
   if (error || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app-bg px-4 py-10">
-        <div className="w-full max-w-lg rounded-2xl border border-app-border bg-app-surface p-6 text-center shadow-2xl">
+        <div className="w-full max-w-lg rounded-2xl border border-app-border bg-app-surface p-6 text-center shadow-lg">
           <p className="text-sm text-app-text-muted">{error ?? "Unknown error."}</p>
 
           <div className="mt-6 flex justify-center">

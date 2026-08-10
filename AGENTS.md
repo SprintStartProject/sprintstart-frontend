@@ -139,7 +139,7 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 The primitives already carry the focus ring, the 44px touch target, the `disabled` / `aria-busy` treatment, the hover motion, the `aria-describedby` wiring for errors, and the focus trap. Rebuilding one by hand means getting all of that right again, which is how the drift started.
 
 - **Radius scale:** `rounded-lg` dense controls · `rounded-xl` standard controls and surfaces nested inside a card · `rounded-2xl` the card itself · `rounded-full` avatars/badges/pills · `rounded-3xl`+ dialog chrome only.
-- **Shadow scale:** `shadow-sm` card at rest · `hover:shadow-lg` that card hovered · `shadow-xl`/`2xl` dialogs. `hover:shadow-app-brand-lift` belongs to `Button variant="primary"` alone.
+- **Shadow scale:** `shadow-sm` card at rest · `hover:shadow-lg` that card hovered · `shadow-lg` anything floating over content (popover, tooltip, dropdown, toast, floating button) · `shadow-2xl` dialogs and drawers only. No backdrop behind it means it is not a dialog. `hover:shadow-app-brand-lift` belongs to `Button variant="primary"` alone.
 
 Legitimate exceptions are listed in [docs/FRONTEND_CODING_STANDARDS.md §4](./docs/FRONTEND_CODING_STANDARDS.md) — clickable cards and list rows, `aria-pressed` toggles and filter chips, `role="menuitem"` / combobox triggers, and the game surfaces. Everything else is a `Button`.
 

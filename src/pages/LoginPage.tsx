@@ -23,7 +23,7 @@ export function LoginPage() {
         />
       </div>
 
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-app-border bg-app-surface p-6 text-center shadow-2xl backdrop-blur-sm sm:p-10">
+      <div className="w-full max-w-md space-y-8 rounded-2xl border border-app-border bg-app-surface p-6 text-center shadow-lg backdrop-blur-sm sm:p-10">
         <div className="flex flex-col items-center space-y-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-brand shadow-lg">
             <Rocket className="h-9 w-9 text-white" />

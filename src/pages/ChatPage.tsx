@@ -256,7 +256,7 @@ export function ChatPage() {
         aria-label="Toggle sidebar"
         aria-controls="chat-mobile-sidebar"
         aria-expanded={sidebarOpen}
-        className="fixed top-4 right-[var(--app-page-gutter)] z-50 mt-15 rounded-full border border-app-border bg-app-surface p-3 text-app-text shadow-2xl hover:cursor-pointer hover:bg-app-surface-hover md:hidden"
+        className="fixed top-4 right-[var(--app-page-gutter)] z-50 mt-15 rounded-full border border-app-border bg-app-surface p-3 text-app-text shadow-lg hover:cursor-pointer hover:bg-app-surface-hover md:hidden"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
         <MessageSquareText size={24} />
@@ -290,7 +290,11 @@ export function ChatPage() {
 
       {/* Main content column */}
       <div
-        className={`relative flex min-w-0 flex-1 flex-col${desktopSidebarOpen ? "chat-sidebar-open" : ""}`}
+        /* The separating space belongs *before* `${`, never inside the string:
+           prettier-plugin-tailwindcss trims class strings when it sorts them,
+           which once silently glued `flex-col` to `chat-sidebar-open` and
+           turned the whole page into a flex row. */
+        className={`relative flex min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "chat-sidebar-open" : ""}`}
       >
         {/* Header: open-sidebar toggle floats at the far-left edge so it
                     doesn't crowd the page title's icon; title stays aligned with
@@ -380,7 +384,7 @@ export function ChatPage() {
               aria-label="Jump to latest message"
               data-testid="chat-scroll-to-bottom"
               onClick={scrollToBottom}
-              className="pointer-events-auto flex items-center gap-1 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text shadow-2xl transition-colors hover:bg-app-surface-hover"
+              className="pointer-events-auto flex items-center gap-1 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text shadow-lg transition-colors hover:bg-app-surface-hover"
             >
               <ArrowDown size={14} />
               Latest

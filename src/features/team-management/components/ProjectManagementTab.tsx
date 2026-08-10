@@ -180,7 +180,7 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
   if (loadError) {
     return (
       <div className="rounded-2xl border border-app-danger-border bg-app-surface p-8 text-center">
-        <p className="text-app-danger text-sm">{loadError}</p>
+        <p className="text-sm text-app-danger-text">{loadError}</p>
       </div>
     );
   }

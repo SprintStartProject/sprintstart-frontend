@@ -152,15 +152,21 @@ only this repository gets the full set of frontend rules here.
   to dialog chrome (`Modal`, `SidePanel`, the Moments overlays) alone — a card
   that reaches for it is asking to look like something it is not.
 
-- **Shadow scale — three rungs, and they mean different things.**
+- **Shadow scale — four rungs, and they mean different things.**
 
-  |                   | when                                                                            |
-  | ----------------- | ------------------------------------------------------------------------------- |
-  | `shadow-sm`       | a card at rest, to lift it off the page background                              |
-  | `hover:shadow-lg` | that same card while hovered, paired with the hover border                      |
-  | `shadow-2xl`      | dialogs, drawers, popovers, menus, toasts — anything that floats above the page |
+  |                   | when                                                                              |
+  | ----------------- | --------------------------------------------------------------------------------- |
+  | `shadow-sm`       | a card at rest, to lift it off the page background                                |
+  | `hover:shadow-lg` | that same card while hovered, paired with the hover border                        |
+  | `shadow-lg`       | floating _over_ content: popovers, tooltips, dropdowns, toasts, floating buttons  |
+  | `shadow-2xl`      | dialogs and drawers — a surface that takes over the screen and dims what's behind |
 
-  `shadow-md` and `shadow-xl` say nothing these three do not; don't reach for
+  The last two are the pair that's easy to get wrong. `2xl` is dialog weight; on
+  a `text-xs` pill or a small tooltip it reads as a smudge rather than as depth,
+  and in dark mode it is worse. If the element does not have a backdrop behind
+  it, it is not a dialog — use `shadow-lg`.
+
+  `shadow-md` and `shadow-xl` say nothing these four do not; don't reach for
   them. The one thing outside the ladder is a `shadow-lg` used as _emphasis_ on
   a filled brand surface — a selected tab, the logo tile. That is decoration on
   a coloured shape, not elevation, and it stays.
