@@ -5,6 +5,7 @@
 // ============================================================
 
 import { useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
@@ -17,7 +18,6 @@ import {
   TrendingUp,
   FileText,
   ArrowRight,
-  Loader2,
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
@@ -60,7 +60,7 @@ export function FaqWidget() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex items-center justify-center min-h-48">
-        <Loader2 className="w-5 h-5 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }

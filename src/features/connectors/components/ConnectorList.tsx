@@ -6,6 +6,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
+import { EmptyState } from "../../../components/ui/EmptyState.tsx";
 import { formatConfiguredAt } from "../data.ts";
 import type { ConnectorListItem } from "../types.ts";
 import { ConnectorSourcesSection } from "./ConnectorSourcesSection.tsx";
@@ -40,14 +41,9 @@ export function ConnectorList({
 }: ConnectorListProps) {
   if (connectors.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-        <p className="text-sm font-medium text-app-text">
-          No connectors registered
-        </p>
-        <p className="mt-1 text-sm text-app-text-muted">
-          Connectors will appear here once they are registered on the backend.
-        </p>
-      </div>
+      <EmptyState title="No connectors registered">
+        Connectors will appear here once they are registered on the backend.
+      </EmptyState>
     );
   }
 

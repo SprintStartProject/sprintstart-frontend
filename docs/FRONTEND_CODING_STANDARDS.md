@@ -104,6 +104,16 @@ only this repository gets the full set of frontend rules here.
   scroll lock via [`useScrollLock`](../src/components/ui/useScrollLock.ts) —
   a backdrop over a page that scrolls underneath is a bug regardless.
 
+- **Waiting is [`ui/Spinner`](../src/components/ui/Spinner.tsx), emptiness is
+  [`ui/EmptyState`](../src/components/ui/EmptyState.tsx).** A bare
+  `<Loader2 className="animate-spin" />` says nothing to a screen reader;
+  `Spinner` carries `role="status"` and a label. Inside a `Button`, use its
+  `loading` prop rather than either.
+
+  `EmptyState` takes a `Spinner` as its `icon` on purpose: a list that is empty
+  and a list that has not arrived yet should differ in their words, not in their
+  shape, so the page does not visibly rearrange when the answer lands.
+
 - **Status pills are [`ui/Badge`](../src/components/ui/Badge.tsx).** Pick the
   `variant` by meaning, not by colour, and `size="sm"` inside dense rows. A
   hand-written `rounded-full … px-2 … text-xs` span is how the codebase ended up

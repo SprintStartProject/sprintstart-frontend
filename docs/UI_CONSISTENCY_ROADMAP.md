@@ -330,15 +330,47 @@ berührt die Dokumentstruktur der Seite und gehört in einen eigenen Schritt.
 
 ---
 
-## 6. Spinner / Loading-State als Komponente
+## 6. Spinner und EmptyState — **erledigt**
 
-**Befund.** 73 handgeschriebene `animate-spin`-Stellen in 48 Dateien, dazu
-zwei feature-spezifische Loading-States (`ConnectorsLoadingState`,
-`DataIngestionLoadingState`) ohne gemeinsame Basis.
+**Befund.** 47 handgeschriebene `animate-spin`-Stellen und 26 Blöcke mit
+gestricheltem Rahmen. Nach Kontext sortiert:
 
-**Vorschlag.** `ui/Spinner.tsx` (Größen passend zur Button-Skala) und ein
-generisches `ui/EmptyState.tsx` — es gibt ~25 Dateien mit handgebauten
-"noch nichts da"-Zuständen.
+| Muster | Anzahl |
+| --- | ---: |
+| Ganzflächiger Ladezustand (`flex justify-center py-N` + `Loader2`) | 13 |
+| Icon, das beim Aktualisieren dreht (kein Spinner, sondern ein Refresh-Symbol) | 8 |
+| Sonstiges inline | 24 |
+| Leerzustände mit gestricheltem Rahmen | 26 |
+
+Die Leerzustände zerfielen in zwei Formen: die reiche (Icon, Titel, Text,
+manchmal eine Aktion) und die knappe (ein Satz im gestrichelten Kasten). Die
+Polsterung reichte dabei von `px-4 py-3` bis `p-8`.
+
+**Der eigentliche Befund war wieder ein anderer.** Kein einziger dieser 47
+Spinner hatte eine Ansage für Screenreader — wer nicht sieht, bekam Stille,
+während die Seite wartete.
+
+**Lösung.**
+
+- [`ui/Spinner`](../src/components/ui/Spinner.tsx) — drei Größen entlang der
+  Button-Skala, `role="status"` und ein Label. `silent` für den Fall, dass die
+  Umgebung das Warten schon ansagt; zwei Ansagen für eine Wartezeit sind
+  schlimmer als keine.
+- [`ui/EmptyState`](../src/components/ui/EmptyState.tsx) — Icon, Titel, Text und
+  optionale Aktion; ohne Titel wird daraus die knappe Ein-Satz-Form. Der `icon`-
+  Slot nimmt bewusst auch einen `Spinner`: **eine leere Liste und eine noch
+  nicht angekommene Liste sollen sich in den Worten unterscheiden, nicht in der
+  Form** — sonst baut sich die Seite sichtbar um, sobald die Antwort da ist.
+- `ConnectorsLoadingState` und `DataIngestionLoadingState` sind dadurch von je
+  16 auf 5 Zeilen geschrumpft und bauen ihren Kreis-Spinner nicht mehr selbst
+  aus `border-t-transparent`.
+
+**Stand:** 9 ganzflächige Ladezustände und 6 Leerzustände migriert. Die 8
+Refresh-Icons bleiben — die drehen ein vorhandenes Symbol, sind also kein
+Spinner. Die verbliebenen Inline-Fälle sitzen in Buttons (dort erledigt das
+`Button`s `loading`-Prop) oder in Spielen.
+
+Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §4.
 
 ---
 

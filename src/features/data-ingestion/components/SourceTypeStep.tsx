@@ -1,4 +1,5 @@
 import { Badge } from "../../../components/ui/Badge.tsx";
+import { EmptyState } from "../../../components/ui/EmptyState.tsx";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 
@@ -86,17 +87,16 @@ export function ComingSoonStep({ sourceSystem }: { sourceSystem: SourceSystem })
   const Icon = meta.icon;
 
   return (
-    <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-app-bg-soft">
-        <Icon className="h-6 w-6 text-app-text-muted" />
-      </div>
-      <p className="mt-4 text-base font-semibold text-app-text">
-        {meta.type} connection is coming soon
-      </p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-app-text-muted">
-        {meta.description} This source type isn&apos;t available to connect yet —
-        for now you can connect GitHub repositories.
-      </p>
-    </div>
+    <EmptyState
+      icon={
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-app-bg-soft">
+          <Icon className="h-6 w-6 text-app-text-muted" />
+        </span>
+      }
+      title={`${meta.type} connection is coming soon`}
+    >
+      {meta.description} This source type isn&apos;t available to connect yet —
+      for now you can connect GitHub repositories.
+    </EmptyState>
   );
 }

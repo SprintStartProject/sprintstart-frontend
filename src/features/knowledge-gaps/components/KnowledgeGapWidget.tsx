@@ -5,6 +5,7 @@
 // ============================================================
 
 import { useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useFetch } from "../../../hooks/useFetch";
@@ -17,7 +18,6 @@ import { Button } from "../../../components/ui/Button";
 import {
   ShieldAlert,
   ArrowRight,
-  Loader2,
   AlertCircle,
   Clock,
   RefreshCw,
@@ -59,7 +59,7 @@ export function KnowledgeGapWidget() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex items-center justify-center min-h-48">
-        <Loader2 className="w-5 h-5 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }

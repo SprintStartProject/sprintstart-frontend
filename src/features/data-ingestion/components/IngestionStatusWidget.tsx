@@ -7,7 +7,8 @@
 // PM Dashboard never re-implements ingestion status handling.
 // ============================================================
 
-import { ArrowRight, Database, Loader2 } from "lucide-react";
+import { ArrowRight, Database } from "lucide-react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { createSourceFromInstance } from "../data.ts";
 import { getIngestionSourceStatuses } from "../../../services/ingestionService.ts";
@@ -47,7 +48,7 @@ export function IngestionStatusWidget() {
     if (loading) {
         return (
             <div className="rounded-2xl border border-app-border bg-app-surface p-4 flex items-center justify-center">
-                <Loader2 className="w-4 h-4 animate-spin text-app-brand" />
+                <Spinner size="lg" label="Loading" />
             </div>
         );
     }

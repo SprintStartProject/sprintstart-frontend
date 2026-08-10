@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { KnowledgeGapSeverity } from "../types";
@@ -12,7 +13,6 @@ import { Button } from "../../../components/ui/Button";
 
 import {
   ShieldAlert,
-  Loader2,
   AlertCircle,
   Clock,
   ArrowLeft,
@@ -93,7 +93,7 @@ export function KnowledgeGapsPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }

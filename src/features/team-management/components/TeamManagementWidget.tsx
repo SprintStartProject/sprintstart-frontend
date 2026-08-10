@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
-  Loader2,
   MessageSquareText,
   SkipForward,
   Users,
@@ -87,7 +87,7 @@ export function TeamManagementWidget({
   if (loading) {
     return (
       <div className="flex min-h-48 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
-        <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }

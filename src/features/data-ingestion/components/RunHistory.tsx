@@ -10,6 +10,7 @@ import {
 } from "../data.ts";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
+import { EmptyState } from "../../../components/ui/EmptyState.tsx";
 import type { IngestionRun } from "../types.ts";
 
 type RunHistoryProps = {
@@ -35,19 +36,17 @@ export function RunHistory({
 }: RunHistoryProps) {
     if (runs.length === 0) {
         return (
-            <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-                <h3 className="text-lg font-semibold text-app-text">
-                    {isFiltered
+            <EmptyState
+                title={
+                    isFiltered
                         ? 'No runs match these filters'
-                        : 'No ingestion runs found'}
-                </h3>
-
-                <p className="mt-2 text-sm text-app-text-muted">
-                    {isFiltered
-                        ? 'Try a different status or repository, or reset the filters.'
-                        : 'The backend did not return any ingestion runs yet.'}
-                </p>
-            </div>
+                        : 'No ingestion runs found'
+                }
+            >
+                {isFiltered
+                    ? 'Try a different status or repository, or reset the filters.'
+                    : 'The backend did not return any ingestion runs yet.'}
+            </EmptyState>
         );
     }
 

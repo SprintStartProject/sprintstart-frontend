@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { ApiError } from "../../../services/apiClient.ts";
@@ -426,17 +427,14 @@ export function GithubRepositoryDiscovery({
       )}
 
       {discoverState === "loaded" && repositories.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-          <GitBranch className="mx-auto h-8 w-8 text-app-text-muted" />
-          <p className="mt-3 text-sm font-semibold text-app-text">
-            No repositories found
-          </p>
-          <p className="mt-1 text-sm text-app-text-muted">
-            The token may only see public repositories. Private repositories
-            require a token with broader scope (e.g. <code>read:org</code> / repo
-            access).
-          </p>
-        </div>
+        <EmptyState
+          icon={<GitBranch className="h-8 w-8" />}
+          title="No repositories found"
+        >
+          The token may only see public repositories. Private repositories
+          require a token with broader scope (e.g. <code>read:org</code> / repo
+          access).
+        </EmptyState>
       )}
 
       {repositories.length > 0 && (

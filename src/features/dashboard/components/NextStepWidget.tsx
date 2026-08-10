@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, Check, Loader2, Rocket } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, Rocket } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { useAuth } from "../../../context/useAuth";
@@ -124,7 +125,7 @@ export function NextStepWidget() {
     if (loading) {
         return (
             <div className="flex min-h-56 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
-                <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
+                <Spinner size="lg" label="Loading" />
             </div>
         );
     }

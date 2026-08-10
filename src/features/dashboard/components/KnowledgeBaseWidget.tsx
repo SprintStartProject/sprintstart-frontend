@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, FileText, Loader2 } from "lucide-react";
+import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { useAuth } from "../../../context/useAuth";
 import type { Artifact } from "../../knowledge-base/types";
@@ -87,7 +88,7 @@ export function KnowledgeBaseWidget() {
 
             {loading ? (
                 <div className="flex flex-1 items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
+                    <Spinner size="lg" label="Loading" />
                 </div>
             ) : artifacts.length === 0 ? (
                 <div className="flex flex-1 flex-col items-start justify-center gap-2">

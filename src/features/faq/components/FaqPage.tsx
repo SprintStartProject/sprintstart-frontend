@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { FAQGroup } from "../types";
@@ -10,7 +11,6 @@ import { Button } from "../../../components/ui/Button";
 import {
   TrendingUp,
   FileText,
-  Loader2,
   AlertCircle,
   ArrowLeft,
   Users,
@@ -63,7 +63,7 @@ export function FaqPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }

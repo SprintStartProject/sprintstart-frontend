@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Spinner } from '../../../components/ui/Spinner';
 import { useProfile } from '../../../features/profile/useProfile';
 import { AccountForm } from '../../../features/profile/components/AccountForm';
 import { PasswordForm } from '../../../features/profile/components/PasswordForm';
@@ -14,7 +14,7 @@ export function ProfileSection() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-app-brand" />
+                <Spinner size="lg" label="Loading" />
             </div>
         );
     }
