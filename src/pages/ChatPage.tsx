@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
+import { useAvailableSources } from "../features/chatbot/hooks/useAvailableSources.ts";
 import { useChatPreferences } from "../context/useChatPreferences";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -72,6 +73,7 @@ export function ChatPage() {
     } = useChat();
 
     const { showThoughtProcess } = useChatPreferences();
+    const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
 
     // Resolved from the chat, not from the switcher: a citation points at an artifact
     // of the project the conversation belongs to. Taking the currently selected project
@@ -441,6 +443,8 @@ export function ChatPage() {
                     isBusy={isThinking || isStreaming}
                     hasProject={hasProject}
                     lastUserPrompt={lastUserPrompt}
+                    availableSources={availableSources}
+                    sourcesLoading={sourcesLoading}
                     textareaRef={textareaRef}
                     showFilters={showFilters}
                     onToggleFilters={() => setShowFilters((v) => !v)}

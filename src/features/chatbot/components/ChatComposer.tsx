@@ -1,6 +1,7 @@
-import { Check, Filter, Send, Square } from "lucide-react";
+import { Check, Filter, Send, Square, X } from "lucide-react";
 import type { FormEvent, RefObject } from "react";
-import { SOURCE_SYSTEMS, type SourceSystem } from "../types";
+import { SOURCE_META } from "../../data-ingestion/data";
+import type { SourceSystem } from "../types";
 
 type ChatComposerProps = {
     /** Current draft text. */
@@ -23,6 +24,14 @@ type ChatComposerProps = {
      * a shell recalls the previous command.
      */
     lastUserPrompt: string;
+    /**
+     * The source systems that can actually be filtered on. Offering the full hardcoded set
+     * meant a connector that was never configured was still selectable, and the prompt then
+     * failed instead of returning fewer results.
+     */
+    availableSources: SourceSystem[];
+    /** True while the connector list is still being fetched. */
+    sourcesLoading: boolean;
 
     /** Ref to the textarea, so the parent can focus / autosize it. */
     textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -53,6 +62,8 @@ export function ChatComposer({
     isBusy,
     hasProject,
     lastUserPrompt,
+    availableSources,
+    sourcesLoading,
     textareaRef,
     showFilters,
     onToggleFilters,
@@ -72,96 +83,140 @@ export function ChatComposer({
     return (
         <footer className="shrink-0 border-t border-app-border bg-app-bg app-page-frame py-4">
             {showFilters && (
-                <div className="mb-3">
-                    <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-app-border bg-app-surface-muted/70 backdrop-blur px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                            <label
-                                htmlFor="filter-from"
-                                className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold"
-                            >
-                                From
-                            </label>
-
-                            <input
-                                id="filter-from"
-                                type="date"
-                                max={to || undefined}
-                                value={from}
-                                onChange={(e) => setFrom(e.target.value)}
-                                className="h-10 rounded-xl border border-app-border bg-app-bg px-3 text-sm outline-none focus:ring-2 focus:ring-app-focus/50"
-                            />
+                <div className="mb-3 overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+                    <div className="flex items-center justify-between gap-3 border-b border-app-border-muted px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                            <Filter size={14} className="text-app-text-muted" />
+                            <span className="text-sm font-semibold text-app-text">Narrow the sources</span>
                         </div>
 
-                        <div className="flex flex-col gap-1">
-                            <label
-                                htmlFor="filter-to"
-                                className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold"
+                        {activeFilterCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
                             >
-                                To
-                            </label>
+                                <X size={12} />
+                                Reset
+                            </button>
+                        )}
+                    </div>
 
-                            <input
-                                id="filter-to"
-                                type="date"
-                                min={from || undefined}
-                                value={to}
-                                onChange={(e) => setTo(e.target.value)}
-                                className="h-10 rounded-xl border border-app-border bg-app-bg px-3 text-sm outline-none focus:ring-2 focus:ring-app-focus/50"
-                            />
-                        </div>
+                    <div className="flex flex-col gap-5 px-4 py-4">
+                        <fieldset className="flex flex-col gap-2">
+                            <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+                                Sources
+                            </legend>
 
-                        <div className="h-8 w-px bg-app-border-muted self-center hidden lg:block" />
+                            {availableSources.length === 0 ? (
+                                <p className="text-sm text-app-text-muted">
+                                    {sourcesLoading
+                                        ? "Loading connected sources…"
+                                        : "No sources are connected yet, so there is nothing to narrow down."}
+                                </p>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {availableSources.map((source) => {
+                                        const selected = sourceSystems.includes(source);
+                                        const meta = SOURCE_META[source];
+                                        const Icon = meta.icon;
 
-                        <div className="flex flex-col gap-1 flex-1 min-w-[240px]">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-app-text-muted tracking-wide uppercase font-semibold">
-                                    Systems
-                                </span>
-                                {activeFilterCount > 0 && (
+                                        return (
+                                            <button
+                                                key={source}
+                                                type="button"
+                                                aria-pressed={selected}
+                                                title={meta.description}
+                                                onClick={() => toggleSourceSystem(source)}
+                                                className={`group flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                                                    selected
+                                                        ? "border-app-brand-border bg-app-brand/10 text-app-brand-text"
+                                                        : "border-app-border bg-app-bg text-app-text-muted hover:border-app-border-strong hover:text-app-text"
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`flex size-4 shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
+                                                        selected
+                                                            ? "border-app-brand bg-app-brand text-white"
+                                                            : "border-app-border-strong bg-transparent"
+                                                    }`}
+                                                >
+                                                    {selected && <Check size={11} strokeWidth={3} />}
+                                                </span>
+                                                <Icon size={15} className="shrink-0 opacity-70" />
+                                                {meta.type}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            <p className="text-xs text-app-text-subtle">
+                                {sourceSystems.length === 0
+                                    ? "Nothing selected — every connected source is searched."
+                                    : "Only the selected sources are searched."}
+                            </p>
+                        </fieldset>
+
+                        <div className="h-px bg-app-border-muted" />
+
+                        <fieldset className="flex flex-col gap-2">
+                            <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+                                Indexed between
+                            </legend>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                    id="filter-from"
+                                    type="date"
+                                    aria-label="Earliest date"
+                                    max={to || undefined}
+                                    value={from}
+                                    onChange={(e) => setFrom(e.target.value)}
+                                    className={`h-10 rounded-xl border bg-app-bg px-3 text-sm text-app-text outline-none transition-colors focus-visible:ring-2 focus-visible:ring-app-focus/50 ${
+                                        rangeInvalid ? "border-app-danger-border" : "border-app-border"
+                                    }`}
+                                />
+
+                                <span className="text-sm text-app-text-subtle">to</span>
+
+                                <input
+                                    id="filter-to"
+                                    type="date"
+                                    aria-label="Latest date"
+                                    min={from || undefined}
+                                    value={to}
+                                    onChange={(e) => setTo(e.target.value)}
+                                    className={`h-10 rounded-xl border bg-app-bg px-3 text-sm text-app-text outline-none transition-colors focus-visible:ring-2 focus-visible:ring-app-focus/50 ${
+                                        rangeInvalid ? "border-app-danger-border" : "border-app-border"
+                                    }`}
+                                />
+
+                                {(from || to) && (
                                     <button
                                         type="button"
-                                        onClick={clearFilters}
-                                        className="text-xs font-semibold text-app-text-muted hover:text-app-brand transition-colors"
+                                        onClick={() => {
+                                            setFrom("");
+                                            setTo("");
+                                        }}
+                                        className="rounded-lg px-2 py-1 text-xs font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
                                     >
-                                        Clear All
+                                        Clear dates
                                     </button>
                                 )}
                             </div>
 
-                            <div
-                                role="group"
-                                aria-label="Source systems"
-                                className="flex flex-wrap gap-2 min-h-10 items-center"
-                            >
-                                {SOURCE_SYSTEMS.map((source) => {
-                                    const selected = sourceSystems.includes(source);
-
-                                    return (
-                                        <button
-                                            key={source}
-                                            type="button"
-                                            aria-pressed={selected}
-                                            onClick={() => toggleSourceSystem(source)}
-                                            className={`h-10 rounded-full px-4 text-xs font-semibold uppercase tracking-wide border transition-colors flex items-center gap-1.5 ${
-                                                selected
-                                                    ? "bg-app-brand text-white border-app-brand"
-                                                    : "bg-app-bg border-app-border text-app-text hover:bg-app-surface"
-                                            }`}
-                                        >
-                                            {selected && <Check size={13} />}
-                                            {source}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                            {rangeInvalid ? (
+                                <p className="text-xs text-app-danger-text" role="alert">
+                                    The first date is after the second one, so nothing would match.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-app-text-subtle">
+                                    Leave empty to search regardless of when a document was indexed.
+                                </p>
+                            )}
+                        </fieldset>
                     </div>
-
-                    {rangeInvalid && (
-                        <p className="mt-1 text-xs text-app-danger-text" role="alert">
-                            The &ldquo;From&rdquo; date can&apos;t be after the &ldquo;To&rdquo; date.
-                        </p>
-                    )}
                 </div>
             )}
 
