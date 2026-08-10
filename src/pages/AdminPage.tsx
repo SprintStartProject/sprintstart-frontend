@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { SCROLL_CONTAINER_ATTRIBUTE } from "../components/ui/useScrollLock";
 import {
   DRAWER_CLOSE_DELAY_MS,
   areAllVisibleUsersSelected,
@@ -457,6 +458,10 @@ export function AdminPage() {
     // in some places.
     <div
       ref={swipeRef}
+      // This page scrolls here rather than letting the document scroll, so a
+      // dialog's scroll lock has to be told where to look — see
+      // `SCROLL_CONTAINER_ATTRIBUTE`.
+      {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
       className="h-dvh overflow-y-scroll overscroll-contain bg-app-bg"
     >
       <header className="border-b border-app-border bg-app-bg">

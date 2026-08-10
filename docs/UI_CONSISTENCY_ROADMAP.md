@@ -268,6 +268,17 @@ die Sperren, damit ein Dialog im Dialog die Seite nicht vorzeitig freigibt.
 `Modal` nutzt ihn, die sieben Ausnahmen ebenfalls — ein Backdrop über einer
 scrollenden Seite ist unabhängig von der Bauart ein Fehler.
 
+**Und ein Nachtrag, der beim Prüfen auffiel.** Die erste Fassung sperrte nur
+`document.body` — und traf damit ausgerechnet die Access-Management-Seite
+nicht, die längste Liste der App. Sie scrollt nämlich nicht im Dokument,
+sondern in einem eigenen Container (`h-dvh overflow-y-scroll`, nötig für die
+Swipe-Geste), und den interessiert ein `overflow: hidden` auf dem Body nicht.
+
+Statt einen Ref durch jede Dialog-Ebene zu reichen, markiert so eine Seite
+ihren Container mit `data-scroll-container`; der Hook findet ihn. Ein Attribut
+statt einer Prop-Kette — und die nächste Seite, die ihr Scrollen selbst
+übernimmt, braucht genau diese eine Zeile.
+
 `Modal` hat außerdem ein `testId` bekommen, das auch den Schließen-Button
 bedient (`${testId}-close`), damit migrierte Dialoge ihre E2E-Anker behalten.
 

@@ -1,6 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
-import { useScrollLock } from '../../../../src/components/ui/useScrollLock';
+import {
+    SCROLL_CONTAINER_ATTRIBUTE,
+    useScrollLock,
+} from '../../../../src/components/ui/useScrollLock';
 
 function Locker({ locked = true }: { locked?: boolean }) {
     useScrollLock(locked);
@@ -39,6 +42,21 @@ describe('useScrollLock', () => {
 
         outer.unmount();
         expect(document.body.style.overflow).toBe('');
+    });
+
+    it('also freezes a page that scrolls in its own container', () => {
+        const container = document.createElement('div');
+        container.setAttribute(SCROLL_CONTAINER_ATTRIBUTE, '');
+        container.style.overflowY = 'scroll';
+        document.body.appendChild(container);
+
+        const view = render(<Locker />);
+        expect(container.style.overflow).toBe('hidden');
+
+        view.unmount();
+        expect(container.style.overflow).toBe('');
+
+        container.remove();
     });
 
     it('restores whatever overflow the page had before', () => {
