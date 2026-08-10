@@ -245,7 +245,7 @@ export function GithubRepositorySyncSettings({
   const isDirty = currentSnapshot !== baseline;
 
   return (
-    <div className="rounded-xl border border-app-border bg-app-surface-muted p-4">
+    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
       {message && (
         <div className="mb-4 rounded-xl border border-app-success-border bg-app-success-bg px-3 py-2 text-sm text-app-success-text">
           {message}

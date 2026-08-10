@@ -62,7 +62,7 @@ export function FaqDetailPage() {
       <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-app-text mb-2">
+          <h2 className="text-lg font-semibold text-app-text mb-2">
             Could not load group
           </h2>
           <p className="text-sm text-app-text-muted mb-6">
@@ -93,7 +93,7 @@ export function FaqDetailPage() {
           </Button>
 
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-xl font-bold text-app-text leading-snug">
+            <h1 className="text-xl sm:text-2xl font-semibold text-app-text leading-snug">
               {detail.questions[0].text}
             </h1>
             <Badge variant="success" className="shrink-0 gap-1.5">

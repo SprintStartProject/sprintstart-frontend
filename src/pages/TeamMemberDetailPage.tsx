@@ -725,7 +725,7 @@ export function TeamMemberDetailPage() {
                         Back
                     </button>
 
-                    <div className="mt-6 rounded-3xl border border-app-border bg-app-surface p-8">
+                    <div className="mt-6 rounded-2xl border border-app-border bg-app-surface p-8">
                         <p className="text-sm text-app-text">
                             Team member not found.
                         </p>
@@ -841,7 +841,7 @@ export function TeamMemberDetailPage() {
                             </div>
 
                             <div>
-                                <h1 className="text-2xl font-bold text-app-text">
+                                <h1 className="text-xl sm:text-2xl font-semibold text-app-text">
                                     {user.firstname} {user.lastname}
                                 </h1>
 
@@ -944,7 +944,7 @@ export function TeamMemberDetailPage() {
                         getStepStatusStyles={getStepStatusStyles}
                     />
                     <aside aria-label="Member insights" className="space-y-4">
-                    <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+                    <div className="rounded-2xl border border-app-border bg-app-surface p-6">
                         <h2 className="text-lg font-semibold text-app-text">
                             Feedback & Skip Requests
                         </h2>

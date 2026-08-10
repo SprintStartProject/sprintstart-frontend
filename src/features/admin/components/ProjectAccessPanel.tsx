@@ -151,7 +151,7 @@ export function ProjectAccessPanel({
   };
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:rounded-3xl sm:p-4">
+    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:p-4">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="items-center align-middle">
           <p className="text-xl font-semibold text-app-text sm:text-2xl">
@@ -174,7 +174,7 @@ export function ProjectAccessPanel({
           </Button>
 
           {openProjectPicker && (
-            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-xl">
+            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-2xl">
               <Input
                 size="sm"
                 value={projectSearch}

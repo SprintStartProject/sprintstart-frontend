@@ -37,7 +37,7 @@ export function DashboardHero({
           };
 
     return (
-        <section className="relative overflow-hidden rounded-3xl border border-app-border bg-app-surface px-6 py-8 sm:px-8 sm:py-10">
+        <section className="relative overflow-hidden rounded-2xl border border-app-border bg-app-surface px-6 py-8 sm:px-8 sm:py-10">
             <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 bg-gradient-to-br from-app-brand/12 via-transparent to-transparent"
@@ -81,7 +81,7 @@ export function DashboardHero({
                         <p className="text-sm font-medium text-app-text-muted">
                             {formattedDate}
                         </p>
-                        <h2 className="bg-gradient-to-r from-app-text via-app-text to-app-brand bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
+                        <h2 className="bg-gradient-to-r from-app-text via-app-text to-app-brand bg-clip-text text-2xl sm:text-3xl font-bold tracking-tight text-transparent">
                             {greeting}, {displayName}
                         </h2>
                     </div>

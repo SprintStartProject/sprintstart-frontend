@@ -1182,7 +1182,7 @@ export function DataIngestionPage() {
                   <section aria-label="Sources">
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="mr-1 text-base font-bold tracking-tight text-app-text">
+                        <h2 className="mr-1 text-lg font-semibold tracking-tight text-app-text">
                           Sources
                         </h2>
                         {sourceHealth.connected > 0 && (
@@ -1248,7 +1248,7 @@ export function DataIngestionPage() {
                   <section aria-label="Runs">
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
-                        <h2 className="text-base font-bold tracking-tight text-app-text">
+                        <h2 className="text-lg font-semibold tracking-tight text-app-text">
                           Runs
                         </h2>
                         {runPageMeta ? (

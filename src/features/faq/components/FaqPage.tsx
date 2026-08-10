@@ -234,7 +234,7 @@ export function FaqPage() {
             <button
               key={group.groupId}
               onClick={() => goToDetail(group)}
-              className="w-full text-left rounded-xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
+              className="w-full text-left rounded-2xl border border-app-border bg-app-surface transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
             >
               <div className="flex items-start justify-between gap-4 mb-2">
                 <p className="text-sm font-medium text-app-text">

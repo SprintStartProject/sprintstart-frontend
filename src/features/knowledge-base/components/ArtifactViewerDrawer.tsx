@@ -460,7 +460,7 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
             contentClassName="p-6"
         >
             {error && viewMode === 'raw' ? (
-                <div className="p-4 bg-app-danger-bg text-app-danger-text rounded-lg border border-app-danger-border">
+                <div className="p-4 bg-app-danger-bg text-app-danger-text rounded-2xl border border-app-danger-border">
                     <p className="font-medium">Error loading content</p>
                     <p className="text-sm mt-1">{error}</p>
                 </div>
@@ -491,7 +491,7 @@ export function ArtifactViewerDrawer({ artifact, onClose, projectId, highlightLi
                                 </object>
                             </div>
                         ) : content?.mimeType.startsWith('image/') ? (
-                            <div className="flex justify-center bg-app-bg p-4 rounded-lg border border-app-border">
+                            <div className="flex justify-center bg-app-bg p-4 rounded-2xl border border-app-border">
                                 <img src={content.content} alt={artifact?.title || 'Image'} className="max-w-full rounded shadow-sm" />
                             </div>
                         ) : (

@@ -234,7 +234,7 @@ export function ConnectorSourcesSection({
       )}
 
       {isLoading && (
-        <div className="rounded-xl border border-app-border bg-app-surface-muted p-4">
+        <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
           <div className="flex items-center gap-3 text-sm text-app-text-muted">
             <RefreshCw size={16} className="animate-spin text-app-brand" />
             Loading sources...

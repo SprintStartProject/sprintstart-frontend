@@ -19,11 +19,11 @@ type ChatEmptyStateProps = {
 export function ChatEmptyState({ onPickSuggestion }: ChatEmptyStateProps) {
     return (
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-            <div className="mb-5 rounded-3xl bg-app-brand-soft p-4 ring-1 ring-app-brand-border">
+            <div className="mb-5 rounded-2xl bg-app-brand-soft p-4 ring-1 ring-app-brand-border">
                 <SleepyBot size={44} className="text-app-brand-text" />
             </div>
 
-            <h1 className="mb-2 text-2xl font-bold text-app-text">
+            <h1 className="mb-2 text-2xl sm:text-3xl font-bold text-app-text">
                 How can I help you today?
             </h1>
 

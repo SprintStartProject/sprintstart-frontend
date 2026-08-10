@@ -73,7 +73,7 @@ export function EditableSelectDetailRow({
                     <div
                         role="listbox"
                         aria-labelledby={labelId}
-                        className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-xl"
+                        className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-2xl"
                     >
                         {options.map((option) => {
                             const isSelected = option === value;

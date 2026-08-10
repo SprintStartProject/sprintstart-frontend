@@ -26,11 +26,11 @@ export function SourceList({
 }: SourceListProps) {
   if (sources.length === 0) {
     return (
-      <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
+      <div className="relative overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
         <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-app-brand-soft blur-3xl" />
 
         <div className="relative z-10 flex flex-col items-center">
-          <h3 className="text-xl font-bold text-app-text">
+          <h3 className="text-lg font-semibold text-app-text">
             Connect your first source
           </h3>
 

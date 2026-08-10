@@ -53,10 +53,10 @@ export function CitationPopover({ selected, onClose }: CitationPopoverProps) {
         <div
             ref={ref}
             style={getCitationPopoverStyle(selected.rect)}
-            className="rounded-xl bg-app-surface border border-app-border p-4 shadow-2xl"
+            className="rounded-2xl bg-app-surface border border-app-border p-4 shadow-2xl"
         >
             <div className="flex justify-between items-start mb-2">
-                <h3 className="text-sm font-bold text-app-text truncate pr-4">
+                <h3 className="text-sm font-semibold text-app-text truncate pr-4">
                     {citation.filename}
                 </h3>
 

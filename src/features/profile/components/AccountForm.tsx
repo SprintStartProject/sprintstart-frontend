@@ -50,8 +50,8 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
     };
 
     return (
-        <div className="rounded-xl border border-app-border bg-app-surface p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-app-text">Account Information</h2>
+        <div className="rounded-2xl border border-app-border bg-app-surface p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-app-text">Account Information</h2>
             
             <div className="mb-6 flex items-center gap-6">
                 <div className="relative group">
@@ -63,7 +63,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                     />
                 </div>
                 <div>
-                    <h3 className="text-lg font-medium text-app-text">{profile.username}</h3>
+                    <h3 className="text-lg font-semibold text-app-text">{profile.username}</h3>
                     <p className="mb-2 text-sm font-medium uppercase tracking-wider text-app-text-muted">
                         {profile.projectRoles.length > 0
                             ? profile.projectRoles.map((role) => role.name).join(', ')
@@ -76,7 +76,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
             </div>
 
             {isChoosingIcon && (
-                <div className="mb-6 rounded-lg border border-app-border bg-app-bg p-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+                <div className="mb-6 rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm animate-in fade-in slide-in-from-top-2">
                     <div className="mb-3 flex items-center justify-between">
                         <span className="text-sm font-medium text-app-text">Select an Avatar</span>
                         <Button variant="ghost" size="sm" onClick={generateOptions}>

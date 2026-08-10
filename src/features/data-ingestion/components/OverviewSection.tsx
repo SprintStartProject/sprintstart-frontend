@@ -86,7 +86,7 @@ export function OverviewSection({
   return (
     <section aria-label="Overview">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-bold tracking-tight text-app-text">
+        <h2 className="text-lg font-semibold tracking-tight text-app-text">
           Overview
         </h2>
       </div>

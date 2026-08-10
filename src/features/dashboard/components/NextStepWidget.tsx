@@ -123,7 +123,7 @@ export function NextStepWidget() {
 
     if (loading) {
         return (
-            <div className="flex min-h-56 items-center justify-center rounded-3xl border border-app-border bg-app-surface p-6">
+            <div className="flex min-h-56 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
                 <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
             </div>
         );
@@ -131,7 +131,7 @@ export function NextStepWidget() {
 
     if (error || !user) {
         return (
-            <div className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-3xl border border-app-border bg-app-surface p-6 text-center">
+            <div className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
                 <AlertCircle className="h-5 w-5 text-app-text-muted" />
                 <p className="text-sm text-app-text-muted">
                     Could not load your onboarding progress.
@@ -149,7 +149,7 @@ export function NextStepWidget() {
     const stepId = user.currentStep?.id;
     const target = stepId ? `/onboarding/${stepId}` : "/onboarding";
 
-    const cardClassName = `group relative flex min-h-56 flex-col overflow-hidden rounded-3xl border border-app-border bg-app-surface p-6 transition-all ${
+    const cardClassName = `group relative flex min-h-56 flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface p-6 transition-all ${
         canOpenOnboarding
             ? "cursor-pointer hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
             : ""

@@ -164,7 +164,7 @@ export function ProjectRolesModal({
                 }
             >
                 <div className="border-t border-app-border pt-6">
-                    <h3 className="mb-3 text-sm font-medium text-app-text">
+                    <h3 className="mb-3 text-sm font-semibold text-app-text">
                         Create New Role
                     </h3>
                     <p className="mb-3 text-xs leading-relaxed text-app-text-muted">
@@ -205,7 +205,7 @@ export function ProjectRolesModal({
                     </div>
 
                     <div className="mt-6">
-                        <h3 className="mb-3 text-sm font-medium text-app-text">
+                        <h3 className="mb-3 text-sm font-semibold text-app-text">
                             Existing Roles
                         </h3>
                         <p className="mb-3 text-xs leading-relaxed text-app-text-muted">

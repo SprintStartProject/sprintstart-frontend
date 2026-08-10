@@ -27,7 +27,7 @@ export function LoginPage() {
                     </div>
 
                     <div className="space-y-1">
-                        <h2 className="text-3xl font-bold tracking-tight text-app-text">
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-app-text">
                             SprintStart
                         </h2>
                         <p className="text-sm text-app-text-muted">
@@ -37,7 +37,7 @@ export function LoginPage() {
                 </div>
 
                 <div className="space-y-6 pt-4">
-                    <div className="rounded-xl bg-app-surface-muted p-4 border border-app-border-muted text-left">
+                    <div className="rounded-2xl bg-app-surface-muted p-4 border border-app-border-muted text-left">
                         <p className="text-xs font-medium text-app-text-muted uppercase tracking-wider mb-2">
                             SSO Authentication
                         </p>
@@ -53,7 +53,6 @@ export function LoginPage() {
                         onClick={handleLogin}
                         loading={status === 'loading'}
                         icon={<LogIn className="h-5 w-5" />}
-                        className="shadow-md"
                     >
                         Sign in with SSO
                     </Button>

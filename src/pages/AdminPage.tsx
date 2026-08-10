@@ -516,7 +516,7 @@ export function AdminPage() {
             <div className="flex min-h-96 items-center justify-center px-6 text-center">
               <div className="max-w-md">
                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-app-danger-solid" />
-                <h3 className="text-base font-semibold text-app-text">
+                <h3 className="text-sm font-semibold text-app-text">
                   Admin data could not be loaded
                 </h3>
                 <p className="mt-2 text-sm text-app-text-muted">

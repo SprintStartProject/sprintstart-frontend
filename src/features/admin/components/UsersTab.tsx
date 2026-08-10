@@ -89,7 +89,7 @@ export function UsersTab({
                           top: menuPosition?.top ?? 8,
                           left: menuPosition?.left ?? 8,
                       }}
-                      className="fixed z-50 w-44 overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-xl"
+                      className="fixed z-50 w-44 overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-2xl"
                   >
                       <button
                           type="button"

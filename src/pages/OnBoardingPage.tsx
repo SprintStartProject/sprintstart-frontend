@@ -358,7 +358,7 @@ export function OnBoardingPage() {
       <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
         <div className={gameActive ? "w-full max-w-2xl text-center" : "max-w-md text-center"}>
           <Sparkles className="w-10 h-10 text-app-brand mx-auto mb-4 animate-pulse" />
-          <h2 className="text-xl font-semibold text-app-text mb-2">
+          <h2 className="text-lg font-semibold text-app-text mb-2">
             Generating your personalized onboarding path...
           </h2>
           <p className="text-sm text-app-text-muted mb-2">
@@ -386,7 +386,7 @@ export function OnBoardingPage() {
       <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-app-text mb-2">
+          <h2 className="text-lg font-semibold text-app-text mb-2">
             Onboarding could not be loaded
           </h2>
           <p className="text-sm text-app-text-muted mb-6">
@@ -521,7 +521,7 @@ export function OnBoardingPage() {
       <main className="app-page-content py-6 pb-24 pt-8">
         {/* "Up Next" Banner — nur wenn es einen empfohlenen Step gibt */}
         {recommendedStep && (
-          <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
+          <div className="rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
             <div className="relative z-10">
               <Badge variant="brand" className="mb-4 gap-2">
@@ -554,7 +554,7 @@ export function OnBoardingPage() {
         {/* "Knowledge check pending" banner — all steps of the phase are done,
             only the check still blocks the next phase */}
         {!recommendedStep && pendingCheckPhase && (
-          <div className="rounded-3xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
+          <div className="rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8 mb-6 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-app-brand-soft blur-3xl rounded-full pointer-events-none" />
             <div className="relative z-10">
               <Badge variant="brand" className="mb-4 gap-2">

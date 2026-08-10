@@ -56,7 +56,7 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
                     onSelect(artifact.id);
                 }
             }}
-            className="group flex cursor-pointer items-start gap-4 rounded-xl border border-app-border bg-app-surface p-4 transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
+            className="group flex cursor-pointer items-start gap-4 rounded-2xl border border-app-border bg-app-surface p-4 transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
         >
             <div className="p-2 bg-app-bg-soft rounded-lg shrink-0 border border-app-border">
                 {getIcon(artifact.artifactType)}

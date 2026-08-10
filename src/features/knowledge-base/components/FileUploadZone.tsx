@@ -183,7 +183,7 @@ export function FileUploadZone({ onUpload, isUploading }: FileUploadZoneProps) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
                         aria-live="polite"
-                        className="mt-4 flex items-start gap-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-4 text-sm text-app-danger-text"
+                        className="mt-4 flex items-start gap-3 rounded-2xl border border-app-danger-border bg-app-danger-bg p-4 text-sm text-app-danger-text"
                         data-testid="file-upload-errors"
                     >
                         <AlertCircle className="h-5 w-5 shrink-0" />

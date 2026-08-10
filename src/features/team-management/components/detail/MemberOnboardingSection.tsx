@@ -83,7 +83,7 @@ export function MemberOnboardingSection({
     getStepStatusStyles,
 }: MemberOnboardingSectionProps) {
     return (
-        <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+        <div className="rounded-2xl border border-app-border bg-app-surface p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <div className="flex items-center gap-2">

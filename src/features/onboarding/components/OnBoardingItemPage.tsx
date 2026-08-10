@@ -300,7 +300,7 @@ export function OnBoardingItemPage() {
       <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-app-text mb-2">
+          <h2 className="text-lg font-semibold text-app-text mb-2">
             Could not load step
           </h2>
           <p className="text-sm text-app-text-muted mb-6">

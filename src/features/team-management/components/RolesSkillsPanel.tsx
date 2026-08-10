@@ -141,7 +141,7 @@ export function RolesSkillsPanel({
                                 className={`rounded-xl border transition-all duration-200 motion-reduce:hover:scale-100 ${
                                     isAssigning
                                         ? 'border-app-brand bg-app-brand-soft'
-                                        : 'border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-md'
+                                        : 'border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg'
                                 }`}
                             >
                                 <div className="flex items-center gap-1 px-2 py-1.5">

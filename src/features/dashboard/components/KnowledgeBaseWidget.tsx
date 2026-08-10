@@ -60,7 +60,7 @@ export function KnowledgeBaseWidget() {
     }, [projectId]);
 
     return (
-        <div className="group relative flex min-h-56 flex-col overflow-hidden rounded-3xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
+        <div className="group relative flex min-h-56 flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
             <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"

@@ -135,7 +135,7 @@ export function KnowledgeBasePage() {
                                 <div
                                     role="alert"
                                     aria-live="assertive"
-                                    className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-app-danger-border bg-app-danger-bg p-4 text-app-danger-text"
+                                    className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-app-danger-border bg-app-danger-bg p-4 text-app-danger-text"
                                     data-testid="kb-fetch-error"
                                 >
                                     <div className="flex items-center gap-3">

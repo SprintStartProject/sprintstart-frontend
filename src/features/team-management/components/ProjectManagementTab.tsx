@@ -197,7 +197,7 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
 
     if (loading) {
         return (
-            <div className="rounded-3xl border border-app-border bg-app-surface p-8 text-center">
+            <div className="rounded-2xl border border-app-border bg-app-surface p-8 text-center">
                 <p className="text-sm text-app-text-muted">
                     Loading your projects...
                 </p>
@@ -207,7 +207,7 @@ export function ProjectManagementTab({ projects }: ProjectManagementTabProps) {
 
     if (loadError) {
         return (
-            <div className="rounded-3xl border border-app-danger-border bg-app-surface p-8 text-center">
+            <div className="rounded-2xl border border-app-danger-border bg-app-surface p-8 text-center">
                 <p className="text-sm text-app-danger">{loadError}</p>
             </div>
         );

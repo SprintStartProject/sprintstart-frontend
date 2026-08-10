@@ -292,22 +292,41 @@ nebenbei gemacht.
 
 ---
 
-## 5. Radius-, Shadow- und Typo-Skala festschreiben
+## 5. Radius-, Shadow- und Typo-Skala festschreiben — **erledigt**
 
-**Befund.** Keine erkennbare Regel, welcher Wert wann gilt:
+**Befund.** Keine erkennbare Regel, welcher Wert wann gilt — aber nach Kontext
+ausgewertet fiel das sehr unterschiedlich aus:
 
-- Container/Cards: `rounded-xl` 132 · `rounded-2xl` 93 · `rounded-lg` 28 ·
-  `rounded-3xl` 17 · `rounded-md` 5 — zwei fast gleich häufige Konkurrenten
-- Shadows: `shadow-sm` 30 · `shadow-lg` 26 · `shadow-2xl` 12 · `shadow-md` 6 ·
-  `shadow-xl` 4
-- Headings: `h1`/`h2`/`h3` reichen von `text-sm` bis `text-4xl`, wobei
-  `text-sm` mit 23 Vorkommen die *häufigste* `h*`-Größe ist. Semantische
-  Ebene und visuelle Hierarchie sind vollständig entkoppelt.
+- **Radius war im Kern schon stimmig.** Karten (`p-4..6`) nutzten 51×
+  `rounded-2xl`, kleine Karten 11× `rounded-xl`. Die Regel existierte also
+  faktisch, nur mit 32 Ausreißern (15× `3xl`, 13× `xl`, 3× `lg`).
+- **Shadow ebenfalls**, nur mit 41 Vorkommen und drei erkennbaren Rollen:
+  `sm` ruhende Karte, `hover:lg` beim Überfahren, `2xl` Dialog.
+- **Headings waren das eigentliche Problem.** `h2` reichte von `text-sm` bis
+  `text-4xl`, weil zwei Rollen vermischt waren: Hero-Überschriften (Login,
+  Dashboard, Onboarding) und normale Sektionstitel. Semantische Ebene und
+  visuelle Größe waren entkoppelt.
 
-**Vorschlag.** Eine kurze Tabelle in `FRONTEND_CODING_STANDARDS.md`
-("Card = `rounded-2xl`, Control = `rounded-xl`, dichte Control =
-`rounded-lg`"; Seitentitel = `text-2xl`, Sektionstitel = `text-lg`, …) und
-danach angleichen. Ohne die festgeschriebene Regel driftet das sofort wieder.
+**Entscheidung.** Vier Typo-Stufen mit einer eigenen Hero-Stufe, damit die
+großen Auftritte groß bleiben; alle Karten auf `rounded-2xl`. Die Tabellen
+stehen in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §4.
+
+**Stand:**
+
+| | vorher | jetzt |
+| --- | --- | --- |
+| Karten-Radius | 2xl 51 · 3xl 15 · xl 13 · lg 3 | **2xl 83**, keine Ausreißer |
+| Shadow | sm · lg · md · xl · 2xl | **sm · hover:lg · 2xl**, plus 5× `lg` als Akzent auf gefüllten Brand-Flächen |
+| Headings | `h2` von `text-sm` bis `text-4xl` | vier Stufen, 24 Überschriften angeglichen |
+
+**Was bewusst außerhalb der Skala steht:** die `404` auf der Fehlerseite
+(`text-5xl`), die große Kennzahl in `IngestionMetrics` (`text-4xl`, ein
+Zahlendisplay, kein Titel) und das Dialog-Chrome in `Modal`/`SidePanel`, das
+seine eigene Titelgröße mitbringt.
+
+**Nebenbefund:** `IngestionMetrics` rendert eine Kennzahl als `<h3>`. Das ist
+semantisch falsch — eine Zahl ist keine Überschrift — aber das Tag zu ändern
+berührt die Dokumentstruktur der Seite und gehört in einen eigenen Schritt.
 
 ---
 

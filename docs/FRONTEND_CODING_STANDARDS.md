@@ -134,8 +134,39 @@ only this repository gets the full set of frontend rules here.
   `role="menuitem"` / combobox triggers, and the game surfaces.
 
 - **Radius scale.** `rounded-lg` for dense controls (`sm` buttons, chips),
-  `rounded-xl` for standard controls and small cards, `rounded-2xl` for content
-  cards and panels. Reserve `rounded-full` for avatars, badges, and pills.
+  `rounded-xl` for standard controls and for surfaces *nested inside* a card —
+  a clickable row, a status box — where the inner corner has to stay tighter
+  than the outer one. `rounded-2xl` for the card or panel itself. Reserve
+  `rounded-full` for avatars, badges, and pills. `rounded-3xl` and larger belong
+  to dialog chrome (`Modal`, `SidePanel`, the Moments overlays) alone — a card
+  that reaches for it is asking to look like something it is not.
+
+- **Shadow scale — three rungs, and they mean different things.**
+
+  | | when |
+  | --- | --- |
+  | `shadow-sm` | a card at rest, to lift it off the page background |
+  | `hover:shadow-lg` | that same card while hovered, paired with the hover border |
+  | `shadow-2xl` | dialogs, drawers, popovers, menus, toasts — anything that floats above the page |
+
+  `shadow-md` and `shadow-xl` say nothing these three do not; don't reach for
+  them. The one thing outside the ladder is a `shadow-lg` used as *emphasis* on
+  a filled brand surface — a selected tab, the logo tile. That is decoration on
+  a coloured shape, not elevation, and it stays.
+
+- **Heading scale — pick the rung by role, not by how big it should look.**
+
+  | role | size | example |
+  | --- | --- | --- |
+  | Hero | `text-2xl sm:text-3xl font-bold` | login, dashboard hero, the onboarding "up next" card |
+  | Page title | `text-xl sm:text-2xl font-semibold` | `PageHeader` — do not hand-roll one |
+  | Section title | `text-lg font-semibold` | a titled block inside a page |
+  | Card / sub-section | `text-sm font-semibold` | the label above a list, a card's own title |
+
+  The heading *level* follows the document outline and is chosen independently:
+  an `<h2>` is an `<h2>` because of what sits above it, not because of its size.
+  Before this scale existed, `<h2>` ranged from `text-sm` to `text-4xl` in the
+  same app, which is the giveaway that the two were being conflated.
 
 - **Text controls are [`ui/Input`](../src/components/ui/Input.tsx),
   [`ui/Textarea`](../src/components/ui/Textarea.tsx) and

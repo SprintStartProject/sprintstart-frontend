@@ -34,7 +34,7 @@ export function MemberGapsPanel({
 
     return (
         <>
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+            <div className="rounded-2xl border border-app-border bg-app-surface p-6">
                 <h2 className="text-lg font-semibold text-app-text">
                     Skill Assessment
                 </h2>
@@ -65,7 +65,7 @@ export function MemberGapsPanel({
                 )}
             </div>
 
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+            <div className="rounded-2xl border border-app-border bg-app-surface p-6">
                 <h2 className="text-lg font-semibold text-app-text">
                     Gaps
                 </h2>

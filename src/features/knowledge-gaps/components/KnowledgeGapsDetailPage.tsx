@@ -72,7 +72,7 @@ export function KnowledgeGapsDetailPage() {
       <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-app-text mb-2">
+          <h2 className="text-lg font-semibold text-app-text mb-2">
             Could not load gap
           </h2>
           <p className="text-sm text-app-text-muted mb-6">
@@ -133,7 +133,7 @@ export function KnowledgeGapsDetailPage() {
 
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-app-text mb-1">
+              <h1 className="text-xl sm:text-2xl font-semibold text-app-text mb-1">
                 {gap.component}
               </h1>
               <div className="flex items-center gap-2 text-xs text-app-text-muted">

@@ -296,7 +296,7 @@ export function KnowledgeGapsPage() {
                 // element, and a CSS transition covering those properties would
                 // try to ease every frame the animation writes -- which is what
                 // made a returning row flicker. CSS keeps only what it owns.
-                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-[scale,background-color,border-color,box-shadow] duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
+                className="w-full text-left flex items-stretch gap-3 rounded-2xl border border-app-border bg-app-surface transition-[scale,background-color,border-color,box-shadow] duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
               >
                 <SeverityBar severity={gap.severity} />
 

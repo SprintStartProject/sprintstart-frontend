@@ -41,7 +41,7 @@ export function QuickChatWidget() {
     }
 
     return (
-        <div className="relative overflow-hidden rounded-3xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
+        <div className="relative overflow-hidden rounded-2xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
             <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full opacity-15 blur-3xl"
