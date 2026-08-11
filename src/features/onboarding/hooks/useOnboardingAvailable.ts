@@ -25,35 +25,35 @@ import { useProjectContext } from "../../projects/useProjectContext";
  * state.
  */
 export function useOnboardingAvailable(): boolean {
-    const { profile } = useAuth();
-    const { selectedProjectId } = useProjectContext();
+  const { profile } = useAuth();
+  const { selectedProjectId } = useProjectContext();
 
-    const [isProjectEmpty, setIsProjectEmpty] = useState(false);
+  const [isProjectEmpty, setIsProjectEmpty] = useState(false);
 
-    useEffect(() => {
-        if (!selectedProjectId || !isOnboardingAccessible(profile)) {
-            return;
-        }
+  useEffect(() => {
+    if (!selectedProjectId || !isOnboardingAccessible(profile)) {
+      return;
+    }
 
-        let cancelled = false;
+    let cancelled = false;
 
-        async function check(projectId: string) {
-            try {
-                const hasContent = await knowledgeService.hasIngestedContent(projectId);
-                if (!cancelled) setIsProjectEmpty(!hasContent);
-            } catch (error) {
-                // Unknown, not empty: leave the entry where it is.
-                console.warn("Failed to check ingested content", error);
-                if (!cancelled) setIsProjectEmpty(false);
-            }
-        }
+    async function check(projectId: string) {
+      try {
+        const hasContent = await knowledgeService.hasIngestedContent(projectId);
+        if (!cancelled) setIsProjectEmpty(!hasContent);
+      } catch (error) {
+        // Unknown, not empty: leave the entry where it is.
+        console.warn("Failed to check ingested content", error);
+        if (!cancelled) setIsProjectEmpty(false);
+      }
+    }
 
-        void check(selectedProjectId);
+    void check(selectedProjectId);
 
-        return () => {
-            cancelled = true;
-        };
-    }, [selectedProjectId, profile]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId, profile]);
 
-    return isOnboardingAccessible(profile) && !isProjectEmpty;
+  return isOnboardingAccessible(profile) && !isProjectEmpty;
 }

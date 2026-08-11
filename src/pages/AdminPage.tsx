@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { SCROLL_CONTAINER_ATTRIBUTE } from "../components/ui/useScrollLock";
 import {
   DRAWER_CLOSE_DELAY_MS,
   areAllVisibleUsersSelected,
@@ -45,19 +46,12 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { adminUserService } from "../services/adminUserService";
 import { projectService } from "../services/projectService";
 
-/**
- * Admin dashboard. Bound to `/admin` (HR/ADMIN).
- * Three-tab layout: users, projects, tokens.
- * Delete-user opens a confirmation dialog.
- */
 export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { reloadProjects } = useProjectContext();
   const [activeTab, setActiveTab] = useState<AdminTab>("users");
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const [searchValue, setSearchValue] = useState("");
@@ -66,9 +60,7 @@ export function AdminPage() {
 
   const [page, setPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
-  const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(
-    null,
-  );
+  const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [deleteUserErrorMessage, setDeleteUserErrorMessage] = useState("");
 
@@ -96,10 +88,7 @@ export function AdminPage() {
     loadTokenNames,
   } = useAdminData();
 
-  const availableProjects = useMemo(
-    () => getAvailableProjects(projects),
-    [projects],
-  );
+  const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
 
   const filteredUsers = useMemo(() => {
     return filterAdminUsers(users, searchValue, userFilter);
@@ -116,10 +105,7 @@ export function AdminPage() {
     return getPaginatedUsers(filteredUsers, safePage);
   }, [filteredUsers, safePage]);
 
-  const allVisibleUsersSelected = areAllVisibleUsersSelected(
-    paginatedUsers,
-    selectedUserIds,
-  );
+  const allVisibleUsersSelected = areAllVisibleUsersSelected(paginatedUsers, selectedUserIds);
 
   const openCreateWizard = useCallback(() => {
     // Step 2 of the wizard needs the saved PAT names; without visiting the
@@ -145,11 +131,7 @@ export function AdminPage() {
 
   const toggleAllVisibleUsers = () => {
     setSelectedUserIds((current) => {
-      return toggleVisibleUserSelection(
-        current,
-        paginatedUsers,
-        allVisibleUsersSelected,
-      );
+      return toggleVisibleUserSelection(current, paginatedUsers, allVisibleUsersSelected);
     });
   };
 
@@ -160,20 +142,12 @@ export function AdminPage() {
     setIsDrawerOpen(true);
   };
 
-  const toggleUserContextMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    userId: string,
-  ) => {
+  const toggleUserContextMenu = (event: MouseEvent<HTMLButtonElement>, userId: string) => {
     event.stopPropagation();
-    setOpenUserMenuId((currentUserMenuId) =>
-      currentUserMenuId === userId ? null : userId,
-    );
+    setOpenUserMenuId((currentUserMenuId) => (currentUserMenuId === userId ? null : userId));
   };
 
-  const openUserDetailsFromMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    user: AdminUser,
-  ) => {
+  const openUserDetailsFromMenu = (event: MouseEvent<HTMLButtonElement>, user: AdminUser) => {
     event.stopPropagation();
     openUserDetails(user);
   };
@@ -184,10 +158,7 @@ export function AdminPage() {
     setUserPendingDelete(user);
   };
 
-  const requestUserDeleteFromMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    user: AdminUser,
-  ) => {
+  const requestUserDeleteFromMenu = (event: MouseEvent<HTMLButtonElement>, user: AdminUser) => {
     event.stopPropagation();
     requestUserDelete(user);
   };
@@ -210,13 +181,9 @@ export function AdminPage() {
     try {
       await adminUserService.deleteUser(userId);
 
-      setUsers((currentUsers) =>
-        currentUsers.filter((currentUser) => currentUser.id !== userId),
-      );
+      setUsers((currentUsers) => currentUsers.filter((currentUser) => currentUser.id !== userId));
 
-      setProjects((currentProjects) =>
-        removeUsersFromProjects(currentProjects, new Set([userId])),
-      );
+      setProjects((currentProjects) => removeUsersFromProjects(currentProjects, new Set([userId])));
 
       setSelectedUserIds((currentSelectedUserIds) => {
         const nextSelectedUserIds = new Set(currentSelectedUserIds);
@@ -271,14 +238,10 @@ export function AdminPage() {
     setBulkDeleteErrorMessage("");
 
     try {
-      await Promise.all(
-        userIdsToDelete.map((userId) => adminUserService.deleteUser(userId)),
-      );
+      await Promise.all(userIdsToDelete.map((userId) => adminUserService.deleteUser(userId)));
 
       setUsers((currentUsers) =>
-        currentUsers.filter(
-          (currentUser) => !userIdsToDeleteSet.has(currentUser.id),
-        ),
+        currentUsers.filter((currentUser) => !userIdsToDeleteSet.has(currentUser.id)),
       );
 
       setProjects((currentProjects) =>
@@ -299,9 +262,7 @@ export function AdminPage() {
       setIsBulkDeleteDialogOpen(false);
     } catch (error) {
       setBulkDeleteErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Selected users could not be deleted.",
+        error instanceof Error ? error.message : "Selected users could not be deleted.",
       );
     } finally {
       setIsBulkDeletingUsers(false);
@@ -316,9 +277,7 @@ export function AdminPage() {
   };
 
   const openProjectDetailsFromUserDrawer = (projectId: string) => {
-    const project = projects.find(
-      (currentProject) => currentProject.id === projectId,
-    );
+    const project = projects.find((currentProject) => currentProject.id === projectId);
 
     if (!project) return;
 
@@ -349,15 +308,11 @@ export function AdminPage() {
         id: updatedProject.id,
         name: updatedProject.name,
       };
-      const assignedUserIds = new Set(
-        updatedProject.users.map((projectUser) => projectUser.id),
-      );
+      const assignedUserIds = new Set(updatedProject.users.map((projectUser) => projectUser.id));
 
       setProjects((currentProjects) =>
         currentProjects.map((currentProject) =>
-          currentProject.id === updatedProject.id
-            ? updatedProject
-            : currentProject,
+          currentProject.id === updatedProject.id ? updatedProject : currentProject,
         ),
       );
 
@@ -377,18 +332,14 @@ export function AdminPage() {
 
             return {
               ...currentUser,
-              projects: nextProjects.sort((left, right) =>
-                left.name.localeCompare(right.name),
-              ),
+              projects: nextProjects.sort((left, right) => left.name.localeCompare(right.name)),
             };
           }
 
           if (hasProject) {
             return {
               ...currentUser,
-              projects: currentUser.projects.filter(
-                (project) => project.id !== updatedProject.id,
-              ),
+              projects: currentUser.projects.filter((project) => project.id !== updatedProject.id),
             };
           }
 
@@ -397,9 +348,7 @@ export function AdminPage() {
       );
 
       setSelectedProject((currentSelectedProject) =>
-        currentSelectedProject?.id === updatedProject.id
-          ? updatedProject
-          : currentSelectedProject,
+        currentSelectedProject?.id === updatedProject.id ? updatedProject : currentSelectedProject,
       );
     },
     [setProjects, setSelectedProject, setUsers],
@@ -418,9 +367,7 @@ export function AdminPage() {
         ),
       );
       setSelectedUser((currentSelectedUser) =>
-        currentSelectedUser?.id === updatedUser.id
-          ? updatedUser
-          : currentSelectedUser,
+        currentSelectedUser?.id === updatedUser.id ? updatedUser : currentSelectedUser,
       );
     },
     [setSelectedUser, setUsers],
@@ -453,8 +400,7 @@ export function AdminPage() {
     onChange: handleTabChange,
   });
 
-  const showInitialLoading =
-    loadingState === "idle" || loadingState === "loading";
+  const showInitialLoading = loadingState === "idle" || loadingState === "loading";
 
   return (
     // The swipe listens on the page rather than the panel: needing to be over
@@ -462,6 +408,10 @@ export function AdminPage() {
     // in some places.
     <div
       ref={swipeRef}
+      // This page scrolls here rather than letting the document scroll, so a
+      // dialog's scroll lock has to be told where to look — see
+      // `SCROLL_CONTAINER_ATTRIBUTE`.
+      {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
       className="h-dvh overflow-y-scroll overscroll-contain"
     >
       <header className="border-b border-app-border bg-app-bg">
@@ -470,12 +420,7 @@ export function AdminPage() {
             icon={Terminal}
             title="Access Management"
             subtitle="Manage users, projects and access tokens."
-            actions={
-              <AdminMetrics
-                userCount={users.length}
-                projectCount={projects.length}
-              />
-            }
+            actions={<AdminMetrics userCount={users.length} projectCount={projects.length} />}
           />
         </div>
       </header>
@@ -494,9 +439,7 @@ export function AdminPage() {
             className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:w-11"
             aria-label="Refresh admin data"
           >
-            <RefreshCw
-              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
         </div>
 
@@ -516,12 +459,10 @@ export function AdminPage() {
             <div className="flex min-h-96 items-center justify-center px-6 text-center">
               <div className="max-w-md">
                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-app-danger-solid" />
-                <h3 className="text-base font-semibold text-app-text">
+                <h3 className="text-sm font-semibold text-app-text">
                   Admin data could not be loaded
                 </h3>
-                <p className="mt-2 text-sm text-app-text-muted">
-                  {errorMessage}
-                </p>
+                <p className="mt-2 text-sm text-app-text-muted">{errorMessage}</p>
                 <button
                   type="button"
                   onClick={() => void refreshAdminData()}
@@ -534,10 +475,7 @@ export function AdminPage() {
           ) : (
             // Only the tab content slides; the loading and error states above
             // are not tabs and would otherwise animate on their way in too.
-            <SlidingTabPanel
-              activeKey={activeTab}
-              index={ADMIN_TAB_ORDER.indexOf(activeTab)}
-            >
+            <SlidingTabPanel activeKey={activeTab} index={ADMIN_TAB_ORDER.indexOf(activeTab)}>
               {activeTab === "users" ? (
                 <>
                   <AdminUsersToolbar
@@ -648,9 +586,8 @@ export function AdminPage() {
         description={
           userPendingDelete ? (
             <>
-              Are you sure you want to delete{" "}
-              <strong>{getDisplayName(userPendingDelete)}</strong>? This action
-              cannot be undone.
+              Are you sure you want to delete <strong>{getDisplayName(userPendingDelete)}</strong>?
+              This action cannot be undone.
             </>
           ) : undefined
         }
@@ -669,10 +606,9 @@ export function AdminPage() {
         title="Delete selected users?"
         description={
           <>
-            Are you sure you want to delete{" "}
-            <strong>{selectedUserIds.size}</strong>{" "}
-            {selectedUserIds.size === 1 ? "selected user" : "selected users"}?
-            This action cannot be undone.
+            Are you sure you want to delete <strong>{selectedUserIds.size}</strong>{" "}
+            {selectedUserIds.size === 1 ? "selected user" : "selected users"}? This action cannot be
+            undone.
           </>
         }
         confirmLabel="Delete All"
@@ -688,6 +624,7 @@ export function AdminPage() {
       <CreateProjectWizard
         isOpen={isCreateWizardOpen}
         tokenNames={tokenNames}
+        users={users}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
       />

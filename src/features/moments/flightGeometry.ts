@@ -46,7 +46,7 @@ const ROCKET_MAX = 64;
 
 /** Resolves the rocket's on-screen size against the viewport it is drawn in. */
 export function rocketSizeFor(width: number): number {
-    return Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH));
+  return Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH));
 }
 
 /**
@@ -69,18 +69,18 @@ const FLYBY_PEAK_MIN = 180;
 const FLYBY_TRAIL_RATIO = 2.4;
 
 export interface FlybyGeometry {
-    /** Edge length of the rocket at the middle of the pass, in px. */
-    peakSize: number;
-    /** Start offset from the viewport centre, in px. */
-    fromX: number;
-    fromY: number;
-    /** End offset from the viewport centre, in px. */
-    toX: number;
-    toY: number;
-    /** Nose angle, in degrees clockwise from "up". */
-    rotate: number;
-    /** Length of the exhaust trail at the peak, in px. */
-    trailLength: number;
+  /** Edge length of the rocket at the middle of the pass, in px. */
+  peakSize: number;
+  /** Start offset from the viewport centre, in px. */
+  fromX: number;
+  fromY: number;
+  /** End offset from the viewport centre, in px. */
+  toX: number;
+  toY: number;
+  /** Nose angle, in degrees clockwise from "up". */
+  rotate: number;
+  /** Length of the exhaust trail at the peak, in px. */
+  trailLength: number;
 }
 
 /**
@@ -90,23 +90,23 @@ export interface FlybyGeometry {
  * ends with a rocket visibly parked outside the frame on a wide monitor.
  */
 export function flybyGeometry(width: number, height: number): FlybyGeometry {
-    const peakSize = Math.max(FLYBY_PEAK_MIN, Math.min(width, height) * FLYBY_PEAK_OF_MIN);
+  const peakSize = Math.max(FLYBY_PEAK_MIN, Math.min(width, height) * FLYBY_PEAK_OF_MIN);
 
-    // Bottom-left to top-right, through the centre.
-    const fromX = -(width / 2 + peakSize);
-    const fromY = height / 2 + peakSize;
-    const toX = -fromX;
-    const toY = -fromY;
+  // Bottom-left to top-right, through the centre.
+  const fromX = -(width / 2 + peakSize);
+  const fromY = height / 2 + peakSize;
+  const toX = -fromX;
+  const toY = -fromY;
 
-    return {
-        peakSize,
-        fromX,
-        fromY,
-        toX,
-        toY,
-        rotate: (Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI,
-        trailLength: peakSize * FLYBY_TRAIL_RATIO,
-    };
+  return {
+    peakSize,
+    fromX,
+    fromY,
+    toX,
+    toY,
+    rotate: (Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI,
+    trailLength: peakSize * FLYBY_TRAIL_RATIO,
+  };
 }
 
 /**
@@ -163,23 +163,23 @@ const PET_EXIT_MIN_S = 0.35;
 const PET_EXIT_MAX_S = 0.95;
 
 export interface PetFlightPlan {
-    path: FlightPath;
-    /** Total flight time, loop leg plus exit leg, in seconds. */
-    durationS: number;
+  path: FlightPath;
+  /** Total flight time, loop leg plus exit leg, in seconds. */
+  durationS: number;
 }
 
 export interface LaunchGeometry {
-    /** Edge length of the rocket, in px. */
-    rocketSize: number;
-    /** Launch pad, in px from the left of the viewport. */
-    padX: number;
-    /** Launch pad, in px from the top of the viewport. */
-    padY: number;
-    /** Length of the exhaust trail at full stretch, in px. */
-    trailLength: number;
-    /** Angle of the exhaust trail, in degrees from horizontal. */
-    trailAngle: number;
-    flight: FlightPath;
+  /** Edge length of the rocket, in px. */
+  rocketSize: number;
+  /** Launch pad, in px from the left of the viewport. */
+  padX: number;
+  /** Launch pad, in px from the top of the viewport. */
+  padY: number;
+  /** Length of the exhaust trail at full stretch, in px. */
+  trailLength: number;
+  /** Angle of the exhaust trail, in degrees from horizontal. */
+  trailAngle: number;
+  flight: FlightPath;
 }
 
 /**
@@ -196,26 +196,23 @@ export interface LaunchGeometry {
  * on nine different monitors is not a plan.
  */
 export function launchGeometry(width: number, height: number): LaunchGeometry {
-    const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
+  const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
 
-    const dx = FLIGHT_X * band;
-    const dy = FLIGHT_Y * height;
+  const dx = FLIGHT_X * band;
+  const dy = FLIGHT_Y * height;
 
-    return {
-        rocketSize: Math.min(
-            ROCKET_MAX,
-            Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH),
-        ),
-        // Band centred, so an ultrawide launches across the middle of the screen
-        // rather than out of its left third.
-        padX: (width - band) / 2 + PAD_X * band,
-        padY: PAD_Y * height,
-        trailLength: Math.hypot(dx, dy),
-        trailAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
-        // Entered from 0°, so the rocket leaves the pad pointing straight up and
-        // tips into its heading as it climbs, the way a launch actually looks.
-        flight: loopFlight({ dx, dy, entryRotate: 0 }),
-    };
+  return {
+    rocketSize: Math.min(ROCKET_MAX, Math.max(ROCKET_MIN, width * ROCKET_OF_WIDTH)),
+    // Band centred, so an ultrawide launches across the middle of the screen
+    // rather than out of its left third.
+    padX: (width - band) / 2 + PAD_X * band,
+    padY: PAD_Y * height,
+    trailLength: Math.hypot(dx, dy),
+    trailAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
+    // Entered from 0°, so the rocket leaves the pad pointing straight up and
+    // tips into its heading as it climbs, the way a launch actually looks.
+    flight: loopFlight({ dx, dy, entryRotate: 0 }),
+  };
 }
 
 /**
@@ -242,74 +239,67 @@ export function launchGeometry(width: number, height: number): LaunchGeometry {
  * already knows must not change with the monitor.
  */
 export function petFlight(width: number, height: number): PetFlightPlan {
-    // Same band as the launch, for the same reason: past 16:9 the width drives a
-    // loop bigger than the screen is tall.
-    const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
+  // Same band as the launch, for the same reason: past 16:9 the width drives a
+  // loop bigger than the screen is tall.
+  const band = Math.min(width, height * MAX_FLIGHT_ASPECT);
 
-    const dx = -PET_X * band;
-    const dy = -Math.min(PET_Y * height, PET_MAX_CLIMB * band);
+  const dx = -PET_X * band;
+  const dy = -Math.min(PET_Y * height, PET_MAX_CLIMB * band);
 
-    const loop = loopFlight({
-        dx,
-        dy,
-        // Entered from 0°: the pet rests upright on its perch and leans into the
-        // climb rather than snapping to its heading on the first frame.
-        entryRotate: 0,
-    });
+  const loop = loopFlight({
+    dx,
+    dy,
+    // Entered from 0°: the pet rests upright on its perch and leans into the
+    // climb rather than snapping to its heading on the first frame.
+    entryRotate: 0,
+  });
 
-    const distance = Math.hypot(dx, dy) || 1;
-    const forwardX = dx / distance;
-    const forwardY = dy / distance;
+  const distance = Math.hypot(dx, dy) || 1;
+  const forwardX = dx / distance;
+  const forwardY = dy / distance;
 
-    // How far past the loop's end the rocket must travel before the whole
-    // glyph has cleared the screen — through whichever edge its heading
-    // reaches first. The perch pins the path to the viewport; without it the
-    // path is offsets with no opinion on where the screen ends.
-    const endAbsX = width - PET_PERCH_INSET + dx;
-    const endAbsY = height - PET_PERCH_INSET + dy;
-    const untilLeft =
-        forwardX < 0 ? (endAbsX + PET_EXIT_CLEARANCE) / -forwardX : Infinity;
-    const untilTop =
-        forwardY < 0 ? (endAbsY + PET_EXIT_CLEARANCE) / -forwardY : Infinity;
-    const exitLength = Math.max(0, Math.min(untilLeft, untilTop));
+  // How far past the loop's end the rocket must travel before the whole
+  // glyph has cleared the screen — through whichever edge its heading
+  // reaches first. The perch pins the path to the viewport; without it the
+  // path is offsets with no opinion on where the screen ends.
+  const endAbsX = width - PET_PERCH_INSET + dx;
+  const endAbsY = height - PET_PERCH_INSET + dy;
+  const untilLeft = forwardX < 0 ? (endAbsX + PET_EXIT_CLEARANCE) / -forwardX : Infinity;
+  const untilTop = forwardY < 0 ? (endAbsY + PET_EXIT_CLEARANCE) / -forwardY : Infinity;
+  const exitLength = Math.max(0, Math.min(untilLeft, untilTop));
 
-    // Accelerating from rest, so the leg's time is set by the speed it works up
-    // to: t = 2d/v for a quadratic ramp. Clamped so a phone's short hop still
-    // reads as a burn and an ultrawide's long run does not overstay.
-    const exitSpeed = (PET_EXIT_SPEED * distance) / FLIGHT_DURATION_S;
-    const exitS = Math.min(
-        PET_EXIT_MAX_S,
-        Math.max(PET_EXIT_MIN_S, (2 * exitLength) / exitSpeed),
-    );
-    const durationS = FLIGHT_DURATION_S + exitS;
+  // Accelerating from rest, so the leg's time is set by the speed it works up
+  // to: t = 2d/v for a quadratic ramp. Clamped so a phone's short hop still
+  // reads as a burn and an ultrawide's long run does not overstay.
+  const exitSpeed = (PET_EXIT_SPEED * distance) / FLIGHT_DURATION_S;
+  const exitS = Math.min(PET_EXIT_MAX_S, Math.max(PET_EXIT_MIN_S, (2 * exitLength) / exitSpeed));
+  const durationS = FLIGHT_DURATION_S + exitS;
 
-    // Stitch the legs. Times are rescaled so the loop keeps its own pacing
-    // inside the longer flight; progress becomes the fraction of the *whole*
-    // journey, so scale and fades driven off it keep meaning what they meant.
-    const totalLength = distance + exitLength;
-    const loopShare = FLIGHT_DURATION_S / durationS;
+  // Stitch the legs. Times are rescaled so the loop keeps its own pacing
+  // inside the longer flight; progress becomes the fraction of the *whole*
+  // journey, so scale and fades driven off it keep meaning what they meant.
+  const totalLength = distance + exitLength;
+  const loopShare = FLIGHT_DURATION_S / durationS;
 
-    const x = [...loop.x];
-    const y = [...loop.y];
-    const rotate = [...loop.rotate];
-    const times = loop.times.map((t) => Number((t * loopShare).toFixed(4)));
-    const progress = loop.progress.map((s) =>
-        Number(((s * distance) / totalLength).toFixed(4)),
-    );
+  const x = [...loop.x];
+  const y = [...loop.y];
+  const rotate = [...loop.rotate];
+  const times = loop.times.map((t) => Number((t * loopShare).toFixed(4)));
+  const progress = loop.progress.map((s) => Number(((s * distance) / totalLength).toFixed(4)));
 
-    const finalRotate = rotate[rotate.length - 1];
-    for (let step = 1; step <= PET_EXIT_STEPS; step++) {
-        const t = step / PET_EXIT_STEPS;
-        // Quadratic ramp: starts at the loop's settled rest, leaves at full
-        // burn. Even time spacing plus squared distance is the acceleration.
-        const along = exitLength * t * t;
+  const finalRotate = rotate[rotate.length - 1];
+  for (let step = 1; step <= PET_EXIT_STEPS; step++) {
+    const t = step / PET_EXIT_STEPS;
+    // Quadratic ramp: starts at the loop's settled rest, leaves at full
+    // burn. Even time spacing plus squared distance is the acceleration.
+    const along = exitLength * t * t;
 
-        x.push(Number((dx + forwardX * along).toFixed(2)));
-        y.push(Number((dy + forwardY * along).toFixed(2)));
-        rotate.push(finalRotate);
-        times.push(Number((loopShare + t * (1 - loopShare)).toFixed(4)));
-        progress.push(Number(((distance + along) / totalLength).toFixed(4)));
-    }
+    x.push(Number((dx + forwardX * along).toFixed(2)));
+    y.push(Number((dy + forwardY * along).toFixed(2)));
+    rotate.push(finalRotate);
+    times.push(Number((loopShare + t * (1 - loopShare)).toFixed(4)));
+    progress.push(Number(((distance + along) / totalLength).toFixed(4)));
+  }
 
-    return { path: { x, y, rotate, times, progress }, durationS };
+  return { path: { x, y, rotate, times, progress }, durationS };
 }

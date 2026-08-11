@@ -27,16 +27,16 @@ export default defineConfig({
         changeOrigin: true,
         agent: keepAliveAgent,
       },
-      '/auth': {
-        target: 'http://127.0.0.1:8081',
+      "/auth": {
+        target: "http://127.0.0.1:8081",
         changeOrigin: true,
         agent: keepAliveAgent,
       },
     },
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    setupFiles: './tests/unit/setup/vitest.setup.ts',
-  }
+    setupFiles: "./tests/unit/setup/vitest.setup.ts",
+  },
 });

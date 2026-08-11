@@ -1,5 +1,8 @@
-import { vi } from 'vitest';
-import type { ProjectContextValue, SelectableProject } from '../../../src/features/projects/ProjectContext';
+import { vi } from "vitest";
+import type {
+  ProjectContextValue,
+  SelectableProject,
+} from "../../../src/features/projects/ProjectContext";
 
 /**
  * Builds a project-context value for tests that render components below the
@@ -10,36 +13,36 @@ import type { ProjectContextValue, SelectableProject } from '../../../src/featur
  * a field.
  */
 export function createProjectContextValue(
-    overrides: Partial<ProjectContextValue> = {},
+  overrides: Partial<ProjectContextValue> = {},
 ): ProjectContextValue {
-    return {
-        projects: [],
-        selectedProject: null,
-        selectedProjectId: '',
-        canManageSelected: false,
-        isSwitcherEnabled: true,
-        isLoading: false,
-        errorMessage: null,
-        setSelectedProjectId: vi.fn(),
-        reloadProjects: vi.fn(),
-        ...overrides,
-    };
+  return {
+    projects: [],
+    selectedProject: null,
+    selectedProjectId: "",
+    canManageSelected: false,
+    isSwitcherEnabled: true,
+    isLoading: false,
+    errorMessage: null,
+    setSelectedProjectId: vi.fn(),
+    reloadProjects: vi.fn(),
+    ...overrides,
+  };
 }
 
 /** Builds a selectable project with sensible defaults. */
 export function createSelectableProject(
-    overrides: Partial<SelectableProject> = {},
+  overrides: Partial<SelectableProject> = {},
 ): SelectableProject {
-    return {
-        id: 'proj1',
-        name: 'Project Alpha',
-        description: '',
-        manager: null,
-        sources: [],
-        users: [],
-        isManaged: true,
-        memberCount: 3,
-        sourceCount: 2,
-        ...overrides,
-    };
+  return {
+    id: "proj1",
+    name: "Project Alpha",
+    description: "",
+    manager: null,
+    sources: [],
+    users: [],
+    isManaged: true,
+    memberCount: 3,
+    sourceCount: 2,
+    ...overrides,
+  };
 }

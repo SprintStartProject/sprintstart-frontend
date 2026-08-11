@@ -13,12 +13,7 @@ export type BackendProjectSourceStatus =
   | "ERROR"
   | (string & {});
 
-export type IngestionRunStatus =
-  | "CONNECTED"
-  | "RUNNING"
-  | "COMPLETED"
-  | "PARTIAL"
-  | "FAILED";
+export type IngestionRunStatus = "CONNECTED" | "RUNNING" | "COMPLETED" | "PARTIAL" | "FAILED";
 
 /**
  * The connection health a per-repo ingestion source reports (endpoint
@@ -26,23 +21,14 @@ export type IngestionRunStatus =
  * than {@link BackendProjectSourceStatus}; every value here is also a member of
  * that broader union, so it flows through the same status-derivation helpers.
  */
-export type ConnectionStatus =
-  | "CONNECTED"
-  | "UPDATING"
-  | "OUT_OF_DATE"
-  | "FAILED"
-  | "DISABLED";
+export type ConnectionStatus = "CONNECTED" | "UPDATING" | "OUT_OF_DATE" | "FAILED" | "DISABLED";
 
 /**
  * Whether a run's artifacts have actually reached the AI service's index, separate
  * from `IngestionRunStatus`. A run can show COMPLETED (fetched and saved locally)
  * while this is still PENDING or has moved to FAILED -- that gap is why this exists.
  */
-export type AiSyncStatus =
-  | "NOT_APPLICABLE"
-  | "PENDING"
-  | "SUCCEEDED"
-  | "FAILED";
+export type AiSyncStatus = "NOT_APPLICABLE" | "PENDING" | "SUCCEEDED" | "FAILED";
 
 export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST";
 

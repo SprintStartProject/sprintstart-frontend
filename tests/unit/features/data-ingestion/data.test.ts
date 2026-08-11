@@ -233,9 +233,7 @@ describe("data-ingestion data helpers", () => {
       ...overrides,
     });
 
-    const instance = (
-      overrides: Partial<JiraInstanceDto> = {},
-    ): JiraInstanceDto => ({
+    const instance = (overrides: Partial<JiraInstanceDto> = {}): JiraInstanceDto => ({
       instanceUrl: "https://acme.atlassian.net",
       displayName: "Team board",
       lastUpdate: "2026-07-28T10:00:00Z",
@@ -247,18 +245,11 @@ describe("data-ingestion data helpers", () => {
       ...overrides,
     });
 
-    const cases: ConnectionStatus[] = [
-      "CONNECTED",
-      "UPDATING",
-      "OUT_OF_DATE",
-      "FAILED",
-    ];
+    const cases: ConnectionStatus[] = ["CONNECTED", "UPDATING", "OUT_OF_DATE", "FAILED"];
 
     for (const connectionStatus of cases) {
       it(`carries the ${connectionStatus} connection status`, () => {
-        const source = createJiraSourceFromInstance(
-          status({ connectionStatus }),
-        );
+        const source = createJiraSourceFromInstance(status({ connectionStatus }));
         expect(source.backendStatus).toBe(connectionStatus);
       });
     }
@@ -308,9 +299,7 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("reports never-synced when the status row has no last run", () => {
-      const source = createJiraSourceFromInstance(
-        status({ lastRunTime: null }),
-      );
+      const source = createJiraSourceFromInstance(status({ lastRunTime: null }));
       expect(source.statusView.state).toBe("attention");
       expect(source.lastRunAt).toBeNull();
     });
@@ -331,34 +320,31 @@ describe("data-ingestion data helpers", () => {
   describe("deriveConnectionStatus / deriveSyncStatus", () => {
     const jiraStatus = (
       overrides: Partial<SourceInstanceIngestionStatus> = {},
-    ): SourceInstanceIngestionStatus =>
-      ({
-        sourceSystem: "JIRA",
-        sourceId: "https://acme.atlassian.net",
-        displayName: "Team board",
-        repositoryId: null,
-        owner: null,
-        name: null,
-        sourceUrl: "https://acme.atlassian.net",
-        connectionStatus: "CONNECTED",
-        enabled: true,
-        lastRunTime: "2026-07-28T10:00:00Z",
-        ingestedCount: 42,
-        updatedCount: 3,
-        deletedCount: 1,
-        failedCount: 0,
-        failedItems: [],
-        artifactCount: 128,
-        lastCommitsSyncAt: null,
-        lastIssuesSyncAt: "2026-07-28T10:00:00Z",
-        lastPullRequestsSyncAt: null,
-        ...overrides,
-      });
+    ): SourceInstanceIngestionStatus => ({
+      sourceSystem: "JIRA",
+      sourceId: "https://acme.atlassian.net",
+      displayName: "Team board",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://acme.atlassian.net",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-28T10:00:00Z",
+      ingestedCount: 42,
+      updatedCount: 3,
+      deletedCount: 1,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 128,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: "2026-07-28T10:00:00Z",
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
 
     it("shows Connected next to a spinning Syncing badge while a sync runs", () => {
-      const source = createJiraSourceFromInstance(
-        jiraStatus({ connectionStatus: "UPDATING" }),
-      );
+      const source = createJiraSourceFromInstance(jiraStatus({ connectionStatus: "UPDATING" }));
 
       const connection = deriveConnectionStatus(source);
       const sync = deriveSyncStatus(source);
@@ -377,18 +363,14 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("shows Disabled while keeping the last sync freshness", () => {
-      const source = createJiraSourceFromInstance(
-        jiraStatus({ enabled: false }),
-      );
+      const source = createJiraSourceFromInstance(jiraStatus({ enabled: false }));
 
       expect(deriveConnectionStatus(source).state).toBe("disabled");
       expect(deriveSyncStatus(source).label).toBe("Synced");
     });
 
     it("shows Connected next to Not synced before the first run", () => {
-      const source = createJiraSourceFromInstance(
-        jiraStatus({ lastRunTime: null }),
-      );
+      const source = createJiraSourceFromInstance(jiraStatus({ lastRunTime: null }));
 
       expect(deriveConnectionStatus(source).label).toBe("Connected");
       expect(deriveSyncStatus(source).label).toBe("Not synced");

@@ -14,29 +14,22 @@ export const PAGE_SIZE = 8;
 // reason `PanelPresence` does: unmounting sooner would cut the slide off
 // halfway and the drawer would appear to vanish rather than glide away.
 export const DRAWER_CLOSE_DELAY_MS = SIDE_PANEL_SLIDE_MS + 30;
-export const PERMISSION_GROUP_OPTIONS = [
-  "Admin",
-  "User",
-  "Project Manager",
-] as const;
+export const PERMISSION_GROUP_OPTIONS = ["Admin", "User", "Project Manager"] as const;
 
-export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> =
-  [
-    { value: "all", label: "All users" },
-    { value: "enabled", label: "Enabled" },
-    { value: "disabled", label: "Disabled" },
-    { value: "onboarded", label: "Onboarding completed" },
-    { value: "not-onboarded", label: "Onboarding open" },
-  ];
+export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = [
+  { value: "all", label: "All users" },
+  { value: "enabled", label: "Enabled" },
+  { value: "disabled", label: "Disabled" },
+  { value: "onboarded", label: "Onboarding completed" },
+  { value: "not-onboarded", label: "Onboarding open" },
+];
 
 export function getDisplayName(user: AdminUser) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
   return fullName || user.username || user.email;
 }
 
-export function getPermissionGroupVariant(
-  permissionGroup: string,
-): BadgeVariant {
+export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant {
   const normalized = permissionGroup.toUpperCase();
 
   if (normalized.includes("ADMIN")) return "warning";
@@ -73,13 +66,8 @@ export function getUserEditFormState(user: AdminUser): UserEditFormState {
   };
 }
 
-export function getDraftDisplayName(
-  user: AdminUser,
-  draftUser: UserEditFormState,
-) {
-  const fullName = [draftUser.firstName, draftUser.lastName]
-    .filter(Boolean)
-    .join(" ");
+export function getDraftDisplayName(user: AdminUser, draftUser: UserEditFormState) {
+  const fullName = [draftUser.firstName, draftUser.lastName].filter(Boolean).join(" ");
 
   return fullName || user.username || draftUser.email;
 }
@@ -93,9 +81,7 @@ export function getProjectEditFormState(
   };
 }
 
-export function getAvailableProjects(
-  projects: ProjectOverview[],
-): ProjectSummary[] {
+export function getAvailableProjects(projects: ProjectOverview[]): ProjectSummary[] {
   return projects
     .map((project) => ({
       id: project.id,
@@ -120,15 +106,11 @@ export function enrichUsersWithProjectNames(
   users: AdminUser[],
   projects: ProjectSummary[],
 ): AdminUser[] {
-  const projectsById = new Map(
-    projects.map((project) => [project.id, project]),
-  );
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
 
   return users.map((user) => {
     const assignedIds =
-      user.projectIds.length > 0
-        ? user.projectIds
-        : user.projects.map((project) => project.id);
+      user.projectIds.length > 0 ? user.projectIds : user.projects.map((project) => project.id);
 
     return {
       ...user,
@@ -162,20 +144,13 @@ export function filterAdminUsers(
       user.profileIcon,
       String(user.enabled),
       String(user.hasCompletedOnboarding),
-      ...user.roles.flatMap((role) => [
-        role.id,
-        role.name,
-        role.description,
-        role.type,
-      ]),
+      ...user.roles.flatMap((role) => [role.id, role.name, role.description, role.type]),
       ...user.projects.flatMap((project) => [project.id, project.name]),
     ];
 
     const matchesSearch =
       normalizedSearch.length === 0 ||
-      searchableValues.some((value) =>
-        value.toLowerCase().includes(normalizedSearch),
-      );
+      searchableValues.some((value) => value.toLowerCase().includes(normalizedSearch));
 
     const matchesFilter =
       userFilter === "all" ||
@@ -199,12 +174,7 @@ export function filterAdminProjects(
       project.id,
       project.name,
       project.description,
-      ...project.sources.flatMap((source) => [
-        source.id,
-        source.name,
-        source.type,
-        source.status,
-      ]),
+      ...project.sources.flatMap((source) => [source.id, source.name, source.type, source.status]),
       ...project.users.flatMap((user) => [
         user.id,
         user.username,
@@ -215,9 +185,7 @@ export function filterAdminProjects(
 
     return (
       normalizedSearch.length === 0 ||
-      searchableValues.some((value) =>
-        value.toLowerCase().includes(normalizedSearch),
-      )
+      searchableValues.some((value) => value.toLowerCase().includes(normalizedSearch))
     );
   });
 }
@@ -240,19 +208,11 @@ export function getPaginatedUsers(
   return users.slice(startIndex, startIndex + pageSize);
 }
 
-export function areAllVisibleUsersSelected(
-  users: AdminUser[],
-  selectedUserIds: Set<string>,
-) {
-  return (
-    users.length > 0 && users.every((user) => selectedUserIds.has(user.id))
-  );
+export function areAllVisibleUsersSelected(users: AdminUser[], selectedUserIds: Set<string>) {
+  return users.length > 0 && users.every((user) => selectedUserIds.has(user.id));
 }
 
-export function toggleSelectedUserId(
-  selectedUserIds: Set<string>,
-  userId: string,
-) {
+export function toggleSelectedUserId(selectedUserIds: Set<string>, userId: string) {
   const nextSelectedUserIds = new Set(selectedUserIds);
 
   if (nextSelectedUserIds.has(userId)) {

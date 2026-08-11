@@ -1,5 +1,9 @@
 import { useId, useState } from "react";
 import { AlertCircle, Plus } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
 import { parseGithubRepositoryInput } from "../../../services/sources/githubRepositoryInput";
 import { createDraftSource, type DraftSource } from "../projectSourcesDraft";
 import { StagedSourceList } from "./StagedSourceList";
@@ -50,9 +54,7 @@ export function ProjectSourcesStep({
     const parsedRepository = parseGithubRepositoryInput(owner, repositoryName);
 
     if (!parsedRepository) {
-      setFormError(
-        "Enter a repository as owner/name, a GitHub URL, or fill in both fields.",
-      );
+      setFormError("Enter a repository as owner/name, a GitHub URL, or fill in both fields.");
       return;
     }
 
@@ -68,19 +70,11 @@ export function ProjectSourcesStep({
     );
 
     if (alreadyStaged) {
-      setFormError(
-        `${parsedRepository.owner}/${parsedRepository.name} is already on the list.`,
-      );
+      setFormError(`${parsedRepository.owner}/${parsedRepository.name} is already on the list.`);
       return;
     }
 
-    onAdd(
-      createDraftSource(
-        parsedRepository.owner,
-        parsedRepository.name,
-        effectiveTokenName,
-      ),
-    );
+    onAdd(createDraftSource(parsedRepository.owner, parsedRepository.name, effectiveTokenName));
 
     setOwner("");
     setRepositoryName("");
@@ -91,55 +85,33 @@ export function ProjectSourcesStep({
     <div className="space-y-5">
       <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor={ownerInputId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Repository owner
-            </label>
-            <input
-              id={ownerInputId}
+          <Field label="Repository owner" controlId={ownerInputId} disabled={disabled}>
+            <Input
               value={owner}
               onChange={(event) => setOwner(event.target.value)}
-              disabled={disabled}
               placeholder="SprintStartProject or a GitHub URL"
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label
-              htmlFor={nameInputId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Repository name
-            </label>
-            <input
-              id={nameInputId}
+          <Field label="Repository name" controlId={nameInputId} disabled={disabled}>
+            <Input
               value={repositoryName}
               onChange={(event) => setRepositoryName(event.target.value)}
-              disabled={disabled}
               placeholder="sprintstart-backend"
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
             />
-          </div>
+          </Field>
         </div>
 
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label
-              htmlFor={tokenSelectId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              GitHub access token
-            </label>
-            <select
-              id={tokenSelectId}
+          <Field
+            label="GitHub access token"
+            controlId={tokenSelectId}
+            disabled={disabled || !hasTokens}
+            className="flex-1"
+          >
+            <Select
               value={effectiveTokenName}
               onChange={(event) => setTokenName(event.target.value)}
-              disabled={disabled || !hasTokens}
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-colors focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
             >
               {hasTokens ? (
                 tokenNames.map((name) => (
@@ -150,24 +122,22 @@ export function ProjectSourcesStep({
               ) : (
                 <option value="">No saved tokens available</option>
               )}
-            </select>
-          </div>
+            </Select>
+          </Field>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={addSource}
             disabled={disabled || !hasTokens}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            icon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" />
             Add repository
-          </button>
+          </Button>
         </div>
 
         {!hasTokens && (
           <p className="mt-3 text-sm text-app-warning-text">
-            Add a GitHub personal access token first, then come back to connect
-            repositories.
+            Add a GitHub personal access token first, then come back to connect repositories.
           </p>
         )}
 

@@ -89,10 +89,7 @@ describe("jiraService instance endpoints", () => {
   it("connectJiraInstance rejects with an ApiError on 502", async () => {
     server.use(
       http.post("/api/v1/jira/connect", () =>
-        HttpResponse.json(
-          { message: "Jira server unreachable" },
-          { status: 502 },
-        ),
+        HttpResponse.json({ message: "Jira server unreachable" }, { status: 502 }),
       ),
     );
 
@@ -128,10 +125,7 @@ describe("jiraService instance endpoints", () => {
   it("updateAllJiraInstances returns one transaction id per instance", async () => {
     server.use(
       http.post("/api/v1/jira/update-all", () =>
-        HttpResponse.json([
-          { transactionId: "tx-1" },
-          { transactionId: "tx-2" },
-        ]),
+        HttpResponse.json([{ transactionId: "tx-1" }, { transactionId: "tx-2" }]),
       ),
     );
 
@@ -168,9 +162,7 @@ describe("jiraService credential endpoints", () => {
   it("getMyJiraCredentials lists the authenticated user's credentials", async () => {
     server.use(
       http.get("/api/v1/jira/credentials", () =>
-        HttpResponse.json([
-          { userEmail: "pm+user@example.com", displayName: "token-a" },
-        ]),
+        HttpResponse.json([{ userEmail: "pm+user@example.com", displayName: "token-a" }]),
       ),
     );
 
@@ -216,21 +208,18 @@ describe("jiraService credential endpoints", () => {
 
   it("changeJiraCredentialName patches the name and returns the credential", async () => {
     server.use(
-      http.patch(
-        "/api/v1/jira/credentials/patch/name",
-        async ({ request }) => {
-          expect(await request.json()).toEqual({
-            userEmail: "pm@example.com",
-            oldName: "token-a",
-            newName: "token-b",
-          });
+      http.patch("/api/v1/jira/credentials/patch/name", async ({ request }) => {
+        expect(await request.json()).toEqual({
+          userEmail: "pm@example.com",
+          oldName: "token-a",
+          newName: "token-b",
+        });
 
-          return HttpResponse.json({
-            userEmail: "pm@example.com",
-            displayName: "token-b",
-          });
-        },
-      ),
+        return HttpResponse.json({
+          userEmail: "pm@example.com",
+          displayName: "token-b",
+        });
+      }),
     );
 
     const credential = await changeJiraCredentialName({
@@ -244,21 +233,18 @@ describe("jiraService credential endpoints", () => {
 
   it("changeJiraCredentialToken patches the token secret", async () => {
     server.use(
-      http.patch(
-        "/api/v1/jira/credentials/patch/token",
-        async ({ request }) => {
-          expect(await request.json()).toEqual({
-            userEmail: "pm@example.com",
-            tokenName: "token-a",
-            newToken: "new-secret",
-          });
+      http.patch("/api/v1/jira/credentials/patch/token", async ({ request }) => {
+        expect(await request.json()).toEqual({
+          userEmail: "pm@example.com",
+          tokenName: "token-a",
+          newToken: "new-secret",
+        });
 
-          return HttpResponse.json({
-            userEmail: "pm@example.com",
-            displayName: "token-a",
-          });
-        },
-      ),
+        return HttpResponse.json({
+          userEmail: "pm@example.com",
+          displayName: "token-a",
+        });
+      }),
     );
 
     const credential = await changeJiraCredentialToken({
@@ -303,14 +289,9 @@ describe("jiraService config endpoints", () => {
       }),
     );
 
-    await removeJiraInstanceFromProject(
-      "https://acme.atlassian.net",
-      "project-1",
-    );
+    await removeJiraInstanceFromProject("https://acme.atlassian.net", "project-1");
 
-    expect(capturedUrl!.searchParams.get("instanceUrl")).toBe(
-      "https://acme.atlassian.net",
-    );
+    expect(capturedUrl!.searchParams.get("instanceUrl")).toBe("https://acme.atlassian.net");
     expect(capturedUrl!.searchParams.get("projectId")).toBe("project-1");
   });
 

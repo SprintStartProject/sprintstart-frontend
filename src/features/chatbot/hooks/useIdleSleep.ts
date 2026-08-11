@@ -18,24 +18,24 @@ export const ASLEEP_DELAY_MS = 20_000;
 const WAKING_MS = 600;
 
 function drowsyDelay(): number {
-    return DROWSY_MIN_MS + Math.random() * (DROWSY_MAX_MS - DROWSY_MIN_MS);
+  return DROWSY_MIN_MS + Math.random() * (DROWSY_MAX_MS - DROWSY_MIN_MS);
 }
 
 interface UseIdleSleepOptions {
-    /**
-     * Whether the bot is allowed to nod off at all. Pass `false` while it is
-     * actually doing something — falling asleep mid-answer would read as the
-     * app having hung rather than as a joke.
-     */
-    enabled?: boolean;
+  /**
+   * Whether the bot is allowed to nod off at all. Pass `false` while it is
+   * actually doing something — falling asleep mid-answer would read as the
+   * app having hung rather than as a joke.
+   */
+  enabled?: boolean;
 }
 
 interface IdleSleep {
-    stage: SleepStage;
-    /** True for the brief startled beat right after waking. */
-    isWaking: boolean;
-    /** Wakes the bot immediately — for clicking it directly. */
-    wake: () => void;
+  stage: SleepStage;
+  /** True for the brief startled beat right after waking. */
+  isWaking: boolean;
+  /** Wakes the bot immediately — for clicking it directly. */
+  wake: () => void;
 }
 
 /**
@@ -51,70 +51,67 @@ interface IdleSleep {
  * the transition may land late; it will not be missed.
  */
 export function useIdleSleep({ enabled = true }: UseIdleSleepOptions = {}): IdleSleep {
-    const [stage, setStage] = useState<SleepStage>("awake");
-    const [isWaking, setIsWaking] = useState(false);
-    const [activityToken, setActivityToken] = useState(0);
+  const [stage, setStage] = useState<SleepStage>("awake");
+  const [isWaking, setIsWaking] = useState(false);
+  const [activityToken, setActivityToken] = useState(0);
 
-    // Mirrors `stage` for the timers to read without re-subscribing on every
-    // stage change. Assigning a ref is not a state update, so no cascade.
-    const stageRef = useRef<SleepStage>(stage);
-    useEffect(() => {
-        stageRef.current = stage;
-    }, [stage]);
+  // Mirrors `stage` for the timers to read without re-subscribing on every
+  // stage change. Assigning a ref is not a state update, so no cascade.
+  const stageRef = useRef<SleepStage>(stage);
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
 
-    const wake = useCallback(() => setActivityToken((token) => token + 1), []);
+  const wake = useCallback(() => setActivityToken((token) => token + 1), []);
 
-    useEffect(() => {
-        if (!enabled) return;
+  useEffect(() => {
+    if (!enabled) return;
 
-        // Every stage transition is scheduled here, including the return to
-        // "awake". Doing it with a zero-delay timer rather than a synchronous
-        // set keeps this effect free of cascading renders, and the functional
-        // update bails out when the bot is already awake — which is every
-        // keystroke of normal typing.
-        const wakeTimer = window.setTimeout(() => {
-            if (stageRef.current === "asleep") setIsWaking(true);
-            setStage((current) => (current === "awake" ? current : "awake"));
-        }, 0);
+    // Every stage transition is scheduled here, including the return to
+    // "awake". Doing it with a zero-delay timer rather than a synchronous
+    // set keeps this effect free of cascading renders, and the functional
+    // update bails out when the bot is already awake — which is every
+    // keystroke of normal typing.
+    const wakeTimer = window.setTimeout(() => {
+      if (stageRef.current === "asleep") setIsWaking(true);
+      setStage((current) => (current === "awake" ? current : "awake"));
+    }, 0);
 
-        // Redrawn on every restart, so a bot that has been woken and left alone
-        // again does not fall asleep on the same schedule as last time.
-        const untilDrowsy = drowsyDelay();
+    // Redrawn on every restart, so a bot that has been woken and left alone
+    // again does not fall asleep on the same schedule as last time.
+    const untilDrowsy = drowsyDelay();
 
-        const drowsyTimer = window.setTimeout(() => setStage("drowsy"), untilDrowsy);
-        const asleepTimer = window.setTimeout(
-            () => setStage("asleep"),
-            untilDrowsy + ASLEEP_DELAY_MS,
-        );
+    const drowsyTimer = window.setTimeout(() => setStage("drowsy"), untilDrowsy);
+    const asleepTimer = window.setTimeout(() => setStage("asleep"), untilDrowsy + ASLEEP_DELAY_MS);
 
-        return () => {
-            window.clearTimeout(wakeTimer);
-            window.clearTimeout(drowsyTimer);
-            window.clearTimeout(asleepTimer);
-        };
-    }, [enabled, activityToken]);
+    return () => {
+      window.clearTimeout(wakeTimer);
+      window.clearTimeout(drowsyTimer);
+      window.clearTimeout(asleepTimer);
+    };
+  }, [enabled, activityToken]);
 
-    // Clears the startled look a moment after it starts.
-    useEffect(() => {
-        if (!isWaking) return;
-        const timer = window.setTimeout(() => setIsWaking(false), WAKING_MS);
-        return () => window.clearTimeout(timer);
-    }, [isWaking]);
+  // Clears the startled look a moment after it starts.
+  useEffect(() => {
+    if (!isWaking) return;
+    const timer = window.setTimeout(() => setIsWaking(false), WAKING_MS);
+    return () => window.clearTimeout(timer);
+  }, [isWaking]);
 
-    useEffect(() => {
-        if (!enabled) return;
+  useEffect(() => {
+    if (!enabled) return;
 
-        const onActivity = () => setActivityToken((token) => token + 1);
+    const onActivity = () => setActivityToken((token) => token + 1);
 
-        document.addEventListener("keydown", onActivity);
-        document.addEventListener("pointerdown", onActivity);
-        return () => {
-            document.removeEventListener("keydown", onActivity);
-            document.removeEventListener("pointerdown", onActivity);
-        };
-    }, [enabled]);
+    document.addEventListener("keydown", onActivity);
+    document.addEventListener("pointerdown", onActivity);
+    return () => {
+      document.removeEventListener("keydown", onActivity);
+      document.removeEventListener("pointerdown", onActivity);
+    };
+  }, [enabled]);
 
-    // Derived rather than reset through an effect: while the bot is busy it is
-    // awake by definition, whatever the timers last recorded.
-    return { stage: enabled ? stage : "awake", isWaking: enabled && isWaking, wake };
+  // Derived rather than reset through an effect: while the bot is busy it is
+  // awake by definition, whatever the timers last recorded.
+  return { stage: enabled ? stage : "awake", isWaking: enabled && isWaking, wake };
 }

@@ -1,11 +1,11 @@
 type TableHeaderProps = {
-    children: string;
+  children: string;
 };
 
 export function TableHeader({ children }: TableHeaderProps) {
-    return (
-        <div className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">
-            {children}
-        </div>
-    );
+  return (
+    <div className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+      {children}
+    </div>
+  );
 }

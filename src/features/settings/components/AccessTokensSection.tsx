@@ -1,17 +1,14 @@
 import { useState } from "react";
 import { useAuth } from "../../../context/useAuth";
-import {
-  SegmentedControl,
-  type SegmentedControlOption,
-} from "../../../components/ui/SegmentedControl";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { TokensSection } from "./TokensSection";
 import { JiraCredentialsSection } from "./jira/JiraCredentialsSection";
 
 type Provider = "github" | "jira";
 
-const PROVIDERS: ReadonlyArray<SegmentedControlOption<Provider>> = [
-  { id: "github", label: "GitHub", testId: "access-tokens-segment-github" },
-  { id: "jira", label: "Jira", testId: "access-tokens-segment-jira" },
+const PROVIDERS: SegmentedTabOption<Provider>[] = [
+  { value: "github", label: "GitHub", testId: "access-tokens-segment-github" },
+  { value: "jira", label: "Jira", testId: "access-tokens-segment-jira" },
 ];
 
 /**
@@ -27,10 +24,11 @@ export function AccessTokensSection() {
 
   return (
     <div className="space-y-5">
-      <SegmentedControl
-        options={PROVIDERS}
+      <SegmentedTabs
         value={provider}
+        options={PROVIDERS}
         onChange={setProvider}
+        layoutId="access-tokens-provider-pill"
         ariaLabel="Access token provider"
       />
 

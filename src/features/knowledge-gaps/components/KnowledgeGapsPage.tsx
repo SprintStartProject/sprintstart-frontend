@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { KnowledgeGapSeverity } from "../types";
@@ -8,10 +9,10 @@ import { useFetch } from "../../../hooks/useFetch";
 import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
+import { Button } from "../../../components/ui/Button";
 
 import {
   ShieldAlert,
-  Loader2,
   AlertCircle,
   Clock,
   ArrowLeft,
@@ -23,15 +24,9 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
-import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "../../../components/ui/FilterSelect";
-import {
-  buttonHoverMotion,
-  buttonHoverMotionDisabled,
-  hoverSpringToken,
-} from "../../../styles/tokens";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { buttonHoverMotion } from "../../../styles/tokens";
 
 type GapSortOption = "severity" | "date" | "component";
 
@@ -46,6 +41,7 @@ const SORT_OPTIONS: FilterSelectOption<GapSortOption>[] = [
 // ------------------------------------------------------------------
 
 export function KnowledgeGapsPage() {
+  const { selectedProjectId } = useProjectContext();
   const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([
     "high",
     "medium",
@@ -63,40 +59,41 @@ export function KnowledgeGapsPage() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(), [refreshKey]);
+  } = useFetch(
+    () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
+    [refreshKey, selectedProjectId],
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setRefreshError(null);
     try {
-      await knowledgeGapService.refreshKnowledgeGaps();
+      await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
-      setRefreshError(
-        "Refresh failed. Is the AI service running?",
-      );
+      setRefreshError("Refresh failed. Is the AI service running?");
     } finally {
       setRefreshing(false);
     }
   };
 
   const refreshButton = (
-    <motion.button
+    <Button
+      variant="primary"
       onClick={() => void handleRefresh()}
-      disabled={refreshing}
-      {...(refreshing ? buttonHoverMotionDisabled : buttonHoverMotion)}
-      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover hover:shadow-[0_10px_26px_-10px_var(--color-app-brand)] disabled:opacity-60"
+      loading={refreshing}
+      icon={<RefreshCw className="h-4 w-4" />}
+      className="shrink-0"
     >
-      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
       {refreshing ? "Refreshing…" : "Refresh"}
-    </motion.button>
+    </Button>
   );
 
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }
@@ -104,24 +101,20 @@ export function KnowledgeGapsPage() {
   if (error || !overview || overview.gaps.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-20">
-        <AlertCircle className="w-5 h-5 text-app-text-muted" />
+        <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-app-text-muted">
           No knowledge gaps yet. Trigger a refresh to detect them.
         </p>
         {refreshButton}
         {refreshError && (
-          <p className="text-sm text-app-danger-text max-w-md text-center">
-            {refreshError}
-          </p>
+          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
         )}
       </div>
     );
   }
 
   // Filter by severity
-  const filtered = overview.gaps.filter((gap) =>
-    severityFilter.includes(gap.severity),
-  );
+  const filtered = overview.gaps.filter((gap) => severityFilter.includes(gap.severity));
 
   // Sort based on selected sort option, with the number of missing docs as a
   // secondary tie-breaker (more missing docs ranks higher within the same
@@ -133,9 +126,7 @@ export function KnowledgeGapsPage() {
         primary = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
         break;
       case "date":
-        primary =
-          new Date(b.lastIngested).getTime() -
-          new Date(a.lastIngested).getTime();
+        primary = new Date(b.lastIngested).getTime() - new Date(a.lastIngested).getTime();
         break;
       case "component":
         primary = a.component.localeCompare(b.component);
@@ -150,9 +141,7 @@ export function KnowledgeGapsPage() {
 
   const toggleSeverityFilter = (severity: KnowledgeGapSeverity) => {
     setSeverityFilter((prev) =>
-      prev.includes(severity)
-        ? prev.filter((s) => s !== severity)
-        : [...prev, severity],
+      prev.includes(severity) ? prev.filter((s) => s !== severity) : [...prev, severity],
     );
   };
 
@@ -160,23 +149,21 @@ export function KnowledgeGapsPage() {
     <div className="min-h-screen bg-app-bg">
       <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
         <div className="app-page-content py-8">
-          <motion.button
+          <Button
+            variant="ghost"
             onClick={() => void navigate("/pm-dashboard")}
-            whileHover={{ x: -3 }}
-            whileTap={{ scale: 0.97 }}
-            transition={hoverSpringToken}
-            className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-muted transition-colors hover:text-app-text"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
             Back to PM-Dashboard
-          </motion.button>
-          <div className="flex items-start justify-between gap-4 mb-6">
+          </Button>
+          <div className="mb-6 flex items-start justify-between gap-4">
             <PageHeader
               icon={ShieldAlert}
               title="Knowledge Gaps"
               subtitle="Documentation gaps identified across the organization and prioritized by impact."
             />
-            <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="flex shrink-0 flex-col items-end gap-1">
               {refreshButton}
               {overview.gaps[0] && (
                 <span className="text-xs text-app-text-muted">
@@ -185,9 +172,7 @@ export function KnowledgeGapsPage() {
               )}
             </div>
           </div>
-          {refreshError && (
-            <p className="text-sm text-app-danger-text mb-4">{refreshError}</p>
-          )}
+          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
           <SeveritySummaryBar gaps={overview.gaps} className="mb-6" />
         </div>
       </section>
@@ -206,52 +191,50 @@ export function KnowledgeGapsPage() {
           >
             <Filter aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
 
-            {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map(
-              (severity) => {
-                const isSelected = severityFilter.includes(severity);
-                const { badge, label } = SEVERITY_STYLES[severity];
+            {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map((severity) => {
+              const isSelected = severityFilter.includes(severity);
+              const { badge, label } = SEVERITY_STYLES[severity];
 
-                return (
-                  <motion.button
-                    key={severity}
-                    type="button"
-                    // These are toggles, not a single choice -- `aria-pressed`
-                    // is what tells assistive tech which severities are
-                    // currently included.
-                    aria-pressed={isSelected}
-                    onClick={() => toggleSeverityFilter(severity)}
-                    {...buttonHoverMotion}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                      isSelected
-                        ? badge
-                        : "border border-app-border/70 bg-app-surface/70 text-app-text-muted backdrop-blur-md hover:border-app-brand-border-strong hover:text-app-text"
-                    }`}
-                  >
-                    {label}
-                  </motion.button>
-                );
-              },
-            )}
+              return (
+                <motion.button
+                  key={severity}
+                  type="button"
+                  // These are toggles, not a single choice -- `aria-pressed`
+                  // is what tells assistive tech which severities are
+                  // currently included.
+                  aria-pressed={isSelected}
+                  onClick={() => toggleSeverityFilter(severity)}
+                  {...buttonHoverMotion}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isSelected
+                      ? badge
+                      : "border border-app-border/70 bg-app-surface/70 text-app-text-muted backdrop-blur-md hover:border-app-brand-border-strong hover:text-app-text"
+                  }`}
+                >
+                  {label}
+                </motion.button>
+              );
+            })}
           </div>
 
-          <span className="text-xs tabular-nums text-app-text-muted">
+          <span className="text-xs text-app-text-muted tabular-nums">
             {filtered.length} of {overview.gaps.length}
           </span>
 
           <div className="ml-auto flex items-center gap-2">
             {(severityFilter.length < 3 || sortBy !== "severity") && (
-              <motion.button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setSeverityFilter(["high", "medium", "low"]);
                   setSortBy("severity");
                 }}
-                {...buttonHoverMotion}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-transparent px-2.5 text-sm font-medium text-app-brand-text transition-colors hover:border-app-brand-border hover:bg-app-surface-hover"
+                icon={<X className="h-3.5 w-3.5" />}
+                className="text-app-brand-text"
               >
-                <X className="h-3.5 w-3.5" />
                 Reset
-              </motion.button>
+              </Button>
             )}
 
             <FilterSelect
@@ -276,84 +259,76 @@ export function KnowledgeGapsPage() {
         <div className="space-y-3">
           <AnimatePresence initial={false}>
             {filtered.map((gap) => {
-            const { badge, label } = SEVERITY_STYLES[gap.severity];
-            const owner = gap.owners[0] ?? null;
+              const { badge, label } = SEVERITY_STYLES[gap.severity];
+              const owner = gap.owners[0] ?? null;
 
-            return (
-              <motion.button
-                key={gap.id}
-                // `layout="position"` rather than `layout`: it animates only
-                // where the row sits, never its measured size, so no scale
-                // correction is ever applied. Plain `layout` is what made a
-                // re-appearing row flash at the wrong size.
-                layout="position"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                // No scale here either: `scale` is owned by the CSS hover on
-                // this same element, and two owners for one property fight.
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-                onClick={() =>
-                  void navigate(`/insights/knowledge-gaps/${gap.id}`)
-                }
-                // The transition list is explicit rather than `transition-all`:
-                // Framer Motion drives `opacity` and `transform` inline on this
-                // element, and a CSS transition covering those properties would
-                // try to ease every frame the animation writes -- which is what
-                // made a returning row flicker. CSS keeps only what it owns.
-                className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface transition-[scale,background-color,border-color,box-shadow] duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100 p-4"
-              >
-                <SeverityBar severity={gap.severity} />
+              return (
+                <motion.button
+                  key={gap.id}
+                  // `layout="position"` rather than `layout`: it animates only
+                  // where the row sits, never its measured size, so no scale
+                  // correction is ever applied. Plain `layout` is what made a
+                  // re-appearing row flash at the wrong size.
+                  layout="position"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  // No scale here either: `scale` is owned by the CSS hover on
+                  // this same element, and two owners for one property fight.
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+                  onClick={() => void navigate(`/insights/knowledge-gaps/${gap.id}`)}
+                  // The transition list is explicit rather than `transition-all`:
+                  // Framer Motion drives `opacity` and `transform` inline on this
+                  // element, and a CSS transition covering those properties would
+                  // try to ease every frame the animation writes -- which is what
+                  // made a returning row flicker. CSS keeps only what it owns.
+                  className="flex w-full items-stretch gap-3 rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-[scale,background-color,border-color,box-shadow] duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
+                >
+                  <SeverityBar severity={gap.severity} />
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-base font-medium text-app-text">
-                      {gap.component}
-                    </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-base font-medium text-app-text">{gap.component}</span>
 
-                    <span
-                      className={`text-xs font-medium px-2 py-1 rounded-full ${badge}`}
-                    >
-                      {label}
-                    </span>
-                  </div>
-
-                  {/* Missing document types for this component */}
-                  <div className="mb-3">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-app-text-muted mb-1.5">
-                      <FileText className="w-3.5 h-3.5" />
-                      Missing documentation ({gap.missingTypes.length})
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {gap.missingTypes.map((type) => (
-                        <span
-                          key={type}
-                          className="bg-app-surface-muted border border-app-border rounded px-2 py-1 text-xs"
-                        >
-                          {type}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 text-xs text-app-text-muted">
-                    <span className="flex items-center gap-1 min-w-0">
-                      <User className="w-3 h-3 shrink-0" />
-                      <span className="truncate">
-                        {owner
-                          ? `${owner.firstname} ${owner.lastname}`
-                          : "Unassigned"}
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge}`}>
+                        {label}
                       </span>
-                    </span>
+                    </div>
 
-                    <span className="flex items-center gap-1 shrink-0">
-                      <Clock className="w-3 h-3" />
-                      {formatRelativeDate(gap.lastIngested)}
-                    </span>
+                    {/* Missing document types for this component */}
+                    <div className="mb-3">
+                      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
+                        <FileText className="h-3.5 w-3.5" />
+                        Missing documentation ({gap.missingTypes.length})
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {gap.missingTypes.map((type) => (
+                          <span
+                            key={type}
+                            className="rounded border border-app-border bg-app-surface-muted px-2 py-1 text-xs"
+                          >
+                            {type}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 text-xs text-app-text-muted">
+                      <span className="flex min-w-0 items-center gap-1">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          {owner ? `${owner.firstname} ${owner.lastname}` : "Unassigned"}
+                        </span>
+                      </span>
+
+                      <span className="flex shrink-0 items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatRelativeDate(gap.lastIngested)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </motion.button>
-            );
+                </motion.button>
+              );
             })}
           </AnimatePresence>
         </div>

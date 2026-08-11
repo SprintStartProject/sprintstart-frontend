@@ -6,7 +6,7 @@ import { flybyGeometry } from "../flightGeometry.ts";
 import { announceRocketFlight } from "../rocketWatch.ts";
 
 interface RocketFlybyProps {
-    onDone: () => void;
+  onDone: () => void;
 }
 
 /** How long the pass takes, in seconds. */
@@ -39,96 +39,93 @@ const DURATION = 1.05;
  *   to end up with neither.
  */
 export function RocketFlyby({ onDone }: RocketFlybyProps) {
-    const [geometry] = useState(() =>
-        flybyGeometry(window.innerWidth, window.innerHeight),
-    );
-    const rocketRef = useRef<HTMLDivElement>(null);
+  const [geometry] = useState(() => flybyGeometry(window.innerWidth, window.innerHeight));
+  const rocketRef = useRef<HTMLDivElement>(null);
 
-    // Teardown is on a timer rather than on `onAnimationComplete`. The callback
-    // is the animation's own report card: if the animation never starts, it
-    // never fires and the overlay stays mounted forever; if it fires early the
-    // rocket vanishes before it is seen. A timer is answerable to neither.
-    useEffect(() => {
-        const timer = window.setTimeout(onDone, DURATION * 1000 + 200);
-        return () => window.clearTimeout(timer);
-    }, [onDone]);
+  // Teardown is on a timer rather than on `onAnimationComplete`. The callback
+  // is the animation's own report card: if the animation never starts, it
+  // never fires and the overlay stays mounted forever; if it fires early the
+  // rocket vanishes before it is seen. A timer is answerable to neither.
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, DURATION * 1000 + 200);
+    return () => window.clearTimeout(timer);
+  }, [onDone]);
 
-    // Announces the pass, so anything with eyes on the page can turn and watch
-    // it go by. Tied to mount rather than to the animation, for the same reason
-    // the teardown is: the element existing is a fact, the animation running is
-    // a hope.
-    useEffect(() => {
-        const rocket = rocketRef.current;
-        if (!rocket) return;
-        return announceRocketFlight(rocket);
-    }, []);
+  // Announces the pass, so anything with eyes on the page can turn and watch
+  // it go by. Tied to mount rather than to the animation, for the same reason
+  // the teardown is: the element existing is a fact, the animation running is
+  // a hope.
+  useEffect(() => {
+    const rocket = rocketRef.current;
+    if (!rocket) return;
+    return announceRocketFlight(rocket);
+  }, []);
 
-    const { fromX, fromY, toX, toY, peakSize } = geometry;
+  const { fromX, fromY, toX, toY, peakSize } = geometry;
 
-    return createPortal(
-        <div
-            aria-hidden="true"
-            data-testid="rocket-flyby"
-            className="pointer-events-none fixed inset-0 z-[80] flex items-center justify-center overflow-hidden"
-        >
-            {/* Light swell as the rocket passes through. Carries the "something
+  return createPortal(
+    <div
+      aria-hidden="true"
+      data-testid="rocket-flyby"
+      className="pointer-events-none fixed inset-0 z-[80] flex items-center justify-center overflow-hidden"
+    >
+      {/* Light swell as the rocket passes through. Carries the "something
                 just happened" without dimming the page the way a scrim would. */}
-            <motion.div
-                className="absolute rounded-full"
-                style={{
-                    width: peakSize * 2,
-                    height: peakSize * 2,
-                    background:
-                        "radial-gradient(circle, var(--brand-glow) 0%, transparent 68%)",
-                }}
-                initial={{ scale: 0.2, opacity: 0 }}
-                animate={{ scale: [0.2, 1.6, 0.2], opacity: [0, 0.6, 0] }}
-                transition={{ duration: DURATION, times: [0, 0.5, 1], ease: "easeInOut" }}
-            />
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: peakSize * 2,
+          height: peakSize * 2,
+          background: "radial-gradient(circle, var(--brand-glow) 0%, transparent 68%)",
+        }}
+        initial={{ scale: 0.2, opacity: 0 }}
+        animate={{ scale: [0.2, 1.6, 0.2], opacity: [0, 0.6, 0] }}
+        transition={{ duration: DURATION, times: [0, 0.5, 1], ease: "easeInOut" }}
+      />
 
-            <motion.div
-                ref={rocketRef}
-                className="absolute"
-                initial={{ x: fromX, y: fromY, scale: 0.25, opacity: 0 }}
-                animate={{
-                    x: [fromX, fromX * 0.6, 0, toX * 0.6, toX],
-                    y: [fromY, fromY * 0.6, 0, toY * 0.6, toY],
-                    scale: [0.25, 0.6, 1, 0.6, 0.25],
-                    opacity: [0, 1, 1, 1, 0],
-                }}
-                transition={{
-                    duration: DURATION,
-                    times: [0, 0.2, 0.5, 0.8, 1],
-                    ease: "easeInOut",
-                }}
-            >
-                {/* Plain CSS rotation: inside here "down" is straight back along
+      <motion.div
+        ref={rocketRef}
+        className="absolute"
+        initial={{ x: fromX, y: fromY, scale: 0.25, opacity: 0 }}
+        animate={{
+          x: [fromX, fromX * 0.6, 0, toX * 0.6, toX],
+          y: [fromY, fromY * 0.6, 0, toY * 0.6, toY],
+          scale: [0.25, 0.6, 1, 0.6, 0.25],
+          opacity: [0, 1, 1, 1, 0],
+        }}
+        transition={{
+          duration: DURATION,
+          times: [0, 0.2, 0.5, 0.8, 1],
+          ease: "easeInOut",
+        }}
+      >
+        {/* Plain CSS rotation: inside here "down" is straight back along
                     the flight path, which is where the trail belongs. */}
-                <div
-                    className="relative flex items-center justify-center"
-                    style={{ transform: `rotate(${geometry.rotate}deg)` }}
-                >
-                    <span
-                        className="absolute rounded-full"
-                        style={{
-                            width: Math.max(4, peakSize * 0.07),
-                            height: geometry.trailLength,
-                            top: peakSize * 0.42,
-                            background:
-                                "linear-gradient(180deg, var(--progress-fill-end), var(--brand) 35%, transparent)",
-                            filter: "blur(2px)",
-                        }}
-                    />
+        <div
+          className="relative flex items-center justify-center"
+          style={{ transform: `rotate(${geometry.rotate}deg)` }}
+        >
+          <span
+            className="absolute rounded-full"
+            style={{
+              width: Math.max(4, peakSize * 0.07),
+              height: geometry.trailLength,
+              top: peakSize * 0.42,
+              background:
+                "linear-gradient(180deg, var(--progress-fill-end), var(--brand) 35%, transparent)",
+              filter: "blur(2px)",
+            }}
+          />
 
-                    <div
-                        className="relative text-app-brand"
-                        style={{ filter: "drop-shadow(0 0 28px var(--brand-glow))" }}
-                    >
-                        <RocketGlyph size={peakSize} flame />
-                    </div>
-                </div>
-            </motion.div>
-        </div>,
-        document.body,
-    );
+          <div
+            className="relative text-app-brand"
+            style={{ filter: "drop-shadow(0 0 28px var(--brand-glow))" }}
+          >
+            <RocketGlyph size={peakSize} flame />
+          </div>
+        </div>
+      </motion.div>
+    </div>,
+    document.body,
+  );
 }

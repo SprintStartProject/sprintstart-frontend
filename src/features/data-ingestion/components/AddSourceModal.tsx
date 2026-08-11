@@ -1,7 +1,9 @@
-import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
-
+import { AlertTriangle, ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "../../../components/ui/Button.tsx";
+import { Input } from "../../../components/ui/Input.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
+import { Select } from "../../../components/ui/Select.tsx";
 import { Stepper } from "../../../components/ui/Stepper.tsx";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
@@ -9,9 +11,7 @@ import {
   connectGithubRepository,
   connectRepositories,
 } from "../../../services/sources/githubService.ts";
-import {
-  parseGithubRepositoryInput,
-} from "../../../services/sources/githubRepositoryInput.ts";
+import { parseGithubRepositoryInput } from "../../../services/sources/githubRepositoryInput.ts";
 import { connectJiraInstance } from "../../../services/sources/jiraService.ts";
 import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
 import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel.tsx";
@@ -59,9 +59,7 @@ export function AddSourceModal({
   const [step, setStep] = useState<WizardStep>("type");
   const [selectedType, setSelectedType] = useState<SourceSystem>("GITHUB");
   // Within the GitHub step: browse an org/user, or add one known repository.
-  const [githubMode, setGithubMode] = useState<"discover" | "single">(
-    "discover",
-  );
+  const [githubMode, setGithubMode] = useState<"discover" | "single">("discover");
   const [singleOwner, setSingleOwner] = useState("");
   const [singleName, setSingleName] = useState("");
   // Locks Back/Cancel while an upload batch is in flight.
@@ -90,9 +88,7 @@ export function AddSourceModal({
   // Resolved multi-select from the discovery picker.
   const [selection, setSelection] = useState<DiscoverySelection[]>([]);
 
-  const [connectState, setConnectState] = useState<
-    "idle" | "loading" | "error"
-  >("idle");
+  const [connectState, setConnectState] = useState<"idle" | "loading" | "error">("idle");
   const [connectError, setConnectError] = useState<string | null>(null);
 
   const isGithub = selectedType === "GITHUB";
@@ -117,10 +113,7 @@ export function AddSourceModal({
     void Promise.resolve().then(() => {
       setJiraCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
-        return current &&
-          jiraCredentials.some(
-            (credential) => credential.displayName === current,
-          )
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
           : jiraCredentials[0].displayName;
       });
@@ -137,8 +130,7 @@ export function AddSourceModal({
     if (!canIngest) {
       setConnectState("error");
       setConnectError(
-        ingestBlockedReason ??
-          "You can only connect sources to projects you manage.",
+        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
       );
       return;
     }
@@ -154,12 +146,8 @@ export function AddSourceModal({
 
     // Repos already ingested elsewhere are linked to this project (reusing their
     // artifacts); only genuinely new ones go through fetch + ingestion.
-    const toLink = selection.filter(
-      (repository) => repository.linkState === "linkable",
-    );
-    const toIngest = selection.filter(
-      (repository) => repository.linkState !== "linkable",
-    );
+    const toLink = selection.filter((repository) => repository.linkState === "linkable");
+    const toIngest = selection.filter((repository) => repository.linkState !== "linkable");
 
     try {
       for (const repository of toLink) {
@@ -210,8 +198,7 @@ export function AddSourceModal({
     if (!canIngest) {
       setConnectState("error");
       setConnectError(
-        ingestBlockedReason ??
-          "You can only connect sources to projects you manage.",
+        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
       );
       return;
     }
@@ -248,9 +235,7 @@ export function AddSourceModal({
     } catch (error) {
       setConnectState("error");
       setConnectError(
-        error instanceof Error
-          ? error.message
-          : "The repository could not be connected.",
+        error instanceof Error ? error.message : "The repository could not be connected.",
       );
     }
   };
@@ -272,8 +257,7 @@ export function AddSourceModal({
     if (!canIngest) {
       setConnectState("error");
       setConnectError(
-        ingestBlockedReason ??
-          "You can only connect sources to projects you manage.",
+        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
       );
       return;
     }
@@ -290,9 +274,7 @@ export function AddSourceModal({
 
     if (!url) {
       setConnectState("error");
-      setConnectError(
-        "Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).",
-      );
+      setConnectError("Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).");
       return;
     }
 
@@ -338,9 +320,7 @@ export function AddSourceModal({
         );
       } else {
         setConnectError(
-          error instanceof Error
-            ? error.message
-            : "The Jira instance could not be connected.",
+          error instanceof Error ? error.message : "The Jira instance could not be connected.",
         );
       }
     }
@@ -361,12 +341,7 @@ export function AddSourceModal({
     <Modal
       isOpen
       title={modalTitle}
-      description={
-        <Stepper
-          steps={["Source type", "Connect"]}
-          current={step === "type" ? 0 : 1}
-        />
-      }
+      description={<Stepper steps={["Source type", "Connect"]} current={step === "type" ? 0 : 1} />}
       size="xl"
       isDismissDisabled={connectState === "loading" || isUploadingFiles}
       onClose={onClose}
@@ -408,14 +383,13 @@ export function AddSourceModal({
               Cancel
             </button>
 
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => setStep("detail")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover"
+              trailingIcon={<ChevronRight className="h-4 w-4" />}
             >
               Continue
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </>
         ) : (
           <>
@@ -439,56 +413,41 @@ export function AddSourceModal({
             </button>
 
             {isSingleRepo && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void handleConnectSingle()}
-                disabled={connectState === "loading" || !canIngest}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canIngest}
+                loading={connectState === "loading"}
               >
-                {connectState === "loading" && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
-                {connectState === "loading"
-                  ? "Connecting…"
-                  : "Connect repository"}
-              </button>
+                {connectState === "loading" ? "Connecting…" : "Connect repository"}
+              </Button>
             )}
 
             {isGithub && !isSingleRepo && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void handleConnect()}
-                disabled={
-                  selectedCount === 0 || connectState === "loading" || !canIngest
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={selectedCount === 0 || !canIngest}
+                loading={connectState === "loading"}
               >
-                {connectState === "loading" && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
                 {connectState === "loading"
                   ? "Connecting…"
                   : `Connect ${selectedCount > 0 ? selectedCount : ""} selected`.replace(
                       /\s+/g,
                       " ",
                     )}
-              </button>
+              </Button>
             )}
 
             {isJira && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void handleConnectJira()}
-                disabled={connectState === "loading" || !canIngest}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canIngest}
+                loading={connectState === "loading"}
               >
-                {connectState === "loading" && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
-                {connectState === "loading"
-                  ? "Connecting…"
-                  : "Connect Jira instance"}
-              </button>
+                {connectState === "loading" ? "Connecting…" : "Connect Jira instance"}
+              </Button>
             )}
           </>
         )
@@ -532,8 +491,7 @@ export function AddSourceModal({
         <div className="space-y-5">
           {!canIngest && (
             <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-              {ingestBlockedReason ??
-                "You can only connect sources to projects you manage."}
+              {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
             </div>
           )}
 
@@ -604,8 +562,6 @@ function SingleRepositoryStep({
   onSubmit: () => void;
 }) {
   const hasTokens = tokenNames.length > 0;
-  const fieldClassName =
-    "mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <form
@@ -617,67 +573,57 @@ function SingleRepositoryStep({
     >
       {!canIngest && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          {ingestBlockedReason ??
-            "You can only connect sources to projects you manage."}
+          {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
         </div>
       )}
 
       {!hasTokens && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Add a GitHub personal access token in Settings first, then come back to
-          connect a repository.
+          Add a GitHub personal access token in Settings first, then come back to connect a
+          repository.
         </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor="single-repo-owner"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="single-repo-owner" className="text-sm font-medium text-app-text">
             Repository owner
           </label>
-          <input
+          <Input
             id="single-repo-owner"
             value={owner}
             onChange={(event) => onOwnerChange(event.target.value)}
             disabled={isBusy || !hasTokens}
             placeholder="octocat or octocat/hello-world"
-            className={fieldClassName}
+            className="mt-2"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="single-repo-name"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="single-repo-name" className="text-sm font-medium text-app-text">
             Repository name
           </label>
-          <input
+          <Input
             id="single-repo-name"
             value={repositoryName}
             onChange={(event) => onRepositoryNameChange(event.target.value)}
             disabled={isBusy || !hasTokens}
             placeholder="hello-world"
-            className={fieldClassName}
+            className="mt-2"
           />
         </div>
       </div>
 
       <div>
-        <label
-          htmlFor="single-repo-token"
-          className="text-sm font-medium text-app-text"
-        >
+        <label htmlFor="single-repo-token" className="text-sm font-medium text-app-text">
           Access token
         </label>
-        <select
+        <Select
           id="single-repo-token"
           value={tokenName}
           onChange={(event) => onTokenNameChange(event.target.value)}
           disabled={isBusy || !hasTokens}
-          className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-2"
         >
           {hasTokens ? (
             tokenNames.map((name) => (
@@ -688,12 +634,12 @@ function SingleRepositoryStep({
           ) : (
             <option value="">No saved tokens</option>
           )}
-        </select>
+        </Select>
       </div>
 
       <p className="text-xs text-app-text-subtle">
-        Paste a full GitHub URL or <code>owner/name</code> into the owner field
-        and the repository name is filled in for you.
+        Paste a full GitHub URL or <code>owner/name</code> into the owner field and the repository
+        name is filled in for you.
       </p>
 
       {errorMessage && (

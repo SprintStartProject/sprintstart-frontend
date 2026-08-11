@@ -2,10 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { RefObject } from "react";
 import { useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 import type { MotionValue } from "framer-motion";
-import {
-    getFlyingRocket,
-    subscribeToRocketFlight,
-} from "../../moments/rocketWatch.ts";
+import { getFlyingRocket, subscribeToRocketFlight } from "../../moments/rocketWatch.ts";
 
 /**
  * How far the pupils may travel from centre, in viewBox units.
@@ -49,17 +46,17 @@ const ORBIT_TURNS = 2.5;
 const ORBIT_RESET_MS = 400;
 
 export interface Gaze {
-    x: MotionValue<number>;
-    y: MotionValue<number>;
+  x: MotionValue<number>;
+  y: MotionValue<number>;
 }
 
 export interface PointerGaze {
-    gaze: Gaze;
-    /**
-     * True while the eyes are on a rocket instead of the pointer. This is the
-     * caller's cue for the rest of the face — the gaze itself already follows.
-     */
-    isWatchingRocket: boolean;
+  gaze: Gaze;
+  /**
+   * True while the eyes are on a rocket instead of the pointer. This is the
+   * caller's cue for the rest of the face — the gaze itself already follows.
+   */
+  isWatchingRocket: boolean;
 }
 
 /**
@@ -86,167 +83,161 @@ export interface PointerGaze {
  * and let the flag decide.
  */
 export function usePointerGaze(
-    ref: RefObject<HTMLElement | null>,
-    enabled: boolean,
-    onOrbit?: () => void,
+  ref: RefObject<HTMLElement | null>,
+  enabled: boolean,
+  onOrbit?: () => void,
 ): PointerGaze {
-    const reduceMotion = useReducedMotion();
-    const active = enabled && !reduceMotion;
+  const reduceMotion = useReducedMotion();
+  const active = enabled && !reduceMotion;
 
-    const rawX = useMotionValue(0);
-    const rawY = useMotionValue(0);
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
 
-    const x = useSpring(rawX, { stiffness: 260, damping: 26, mass: 0.5 });
-    const y = useSpring(rawY, { stiffness: 260, damping: 26, mass: 0.5 });
+  const x = useSpring(rawX, { stiffness: 260, damping: 26, mass: 0.5 });
+  const y = useSpring(rawY, { stiffness: 260, damping: 26, mass: 0.5 });
 
-    // The rocket currently in flight, if any. External-store rather than local
-    // state, so every bot on the page agrees frame-for-frame on whether there
-    // is something to gawp at.
-    const flyingRocket = useSyncExternalStore(
-        subscribeToRocketFlight,
-        getFlyingRocket,
-        () => null,
-    );
-    const watchedRocket = active ? flyingRocket : null;
+  // The rocket currently in flight, if any. External-store rather than local
+  // state, so every bot on the page agrees frame-for-frame on whether there
+  // is something to gawp at.
+  const flyingRocket = useSyncExternalStore(subscribeToRocketFlight, getFlyingRocket, () => null);
+  const watchedRocket = active ? flyingRocket : null;
 
-    // Mirror for the pointer handler below, which must not re-subscribe (and
-    // drop a half-finished orbit) every time a rocket comes or goes.
-    const watchedRocketRef = useRef(watchedRocket);
-    useEffect(() => {
-        watchedRocketRef.current = watchedRocket;
-    }, [watchedRocket]);
+  // Mirror for the pointer handler below, which must not re-subscribe (and
+  // drop a half-finished orbit) every time a rocket comes or goes.
+  const watchedRocketRef = useRef(watchedRocket);
+  useEffect(() => {
+    watchedRocketRef.current = watchedRocket;
+  }, [watchedRocket]);
 
-    // Follows the flight. A frame loop rather than events, because the rocket
-    // is mid-animation and its position changes every frame regardless — there
-    // is nothing to be notified *of*. It only runs while a flight is up, so
-    // the idle cost is nothing.
-    useEffect(() => {
-        if (!watchedRocket) return;
+  // Follows the flight. A frame loop rather than events, because the rocket
+  // is mid-animation and its position changes every frame regardless — there
+  // is nothing to be notified *of*. It only runs while a flight is up, so
+  // the idle cost is nothing.
+  useEffect(() => {
+    if (!watchedRocket) return;
 
-        let frame = 0;
+    let frame = 0;
 
-        const follow = () => {
-            const element = ref.current;
+    const follow = () => {
+      const element = ref.current;
 
-            if (element && watchedRocket.isConnected) {
-                const box = element.getBoundingClientRect();
-                const target = watchedRocket.getBoundingClientRect();
+      if (element && watchedRocket.isConnected) {
+        const box = element.getBoundingClientRect();
+        const target = watchedRocket.getBoundingClientRect();
 
-                if (box.width > 0 && target.width > 0) {
-                    const dx =
-                        target.left + target.width / 2 - (box.left + box.width / 2);
-                    const dy =
-                        target.top + target.height / 2 - (box.top + box.height / 2);
+        if (box.width > 0 && target.width > 0) {
+          const dx = target.left + target.width / 2 - (box.left + box.width / 2);
+          const dy = target.top + target.height / 2 - (box.top + box.height / 2);
 
-                    rawX.set(clamp(dx / REACH) * MAX_X);
-                    rawY.set(clamp(dy / REACH) * MAX_Y);
-                }
-            }
-
-            frame = requestAnimationFrame(follow);
-        };
-
-        frame = requestAnimationFrame(follow);
-        return () => {
-            cancelAnimationFrame(frame);
-            // Ease back to centre once the show is over. Snapping to the
-            // pointer would mean the eyes teleport the moment the rocket
-            // fades, which undoes the "watched it go" beat.
-            rawX.set(0);
-            rawY.set(0);
-        };
-    }, [watchedRocket, ref, rawX, rawY]);
-
-    // Held in a ref so a changing callback identity does not tear down the
-    // listener and lose a half-finished lap with it.
-    const onOrbitRef = useRef(onOrbit);
-    useEffect(() => {
-        onOrbitRef.current = onOrbit;
-    }, [onOrbit]);
-
-    useEffect(() => {
-        if (!active) {
-            rawX.set(0);
-            rawY.set(0);
-            return;
+          rawX.set(clamp(dx / REACH) * MAX_X);
+          rawY.set(clamp(dy / REACH) * MAX_Y);
         }
+      }
 
-        let frame = 0;
-        let previousAngle: number | null = null;
-        let turned = 0;
-        let lastMoveAt = 0;
+      frame = requestAnimationFrame(follow);
+    };
 
-        function handlePointerMove(event: PointerEvent) {
-            // The rocket owns the eyes for as long as it is up. The listener
-            // stays subscribed — tearing it down would lose a half-finished
-            // orbit — but its input goes nowhere.
-            if (watchedRocketRef.current) return;
+    frame = requestAnimationFrame(follow);
+    return () => {
+      cancelAnimationFrame(frame);
+      // Ease back to centre once the show is over. Snapping to the
+      // pointer would mean the eyes teleport the moment the rocket
+      // fades, which undoes the "watched it go" beat.
+      rawX.set(0);
+      rawY.set(0);
+    };
+  }, [watchedRocket, ref, rawX, rawY]);
 
-            // Coalesced into one read per frame: the listener can fire several
-            // times between paints, and `getBoundingClientRect` forces layout.
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-                const element = ref.current;
-                if (!element) return;
+  // Held in a ref so a changing callback identity does not tear down the
+  // listener and lose a half-finished lap with it.
+  const onOrbitRef = useRef(onOrbit);
+  useEffect(() => {
+    onOrbitRef.current = onOrbit;
+  }, [onOrbit]);
 
-                const box = element.getBoundingClientRect();
-                if (box.width === 0) return;
+  useEffect(() => {
+    if (!active) {
+      rawX.set(0);
+      rawY.set(0);
+      return;
+    }
 
-                const dx = event.clientX - (box.left + box.width / 2);
-                const dy = event.clientY - (box.top + box.height / 2);
+    let frame = 0;
+    let previousAngle: number | null = null;
+    let turned = 0;
+    let lastMoveAt = 0;
 
-                rawX.set(clamp(dx / REACH) * MAX_X);
-                rawY.set(clamp(dy / REACH) * MAX_Y);
+    function handlePointerMove(event: PointerEvent) {
+      // The rocket owns the eyes for as long as it is up. The listener
+      // stays subscribed — tearing it down would lose a half-finished
+      // orbit — but its input goes nowhere.
+      if (watchedRocketRef.current) return;
 
-                trackOrbit(dx, dy);
-            });
-        }
+      // Coalesced into one read per frame: the listener can fire several
+      // times between paints, and `getBoundingClientRect` forces layout.
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const element = ref.current;
+        if (!element) return;
 
-        function trackOrbit(dx: number, dy: number) {
-            const now = performance.now();
-            const wasStill = now - lastMoveAt > ORBIT_RESET_MS;
-            lastMoveAt = now;
+        const box = element.getBoundingClientRect();
+        if (box.width === 0) return;
 
-            const angle = Math.atan2(dy, dx);
-            const tooFar = Math.hypot(dx, dy) > ORBIT_RADIUS;
+        const dx = event.clientX - (box.left + box.width / 2);
+        const dy = event.clientY - (box.top + box.height / 2);
 
-            if (wasStill || tooFar) {
-                previousAngle = tooFar ? null : angle;
-                turned = 0;
-                return;
-            }
+        rawX.set(clamp(dx / REACH) * MAX_X);
+        rawY.set(clamp(dy / REACH) * MAX_Y);
 
-            if (previousAngle === null) {
-                previousAngle = angle;
-                return;
-            }
+        trackOrbit(dx, dy);
+      });
+    }
 
-            // Signed and wrapped into (-PI, PI], so laps in one direction add up
-            // while back-and-forth wiggling cancels itself out — which is the
-            // difference between circling the bot and just moving near it.
-            let delta = angle - previousAngle;
-            while (delta > Math.PI) delta -= 2 * Math.PI;
-            while (delta < -Math.PI) delta += 2 * Math.PI;
+    function trackOrbit(dx: number, dy: number) {
+      const now = performance.now();
+      const wasStill = now - lastMoveAt > ORBIT_RESET_MS;
+      lastMoveAt = now;
 
-            previousAngle = angle;
-            turned += delta;
+      const angle = Math.atan2(dy, dx);
+      const tooFar = Math.hypot(dx, dy) > ORBIT_RADIUS;
 
-            if (Math.abs(turned) >= ORBIT_TURNS * 2 * Math.PI) {
-                turned = 0;
-                onOrbitRef.current?.();
-            }
-        }
+      if (wasStill || tooFar) {
+        previousAngle = tooFar ? null : angle;
+        turned = 0;
+        return;
+      }
 
-        window.addEventListener("pointermove", handlePointerMove);
-        return () => {
-            cancelAnimationFrame(frame);
-            window.removeEventListener("pointermove", handlePointerMove);
-        };
-    }, [active, ref, rawX, rawY]);
+      if (previousAngle === null) {
+        previousAngle = angle;
+        return;
+      }
 
-    return { gaze: { x, y }, isWatchingRocket: watchedRocket !== null };
+      // Signed and wrapped into (-PI, PI], so laps in one direction add up
+      // while back-and-forth wiggling cancels itself out — which is the
+      // difference between circling the bot and just moving near it.
+      let delta = angle - previousAngle;
+      while (delta > Math.PI) delta -= 2 * Math.PI;
+      while (delta < -Math.PI) delta += 2 * Math.PI;
+
+      previousAngle = angle;
+      turned += delta;
+
+      if (Math.abs(turned) >= ORBIT_TURNS * 2 * Math.PI) {
+        turned = 0;
+        onOrbitRef.current?.();
+      }
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", handlePointerMove);
+    };
+  }, [active, ref, rawX, rawY]);
+
+  return { gaze: { x, y }, isWatchingRocket: watchedRocket !== null };
 }
 
 function clamp(value: number): number {
-    return Math.max(-1, Math.min(1, value));
+  return Math.max(-1, Math.min(1, value));
 }

@@ -7,6 +7,7 @@ codebase. This file is the frontend-only companion to the root-level
 only this repository gets the full set of frontend rules here.
 
 > **Related docs**
+>
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — feature-first structure, routing, state, design system, animation.
 > - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
@@ -23,9 +24,6 @@ only this repository gets the full set of frontend rules here.
   necessitate it.
 - **Tool discipline** — use search and reading tools first to understand the
   existing design system before applying changes.
-- **Reduced motion first** — every animation must be safe to collapse. The
-  `'classic'` style mode and `prefers-reduced-motion` media query must never break
-  functionality.
 
 ---
 
@@ -34,7 +32,7 @@ only this repository gets the full set of frontend rules here.
 - **`verbatimModuleSyntax: true`** — type imports MUST be `import type { ... }`:
 
   ```typescript
-  import type { TaskDto } from '../types.ts';
+  import type { TaskDto } from "../types";
   ```
 
 - **Explicit `.ts`/`.tsx` extensions on relative imports are allowed and encouraged**
@@ -79,62 +77,149 @@ only this repository gets the full set of frontend rules here.
 - **Services return typed responses and surface backend failures** — don't silently
   swallow errors (no empty `catch`).
 
-- **Error boundaries** should wrap each page-level route in `AppRouter`. The global
-  fallback is a minimal "Something went wrong" view with a retry action.
-
 ---
 
 ## 4. Styling (Tailwind CSS v4)
 
 - **Always use the palette tokens; never hardcode colors.**
   - No `#2563eb`, no raw Tailwind colors like `text-blue-500`.
-  - Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-bg-soft`, `bg-app-surface`,
-    `bg-app-surface-muted`, `bg-app-surface-hover`), text (`text-app-text`,
-    `text-app-text-muted`, `text-app-text-subtle`, `text-app-text-disabled`),
-    borders (`border-app-border`, `border-app-border-muted`, `border-app-border-strong`),
-    brand (`bg-app-brand`, `text-app-brand`, `border-app-brand`, `bg-app-brand-soft`,
-    `text-app-brand-text`, `bg-app-brand-glow`), and status (`success` / `warning` /
-    `danger` / `neutral` / `orange`, e.g. `bg-app-success-bg text-app-success-text`).
-
-- **Glassmorphism & glow tokens** (ultra mode):
-  - `bg-app-glass`, `border-app-glass-border` (use via the `app-glass` utility class)
-  - `bg-app-glow`, `bg-app-glow-accent`, `bg-app-glow-alt` (aurora blobs)
-  - See `src/styles/index.css` for the full set.
-
-- **Font tokens**: `font-sans`, `font-heading`, `font-mono`.
-
-- **Reusable UI primitives**:
-  - `SpotlightCard` — card wrapper with cursor-driven tilt and spotlight glow.
-    Reads `isTiltEnabled` from `ThemeContext`; respects `'classic'` mode.
-    Usage:
-    ```tsx
-    import { SpotlightCard } from '@/components/ui/SpotlightCard';
-    <SpotlightCard roundedClassName="rounded-3xl">
-      <YourContent />
-    </SpotlightCard>
-    ```
-
-- **Shared CSS layout utilities**: `app-page-frame` (responsive gutter), `app-page-shell`
-  (full page container), `app-page-content` (centered with max-width). Prefer these
-  over manual `px-*` on page wrappers.
+  - Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-surface`,
+    `bg-app-surface-muted`), text (`text-app-text`, `text-app-text-muted`,
+    `text-app-text-subtle`), borders (`border-app-border`, …), brand
+    (`bg-app-brand`, `text-app-brand`, …), and status (`success` / `warning` /
+    `danger` / `neutral`, e.g. `bg-app-success-bg text-app-success-text`).
 
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
 
+- **Dialogs are [`ui/Modal`](../src/components/ui/Modal.tsx)** (or
+  [`ui/SidePanel`](../src/components/ui/SidePanel.tsx) for a drawer). It brings
+  the focus trap, Escape handling, focus restore, `aria-modal` and the
+  background scroll lock. A hand-written `fixed inset-0` overlay has to get all
+  five right, and the one that existed got four — which is four more chances to
+  drift than anyone needs.
+
+  Full-screen surfaces that are _not_ dialogs may stay hand-written: the game
+  overlays, where the game owns the keyboard and a focus trap would fight it
+  for the arrow keys, and the Moments celebrations. Those still share the
+  scroll lock via [`useScrollLock`](../src/components/ui/useScrollLock.ts) —
+  a backdrop over a page that scrolls underneath is a bug regardless.
+
+- **Waiting is [`ui/Spinner`](../src/components/ui/Spinner.tsx), emptiness is
+  [`ui/EmptyState`](../src/components/ui/EmptyState.tsx).** A bare
+  `<Loader2 className="animate-spin" />` says nothing to a screen reader;
+  `Spinner` carries `role="status"` and a label. Inside a `Button`, use its
+  `loading` prop rather than either.
+
+  `EmptyState` takes a `Spinner` as its `icon` on purpose: a list that is empty
+  and a list that has not arrived yet should differ in their words, not in their
+  shape, so the page does not visibly rearrange when the answer lands.
+
+- **Status pills are [`ui/Badge`](../src/components/ui/Badge.tsx).** Pick the
+  `variant` by meaning, not by colour, and `size="sm"` inside dense rows. A
+  hand-written `rounded-full … px-2 … text-xs` span is how the codebase ended up
+  with the same "Unread" chip in four slightly different sizes.
+
+  If a badge needs a colour that no variant covers, add a token pair to
+  `index.css` and a variant here — never a raw palette value at the call site,
+  which cannot follow the theme.
+
 - **No custom standalone `.css` classes** unless styling third-party widgets or
-  dealing with browser overrides. Use `@utility` in `index.css` for reusable
-  combinations (e.g. `app-glass`).
+  dealing with browser overrides.
 
 - **Light/dark theme** is controlled via the `.dark` class (`@custom-variant dark`),
   managed by `ThemeProvider`. Every color must work in both themes — which is
   automatic when you use tokens.
 
-- **Style modes**: the app supports `'ultra'` (default: glassmorphic glow, aurora
-  drift, spotlight) and `'classic'` (flat surfaces, no ambient animation). Activated
-  via `.style-classic` on `<html>`, managed by `ThemeProvider`. When `'classic'` is
-  active, decorative layers (`app-aurora`, `app-spotlight`, `app-bg-grid`) are
-  disabled by CSS. Respect this in custom components by checking
-  `useTheme().isClassicMode`.
+- **Every action control is [`ui/Button`](../src/components/ui/Button.tsx) — do not
+  hand-roll a `<button>` with its own classes.** Pick `variant` by intent
+  (`primary` | `secondary` | `ghost` | `danger` | `dangerSoft` | `dangerGhost`)
+  and `size` by density (`sm` | `md` | `lg`, default `md`); height, radius, type
+  scale, hover, focus ring and disabled treatment then follow automatically.
+  Use `loading` rather than wiring up your own spinner, and `iconOnly` (plus an
+  `aria-label`) for square icon buttons. If a variant you need is missing, add it
+  to the component instead of patching it at the call site.
+
+  Legitimate exceptions — these are _not_ action buttons and stay hand-written:
+  clickable cards and list rows, `aria-pressed` toggles and filter chips,
+  `role="menuitem"` / combobox triggers, and the game surfaces.
+
+- **Radius scale.** `rounded-lg` for dense controls (`sm` buttons, chips),
+  `rounded-xl` for standard controls and for surfaces _nested inside_ a card —
+  a clickable row, a status box — where the inner corner has to stay tighter
+  than the outer one. `rounded-2xl` for the card or panel itself. Reserve
+  `rounded-full` for avatars, badges, and pills. `rounded-3xl` and larger belong
+  to dialog chrome (`Modal`, `SidePanel`, the Moments overlays) alone — a card
+  that reaches for it is asking to look like something it is not.
+
+- **Shadow scale — four rungs, and they mean different things.**
+
+  |                   | when                                                                              |
+  | ----------------- | --------------------------------------------------------------------------------- |
+  | `shadow-sm`       | a card at rest, to lift it off the page background                                |
+  | `hover:shadow-lg` | that same card while hovered, paired with the hover border                        |
+  | `shadow-lg`       | floating _over_ content: popovers, tooltips, dropdowns, toasts, floating buttons  |
+  | `shadow-2xl`      | dialogs and drawers — a surface that takes over the screen and dims what's behind |
+
+  The last two are the pair that's easy to get wrong. `2xl` is dialog weight; on
+  a `text-xs` pill or a small tooltip it reads as a smudge rather than as depth,
+  and in dark mode it is worse. If the element does not have a backdrop behind
+  it, it is not a dialog — use `shadow-lg`.
+
+  `shadow-md` and `shadow-xl` say nothing these four do not; don't reach for
+  them. The one thing outside the ladder is a `shadow-lg` used as _emphasis_ on
+  a filled brand surface — a selected tab, the logo tile. That is decoration on
+  a coloured shape, not elevation, and it stays.
+
+- **Heading scale — pick the rung by role, not by how big it should look.**
+
+  | role               | size                                | example                                              |
+  | ------------------ | ----------------------------------- | ---------------------------------------------------- |
+  | Hero               | `text-2xl sm:text-3xl font-bold`    | login, dashboard hero, the onboarding "up next" card |
+  | Page title         | `text-xl sm:text-2xl font-semibold` | `PageHeader` — do not hand-roll one                  |
+  | Section title      | `text-lg font-semibold`             | a titled block inside a page                         |
+  | Card / sub-section | `text-sm font-semibold`             | the label above a list, a card's own title           |
+
+  The heading _level_ follows the document outline and is chosen independently:
+  an `<h2>` is an `<h2>` because of what sits above it, not because of its size.
+  Before this scale existed, `<h2>` ranged from `text-sm` to `text-4xl` in the
+  same app, which is the giveaway that the two were being conflated.
+
+- **Text controls are [`ui/Input`](../src/components/ui/Input.tsx),
+  [`ui/Textarea`](../src/components/ui/Textarea.tsx) and
+  [`ui/Select`](../src/components/ui/Select.tsx).** They share `FieldSize` with
+  `Button`, so a control and a button in the same row are the same height. Use
+  `icon` for a leading search/key glyph and `trailing` for an action pinned
+  inside the right edge, rather than positioning them absolutely by hand.
+
+- **Wrap a labelled control in [`ui/Field`](../src/components/ui/Field.tsx).**
+  It generates the id, binds the `<label>`, collects `hint` and `error` into
+  `aria-describedby` and sets `aria-invalid` — the wiring hand-written forms
+  keep forgetting. Pass the message to `error`; do not render your own `<p>`
+  below the field, or screen readers will never hear it.
+
+  ```tsx
+  <Field label="Token name" hint="Shown in the token list." error={nameError}>
+    <Input value={name} onChange={(e) => setName(e.target.value)} />
+  </Field>
+  ```
+
+  Hand-written markup stays right for composite controls where the box is
+  shared — the "Every _n_ minutes" row, the chat composer, the borderless quick
+  chat field — and for checkboxes, radios and file pickers, which are a
+  different anatomy.
+
+- **A `Textarea` grows with its content.** That is the default; set `minRows`
+  and `maxRows` rather than a fixed `h-*` or a `rows`. Reach for
+  `autoResize={false}` only when a height genuinely must not move, and say why
+  in a comment. A control that is styled identically to its neighbour but
+  behaves differently is worse than one that looks different too.
+
+  A textarea that cannot use `Textarea` — borderless, inside a shared box —
+  still shares the behaviour via
+  [`useAutoResize`](../src/components/ui/useAutoResize.ts). Do not re-implement
+  the height maths inline: every hand-rolled copy so far forgot to shrink the
+  field again when the value was reset from the outside.
 
 ---
 
@@ -158,56 +243,38 @@ only this repository gets the full set of frontend rules here.
 - **Focus** — keep visible focus via the `--app-focus` token
   (`focus-visible:ring-app-focus`); don't remove outlines.
 
-- **Reduced motion** — the `'classic'` style mode and `prefers-reduced-motion`
-  media query must disable all decorative animations. Check
-  `useReducedMotion()` from Framer Motion for component-level guards.
-
 ---
 
 ## 6. Animation (Framer Motion 12)
 
 - **Use the centralized spring transition tokens** — don't inline ad-hoc spring
-  configs. Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts).
-
-  Core presets:
-
-  | Token | Type | Use case |
-  | --- | --- | --- |
-  | `centralSpringToken` | spring | Layout transitions, list enter/exit, general motion |
-  | `hoverSpringToken` | spring | Hover/tap micro-interactions |
-  | `dockMagnifySpringToken` | spring | Sidebar dock magnification (grow/shrink) |
-  | `slidingIndicatorSpringToken` | spring | Active nav indicator pill (`layoutId`) |
-  | `sidePanelSlideToken` | tween | Side panel slide in/out (guaranteed timing) |
-  | `SIDE_PANEL_SLIDE_MS` | number | Panel animation duration (420ms) |
-  | `enterTransition` | tween | Page-level enter (AuroraBackground, etc.) |
-  | `idleDriftToken` | tween | Decorative breathing loops |
-  | `celebrationSpringToken` | spring | Celebration cards (under-damped overshoot) |
-  | `flightEaseToken` | tween | Rocket trail / ignition bloom |
-  | `petPeekSpringToken` | spring | Rocket pet duck/lean |
-  | `modalBackdropVariants` | variants | Backdrop fade for all dialogs |
-  | `getModalDialogVariants()` | variants | Dialog surface enter/exit |
-  | `buttonHoverMotion` | spread | `motion.button` hover/tap (1.03 scale) |
-
-  See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-  for the complete reference.
-
-- **Use the `buttonHoverMotion` spread** for consistent button feedback:
-
-  ```tsx
-  import { buttonHoverMotion } from "@/styles/tokens";
-  <motion.button {...buttonHoverMotion}>Save</motion.button>
-  ```
+  configs. Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts),
+  exporting `centralSpringToken` (default layout/list motion) and `hoverSpringToken`
+  (micro-interactions).
 
 - **Wrap dynamically added/removed elements** (lists, drawers) in `<AnimatePresence>`
   to avoid clipping on exit. Use `mode="popLayout"` when the wrapper affects
   document reflow.
 
-- **Always specify `layout`** on the direct child of `<AnimatePresence>` so Framer
-  Motion interpolates reflow smoothly.
+- **Do not apply `buttonHoverMotion` by hand.**
+  [`ui/Button`](../src/components/ui/Button.tsx) already carries it, for every
+  variant and size, and swaps to `buttonHoverMotionDisabled` when the button is
+  disabled or loading. Reaching for `<motion.button {...buttonHoverMotion}>` is
+  how the app ended up with a "Refresh" icon button that magnified on one page
+  header and sat dead on the next.
 
-- **The Moments system** (`features/moments/`) owns all celebratory animations.
-  Call `useMoments().celebrate(input)` for earned rewards, `useMoments().flyby()`
-  for small wins. Don't duplicate celebration patterns.
+  The token stays public for the controls that are _not_ `Button` and still need
+  to feel the same — the `role="combobox"` trigger in `FilterSelect` and the
+  `aria-pressed` filter chips. Those, and only those.
+
+- **The brand lift shadow (`hover:shadow-app-brand-lift`) belongs to `primary`
+  and to nothing else.** It marks the one action a screen wants; if every button
+  glowed, the cue would carry no information. It is a token in `index.css` with
+  separate light and dark values — never an arbitrary `shadow-[…]` value, which
+  cannot adapt to the theme.
+
+- See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
+  for the full animation system.
 
 ---
 
@@ -256,7 +323,7 @@ only this repository gets the full set of frontend rules here.
 
 ---
 
-## 9. Documentation (the *why*, not the obvious *what*)
+## 9. Documentation (the _why_, not the obvious _what_)
 
 - Use **TSDoc** blocks on exported symbols — see
   [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md)
@@ -272,9 +339,6 @@ only this repository gets the full set of frontend rules here.
   - **Hooks/effects:** when timing or dependencies matter.
   - **Business logic:** permission/role rules, conditional flows, data transforms,
     backend-contract assumptions, and **temporary limitations / known backend gaps**.
-  - **Moments integration:** when calling `useMoments().celebrate()` or
-    `useMoments().flyby()`, document *what* event triggers it, so the tone
-    (`success` / `milestone` / `triumph`) stays consistent across the app.
 
 - Don't document obvious assignments, trivial state updates, plain JSX, or restate
   names. Keep comments current — update/remove them when behavior changes.
@@ -288,15 +352,10 @@ only this repository gets the full set of frontend rules here.
   `# type: ignore`, `@SuppressWarnings`-style escape hatches. Fix the underlying
   type mismatch instead.
 - **No hardcoded colors** — use the shared palette tokens.
-- **No ad-hoc spring configs** — use `src/styles/tokens.ts`. (Intentional
-  exceptions that are functionally identical to an existing token should be
-  refactored to use it; if the damping difference is deliberate, document why.)
+- **No ad-hoc spring configs** — use `src/styles/tokens.ts`.
 - **No empty `catch` blocks** — surface backend failures.
 - **No class components** — functional + hooks only.
 - **No default exports** except lazy-loaded route pages.
-- **No duplicate celebration patterns** — use `useMoments()` rather than
-  hand-rolling confetti or flybys.
-- **No color-only meaning** — always pair color with an icon, text, or shape.
 
 ---
 
@@ -321,4 +380,26 @@ npm run test        # full Vitest suite (unit + a11y)
 npm run try         # install + build + lint + unit + a11y
 ```
 
-Prettier owns formatting — don't fight it; run lint before finishing.
+### Formatting
+
+Prettier owns formatting — don't fight it, don't hand-align, don't argue with
+the class order. The config lives in [`.prettierrc`](../.prettierrc):
+2 spaces, double quotes, `printWidth: 100`.
+
+```bash
+npm run format        # rewrite
+npm run format:check  # verify (also part of `npm run try`)
+```
+
+`prettier-plugin-tailwindcss` sorts Tailwind classes. It needs
+`"tailwindStylesheet": "./src/styles/index.css"` because Tailwind v4 has no
+`tailwind.config.js` — without that line the plugin cannot resolve our
+`app-*` utilities and sorts them wrongly. Don't remove it.
+
+Formatting-only commits belong in
+[`.git-blame-ignore-revs`](../.git-blame-ignore-revs) so `git blame` keeps
+pointing at whoever wrote the line. Enable it once per clone:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```

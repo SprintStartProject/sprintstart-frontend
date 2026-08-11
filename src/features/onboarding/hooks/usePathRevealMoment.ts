@@ -15,20 +15,20 @@ const STORAGE_KEY = "sprintstart.onboarding.revealedPathId";
 
 /** Tolerates a disabled or blocked localStorage (private mode, hardened browsers). */
 function readRevealedPathId(): string | null {
-    try {
-        return window.localStorage.getItem(STORAGE_KEY);
-    } catch (error) {
-        console.warn("Failed to read the revealed onboarding path", error);
-        return null;
-    }
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn("Failed to read the revealed onboarding path", error);
+    return null;
+  }
 }
 
 function markRevealed(pathId: string) {
-    try {
-        window.localStorage.setItem(STORAGE_KEY, pathId);
-    } catch (error) {
-        console.warn("Failed to persist the revealed onboarding path", error);
-    }
+  try {
+    window.localStorage.setItem(STORAGE_KEY, pathId);
+  } catch (error) {
+    console.warn("Failed to persist the revealed onboarding path", error);
+  }
 }
 
 /**
@@ -46,18 +46,18 @@ function markRevealed(pathId: string) {
  * everybody and nothing ever reports it.
  */
 function isPathUntouched(path: OnboardingPathEndpoint): boolean {
-    return path.phases.every(
-        (phase) =>
-            !phase.checkSummary?.passed &&
-            phase.steps.every(
-                (step) =>
-                    step.startedAt === null &&
-                    step.completedAt === null &&
-                    step.status !== "IN_PROGRESS" &&
-                    step.status !== "FINISHED" &&
-                    step.status !== "SKIPPED",
-            ),
-    );
+  return path.phases.every(
+    (phase) =>
+      !phase.checkSummary?.passed &&
+      phase.steps.every(
+        (step) =>
+          step.startedAt === null &&
+          step.completedAt === null &&
+          step.status !== "IN_PROGRESS" &&
+          step.status !== "FINISHED" &&
+          step.status !== "SKIPPED",
+      ),
+  );
 }
 
 /**
@@ -88,44 +88,44 @@ function isPathUntouched(path: OnboardingPathEndpoint): boolean {
  * out from behind its own launch, every time someone opens onboarding.
  */
 export function usePathRevealMoment(path: OnboardingPathEndpoint | null): void {
-    const { revealPath } = useMoments();
-    const offeredRef = useRef<string | null>(null);
-    const endLaunchRef = useRef<(() => void) | null>(null);
+  const { revealPath } = useMoments();
+  const offeredRef = useRef<string | null>(null);
+  const endLaunchRef = useRef<(() => void) | null>(null);
 
-    useLayoutEffect(() => {
-        if (!path) return;
-        if (offeredRef.current === path.id) return;
-        if (readRevealedPathId() === path.id) return;
-        if (!isPathUntouched(path)) return;
+  useLayoutEffect(() => {
+    if (!path) return;
+    if (offeredRef.current === path.id) return;
+    if (readRevealedPathId() === path.id) return;
+    if (!isPathUntouched(path)) return;
 
-        const pathId = path.id;
-        offeredRef.current = pathId;
+    const pathId = path.id;
+    offeredRef.current = pathId;
 
-        endLaunchRef.current = revealPath({
-            onLaunched: () => markRevealed(pathId),
-        });
-    }, [path, revealPath]);
+    endLaunchRef.current = revealPath({
+      onLaunched: () => markRevealed(pathId),
+    });
+  }, [path, revealPath]);
 
-    // The launch belongs to this page and ends when the page does — not when
-    // the user clicks the sidebar. Those are not the same instant: the router
-    // keeps the current view on screen while a navigation is pending, so
-    // closing on the click uncovers the path for however long that takes,
-    // which is the flash you get on the way out. Unmounting is exactly when
-    // the new view takes over.
-    //
-    // Deliberately its own effect with no dependencies: putting the disposer
-    // on the effect above would fire it whenever the path object changes
-    // identity — a refetch would silently kill a launch still on the pad.
-    //
-    // A layout effect, so the teardown lands in the same commit as the page
-    // swap. A passive one runs after the browser has painted, which leaves a
-    // frame of the launch sitting on top of the view the user just moved to —
-    // the same flash as before, only pointing the other way.
-    useLayoutEffect(
-        () => () => {
-            endLaunchRef.current?.();
-            endLaunchRef.current = null;
-        },
-        [],
-    );
+  // The launch belongs to this page and ends when the page does — not when
+  // the user clicks the sidebar. Those are not the same instant: the router
+  // keeps the current view on screen while a navigation is pending, so
+  // closing on the click uncovers the path for however long that takes,
+  // which is the flash you get on the way out. Unmounting is exactly when
+  // the new view takes over.
+  //
+  // Deliberately its own effect with no dependencies: putting the disposer
+  // on the effect above would fire it whenever the path object changes
+  // identity — a refetch would silently kill a launch still on the pad.
+  //
+  // A layout effect, so the teardown lands in the same commit as the page
+  // swap. A passive one runs after the browser has painted, which leaves a
+  // frame of the launch sitting on top of the view the user just moved to —
+  // the same flash as before, only pointing the other way.
+  useLayoutEffect(
+    () => () => {
+      endLaunchRef.current?.();
+      endLaunchRef.current = null;
+    },
+    [],
+  );
 }

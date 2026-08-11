@@ -25,7 +25,7 @@ let flyingRocket: HTMLElement | null = null;
 const listeners = new Set<Listener>();
 
 function notify(): void {
-    listeners.forEach((listener) => listener());
+  listeners.forEach((listener) => listener());
 }
 
 /**
@@ -35,19 +35,19 @@ function notify(): void {
  * late must not wipe out the flight that superseded it.
  */
 export function announceRocketFlight(element: HTMLElement): () => void {
-    flyingRocket = element;
-    notify();
+  flyingRocket = element;
+  notify();
 
-    return () => {
-        if (flyingRocket !== element) return;
-        flyingRocket = null;
-        notify();
-    };
+  return () => {
+    if (flyingRocket !== element) return;
+    flyingRocket = null;
+    notify();
+  };
 }
 
 /** The rocket currently crossing the screen, if any. */
 export function getFlyingRocket(): HTMLElement | null {
-    return flyingRocket;
+  return flyingRocket;
 }
 
 /**
@@ -55,8 +55,8 @@ export function getFlyingRocket(): HTMLElement | null {
  * Shaped for `useSyncExternalStore`, but a plain effect works just as well.
  */
 export function subscribeToRocketFlight(listener: Listener): () => void {
-    listeners.add(listener);
-    return () => {
-        listeners.delete(listener);
-    };
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

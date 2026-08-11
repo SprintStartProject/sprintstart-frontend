@@ -13,9 +13,7 @@ type ProjectsTabProps = {
 
 /** Manager display name, falling back to the username when no name is set. */
 function getManagerName(manager: ProjectManager) {
-  const fullName = [manager.firstName, manager.lastName]
-    .filter(Boolean)
-    .join(" ");
+  const fullName = [manager.firstName, manager.lastName].filter(Boolean).join(" ");
 
   return fullName || manager.username;
 }
@@ -56,27 +54,19 @@ export function ProjectsTab({
       <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-app-border bg-app-surface px-6 text-center">
         {noProjectsExist ? (
           <>
-            <p className="text-base font-medium text-app-text">
-              No projects yet
-            </p>
+            <p className="text-base font-medium text-app-text">No projects yet</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Create your first project to get started.
             </p>
           </>
         ) : hasSearchQuery ? (
           <>
-            <p className="text-base font-medium text-app-text">
-              No projects found
-            </p>
-            <p className="mt-1 text-sm text-app-text-muted">
-              Try adjusting your search term.
-            </p>
+            <p className="text-base font-medium text-app-text">No projects found</p>
+            <p className="mt-1 text-sm text-app-text-muted">Try adjusting your search term.</p>
           </>
         ) : (
           <>
-            <p className="text-base font-medium text-app-text">
-              No projects found
-            </p>
+            <p className="text-base font-medium text-app-text">No projects found</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Try another search term or create a new project first.
             </p>
@@ -111,14 +101,13 @@ export function ProjectsTab({
 
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="break-words text-sm font-semibold text-app-text">
+                  <span className="text-sm font-semibold break-words text-app-text">
                     {project.name}
                   </span>
                 </div>
 
                 <p className="line-clamp-2 text-sm leading-relaxed text-app-text-muted">
-                  {project.description ||
-                    "No project description available yet."}
+                  {project.description || "No project description available yet."}
                 </p>
 
                 {visibleSourceTypeBadges.length > 0 && (
@@ -131,12 +120,9 @@ export function ProjectsTab({
                       </AccessBadge>
                     ))}
 
-                    {sourceTypeBadges.length >
-                      visibleSourceTypeBadges.length && (
+                    {sourceTypeBadges.length > visibleSourceTypeBadges.length && (
                       <AccessBadge variant="neutral">
-                        +
-                        {sourceTypeBadges.length -
-                          visibleSourceTypeBadges.length}
+                        +{sourceTypeBadges.length - visibleSourceTypeBadges.length}
                       </AccessBadge>
                     )}
                   </div>
@@ -156,9 +142,7 @@ export function ProjectsTab({
                   <span className="flex min-w-0 items-center gap-1.5">
                     <UserCog className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">
-                      {project.manager
-                        ? getManagerName(project.manager)
-                        : "No manager"}
+                      {project.manager ? getManagerName(project.manager) : "No manager"}
                     </span>
                   </span>
                 </div>

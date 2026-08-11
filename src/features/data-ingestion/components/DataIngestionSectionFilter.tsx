@@ -1,7 +1,4 @@
-import {
-  SegmentedTabs,
-  type SegmentedTabOption,
-} from "../../../components/ui/SegmentedTabs.tsx";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs.tsx";
 import { SECTION_ORDER, type SectionKey } from "../types.ts";
 
 const SECTION_LABELS: Record<SectionKey, string> = {

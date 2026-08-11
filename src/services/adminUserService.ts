@@ -116,9 +116,7 @@ function getAvailableRolesFromUsers(users: AdminUser[]): AvailableRole[] {
     });
   });
 
-  return Array.from(roleMap.values()).sort((left, right) =>
-    left.name.localeCompare(right.name),
-  );
+  return Array.from(roleMap.values()).sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function toPermissionGroupLabel(permissionGroup: string): string {
@@ -137,9 +135,7 @@ function toPermissionGroupLabel(permissionGroup: string): string {
   }
 }
 
-function toBackendPermissionGroup(
-  permissionGroup: string,
-): BackendPermissionGroup {
+function toBackendPermissionGroup(permissionGroup: string): BackendPermissionGroup {
   switch (permissionGroup.trim().toUpperCase()) {
     case "ADMIN":
       return "ADMIN";
@@ -155,9 +151,7 @@ function toBackendPermissionGroup(
   }
 }
 
-function toUserRolesFromProjectRoles(
-  projectRoles: BackendProjectRole[] = [],
-): UserRole[] {
+function toUserRolesFromProjectRoles(projectRoles: BackendProjectRole[] = []): UserRole[] {
   return projectRoles.map((role) => ({
     id: role.id,
     name: role.name,
@@ -223,9 +217,7 @@ export const adminUserService = {
    * Returns all users visible for admin user management.
    */
   async getUsers(): Promise<AdminUser[]> {
-    const users = await apiClient.fetch<BackendUserResponse[]>(
-      "/api/v1/admin/users",
-    );
+    const users = await apiClient.fetch<BackendUserResponse[]>("/api/v1/admin/users");
     return users.map(toAdminUser);
   },
 
@@ -235,9 +227,7 @@ export const adminUserService = {
    * Returns detailed information for a specific user.
    */
   async getUserById(userId: string): Promise<AdminUser> {
-    const user = await apiClient.fetch<BackendUserResponse>(
-      `/api/v1/admin/users/${userId}`,
-    );
+    const user = await apiClient.fetch<BackendUserResponse>(`/api/v1/admin/users/${userId}`);
     return toAdminUser(user);
   },
 
@@ -257,10 +247,7 @@ export const adminUserService = {
    *   permissionGroup?: "USER"
    * }
    */
-  async updateUser(
-    userId: string,
-    request: UpdateAdminUserRequest,
-  ): Promise<AdminUser> {
+  async updateUser(userId: string, request: UpdateAdminUserRequest): Promise<AdminUser> {
     const updatedUser = await apiClient.fetch<BackendUserResponse>(
       `/api/v1/admin/users/${userId}`,
       {
@@ -288,10 +275,7 @@ export const adminUserService = {
    *   ]
    * }
    */
-  async updateUserRoles(
-    userId: string,
-    request: UpdateAdminUserRolesRequest,
-  ): Promise<AdminUser> {
+  async updateUserRoles(userId: string, request: UpdateAdminUserRolesRequest): Promise<AdminUser> {
     await apiClient.fetch<void>(`/api/v1/admin/users/${userId}/roles`, {
       method: "PATCH",
       headers: {
@@ -340,12 +324,9 @@ export const adminUserService = {
    * PATCH /api/v1/admin/users/{id}/enabled
    */
   async deleteUser(userId: string): Promise<DeleteAdminUserResponse> {
-    return apiClient.fetch<DeleteAdminUserResponse>(
-      `/api/v1/admin/users/${userId}`,
-      {
-        method: "DELETE",
-      },
-    );
+    return apiClient.fetch<DeleteAdminUserResponse>(`/api/v1/admin/users/${userId}`, {
+      method: "DELETE",
+    });
   },
 
   /**

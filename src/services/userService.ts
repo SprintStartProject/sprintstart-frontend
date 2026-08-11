@@ -37,9 +37,7 @@ export const userService = {
    */
   async getProfile(): Promise<UserProfile | null> {
     try {
-      const profile = await apiClient.fetch<BackendUserProfile>(
-        "/api/v1/users/me",
-      );
+      const profile = await apiClient.fetch<BackendUserProfile>("/api/v1/users/me");
       return toUserProfile(profile);
     } catch (error) {
       console.error("Failed to retrieve profile", error);
@@ -62,13 +60,10 @@ export const userService = {
       delete payload.projectIds;
     }
 
-    const updatedProfile = await apiClient.fetch<BackendUserProfile>(
-      "/api/v1/users/me",
-      {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      },
-    );
+    const updatedProfile = await apiClient.fetch<BackendUserProfile>("/api/v1/users/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
 
     return toUserProfile(updatedProfile);
   },

@@ -3,20 +3,10 @@ import { apiClient } from "../apiClient.ts";
 // ---- Enums / shared ----
 
 /** Connection state the backend reports for a connected Jira instance. */
-export type JiraInstanceStatus =
-  | "UPDATING"
-  | "UP_TO_DATE"
-  | "OUT_OF_DATE"
-  | "FAILED";
+export type JiraInstanceStatus = "UPDATING" | "UP_TO_DATE" | "OUT_OF_DATE" | "FAILED";
 
 export type JiraScheduleDayOfWeek =
-  | "MONDAY"
-  | "TUESDAY"
-  | "WEDNESDAY"
-  | "THURSDAY"
-  | "FRIDAY"
-  | "SATURDAY"
-  | "SUNDAY";
+  "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
 
 /**
  * Typed schedule payload for a Jira instance. Structurally identical to
@@ -150,12 +140,8 @@ export type GetJiraInstanceConfigResponse = {
  * @param projectId - Optional project UUID to scope the result to.
  * @throws ApiError — 403 for an insufficient role.
  */
-export async function getJiraInstances(
-  projectId?: string,
-): Promise<JiraInstanceDto[]> {
-  const query = projectId
-    ? `?${new URLSearchParams({ projectId }).toString()}`
-    : "";
+export async function getJiraInstances(projectId?: string): Promise<JiraInstanceDto[]> {
+  const query = projectId ? `?${new URLSearchParams({ projectId }).toString()}` : "";
 
   return apiClient.fetch<JiraInstanceDto[]>(`/api/v1/jira/instances${query}`);
 }
@@ -170,9 +156,7 @@ export async function getJiraInstances(
  * @throws ApiError — 404 when the instance or credential is missing, 502 when
  *   the Jira server is unreachable/incompatible, 403 for an insufficient role.
  */
-export async function connectJiraInstance(
-  request: ConnectJiraInstanceRequest,
-): Promise<void> {
+export async function connectJiraInstance(request: ConnectJiraInstanceRequest): Promise<void> {
   await apiClient.fetch<void>("/api/v1/jira/connect", {
     method: "POST",
     body: JSON.stringify(request),
@@ -224,15 +208,10 @@ export async function updateJiraInstance(
  * @returns One accepted transaction id per instance.
  * @throws ApiError — 403 for an insufficient role.
  */
-export async function updateAllJiraInstances(): Promise<
-  UpdateJiraInstanceResponse[]
-> {
-  return apiClient.fetch<UpdateJiraInstanceResponse[]>(
-    "/api/v1/jira/update-all",
-    {
-      method: "POST",
-    },
-  );
+export async function updateAllJiraInstances(): Promise<UpdateJiraInstanceResponse[]> {
+  return apiClient.fetch<UpdateJiraInstanceResponse[]>("/api/v1/jira/update-all", {
+    method: "POST",
+  });
 }
 
 // ---- Credentials ----
@@ -244,9 +223,7 @@ export async function updateAllJiraInstances(): Promise<
  * @throws ApiError — 400 when a credential with that name already exists,
  *   403 for an insufficient role.
  */
-export async function addJiraCredential(
-  request: AddCredentialRequest,
-): Promise<void> {
+export async function addJiraCredential(request: AddCredentialRequest): Promise<void> {
   await apiClient.fetch<void>("/api/v1/jira/credentials", {
     method: "POST",
     body: JSON.stringify(request),
@@ -260,9 +237,7 @@ export async function addJiraCredential(
  * @param signal - Optional AbortSignal for cancelling an in-flight request.
  * @throws ApiError when the request fails.
  */
-export async function getMyJiraCredentials(
-  signal?: AbortSignal,
-): Promise<JiraCredentialsDto[]> {
+export async function getMyJiraCredentials(signal?: AbortSignal): Promise<JiraCredentialsDto[]> {
   return apiClient.fetch<JiraCredentialsDto[]>("/api/v1/jira/credentials", {
     signal,
   });
@@ -273,9 +248,7 @@ export async function getMyJiraCredentials(
  *
  * @throws ApiError — 404 when the credential is unknown, 403 for an insufficient role.
  */
-export async function deleteJiraCredential(
-  request: DeleteJiraCredentialRequest,
-): Promise<void> {
+export async function deleteJiraCredential(request: DeleteJiraCredentialRequest): Promise<void> {
   await apiClient.fetch<void>("/api/v1/jira/credentials", {
     method: "DELETE",
     body: JSON.stringify(request),
@@ -291,13 +264,10 @@ export async function deleteJiraCredential(
 export async function changeJiraCredentialName(
   request: ChangeJiraCredentialNameRequest,
 ): Promise<JiraCredentialsDto> {
-  return apiClient.fetch<JiraCredentialsDto>(
-    "/api/v1/jira/credentials/patch/name",
-    {
-      method: "PATCH",
-      body: JSON.stringify(request),
-    },
-  );
+  return apiClient.fetch<JiraCredentialsDto>("/api/v1/jira/credentials/patch/name", {
+    method: "PATCH",
+    body: JSON.stringify(request),
+  });
 }
 
 /**
@@ -309,13 +279,10 @@ export async function changeJiraCredentialName(
 export async function changeJiraCredentialToken(
   request: ChangeJiraCredentialTokenRequest,
 ): Promise<JiraCredentialsDto> {
-  return apiClient.fetch<JiraCredentialsDto>(
-    "/api/v1/jira/credentials/patch/token",
-    {
-      method: "PATCH",
-      body: JSON.stringify(request),
-    },
-  );
+  return apiClient.fetch<JiraCredentialsDto>("/api/v1/jira/credentials/patch/token", {
+    method: "PATCH",
+    body: JSON.stringify(request),
+  });
 }
 
 // ---- Config ----
@@ -325,12 +292,8 @@ export async function changeJiraCredentialToken(
  *
  * @throws ApiError — 403 for an insufficient role.
  */
-export async function getAllJiraConfigs(): Promise<
-  GetJiraInstanceConfigResponse[]
-> {
-  return apiClient.fetch<GetJiraInstanceConfigResponse[]>(
-    "/api/v1/jira/config",
-  );
+export async function getAllJiraConfigs(): Promise<GetJiraInstanceConfigResponse[]> {
+  return apiClient.fetch<GetJiraInstanceConfigResponse[]>("/api/v1/jira/config");
 }
 
 /**
@@ -342,14 +305,10 @@ export async function getAllJiraConfigs(): Promise<
  * @param instanceUrl - The full Jira instance URL.
  * @throws ApiError — 404 when the instance is unknown, 403 for an insufficient role.
  */
-export async function getJiraConfig(
-  instanceUrl: string,
-): Promise<GetJiraInstanceConfigResponse> {
+export async function getJiraConfig(instanceUrl: string): Promise<GetJiraInstanceConfigResponse> {
   const query = new URLSearchParams({ instanceUrl }).toString();
 
-  return apiClient.fetch<GetJiraInstanceConfigResponse>(
-    `/api/v1/jira/config/instance?${query}`,
-  );
+  return apiClient.fetch<GetJiraInstanceConfigResponse>(`/api/v1/jira/config/instance?${query}`);
 }
 
 /**
@@ -373,9 +332,7 @@ export async function configureAllJiraInstances(
  *
  * @throws ApiError — 404 when the instance is unknown, 403 for an insufficient role.
  */
-export async function configureJiraInstance(
-  request: ConfigureJiraInstanceRequest,
-): Promise<void> {
+export async function configureJiraInstance(request: ConfigureJiraInstanceRequest): Promise<void> {
   await apiClient.fetch<void>("/api/v1/jira/config/configure", {
     method: "PUT",
     body: JSON.stringify(request),

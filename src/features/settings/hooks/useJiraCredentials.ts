@@ -65,9 +65,7 @@ export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
       if (id === requestIdRef.current && mountedRef.current) {
         setLoaded(true);
         setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Failed to load Jira credentials.",
+          loadError instanceof Error ? loadError.message : "Failed to load Jira credentials.",
         );
       }
     } finally {

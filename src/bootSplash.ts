@@ -13,17 +13,17 @@ const SIGNOUT_KEY = "sprintstart.boot.signout";
 const EXIT_MS = 520;
 
 declare global {
-    interface Window {
-        /** Published by the inline boot script; absent in tests and Storybook. */
-        __bootSplash?: { start: number; flightMs: number };
-    }
+  interface Window {
+    /** Published by the inline boot script; absent in tests and Storybook. */
+    __bootSplash?: { start: number; flightMs: number };
+  }
 }
 
 /** Milliseconds still to run before the launch has played out. */
 function remainingFlightMs(): number {
-    const boot = window.__bootSplash;
-    if (!boot) return 0;
-    return Math.max(0, boot.start + boot.flightMs - Date.now());
+  const boot = window.__bootSplash;
+  if (!boot) return 0;
+  return Math.max(0, boot.start + boot.flightMs - Date.now());
 }
 
 /**
@@ -36,12 +36,12 @@ function remainingFlightMs(): number {
  * leaves, and the worst case is a stale first name after a rename.
  */
 export function rememberBootGreeting(firstName: string | null | undefined): void {
-    try {
-        if (firstName) window.localStorage.setItem(GREETING_KEY, firstName);
-        else window.localStorage.removeItem(GREETING_KEY);
-    } catch {
-        // The splash falls back to an unnamed greeting.
-    }
+  try {
+    if (firstName) window.localStorage.setItem(GREETING_KEY, firstName);
+    else window.localStorage.removeItem(GREETING_KEY);
+  } catch {
+    // The splash falls back to an unnamed greeting.
+  }
 }
 
 /**
@@ -58,11 +58,11 @@ export function rememberBootGreeting(firstName: string | null | undefined): void
  * load that reads it: it describes one navigation, not a preference.
  */
 export function markSigningOut(): void {
-    try {
-        window.sessionStorage.setItem(SIGNOUT_KEY, "1");
-    } catch {
-        // The splash will briefly show a pad. Not worth failing a sign-out for.
-    }
+  try {
+    window.sessionStorage.setItem(SIGNOUT_KEY, "1");
+  } catch {
+    // The splash will briefly show a pad. Not worth failing a sign-out for.
+  }
 }
 
 /**
@@ -93,34 +93,32 @@ export function markSigningOut(): void {
  * settles, which includes signing out and back in within one session, and a
  * flag would make every call after the first one silently do nothing.
  */
-export function dismissBootSplash(
-    mode: "flight" | "now" | "instant" = "flight",
-): void {
-    const splash = document.getElementById(SPLASH_ID);
-    if (!splash || splash.dataset.exiting === "true") return;
+export function dismissBootSplash(mode: "flight" | "now" | "instant" = "flight"): void {
+  const splash = document.getElementById(SPLASH_ID);
+  if (!splash || splash.dataset.exiting === "true") return;
 
-    // "instant" is for the entries that were never being loaded *into* — the
-    // Keycloak login theme boots from the same `index.html`, and holding a
-    // sign-in form behind a launch is a send-off for a journey nobody started.
-    if (mode === "instant") {
-        splash.remove();
-        return;
-    }
+  // "instant" is for the entries that were never being loaded *into* — the
+  // Keycloak login theme boots from the same `index.html`, and holding a
+  // sign-in form behind a launch is a send-off for a journey nobody started.
+  if (mode === "instant") {
+    splash.remove();
+    return;
+  }
 
-    // Flagged before the wait rather than by the class that starts the fade:
-    // the class has to land when the flight is over, and a second call in the
-    // meantime must not queue a second exit behind it.
-    splash.dataset.exiting = "true";
+  // Flagged before the wait rather than by the class that starts the fade:
+  // the class has to land when the flight is over, and a second call in the
+  // meantime must not queue a second exit behind it.
+  splash.dataset.exiting = "true";
 
-    window.setTimeout(
-        () => {
-            splash.classList.add(READY_CLASS);
-            // On a timer rather than on `animationend`: that event is the
-            // animation reporting on itself, and if it never starts — reduced
-            // motion, a dropped frame, a backgrounded tab — it never fires and
-            // the splash stays over the app for good.
-            window.setTimeout(() => splash.remove(), EXIT_MS);
-        },
-        mode === "now" ? 0 : remainingFlightMs(),
-    );
+  window.setTimeout(
+    () => {
+      splash.classList.add(READY_CLASS);
+      // On a timer rather than on `animationend`: that event is the
+      // animation reporting on itself, and if it never starts — reduced
+      // motion, a dropped frame, a backgrounded tab — it never fires and
+      // the splash stays over the app for good.
+      window.setTimeout(() => splash.remove(), EXIT_MS);
+    },
+    mode === "now" ? 0 : remainingFlightMs(),
+  );
 }

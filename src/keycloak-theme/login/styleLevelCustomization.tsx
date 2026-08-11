@@ -8,7 +8,7 @@
 import type { ReactNode } from "react";
 import type { ClassKey } from "@keycloakify/login-ui/useKcClsx";
 import "./login.css";
-import "../../styles/index.css"
+import "../../styles/index.css";
 
 type Classes = { [key in ClassKey]?: string };
 

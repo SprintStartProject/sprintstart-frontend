@@ -72,9 +72,7 @@ export const handlers = [
     });
   }),
 
-  http.delete("/api/v1/admin/users/:userId", () =>
-    HttpResponse.json({ id: "123", deleted: true }),
-  ),
+  http.delete("/api/v1/admin/users/:userId", () => HttpResponse.json({ id: "123", deleted: true })),
 
   http.get("/api/v1/admin/projects", () =>
     HttpResponse.json([
@@ -173,17 +171,14 @@ export const handlers = [
     });
   }),
 
-  http.patch(
-    "/api/v1/admin/users/:userId/enabled",
-    async ({ request, params }) => {
-      const body = (await request.json()) as Record<string, unknown>;
-      return HttpResponse.json({
-        ...backendUser,
-        id: params.userId,
-        ...body,
-      });
-    },
-  ),
+  http.patch("/api/v1/admin/users/:userId/enabled", async ({ request, params }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({
+      ...backendUser,
+      id: params.userId,
+      ...body,
+    });
+  }),
 
   http.get("/api/v1/chats/:chatId", ({ params }) =>
     HttpResponse.json({
@@ -360,10 +355,7 @@ export const handlers = [
     }),
   ),
 
-  http.put(
-    "/api/v1/onboarding/me/tasks/:taskId",
-    () => new HttpResponse(null, { status: 200 }),
-  ),
+  http.put("/api/v1/onboarding/me/tasks/:taskId", () => new HttpResponse(null, { status: 200 })),
 
   http.get("/api/v1/onboarding/me/team-overview", () =>
     HttpResponse.json({
@@ -383,9 +375,7 @@ export const handlers = [
       },
       hasFeedback: false,
       // Mirrors the API: a list under `projectIds`, keyed by `projectId`.
-      projectIds: [
-        { projectId: "project-1", name: "SprintStart Project", description: null },
-      ],
+      projectIds: [{ projectId: "project-1", name: "SprintStart Project", description: null }],
     }),
   ),
 
@@ -402,9 +392,7 @@ export const handlers = [
         progressPercentage: 80,
         currentStep: { startedAt: "2023-01-01T10:00:00Z" },
         skills: [],
-        projectIds: [
-          { projectId: "project-1", name: "SprintStart Project", description: null },
-        ],
+        projectIds: [{ projectId: "project-1", name: "SprintStart Project", description: null }],
       },
       {
         userId: "user2",
@@ -415,14 +403,10 @@ export const handlers = [
         progressPercentage: 20,
         currentStep: { startedAt: "2023-01-02T10:00:00Z" },
         skills: [],
-        projectIds: [
-          { projectId: "project-1", name: "SprintStart Project", description: null },
-        ],
+        projectIds: [{ projectId: "project-1", name: "SprintStart Project", description: null }],
       },
     ];
-    const filtered = roleId
-      ? users.filter((u) => u.roles.some((r) => r.id === roleId))
-      : users;
+    const filtered = roleId ? users.filter((u) => u.roles.some((r) => r.id === roleId)) : users;
     return HttpResponse.json({ content: filtered });
   }),
 
@@ -490,25 +474,19 @@ export const handlers = [
     ]),
   ),
 
-  http.put(
-    "/api/v1/projectRoles/:roleId/skills",
-    async ({ request, params }) => {
-      const body = (await request.json()) as { skillIds: string[] };
-      return HttpResponse.json(
-        body.skillIds.map((skillId) => ({
-          id: skillId,
-          name: "Skill " + skillId,
-          roleIds: [params.roleId],
-          status: "ACTIVE" as const,
-        })),
-      );
-    },
-  ),
+  http.put("/api/v1/projectRoles/:roleId/skills", async ({ request, params }) => {
+    const body = (await request.json()) as { skillIds: string[] };
+    return HttpResponse.json(
+      body.skillIds.map((skillId) => ({
+        id: skillId,
+        name: "Skill " + skillId,
+        roleIds: [params.roleId],
+        status: "ACTIVE" as const,
+      })),
+    );
+  }),
 
-  http.delete(
-    "/api/v1/admin/skills/:skillId",
-    () => new HttpResponse(null, { status: 204 }),
-  ),
+  http.delete("/api/v1/admin/skills/:skillId", () => new HttpResponse(null, { status: 204 })),
 
   http.get("/api/v1/me/skills", () => HttpResponse.json([])),
 
@@ -522,9 +500,7 @@ export const handlers = [
     });
   }),
 
-  http.get("/api/v1/admin/users/:userId/skill-assessments/completed", () =>
-    HttpResponse.json([]),
-  ),
+  http.get("/api/v1/admin/users/:userId/skill-assessments/completed", () => HttpResponse.json([])),
 
   http.post("/api/v1/projectRoles", async ({ request }) => {
     const body = (await request.json()) as {
@@ -538,8 +514,5 @@ export const handlers = [
     });
   }),
 
-  http.post(
-    "/api/v1/users/:userId/project-roles",
-    () => new HttpResponse(null, { status: 200 }),
-  ),
+  http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
 ];

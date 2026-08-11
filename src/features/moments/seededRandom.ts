@@ -6,6 +6,6 @@
  * across a re-render instead of visibly reshuffling mid-animation.
  */
 export function seeded(seed: number): number {
-    const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
-    return value - Math.floor(value);
+  const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return value - Math.floor(value);
 }

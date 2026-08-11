@@ -14,10 +14,10 @@
 export const MOMENT_STAGE_ATTRIBUTE = "data-moment-stage";
 
 export interface StageRect {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -42,23 +42,23 @@ const MIN_STAGE_PX = 200;
  * requirement.
  */
 export function momentStageRect(): StageRect {
-    const viewport: StageRect = {
-        left: 0,
-        top: 0,
-        width: window.innerWidth,
-        height: window.innerHeight,
-    };
+  const viewport: StageRect = {
+    left: 0,
+    top: 0,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
 
-    const stage = document.querySelector(`[${MOMENT_STAGE_ATTRIBUTE}]`);
-    if (!stage) return viewport;
+  const stage = document.querySelector(`[${MOMENT_STAGE_ATTRIBUTE}]`);
+  if (!stage) return viewport;
 
-    const rect = stage.getBoundingClientRect();
-    const left = Math.max(rect.left, 0);
-    const top = Math.max(rect.top, 0);
-    const width = Math.min(rect.right, viewport.width) - left;
-    const height = Math.min(rect.bottom, viewport.height) - top;
+  const rect = stage.getBoundingClientRect();
+  const left = Math.max(rect.left, 0);
+  const top = Math.max(rect.top, 0);
+  const width = Math.min(rect.right, viewport.width) - left;
+  const height = Math.min(rect.bottom, viewport.height) - top;
 
-    if (width < MIN_STAGE_PX || height < MIN_STAGE_PX) return viewport;
+  if (width < MIN_STAGE_PX || height < MIN_STAGE_PX) return viewport;
 
-    return { left, top, width, height };
+  return { left, top, width, height };
 }

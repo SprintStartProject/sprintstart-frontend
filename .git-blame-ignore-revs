@@ -1,0 +1,14 @@
+# Revisions that only reformat code — no behaviour, no styling, no logic.
+# `git blame` skips these so the real author of a line stays visible.
+#
+# Enabled per clone once (it is not committed config):
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub picks this file up automatically, no setup needed there.
+#
+# Add one full 40-character SHA per line, newest at the bottom, with the
+# commit subject as a comment above it.
+
+# formatting: prettier across the codebase
+# <SHA nach dem Formatier-Commit hier eintragen>

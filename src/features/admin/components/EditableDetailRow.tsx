@@ -1,32 +1,36 @@
 import { useId } from "react";
+import { Input } from "../../../components/ui/Input";
 
 type EditableDetailRowProps = {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    type?: "text" | "email";
-    autoComplete?: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: "text" | "email";
+  autoComplete?: string;
 };
 
 export function EditableDetailRow({
-    label,
-    value,
-    onChange,
-    type = "text",
-    autoComplete,
+  label,
+  value,
+  onChange,
+  type = "text",
+  autoComplete,
 }: EditableDetailRowProps) {
-    const id = useId();
-    return (
-        <div className="grid grid-cols-1 items-center gap-1.5 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
-            <label htmlFor={id} className="text-sm text-app-text-muted">{label}</label>
-            <input
-                id={id}
-                type={type}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                autoComplete={autoComplete}
-                className="h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
-            />
-        </div>
-    );
+  const id = useId();
+  return (
+    <div className="grid grid-cols-1 items-center gap-1.5 py-2.5 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
+      {/* The label sits beside the control rather than above it, so this
+                row lays itself out instead of using `Field`. */}
+      <label htmlFor={id} className="text-sm text-app-text-muted">
+        {label}
+      </label>
+      <Input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+      />
+    </div>
+  );
 }

@@ -1,5 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { Search, Users } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "./SelectionCheckbox";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -51,50 +53,37 @@ export function MemberPicker({
   }, [search, users]);
 
   const allVisibleSelected =
-    visibleUsers.length > 0 &&
-    visibleUsers.every((user) => selectedUserIds.has(user.id));
+    visibleUsers.length > 0 && visibleUsers.every((user) => selectedUserIds.has(user.id));
 
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <label
-          htmlFor={searchInputId}
-          className="block text-sm text-app-text-muted"
-        >
+        <label htmlFor={searchInputId} className="block text-sm text-app-text-muted">
           {label}
         </label>
-        <span className="text-xs text-app-text-muted">
-          {selectedUserIds.size} selected
-        </span>
+        <span className="text-xs text-app-text-muted">{selectedUserIds.size} selected</span>
       </div>
 
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled"
-          aria-hidden="true"
-        />
-        <input
-          id={searchInputId}
-          type="search"
-          value={search}
-          disabled={disabled}
-          placeholder="Filter by name, username or email"
-          onChange={(event) => setSearch(event.target.value)}
-          className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-9 pr-3 text-sm font-medium text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
-        />
-      </div>
+      <Input
+        id={searchInputId}
+        type="search"
+        value={search}
+        disabled={disabled}
+        placeholder="Filter by name, username or email"
+        onChange={(event) => setSearch(event.target.value)}
+        icon={<Search className="h-4 w-4" />}
+      />
 
       {visibleUsers.length > 0 && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={disabled}
           onClick={() => onToggleVisible(visibleUsers, allVisibleSelected)}
-          className="mt-2 text-xs font-semibold text-app-brand-text transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-2"
         >
-          {allVisibleSelected
-            ? "Clear these"
-            : `Select these ${visibleUsers.length}`}
-        </button>
+          {allVisibleSelected ? "Clear these" : `Select these ${visibleUsers.length}`}
+        </Button>
       )}
 
       <ul className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-app-border">
@@ -119,12 +108,8 @@ export function MemberPicker({
                   ariaLabel={`Add ${displayName} to the project`}
                 />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-app-text">
-                    {displayName}
-                  </p>
-                  <p className="truncate text-xs text-app-text-muted">
-                    {user.email}
-                  </p>
+                  <p className="truncate text-sm font-medium text-app-text">{displayName}</p>
+                  <p className="truncate text-xs text-app-text-muted">{user.email}</p>
                 </div>
               </li>
             );

@@ -20,18 +20,12 @@ describe("useJiraCredentials", () => {
   });
 
   it("loads the authenticated user's credentials on mount", async () => {
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([
-      cred("default"),
-      cred("ci"),
-    ]);
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([cred("default"), cred("ci")]);
 
     const { result } = renderHook(() => useJiraCredentials());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    expect(result.current.credentials.map((c) => c.displayName)).toEqual([
-      "default",
-      "ci",
-    ]);
+    expect(result.current.credentials.map((c) => c.displayName)).toEqual(["default", "ci"]);
     expect(result.current.error).toBeNull();
     expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
@@ -45,9 +39,7 @@ describe("useJiraCredentials", () => {
   });
 
   it("surfaces an error message when loading fails", async () => {
-    vi.mocked(getMyJiraCredentials).mockRejectedValue(
-      new Error("Network down"),
-    );
+    vi.mocked(getMyJiraCredentials).mockRejectedValue(new Error("Network down"));
 
     const { result } = renderHook(() => useJiraCredentials());
 
@@ -64,9 +56,7 @@ describe("useJiraCredentials", () => {
     const { result } = renderHook(() => useJiraCredentials());
 
     await waitFor(() =>
-      expect(result.current.credentials.map((c) => c.displayName)).toEqual([
-        "a",
-      ]),
+      expect(result.current.credentials.map((c) => c.displayName)).toEqual(["a"]),
     );
 
     await act(async () => {
@@ -74,10 +64,7 @@ describe("useJiraCredentials", () => {
     });
 
     await waitFor(() =>
-      expect(result.current.credentials.map((c) => c.displayName)).toEqual([
-        "a",
-        "b",
-      ]),
+      expect(result.current.credentials.map((c) => c.displayName)).toEqual(["a", "b"]),
     );
   });
 
@@ -98,17 +85,13 @@ describe("useJiraCredentials", () => {
     });
 
     await waitFor(() =>
-      expect(result.current.credentials.map((c) => c.displayName)).toEqual([
-        "fresh",
-      ]),
+      expect(result.current.credentials.map((c) => c.displayName)).toEqual(["fresh"]),
     );
 
     await act(async () => {
       resolveSlow([cred("stale")]);
       await slow;
     });
-    expect(result.current.credentials.map((c) => c.displayName)).toEqual([
-      "fresh",
-    ]);
+    expect(result.current.credentials.map((c) => c.displayName)).toEqual(["fresh"]);
   });
 });

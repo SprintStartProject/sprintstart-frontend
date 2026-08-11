@@ -1,12 +1,12 @@
-import type { ReactNode } from 'react';
-import { useEffect, useLayoutEffect, useState } from 'react';
-import type { StyleMode, Theme } from './ThemeContext';
-import { ThemeContext } from './ThemeContext';
+import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import type { StyleMode, Theme } from "./ThemeContext";
+import { ThemeContext } from "./ThemeContext";
 
-const STORAGE_KEY = 'theme';
-const STYLE_STORAGE_KEY = 'style-mode';
-const AURORA_STORAGE_KEY = 'sprintstart:aurora-enabled';
-const TILT_STORAGE_KEY = 'sprintstart:tilt-enabled';
+const STORAGE_KEY = "theme";
+const STYLE_STORAGE_KEY = "style-mode";
+const AURORA_STORAGE_KEY = "sprintstart:aurora-enabled";
+const TILT_STORAGE_KEY = "sprintstart:tilt-enabled";
 
 /**
  * Reads the user's stored theme preference, falling back to the OS
@@ -15,27 +15,25 @@ const TILT_STORAGE_KEY = 'sprintstart:tilt-enabled';
  * chosen by the user and stored.
  */
 function getInitialTheme(): Theme {
-    let stored: string | null = null;
-    try {
-        stored = window.localStorage.getItem(STORAGE_KEY);
-    } catch (error) {
-        // localStorage may be disabled (private mode) or throw on access.
-        console.warn('Failed to read theme preference', error);
-    }
-    if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        return stored;
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    // localStorage may be disabled (private mode) or throw on access.
+    console.warn("Failed to read theme preference", error);
+  }
+  if (stored === "light" || stored === "dark" || stored === "system") {
+    return stored;
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 /** Resolves a (possibly 'system') theme to the concrete light/dark mode in effect. */
 function resolveDark(theme: Theme): boolean {
-    if (theme === 'system') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return theme === 'dark';
+  if (theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  return theme === "dark";
 }
 
 /**
@@ -44,14 +42,14 @@ function resolveDark(theme: Theme): boolean {
  * swallowed — the in-memory theme still applies for the current session.
  */
 function applyTheme(theme: Theme) {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(resolveDark(theme) ? 'dark' : 'light');
-    try {
-        window.localStorage.setItem(STORAGE_KEY, theme);
-    } catch (error) {
-        console.warn('Failed to persist theme preference', error);
-    }
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+  root.classList.add(resolveDark(theme) ? "dark" : "light");
+  try {
+    window.localStorage.setItem(STORAGE_KEY, theme);
+  } catch (error) {
+    console.warn("Failed to persist theme preference", error);
+  }
 }
 
 /**
@@ -59,21 +57,21 @@ function applyTheme(theme: Theme) {
  * (the full-motion experience) when nothing is persisted.
  */
 function getInitialStyleMode(): StyleMode {
-    let stored: string | null = null;
-    try {
-        stored = window.localStorage.getItem(STYLE_STORAGE_KEY);
-    } catch (error) {
-        console.warn('Failed to read style mode preference', error);
-    }
-    if (stored === 'ultra' || stored === 'classic') {
-        return stored;
-    }
-    // Auto-activate classic mode when the OS has requested reduced motion,
-    // with localStorage still taking priority (checked above).
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        return 'classic';
-    }
-    return 'ultra';
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(STYLE_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Failed to read style mode preference", error);
+  }
+  if (stored === "ultra" || stored === "classic") {
+    return stored;
+  }
+  // Auto-activate classic mode when the OS has requested reduced motion,
+  // with localStorage still taking priority (checked above).
+  if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return "classic";
+  }
+  return "ultra";
 }
 
 /**
@@ -82,17 +80,17 @@ function getInitialStyleMode(): StyleMode {
  * mode still applies for the current session.
  */
 function applyStyleMode(mode: StyleMode) {
-    const root = window.document.documentElement;
-    if (mode === 'classic') {
-        root.classList.add('style-classic');
-    } else {
-        root.classList.remove('style-classic');
-    }
-    try {
-        window.localStorage.setItem(STYLE_STORAGE_KEY, mode);
-    } catch (error) {
-        console.warn('Failed to persist style mode preference', error);
-    }
+  const root = window.document.documentElement;
+  if (mode === "classic") {
+    root.classList.add("style-classic");
+  } else {
+    root.classList.remove("style-classic");
+  }
+  try {
+    window.localStorage.setItem(STYLE_STORAGE_KEY, mode);
+  } catch (error) {
+    console.warn("Failed to persist style mode preference", error);
+  }
 }
 
 /**
@@ -100,36 +98,36 @@ function applyStyleMode(mode: StyleMode) {
  * Defaults to `false` (off) when nothing is stored.
  */
 function getInitialAuroraEnabled(): boolean {
-    let stored: string | null = null;
-    try {
-        stored = window.localStorage.getItem(AURORA_STORAGE_KEY);
-    } catch {
-        // localStorage unavailable.
-    }
-    if (stored !== null) {
-        return stored === 'true';
-    }
-    return false;
-    }
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(AURORA_STORAGE_KEY);
+  } catch {
+    // localStorage unavailable.
+  }
+  if (stored !== null) {
+    return stored === "true";
+  }
+  return false;
+}
 
-    /**
-         * Reads the user's stored tilt effect preference.
-         * Defaults to `false` (off) when nothing is stored.
-         */
-    function getInitialTiltEnabled(): boolean {
-        let stored: string | null = null;
-        try {
-            stored = window.localStorage.getItem(TILT_STORAGE_KEY);
-        } catch {
-            // localStorage unavailable.
-        }
-        if (stored !== null) {
-                return stored === 'true';
-            }
-            return false;
-        }
+/**
+ * Reads the user's stored tilt effect preference.
+ * Defaults to `false` (off) when nothing is stored.
+ */
+function getInitialTiltEnabled(): boolean {
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(TILT_STORAGE_KEY);
+  } catch {
+    // localStorage unavailable.
+  }
+  if (stored !== null) {
+    return stored === "true";
+  }
+  return false;
+}
 
-        /**
+/**
  * Provider component that manages the application's visual theme.
  *
  * Supports an explicit 'system' preference that follows the OS
@@ -149,121 +147,121 @@ function getInitialAuroraEnabled(): boolean {
  * in a standard `useEffect`.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
-    const [styleMode, setStyleModeState] = useState<StyleMode>(() => getInitialStyleMode());
-    const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() => getInitialAuroraEnabled());
-    const [isTiltEnabled, setIsTiltEnabledState] = useState<boolean>(() => getInitialTiltEnabled());
+  const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
+  const [styleMode, setStyleModeState] = useState<StyleMode>(() => getInitialStyleMode());
+  const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() => getInitialAuroraEnabled());
+  const [isTiltEnabled, setIsTiltEnabledState] = useState<boolean>(() => getInitialTiltEnabled());
 
-    // Sync before paint to avoid a FOUC of the default light palette.
-    useLayoutEffect(() => {
-        applyTheme(theme);
-    }, [theme]);
+  // Sync before paint to avoid a FOUC of the default light palette.
+  useLayoutEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
-    // Apply .style-classic before paint to prevent a Flash of Unstyled Glow
-    // (aurora blobs / spotlight gradients flashing before the override lands).
-    useLayoutEffect(() => {
-        applyStyleMode(styleMode);
-    }, [styleMode]);
+  // Apply .style-classic before paint to prevent a Flash of Unstyled Glow
+  // (aurora blobs / spotlight gradients flashing before the override lands).
+  useLayoutEffect(() => {
+    applyStyleMode(styleMode);
+  }, [styleMode]);
 
-    // When the user picks 'system', keep the applied mode in sync with the OS.
-    useEffect(() => {
-        if (theme !== 'system') return;
+  // When the user picks 'system', keep the applied mode in sync with the OS.
+  useEffect(() => {
+    if (theme !== "system") return;
 
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = () => applyTheme('system');
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, [theme]);
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyTheme("system");
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [theme]);
 
-    // Listen for live changes to prefers-reduced-motion so the style
-    // mode follows even after initial mount.
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  // Listen for live changes to prefers-reduced-motion so the style
+  // mode follows even after initial mount.
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-        const handleChange = (e: MediaQueryListEvent) => {
-            if (e.matches) {
-                setStyleModeState('classic');
-            } else {
-                // Only revert to ultra if the user hasn't explicitly toggled.
-                try {
-                    const stored = window.localStorage.getItem('style-mode');
-                    if (stored !== 'classic') {
-                        setStyleModeState('ultra');
-                    }
-                } catch {
-                    // localStorage unavailable — stay safe, stay classic.
-                }
-            }
-        };
-
-        // Defensive guard for test environments where matchMedia lacks addEventListener.
-        if (typeof mediaQuery.addEventListener === 'function') {
-            mediaQuery.addEventListener('change', handleChange);
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setStyleModeState("classic");
+      } else {
+        // Only revert to ultra if the user hasn't explicitly toggled.
+        try {
+          const stored = window.localStorage.getItem("style-mode");
+          if (stored !== "classic") {
+            setStyleModeState("ultra");
+          }
+        } catch {
+          // localStorage unavailable — stay safe, stay classic.
         }
-        return () => {
-            if (typeof mediaQuery.removeEventListener === 'function') {
-                mediaQuery.removeEventListener('change', handleChange);
-            }
-        };
-    }, []);
-
-    const setTheme = (next: Theme) => {
-        setThemeState(next);
+      }
     };
 
-    // Sidebar quick toggle: cycle light <-> dark. 'system' is treated as the
-    // resolved mode so toggling from 'system' flips to the opposite concrete mode.
-    const toggleTheme = () => {
-        setThemeState((prev) => (resolveDark(prev) ? 'light' : 'dark'));
+    // Defensive guard for test environments where matchMedia lacks addEventListener.
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+    }
+    return () => {
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener("change", handleChange);
+      }
     };
+  }, []);
 
-    const setStyleMode = (next: StyleMode) => {
-        setStyleModeState(next);
-    };
+  const setTheme = (next: Theme) => {
+    setThemeState(next);
+  };
 
-    const toggleStyleMode = () => {
-        setStyleModeState((prev) => (prev === 'classic' ? 'ultra' : 'classic'));
-    };
+  // Sidebar quick toggle: cycle light <-> dark. 'system' is treated as the
+  // resolved mode so toggling from 'system' flips to the opposite concrete mode.
+  const toggleTheme = () => {
+    setThemeState((prev) => (resolveDark(prev) ? "light" : "dark"));
+  };
 
-    const isDarkMode = resolveDark(theme);
-        const isClassicMode = styleMode === 'classic';
+  const setStyleMode = (next: StyleMode) => {
+    setStyleModeState(next);
+  };
 
-        const setIsAuroraEnabled = (enabled: boolean) => {
-            setIsAuroraEnabledState(enabled);
-            try {
-                window.localStorage.setItem(AURORA_STORAGE_KEY, enabled ? 'true' : 'false');
-            } catch {
-                // localStorage unavailable.
-            }
-        };
+  const toggleStyleMode = () => {
+    setStyleModeState((prev) => (prev === "classic" ? "ultra" : "classic"));
+  };
 
-        const setIsTiltEnabled = (enabled: boolean) => {
-            setIsTiltEnabledState(enabled);
-            try {
-                window.localStorage.setItem(TILT_STORAGE_KEY, enabled ? 'true' : 'false');
-            } catch {
-                // localStorage unavailable.
-            }
-        };
+  const isDarkMode = resolveDark(theme);
+  const isClassicMode = styleMode === "classic";
 
-        return (
-            <ThemeContext.Provider
-                value={{
-                    theme,
-                    setTheme,
-                    toggleTheme,
-                    isDarkMode,
-                    styleMode,
-                    setStyleMode,
-                    toggleStyleMode,
-                    isClassicMode,
-                    isAuroraEnabled,
-                    setIsAuroraEnabled,
-                    isTiltEnabled,
-                    setIsTiltEnabled,
-                }}
-            >
-                {children}
-            </ThemeContext.Provider>
-        );
+  const setIsAuroraEnabled = (enabled: boolean) => {
+    setIsAuroraEnabledState(enabled);
+    try {
+      window.localStorage.setItem(AURORA_STORAGE_KEY, enabled ? "true" : "false");
+    } catch {
+      // localStorage unavailable.
+    }
+  };
+
+  const setIsTiltEnabled = (enabled: boolean) => {
+    setIsTiltEnabledState(enabled);
+    try {
+      window.localStorage.setItem(TILT_STORAGE_KEY, enabled ? "true" : "false");
+    } catch {
+      // localStorage unavailable.
+    }
+  };
+
+  return (
+    <ThemeContext.Provider
+      value={{
+        theme,
+        setTheme,
+        toggleTheme,
+        isDarkMode,
+        styleMode,
+        setStyleMode,
+        toggleStyleMode,
+        isClassicMode,
+        isAuroraEnabled,
+        setIsAuroraEnabled,
+        isTiltEnabled,
+        setIsTiltEnabled,
+      }}
+    >
+      {children}
+    </ThemeContext.Provider>
+  );
 }

@@ -94,10 +94,7 @@ describe("JiraCredentialsSection", () => {
     await user.click(screen.getByTestId("settings-jira-add-open"));
     expect(screen.getByTestId("settings-jira-add-email")).toHaveValue(EMAIL);
     await user.type(screen.getByTestId("settings-jira-add-name"), "ci");
-    await user.type(
-      screen.getByTestId("settings-jira-add-token"),
-      "secret-token",
-    );
+    await user.type(screen.getByTestId("settings-jira-add-token"), "secret-token");
     await user.click(screen.getByTestId("settings-jira-add-submit"));
 
     await waitFor(() =>
@@ -158,10 +155,7 @@ describe("JiraCredentialsSection", () => {
     await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-rotate-open-default"));
-    await user.type(
-      screen.getByTestId("settings-jira-rotate-input-default"),
-      "new-token",
-    );
+    await user.type(screen.getByTestId("settings-jira-rotate-input-default"), "new-token");
     await user.click(screen.getByTestId("settings-jira-rotate-submit-default"));
 
     await waitFor(() =>
@@ -183,9 +177,7 @@ describe("JiraCredentialsSection", () => {
     await screen.findByText("default");
 
     await user.click(screen.getByTestId("settings-jira-delete-open-default"));
-    await user.click(
-      screen.getByTestId("settings-jira-delete-confirm-default"),
-    );
+    await user.click(screen.getByTestId("settings-jira-delete-confirm-default"));
 
     await waitFor(() =>
       expect(deleteJiraCredential).toHaveBeenCalledWith({

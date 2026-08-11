@@ -3,49 +3,58 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, type ReactNode } from "react";
 import { getModalDialogVariants, modalBackdropVariants } from "../../styles/tokens";
+import { Button } from "./Button";
+import { useScrollLock } from "./useScrollLock";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
 type ModalProps = {
-    isOpen: boolean;
-    title: string;
-    description?: ReactNode;
-    children?: ReactNode;
-    footer?: ReactNode;
-    /** Optional controls shown in the header, left of the close button. */
-    headerActions?: ReactNode;
-    size?: ModalSize;
-    zIndexClassName?: string;
-    bodyClassName?: string;
-    role?: "dialog" | "alertdialog";
-    closeLabel?: string;
-    closeOnBackdrop?: boolean;
-    closeOnEscape?: boolean;
-    isDismissDisabled?: boolean;
-    titleId?: string;
-    descriptionId?: string;
-    onClose: () => void;
+  isOpen: boolean;
+  title: string;
+  description?: ReactNode;
+  children?: ReactNode;
+  footer?: ReactNode;
+  /** Optional controls shown in the header, left of the close button. */
+  headerActions?: ReactNode;
+  size?: ModalSize;
+  zIndexClassName?: string;
+  bodyClassName?: string;
+  role?: "dialog" | "alertdialog";
+  closeLabel?: string;
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
+  isDismissDisabled?: boolean;
+  titleId?: string;
+  descriptionId?: string;
+  /**
+   * `data-testid` for the dialog itself, and — suffixed with `-close` — for
+   * its close button. Present because standards §5 requires E2E-targeted
+   * elements to carry one, and a dialog is the thing a test opens and closes.
+   */
+  testId?: string;
+  onClose: () => void;
 };
 
 const sizeClassNames: Record<ModalSize, string> = {
-    sm: "max-w-sm",
-    md: "max-w-md",
-    lg: "max-w-2xl",
-    xl: "max-w-4xl",
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
 };
 
 const focusableSelector = [
-    "a[href]",
-    "button:not([disabled])",
-    "textarea:not([disabled])",
-    "input:not([disabled])",
-    "select:not([disabled])",
-    "[tabindex]:not([tabindex='-1'])",
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
 function getFocusableElements(container: HTMLElement) {
-    return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector))
-        .filter((element) => !element.hasAttribute("aria-hidden"));
+  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+    (element) => !element.hasAttribute("aria-hidden"),
+  );
 }
 
 /**
@@ -55,189 +64,191 @@ function getFocusableElements(container: HTMLElement) {
  * backdrop/dialog animation via modalBackdropVariants + getModalDialogVariants.
  */
 export function Modal({
-    isOpen,
-    title,
-    description,
-    children,
-    footer,
-    headerActions,
-    size = "md",
-    zIndexClassName = "z-50",
-    bodyClassName = "px-7 py-6",
-    role = "dialog",
-    closeLabel = "Close dialog",
-    closeOnBackdrop = true,
-    closeOnEscape = true,
-    isDismissDisabled = false,
-    titleId = "modal-title",
-    descriptionId = "modal-description",
-    onClose,
+  isOpen,
+  title,
+  description,
+  children,
+  footer,
+  headerActions,
+  size = "md",
+  zIndexClassName = "z-50",
+  bodyClassName = "px-7 py-6",
+  role = "dialog",
+  closeLabel = "Close dialog",
+  closeOnBackdrop = true,
+  closeOnEscape = true,
+  isDismissDisabled = false,
+  titleId = "modal-title",
+  descriptionId = "modal-description",
+  testId,
+  onClose,
 }: ModalProps) {
-    const dialogRef = useRef<HTMLDivElement>(null);
-    const previouslyFocusedElement = useRef<HTMLElement | null>(null);
-    const prefersReducedMotion = useReducedMotion();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
-    useEffect(() => {
-        if (!isOpen) return;
+  // Without this the page behind a dialog still scrolls under the pointer,
+  // which is disorienting and, on a long admin table, loses the row the user
+  // opened the dialog from.
+  useScrollLock(isOpen);
 
-        previouslyFocusedElement.current =
-            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  useEffect(() => {
+    if (!isOpen) return;
 
-        window.requestAnimationFrame(() => {
-            const dialog = dialogRef.current;
-            if (!dialog) return;
+    previouslyFocusedElement.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-            // The autofocus runs a frame late, so a keyboard user (or a test
-            // typing into the dialog) may already have moved focus inside it by
-            // now. Don't yank it back to the first control in that case.
-            const active = document.activeElement;
-            if (active && active !== dialog && dialog.contains(active)) return;
+    window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
 
-            const [firstFocusable] = getFocusableElements(dialog);
-            (firstFocusable ?? dialog).focus();
-        });
+      // The autofocus runs a frame late, so a keyboard user (or a test
+      // typing into the dialog) may already have moved focus inside it by
+      // now. Don't yank it back to the first control in that case.
+      const active = document.activeElement;
+      if (active && active !== dialog && dialog.contains(active)) return;
 
-        return () => {
-            previouslyFocusedElement.current?.focus();
-        };
-    }, [isOpen]);
+      const [firstFocusable] = getFocusableElements(dialog);
+      (firstFocusable ?? dialog).focus();
+    });
 
-    useEffect(() => {
-        if (!isOpen) return;
+    return () => {
+      previouslyFocusedElement.current?.focus();
+    };
+  }, [isOpen]);
 
-        function handleKeyDown(event: KeyboardEvent) {
-            if (event.key === "Escape" && closeOnEscape && !isDismissDisabled) {
-                onClose();
-                return;
-            }
+  useEffect(() => {
+    if (!isOpen) return;
 
-            if (event.key !== "Tab") {
-                return;
-            }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && closeOnEscape && !isDismissDisabled) {
+        onClose();
+        return;
+      }
 
-            const dialog = dialogRef.current;
-            if (!dialog) return;
+      if (event.key !== "Tab") {
+        return;
+      }
 
-            const focusableElements = getFocusableElements(dialog);
-            if (focusableElements.length === 0) {
-                event.preventDefault();
-                dialog.focus();
-                return;
-            }
+      const dialog = dialogRef.current;
+      if (!dialog) return;
 
-            const firstElement = focusableElements[0];
-            const lastElement = focusableElements[focusableElements.length - 1];
+      const focusableElements = getFocusableElements(dialog);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
 
-            if (event.shiftKey && document.activeElement === firstElement) {
-                event.preventDefault();
-                lastElement.focus();
-            } else if (!event.shiftKey && document.activeElement === lastElement) {
-                event.preventDefault();
-                firstElement.focus();
-            }
-        }
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
 
-        document.addEventListener("keydown", handleKeyDown);
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
 
-        return () => {
-            document.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [closeOnEscape, isDismissDisabled, isOpen, onClose]);
+    document.addEventListener("keydown", handleKeyDown);
 
-    const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeOnEscape, isDismissDisabled, isOpen, onClose]);
 
-    // Rendered into <body> so the dialog is never trapped inside an ancestor's
-    // stacking context. Callers sit anywhere in the tree -- the sidebar's
-    // `position: sticky` wrapper, for one, creates a stacking context that would
-    // otherwise cap the overlay below page content that uses a positive z-index.
-    return createPortal(
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    variants={modalBackdropVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
+  const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+
+  // Rendered into <body> so the dialog is never trapped inside an ancestor's
+  // stacking context. Callers sit anywhere in the tree -- the sidebar's
+  // `position: sticky` wrapper, for one, creates a stacking context that would
+  // otherwise cap the overlay below page content that uses a positive z-index.
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          variants={modalBackdropVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
+        >
+          {closeOnBackdrop && (
+            <button
+              type="button"
+              aria-label={closeLabel}
+              disabled={isDismissDisabled}
+              onClick={onClose}
+              className="absolute inset-0 disabled:cursor-default"
+            />
+          )}
+
+          <motion.div
+            ref={dialogRef}
+            data-testid={testId}
+            role={role}
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={description ? descriptionId : undefined}
+            tabIndex={-1}
+            variants={dialogVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className={`relative z-10 w-full ${sizeClassNames[size]} overflow-hidden rounded-[28px] border border-app-border bg-app-bg shadow-2xl`}
+          >
+            <div className="pointer-events-none absolute -top-16 -right-16 h-[200px] w-[200px] rounded-full bg-app-brand-glow blur-3xl" />
+
+            <div className="relative z-10 flex items-start justify-between gap-4 px-7 pt-7">
+              <div>
+                <h2 id={titleId} className="text-[22px] leading-tight font-bold text-app-text">
+                  {title}
+                </h2>
+
+                {description && (
+                  <div
+                    id={descriptionId}
+                    className="mt-1 text-xs leading-relaxed text-app-text-muted"
+                  >
+                    {description}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {headerActions}
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  iconOnly
+                  onClick={onClose}
+                  disabled={isDismissDisabled}
+                  aria-label={closeLabel}
+                  data-testid={testId ? `${testId}-close` : undefined}
                 >
-                    {closeOnBackdrop && (
-                        <button
-                            type="button"
-                            aria-label={closeLabel}
-                            disabled={isDismissDisabled}
-                            onClick={onClose}
-                            className="absolute inset-0 disabled:cursor-default"
-                        />
-                    )}
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-                    <motion.div
-                        ref={dialogRef}
-                        role={role}
-                        aria-modal="true"
-                        aria-labelledby={titleId}
-                        aria-describedby={description ? descriptionId : undefined}
-                        tabIndex={-1}
-                        variants={dialogVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        className={`relative z-10 w-full ${sizeClassNames[size]} overflow-hidden rounded-[28px] border border-app-border bg-app-bg shadow-2xl`}
-                    >
-                        <div className="pointer-events-none absolute -right-16 -top-16 h-[200px] w-[200px] rounded-full bg-app-brand-glow blur-3xl" />
+            {children && <div className={`relative z-10 ${bodyClassName}`}>{children}</div>}
 
-                        <div className="relative z-10 flex items-start justify-between gap-4 px-7 pt-7">
-                            <div>
-                                <h2
-                                    id={titleId}
-                                    className="text-[22px] font-bold leading-tight text-app-text"
-                                >
-                                    {title}
-                                </h2>
-
-                                {description && (
-                                    <div
-                                        id={descriptionId}
-                                        className="mt-1 text-xs leading-relaxed text-app-text-muted"
-                                    >
-                                        {description}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-2">
-                                {headerActions}
-
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    disabled={isDismissDisabled}
-                                    className="rounded-lg border border-app-border p-2 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
-                                    aria-label={closeLabel}
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {children && (
-                            <div className={`relative z-10 ${bodyClassName}`}>
-                                {children}
-                            </div>
-                        )}
-
-                        {footer && (
-                            <div
-                                className={`relative z-10 flex flex-col-reverse gap-3 px-7 pb-7 sm:flex-row sm:justify-end ${
-                                    children ? "" : "pt-6"
-                                }`}
-                            >
-                                {footer}
-                            </div>
-                        )}
-                    </motion.div>
-                </motion.div>
+            {footer && (
+              <div
+                className={`relative z-10 flex flex-col-reverse gap-3 px-7 pb-7 sm:flex-row sm:justify-end ${
+                  children ? "" : "pt-6"
+                }`}
+              >
+                {footer}
+              </div>
             )}
-        </AnimatePresence>,
-        document.body,
-    );
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
 }

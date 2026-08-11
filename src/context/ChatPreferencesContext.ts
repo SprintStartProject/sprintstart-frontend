@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext } from "react";
 
 /**
  * User-facing chat display preferences. These are client-side only and
@@ -6,10 +6,10 @@ import { createContext } from 'react';
  * only what the UI renders.
  */
 export interface ChatPreferences {
-    /** Whether the "Thought Process" reasoning block is shown above each assistant message. */
-    showThoughtProcess: boolean;
-    /** Toggles the Thought Process visibility (persisted). */
-    setShowThoughtProcess: (value: boolean) => void;
+  /** Whether the "Thought Process" reasoning block is shown above each assistant message. */
+  showThoughtProcess: boolean;
+  /** Toggles the Thought Process visibility (persisted). */
+  setShowThoughtProcess: (value: boolean) => void;
 }
 
 /**

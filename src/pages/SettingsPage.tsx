@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
-import { Key, MessageSquare, Palette, Settings, User } from "lucide-react";
+import { Key, MessageSquare, Palette, Rocket, Settings, User } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -8,10 +8,11 @@ import { SettingsSection } from "../features/settings/components/SettingsSection
 import { ProfileSection } from "../features/settings/components/ProfileSection";
 import { AppearanceSection } from "../features/settings/components/AppearanceSection";
 import { ChatSection } from "../features/settings/components/ChatSection";
+import { MomentsSection } from "../features/settings/components/MomentsSection";
 import { AccessTokensSection } from "../features/settings/components/AccessTokensSection";
 import { useDinoEasterEgg } from "../features/settings/hooks/useDinoEasterEgg";
 
-type SectionId = "profile" | "appearance" | "chat" | "tokens";
+type SectionId = "profile" | "appearance" | "chat" | "moments" | "tokens";
 
 type SectionDef = {
   id: SectionId;
@@ -48,12 +49,19 @@ const ALL_SECTIONS: ReadonlyArray<SectionDef> = [
     render: () => <ChatSection />,
   },
   {
+    id: "moments",
+    label: "Moments",
+    icon: Rocket,
+    title: "Moments",
+    description: "Small decorative extras that live outside the onboarding flow.",
+    render: () => <MomentsSection />,
+  },
+  {
     id: "tokens",
     label: "Access Tokens",
     icon: Key,
     title: "Access Tokens",
-    description:
-      "GitHub Personal Access Tokens and Jira credentials used for source ingestion.",
+    description: "GitHub Personal Access Tokens and Jira credentials used for source ingestion.",
     render: () => <AccessTokensSection />,
   },
 ];
@@ -72,21 +80,17 @@ const PAT_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
  */
 export function SettingsPage() {
   const { profile } = useAuth();
-  const canManagePats =
-    profile !== null && PAT_ALLOWED_GROUPS.has(profile.permissionGroup);
+  const canManagePats = profile !== null && PAT_ALLOWED_GROUPS.has(profile.permissionGroup);
 
   const dino = useDinoEasterEgg();
 
   const sections = useMemo(
-    () =>
-      canManagePats
-        ? ALL_SECTIONS
-        : ALL_SECTIONS.filter((s) => s.id !== "tokens"),
+    () => (canManagePats ? ALL_SECTIONS : ALL_SECTIONS.filter((s) => s.id !== "tokens")),
     [canManagePats],
   );
 
   return (
-    <div className="h-full min-h-screen w-full bg-app-bg">
+    <div className="h-full min-h-screen w-full">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-content py-6">
           <div className="max-w-4xl">
@@ -102,15 +106,12 @@ export function SettingsPage() {
 
       <main className="app-page-content py-6 md:py-8">
         <div className="mx-auto max-w-4xl">
-          <nav
-            aria-label="Settings sections"
-            className="mb-8 flex gap-2 overflow-x-auto pb-1"
-          >
+          <nav aria-label="Settings sections" className="mb-8 flex gap-2 overflow-x-auto pb-1">
             {sections.map(({ id, label, icon: Icon }) => (
               <a
                 key={id}
                 href={`#${id}`}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
               >
                 <Icon className="h-4 w-4" aria-hidden />
                 {label}
@@ -138,7 +139,7 @@ export function SettingsPage() {
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 rounded-full bg-app-brand px-4 py-2 text-sm font-medium text-white shadow-lg"
+          className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-app-brand px-4 py-2 text-sm font-medium text-white shadow-lg"
         >
           {dino.toast}
         </div>

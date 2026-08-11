@@ -1,13 +1,6 @@
-import { motion } from "framer-motion";
 import { RotateCcw } from "lucide-react";
-import {
-  buttonHoverMotion,
-  buttonHoverMotionDisabled,
-} from "../../../styles/tokens.ts";
-import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "../../../components/ui/FilterSelect.tsx";
+import { Button } from "../../../components/ui/Button.tsx";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import type { IngestionRunStatus } from "../types.ts";
 
 /** `"ALL"` means "no status filter", i.e. the query param is omitted. */
@@ -64,18 +57,11 @@ export function RunHistoryFilters({
 
   const sourceOptions: FilterSelectOption<string>[] = [
     { value: "ALL", label: "All sources" },
-    ...sources.map((source) => ({
-      value: source.value,
-      label: source.label,
-    })),
+    ...sources.map((source) => ({ value: source.value, label: source.label })),
   ];
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      role="group"
-      aria-label="Filter runs"
-    >
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter runs">
       <FilterSelect
         label="Filter runs by status"
         value={status}
@@ -97,16 +83,16 @@ export function RunHistoryFilters({
       )}
 
       {hasActiveFilter && (
-        <motion.button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onReset}
           disabled={disabled}
-          {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-transparent px-2.5 text-sm font-medium text-app-brand-text transition-colors hover:border-app-brand-border hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+          icon={<RotateCcw className="h-3.5 w-3.5" />}
+          className="text-app-brand-text"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
           Reset
-        </motion.button>
+        </Button>
       )}
     </div>
   );
