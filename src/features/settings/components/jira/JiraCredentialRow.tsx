@@ -129,8 +129,8 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-semibold text-app-text">{displayName}</p>
-          <p className="break-words text-xs text-app-text-muted">{userEmail}</p>
+          <p className="text-sm font-semibold break-words text-app-text">{displayName}</p>
+          <p className="text-xs break-words text-app-text-muted">{userEmail}</p>
         </div>
 
         {panel === "none" && (

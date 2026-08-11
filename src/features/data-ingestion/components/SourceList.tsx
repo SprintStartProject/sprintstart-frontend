@@ -96,7 +96,7 @@ export function SourceList({
                     )}
 
                     {source.jiraInstance?.instanceUrl && (
-                      <p className="mt-0.5 break-words text-xs text-app-text-subtle">
+                      <p className="mt-0.5 text-xs break-words text-app-text-subtle">
                         {formatJiraInstanceDomain(source.jiraInstance.instanceUrl)}
                       </p>
                     )}
