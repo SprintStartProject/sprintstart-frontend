@@ -6,18 +6,22 @@ import type { IngestionRunStatus } from "../types.ts";
 /** `"ALL"` means "no status filter", i.e. the query param is omitted. */
 export type RunStatusFilter = IngestionRunStatus | "ALL";
 
-export type RunRepositoryOption = {
-  repositoryId: string;
+/**
+ * One selectable source in the run filter. `value` is a GitHub repository id or
+ * a Jira instance URL; the parent decides which query param it maps to.
+ */
+export type RunSourceOption = {
+  value: string;
   label: string;
 };
 
 type RunHistoryFiltersProps = {
   status: RunStatusFilter;
-  /** A repository id, or `"ALL"` for every repository in the project. */
-  repositoryId: string;
-  repositories: RunRepositoryOption[];
+  /** A source `value`, or `"ALL"` for every source in the project. */
+  sourceValue: string;
+  sources: RunSourceOption[];
   onStatusChange: (status: RunStatusFilter) => void;
-  onRepositoryChange: (repositoryId: string) => void;
+  onSourceChange: (value: string) => void;
   onReset: () => void;
   disabled?: boolean;
 };
@@ -42,21 +46,18 @@ const STATUS_OPTIONS: FilterSelectOption<RunStatusFilter>[] = [
  */
 export function RunHistoryFilters({
   status,
-  repositoryId,
-  repositories,
+  sourceValue,
+  sources,
   onStatusChange,
-  onRepositoryChange,
+  onSourceChange,
   onReset,
   disabled = false,
 }: RunHistoryFiltersProps) {
-  const hasActiveFilter = status !== "ALL" || repositoryId !== "ALL";
+  const hasActiveFilter = status !== "ALL" || sourceValue !== "ALL";
 
-  const repositoryOptions: FilterSelectOption<string>[] = [
-    { value: "ALL", label: "All repositories" },
-    ...repositories.map((repository) => ({
-      value: repository.repositoryId,
-      label: repository.label,
-    })),
+  const sourceOptions: FilterSelectOption<string>[] = [
+    { value: "ALL", label: "All sources" },
+    ...sources.map((source) => ({ value: source.value, label: source.label })),
   ];
 
   return (
@@ -70,12 +71,12 @@ export function RunHistoryFilters({
         className="w-40"
       />
 
-      {repositories.length > 1 && (
+      {sources.length > 1 && (
         <FilterSelect
-          label="Filter runs by repository"
-          value={repositoryId}
-          options={repositoryOptions}
-          onChange={onRepositoryChange}
+          label="Filter runs by source"
+          value={sourceValue}
+          options={sourceOptions}
+          onChange={onSourceChange}
           disabled={disabled}
           className="w-52"
         />

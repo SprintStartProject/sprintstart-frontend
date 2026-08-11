@@ -41,6 +41,56 @@ describe("RunDetailsPanel", () => {
     expect(screen.getByText("Indexed into AI")).toBeInTheDocument();
   });
 
+  it("names the source system in the fetch stage for a Jira run", () => {
+    render(
+      <RunDetailsPanel
+        run={makeRun({ sourceSystem: "JIRA" })}
+        sourceLabel="My Jira"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Fetched from Jira")).toBeInTheDocument();
+    expect(screen.queryByText("Fetched from GitHub")).not.toBeInTheDocument();
+  });
+
+  it("shows the GitHub owner in the timing section", () => {
+    render(
+      <RunDetailsPanel
+        run={makeRun({ sourceSystem: "GITHUB", sourceId: "acme/widgets", owner: "acme" })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+  });
+
+  it("derives the GitHub owner from the sourceId when owner is absent", () => {
+    render(
+      <RunDetailsPanel
+        run={makeRun({ sourceSystem: "GITHUB", sourceId: "acme/widgets", owner: null })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+  });
+
+  it("shows the Jira instance domain in the timing section", () => {
+    render(
+      <RunDetailsPanel
+        run={makeRun({ sourceSystem: "JIRA", sourceId: "https://acme.atlassian.net", owner: null })}
+        sourceLabel="My Jira"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Domain")).toBeInTheDocument();
+    expect(screen.getByText("acme.atlassian.net")).toBeInTheDocument();
+  });
+
   it("lists failed items", () => {
     render(<RunDetailsPanel run={makeRun()} onClose={vi.fn()} />);
 

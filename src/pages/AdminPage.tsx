@@ -530,7 +530,11 @@ export function AdminPage() {
                   />
                 </>
               ) : (
-                <TokensTab tokenNames={tokenNames} onRefresh={() => void loadTokenNames()} />
+                <TokensTab
+                  tokenNames={tokenNames}
+                  onRefresh={() => void loadTokenNames()}
+                  userEmail={profile?.email ?? null}
+                />
               )}
             </SlidingTabPanel>
           )}

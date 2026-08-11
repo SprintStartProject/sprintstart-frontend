@@ -13,7 +13,6 @@ function renderModal(overrides: Partial<Parameters<typeof AddSourceModal>[0]> = 
     canIngest: true,
     onClose: vi.fn(),
     onConnected: vi.fn(),
-    onSwitchToSingleRepo: vi.fn(),
     ...overrides,
   };
   render(<AddSourceModal {...props} />);
@@ -23,7 +22,11 @@ function renderModal(overrides: Partial<Parameters<typeof AddSourceModal>[0]> = 
 const discoveryHandler = http.get("/api/v1/github/discover/org/:org", () =>
   HttpResponse.json({
     repositories: [
-      { name: "repo-a", private: false, html_url: "https://github.com/acme/repo-a" },
+      {
+        name: "repo-a",
+        private: false,
+        html_url: "https://github.com/acme/repo-a",
+      },
       {
         name: "repo-connected",
         private: true,
@@ -64,9 +67,15 @@ function sourceStatusHandler({ inThisProject = [] as string[] } = {}) {
   });
 }
 
-/** Advances the wizard from the source-type step into the GitHub discovery step. */
+/** Advances the wizard from the source-type step into the detail step. */
 async function gotoGithubStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /continue/i }));
+}
+
+function jiraCredentialsHandler(names: string[], email = "me@corp.com") {
+  return http.get("/api/v1/jira/credentials", () =>
+    HttpResponse.json(names.map((displayName) => ({ userEmail: email, displayName }))),
+  );
 }
 
 describe("AddSourceModal", () => {
@@ -81,14 +90,81 @@ describe("AddSourceModal", () => {
     expect(screen.getByRole("button", { name: /upload/i })).toBeInTheDocument();
   });
 
-  it("shows a coming-soon panel for a not-yet-available type", async () => {
+  it("shows the Jira connect form on the Jira step", async () => {
+    server.use(jiraCredentialsHandler(["default"]));
     const user = userEvent.setup();
     renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
     await gotoGithubStep(user);
 
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    expect(screen.getByTestId("jira-display-name")).toBeInTheDocument();
+    expect(screen.getByTestId("jira-instance-url")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("jira-credential")).getByRole("option", {
+          name: "default - me@corp.com",
+        }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("connects a Jira instance with the right body and reports success", async () => {
+    let capturedBody: unknown = null;
+    server.use(
+      jiraCredentialsHandler(["default"]),
+      http.post("/api/v1/jira/connect", async ({ request }) => {
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 202 });
+      }),
+    );
+
+    const user = userEvent.setup();
+    const props = renderModal();
+
+    await user.click(screen.getByRole("button", { name: /jira/i }));
+    await gotoGithubStep(user);
+
+    await user.type(screen.getByTestId("jira-display-name"), "Team board");
+    await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
+
+    // Wait for the credential to load and default-select.
+    await waitFor(() => expect(screen.getByTestId("jira-credential")).toHaveValue("default"));
+
+    await user.click(screen.getByRole("button", { name: /connect jira instance/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+    expect(props.onClose).toHaveBeenCalled();
+    expect(capturedBody).toEqual({
+      displayName: "Team board",
+      url: "https://acme.atlassian.net",
+      userEmail: "me@corp.com",
+      tokenName: "default",
+      projectId: "project-1",
+    });
+  });
+
+  it("surfaces a 502 as an unreachable-server message", async () => {
+    server.use(
+      jiraCredentialsHandler(["default"]),
+      http.post("/api/v1/jira/connect", () =>
+        HttpResponse.json({ message: "bad gateway" }, { status: 502 }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByRole("button", { name: /jira/i }));
+    await gotoGithubStep(user);
+
+    await user.type(screen.getByTestId("jira-display-name"), "Team board");
+    await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
+    await waitFor(() => expect(screen.getByTestId("jira-credential")).toHaveValue("default"));
+
+    await user.click(screen.getByRole("button", { name: /connect jira instance/i }));
+
+    expect(await screen.findByText(/Jira server could not be reached/i)).toBeInTheDocument();
   });
 
   it("lets an already-ingested repository be selected for linking", async () => {
@@ -210,7 +286,9 @@ describe("AddSourceModal", () => {
       discoveryHandler,
       http.post("/api/v1/github/connect/all", async ({ request }) => {
         capturedBody = await request.json();
-        return HttpResponse.json({ transactionIdsByRepositoryId: { "acme/repo-a": "txn-a" } });
+        return HttpResponse.json({
+          transactionIdsByRepositoryId: { "acme/repo-a": "txn-a" },
+        });
       }),
     );
 
@@ -230,7 +308,12 @@ describe("AddSourceModal", () => {
     expect(props.onClose).toHaveBeenCalled();
     expect(capturedBody).toEqual({
       repositories: [
-        { owner: "acme", name: "repo-a", tokenName: "default", projectId: "project-1" },
+        {
+          owner: "acme",
+          name: "repo-a",
+          tokenName: "default",
+          projectId: "project-1",
+        },
       ],
     });
   });

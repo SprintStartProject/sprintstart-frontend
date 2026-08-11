@@ -134,7 +134,15 @@ export function GithubRepositoryDiscovery({
       ]);
 
       setRepositoryIdsByFullName(
-        new Map(allConnected.map((status) => [status.sourceId.toLowerCase(), status.repositoryId])),
+        new Map(
+          // Only GitHub rows carry a repositoryId; connector-neutral rows (Jira)
+          // have none and are not link-by-repository candidates here.
+          allConnected.flatMap((status) =>
+            status.repositoryId
+              ? ([[status.sourceId.toLowerCase(), status.repositoryId]] as [string, string][])
+              : [],
+          ),
+        ),
       );
       setProjectFullNames(
         new Set(connectedToProject.map((status) => status.sourceId.toLowerCase())),

@@ -4,6 +4,9 @@ import {
   SOURCE_META,
   INGESTION_RUN_LIMIT,
   DETAILS_RUN_LIMIT,
+  createJiraSourceFromInstance,
+  deriveConnectionStatus,
+  deriveSyncStatus,
   getSourceStatus,
   getSourceStatusLabel,
   getRunStatusLabel,
@@ -14,7 +17,12 @@ import {
   formatRunFinishedAt,
   formatNumber,
 } from "../../../../src/features/data-ingestion/data";
-import type { IngestionRunStatus } from "../../../../src/features/data-ingestion/types";
+import type {
+  ConnectionStatus,
+  IngestionRunStatus,
+  SourceInstanceIngestionStatus,
+} from "../../../../src/features/data-ingestion/types";
+import type { JiraInstanceDto } from "../../../../src/services/sources/jiraService";
 
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
@@ -197,5 +205,175 @@ describe("data-ingestion data helpers", () => {
         expect(getRunStatusLabel(status)).toBeTruthy();
       });
     }
+  });
+
+  describe("createJiraSourceFromInstance", () => {
+    const status = (
+      overrides: Partial<SourceInstanceIngestionStatus> = {},
+    ): SourceInstanceIngestionStatus => ({
+      sourceSystem: "JIRA",
+      sourceId: "https://acme.atlassian.net",
+      displayName: "Team board",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://acme.atlassian.net",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-28T10:00:00Z",
+      ingestedCount: 42,
+      updatedCount: 3,
+      deletedCount: 1,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 128,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: "2026-07-28T10:00:00Z",
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
+
+    const instance = (overrides: Partial<JiraInstanceDto> = {}): JiraInstanceDto => ({
+      instanceUrl: "https://acme.atlassian.net",
+      displayName: "Team board",
+      lastUpdate: "2026-07-28T10:00:00Z",
+      projectIds: ["p1"],
+      sourceEnabled: true,
+      status: "UP_TO_DATE",
+      updateCredentialName: "default",
+      updateCredentialUserEmail: "jira@corp.com",
+      ...overrides,
+    });
+
+    const cases: ConnectionStatus[] = ["CONNECTED", "UPDATING", "OUT_OF_DATE", "FAILED"];
+
+    for (const connectionStatus of cases) {
+      it(`carries the ${connectionStatus} connection status`, () => {
+        const source = createJiraSourceFromInstance(status({ connectionStatus }));
+        expect(source.backendStatus).toBe(connectionStatus);
+      });
+    }
+
+    it("overrides the status with DISABLED when the source is disabled", () => {
+      const source = createJiraSourceFromInstance(
+        status({ connectionStatus: "CONNECTED", enabled: false }),
+      );
+      expect(source.backendStatus).toBe("DISABLED");
+      expect(source.statusView.state).toBe("disabled");
+    });
+
+    it("carries the instance identity and merged credential in jiraInstance, not githubRepository", () => {
+      const source = createJiraSourceFromInstance(status(), instance());
+      expect(source.sourceSystem).toBe("JIRA");
+      expect(source.sourceId).toBe("https://acme.atlassian.net");
+      expect(source.name).toBe("Team board");
+      expect(source.githubRepository).toBeNull();
+      expect(source.jiraInstance).toEqual({
+        instanceUrl: "https://acme.atlassian.net",
+        displayName: "Team board",
+        credentialName: "default",
+        credentialUserEmail: "jira@corp.com",
+      });
+    });
+
+    it("takes counters and the real artifact total from the status row", () => {
+      const source = createJiraSourceFromInstance(status(), instance());
+      expect(source.artifacts).toBe(128);
+      expect(source.latestIngestedCount).toBe(42);
+      expect(source.latestUpdatedCount).toBe(3);
+      expect(source.deletedCount).toBe(1);
+      // The status row's artifactCount is the real stored total, no longer the
+      // last run's ingested count.
+      expect(source.totalArtifactCount).toBe(128);
+    });
+
+    it("still renders with empty credentials when no instance DTO is matched", () => {
+      const source = createJiraSourceFromInstance(status());
+      expect(source.artifacts).toBe(128);
+      expect(source.jiraInstance).toEqual({
+        instanceUrl: "https://acme.atlassian.net",
+        displayName: "Team board",
+        credentialName: "",
+        credentialUserEmail: "",
+      });
+    });
+
+    it("reports never-synced when the status row has no last run", () => {
+      const source = createJiraSourceFromInstance(status({ lastRunTime: null }));
+      expect(source.statusView.state).toBe("attention");
+      expect(source.lastRunAt).toBeNull();
+    });
+    it("shows a synced badge after a successful Jira sync", () => {
+      const source = createJiraSourceFromInstance(status());
+
+      expect(source.ingestionStatusLabel).toBe("Synced");
+    });
+
+    it("surfaces a disabled Jira connector while preserving the synced badge", () => {
+      const source = createJiraSourceFromInstance(status(), instance(), false);
+
+      expect(source.statusView.label).toBe("Connector disabled");
+      expect(source.ingestionStatusLabel).toBe("Synced");
+    });
+  });
+
+  describe("deriveConnectionStatus / deriveSyncStatus", () => {
+    const jiraStatus = (
+      overrides: Partial<SourceInstanceIngestionStatus> = {},
+    ): SourceInstanceIngestionStatus => ({
+      sourceSystem: "JIRA",
+      sourceId: "https://acme.atlassian.net",
+      displayName: "Team board",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://acme.atlassian.net",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-28T10:00:00Z",
+      ingestedCount: 42,
+      updatedCount: 3,
+      deletedCount: 1,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 128,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: "2026-07-28T10:00:00Z",
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
+
+    it("shows Connected next to a spinning Syncing badge while a sync runs", () => {
+      const source = createJiraSourceFromInstance(jiraStatus({ connectionStatus: "UPDATING" }));
+
+      const connection = deriveConnectionStatus(source);
+      const sync = deriveSyncStatus(source);
+
+      expect(connection.label).toBe("Connected");
+      expect(connection.spinning).toBe(false);
+      expect(sync.label).toBe("Syncing");
+      expect(sync.spinning).toBe(true);
+    });
+
+    it("shows Connected next to Synced when healthy and idle", () => {
+      const source = createJiraSourceFromInstance(jiraStatus());
+
+      expect(deriveConnectionStatus(source).label).toBe("Connected");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
+    });
+
+    it("shows Disabled while keeping the last sync freshness", () => {
+      const source = createJiraSourceFromInstance(jiraStatus({ enabled: false }));
+
+      expect(deriveConnectionStatus(source).state).toBe("disabled");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
+    });
+
+    it("shows Connected next to Not synced before the first run", () => {
+      const source = createJiraSourceFromInstance(jiraStatus({ lastRunTime: null }));
+
+      expect(deriveConnectionStatus(source).label).toBe("Connected");
+      expect(deriveSyncStatus(source).label).toBe("Not synced");
+    });
   });
 });

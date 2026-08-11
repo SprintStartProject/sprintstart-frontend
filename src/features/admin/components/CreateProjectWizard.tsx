@@ -7,11 +7,13 @@ import { Modal } from "../../../components/ui/Modal";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { Stepper } from "../../../components/ui/Stepper";
+import { ApiError } from "../../../services/apiClient";
 import {
   projectService,
   type AdminProjectDetails,
   type ProjectManager,
 } from "../../../services/projectService";
+import { connectJiraInstance } from "../../../services/sources/jiraService";
 import {
   connectDraftSources,
   createDraftSourceFromDiscovery,
@@ -23,8 +25,12 @@ import {
   GithubRepositoryDiscovery,
   type DiscoverySelection,
 } from "../../data-ingestion/components/GithubRepositoryDiscovery";
-import { ComingSoonStep, SourceTypeStep } from "../../data-ingestion/components/SourceTypeStep";
+import { JiraConnectStep } from "../../data-ingestion/components/JiraConnectStep";
+import { SourceTypeStep } from "../../data-ingestion/components/SourceTypeStep";
+import { SOURCE_SYSTEMS } from "../../data-ingestion/data";
 import type { SourceSystem } from "../../data-ingestion/types";
+import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
+import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel";
 import { MemberPicker } from "./MemberPicker";
 import { StagedSourceList } from "./StagedSourceList";
 import { toggleSelectedUserId, toggleVisibleUserSelection } from "../data";
@@ -58,12 +64,15 @@ type SourceStep = "type" | "detail";
  * than typing a name, and putting both on one screen made the first step long
  * enough to scroll.
  *
- * The project is created when the wizard finishes, not when a step is left, so
- * cancelling out later leaves nothing behind. Sources are connected one by
- * one afterwards against the new project id; because creation and connecting
- * are separate backend calls, a source failure cannot roll the project back —
- * the wizard therefore stays open on a partial failure and offers a retry
- * rather than pretending the whole operation failed.
+ * The project is created no earlier than the type-specific "connect" action, so
+ * cancelling out of the wizard before then leaves nothing behind. Which action
+ * that is depends on the connector: GitHub stages the selected repositories and
+ * connects them on finish; Jira creates the project and connects the instance in
+ * one step; Upload has to attach files to a live project, so it creates the
+ * project explicitly first and then reveals the drop zone. Because creation and
+ * connecting are separate backend calls, a source failure cannot roll the
+ * project back — the wizard therefore stays open on a partial failure and offers
+ * a retry rather than pretending the whole operation failed.
  */
 export function CreateProjectWizard({
   isOpen,
@@ -87,20 +96,38 @@ export function CreateProjectWizard({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState("");
 
-  // Source type chosen on step 2. Only GitHub can be connected during creation;
-  // Jira is coming soon and uploads need the project to already exist.
+  // Source type chosen on step 2. All three connectors are now wired: GitHub
+  // stages repositories, Jira connects an instance, Upload attaches files.
   const [selectedType, setSelectedType] = useState<SourceSystem>("GITHUB");
   // The resolved multi-select from the GitHub discovery picker, staged until the
   // project is created and the repositories are connected against it.
   const [selection, setSelection] = useState<DiscoverySelection[]>([]);
   const [tokenName, setTokenName] = useState(tokenNames[0] ?? "");
 
+  // --- Jira connect form ---
+  const [jiraDisplayName, setJiraDisplayName] = useState("");
+  const [jiraUrl, setJiraUrl] = useState("");
+  const [jiraCredentialName, setJiraCredentialName] = useState("");
+
   const [sources, setSources] = useState<DraftSource[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Locks Back/Cancel while an upload batch is in flight.
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [submitError, setSubmitError] = useState("");
   // Set once the project exists, so a retry after a partial failure connects
   // the remaining sources instead of creating a second project.
   const [createdProjectId, setCreatedProjectId] = useState("");
+
+  const isGithub = selectedType === "GITHUB";
+  const isJira = selectedType === "JIRA";
+  const isUpload = selectedType === "UPLOAD";
+
+  const {
+    credentials: jiraCredentials,
+    loaded: jiraCredentialsLoaded,
+    error: jiraCredentialsError,
+    isRefreshing: jiraCredentialsLoading,
+  } = useJiraCredentials(isOpen && isJira);
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -113,6 +140,21 @@ export function CreateProjectWizard({
       );
     });
   }, [tokenNames]);
+
+  // Same adoption pattern for the Jira credential picker: select the first
+  // stored credential once the list arrives, keeping a still-valid choice.
+  useEffect(() => {
+    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
+
+    void Promise.resolve().then(() => {
+      setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+    });
+  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
@@ -146,20 +188,24 @@ export function CreateProjectWizard({
     setSelectedUserIds(new Set());
     setSelectedType("GITHUB");
     setSelection([]);
+    setJiraDisplayName("");
+    setJiraUrl("");
+    setJiraCredentialName("");
     setSources([]);
     setSubmitError("");
     setCreatedProjectId("");
   };
 
-  // Only GitHub stages a selection; leaving it clears the staged repositories so
-  // the footer count and "coming soon" panels stay consistent.
+  // Switching type clears the state that belongs to the previous connector so
+  // the footer count and each step stay consistent with the current choice.
   const handleSelectType = (type: SourceSystem) => {
     setSelectedType(type);
+    setSubmitError("");
     if (type !== "GITHUB") setSelection([]);
   };
 
   const closeWizard = () => {
-    if (isSubmitting) return;
+    if (isSubmitting || isUploadingFiles) return;
 
     resetWizard();
     onClose();
@@ -300,6 +346,98 @@ export function CreateProjectWizard({
   // stays on the last step, which is where the repositories were being
   // connected.
   const stepIndex = isDetailsStep ? 0 : isPeopleStep ? 1 : isTypeStep ? 2 : 3;
+  const isBusy = isSubmitting || isUploadingFiles;
+  /**
+   * Creates the project and connects one Jira instance to it. The connect
+   * endpoint returns 202 with an empty body (progress surfaces through the
+   * ingestion-run history), so on success we just close. If the project was
+   * created but the connect failed, `createdProjectId` keeps the wizard on a
+   * retry that reuses the same project instead of creating another.
+   */
+  const finishJira = async () => {
+    if (!isNameValid) return;
+
+    const displayName = jiraDisplayName.trim();
+    const url = jiraUrl.trim();
+    const credentialName = jiraCredentialName.trim();
+
+    if (!displayName) {
+      setSubmitError("Enter a display name for the Jira instance.");
+      return;
+    }
+
+    if (!url) {
+      setSubmitError("Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).");
+      return;
+    }
+
+    if (!credentialName) {
+      setSubmitError("Select a stored Jira credential.");
+      return;
+    }
+
+    const selectedCredential = jiraCredentials.find(
+      (credential) => credential.displayName === credentialName,
+    );
+    if (!selectedCredential) {
+      setSubmitError("The selected Jira credential is no longer available.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const projectId = await ensureProject();
+
+      await connectJiraInstance({
+        displayName,
+        url,
+        userEmail: selectedCredential.userEmail,
+        tokenName: selectedCredential.displayName,
+        projectId,
+      });
+
+      resetWizard();
+      onClose();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        setSubmitError(
+          "The Jira instance or credential could not be found. Check the URL and the selected credential.",
+        );
+      } else if (error instanceof ApiError && error.status === 502) {
+        setSubmitError(
+          "The Jira server could not be reached. Check the instance URL and try again.",
+        );
+      } else {
+        setSubmitError(
+          error instanceof Error ? error.message : "The Jira instance could not be connected.",
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Creates the project so files can be attached to it. Uploads go to a live
+   * project id, so unlike the staged connectors the project must exist before
+   * the drop zone is usable.
+   */
+  const createProjectForUpload = async () => {
+    if (!isNameValid) return;
+
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      await ensureProject();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Project could not be created.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Modal
@@ -309,7 +447,7 @@ export function CreateProjectWizard({
         <Stepper steps={["Details", "People", "Source type", "Connect"]} current={stepIndex} />
       }
       size="xl"
-      isDismissDisabled={isSubmitting}
+      isDismissDisabled={isBusy}
       onClose={closeWizard}
       closeLabel="Close new project wizard"
       footer={
@@ -317,15 +455,20 @@ export function CreateProjectWizard({
           <Button
             variant="secondary"
             onClick={
-              isDetailsStep || isProjectCreated
+              isDetailsStep
                 ? closeWizard
-                : isDetailStep
-                  ? () => setSourceStep("type")
-                  : isPeopleStep
-                    ? () => setStep("details")
-                    : () => setStep("people")
+                : isProjectCreated
+                  ? closeWizard
+                  : isDetailStep
+                    ? () => {
+                        setSubmitError("");
+                        setSourceStep("type");
+                      }
+                    : isPeopleStep
+                      ? () => setStep("details")
+                      : () => setStep("people")
             }
-            disabled={isSubmitting}
+            disabled={isBusy}
             icon={isDetailsStep || isProjectCreated ? undefined : <ArrowLeft className="h-4 w-4" />}
           >
             {isDetailsStep ? "Cancel" : isProjectCreated ? "Done" : "Back"}
@@ -354,6 +497,26 @@ export function CreateProjectWizard({
             >
               Continue
             </Button>
+          ) : isJira ? (
+            <Button
+              variant="primary"
+              onClick={() => void finishJira()}
+              loading={isSubmitting}
+              icon={<Check className="h-4 w-4" />}
+            >
+              {isProjectCreated ? "Retry Jira connection" : "Create and connect Jira instance"}
+            </Button>
+          ) : isUpload ? (
+            !isProjectCreated ? (
+              <Button
+                variant="primary"
+                onClick={() => void createProjectForUpload()}
+                loading={isSubmitting}
+                icon={<Check className="h-4 w-4" />}
+              >
+                Create project
+              </Button>
+            ) : null
           ) : !isProjectCreated || hasFailures ? (
             <Button
               variant="primary"
@@ -460,7 +623,7 @@ export function CreateProjectWizard({
             }
           />
         </form>
-      ) : isProjectCreated ? (
+      ) : isProjectCreated && isGithub ? (
         // The project exists (e.g. after a partial failure): show the connect
         // outcome per repository with retry/remove instead of the picker.
         <StagedSourceList
@@ -475,22 +638,57 @@ export function CreateProjectWizard({
           onSelectType={handleSelectType}
           heading="Start data ingestion"
           description="Connect a data source to this project now, or skip for now and add sources later from its Data Ingestion page."
+          availableTypes={SOURCE_SYSTEMS}
         />
-      ) : selectedType === "GITHUB" ? (
-        <GithubRepositoryDiscovery
-          tokenNames={tokenNames}
-          projectId={null}
-          tokenName={tokenName}
-          onTokenNameChange={setTokenName}
-          onSelectionChange={setSelection}
-          isConnecting={isSubmitting}
+      ) : isGithub ? (
+        isProjectCreated ? (
+          // The project exists (e.g. after a partial failure): show the connect
+          // outcome per repository with retry/remove instead of the picker.
+          <StagedSourceList
+            sources={sources}
+            disabled={isSubmitting}
+            onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
+            onRetry={(sourceId) => void retrySource(sourceId)}
+          />
+        ) : (
+          <GithubRepositoryDiscovery
+            tokenNames={tokenNames}
+            projectId={null}
+            tokenName={tokenName}
+            onTokenNameChange={setTokenName}
+            onSelectionChange={setSelection}
+            isConnecting={isSubmitting}
+          />
+        )
+      ) : isJira ? (
+        <JiraConnectStep
+          displayName={jiraDisplayName}
+          url={jiraUrl}
+          credentialName={jiraCredentialName}
+          credentials={jiraCredentials}
+          credentialsLoaded={jiraCredentialsLoaded}
+          credentialsLoading={jiraCredentialsLoading}
+          credentialsError={jiraCredentialsError}
+          isBusy={isSubmitting}
+          canIngest
+          errorMessage={null}
+          onDisplayNameChange={setJiraDisplayName}
+          onUrlChange={setJiraUrl}
+          onCredentialNameChange={setJiraCredentialName}
+          onSubmit={() => void finishJira()}
         />
-      ) : selectedType === "JIRA" ? (
-        <ComingSoonStep sourceSystem="JIRA" />
+      ) : createdProjectId ? (
+        <UploadArtifactPanel
+          projectId={createdProjectId}
+          onUploadSuccess={() => {}}
+          onFinished={closeWizard}
+          onUploadingChange={setIsUploadingFiles}
+        />
       ) : (
-        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Files can be uploaded once the project exists. Create the project first, then add uploads
-          from its Data Ingestion page.
+        <div className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-relaxed text-app-text-muted">
+          Uploaded files attach to the project, so the project is created first. Choose{" "}
+          <span className="font-medium text-app-text">Create project</span> to add files now — you
+          can connect more sources afterwards from its Data Ingestion page.
         </div>
       )}
     </Modal>

@@ -1,24 +1,28 @@
-import { AlertTriangle, ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { Stepper } from "../../../components/ui/Stepper.tsx";
+import { ApiError } from "../../../services/apiClient.ts";
 import {
   addRepositoryToProject,
   connectGithubRepository,
   connectRepositories,
 } from "../../../services/sources/githubService.ts";
 import { parseGithubRepositoryInput } from "../../../services/sources/githubRepositoryInput.ts";
+import { connectJiraInstance } from "../../../services/sources/jiraService.ts";
+import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
 import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel.tsx";
-import { SOURCE_META } from "../data.ts";
+import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import {
   GithubRepositoryDiscovery,
   type DiscoverySelection,
 } from "./GithubRepositoryDiscovery.tsx";
-import { ComingSoonStep, SourceTypeStep } from "./SourceTypeStep.tsx";
+import { JiraConnectStep } from "./JiraConnectStep.tsx";
+import { SourceTypeStep } from "./SourceTypeStep.tsx";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -39,8 +43,9 @@ type WizardStep = "type" | "detail";
  * Two-step "Add sources" wizard. Step one picks the source type (GitHub, Jira,
  * Upload); step two shows the type-specific flow — GitHub opens the org/user
  * repository discovery (searchable, paginated, multi-select, with a single-repo
- * fallback), while not-yet-available types show a "coming soon" panel. This
- * keeps the familiar source-type choice while making discovery the GitHub path.
+ * fallback), Jira enters one instance directly (no discovery endpoint) and picks
+ * a stored credential, and Upload adds documents. This keeps the familiar
+ * source-type choice while giving each connector its own connect path.
  */
 export function AddSourceModal({
   projectId,
@@ -87,7 +92,33 @@ export function AddSourceModal({
   const [connectError, setConnectError] = useState<string | null>(null);
 
   const isGithub = selectedType === "GITHUB";
+  const isJira = selectedType === "JIRA";
   const selectedCount = selection.length;
+
+  // --- Jira connect state ---
+  const [jiraDisplayName, setJiraDisplayName] = useState("");
+  const [jiraUrl, setJiraUrl] = useState("");
+  const [jiraCredentialName, setJiraCredentialName] = useState("");
+
+  const {
+    credentials: jiraCredentials,
+    loaded: jiraCredentialsLoaded,
+    error: jiraCredentialsError,
+    isRefreshing: jiraCredentialsLoading,
+  } = useJiraCredentials(isJira);
+
+  useEffect(() => {
+    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
+
+    void Promise.resolve().then(() => {
+      setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+    });
+  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
   const handleConnect = async () => {
     if (!projectId) {
@@ -209,6 +240,92 @@ export function AddSourceModal({
     }
   };
 
+  /**
+   * Connects one Jira instance. The connect endpoint returns 202 with an empty
+   * body (no transaction id) — progress surfaces through the ingestion-run
+   * history — so on success we just fire `onConnected` (starts polling) and
+   * close. 404/502 get their own messages (missing instance/credential vs.
+   * Jira unreachable).
+   */
+  const handleConnectJira = async () => {
+    if (!projectId) {
+      setConnectState("error");
+      setConnectError("Select a project before connecting a Jira instance.");
+      return;
+    }
+
+    if (!canIngest) {
+      setConnectState("error");
+      setConnectError(
+        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
+      );
+      return;
+    }
+
+    const displayName = jiraDisplayName.trim();
+    const url = jiraUrl.trim();
+    const tokenName = jiraCredentialName.trim();
+
+    if (!displayName) {
+      setConnectState("error");
+      setConnectError("Enter a display name for the Jira instance.");
+      return;
+    }
+
+    if (!url) {
+      setConnectState("error");
+      setConnectError("Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).");
+      return;
+    }
+
+    if (!tokenName) {
+      setConnectState("error");
+      setConnectError("Select a stored Jira credential.");
+      return;
+    }
+
+    const selectedCredential = jiraCredentials.find(
+      (credential) => credential.displayName === tokenName,
+    );
+    if (!selectedCredential) {
+      setConnectState("error");
+      setConnectError("The selected Jira credential is no longer available.");
+      return;
+    }
+    setConnectState("loading");
+    setConnectError(null);
+
+    try {
+      await connectJiraInstance({
+        displayName,
+        url,
+        userEmail: selectedCredential.userEmail,
+        tokenName: selectedCredential.displayName,
+        projectId,
+      });
+
+      setConnectState("idle");
+      onConnected();
+      onClose();
+    } catch (error) {
+      setConnectState("error");
+
+      if (error instanceof ApiError && error.status === 404) {
+        setConnectError(
+          "The Jira instance or credential could not be found. Check the URL and the selected credential.",
+        );
+      } else if (error instanceof ApiError && error.status === 502) {
+        setConnectError(
+          "The Jira server could not be reached. Check the instance URL and try again.",
+        );
+      } else {
+        setConnectError(
+          error instanceof Error ? error.message : "The Jira instance could not be connected.",
+        );
+      }
+    }
+  };
+
   const modalTitle =
     step === "type"
       ? "Add a data source"
@@ -321,12 +438,28 @@ export function AddSourceModal({
                     )}
               </Button>
             )}
+
+            {isJira && (
+              <button
+                type="button"
+                onClick={() => void handleConnectJira()}
+                disabled={connectState === "loading" || !canIngest}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {connectState === "loading" && <Loader2 className="h-4 w-4 animate-spin" />}
+                {connectState === "loading" ? "Connecting…" : "Connect Jira instance"}
+              </button>
+            )}
           </>
         )
       }
     >
       {step === "type" ? (
-        <SourceTypeStep selectedType={selectedType} onSelectType={setSelectedType} />
+        <SourceTypeStep
+          selectedType={selectedType}
+          onSelectType={setSelectedType}
+          availableTypes={SOURCE_SYSTEMS}
+        />
       ) : isUpload ? (
         projectId ? (
           <UploadArtifactPanel
@@ -375,7 +508,23 @@ export function AddSourceModal({
           />
         </div>
       ) : (
-        <ComingSoonStep sourceSystem={selectedType} />
+        <JiraConnectStep
+          displayName={jiraDisplayName}
+          url={jiraUrl}
+          credentialName={jiraCredentialName}
+          credentials={jiraCredentials}
+          credentialsLoaded={jiraCredentialsLoaded}
+          credentialsLoading={jiraCredentialsLoading}
+          credentialsError={jiraCredentialsError}
+          isBusy={connectState === "loading"}
+          canIngest={canIngest}
+          ingestBlockedReason={ingestBlockedReason}
+          errorMessage={connectError}
+          onDisplayNameChange={setJiraDisplayName}
+          onUrlChange={setJiraUrl}
+          onCredentialNameChange={setJiraCredentialName}
+          onSubmit={() => void handleConnectJira()}
+        />
       )}
     </Modal>
   );

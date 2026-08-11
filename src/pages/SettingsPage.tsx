@@ -8,7 +8,7 @@ import { SettingsSection } from "../features/settings/components/SettingsSection
 import { ProfileSection } from "../features/settings/components/ProfileSection";
 import { AppearanceSection } from "../features/settings/components/AppearanceSection";
 import { ChatSection } from "../features/settings/components/ChatSection";
-import { TokensSection } from "../features/settings/components/TokensSection";
+import { AccessTokensSection } from "../features/settings/components/AccessTokensSection";
 import { useDinoEasterEgg } from "../features/settings/hooks/useDinoEasterEgg";
 
 type SectionId = "profile" | "appearance" | "chat" | "tokens";
@@ -52,8 +52,9 @@ const ALL_SECTIONS: ReadonlyArray<SectionDef> = [
     label: "Access Tokens",
     icon: Key,
     title: "Access Tokens",
-    description: "GitHub Personal Access Tokens used for repository ingestion.",
-    render: () => <TokensSection />,
+    description:
+      "GitHub Personal Access Tokens and Jira credentials used for source ingestion.",
+    render: () => <AccessTokensSection />,
   },
 ];
 

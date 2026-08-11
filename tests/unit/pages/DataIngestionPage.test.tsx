@@ -56,6 +56,7 @@ const {
   mockGetIngestionSourceStatuses,
   mockGetUnifiedArtifacts,
   mockListConnectors,
+  mockConfigureAllGithubRepositories,
 } = vi.hoisted(() => ({
   mockGetIngestionRunsPage: vi.fn(),
   mockGetIngestionStatus: vi.fn(),
@@ -67,6 +68,7 @@ const {
   mockGetIngestionSourceStatuses: vi.fn(),
   mockGetUnifiedArtifacts: vi.fn(),
   mockListConnectors: vi.fn(),
+  mockConfigureAllGithubRepositories: vi.fn(),
 }));
 
 vi.mock("../../../src/services/ingestionService", () => ({
@@ -88,6 +90,21 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   getGithubPatNames: mockGetGithubPatNames,
   updateAllGithubRepositories: mockUpdateAllGithubRepositories,
   updateGithubRepository: mockUpdateGithubRepository,
+  configureAllGithubRepositories: mockConfigureAllGithubRepositories,
+}));
+
+const { mockGetJiraInstances, mockUpdateJiraInstance, mockConfigureAllJiraInstances } = vi.hoisted(
+  () => ({
+    mockGetJiraInstances: vi.fn(),
+    mockUpdateJiraInstance: vi.fn(),
+    mockConfigureAllJiraInstances: vi.fn(),
+  }),
+);
+
+vi.mock("../../../src/services/sources/jiraService", () => ({
+  getJiraInstances: mockGetJiraInstances,
+  updateJiraInstance: mockUpdateJiraInstance,
+  configureAllJiraInstances: mockConfigureAllJiraInstances,
 }));
 
 vi.mock("../../../src/services/connectorService", async (importOriginal) => {
@@ -124,6 +141,10 @@ describe("DataIngestionPage", () => {
       users: [],
     });
     mockGetIngestionSourceStatuses.mockResolvedValue([]);
+    mockGetJiraInstances.mockResolvedValue([]);
+    mockUpdateJiraInstance.mockResolvedValue({ transactionId: "jira-tx" });
+    mockConfigureAllGithubRepositories.mockResolvedValue(undefined);
+    mockConfigureAllJiraInstances.mockResolvedValue(undefined);
     mockGetUnifiedArtifacts.mockResolvedValue([]);
     mockListConnectors.mockResolvedValue([]);
     selectProject();
@@ -201,6 +222,220 @@ describe("DataIngestionPage", () => {
     expect(mockGetIngestionSourceStatuses).toHaveBeenCalledWith("proj1");
   });
 
+  it("builds a Jira source card from the connector-neutral status row", async () => {
+    // Jira is not a project source, so the card is driven purely by the
+    // status endpoint (health/counters/artifact total); the instance DTO is
+    // merged in only for the credential shown in the details panel.
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "JIRA",
+        sourceId: "https://team.atlassian.net",
+        displayName: "Team board",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://team.atlassian.net",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 5,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 128,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: "2026-07-01T00:00:00Z",
+        lastPullRequestsSyncAt: null,
+      },
+    ]);
+    mockGetJiraInstances.mockResolvedValue([
+      {
+        instanceUrl: "https://team.atlassian.net",
+        displayName: "Team board",
+        lastUpdate: "2026-07-01T00:00:00Z",
+        projectIds: ["proj1"],
+        sourceEnabled: true,
+        status: "UP_TO_DATE",
+        updateCredentialName: "default",
+        updateCredentialUserEmail: "jira@corp.com",
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("Team board")).length).toBeGreaterThan(0);
+
+    // The instance's real stored-artifact total (from the status row) drives
+    // the card and the overview KPI, no longer approximated from a run.
+    await waitFor(() => {
+      expect(screen.getAllByText("128").length).toBeGreaterThan(0);
+    });
+    expect(mockGetJiraInstances).toHaveBeenCalledWith("proj1");
+  });
+
+  it("does not double a Jira instance that is also exposed as a project source", async () => {
+    // The backend now exposes connected Jira instances as project sources
+    // (for the admin/project source lists), so the accessible-project list
+    // contains the instance too. Jira cards are built solely from the
+    // connector-neutral status rows, so the project source must not add a
+    // second card for the same instance.
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [
+        {
+          id: "https://team.atlassian.net",
+          name: "Team board",
+          type: "JIRA",
+          status: "CONNECTED",
+        },
+      ],
+      users: [],
+    });
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "JIRA",
+        sourceId: "https://team.atlassian.net",
+        displayName: "Team board",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://team.atlassian.net",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 5,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 128,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: "2026-07-01T00:00:00Z",
+        lastPullRequestsSyncAt: null,
+      },
+    ]);
+    mockGetJiraInstances.mockResolvedValue([
+      {
+        instanceUrl: "https://team.atlassian.net",
+        displayName: "Team board",
+        lastUpdate: "2026-07-01T00:00:00Z",
+        projectIds: ["proj1"],
+        sourceEnabled: true,
+        status: "UP_TO_DATE",
+        updateCredentialName: "default",
+        updateCredentialUserEmail: "jira@corp.com",
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    // The overview KPI counts the single connected source, not two.
+    const connectedSourcesKpi = await screen.findByRole("button", {
+      name: /connected sources/i,
+    });
+    expect(within(connectedSourcesKpi).getByText("1")).toBeInTheDocument();
+  });
+
+  it("filters the run history to a Jira instance via sourceRef", async () => {
+    // A GitHub repo (repositoryId) and a Jira instance (URL) together offer
+    // two options in the source filter, so the dropdown appears.
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "GITHUB",
+        sourceId: "octocat/hello-world",
+        displayName: "octocat/hello-world",
+        repositoryId: "repo-uuid",
+        owner: "octocat",
+        name: "hello-world",
+        sourceUrl: "https://github.com/octocat/hello-world",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 1,
+        updatedCount: 0,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 10,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      },
+      {
+        sourceSystem: "JIRA",
+        sourceId: "https://team.atlassian.net",
+        displayName: "Team board",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://team.atlassian.net",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 5,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 128,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: "2026-07-01T00:00:00Z",
+        lastPullRequestsSyncAt: null,
+      },
+    ]);
+    mockGetJiraInstances.mockResolvedValue([
+      {
+        instanceUrl: "https://team.atlassian.net",
+        displayName: "Team board",
+        lastUpdate: "2026-07-01T00:00:00Z",
+        projectIds: ["proj1"],
+        sourceEnabled: true,
+        status: "UP_TO_DATE",
+        updateCredentialName: "default",
+        updateCredentialUserEmail: "jira@corp.com",
+      },
+    ]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Filter runs by source")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(
+      screen.getByLabelText("Filter runs by source"),
+      "https://team.atlassian.net",
+    );
+
+    // The Jira instance URL is sent as sourceRef, not repositoryId.
+    await waitFor(() => {
+      expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceRef: "https://team.atlassian.net",
+          repositoryId: undefined,
+          page: 1,
+        }),
+      );
+    });
+  });
+
   it("applies a projectId deep link once and then releases the project switcher", async () => {
     const setSelectedProjectId = vi.fn();
     const project = createSelectableProject({ id: "proj1", isManaged: true });
@@ -242,6 +477,89 @@ describe("DataIngestionPage", () => {
     setSelectedProjectId.mockClear();
     await waitFor(() => {
       expect(setSelectedProjectId).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not let one repository's failed run colour another repository", async () => {
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [
+        { id: "src1", name: "octocat/healthy", type: "GITHUB", status: "CONNECTED" },
+        { id: "src2", name: "octocat/broken", type: "GITHUB", status: "CONNECTED" },
+      ],
+      users: [],
+    });
+
+    const instance = (name: string, repositoryId: string, failedCount: number) => ({
+      sourceSystem: "GITHUB",
+      sourceId: `octocat/${name}`,
+      repositoryId,
+      owner: "octocat",
+      name,
+      sourceUrl: `https://github.com/octocat/${name}`,
+      status: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-01T00:00:00Z",
+      ingestedCount: 5,
+      updatedCount: 0,
+      deletedCount: 0,
+      failedCount,
+      failedItems: [],
+      artifactCount: 10,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: null,
+    });
+
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      instance("healthy", "repo-healthy", 0),
+      instance("broken", "repo-broken", 3),
+    ]);
+
+    // Only the broken repo has a failed run loaded.
+    mockGetIngestionRunsPage.mockResolvedValue(
+      createRunPage([
+        {
+          runId: "run-broken",
+          sourceSystem: "GITHUB",
+          sourceId: "octocat/broken",
+          owner: "octocat",
+          name: "broken",
+          repositoryId: "repo-broken",
+          startedAt: "2026-07-05T10:00:00Z",
+          finishedAt: "2026-07-05T10:05:00Z",
+          ingestedCount: 0,
+          updatedCount: 0,
+          deletedCount: 0,
+          failedCount: 3,
+          status: "FAILED",
+          failedItems: [],
+          failureReason: null,
+          aiSyncStatus: "FAILED",
+          aiSyncFailureReason: null,
+        },
+      ]),
+    );
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    // Rendered both as a source card and in the overview breakdown.
+    await screen.findAllByText("octocat/healthy");
+
+    // Exactly one card needs attention — previously the newest GitHub run was
+    // applied to every GitHub source, marking the healthy repo as failing too.
+    // Scoped to the Sources section: the overview KPI carries the same label.
+    await waitFor(() => {
+      const sourcesSection = within(screen.getByRole("region", { name: "Sources" }));
+      expect(sourcesSection.getAllByText("Needs attention")).toHaveLength(1);
+      expect(sourcesSection.getAllByText("Connected").length).toBeGreaterThan(0);
     });
   });
 
@@ -504,10 +822,8 @@ describe("DataIngestionPage", () => {
     expect(await screen.findByText("old-run")).toBeInTheDocument();
 
     const statusSelect = screen.getByLabelText("Filter runs by status");
-    await user.click(statusSelect);
-    await user.click(await screen.findByRole("option", { name: "Failed" }));
-    await user.click(statusSelect);
-    await user.click(await screen.findByRole("option", { name: "Success" }));
+    await user.selectOptions(statusSelect, "FAILED");
+    await user.selectOptions(statusSelect, "COMPLETED");
 
     expect(await screen.findByText("new-run")).toBeInTheDocument();
 
@@ -531,14 +847,85 @@ describe("DataIngestionPage", () => {
       expect(screen.getByLabelText("Filter runs by status")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByLabelText("Filter runs by status"));
-    await user.click(await screen.findByRole("option", { name: "Failed" }));
+    await user.selectOptions(screen.getByLabelText("Filter runs by status"), "FAILED");
 
     await waitFor(() => {
       expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
         expect.objectContaining({ status: "FAILED", page: 1 }),
       );
     });
+  });
+
+  it("opens and saves global Jira sync settings for a Jira-only project", async () => {
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+    });
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "JIRA",
+        sourceId: "https://team.atlassian.net",
+        displayName: "Team board",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://team.atlassian.net",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 5,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 128,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: "2026-07-01T00:00:00Z",
+        lastPullRequestsSyncAt: null,
+      },
+    ]);
+    mockGetJiraInstances.mockResolvedValue([
+      {
+        instanceUrl: "https://team.atlassian.net",
+        displayName: "Team board",
+        lastUpdate: "2026-07-01T00:00:00Z",
+        projectIds: ["proj1"],
+        sourceEnabled: true,
+        status: "UP_TO_DATE",
+        updateCredentialName: "default",
+        updateCredentialUserEmail: "jira@example.com",
+      },
+    ]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const manageButton = await screen.findByRole("button", { name: /manage sync settings/i });
+    await user.click(manageButton);
+
+    expect(await screen.findByText("Jira Sync Settings")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tablist", { name: /sync settings connector/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: /toggle global jira auto update/i }));
+    await user.click(screen.getByRole("button", { name: /apply globally/i }));
+
+    await waitFor(() => {
+      expect(mockConfigureAllJiraInstances).toHaveBeenCalledWith({
+        autoUpdate: false,
+        schedule: { type: "INTERVAL", everyMinutes: 60 },
+      });
+    });
+    expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
   });
 
   it("opens the connectors modal from Manage connectors", async () => {
@@ -579,11 +966,7 @@ describe("DataIngestionPage", () => {
     const filter = () => within(screen.getByRole("group", { name: /filter sections/i }));
     await user.click(filter().getByRole("button", { name: /runs/i }));
 
-    const runsButton = filter().getByRole("button", { name: /runs/i });
-    expect(runsButton).toHaveAttribute("aria-pressed", "true");
-    // The brand fill is a separate element that slides between tabs, so it
-    // lives inside the active button rather than on it.
-    expect(runsButton.querySelector(".bg-app-brand")).not.toBeNull();
+    expect(filter().getByRole("button", { name: /runs/i })).toHaveClass("bg-app-brand");
   });
 
   it("opens the add-source wizard and reaches GitHub discovery via Continue", async () => {
