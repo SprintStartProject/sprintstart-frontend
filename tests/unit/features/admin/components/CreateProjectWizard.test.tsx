@@ -230,13 +230,14 @@ describe("CreateProjectWizard", () => {
     ]);
     const user = userEvent.setup();
     renderWizard();
-    await settleModalFocus();
+
+    // The manager picker lives on the people step, not next to the name.
+    await goToPeopleStep(user);
 
     await waitFor(() =>
       expect(screen.getByRole("option", { name: "Jane Doe" })).toBeInTheDocument(),
     );
 
-    await user.type(screen.getByLabelText("Name"), "Apollo");
     await user.selectOptions(screen.getByLabelText("Project manager"), "user-7");
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await goToGithubDetail(user);
@@ -382,6 +383,9 @@ describe("CreateProjectWizard", () => {
     const { onClose } = renderWizard();
 
     await goToSourcesStep(user);
+    // Two steps back: the wizard runs details → people → source type, and the
+    // secondary button only reads "Cancel" once it is back on the first step.
+    await user.click(screen.getByRole("button", { name: /back/i }));
     await user.click(screen.getByRole("button", { name: /back/i }));
     await user.click(screen.getByRole("button", { name: /cancel/i }));
 

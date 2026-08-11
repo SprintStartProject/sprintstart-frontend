@@ -416,13 +416,13 @@ describe("DataIngestionPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Filter runs by source")).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Filter runs by source" })).toBeInTheDocument();
     });
 
-    await user.selectOptions(
-      screen.getByLabelText("Filter runs by source"),
-      "https://team.atlassian.net",
-    );
+    // `FilterSelect` is a listbox, not a native <select>: open it, then pick the
+    // instance by its display name.
+    await user.click(screen.getByRole("combobox", { name: "Filter runs by source" }));
+    await user.click(await screen.findByRole("option", { name: "Team board" }));
 
     // The Jira instance URL is sent as sourceRef, not repositoryId.
     await waitFor(() => {
@@ -821,9 +821,11 @@ describe("DataIngestionPage", () => {
 
     expect(await screen.findByText("old-run")).toBeInTheDocument();
 
-    const statusSelect = screen.getByLabelText("Filter runs by status");
-    await user.selectOptions(statusSelect, "FAILED");
-    await user.selectOptions(statusSelect, "COMPLETED");
+    const statusFilter = () => screen.getByRole("combobox", { name: "Filter runs by status" });
+    await user.click(statusFilter());
+    await user.click(await screen.findByRole("option", { name: "Failed" }));
+    await user.click(statusFilter());
+    await user.click(await screen.findByRole("option", { name: "Success" }));
 
     expect(await screen.findByText("new-run")).toBeInTheDocument();
 
@@ -844,10 +846,11 @@ describe("DataIngestionPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Filter runs by status")).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Filter runs by status" })).toBeInTheDocument();
     });
 
-    await user.selectOptions(screen.getByLabelText("Filter runs by status"), "FAILED");
+    await user.click(screen.getByRole("combobox", { name: "Filter runs by status" }));
+    await user.click(await screen.findByRole("option", { name: "Failed" }));
 
     await waitFor(() => {
       expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
@@ -966,7 +969,9 @@ describe("DataIngestionPage", () => {
     const filter = () => within(screen.getByRole("group", { name: /filter sections/i }));
     await user.click(filter().getByRole("button", { name: /runs/i }));
 
-    expect(filter().getByRole("button", { name: /runs/i })).toHaveClass("bg-app-brand");
+    // `SegmentedTabs` draws the active fill as its own sliding element, so the
+    // pressed state is what says "selected" — not a class on the button.
+    expect(filter().getByRole("button", { name: /runs/i })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("opens the add-source wizard and reaches GitHub discovery via Continue", async () => {
