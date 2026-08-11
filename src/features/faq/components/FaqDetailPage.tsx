@@ -11,6 +11,7 @@ import type {
 } from "../../../features/faq/types";
 import { insightsService } from "../../../services/faqService";
 import { useFetch } from "../../../hooks/useFetch";
+import { useProjectContext } from "../../projects/useProjectContext";
 
 import {
   ArrowLeft,
@@ -28,6 +29,7 @@ import {
 // ─────────────────────────────────────────────────────────────
 
 export function FaqDetailPage() {
+    const { selectedProjectId } = useProjectContext();
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
 
@@ -36,7 +38,7 @@ export function FaqDetailPage() {
     loading,
     error,
   } = useFetch(
-    () => insightsService.fetchFAQGroup(groupId ?? ""),
+    () => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
     [groupId],
   );
 

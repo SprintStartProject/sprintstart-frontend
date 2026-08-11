@@ -4,24 +4,34 @@ import keycloak from "../config/keycloak";
 import type { Chat, ChatMessage, StreamHandlers } from "../features/chatbot/types";
 
 /**
- * Retrieves created chats for the current user (personal `/me` endpoint).
+ * Retrieves the current user's chats within one project (personal `/me` endpoint).
  *
+ * Scoped, so the sidebar follows the project switcher like the rest of the app.
+ * Chats created before the backend scoped them belong to no project and are
+ * therefore in no list; they stay reachable by id.
+ *
+ * @param projectId The project whose chats to list.
  * @throws Error if the backend request fails
  */
-export async function getMyChats() {
-    const response = await apiClient.fetch<{ chats: Chat[] }>(`/api/v1/chats/me`);
+export async function getMyChats(projectId: string) {
+    const response = await apiClient.fetch<{ chats: Chat[] }>(
+        `/api/v1/chats/me?projectId=${encodeURIComponent(projectId)}`,
+    );
     return response;
 }
 
 /**
- * Creates a new chat for the authenticated user.
+ * Creates a new chat for the authenticated user inside a project.
  *
- * @param _userId Ignored parameter kept for signature compatibility (owner derived from JWT).
+ * @param projectId The project the chat belongs to. The backend rejects a project
+ *   the caller has no access to, and every prompt is answered from that project's
+ *   corpus only.
  * @returns The backend returns `{ id }`.
  */
-export async function createChat(_userId?: string) {
+export async function createChat(projectId: string) {
     return await apiClient.fetch<{ id: string }>(`/api/v1/chats/me`, {
         method: "POST",
+        body: JSON.stringify({ projectId }),
     });
 }
 
@@ -73,6 +83,32 @@ type ChatEvent =
     | { type: "error"; message: string };
 
 /**
+ * Turns a `yyyy-mm-dd` value from a date input into the UTC instant at which
+ * that day starts *in the user's timezone*.
+ *
+ * Appending `Z` to the raw value treats the locally picked date as if it were
+ * UTC, which shifts the boundary by the offset — in CEST that silently dropped
+ * the first two hours of the selected day.
+ */
+function localDayStart(date: string): string | undefined {
+    const parsed = new Date(`${date}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+/**
+ * The counterpart to {@link localDayStart}, clamped to the current time.
+ *
+ * The backend validates this bound with `@PastOrPresent`, so the end of *today*
+ * is a future instant and gets rejected — picking today as the upper bound
+ * failed the whole prompt with a 400.
+ */
+function localDayEnd(date: string): string | undefined {
+    const parsed = new Date(`${date}T23:59:59.999`);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    return new Date(Math.min(parsed.getTime(), Date.now())).toISOString();
+}
+
+/**
  * Creates a new prompt and handles the chat response.
  *
  * @param chatId The chat the prompt is created in.
@@ -114,8 +150,8 @@ export async function streamMessage(
         sourceSystems.length || from || to
             ? {
                 sourceSystems: sourceSystems.length ? sourceSystems : undefined,
-                from: from ? `${from}T00:00:00Z` : undefined,
-                to: to ? `${to}T23:59:59Z` : undefined,
+                from: from ? localDayStart(from) : undefined,
+                to: to ? localDayEnd(to) : undefined,
             }
             : undefined;
 
@@ -135,6 +171,15 @@ export async function streamMessage(
     });
 
     if (!res.ok) {
+        // 409 is the backend's answer for a chat that predates project scoping: it
+        // has no project, so it can be read but never prompted. Worth saying plainly
+        // — the raw status reads like a bug rather than a property of that chat.
+        if (res.status === 409) {
+            handlers.onError?.(
+                "This conversation was started before projects were separated and can no longer be continued. Please start a new chat.",
+            );
+            return;
+        }
         handlers.onError?.(`HTTP error! status: ${res.status}`);
         return;
     }

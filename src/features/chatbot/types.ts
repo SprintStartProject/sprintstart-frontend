@@ -8,6 +8,17 @@ export type Chat = {
     userId: string;
 
     /**
+     * The project this chat is scoped to, or `null` for chats created before the
+     * backend scoped them.
+     *
+     * Anything resolved *from* a chat — most importantly its citations — must use
+     * this rather than the currently selected project: switching projects would
+     * otherwise resolve an older chat's citations against the wrong corpus. A chat
+     * without a project can no longer be prompted (the backend answers 409).
+     */
+    projectId: string | null;
+
+    /**
      * Date the chat was created.
      */
     createdAt: string;
@@ -131,7 +142,8 @@ export type StreamHandlers = {
 
 export const SOURCE_SYSTEMS = [
     "GITHUB",
-    "UPLOAD"
+    "UPLOAD",
+    "JIRA"
 ] as const;
 
 export type SourceSystem = (typeof SOURCE_SYSTEMS)[number];

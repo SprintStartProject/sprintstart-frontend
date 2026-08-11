@@ -7,6 +7,7 @@ import {
     streamMessage
 } from "../services/chatService";
 import { useAuth } from "./useAuth";
+import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
 import type { ChatContextValue, SelectedCitation } from "./ChatContext";
 import type { Chat, ChatMessage, Citation, SourceSystem } from "../features/chatbot/types";
@@ -52,7 +53,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const { profile } = useAuth();
     const userId = profile?.id ?? "";
 
+    // Chats live inside a project: the list is scoped to it and a new chat is created
+    // in it. Switching projects therefore has to reset chat state the same way a user
+    // change does — otherwise the previous project's chats and cached messages stay on
+    // screen while the sidebar has already moved on.
+    const { selectedProjectId } = useProjectContext();
+
     const [chats, setChats] = useState<Chat[]>([]);
+    // The project `chats` was last loaded for. Consumers need it to tell "this project has no
+    // such chat" apart from "the list has not arrived yet" — the difference between redirecting
+    // away from a foreign chat and flickering away from a legitimate one.
+    const [chatsProjectId, setChatsProjectId] = useState<string | null>(null);
     const [messagesByChat, setMessagesByChat] = useState<MessagesByChat>({});
 
     const [isThinking, setIsThinking] = useState(false);
@@ -60,6 +71,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
     const [thinkingState, setThinkingState] = useState<string | null>(null);
+
+    // The chat the in-flight stream belongs to. The flags above are global
+    // (one stream at a time), so without this the thinking indicator, the
+    // composer's busy state and the stop button follow the user into whatever
+    // chat they switch to. Consumers gate on this in `useChat`.
+    const [streamingChatId, setStreamingChatId] = useState<string | null>(null);
 
     const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
     const [newRequest, setNewRequest] = useState("");
@@ -174,21 +191,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }, []);
 
     /**
-     * Loads the user's chats once auth is ready (profile.id available).
+     * Loads the user's chats for the selected project once auth is ready.
      * Gated on `userId` so the fetch doesn't fire before Keycloak has
-     * initialized — which would 401 and trigger a login redirect loop.
-     * Also resets all chat state when the authenticated user changes so a
-     * previous user's messages/chats are never visible to the next one.
+     * initialized — which would 401 and trigger a login redirect loop — and on
+     * `selectedProjectId` because the listing is project-scoped.
+     * Resets all chat state when either changes, so neither a previous user's nor
+     * a previous project's messages are ever visible afterwards.
      */
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !selectedProjectId) return;
 
         // Reset + fetch run inside an async callback so the synchronous resets
         // (before the first await) don't trip the "setState in effect body"
         // lint rule — they execute in the same tick, just outside the effect
         // body's direct call frame.
         void (async () => {
-            // Reset stale state from a previous session whenever the user changes.
+            // Reset stale state whenever the user or the selected project changes.
             abortControllerRef.current?.abort();
             abortControllerRef.current = null;
             clearStreamTimeout();
@@ -203,17 +221,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setIsStreaming(false);
             setStreamingMessageId(null);
             setThinkingState(null);
+            setStreamingChatId(null);
             setMessagesByChat({});
+            setChatsProjectId(null);
 
             try {
-                const data = await getMyChats();
+                const data = await getMyChats(selectedProjectId);
                 setChats(data?.chats ?? []);
+                setChatsProjectId(selectedProjectId);
             } catch (e) {
                 console.error("Failed to load chats", e);
                 setChats([]);
+                setChatsProjectId(selectedProjectId);
             }
         })();
-    }, [userId, clearStreamTimeout]);
+    }, [userId, selectedProjectId, clearStreamTimeout]);
 
     const sortedChats = useMemo(
         () =>
@@ -225,9 +247,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     );
 
     const refreshChats = useCallback(async () => {
-        const data = await getMyChats();
+        if (!selectedProjectId) return;
+        const data = await getMyChats(selectedProjectId);
         setChats(data?.chats ?? []);
-    }, []);
+        setChatsProjectId(selectedProjectId);
+    }, [selectedProjectId]);
 
     const loadMessages = useCallback(async (chatId: string) => {
         // Mark this chat as the latest requested so a slow earlier response
@@ -263,12 +287,45 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // Invalidate any previous stream so its handlers can't clobber state.
         const thisStreamId = ++streamIdRef.current;
 
+        // Settle a stream that is still in flight before starting a new one.
+        // The id bump above already silenced its handlers, so without this the
+        // request would keep streaming in the background while its chat kept an
+        // empty assistant bubble forever — no content, no error, and no refetch
+        // (`loadMessages` skips chats that are already cached).
+        const orphan = draftRef.current;
+        clearStreamTimeout();
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
+        if (orphan) {
+            cancelDraft();
+            flushDraft();
+            draftRef.current = null;
+            // Partial content stays visible, exactly like a manual stop. Only a
+            // bubble that never received a token needs an explanation.
+            if (!orphan.content) {
+                setMessagesByChat(prev => ({
+                    ...prev,
+                    [orphan.chatId]: (prev[orphan.chatId] ?? []).map(m =>
+                        m.id === orphan.assistantId
+                            ? { ...m, error: "Interrupted by a new message.", isStreaming: false }
+                            : m
+                    )
+                }));
+            }
+        }
+
         let currentChatId = chatId;
         let shouldNavigate = false;
         let chatForMessages: Chat | undefined;
 
         if (!currentChatId) {
-            const created = await createChat(userId);
+            // A chat is always created inside a project. Without one there is nothing
+            // to scope retrieval to, so the backend would reject the request anyway.
+            if (!selectedProjectId) {
+                console.error("Cannot create a chat without a selected project");
+                return;
+            }
+            const created = await createChat(selectedProjectId);
 
             const newChat: Chat = {
                 id: created.id,
@@ -276,6 +333,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 // meaningful immediately; the backend may overwrite it later.
                 title: deriveTitle(text),
                 userId,
+                projectId: selectedProjectId,
                 createdAt: new Date().toISOString(),
             };
 
@@ -319,6 +377,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }));
 
         setIsThinking(true);
+        // A follow-up sent mid-stream would otherwise inherit the previous
+        // stream's flags — a caret on a message that no longer receives tokens
+        // and the previous turn's tool label under the dots.
+        setIsStreaming(false);
+        setStreamingMessageId(null);
+        setThinkingState(null);
+        setStreamingChatId(currentChatId);
         streamingStartedRef.current = false;
 
         // Initialize the rAF-batched draft so token/reasoning/citation events
@@ -383,6 +448,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setIsStreaming(false);
             setIsThinking(false);
             setStreamingMessageId(null);
+            // Without this the last tool label survives the turn and is shown
+            // again at the start of the next one, before the first real
+            // `tool_use` event arrives.
+            setThinkingState(null);
+            setStreamingChatId(null);
         };
 
         try {
@@ -501,7 +571,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 )
             }));
         }
-    }, [refreshChats, userId, cancelDraft, flushDraft, scheduleDraftFlush, clearStreamTimeout]);
+    }, [refreshChats, userId, selectedProjectId, cancelDraft, flushDraft, scheduleDraftFlush, clearStreamTimeout]);
 
     /**
      * Aborts the in-flight chat stream (if any). The partial content already
@@ -517,6 +587,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clearStreamTimeout();
         cancelDraft();
         flushDraft();
+        const stopped = draftRef.current;
         draftRef.current = null;
         abortControllerRef.current?.abort();
         abortControllerRef.current = null;
@@ -524,16 +595,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setIsStreaming(false);
         setIsThinking(false);
         setStreamingMessageId(null);
-    }, [cancelDraft, flushDraft, clearStreamTimeout]);
+        setThinkingState(null);
+        setStreamingChatId(null);
+
+        // Stopping before the first token would otherwise leave a bare empty
+        // bubble — the placeholder is only hidden while `isThinking` is true.
+        if (stopped && !stopped.content) {
+            setMessagesByChat(prev => ({
+                ...prev,
+                [stopped.chatId]: (prev[stopped.chatId] ?? []).map(m =>
+                    m.id === stopped.assistantId
+                        ? { ...m, error: "Stopped before the assistant replied.", isStreaming: false }
+                        : m
+                )
+            }));
+        }
+
+        // The abort reaches `onDone` with an already-invalidated stream id, so
+        // its `refreshChats` is skipped — a chat stopped right after creation
+        // would keep the client-side fallback title forever.
+        void refreshChats().catch(e => console.error("Failed to refresh chats", e));
+    }, [cancelDraft, flushDraft, clearStreamTimeout, refreshChats]);
 
     const value: ChatContextValue = {
         chats,
         sortedChats,
+        chatsProjectId,
+        selectedProjectId,
         messagesByChat,
         isThinking,
         isStreaming,
         streamingMessageId,
         thinkingState,
+        streamingChatId,
         selectedCitation,
         setSelectedCitation,
         newRequest,

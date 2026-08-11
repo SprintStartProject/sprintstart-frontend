@@ -9,12 +9,16 @@ import type {
 import knowledgeGapMock from '../mocks/knowledgeGapsMock.json';
 import knowledgeGapDetailMock from '../mocks/knowledgeGapsDetailMock.json';
 
+/**
+ * Knowledge gaps are detected and cached per project, so every call carries the
+ * project it is asking about.
+ */
 export const knowledgeGapService = {
 
-    async fetchKnowledgeGaps(): Promise<KnowledgeGapOverview> {
+    async fetchKnowledgeGaps(projectId: string): Promise<KnowledgeGapOverview> {
         try {
             return await apiClient.fetch<KnowledgeGapOverview>(
-                '/api/v1/insights/knowledge-gaps'
+                `/api/v1/insights/knowledge-gaps?projectId=${encodeURIComponent(projectId)}`
             );
         } catch (error) {
             if (!(error instanceof ApiError && error.status === 404)) {
@@ -25,10 +29,10 @@ export const knowledgeGapService = {
         }
     },
 
-    async fetchKnowledgeGap(gapId: string): Promise<KnowledgeGap> {
+    async fetchKnowledgeGap(projectId: string, gapId: string): Promise<KnowledgeGap> {
         try {
             return await apiClient.fetch<KnowledgeGap>(
-                `/api/v1/insights/knowledge-gaps/${gapId}`
+                `/api/v1/insights/knowledge-gaps/${gapId}?projectId=${encodeURIComponent(projectId)}`
             );
         } catch (error) {
             if (!(error instanceof ApiError && error.status === 404)) {
@@ -50,9 +54,9 @@ export const knowledgeGapService = {
      *
      * @returns The number of gaps stored after the refresh.
      */
-    async refreshKnowledgeGaps(): Promise<{ gapCount: number }> {
+    async refreshKnowledgeGaps(projectId: string): Promise<{ gapCount: number }> {
         return await apiClient.fetch<{ gapCount: number }>(
-            '/api/v1/insights/knowledge-gaps/refresh',
+            `/api/v1/insights/knowledge-gaps/refresh?projectId=${encodeURIComponent(projectId)}`,
             { method: 'POST' }
         );
     },
@@ -60,9 +64,10 @@ export const knowledgeGapService = {
     /**
      * Returns the users currently assigned as owners of a component.
      */
-    async getComponentOwners(component: string): Promise<KnowledgeGapOwner[]> {
+    async getComponentOwners(projectId: string, component: string): Promise<KnowledgeGapOwner[]> {
         return await apiClient.fetch<KnowledgeGapOwner[]>(
-            `/api/v1/insights/knowledge-gaps/component-owners?component=${encodeURIComponent(component)}`
+            `/api/v1/insights/knowledge-gaps/component-owners` +
+                `?projectId=${encodeURIComponent(projectId)}&component=${encodeURIComponent(component)}`
         );
     },
 
@@ -70,11 +75,12 @@ export const knowledgeGapService = {
      * Replaces the owners of a component and returns the resolved owners.
      */
     async setComponentOwners(
+        projectId: string,
         component: string,
         userIds: string[]
     ): Promise<KnowledgeGapOwner[]> {
         return await apiClient.fetch<KnowledgeGapOwner[]>(
-            '/api/v1/insights/knowledge-gaps/component-owners',
+            `/api/v1/insights/knowledge-gaps/component-owners?projectId=${encodeURIComponent(projectId)}`,
             {
                 method: 'PUT',
                 body: JSON.stringify({ component, userIds }),

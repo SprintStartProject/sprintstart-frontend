@@ -74,6 +74,7 @@ import {
     type PhaseCheckAdminTab,
 } from '../features/team-management/components/detail/PhaseCheckAdminModal';
 import { StepDetailsPanel } from '../features/team-management/components/detail/StepDetailsPanel';
+import { useProjectContext } from "../features/projects/useProjectContext";
 
 function formatMinutes(minutes?: number | null): string {
     if (!minutes || minutes <= 0) return 'No estimate';
@@ -117,6 +118,7 @@ function getStepStatusStyles(status: string) {
 }
 
 export function TeamMemberDetailPage() {
+    const { selectedProjectId } = useProjectContext();
     const { userId } = useParams<{ userId: string }>();
 
     const navigate = useNavigate();
@@ -193,7 +195,7 @@ export function TeamMemberDetailPage() {
                 getProjectRoles(),
                 getUserSkillLevels(userId),
                 getUserOnboardingPath(userId),
-                knowledgeGapService.fetchKnowledgeGaps(),
+                knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
             ]);
             let feedback: OnboardingFeedback[] = [];
             try {
@@ -224,7 +226,9 @@ export function TeamMemberDetailPage() {
         }
 
         void loadMember();
-    }, [userId]);
+        // Knowledge gaps are project-scoped, so switching projects has to reload them —
+        // otherwise this page keeps showing the previous project's gaps for the member.
+    }, [userId, selectedProjectId]);
 
     useEffect(() => {
         async function loadPathTaskCounts() {

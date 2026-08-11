@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
+import { useAvailableSources } from "../features/chatbot/hooks/useAvailableSources.ts";
 import { useChatPreferences } from "../context/useChatPreferences";
 import { useAuth } from "../context/useAuth";
+import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
 import { MessageRow } from "../features/chatbot/components/MessageRow.tsx";
 import { ThinkingIndicator } from "../features/chatbot/components/ThinkingIndicator.tsx";
@@ -31,10 +33,14 @@ type CitationArtifactOpen = {
  */
 export function ChatPage() {
     const { profile } = useAuth();
+    const { selectedProjectId } = useProjectContext();
     const {
         messages,
         chatId,
         chats,
+        activeChat,
+        hasProject,
+        lastUserPrompt,
         handleSubmit,
         stopStreaming,
         isThinking,
@@ -67,8 +73,14 @@ export function ChatPage() {
     } = useChat();
 
     const { showThoughtProcess } = useChatPreferences();
+    const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
 
-    const projectId = profile?.projectIds?.[0] ?? null;
+    // Resolved from the chat, not from the switcher: a citation points at an artifact
+    // of the project the conversation belongs to. Taking the currently selected project
+    // instead made citations in an older chat 404 as soon as the user switched projects.
+    // Only the empty state (no chat open yet) falls back to the selection.
+    const projectId =
+        activeChat?.projectId ?? selectedProjectId ?? profile?.projectIds?.[0] ?? null;
     const [viewingCitationArtifact, setViewingCitationArtifact] =
         useState<CitationArtifactOpen | null>(null);
 
@@ -131,6 +143,32 @@ export function ChatPage() {
             setGameActive(false);
         }
     }
+
+    // E5: replacement for the live region that used to wrap the message list.
+    // `ThinkingIndicator` already carries `role="status"` for the working
+    // state, so this only needs to report that a turn has finished. Gated on
+    // the chat id as well: switching away from a streaming chat also clears
+    // the busy flags, and that must not be announced as a finished answer.
+    const busy = isThinking || isStreaming;
+    const [announcement, setAnnouncement] = useState("");
+    const [prevTurn, setPrevTurn] = useState({ chatId, busy });
+    if (prevTurn.chatId !== chatId || prevTurn.busy !== busy) {
+        const finished = prevTurn.chatId === chatId && prevTurn.busy && !busy;
+        setPrevTurn({ chatId, busy });
+        setAnnouncement(finished ? "Response complete." : "");
+    }
+
+    // Submitting blurs the composer so Space can start the dino game while the assistant
+    // works. Once the turn is over that reason is gone, so focus goes back — otherwise every
+    // follow-up question needs a click first. Skipped when something else already holds focus,
+    // so this never steals the caret from wherever the user went in the meantime.
+    useEffect(() => {
+        if (busy) return;
+        if (!chatId) return;
+        const active = document.activeElement;
+        if (active && active !== document.body) return;
+        textareaRef.current?.focus();
+    }, [busy, chatId, textareaRef]);
 
     // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
     useEffect(() => {
@@ -319,11 +357,11 @@ export function ChatPage() {
                 <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">
                     {!chatId && <ChatEmptyState onPickSuggestion={fillSuggestion} />}
 
-                    <div
-                        className="app-page-frame flex w-full flex-col gap-8 py-8"
-                        aria-live="polite"
-                        aria-atomic="false"
-                    >
+                    {/* E5: deliberately NOT a live region. Marking the message
+                        list `aria-live` made screen readers re-announce the
+                        whole answer on every streamed token; the sr-only
+                        status node below announces the end of a turn instead. */}
+                    <div className="app-page-frame flex w-full flex-col gap-8 py-8">
                         {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
                             switch, new messages). Per AGENTS.md §11. */}
@@ -365,6 +403,10 @@ export function ChatPage() {
                             onGameExit={() => setGameActive(false)}
                         />
 
+                        <div className="sr-only" role="status" aria-live="polite">
+                            {announcement}
+                        </div>
+
                         <div ref={bottomRef} />
                     </div>
                 </div>
@@ -399,6 +441,10 @@ export function ChatPage() {
                     onSubmit={handleChatSubmit}
                     onStop={stopStreaming}
                     isBusy={isThinking || isStreaming}
+                    hasProject={hasProject}
+                    lastUserPrompt={lastUserPrompt}
+                    availableSources={availableSources}
+                    sourcesLoading={sourcesLoading}
                     textareaRef={textareaRef}
                     showFilters={showFilters}
                     onToggleFilters={() => setShowFilters((v) => !v)}

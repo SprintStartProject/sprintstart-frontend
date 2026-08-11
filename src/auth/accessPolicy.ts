@@ -42,14 +42,23 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
 };
 
 /**
- * Routes that a PM may only reach for a project they manage. Both are scoped to
- * the globally selected project, so holding the PM role while being a mere
- * member of the selected project is not enough. Admins and HR are gated by role
- * alone and are unaffected by this list.
+ * Routes that a PM may only reach for a project they manage. All of them are scoped to
+ * the globally selected project, so holding the PM role while being a mere member of
+ * that project is not enough. Admins and HR are gated by role alone and are unaffected
+ * by this list.
+ *
+ * The insights and team routes belong here for the same reason as the dashboard: they
+ * show the selected project's questions, documentation gaps and members. A PM who is
+ * only a member of that project has no business managing it, and the backend now
+ * enforces exactly this through `@projectAuth.canAccessProject` — leaving the entries
+ * in the sidebar would only produce 403s.
  */
 const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
     '/pm-dashboard',
     '/data-ingestion',
+    '/team-management',
+    '/insights/faq',
+    '/insights/knowledge-gaps',
 ];
 
 const routePrefixes: Partial<Record<AppRoute, readonly string[]>> = {
