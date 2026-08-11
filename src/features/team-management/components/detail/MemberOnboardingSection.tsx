@@ -84,7 +84,7 @@ export function MemberOnboardingSection({
 }: MemberOnboardingSectionProps) {
   return (
     <SpotlightCard roundedClassName="rounded-3xl">
-      <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+      <div className="rounded-3xl p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2">

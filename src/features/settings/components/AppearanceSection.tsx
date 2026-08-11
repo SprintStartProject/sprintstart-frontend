@@ -61,7 +61,6 @@ export function AppearanceSection() {
         <button
           type="button"
           role="switch"
-          aria-label="Toggle Aurora Background"
           aria-labelledby="aurora-toggle-title"
           aria-checked={isAuroraEnabled}
           onClick={() => setIsAuroraEnabled(!isAuroraEnabled)}
@@ -94,7 +93,6 @@ export function AppearanceSection() {
         <button
           type="button"
           role="switch"
-          aria-label="Toggle Card Tilt Effect"
           aria-labelledby="tilt-toggle-title"
           aria-checked={isTiltEnabled}
           onClick={() => setIsTiltEnabled(!isTiltEnabled)}

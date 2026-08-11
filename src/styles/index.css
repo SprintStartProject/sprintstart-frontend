@@ -626,18 +626,23 @@ body {
   z-index: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .app-spotlight { display: none; }
-}
-
 /* Respect users who prefer reduced motion: collapse ALL decorative animation. */
 @media (prefers-reduced-motion: reduce) {
+  .app-spotlight { display: none; }
+
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Loading spinners are essential feedback, not decoration — keep them
+     turning even under reduced-motion (WCAG allows essential animation). */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

@@ -1164,7 +1164,7 @@ export function DataIngestionPage() {
     // provides `min-h-screen` and the document scroll. Nesting a `h-screen`
     // scroller inside it produced a second scrollbar and dead space below the
     // content once the viewport lost height to a horizontal scrollbar.
-    <div className="">
+    <div>
       <div>
         <DataIngestionHeader
           isLoading={isLoading}

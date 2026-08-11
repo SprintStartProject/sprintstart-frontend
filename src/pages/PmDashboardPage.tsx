@@ -34,7 +34,7 @@ export function PmDashboardPage() {
       </SpotlightCard>
 
         <SpotlightCard roundedClassName="rounded-3xl">
-        <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <section className="p-4">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
             <p className="text-sm text-app-text-muted">
@@ -47,7 +47,7 @@ export function PmDashboardPage() {
       </SpotlightCard>
 
         <SpotlightCard roundedClassName="rounded-3xl">
-        <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <section className="p-4">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-app-text">Insights</h2>
             <p className="text-sm text-app-text-muted">

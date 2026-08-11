@@ -81,16 +81,20 @@ export function SpotlightCard({
         ? { rotateX, rotateY, transformPerspective: 800 as const }
         : {};
 
-    const spotlightOverlay = isTiltEnabled ? (
-        <motion.div
-                    className={`pointer-events-none absolute -inset-px ${roundedClassName} opacity-0 transition duration-300 group-hover:opacity-100 z-0`}
-            style={{
-                background: useMotionTemplate`radial-gradient(
+    // `useMotionTemplate` is a hook, so it must be called unconditionally on
+    // every render — gating the *call* behind `isTiltEnabled` would change the
+    // hook count when the tilt toggle flips and crash React. Only the rendered
+    // overlay is conditional.
+    const spotlightBackground = useMotionTemplate`radial-gradient(
                     500px circle at ${mouseX}px ${mouseY}px,
                     var(--brand-glow),
                     transparent 80%
-                )`,
-            }}
+                )`;
+
+    const spotlightOverlay = isTiltEnabled ? (
+        <motion.div
+                    className={`pointer-events-none absolute -inset-px ${roundedClassName} opacity-0 transition duration-300 group-hover:opacity-100 z-0`}
+            style={{ background: spotlightBackground }}
         />
     ) : null;
 

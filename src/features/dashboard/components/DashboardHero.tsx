@@ -37,7 +37,7 @@ export function DashboardHero({
       };
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-app-border bg-app-surface px-6 py-8 sm:px-8 sm:py-10">
+    <section className="relative overflow-hidden rounded-2xl px-6 py-8 sm:px-8 sm:py-10">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-gradient-to-br from-app-brand/12 via-transparent to-transparent"

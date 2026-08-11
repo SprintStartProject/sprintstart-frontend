@@ -77,7 +77,7 @@ export function SkillsStrip() {
   const hiddenCount = skills.length - visibleSkills.length;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-app-border bg-app-surface px-5 py-4">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl px-5 py-4">
       <div className="flex items-center gap-2">
         <GraduationCap className="h-4 w-4 text-app-brand" />
         <span className="text-xs font-semibold tracking-widest text-app-text-muted uppercase">

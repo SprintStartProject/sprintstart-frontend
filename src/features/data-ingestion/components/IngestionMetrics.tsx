@@ -134,7 +134,7 @@ function MetricCard({
 }) {
   return (
     <SpotlightCard roundedClassName="rounded-3xl">
-      <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+      <div className="rounded-3xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-sm text-app-text-muted">{title}</p>
