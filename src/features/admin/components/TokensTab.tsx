@@ -9,10 +9,7 @@ import {
   deleteGithubPat,
   updateGithubPat,
 } from "../../../services/sources/githubService";
-import {
-  SegmentedControl,
-  type SegmentedControlOption,
-} from "../../../components/ui/SegmentedControl";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { JiraCredentialsSection } from "../../settings/components/jira/JiraCredentialsSection";
 
 const INVALID_TOKEN_MESSAGE =
@@ -33,9 +30,9 @@ function parseApiError(error: unknown, validationFallback: string): string {
 
 type Provider = "github" | "jira";
 
-const PROVIDERS: ReadonlyArray<SegmentedControlOption<Provider>> = [
-  { id: "github", label: "GitHub", testId: "admin-tokens-segment-github" },
-  { id: "jira", label: "Jira", testId: "admin-tokens-segment-jira" },
+const PROVIDERS: SegmentedTabOption<Provider>[] = [
+  { value: "github", label: "GitHub", testId: "admin-tokens-segment-github" },
+  { value: "jira", label: "Jira", testId: "admin-tokens-segment-jira" },
 ];
 
 type TokensTabProps = {
@@ -161,10 +158,11 @@ export function TokensTab({ tokenNames, onRefresh, userEmail }: TokensTabProps) 
 
   return (
     <div className="space-y-5">
-      <SegmentedControl
-        options={PROVIDERS}
+      <SegmentedTabs
         value={provider}
+        options={PROVIDERS}
         onChange={setProvider}
+        layoutId="admin-tokens-provider-pill"
         ariaLabel="Access token provider"
       />
 

@@ -12,6 +12,14 @@ export type SegmentedTabOption<TValue extends string> = {
   icon?: ReactNode;
   /** Optional trailing count badge. */
   count?: number;
+  /**
+   * Optional `data-testid` for end-to-end targeting, per AGENTS.md §5.
+   *
+   * Only for options whose label is not a stable handle — a provider switch
+   * whose labels are product names, say. Prefer the accessible name where it
+   * is stable, so the test asserts what a user can actually see.
+   */
+  testId?: string;
 };
 
 type SegmentedTabsProps<TValue extends string> = {
@@ -75,6 +83,7 @@ export function SegmentedTabs<TValue extends string>({
             key={option.value}
             type="button"
             aria-pressed={isActive}
+            data-testid={option.testId}
             onClick={() => onChange(option.value)}
             onHoverStart={() => setHovered(option.value)}
             onHoverEnd={() => setHovered((current) => (current === option.value ? null : current))}

@@ -1,5 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 
+import { Field } from "../../../components/ui/Field.tsx";
+import { Input } from "../../../components/ui/Input.tsx";
+import { Select } from "../../../components/ui/Select.tsx";
 import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
 
 /**
@@ -42,9 +45,6 @@ export function JiraConnectStep({
   onCredentialNameChange: (value: string) => void;
   onSubmit: () => void;
 }) {
-  const fieldClassName =
-    "mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60";
-
   const hasCredentials = credentials.length > 0;
   const showNoCredentials = credentialsLoaded && !credentialsLoading && !hasCredentials;
 
@@ -68,48 +68,30 @@ export function JiraConnectStep({
           Jira first, then come back to connect.
         </div>
       )}
-      <div>
-        <label htmlFor="jira-display-name" className="text-sm font-medium text-app-text">
-          Display name
-        </label>
-        <input
-          id="jira-display-name"
+      <Field label="Display name" controlId="jira-display-name" disabled={isBusy}>
+        <Input
           data-testid="jira-display-name"
           value={displayName}
           onChange={(event) => onDisplayNameChange(event.target.value)}
-          disabled={isBusy}
           placeholder="e.g. Team board"
-          className={fieldClassName}
         />
-      </div>
+      </Field>
 
-      <div>
-        <label htmlFor="jira-instance-url" className="text-sm font-medium text-app-text">
-          Instance URL
-        </label>
-        <input
-          id="jira-instance-url"
+      <Field label="Instance URL" controlId="jira-instance-url" disabled={isBusy}>
+        <Input
           data-testid="jira-instance-url"
           type="url"
           value={url}
           onChange={(event) => onUrlChange(event.target.value)}
-          disabled={isBusy}
           placeholder="https://your-domain.atlassian.net"
-          className={fieldClassName}
         />
-      </div>
+      </Field>
 
-      <div>
-        <label htmlFor="jira-credential" className="text-sm font-medium text-app-text">
-          Credential
-        </label>
-        <select
-          id="jira-credential"
+      <Field label="Credential" controlId="jira-credential" disabled={isBusy || !hasCredentials}>
+        <Select
           data-testid="jira-credential"
           value={credentialName}
           onChange={(event) => onCredentialNameChange(event.target.value)}
-          disabled={isBusy || !hasCredentials}
-          className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
         >
           {hasCredentials ? (
             credentials.map((credential) => (
@@ -122,8 +104,8 @@ export function JiraConnectStep({
               {credentialsLoading ? "Loading credentials..." : "No credentials"}
             </option>
           )}
-        </select>
-      </div>
+        </Select>
+      </Field>
       <p className="text-xs text-app-text-subtle">
         Jira account emails are stored with each credential. Manage them under Settings, Access
         Tokens, Jira.

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, Loader2, Plus } from "lucide-react";
+import { KeyRound, Plus } from "lucide-react";
+import { Button } from "../../../../components/ui/Button";
+import { Spinner } from "../../../../components/ui/Spinner";
 import { centralSpringToken } from "../../../../styles/tokens";
 import { useJiraCredentials } from "../../hooks/useJiraCredentials";
 import { JiraCredentialAddForm } from "./JiraCredentialAddForm";
@@ -16,12 +18,9 @@ type JiraCredentialsSectionProps = {
  * may contain different Jira account emails; the login email only pre-fills
  * the add form.
  */
-export function JiraCredentialsSection({
-  defaultUserEmail,
-}: JiraCredentialsSectionProps) {
+export function JiraCredentialsSection({ defaultUserEmail }: JiraCredentialsSectionProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const { credentials, loaded, error, isRefreshing, reload } =
-    useJiraCredentials();
+  const { credentials, loaded, error, isRefreshing, reload } = useJiraCredentials();
 
   const handleSaved = async () => {
     await reload();
@@ -39,31 +38,26 @@ export function JiraCredentialsSection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-app-text">
-            {credentials.length}{" "}
-            {credentials.length === 1 ? "credential" : "credentials"}
+            {credentials.length} {credentials.length === 1 ? "credential" : "credentials"}
           </span>
         </div>
 
         {!isAddOpen && (
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => setIsAddOpen(true)}
             data-testid="settings-jira-add-open"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
+            icon={<Plus className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
-            <Plus className="h-4 w-4" aria-hidden />
             Add Credential
-          </button>
+          </Button>
         )}
       </div>
 
       {showInitialLoading && (
         <div className="flex items-center justify-center py-8">
-          <Loader2
-            className="h-6 w-6 animate-spin text-app-brand"
-            aria-hidden
-          />
-          <span className="sr-only">Loading Jira credentials...</span>
+          <Spinner size="lg" label="Loading Jira credentials" />
         </div>
       )}
 
@@ -100,14 +94,9 @@ export function JiraCredentialsSection({
           {credentials.length === 0 && !isAddOpen ? (
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-8">
               <div className="flex flex-col items-center gap-3 text-center">
-                <KeyRound
-                  className="h-8 w-8 text-app-text-disabled"
-                  aria-hidden
-                />
+                <KeyRound className="h-8 w-8 text-app-text-disabled" aria-hidden />
                 <div>
-                  <p className="text-base font-medium text-app-text">
-                    No credentials yet
-                  </p>
+                  <p className="text-base font-medium text-app-text">No credentials yet</p>
                   <p className="mt-1 text-sm text-app-text-muted">
                     Add a Jira API token to connect and ingest Jira instances.
                   </p>
@@ -123,10 +112,7 @@ export function JiraCredentialsSection({
                 <AnimatePresence initial={false}>
                   {credentials.map((credential) => (
                     <li key={credential.displayName}>
-                      <JiraCredentialRow
-                        credential={credential}
-                        onSaved={handleSaved}
-                      />
+                      <JiraCredentialRow credential={credential} onSaved={handleSaved} />
                     </li>
                   ))}
                 </AnimatePresence>

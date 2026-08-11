@@ -3,7 +3,6 @@ import {
   Clock3,
   Database,
   GitBranch,
-  Loader2,
   RefreshCw,
   Unlink,
   XCircle,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/ui/Button";
+import { Spinner } from "../../../components/ui/Spinner";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
@@ -330,21 +330,17 @@ export function SourceDetailsPanel({
             {isJira ? "Update instance" : "Update repo"}
           </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => {
               void handleRefreshDetails();
             }}
-            disabled={!onRefreshDetails || isUpdating || isRefreshing}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!onRefreshDetails || isUpdating}
+            loading={isRefreshing}
+            icon={<RefreshCw className="h-4 w-4" />}
           >
-            {isRefreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
             Refresh details
-          </button>
+          </Button>
         </div>
       }
     >
@@ -356,7 +352,9 @@ export function SourceDetailsPanel({
         {source.statusView.state === "syncing" && (
           <div className="mb-3 rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-3">
             <p className="flex items-center gap-2 text-sm font-medium text-app-brand-text">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              {/* The sentence beside it already says what is happening, so the
+                  glyph stays silent rather than announcing a second time. */}
+              <Spinner size="sm" silent />
               {source.statusView.label === "Indexing"
                 ? "Indexing artifacts into the knowledge base…"
                 : "Syncing the latest changes…"}

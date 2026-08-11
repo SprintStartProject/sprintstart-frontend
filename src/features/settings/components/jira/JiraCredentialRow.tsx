@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { Button } from "../../../../components/ui/Button";
+import { Field } from "../../../../components/ui/Field";
+import { Input } from "../../../../components/ui/Input";
 import { centralSpringToken } from "../../../../styles/tokens";
-import {
-  parseApiError,
-  describeRefreshFailure,
-} from "../../../../services/apiError";
+import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
 import {
   changeJiraCredentialName,
   changeJiraCredentialToken,
@@ -27,10 +27,7 @@ type Panel = "none" | "rename" | "rotate" | "delete";
  * (rename prefilled with the current name, rotate empty and masked). The
  * credential is identified by `(userEmail, displayName)` for every mutation.
  */
-export function JiraCredentialRow({
-  credential,
-  onSaved,
-}: JiraCredentialRowProps) {
+export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProps) {
   const { userEmail, displayName } = credential;
 
   const [panel, setPanel] = useState<Panel>("none");
@@ -64,10 +61,7 @@ export function JiraCredentialRow({
    * panel open with the server message; a mutation that succeeds but whose
    * refetch fails still closes with a distinct "couldn't refresh" note.
    */
-  const runMutation = async (
-    mutate: () => Promise<unknown>,
-    fallback: string,
-  ) => {
+  const runMutation = async (mutate: () => Promise<unknown>, fallback: string) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setIsBusy(true);
@@ -135,44 +129,45 @@ export function JiraCredentialRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-semibold text-app-text">
-            {displayName}
-          </p>
+          <p className="break-words text-sm font-semibold text-app-text">{displayName}</p>
           <p className="break-words text-xs text-app-text-muted">{userEmail}</p>
         </div>
 
         {panel === "none" && (
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={openRename}
               data-testid={`settings-jira-rename-open-${displayName}`}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text sm:flex-none"
+              icon={<Pencil className="h-3.5 w-3.5" />}
               aria-label={`Rename credential ${displayName}`}
+              className="flex-1 sm:flex-none"
             >
-              <Pencil className="h-3.5 w-3.5" aria-hidden />
               Rename
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={openRotate}
               data-testid={`settings-jira-rotate-open-${displayName}`}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text sm:flex-none"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
               aria-label={`Rotate token ${displayName}`}
+              className="flex-1 sm:flex-none"
             >
-              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
               Rotate
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="dangerSoft"
+              size="sm"
               onClick={openDelete}
               data-testid={`settings-jira-delete-open-${displayName}`}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-danger-bg bg-app-danger-bg px-3 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white sm:flex-none"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
               aria-label={`Delete credential ${displayName}`}
+              className="flex-1 sm:flex-none"
             >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
               Delete
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -192,51 +187,36 @@ export function JiraCredentialRow({
             aria-label={`Rename credential ${displayName}`}
             className="border-t border-app-brand-border bg-app-brand-soft px-4 py-4 sm:px-5"
           >
-            <p className="mb-3 text-sm font-semibold text-app-text">
-              Rename credential
-            </p>
+            <p className="mb-3 text-sm font-semibold text-app-text">Rename credential</p>
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-              <div className="min-w-0 flex-1">
-                <label
-                  htmlFor={`settings-jira-rename-${displayName}`}
-                  className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                >
-                  New name
-                </label>
-                <input
-                  id={`settings-jira-rename-${displayName}`}
+              <Field
+                label="New name"
+                controlId={`settings-jira-rename-${displayName}`}
+                disabled={isBusy}
+                className="min-w-0 flex-1"
+              >
+                <Input
                   data-testid={`settings-jira-rename-input-${displayName}`}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder="e.g. default"
                   required
                   maxLength={64}
-                  disabled={isBusy}
-                  className="h-11 w-full rounded-xl border border-app-brand-border bg-app-surface px-4 text-sm font-medium text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                 />
-              </div>
+              </Field>
               <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
-                <button
+                <Button
+                  variant="primary"
                   type="submit"
                   data-testid={`settings-jira-rename-submit-${displayName}`}
-                  disabled={isBusy}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  loading={isBusy}
+                  icon={<Pencil className="h-4 w-4" />}
                 >
-                  {isBusy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  ) : (
-                    <Pencil className="h-4 w-4" aria-hidden />
-                  )}
                   {isBusy ? "Renaming..." : "Confirm"}
-                </button>
-                <button
-                  type="button"
-                  onClick={close}
-                  disabled={isBusy}
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="secondary" onClick={close} disabled={isBusy}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
             {error && (
@@ -261,58 +241,38 @@ export function JiraCredentialRow({
             aria-label={`Rotate token ${displayName}`}
             className="border-t border-app-brand-border bg-app-brand-soft px-4 py-4 sm:px-5"
           >
-            <p className="mb-3 text-sm font-semibold text-app-text">
-              Rotate token
-            </p>
+            <p className="mb-3 text-sm font-semibold text-app-text">Rotate token</p>
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-              <div className="min-w-0 flex-1">
-                <label
-                  htmlFor={`settings-jira-rotate-${displayName}`}
-                  className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                >
-                  New API token
-                </label>
-                <div className="relative">
-                  <KeyRound
-                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled"
-                    aria-hidden
-                  />
-                  <input
-                    id={`settings-jira-rotate-${displayName}`}
-                    data-testid={`settings-jira-rotate-input-${displayName}`}
-                    type="password"
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    placeholder="New Jira API token"
-                    required
-                    autoComplete="off"
-                    disabled={isBusy}
-                    className="h-11 w-full rounded-xl border border-app-brand-border bg-app-surface pl-11 pr-4 text-sm font-medium text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
-                  />
-                </div>
-              </div>
+              <Field
+                label="New API token"
+                controlId={`settings-jira-rotate-${displayName}`}
+                disabled={isBusy}
+                className="min-w-0 flex-1"
+              >
+                <Input
+                  data-testid={`settings-jira-rotate-input-${displayName}`}
+                  type="password"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="New Jira API token"
+                  required
+                  autoComplete="off"
+                  icon={<KeyRound className="h-4 w-4" />}
+                />
+              </Field>
               <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
-                <button
+                <Button
+                  variant="primary"
                   type="submit"
                   data-testid={`settings-jira-rotate-submit-${displayName}`}
-                  disabled={isBusy}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  loading={isBusy}
+                  icon={<RefreshCw className="h-4 w-4" />}
                 >
-                  {isBusy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" aria-hidden />
-                  )}
                   {isBusy ? "Rotating..." : "Confirm"}
-                </button>
-                <button
-                  type="button"
-                  onClick={close}
-                  disabled={isBusy}
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="secondary" onClick={close} disabled={isBusy}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
             {error && (
@@ -333,8 +293,8 @@ export function JiraCredentialRow({
             className="border-t border-app-border bg-app-danger-bg px-5 py-4"
           >
             <p className="mb-3 text-sm text-app-danger-text">
-              Delete <strong>{displayName}</strong>? This cannot be undone and
-              may break connected Jira instances.
+              Delete <strong>{displayName}</strong>? This cannot be undone and may break connected
+              Jira instances.
             </p>
             {error && (
               <p role="alert" className="mb-2 text-sm text-app-danger-text">
@@ -342,30 +302,18 @@ export function JiraCredentialRow({
               </p>
             )}
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={confirmDelete}
                 data-testid={`settings-jira-delete-confirm-${displayName}`}
-                disabled={isBusy}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-app-danger-solid px-4 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                loading={isBusy}
               >
-                {isBusy ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={close}
-                disabled={isBusy}
-                className="inline-flex h-9 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-              >
+                {isBusy ? "Deleting..." : "Delete"}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={close} disabled={isBusy}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </motion.div>
         )}

@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
@@ -440,15 +440,14 @@ export function AddSourceModal({
             )}
 
             {isJira && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void handleConnectJira()}
-                disabled={connectState === "loading" || !canIngest}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-app-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canIngest}
+                loading={connectState === "loading"}
               >
-                {connectState === "loading" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {connectState === "loading" ? "Connecting…" : "Connect Jira instance"}
-              </button>
+              </Button>
             )}
           </>
         )

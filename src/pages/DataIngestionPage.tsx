@@ -6,10 +6,7 @@ import { Button } from "../components/ui/Button.tsx";
 import { Modal } from "../components/ui/Modal.tsx";
 import { PanelPresence } from "../components/ui/PanelPresence.tsx";
 import { Pagination } from "../components/ui/Pagination.tsx";
-import {
-  SegmentedControl,
-  type SegmentedControlOption,
-} from "../components/ui/SegmentedControl.tsx";
+import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs.tsx";
 import { DataIngestionHeader } from "../features/data-ingestion/components/DataIngestionHeader.tsx";
 import { DataIngestionLoadingState } from "../features/data-ingestion/components/DataIngestionLoadingState.tsx";
 import { DataIngestionSectionFilter } from "../features/data-ingestion/components/DataIngestionSectionFilter.tsx";
@@ -94,9 +91,9 @@ const DEFAULT_GLOBAL_JIRA_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
 
 type SyncSettingsProvider = "github" | "jira";
 
-const SYNC_SETTINGS_PROVIDERS: ReadonlyArray<SegmentedControlOption<SyncSettingsProvider>> = [
-  { id: "github", label: "GitHub" },
-  { id: "jira", label: "Jira" },
+const SYNC_SETTINGS_PROVIDERS: SegmentedTabOption<SyncSettingsProvider>[] = [
+  { value: "github", label: "GitHub" },
+  { value: "jira", label: "Jira" },
 ];
 
 // Small enough that the run table stays scannable and pagination is actually
@@ -1441,10 +1438,11 @@ export function DataIngestionPage() {
       >
         {hasGithubSources && hasJiraSources ? (
           <div className="mb-5">
-            <SegmentedControl
-              options={SYNC_SETTINGS_PROVIDERS}
+            <SegmentedTabs
               value={syncSettingsProvider}
+              options={SYNC_SETTINGS_PROVIDERS}
               onChange={setSyncSettingsProvider}
+              layoutId="sync-settings-provider-pill"
               ariaLabel="Sync settings connector"
             />
           </div>
