@@ -20,6 +20,7 @@ import type {
   SourceStatusPresentation,
   SourceSystem,
 } from "./types.ts";
+import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
 
 export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
 
@@ -66,9 +67,11 @@ export function createSourceFromInstance(
   const hasNeverSynced = instance.lastRunTime === null;
 
   return {
-    sourceId: instance.repositoryId,
+    // GitHub rows carry a repositoryId; fall back to the connector-neutral
+    // sourceId so the card always has a stable selection key.
+    sourceId: instance.repositoryId ?? instance.sourceId,
     sourceSystem: instance.sourceSystem,
-    name: instance.sourceId,
+    name: instance.displayName,
     type: meta.type,
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
@@ -95,8 +98,8 @@ export function createSourceFromInstance(
     sharesSourceSystem: false,
     failedItems: instance.failedItems,
     githubRepository: {
-      owner: instance.owner,
-      name: instance.name,
+      owner: instance.owner ?? "",
+      name: instance.name ?? "",
       repositoryId: instance.repositoryId,
       fullName: instance.sourceId,
       url: instance.sourceUrl,
@@ -105,6 +108,78 @@ export function createSourceFromInstance(
     lastCommitsSyncAt: instance.lastCommitsSyncAt,
     lastIssuesSyncAt: instance.lastIssuesSyncAt,
     lastPullRequestsSyncAt: instance.lastPullRequestsSyncAt,
+  };
+}
+
+/**
+ * Turns one Jira ingestion status row (`/api/v1/ingestion-sources/status`, the
+ * connector-neutral rows where `sourceSystem === "JIRA"`) into a
+ * {@link DataSource}, the Jira counterpart to {@link createSourceFromInstance}.
+ *
+ * The status row is now authoritative for health, counters, total artifact count
+ * and last-sync time — exactly like GitHub — so no run stitch is needed. The
+ * status endpoint carries no credential metadata, though, so the matching
+ * {@link JiraInstanceDto} (looked up by instance URL) is merged in for the
+ * credential shown in the details panel. `githubRepository` is always null;
+ * identity lives in `jiraInstance`, keyed by the instance URL (`sourceId`).
+ */
+export function createJiraSourceFromInstance(
+  status: SourceInstanceIngestionStatus,
+  instance?: JiraInstanceDto | null,
+  connectorEnabled?: boolean,
+): DataSource {
+  const meta = SOURCE_META.JIRA;
+  const backendStatus: BackendProjectSourceStatus =
+    status.enabled === false ? "DISABLED" : status.connectionStatus;
+  const hasErrors = status.failedCount > 0;
+  const hasNeverSynced = status.lastRunTime === null;
+
+  return {
+    sourceId: status.sourceId,
+    sourceSystem: "JIRA",
+    name: status.displayName,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled,
+    }),
+    artifacts: status.artifactCount,
+    lastSync: formatDateTime(status.lastRunTime),
+    nextSync: "Not available",
+    errors: status.failedCount,
+    description: meta.description,
+    lastRunAt: status.lastRunTime,
+    latestIngestedCount: status.ingestedCount,
+    latestUpdatedCount: status.updatedCount,
+    deletedCount: status.deletedCount,
+    totalArtifactCount: status.artifactCount,
+    runIds: [],
+    sharesSourceSystem: false,
+    failedItems: status.failedItems,
+    githubRepository: null,
+    jiraInstance: {
+      instanceUrl: status.sourceId,
+      // Prefer the instance DTO's display name/credential; the status row still
+      // provides a display name, but only the DTO knows the credential pair.
+      displayName: instance?.displayName ?? status.displayName,
+      credentialName: instance?.updateCredentialName ?? "",
+      credentialUserEmail: instance?.updateCredentialUserEmail ?? "",
+    },
+    lastCommitsSyncAt: null,
+    // Jira's per-type sync timestamp; the backend maps it to the last update.
+    lastIssuesSyncAt: status.lastIssuesSyncAt,
+    lastPullRequestsSyncAt: null,
   };
 }
 
@@ -261,6 +336,70 @@ export function deriveSourceStatus({
   };
 }
 
+/**
+ * Splits a source's merged {@link deriveSourceStatus} presentation into the two
+ * badges every source card and details drawer shows: a connection badge and a
+ * sync-status badge. Splitting here (rather than per connector) keeps GitHub and
+ * Jira identical — both always show "Connected/Disabled" next to the live sync
+ * status — instead of one collapsing to a single "Syncing" chip.
+ *
+ * The connection badge answers "is this source linked and enabled?". Only a
+ * disabled source (or one under a disabled connector) reads as not-connected;
+ * syncing, out-of-date and needs-attention are all still connected states.
+ */
+export function deriveConnectionStatus(
+  source: DataSource,
+): SourceStatusPresentation {
+  if (source.statusView.state === "disabled") {
+    return source.statusView;
+  }
+
+  return {
+    state: "connected",
+    label: "Connected",
+    icon: CheckCircle2,
+    tone: "success",
+    spinning: false,
+  };
+}
+
+/**
+ * The sync-status half of the badge pair (see {@link deriveConnectionStatus}):
+ * the live ingestion activity and freshness, keeping the spinner while a sync is
+ * in flight. Syncing, out-of-date and attention already describe the sync, so
+ * they pass through; the connection states (connected/disabled) collapse to the
+ * freshness the source last reached — "Synced" once it has run, else "Not synced".
+ */
+export function deriveSyncStatus(
+  source: DataSource,
+): SourceStatusPresentation {
+  const view = source.statusView;
+
+  if (
+    view.state === "syncing" ||
+    view.state === "stale" ||
+    view.state === "attention"
+  ) {
+    return view;
+  }
+
+  return source.lastRunAt !== null
+    ? {
+        state: "connected",
+        label: "Synced",
+        icon: CheckCircle2,
+        tone: "success",
+        spinning: false,
+      }
+    : {
+        state: "attention",
+        label: "Not synced",
+        icon: AlertTriangle,
+        tone: "danger",
+        spinning: false,
+      };
+}
+
 export function getSourceStatusLabel(
   hasNeverSynced: boolean,
   hasErrors: boolean,
@@ -351,15 +490,26 @@ export function getSourceLabel(sourceSystem: SourceSystem) {
 }
 
 /**
- * Maps each ingestion run to the connected source it produced artifacts for, so
- * run lists can show the repository (e.g. "sprintstart-frontend") instead of the
- * generic source-system label ("GitHub").
+ * The host of a Jira instance URL without the scheme, e.g.
+ * `"acme.atlassian.net"` for `"https://acme.atlassian.net"`. Falls back to
+ * stripping the scheme/trailing slash by hand if the value is not a valid URL.
+ */
+export function formatJiraInstanceDomain(instanceUrl: string): string {
+  try {
+    return new URL(instanceUrl).host;
+  } catch {
+    return instanceUrl.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  }
+}
+
+/**
+ * Maps a run's source reference (the run's `sourceId`) to the connected source's
+ * friendly display name, so run lists can show that name instead of the raw
+ * reference — most visibly for Jira, whose `sourceId` is the instance URL.
  *
- * The backend does not yet persist a source instance on a run (see
- * backend-ingestion-source-instance-issue.md), so the association is recovered
- * from the source's `runIds`, which are collected from the artifacts each run
- * ingested. Runs that produced no artifacts (empty/failed) won't be in the map
- * and fall back to the source-system label.
+ * Keyed by the same value the run carries in `sourceId`: GitHub `"owner/name"`
+ * (the repository's full name) and Jira the instance URL. Runs whose source is
+ * no longer connected won't be in the map and fall back to the raw reference.
  */
 export function buildRunSourceLabels(
   sources: DataSource[],
@@ -367,29 +517,31 @@ export function buildRunSourceLabels(
   const labels = new Map<string, string>();
 
   sources.forEach((source) => {
-    source.runIds.forEach((runId) => {
-      if (!labels.has(runId)) {
-        labels.set(runId, source.name);
-      }
-    });
+    const ref =
+      source.jiraInstance?.instanceUrl ?? source.githubRepository?.fullName;
+    if (ref && !labels.has(ref)) {
+      labels.set(ref, source.name);
+    }
   });
 
   return labels;
 }
 
 /**
- * Repository label for a run. Prefers the repository identity the backend now
- * persists on the run itself (`sourceId` = "owner/name"), falling back to the
- * artifact-derived {@link buildRunSourceLabels} map for legacy runs that predate
- * that field, and finally to the source-system label.
+ * Display label for a run. Prefers the connected source's friendly display name
+ * (resolved from the run's `sourceId` via {@link buildRunSourceLabels}), falling
+ * back to the raw `sourceId` the backend persists on the run, and finally to the
+ * source-system label for uploads and legacy runs that carry no `sourceId`.
  */
 export function getRunSourceLabel(
   run: IngestionRun,
-  labelByRunId?: Map<string, string>,
+  labelBySourceRef?: Map<string, string>,
 ) {
-  return (
-    run.sourceId ?? labelByRunId?.get(run.runId) ?? getSourceLabel(run.sourceSystem)
-  );
+  if (run.sourceId) {
+    return labelBySourceRef?.get(run.sourceId) ?? run.sourceId;
+  }
+
+  return getSourceLabel(run.sourceSystem);
 }
 
 export function formatDateTime(value: string | null) {

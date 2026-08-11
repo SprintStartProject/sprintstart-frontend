@@ -377,6 +377,25 @@ describe('ingestionService', () => {
             expect(result.page.hasNext).toBe(false);
             expect(result.page.totalElements).toBe(1);
         });
+
+        it('passes the sourceRef filter for a connector-neutral instance', async () => {
+            let capturedParams: URLSearchParams | null = null;
+            server.use(
+                http.get('/api/v1/ingestion-runs/page', ({ request }) => {
+                    capturedParams = new URL(request.url).searchParams;
+                    return HttpResponse.json({ items: [] });
+                }),
+            );
+
+            await getIngestionRunsPage({
+                sourceRef: 'https://team.atlassian.net',
+            });
+
+            expect(capturedParams!.get('sourceRef')).toBe(
+                'https://team.atlassian.net',
+            );
+            expect(capturedParams!.get('repositoryId')).toBeNull();
+        });
     });
 
     describe('getIngestionSourceStatuses', () => {
@@ -405,11 +424,43 @@ describe('ingestionService', () => {
             const statuses = await getIngestionSourceStatuses();
             expect(statuses[0].repositoryId).toBe('repo-uuid');
             expect(statuses[0].artifactCount).toBe(340);
-            // This fixture only sends the deprecated `status` alias.
             expect(statuses[0].connectionStatus).toBe('CONNECTED');
             expect(statuses[0].enabled).toBe(true);
             expect(statuses[0].deletedCount).toBe(0);
             expect(statuses[0].lastIssuesSyncAt).toBeNull();
+            // No displayName in the fixture -> falls back to the sourceId.
+            expect(statuses[0].displayName).toBe('octo/repo');
+        });
+
+        it('maps a connector-neutral (Jira) row with nullable GitHub identity', async () => {
+            server.use(
+                http.get('/api/v1/ingestion-sources/status', () =>
+                    HttpResponse.json([
+                        {
+                            sourceSystem: 'JIRA',
+                            sourceId: 'https://team.atlassian.net',
+                            displayName: 'Team board',
+                            repositoryId: null,
+                            owner: null,
+                            name: null,
+                            sourceUrl: 'https://team.atlassian.net',
+                            connectionStatus: 'CONNECTED',
+                            enabled: true,
+                            artifactCount: 128,
+                            lastIssuesSyncAt: '2026-07-01T00:00:00Z',
+                        },
+                    ]),
+                ),
+            );
+
+            const statuses = await getIngestionSourceStatuses();
+            expect(statuses[0].sourceSystem).toBe('JIRA');
+            expect(statuses[0].sourceId).toBe('https://team.atlassian.net');
+            expect(statuses[0].displayName).toBe('Team board');
+            expect(statuses[0].repositoryId).toBeNull();
+            expect(statuses[0].owner).toBeNull();
+            expect(statuses[0].name).toBeNull();
+            expect(statuses[0].artifactCount).toBe(128);
         });
 
         it('passes the projectId query when provided', async () => {

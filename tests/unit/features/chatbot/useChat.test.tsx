@@ -33,11 +33,10 @@ describe('useChat', () => {
 
     it('fetches chats and user profile on mount', async () => {
         server.use(
-            http.get('/api/v1/chats', () =>
+            http.get('/api/v1/chats/me', () =>
                 HttpResponse.json({
                     chats: [
                         { id: 'chat1', userId: 'user1' },
-                        { id: 'chat2', userId: 'user2' },
                     ],
                 }),
             ),
@@ -56,7 +55,7 @@ describe('useChat', () => {
                     hasCompletedOnboarding: true,
                 }),
             ),
-            http.get('/api/v1/chats/chat1', () =>
+            http.get('/api/v1/chats/me/chat1', () =>
                 HttpResponse.json({ messages: [] }),
             ),
         );
@@ -70,8 +69,8 @@ describe('useChat', () => {
 
     it('loads messages when chat is selected', async () => {
         server.use(
-            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
-            http.get('/api/v1/chats/chat1', () =>
+            http.get('/api/v1/chats/me', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/me/chat1', () =>
                 HttpResponse.json({
                     messages: [
                         {
@@ -137,8 +136,8 @@ describe('useChat', () => {
         });
 
         server.use(
-            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
-            http.get('/api/v1/chats/chat1', () => HttpResponse.json({ messages: [] })),
+            http.get('/api/v1/chats/me', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/me/chat1', () => HttpResponse.json({ messages: [] })),
             http.get('/api/v1/users/me', () =>
                 HttpResponse.json({
                     id: 'user1',
@@ -154,12 +153,12 @@ describe('useChat', () => {
                     hasCompletedOnboarding: true,
                 }),
             ),
-            http.post('/api/v1/chats/prompt', () =>
+            http.post('/api/v1/chats/me/prompt', () =>
                 new HttpResponse(stream, {
                     headers: { 'Content-Type': 'text/event-stream' },
                 }),
             ),
-            http.post('/api/v1/chats', () =>
+            http.post('/api/v1/chats/me', () =>
                 HttpResponse.json({
                     id: 'newChatId',
                 }),
@@ -206,8 +205,8 @@ describe('useChat', () => {
         });
 
         server.use(
-            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
-            http.get('/api/v1/chats/chat1', () => HttpResponse.json({ messages: [] })),
+            http.get('/api/v1/chats/me', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/me/chat1', () => HttpResponse.json({ messages: [] })),
             http.get('/api/v1/users/me', () =>
                 HttpResponse.json({
                     id: 'user1',
@@ -223,12 +222,12 @@ describe('useChat', () => {
                     hasCompletedOnboarding: true,
                 }),
             ),
-            http.post('/api/v1/chats/prompt', () =>
+            http.post('/api/v1/chats/me/prompt', () =>
                 new HttpResponse(stream, {
                     headers: { 'Content-Type': 'text/event-stream' },
                 }),
             ),
-            http.post('/api/v1/chats', () =>
+            http.post('/api/v1/chats/me', () =>
                 HttpResponse.json({
                     id: 'newChatId',
                 }),
@@ -259,16 +258,6 @@ describe('useChat', () => {
 
     it('exposes stopStreaming function that can abort a stream', async () => {
         const encoder = new TextEncoder();
-        // Simulate an abort: the stream yields one token, then the next
-        // read() throws an AbortError. MSW doesn't propagate abort to mock
-        // streams, so we simulate the error directly — the behavior is the
-        // same as a real abort: chatService catches AbortError → onDone.
-        // The token is enqueued synchronously in start() and the error is
-        // deferred via a macrotask (queueMicrotask would still run before
-        // chatService reads; setTimeout(0) lets MSW forward the chunk
-        // first). A short delay is unavoidable because MSW discards queued
-        // chunks when the source stream errors — the token must be consumed
-        // end-to-end before the error fires.
         const abortError = new Error('aborted');
         abortError.name = 'AbortError';
 
@@ -280,8 +269,8 @@ describe('useChat', () => {
         });
 
         server.use(
-            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
-            http.get('/api/v1/chats/chat1', () => HttpResponse.json({ messages: [] })),
+            http.get('/api/v1/chats/me', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/me/chat1', () => HttpResponse.json({ messages: [] })),
             http.get('/api/v1/users/me', () =>
                 HttpResponse.json({
                     id: 'user1',
@@ -297,12 +286,12 @@ describe('useChat', () => {
                     hasCompletedOnboarding: true,
                 }),
             ),
-            http.post('/api/v1/chats/prompt', () =>
+            http.post('/api/v1/chats/me/prompt', () =>
                 new HttpResponse(stream, {
                     headers: { 'Content-Type': 'text/event-stream' },
                 }),
             ),
-            http.post('/api/v1/chats', () =>
+            http.post('/api/v1/chats/me', () =>
                 HttpResponse.json({
                     id: 'newChatId',
                 }),
@@ -341,8 +330,8 @@ describe('useChat', () => {
         });
 
         server.use(
-            http.get('/api/v1/chats', () => HttpResponse.json({ chats: [] })),
-            http.get('/api/v1/chats/chat1', () => HttpResponse.json({ messages: [] })),
+            http.get('/api/v1/chats/me', () => HttpResponse.json({ chats: [] })),
+            http.get('/api/v1/chats/me/chat1', () => HttpResponse.json({ messages: [] })),
             http.get('/api/v1/users/me', () =>
                 HttpResponse.json({
                     id: 'user1',
@@ -358,12 +347,12 @@ describe('useChat', () => {
                     hasCompletedOnboarding: true,
                 }),
             ),
-            http.post('/api/v1/chats/prompt', () =>
+            http.post('/api/v1/chats/me/prompt', () =>
                 new HttpResponse(stream, {
                     headers: { 'Content-Type': 'text/event-stream' },
                 }),
             ),
-            http.post('/api/v1/chats', () =>
+            http.post('/api/v1/chats/me', () =>
                 HttpResponse.json({ id: 'newChatId' }),
             ),
         );

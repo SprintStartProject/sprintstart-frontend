@@ -3,6 +3,8 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CreateProjectWizard } from '../../../../../src/features/admin/components/CreateProjectWizard';
 import type { AdminProjectDetails } from '../../../../../src/services/projectService';
+import type { DiscoveredRepository } from '../../../../../src/services/sources/githubService';
+import type { SourceInstanceIngestionStatus } from '../../../../../src/features/data-ingestion/types';
 
 vi.mock('../../../../../src/services/projectService', () => ({
     projectService: {
@@ -13,11 +15,31 @@ vi.mock('../../../../../src/services/projectService', () => ({
 }));
 
 vi.mock('../../../../../src/services/sources/githubService', () => ({
+    discoverRepositories: vi.fn(),
     connectGithubRepository: vi.fn(),
+    addRepositoryToProject: vi.fn(),
+}));
+
+vi.mock('../../../../../src/services/ingestionService', () => ({
+    getIngestionSourceStatuses: vi.fn(),
+}));
+
+vi.mock('../../../../../src/services/sources/jiraService', () => ({
+    connectJiraInstance: vi.fn(),
+    getMyJiraCredentials: vi.fn(),
 }));
 
 import { projectService } from '../../../../../src/services/projectService';
-import { connectGithubRepository } from '../../../../../src/services/sources/githubService';
+import {
+    addRepositoryToProject,
+    connectGithubRepository,
+    discoverRepositories,
+} from '../../../../../src/services/sources/githubService';
+import {
+    connectJiraInstance,
+    getMyJiraCredentials,
+} from '../../../../../src/services/sources/jiraService';
+import { getIngestionSourceStatuses } from '../../../../../src/services/ingestionService';
 
 const createdProject: AdminProjectDetails = {
     id: 'proj-new',
@@ -27,6 +49,27 @@ const createdProject: AdminProjectDetails = {
     sources: [],
     users: [],
 };
+
+function repo(overrides: Partial<DiscoveredRepository> = {}): DiscoveredRepository {
+    return {
+        name: 'widgets',
+        isPrivate: false,
+        url: 'https://github.com/acme/widgets',
+        alreadyConnected: false,
+        isEnabled: null,
+        ...overrides,
+    };
+}
+
+/** Minimal per-repo status row; the picker only reads sourceId + repositoryId. */
+function statusRow(fullName: string, repositoryId: string): SourceInstanceIngestionStatus {
+    return {
+        sourceId: fullName,
+        repositoryId,
+        owner: fullName.split('/')[0],
+        name: fullName.split('/')[1],
+    } as unknown as SourceInstanceIngestionStatus;
+}
 
 function renderWizard(overrides: Partial<Parameters<typeof CreateProjectWizard>[0]> = {}) {
     const onClose = vi.fn();
@@ -58,19 +101,22 @@ async function settleModalFocus() {
     });
 }
 
-/** Fills in the name on step 1 and moves to the sources step. */
+/** Fills in the name on step 1 and moves to the source-type step. */
 async function goToSourcesStep(user: ReturnType<typeof userEvent.setup>) {
     await settleModalFocus();
     await user.type(screen.getByLabelText('Name'), 'Apollo');
     await user.click(screen.getByRole('button', { name: /continue/i }));
 }
 
-async function addRepository(
-    user: ReturnType<typeof userEvent.setup>,
-    reference: string,
-) {
-    await user.type(screen.getByLabelText('Repository owner'), reference);
-    await user.click(screen.getByRole('button', { name: /add repository/i }));
+/** From the source-type step, advance into the GitHub discovery detail. */
+async function goToGithubDetail(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+}
+
+/** Runs GitHub discovery for an owner and waits for the results to render. */
+async function discover(user: ReturnType<typeof userEvent.setup>, owner = 'acme') {
+    await user.type(screen.getByLabelText('Organization, user, or URL'), owner);
+    await user.click(screen.getByRole('button', { name: /discover/i }));
 }
 
 describe('CreateProjectWizard', () => {
@@ -79,6 +125,20 @@ describe('CreateProjectWizard', () => {
         vi.mocked(projectService.getManagerCandidates).mockResolvedValue([]);
         vi.mocked(projectService.createProject).mockResolvedValue(createdProject);
         vi.mocked(connectGithubRepository).mockResolvedValue({ transactionId: 'tx' });
+        vi.mocked(addRepositoryToProject).mockResolvedValue({
+            repositoryId: 'repo-42',
+            projectIds: ['proj-new'],
+        });
+        vi.mocked(discoverRepositories).mockResolvedValue({
+            repositories: [repo({ name: 'widgets' }), repo({ name: 'gadgets' })],
+            hasMore: false,
+            resolvedOwnerType: 'org',
+        });
+        vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
+        vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
+        vi.mocked(getMyJiraCredentials).mockResolvedValue([
+            { userEmail: 'me@example.com', displayName: 'Team token' },
+        ]);
     });
 
     it('blocks the step-1 continue button until a name is entered', async () => {
@@ -98,7 +158,26 @@ describe('CreateProjectWizard', () => {
         const { onClose, onProjectCreated } = renderWizard();
 
         await goToSourcesStep(user);
+        await goToGithubDetail(user);
         await user.click(screen.getByRole('button', { name: /create without sources/i }));
+
+        await waitFor(() =>
+            expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
+                name: 'Apollo',
+                description: undefined,
+            }),
+        );
+        expect(vi.mocked(connectGithubRepository)).not.toHaveBeenCalled();
+        expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    it('creates the project without sources via "Skip for now" on the source-type step', async () => {
+        const user = userEvent.setup();
+        const { onClose, onProjectCreated } = renderWizard();
+
+        await goToSourcesStep(user);
+        await user.click(screen.getByRole('button', { name: /skip for now/i }));
 
         await waitFor(() =>
             expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
@@ -132,6 +211,7 @@ describe('CreateProjectWizard', () => {
         await user.type(screen.getByLabelText('Name'), 'Apollo');
         await user.selectOptions(screen.getByLabelText('Project manager'), 'user-7');
         await user.click(screen.getByRole('button', { name: /continue/i }));
+        await goToGithubDetail(user);
         await user.click(screen.getByRole('button', { name: /create without sources/i }));
 
         await waitFor(() =>
@@ -142,13 +222,16 @@ describe('CreateProjectWizard', () => {
         );
     });
 
-    it('connects every staged repository against the new project id', async () => {
+    it('connects the repositories selected in discovery against the new project id', async () => {
         const user = userEvent.setup();
         renderWizard();
 
         await goToSourcesStep(user);
-        await addRepository(user, 'acme/widgets');
-        await addRepository(user, 'acme/gadgets');
+        await goToGithubDetail(user);
+        await discover(user);
+
+        await user.click(await screen.findByRole('checkbox', { name: /widgets/i }));
+        await user.click(screen.getByRole('checkbox', { name: /gadgets/i }));
 
         await user.click(
             screen.getByRole('button', { name: /create and connect 2 repositories/i }),
@@ -165,16 +248,34 @@ describe('CreateProjectWizard', () => {
         });
     });
 
-    it('rejects a repository that is already on the list', async () => {
+    it('links an already-ingested repository instead of re-ingesting it', async () => {
+        vi.mocked(discoverRepositories).mockResolvedValue({
+            repositories: [repo({ name: 'linked', alreadyConnected: true, isEnabled: true })],
+            hasMore: false,
+            resolvedOwnerType: 'org',
+        });
+        vi.mocked(getIngestionSourceStatuses).mockResolvedValue([
+            statusRow('acme/linked', 'repo-42'),
+        ]);
         const user = userEvent.setup();
         renderWizard();
 
         await goToSourcesStep(user);
-        await addRepository(user, 'acme/widgets');
-        await addRepository(user, 'ACME/Widgets');
+        await goToGithubDetail(user);
+        await discover(user);
 
-        expect(screen.getByText(/is already on the list/i)).toBeInTheDocument();
-        expect(screen.getAllByText('acme/widgets')).toHaveLength(1);
+        await user.click(await screen.findByRole('checkbox', { name: /linked/i }));
+        await user.click(
+            screen.getByRole('button', { name: /create and connect 1 repository/i }),
+        );
+
+        await waitFor(() =>
+            expect(vi.mocked(addRepositoryToProject)).toHaveBeenCalledWith(
+                'repo-42',
+                'proj-new',
+            ),
+        );
+        expect(vi.mocked(connectGithubRepository)).not.toHaveBeenCalled();
     });
 
     it('keeps the project and offers a retry when a source fails to connect', async () => {
@@ -185,7 +286,10 @@ describe('CreateProjectWizard', () => {
         const { onClose, onProjectCreated } = renderWizard();
 
         await goToSourcesStep(user);
-        await addRepository(user, 'acme/widgets');
+        await goToGithubDetail(user);
+        await discover(user);
+
+        await user.click(await screen.findByRole('checkbox', { name: /widgets/i }));
         await user.click(
             screen.getByRole('button', { name: /create and connect 1 repository/i }),
         );
@@ -198,9 +302,75 @@ describe('CreateProjectWizard', () => {
 
         await user.click(screen.getByRole('button', { name: 'Retry' }));
 
-        await waitFor(() => expect(screen.getByText(/connected/i)).toBeInTheDocument());
+        await waitFor(() =>
+            expect(screen.getByText(/Connected · team-pat/i)).toBeInTheDocument(),
+        );
         // The retry must not create a second project.
         expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates the project and connects a Jira instance against the new project id', async () => {
+        const user = userEvent.setup();
+        const { onClose } = renderWizard();
+
+        await goToSourcesStep(user);
+        await user.click(screen.getByRole('button', { name: /indexes jira issues/i }));
+        await goToGithubDetail(user);
+
+        // The stored credential is adopted automatically once it loads.
+        await screen.findByRole('option', { name: /Team token - me@example.com/i });
+
+        await user.type(screen.getByLabelText('Display name'), 'Team board');
+        await user.type(
+            screen.getByLabelText('Instance URL'),
+            'https://acme.atlassian.net',
+        );
+
+        await user.click(
+            screen.getByRole('button', { name: /create and connect jira instance/i }),
+        );
+
+        await waitFor(() =>
+            expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
+                name: 'Apollo',
+                description: undefined,
+            }),
+        );
+        expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith({
+            displayName: 'Team board',
+            url: 'https://acme.atlassian.net',
+            userEmail: 'me@example.com',
+            tokenName: 'Team token',
+            projectId: 'proj-new',
+        });
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    it('creates the project first so files can be uploaded to it', async () => {
+        const user = userEvent.setup();
+        const { onProjectCreated } = renderWizard();
+
+        await goToSourcesStep(user);
+        await user.click(screen.getByRole('button', { name: /indexes manually uploaded/i }));
+        await goToGithubDetail(user);
+
+        // Before the project exists the drop zone is withheld behind an explicit
+        // "Create project" action, since uploads need a live project id.
+        expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole('button', { name: /create project/i }));
+
+        await waitFor(() =>
+            expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
+                name: 'Apollo',
+                description: undefined,
+            }),
+        );
+        expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
+        // The upload drop zone is now revealed against the created project.
+        expect(
+            await screen.findByText(/drag and drop .* files/i),
+        ).toBeInTheDocument();
     });
 
     it('does not create the project when the wizard is cancelled on the source step', async () => {

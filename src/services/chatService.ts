@@ -4,38 +4,36 @@ import keycloak from "../config/keycloak";
 import type { Chat, ChatMessage, StreamHandlers } from "../features/chatbot/types";
 
 /**
- * Retrieves all created chats.
+ * Retrieves created chats for the current user (personal `/me` endpoint).
  *
  * @throws Error if the backend request fails
  */
-export async function getChats() {
-    const response = await apiClient.fetch<{ chats: Chat[] }>(`/api/v1/chats`);
+export async function getMyChats() {
+    const response = await apiClient.fetch<{ chats: Chat[] }>(`/api/v1/chats/me`);
     return response;
 }
 
 /**
- * Creates a new chat for a specific user.
+ * Creates a new chat for the authenticated user.
  *
- * @param userId The user starting the conversation.
- * @returns The backend returns only `{ id }` — callers must synthesize the
- *   remaining `Chat` fields (`title`, `userId`, `createdAt`) client-side.
+ * @param _userId Ignored parameter kept for signature compatibility (owner derived from JWT).
+ * @returns The backend returns `{ id }`.
  */
-export async function createChat(userId: string) {
-    return await apiClient.fetch<{ id: string }>(`/api/v1/chats`, {
+export async function createChat(_userId?: string) {
+    return await apiClient.fetch<{ id: string }>(`/api/v1/chats/me`, {
         method: "POST",
-        body: JSON.stringify({ userId }),
     });
 }
 
 /**
- * Retrieves all messages from a specific chat.
+ * Retrieves all messages from a specific chat owned by the authenticated user.
  *
  * @param chatId The chat the messages belong to.
  * @note The backend's `ChatMessageResponse` omits `id` — we generate stable
  *   client-side ids here so React keys and the streaming-message tracking work.
  */
 export async function getMessages(chatId: string) {
-    const response = await apiClient.fetch<{ messages: ChatMessage[] }>(`/api/v1/chats/${chatId}`);
+    const response = await apiClient.fetch<{ messages: ChatMessage[] }>(`/api/v1/chats/me/${chatId}`);
     return {
         messages: response.messages.map((msg) => ({
             ...msg,
@@ -121,7 +119,7 @@ export async function streamMessage(
             }
             : undefined;
 
-    const res = await fetch(`/api/v1/chats/prompt`, {
+    const res = await fetch(`/api/v1/chats/me/prompt`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

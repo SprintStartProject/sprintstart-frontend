@@ -5,18 +5,22 @@ import type { IngestionRunStatus } from "../types.ts";
 /** `"ALL"` means "no status filter", i.e. the query param is omitted. */
 export type RunStatusFilter = IngestionRunStatus | "ALL";
 
-export type RunRepositoryOption = {
-  repositoryId: string;
+/**
+ * One selectable source in the run filter. `value` is a GitHub repository id or
+ * a Jira instance URL; the parent decides which query param it maps to.
+ */
+export type RunSourceOption = {
+  value: string;
   label: string;
 };
 
 type RunHistoryFiltersProps = {
   status: RunStatusFilter;
-  /** A repository id, or `"ALL"` for every repository in the project. */
-  repositoryId: string;
-  repositories: RunRepositoryOption[];
+  /** A source `value`, or `"ALL"` for every source in the project. */
+  sourceValue: string;
+  sources: RunSourceOption[];
   onStatusChange: (status: RunStatusFilter) => void;
-  onRepositoryChange: (repositoryId: string) => void;
+  onSourceChange: (value: string) => void;
   onReset: () => void;
   disabled?: boolean;
 };
@@ -44,16 +48,16 @@ const SELECT_CLASSNAME =
  */
 export function RunHistoryFilters({
   status,
-  repositoryId,
-  repositories,
+  sourceValue,
+  sources,
   onStatusChange,
-  onRepositoryChange,
+  onSourceChange,
   onReset,
   disabled = false,
 }: RunHistoryFiltersProps) {
   const statusId = useId();
-  const repositoryId_ = useId();
-  const hasActiveFilter = status !== "ALL" || repositoryId !== "ALL";
+  const sourceId = useId();
+  const hasActiveFilter = status !== "ALL" || sourceValue !== "ALL";
 
   return (
     <div
@@ -80,25 +84,22 @@ export function RunHistoryFilters({
         ))}
       </select>
 
-      {repositories.length > 1 && (
+      {sources.length > 1 && (
         <>
-          <label htmlFor={repositoryId_} className="sr-only">
-            Filter runs by repository
+          <label htmlFor={sourceId} className="sr-only">
+            Filter runs by source
           </label>
           <select
-            id={repositoryId_}
-            value={repositoryId}
+            id={sourceId}
+            value={sourceValue}
             disabled={disabled}
-            onChange={(event) => onRepositoryChange(event.target.value)}
+            onChange={(event) => onSourceChange(event.target.value)}
             className={SELECT_CLASSNAME}
           >
-            <option value="ALL">All repositories</option>
-            {repositories.map((repository) => (
-              <option
-                key={repository.repositoryId}
-                value={repository.repositoryId}
-              >
-                {repository.label}
+            <option value="ALL">All sources</option>
+            {sources.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
               </option>
             ))}
           </select>
