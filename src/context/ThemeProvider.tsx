@@ -113,9 +113,9 @@ function getInitialAuroraEnabled(): boolean {
     }
 
     /**
-     * Reads the user's stored tilt effect preference.
-     * Defaults to `true` (on) when nothing is stored.
-     */
+         * Reads the user's stored tilt effect preference.
+         * Defaults to `false` (off) when nothing is stored.
+         */
     function getInitialTiltEnabled(): boolean {
         let stored: string | null = null;
         try {
