@@ -205,7 +205,19 @@ export function SidebarNavLink({
                 // specular edges read as uneven next to the plain
                 // brand colour used elsewhere in the app. The
                 // depth comes from the soft glow alone.
+                //
+                // The `key` is what makes the pill slide. Both this
+                // and the hover tint below are `motion.span` in the
+                // same slot, so without distinct keys React reconciles
+                // them as one element and merely swaps `layoutId` on a
+                // node that never unmounts. Framer Motion pairs a
+                // shared element by watching one mount as another
+                // unmounts, so that swap gave it nothing to measure
+                // against and the pill appeared at the new entry
+                // outright. Separate keys restore the unmount/mount
+                // pair and the pill travels between rows.
                 <motion.span
+                  key="active-pill"
                   aria-hidden="true"
                   layoutId={indicatorLayoutId}
                   transition={indicatorTransition}
@@ -213,6 +225,7 @@ export function SidebarNavLink({
                 />
               ) : prefersReducedMotion ? (
                 <span
+                  key="hover-tint-static"
                   aria-hidden="true"
                   className="absolute inset-0 rounded-[10px] bg-app-surface-hover opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
                 />
@@ -223,6 +236,7 @@ export function SidebarNavLink({
                 // the magnification look like it jumped between
                 // neighbours instead of travelling through them.
                 <motion.span
+                  key="hover-tint"
                   aria-hidden="true"
                   style={{ opacity: tintOpacity }}
                   className="absolute inset-0 rounded-[10px] bg-app-surface-hover"
