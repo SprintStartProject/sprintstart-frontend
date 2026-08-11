@@ -1,14 +1,12 @@
 import { ArrowLeft, Check, MessageSquareText, Pencil, Plus, SkipForward, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { Select } from "../components/ui/Select";
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
 } from "../features/onboarding/types";
+import { findActivePhaseIndex } from "../features/onboarding/activePhase";
 import type { ProjectRole, TeamOverviewUser } from "../features/team-management/types";
 import type { KnowledgeGap } from "../features/knowledge-gaps/types";
 import { knowledgeGapService } from "../services/knowledgeGapService";
@@ -57,7 +55,13 @@ import { AddCustomStepModal } from "../features/team-management/components/detai
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
 import { MemberOnboardingSection } from "../features/team-management/components/detail/MemberOnboardingSection";
+import { MemberReviewPoolPanel } from "../features/team-management/components/detail/MemberReviewPoolPanel";
+import {
+  PhaseCheckAdminModal,
+  type PhaseCheckAdminTab,
+} from "../features/team-management/components/detail/PhaseCheckAdminModal";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
+import { useProjectContext } from "../features/projects/useProjectContext";
 
 function formatMinutes(minutes?: number | null): string {
   if (!minutes || minutes <= 0) return "No estimate";
@@ -99,6 +103,7 @@ function getStepStatusStyles(status: string) {
 }
 
 export function TeamMemberDetailPage() {
+  const { selectedProjectId } = useProjectContext();
   const { userId } = useParams<{ userId: string }>();
 
   const navigate = useNavigate();
@@ -123,6 +128,8 @@ export function TeamMemberDetailPage() {
     phaseId: string;
     position: number;
   } | null>(null);
+  // Which tab of the knowledge-check modal is open for the selected phase (null = closed).
+  const [checkModalTab, setCheckModalTab] = useState<PhaseCheckAdminTab | null>(null);
   const [customStepTitle, setCustomStepTitle] = useState("");
   const [customStepDescription, setCustomStepDescription] = useState("");
   const [customStepExpectedOutcome, setCustomStepExpectedOutcome] = useState("");
@@ -164,7 +171,7 @@ export function TeamMemberDetailPage() {
         getProjectRoles(),
         getUserSkillLevels(userId),
         getUserOnboardingPath(userId),
-        knowledgeGapService.fetchKnowledgeGaps(),
+        knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
       ]);
       let feedback: OnboardingFeedback[] = [];
       try {
@@ -179,14 +186,19 @@ export function TeamMemberDetailPage() {
       setKnowledgeGaps(knowledgeGapOverview.gaps);
       setFeedbackItems(feedback);
       setOnboardingPath(path);
-      setSelectedPhaseId(path?.phases?.[0]?.id ?? "");
-      setSelectedStepId(memberData?.currentStep?.id ?? path?.phases?.[0]?.steps?.[0]?.id ?? "");
+      // Open on the phase the member is actually working on. Phase 1 is almost never
+      // the interesting one for a reviewer, and it hides how far along they really are.
+      const activePhase = path?.phases?.[findActivePhaseIndex(path)];
+      setSelectedPhaseId(activePhase?.id ?? "");
+      setSelectedStepId(memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? "");
       setLoadingFeedback(false);
       setLoading(false);
     }
 
     void loadMember();
-  }, [userId]);
+    // Knowledge gaps are project-scoped, so switching projects has to reload them —
+    // otherwise this page keeps showing the previous project's gaps for the member.
+  }, [userId, selectedProjectId]);
 
   useEffect(() => {
     async function loadPathTaskCounts() {
@@ -251,8 +263,10 @@ export function TeamMemberDetailPage() {
     const path = await getUserOnboardingPath(userId);
     setOnboardingPath(path);
 
+    // Only when the selected phase disappeared; fall back to the active one rather than
+    // to phase 1, for the same reason as on load.
     if (path?.phases?.length && !path.phases.some((phase) => phase.id === selectedPhaseId)) {
-      setSelectedPhaseId(path.phases[0].id);
+      setSelectedPhaseId(path.phases[findActivePhaseIndex(path)].id);
     }
 
     const refreshedSteps = path?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
@@ -632,7 +646,7 @@ export function TeamMemberDetailPage() {
             Back
           </button>
 
-          <div className="mt-6 rounded-2xl border border-app-border bg-app-surface p-8">
+          <div className="mt-6 rounded-3xl border border-app-border bg-app-surface p-8">
             <p className="text-sm text-app-text">Team member not found.</p>
           </div>
         </main>
@@ -728,7 +742,7 @@ export function TeamMemberDetailPage() {
               </div>
 
               <div>
-                <h1 className="text-xl font-semibold text-app-text sm:text-2xl">
+                <h1 className="text-2xl font-bold text-app-text">
                   {user.firstname} {user.lastname}
                 </h1>
 
@@ -795,7 +809,10 @@ export function TeamMemberDetailPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+        {/* items-start keeps both columns at their own height: without it the grid
+                    stretches the onboarding card to match the insights column, which grows
+                    when the review questions are expanded. */}
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
           <MemberOnboardingSection
             phases={phases}
             selectedPhase={selectedPhase}
@@ -820,12 +837,14 @@ export function TeamMemberDetailPage() {
             onReorderSteps={(phaseId, activeStepId, overStepId) =>
               void handleReorderSteps(phaseId, activeStepId, overStepId)
             }
+            onOpenCheck={setCheckModalTab}
             formatMinutes={formatMinutes}
             getActualMinutes={getActualMinutes}
             getStepStatusStyles={getStepStatusStyles}
           />
           <aside aria-label="Member insights" className="space-y-4">
-            <div className="rounded-2xl border border-app-border bg-app-surface p-6">
+            {userId && <MemberReviewPoolPanel userId={userId} />}
+            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
               <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
 
               <div className="mt-4 space-y-3">
@@ -836,9 +855,9 @@ export function TeamMemberDetailPage() {
                   </div>
 
                   {(unreadFeedback.length > 0 || pendingSkip) && (
-                    <Badge variant="warning" size="sm">
+                    <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
                       {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
-                    </Badge>
+                    </span>
                   )}
                 </div>
 
@@ -853,9 +872,9 @@ export function TeamMemberDetailPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-app-text">Skip request</p>
-                            <Badge variant="warning" size="sm">
+                            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
                               Pending
-                            </Badge>
+                            </span>
                           </div>
 
                           {user.currentStep?.title && (
@@ -984,9 +1003,9 @@ export function TeamMemberDetailPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-sm font-semibold text-app-text">Feedback</p>
-                          <Badge variant="warning" size="sm">
+                          <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
                             Unread
-                          </Badge>
+                          </span>
                         </div>
                         <p className="mt-2 text-sm text-app-text">
                           {user.firstname} has left feedback on their onboarding path.
@@ -1031,17 +1050,15 @@ export function TeamMemberDetailPage() {
               >
                 <span className="text-sm font-medium text-app-text">{role.name}</span>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
+                <button
+                  type="button"
                   onClick={() => setRoleToRemove(role)}
                   disabled={savingRoleId === role.id}
-                  className="hover:text-app-danger-text"
+                  className="rounded-lg p-1.5 text-app-text-muted hover:bg-app-surface-hover hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={`Remove ${role.name}`}
                 >
                   <X className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             ))
           ) : (
@@ -1052,11 +1069,10 @@ export function TeamMemberDetailPage() {
         </div>
 
         <div className="mt-6 flex gap-2">
-          <Select
+          <select
             value={selectedRoleId}
-            aria-label="Choose role"
             onChange={(event) => setSelectedRoleId(event.target.value)}
-            className="min-w-0 flex-1"
+            className="min-w-0 flex-1 rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
           >
             <option value="">Choose role</option>
 
@@ -1065,16 +1081,17 @@ export function TeamMemberDetailPage() {
                 {role.name}
               </option>
             ))}
-          </Select>
+          </select>
 
-          <Button
-            variant="primary"
+          <button
+            type="button"
             onClick={() => void handleAddRole()}
             disabled={!selectedRoleId || savingRoleId !== null}
-            icon={<Plus className="h-4 w-4" />}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
+            <Plus className="h-4 w-4" />
             Add
-          </Button>
+          </button>
         </div>
 
         {unassignedRoles.length === 0 && (
@@ -1110,6 +1127,17 @@ export function TeamMemberDetailPage() {
         onClose={() => setStepInsertTarget(null)}
         onSubmit={() => void handleCreateCustomStep()}
       />
+      {checkModalTab && selectedPhase && userId && (
+        <PhaseCheckAdminModal
+          userId={userId}
+          phaseId={selectedPhase.id}
+          phaseTitle={selectedPhase.title}
+          memberName={`${user.firstname} ${user.lastname}`.trim()}
+          initialTab={checkModalTab}
+          onSaved={() => void refreshOnboardingPath()}
+          onClose={() => setCheckModalTab(null)}
+        />
+      )}
       <PanelPresence value={detailStep}>
         {(step) => (
           <StepDetailsPanel

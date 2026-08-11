@@ -238,6 +238,98 @@ describe("onboardingService", () => {
     expect(result.results[1].feedback).toBe("Right idea.");
   });
 
+  it("fetchReviewCheck loads the open pool with its source phases", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/review-check", () =>
+        HttpResponse.json({
+          openCount: 1,
+          questions: [
+            {
+              id: "q1",
+              position: 0,
+              type: "MULTIPLE_CHOICE",
+              question: "Which one?",
+              options: [{ id: "o1", position: 0, label: "A" }],
+              review: true,
+              reviewSourcePhaseTitle: "Setup",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const pool = await onboardingService.fetchReviewCheck();
+
+    expect(pool.openCount).toBe(1);
+    expect(pool.questions[0].review).toBe(true);
+    expect(pool.questions[0].reviewSourcePhaseTitle).toBe("Setup");
+    // Correct answers must not leak into the pool listing.
+    expect(pool.questions[0].options?.[0]).not.toHaveProperty("correct");
+  });
+
+  it("submitReviewCheck posts only the answered questions and reports what is left", async () => {
+    let capturedBody: unknown = null;
+    server.use(
+      http.post("/api/v1/onboarding/me/review-check/attempts", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          answeredCount: 1,
+          correctCount: 1,
+          remainingCount: 0,
+          onboardingCompleted: true,
+          results: [
+            {
+              questionId: "q1",
+              correct: true,
+              correctOptionIds: ["o1"],
+              correctAnswer: null,
+              explanation: null,
+              feedback: null,
+              review: true,
+              reviewSourcePhaseTitle: "Setup",
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await onboardingService.submitReviewCheck([
+      { questionId: "q1", selectedOptionIds: ["o1"] },
+    ]);
+
+    expect(capturedBody).toEqual({
+      answers: [{ questionId: "q1", selectedOptionIds: ["o1"] }],
+    });
+    expect(result.remainingCount).toBe(0);
+    // Clearing the last open question is what finishes the onboarding journey.
+    expect(result.onboardingCompleted).toBe(true);
+  });
+
+  it("fetchUserReviewCheck loads another user's open pool for reviewers", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/users/user1/review-check", () =>
+        HttpResponse.json({
+          openCount: 1,
+          questions: [
+            {
+              id: "q1",
+              position: 0,
+              type: "SHORT_TEXT",
+              question: "cmd?",
+              review: true,
+              reviewSourcePhaseTitle: "Setup",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const pool = await onboardingService.fetchUserReviewCheck("user1");
+
+    expect(pool.openCount).toBe(1);
+    expect(pool.questions[0].reviewSourcePhaseTitle).toBe("Setup");
+  });
+
   it("savePhaseCheck sends a PUT with the questions payload", async () => {
     let capturedBody: unknown = null;
     server.use(

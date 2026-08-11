@@ -10,6 +10,7 @@ import { insightsService } from "../../../services/faqService";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { useFetch } from "../../../hooks/useFetch";
+import { useProjectContext } from "../../projects/useProjectContext";
 
 import {
   ArrowLeft,
@@ -27,6 +28,7 @@ import {
 // ─────────────────────────────────────────────────────────────
 
 export function FaqDetailPage() {
+  const { selectedProjectId } = useProjectContext();
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
 
@@ -34,7 +36,7 @@ export function FaqDetailPage() {
     data: detail,
     loading,
     error,
-  } = useFetch(() => insightsService.fetchFAQGroup(groupId ?? ""), [groupId]);
+  } = useFetch(() => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""), [groupId]);
 
   // ── LOADING ──────────────────────────────────────────────
 

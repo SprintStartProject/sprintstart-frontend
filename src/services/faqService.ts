@@ -3,13 +3,19 @@ import type { FAQOverview, FAQDetail } from "../features/faq/types";
 import faqMock from "../mocks/faqMock.json";
 import faqDetailMock from "../mocks/faqDetailMock.json";
 
+/**
+ * FAQ insights are project-scoped: the groups are built from the questions asked in
+ * one project's chats, so every call has to say which project it means.
+ */
 export const insightsService = {
   /**
    * Fetches all recurring question groups sorted by frequency.
    */
-  async fetchFAQGroups(): Promise<FAQOverview> {
+  async fetchFAQGroups(projectId: string): Promise<FAQOverview> {
     try {
-      return await apiClient.fetch<FAQOverview>("/api/v1/insights/faq");
+      return await apiClient.fetch<FAQOverview>(
+        `/api/v1/insights/faq?projectId=${encodeURIComponent(projectId)}`,
+      );
     } catch (_error) {
       return faqMock;
     }
@@ -18,9 +24,11 @@ export const insightsService = {
   /**
    * Fetches detailed information about a specific FAQ group.
    */
-  async fetchFAQGroup(groupId: string): Promise<FAQDetail> {
+  async fetchFAQGroup(projectId: string, groupId: string): Promise<FAQDetail> {
     try {
-      return await apiClient.fetch<FAQDetail>(`/api/v1/insights/faq/${groupId}`);
+      return await apiClient.fetch<FAQDetail>(
+        `/api/v1/insights/faq/${groupId}?projectId=${encodeURIComponent(projectId)}`,
+      );
     } catch (error) {
       console.error(`Error fetching FAQ group with ID ${groupId}:`, error);
       return faqDetailMock;
@@ -35,9 +43,10 @@ export const insightsService = {
    *
    * @returns The number of groups stored after the refresh.
    */
-  async refreshFAQGroups(): Promise<{ groupCount: number }> {
-    return await apiClient.fetch<{ groupCount: number }>("/api/v1/insights/faq/refresh", {
-      method: "POST",
-    });
+  async refreshFAQGroups(projectId: string): Promise<{ groupCount: number }> {
+    return await apiClient.fetch<{ groupCount: number }>(
+      `/api/v1/insights/faq/refresh?projectId=${encodeURIComponent(projectId)}`,
+      { method: "POST" },
+    );
   },
 };

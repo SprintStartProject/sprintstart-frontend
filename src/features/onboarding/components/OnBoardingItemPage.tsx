@@ -31,12 +31,35 @@ import {
   AlertCircle,
   Trophy,
   CircleArrowRight,
+  ClipboardCheck,
   Lightbulb,
   ThumbsUp,
   ThumbsDown,
 } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
+
+/**
+ * Where the user goes once this step is behind them.
+ *
+ * Resolved from the path rather than assumed, because "next" is not always another step:
+ * clearing the last step of a phase leaves its knowledge check as the only thing standing
+ * between the user and the rest of their journey.
+ */
+type NextAction =
+  | {
+      kind: "step";
+      stepId: string;
+      /**
+       * True when the step has never been started. The rocket marks a
+       * *beginning*, and the lookup above also admits already-in-progress
+       * steps -- picking a half-finished one back up is a return, not a
+       * departure.
+       */
+      isFirstStart: boolean;
+    }
+  | { kind: "check"; phaseId: string }
+  | { kind: "done" };
 
 // ─────────────────────────────────────────────────────────────
 // HELPER
@@ -90,53 +113,85 @@ export function OnBoardingItemPage() {
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
 
   const [nextLoading, setNextLoading] = useState<boolean>(false);
+  const [nextAction, setNextAction] = useState<NextAction | null>(null);
+
+  const currentStepId = stepDetail?.id;
+  const currentPhaseId = stepDetail?.phaseId;
+  const currentStatus = stepDetail?.status;
 
   const { flyby } = useMoments();
 
   /**
-   * Jumps to the next actionable step in the user's path: fetches the whole path,
-   * picks the first step that isn't finished/skipped (excluding this one), starts it
-   * and navigates there. Falls back to the overview when nothing is left to do.
+   * Works out what comes after this step, once the step is behind the user.
+   *
+   * Resolved up front rather than on click so the button can say where it leads. A locked
+   * phase is never a candidate: while this phase's knowledge check is unpassed the next
+   * phase stays locked, and its steps are not reachable yet.
    */
-  const goToNextStep = async (): Promise<void> => {
-    setNextLoading(true);
-    try {
-      const path = await onboardingService.fetchPath();
-      // Never jump into a locked phase: if the current phase's knowledge check still
-      // blocks the next one, there is no reachable next step, so fall back to the
-      // overview where the pending check is shown.
-      const nextStep = path.phases
-        .filter((phase) => !phase.locked)
-        .flatMap((phase) => phase.steps)
-        .find(
-          (step) =>
-            step.id !== stepDetail?.id && step.status !== "FINISHED" && step.status !== "SKIPPED",
-        );
+  useEffect(() => {
+    if (!currentStepId || !currentPhaseId) return;
+    if (currentStatus !== "FINISHED" && currentStatus !== "SKIPPED") return;
 
-      if (nextStep) {
-        // The rocket marks a step *beginning*, so it only flies when this one
-        // has not been started before. The path filter above admits both
-        // untouched and already-in-progress steps, and picking a half-finished
-        // one back up is a return, not a departure.
-        const isFirstStart = nextStep.status === "WAITING";
+    const resolveNextAction = async () => {
+      try {
+        const path = await onboardingService.fetchPath();
 
-        try {
-          await onboardingService.startStep(nextStep.id);
-        } catch (err) {
-          console.error("Failed to start next onboarding step:", err);
+        const nextStep = path.phases
+          .filter((phase) => !phase.locked)
+          .flatMap((phase) => phase.steps)
+          .find(
+            (step) =>
+              step.id !== currentStepId && step.status !== "FINISHED" && step.status !== "SKIPPED",
+          );
+        if (nextStep) {
+          setNextAction({
+            kind: "step",
+            stepId: nextStep.id,
+            isFirstStart: nextStep.status === "WAITING",
+          });
+          return;
         }
 
-        if (isFirstStart) flyby();
-        void navigate(`/onboarding/${nextStep.id}`);
-      } else {
-        // Nothing pending left — journey complete, go back to the overview.
-        void navigate("/onboarding");
+        // No reachable step left: either this phase's own check is what blocks the way,
+        // or the whole journey is done.
+        const ownPhase = path.phases.find((phase) => phase.id === currentPhaseId);
+        setNextAction(
+          ownPhase?.checkSummary?.required && !ownPhase.checkSummary.passed
+            ? { kind: "check", phaseId: ownPhase.id }
+            : { kind: "done" },
+        );
+      } catch (err) {
+        console.error("Failed to resolve the next onboarding action:", err);
       }
+    };
+
+    void resolveNextAction();
+  }, [currentStepId, currentPhaseId, currentStatus]);
+
+  /**
+   * Follows [nextAction]: starts and opens the next step, or returns to the overview —
+   * pointing it at the pending knowledge check when that is what is waiting.
+   */
+  const goToNextStep = async (): Promise<void> => {
+    if (!nextAction) return;
+
+    if (nextAction.kind !== "step") {
+      void navigate("/onboarding", {
+        state: nextAction.kind === "check" ? { focusCheckPhaseId: nextAction.phaseId } : undefined,
+      });
+      return;
+    }
+
+    setNextLoading(true);
+    try {
+      await onboardingService.startStep(nextAction.stepId);
+      if (nextAction.isFirstStart) flyby();
     } catch (err) {
-      console.error("Error navigating to next step:", err);
+      console.error("Failed to start next onboarding step:", err);
     } finally {
       setNextLoading(false);
     }
+    void navigate(`/onboarding/${nextAction.stepId}`);
   };
 
   const updateStepStatus = async (newStatus: StepStatus) => {
@@ -470,11 +525,24 @@ export function OnBoardingItemPage() {
                   variant="primary"
                   fullWidth
                   onClick={() => void goToNextStep()}
+                  disabled={!nextAction}
                   loading={nextLoading}
-                  trailingIcon={nextLoading ? undefined : <CircleArrowRight className="h-4 w-4" />}
+                  trailingIcon={
+                    nextLoading ? undefined : nextAction?.kind === "check" ? (
+                      <ClipboardCheck className="h-4 w-4" />
+                    ) : (
+                      <CircleArrowRight className="h-4 w-4" />
+                    )
+                  }
                   className="mt-3"
                 >
-                  {nextLoading ? "Loading..." : "Continue to next step"}
+                  {nextLoading || !nextAction
+                    ? "Loading..."
+                    : nextAction.kind === "check"
+                      ? "Start knowledge check"
+                      : nextAction.kind === "done"
+                        ? "Back to overview"
+                        : "Continue to next step"}
                 </Button>
               )}
             </div>

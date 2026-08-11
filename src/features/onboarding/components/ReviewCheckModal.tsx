@@ -1,68 +1,45 @@
 // ============================================================
-// PhaseCheckModal.tsx
+// ReviewCheckModal.tsx
 // ============================================================
-// Modal for taking a phase-level knowledge check: loads the
-// questions (without correct answers), lets the user answer
-// them, submits the attempt and shows the graded result.
+// Modal for working through the review pool: the questions the
+// user got wrong in earlier phases. Unlike a phase check there
+// is no pass threshold — every correct answer clears a question
+// for good, wrong ones stay for another try — and clearing the
+// last one can finish the whole onboarding journey.
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
 import { onboardingService } from "../../../services/onboardingService";
 import { Modal } from "../../../components/ui/Modal";
 import type {
-  PhaseCheckEndpoint,
+  ReviewCheckEndpoint,
+  ReviewCheckResult,
   PhaseCheckAnswerSubmission,
-  PhaseCheckAttemptResult,
   PhaseCheckAnswerResult,
 } from "../types";
 import { CheckQuestionCard } from "./CheckQuestionCard";
 import { emptyDraft, isAnswered, toSubmission, type DraftAnswer } from "../checkAnswers";
 import { CheckPassCelebration } from "./CheckPassCelebration";
 import { ConfettiBurst } from "./ConfettiBurst";
-import { Loader2, AlertCircle, XCircle, RotateCcw } from "lucide-react";
+import { Loader2, AlertCircle, PartyPopper, RotateCcw } from "lucide-react";
 
-interface PhaseCheckModalProps {
-  phaseId: string;
-  phaseTitle: string;
+interface ReviewCheckModalProps {
   /**
    * Called when the modal closes.
-   * - `submittedAttempt`: true when at least one attempt was submitted while the
-   *   modal was open, so the parent can refetch the path (lock states and check
-   *   summaries may have changed).
-   * - `passed`: true when the check is now passed.
-   * - `onboardingCompleted`: true when this attempt finished the whole journey.
-   *   Reported by the backend rather than derived from "was this the last phase?",
-   *   because open review questions keep onboarding running past the final check.
+   * - `answeredAny`: true when answers were submitted, so the parent can refetch the
+   *   pool count and the path.
+   * - `onboardingCompleted`: true when clearing the pool finished the whole journey.
    */
-  onClose: (result: {
-    submittedAttempt: boolean;
-    passed: boolean;
-    onboardingCompleted: boolean;
-  }) => void;
+  onClose: (result: { answeredAny: boolean; onboardingCompleted: boolean }) => void;
 }
 
-/**
- * The one thing worth saying under a passed check, most actionable first: questions
- * the user still owes beat an unlocked phase, since those now gate finishing onboarding.
- */
-function passDetail(result: PhaseCheckAttemptResult): string | undefined {
-  if (result.onboardingCompleted) return "You have finished your onboarding!";
-  if (result.openReviewCount > 0) {
-    return result.openReviewCount === 1
-      ? "1 question is waiting in your review check."
-      : `${result.openReviewCount} questions are waiting in your review check.`;
-  }
-  if (result.nextPhaseUnlocked) return "The next phase is now unlocked.";
-  return undefined;
-}
-
-export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModalProps) {
-  const [check, setCheck] = useState<PhaseCheckEndpoint | null>(null);
+export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
+  const [pool, setPool] = useState<ReviewCheckEndpoint | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, DraftAnswer>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [result, setResult] = useState<PhaseCheckAttemptResult | null>(null);
+  const [result, setResult] = useState<ReviewCheckResult | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   // Anchor at the very top of the scrollable modal body. After grading, the user is
@@ -74,7 +51,7 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
 
   /**
    * Scrolls back to the top whenever the result appears or is cleared: to the banner after
-   * grading, and to question 1 after "Try again".
+   * grading, and to question 1 after "Keep going" loads the next round.
    *
    * Deliberately an effect rather than a call at the end of `submit`: grading replaces
    * every question card with its longer graded form, which grows the content above the
@@ -94,16 +71,15 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
   }, [result]);
 
   useEffect(() => {
-    const loadCheck = async () => {
+    const loadPool = async () => {
       try {
-        const data = await onboardingService.fetchPhaseCheck(phaseId);
-        setCheck(data);
+        setPool(await onboardingService.fetchReviewCheck());
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : "Unknown error");
       }
     };
-    void loadCheck();
-  }, [phaseId]);
+    void loadPool();
+  }, []);
 
   const getDraft = (questionId: string): DraftAnswer => answers[questionId] ?? emptyDraft;
 
@@ -119,19 +95,19 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
     setAnswers({ ...answers, [questionId]: { ...getDraft(questionId), textAnswer: text } });
   };
 
-  const allAnswered =
-    check?.questions.every((question) => isAnswered(question, getDraft(question.id))) ?? false;
+  // Partial submissions are allowed, so any single answered question is enough.
+  const answeredQuestions =
+    pool?.questions.filter((question) => isAnswered(question, getDraft(question.id))) ?? [];
 
   const submit = async () => {
-    if (!check) return;
+    if (answeredQuestions.length === 0) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const payload: PhaseCheckAnswerSubmission[] = check.questions.map((question) =>
+      const payload: PhaseCheckAnswerSubmission[] = answeredQuestions.map((question) =>
         toSubmission(question, getDraft(question.id)),
       );
-      const attemptResult = await onboardingService.submitPhaseCheck(check.phaseId, payload);
-      setResult(attemptResult);
+      setResult(await onboardingService.submitReviewCheck(payload));
       setHasSubmitted(true);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Unknown error");
@@ -140,10 +116,20 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
     }
   };
 
-  const retry = () => {
-    setAnswers({});
+  /**
+   * Loads whatever is still open after a graded round, so the user can keep going
+   * without reopening the modal. Cleared answers disappear, wrong ones come back blank.
+   */
+  const continueWithRemaining = async () => {
     setResult(null);
+    setAnswers({});
     setSubmitError(null);
+    setPool(null);
+    try {
+      setPool(await onboardingService.fetchReviewCheck());
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Unknown error");
+    }
   };
 
   const resultFor = (questionId: string): PhaseCheckAnswerResult | null =>
@@ -151,48 +137,54 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
 
   const close = () =>
     onClose({
-      submittedAttempt: hasSubmitted,
-      passed: result?.passed ?? false,
+      answeredAny: hasSubmitted,
       onboardingCompleted: result?.onboardingCompleted ?? false,
     });
 
-  const footer =
-    check && check.questions.length > 0 ? (
-      result ? (
-        <>
-          {!result.passed && (
-            <button
-              onClick={retry}
-              className="flex items-center justify-center gap-2 rounded-xl border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Try again
-            </button>
-          )}
+  // Only the questions of this round stay visible after grading, so the result reads
+  // as a summary of what was just answered rather than a half-graded list.
+  const visibleQuestions = result
+    ? (pool?.questions.filter((question) => resultFor(question.id) !== null) ?? [])
+    : (pool?.questions ?? []);
+
+  const poolCleared = result !== null && result.remainingCount === 0;
+
+  const footer = pool ? (
+    result ? (
+      <>
+        {!poolCleared && (
           <button
-            onClick={close}
-            className="rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover"
+            onClick={() => void continueWithRemaining()}
+            className="flex items-center justify-center gap-2 rounded-xl border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
           >
-            Done
+            <RotateCcw className="h-4 w-4" />
+            Keep going
           </button>
-        </>
-      ) : (
+        )}
         <button
-          onClick={() => void submit()}
-          disabled={!allAnswered || submitting}
-          className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={close}
+          className="rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover"
         >
-          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          Submit answers
+          Done
         </button>
-      )
-    ) : undefined;
+      </>
+    ) : pool.questions.length > 0 ? (
+      <button
+        onClick={() => void submit()}
+        disabled={answeredQuestions.length === 0 || submitting}
+        className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+        Submit answers
+      </button>
+    ) : undefined
+  ) : undefined;
 
   return (
     <Modal
       isOpen
-      title="Knowledge check"
-      description={phaseTitle}
+      title="Review check"
+      description="Questions you did not get right yet"
       size="lg"
       bodyClassName="max-h-[60vh] overflow-y-auto px-7 py-6"
       onClose={close}
@@ -200,14 +192,14 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
     >
       <div ref={topRef} />
 
-      {/* Fires once when the result turns out to be a pass, and cleans itself up */}
-      {result?.passed && <ConfettiBurst />}
+      {/* Fires once when the last open question is cleared, and cleans itself up */}
+      {poolCleared && <ConfettiBurst />}
 
       {/* Loading / load error */}
-      {!check && !loadError && (
+      {!pool && !loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-app-text-muted">
           <Loader2 className="h-6 w-6 animate-spin text-app-brand" />
-          <p className="text-sm">Loading knowledge check...</p>
+          <p className="text-sm">Loading review questions...</p>
         </div>
       )}
       {loadError && (
@@ -217,32 +209,51 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
         </div>
       )}
 
-      {/* Result banner: a celebratory one on pass, a plain one otherwise */}
-      {result?.passed && (
+      {/* Nothing left to review */}
+      {pool && pool.questions.length === 0 && !result && (
+        <div className="flex flex-col items-center gap-3 py-12 text-center">
+          <PartyPopper className="h-8 w-8 text-app-success-solid" />
+          <p className="text-sm font-semibold text-app-text">Nothing to review</p>
+          <p className="text-sm text-app-text-muted">
+            You have answered every question correctly so far. Anything you miss in a knowledge
+            check will show up here.
+          </p>
+        </div>
+      )}
+
+      {/* Result banner */}
+      {result && poolCleared && (
         <CheckPassCelebration
           correctCount={result.correctCount}
-          questionCount={result.questionCount}
-          detail={passDetail(result)}
+          questionCount={result.answeredCount}
+          detail={
+            result.onboardingCompleted
+              ? "That was the last open question — you have finished your onboarding!"
+              : "Your review list is empty."
+          }
         />
       )}
-      {result && !result.passed && (
-        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-app-danger-solid/30 bg-app-surface-muted p-4">
-          <XCircle className="h-6 w-6 shrink-0 text-app-danger-solid" />
+      {result && !poolCleared && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4">
+          <RotateCcw className="h-6 w-6 shrink-0 text-app-text-muted" />
           <div>
-            <div className="text-sm font-semibold text-app-text">Not passed yet</div>
+            <div className="text-sm font-semibold text-app-text">
+              {result.correctCount} of {result.answeredCount} correct
+            </div>
             <div className="mt-0.5 text-xs text-app-text-muted">
-              {result.correctCount}/{result.questionCount} correct (
-              {Math.round((result.correctCount / Math.max(result.questionCount, 1)) * 100)}% ·{" "}
-              {result.requiredPercent}% required). Review the answers below and try again.
+              {result.remainingCount === 1
+                ? "1 question is still on your review list."
+                : `${result.remainingCount} questions are still on your review list.`}{" "}
+              Wrong answers stay until you get them right.
             </div>
           </div>
         </div>
       )}
 
       {/* Questions */}
-      {check && (
+      {visibleQuestions.length > 0 && (
         <div className="space-y-6">
-          {check.questions.map((question, index) => (
+          {visibleQuestions.map((question, index) => (
             <CheckQuestionCard
               key={question.id}
               question={question}

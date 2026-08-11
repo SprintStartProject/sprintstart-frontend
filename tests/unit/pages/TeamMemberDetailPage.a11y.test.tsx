@@ -103,3 +103,19 @@ describe("TeamMemberDetailPage Accessibility", () => {
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 });
+
+// These components read the selected project to scope their requests; the hook
+// throws outside a ProjectProvider, so it is stubbed rather than provider-wrapped.
+vi.mock("../../../src/features/projects/useProjectContext", async () => {
+  const { createProjectContextValue, createSelectableProject } =
+    await import("../setup/projectContext");
+  const project = createSelectableProject({ id: "proj1" });
+  return {
+    useProjectContext: () =>
+      createProjectContextValue({
+        projects: [project],
+        selectedProject: project,
+        selectedProjectId: "proj1",
+      }),
+  };
+});

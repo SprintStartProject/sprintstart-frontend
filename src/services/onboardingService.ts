@@ -13,6 +13,8 @@ import type {
   PhaseCheckEndpoint,
   PhaseCheckAnswerSubmission,
   PhaseCheckAttemptResult,
+  ReviewCheckEndpoint,
+  ReviewCheckResult,
   AdminPhaseCheckEndpoint,
   UpsertPhaseCheckQuestion,
   PhaseCheckAttemptsReviewEndpoint,
@@ -169,6 +171,28 @@ export const onboardingService = {
     );
   },
 
+  // ── REVIEW CHECK ──────────────────────────────────────────
+
+  /**
+   * Loads the current user's review pool: questions they got wrong in earlier phases
+   * and still have to answer correctly once. Never contains correct answers.
+   */
+  async fetchReviewCheck(): Promise<ReviewCheckEndpoint> {
+    return await apiClient.fetch<ReviewCheckEndpoint>("/api/v1/onboarding/me/review-check");
+  },
+
+  /**
+   * Submits answers for the review pool. Correctly answered questions leave the pool
+   * permanently, wrong ones stay open. Answering only some open questions is allowed,
+   * so the pool can be worked through in several sittings.
+   */
+  async submitReviewCheck(answers: PhaseCheckAnswerSubmission[]): Promise<ReviewCheckResult> {
+    return await apiClient.fetch<ReviewCheckResult>("/api/v1/onboarding/me/review-check/attempts", {
+      method: "POST",
+      body: JSON.stringify({ answers }),
+    });
+  },
+
   /**
    * Loads a phase check for admin editing screens, including correct answers.
    * Requires ADMIN/PM/HR role.
@@ -192,6 +216,17 @@ export const onboardingService = {
         method: "PUT",
         body: JSON.stringify({ questions }),
       },
+    );
+  },
+
+  /**
+   * Loads a user's open review pool so admins, PMs, or HR can see which earlier
+   * questions still keep that user from finishing onboarding. Never contains correct
+   * answers — use fetchPhaseCheckForEditing for those. Requires ADMIN/PM/HR role.
+   */
+  async fetchUserReviewCheck(userId: string): Promise<ReviewCheckEndpoint> {
+    return await apiClient.fetch<ReviewCheckEndpoint>(
+      `/api/v1/onboarding/users/${userId}/review-check`,
     );
   },
 

@@ -21,6 +21,22 @@ vi.mock("../../../../src/context/useAuth", () => ({
   }),
 }));
 
+// ChatProvider scopes the chat list and new chats to the selected project, so it reads
+// the project context; the hook throws outside a ProjectProvider.
+vi.mock("../../../../src/features/projects/useProjectContext", async () => {
+  const { createProjectContextValue, createSelectableProject } =
+    await import("../../setup/projectContext");
+  const project = createSelectableProject({ id: "proj1" });
+  return {
+    useProjectContext: () =>
+      createProjectContextValue({
+        projects: [project],
+        selectedProject: project,
+        selectedProjectId: "proj1",
+      }),
+  };
+});
+
 const wrapper = ({ children }: { children: ReactNode }) => <ChatProvider>{children}</ChatProvider>;
 
 describe("useChat", () => {

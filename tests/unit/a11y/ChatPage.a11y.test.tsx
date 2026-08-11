@@ -21,6 +21,10 @@ vi.mock("../../../src/context/useChatPreferences", () => ({
   }),
 }));
 
+vi.mock("../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "project1" }),
+}));
+
 describe("ChatPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(

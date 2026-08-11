@@ -4,6 +4,7 @@ import { knowledgeGapService } from "../../../src/services/knowledgeGapService";
 import { server } from "../../unit/setup/vitest.setup";
 
 describe("knowledgeGapService", () => {
+  const projectId = "project-1";
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -17,7 +18,7 @@ describe("knowledgeGapService", () => {
       };
       server.use(http.get("/api/v1/insights/knowledge-gaps", () => HttpResponse.json(overview)));
 
-      const result = await knowledgeGapService.fetchKnowledgeGaps();
+      const result = await knowledgeGapService.fetchKnowledgeGaps(projectId);
 
       expect(result).toEqual(overview);
     });
@@ -27,7 +28,7 @@ describe("knowledgeGapService", () => {
         http.get("/api/v1/insights/knowledge-gaps", () => HttpResponse.json({}, { status: 500 })),
       );
 
-      const result = await knowledgeGapService.fetchKnowledgeGaps();
+      const result = await knowledgeGapService.fetchKnowledgeGaps(projectId);
 
       expect(result).toBeDefined();
       expect(result.gaps).toBeInstanceOf(Array);
@@ -38,7 +39,7 @@ describe("knowledgeGapService", () => {
         http.get("/api/v1/insights/knowledge-gaps", () => new HttpResponse(null, { status: 404 })),
       );
 
-      const result = await knowledgeGapService.fetchKnowledgeGaps();
+      const result = await knowledgeGapService.fetchKnowledgeGaps(projectId);
 
       expect(result).toBeDefined();
     });
@@ -49,7 +50,7 @@ describe("knowledgeGapService", () => {
       const detail = { id: "g1", title: "Gap 1", severity: "high", missingTypes: [] };
       server.use(http.get("/api/v1/insights/knowledge-gaps/g1", () => HttpResponse.json(detail)));
 
-      const result = await knowledgeGapService.fetchKnowledgeGap("g1");
+      const result = await knowledgeGapService.fetchKnowledgeGap(projectId, "g1");
 
       expect(result).toEqual(detail);
     });
@@ -62,7 +63,7 @@ describe("knowledgeGapService", () => {
         ),
       );
 
-      const result = await knowledgeGapService.fetchKnowledgeGap("missing");
+      const result = await knowledgeGapService.fetchKnowledgeGap(projectId, "missing");
 
       expect(result).toBeDefined();
       expect(result.id).toBeDefined();
@@ -75,7 +76,7 @@ describe("knowledgeGapService", () => {
         ),
       );
 
-      const result = await knowledgeGapService.fetchKnowledgeGap("g2");
+      const result = await knowledgeGapService.fetchKnowledgeGap(projectId, "g2");
 
       expect(result).toBeDefined();
       expect(result.id).toBeDefined();

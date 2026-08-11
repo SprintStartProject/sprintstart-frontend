@@ -18,8 +18,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
+import { useProjectContext } from "../../projects/useProjectContext";
 
 export function FaqPage() {
+  const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -30,13 +32,16 @@ export function FaqPage() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => insightsService.fetchFAQGroups(), [refreshKey]);
+  } = useFetch(
+    () => insightsService.fetchFAQGroups(selectedProjectId),
+    [refreshKey, selectedProjectId],
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setRefreshError(null);
     try {
-      await insightsService.refreshFAQGroups();
+      await insightsService.refreshFAQGroups(selectedProjectId);
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("FAQ refresh failed", err);

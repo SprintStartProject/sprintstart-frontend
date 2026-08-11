@@ -9,6 +9,7 @@ import { http, HttpResponse } from "msw";
 import { mockKeycloakInstance, server } from "../../unit/setup/vitest.setup";
 
 describe("chatService", () => {
+  const projectId = "project-1";
   beforeEach(() => {
     vi.clearAllMocks();
     mockKeycloakInstance.authenticated = true;
@@ -17,25 +18,32 @@ describe("chatService", () => {
   });
 
   describe("REST endpoints", () => {
-    it("getMyChats returns chat list", async () => {
+    it("getMyChats scopes the listing to the given project", async () => {
+      let requestedProject: string | null = null;
       server.use(
-        http.get("/api/v1/chats/me", () =>
-          HttpResponse.json({
+        http.get("/api/v1/chats/me", ({ request }) => {
+          requestedProject = new URL(request.url).searchParams.get("projectId");
+          return HttpResponse.json({
             chats: [
               { id: "chat1", userId: "user1", title: "Test", createdAt: new Date().toISOString() },
             ],
-          }),
-        ),
+          });
+        }),
       );
 
-      const result = await getMyChats();
+      const result = await getMyChats(projectId);
+
+      // Unscoped, the sidebar would show every project's chats at once.
+      expect(requestedProject).toBe(projectId);
       expect(result.chats).toHaveLength(1);
       expect(result.chats[0].id).toBe("chat1");
     });
 
-    it("createChat returns created chat", async () => {
+    it("createChat creates the chat inside the given project", async () => {
+      let body: { projectId?: string } | undefined;
       server.use(
-        http.post("/api/v1/chats/me", () => {
+        http.post("/api/v1/chats/me", async ({ request }) => {
+          body = (await request.json()) as { projectId?: string };
           return HttpResponse.json({
             id: "chat2",
             userId: "user1",
@@ -45,7 +53,10 @@ describe("chatService", () => {
         }),
       );
 
-      const result = await createChat("user1");
+      const result = await createChat(projectId);
+
+      // The project is what every prompt in this chat is answered from.
+      expect(body?.projectId).toBe(projectId);
       expect(result.id).toBe("chat2");
     });
 
@@ -112,6 +123,49 @@ describe("chatService", () => {
       expect(onToken).toHaveBeenNthCalledWith(2, "lo");
       expect(onDone).toHaveBeenCalledTimes(1);
       expect(onError).not.toHaveBeenCalled();
+    });
+
+    it("sends date filters as local day boundaries and never a future upper bound", async () => {
+      let capturedBody: { filters?: { from?: string; to?: string } } | null = null;
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+
+      server.use(
+        http.post("/api/v1/chats/me/prompt", async ({ request }) => {
+          capturedBody = (await request.json()) as typeof capturedBody;
+          return new HttpResponse(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          });
+        }),
+      );
+
+      // Today as the upper bound is the case that used to fail: the
+      // backend validates it with @PastOrPresent, and the end of today
+      // is a future instant.
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+      await streamMessage("chat1", "hello", [], "2026-01-15", today, {
+        onToken: vi.fn(),
+        onReasoning: vi.fn(),
+        onCitation: vi.fn(),
+        onToolUse: vi.fn(),
+        onDone: vi.fn(),
+        onError: vi.fn(),
+      });
+
+      const { from, to } = capturedBody!.filters!;
+
+      // Built from local date parts, so this holds in any timezone —
+      // appending "Z" to the raw value would shift it by the offset.
+      expect(from).toBe(new Date(2026, 0, 15, 0, 0, 0, 0).toISOString());
+      expect(new Date(to!).getTime()).toBeLessThanOrEqual(Date.now());
     });
 
     it("calls onError and skips streaming if token refresh fails", async () => {

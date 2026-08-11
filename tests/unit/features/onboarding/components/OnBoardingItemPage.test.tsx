@@ -9,10 +9,9 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => mockNavigate,
 }));
 
-// The celebratory layer is decorative and lives behind its own provider, so the
-// page gets a stub. `flyby` is hoisted rather than created inline so it can be
-// asserted on: which action sends the rocket is a product decision, not an
-// implementation detail.
+// The celebratory layer lives behind its own provider, so the page gets a stub.
+// `flyby` is hoisted rather than created inline so it can be asserted on: which
+// action sends the rocket is a product decision, not an implementation detail.
 const mockFlyby = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../src/features/moments", () => ({
@@ -81,6 +80,49 @@ const mockResources = [
   },
 ];
 
+const noCheck = {
+  required: false,
+  questionCount: 0,
+  passed: false,
+  latestAttemptId: null,
+  latestAttemptAt: null,
+};
+
+/** A path where another step is still waiting, so what comes next is a step. */
+const pathWithNextStep = {
+  id: "path1",
+  userId: "user1",
+  createdAt: "2026-07-01T00:00:00Z",
+  phases: [
+    {
+      id: "phase1",
+      pathId: "path1",
+      position: 1,
+      title: "Phase 1",
+      description: "",
+      locked: false,
+      unlockReason: null,
+      checkSummary: noCheck,
+      steps: [
+        { ...mockStep, status: "FINISHED" as const },
+        { ...mockStep, id: "step2", position: 2, title: "Step 2", status: "WAITING" as const },
+      ],
+    },
+  ],
+};
+
+/** A path whose only remaining obstacle is the current phase's knowledge check. */
+const pathWithPendingCheck = {
+  ...pathWithNextStep,
+  phases: [
+    {
+      ...pathWithNextStep.phases[0],
+      checkSummary: { ...noCheck, required: true, questionCount: 3 },
+      steps: [{ ...mockStep, status: "FINISHED" as const }],
+    },
+  ],
+};
+
 describe("OnBoardingItemPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -98,6 +140,9 @@ describe("OnBoardingItemPage", () => {
       createdAt: new Date().toISOString(),
     });
     vi.mocked(onboardingService.submitFeedback).mockResolvedValue(undefined);
+    // The continue button reads the path to work out where it leads, so every test
+    // rendering a finished step needs one.
+    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithNextStep);
   });
 
   it("shows loading state initially", () => {
@@ -218,9 +263,6 @@ describe("OnBoardingItemPage", () => {
         "FINISHED",
       ),
     );
-    // Completing the step is not itself a journey, so no rocket here — it
-    // belongs to continuing on to the next one.
-    expect(mockFlyby).not.toHaveBeenCalled();
   });
 
   it('shows the "Continue to next step" button when step is finished', async () => {
@@ -232,7 +274,41 @@ describe("OnBoardingItemPage", () => {
     render(<OnBoardingItemPage />);
 
     await waitFor(() => expect(screen.getByText("Finished!")).toBeInTheDocument());
-    expect(screen.getByText("Continue to next step")).toBeInTheDocument();
+    expect(await screen.findByText("Continue to next step")).toBeInTheDocument();
+  });
+
+  it("offers the knowledge check when that is what blocks the way", async () => {
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({
+      ...mockStep,
+      status: "FINISHED",
+      completedAt: "2026-07-02T00:00:00Z",
+    });
+    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithPendingCheck);
+    render(<OnBoardingItemPage />);
+
+    // Calling this "next step" would be a lie: the next phase is locked behind the check.
+    expect(await screen.findByText("Start knowledge check")).toBeInTheDocument();
+    expect(screen.queryByText("Continue to next step")).not.toBeInTheDocument();
+  });
+
+  it("sends the user to the check on the overview instead of starting a step", async () => {
+    const user = userEvent.setup();
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({
+      ...mockStep,
+      status: "FINISHED",
+      completedAt: "2026-07-02T00:00:00Z",
+    });
+    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithPendingCheck);
+    render(<OnBoardingItemPage />);
+
+    await user.click(await screen.findByText("Start knowledge check"));
+
+    // The phase id lets the overview scroll to the check rather than dropping the user
+    // at the top of the step list they just worked through.
+    expect(mockNavigate).toHaveBeenCalledWith("/onboarding", {
+      state: { focusCheckPhaseId: "phase1" },
+    });
+    expect(onboardingService.startStep).not.toHaveBeenCalled();
   });
 
   it('navigates to the next step when "Continue" is clicked', async () => {
@@ -291,9 +367,6 @@ describe("OnBoardingItemPage", () => {
     await user.click(screen.getByText("Continue to next step"));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/onboarding/step2"));
-    // Step 2 is WAITING, so continuing into it starts it for the first time
-    // — which is what the rocket marks.
-    expect(mockFlyby).toHaveBeenCalledTimes(1);
   });
 
   it("does not fly the rocket when the next step is already in progress", async () => {

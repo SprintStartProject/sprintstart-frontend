@@ -4,6 +4,7 @@ import { insightsService } from "../../../src/services/faqService";
 import { server } from "../../unit/setup/vitest.setup";
 
 describe("faqService", () => {
+  const projectId = "project-1";
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -16,7 +17,7 @@ describe("faqService", () => {
       };
       server.use(http.get("/api/v1/insights/faq", () => HttpResponse.json(overview)));
 
-      const result = await insightsService.fetchFAQGroups();
+      const result = await insightsService.fetchFAQGroups(projectId);
 
       expect(result).toEqual(overview);
     });
@@ -24,7 +25,7 @@ describe("faqService", () => {
     it("returns mock fallback data on error", async () => {
       server.use(http.get("/api/v1/insights/faq", () => HttpResponse.json({}, { status: 500 })));
 
-      const result = await insightsService.fetchFAQGroups();
+      const result = await insightsService.fetchFAQGroups(projectId);
 
       expect(result).toBeDefined();
       expect(Array.isArray((result as { groups: unknown[] }).groups)).toBe(true);
@@ -41,7 +42,7 @@ describe("faqService", () => {
       };
       server.use(http.get("/api/v1/insights/faq/g1", () => HttpResponse.json(detail)));
 
-      const result = await insightsService.fetchFAQGroup("g1");
+      const result = await insightsService.fetchFAQGroup(projectId, "g1");
 
       expect(result).toEqual(detail);
     });
@@ -49,7 +50,7 @@ describe("faqService", () => {
     it("returns mock fallback data on error", async () => {
       server.use(http.get("/api/v1/insights/faq/g1", () => HttpResponse.json({}, { status: 500 })));
 
-      const result = await insightsService.fetchFAQGroup("g1");
+      const result = await insightsService.fetchFAQGroup(projectId, "g1");
 
       expect(result).toBeDefined();
       expect((result as { groupId: string }).groupId).toBeDefined();

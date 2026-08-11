@@ -14,6 +14,7 @@ import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Button } from "../../../components/ui/Button";
+import { useProjectContext } from "../../projects/useProjectContext";
 
 import { ShieldAlert, ArrowRight, AlertCircle, Clock, RefreshCw } from "lucide-react";
 
@@ -22,6 +23,7 @@ import { ShieldAlert, ArrowRight, AlertCircle, Clock, RefreshCw } from "lucide-r
 // ─────────────────────────────────────────────────────────────
 
 export function KnowledgeGapWidget() {
+  const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -32,13 +34,16 @@ export function KnowledgeGapWidget() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(), [refreshKey]);
+  } = useFetch(
+    () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
+    [refreshKey, selectedProjectId],
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setRefreshError(null);
     try {
-      await knowledgeGapService.refreshKnowledgeGaps();
+      await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);

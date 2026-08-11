@@ -7,10 +7,17 @@ import type { Chat } from "../../../../src/features/chatbot/types";
 
 describe("ChatSidebar", () => {
   const mockChats: Chat[] = [
-    { id: "chat1", userId: "user1", createdAt: new Date().toISOString(), title: "First chat" },
+    {
+      id: "chat1",
+      userId: "user1",
+      projectId: "project-1",
+      createdAt: new Date().toISOString(),
+      title: "First chat",
+    },
     {
       id: "chat2",
       userId: "user1",
+      projectId: "project-1",
       createdAt: new Date(Date.now() - 86400000).toISOString(),
       title: "",
     },

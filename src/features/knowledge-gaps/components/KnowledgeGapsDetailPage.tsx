@@ -12,6 +12,7 @@ import { getTeamOverview } from "../../../services/teamManagementService";
 import { useFetch } from "../../../hooks/useFetch";
 import { formatDateTime, formatRelativeDate, daysSince } from "../format";
 import { SEVERITY_STYLES } from "../severity";
+import { useProjectContext } from "../../projects/useProjectContext";
 
 import {
   ArrowLeft,
@@ -35,6 +36,7 @@ const STALE_AFTER_DAYS = 30;
 // ─────────────────────────────────────────────────────────────
 
 export function KnowledgeGapsDetailPage() {
+  const { selectedProjectId } = useProjectContext();
   const { gapId } = useParams<{ gapId: string }>();
   const navigate = useNavigate();
 
@@ -45,7 +47,10 @@ export function KnowledgeGapsDetailPage() {
     data: gap,
     loading,
     error,
-  } = useFetch(() => knowledgeGapService.fetchKnowledgeGap(gapId ?? ""), [gapId, refreshKey]);
+  } = useFetch(
+    () => knowledgeGapService.fetchKnowledgeGap(selectedProjectId, gapId ?? ""),
+    [gapId, refreshKey],
+  );
 
   const { data: teamUsers } = useFetch(() => getTeamOverview(), []);
 
@@ -90,7 +95,7 @@ export function KnowledgeGapsDetailPage() {
   const saveOwners = async (userIds: string[]) => {
     setSavingOwners(true);
     try {
-      await knowledgeGapService.setComponentOwners(gap.component, userIds);
+      await knowledgeGapService.setComponentOwners(selectedProjectId, gap.component, userIds);
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("Failed to update owner", err);

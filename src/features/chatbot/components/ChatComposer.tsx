@@ -1,8 +1,7 @@
-import { Check, Filter, Send, Square } from "lucide-react";
+import { Check, Filter, Send, Square, X } from "lucide-react";
 import type { FormEvent, RefObject } from "react";
-import { Button } from "../../../components/ui/Button";
-import { useAutoResize } from "../../../components/ui/useAutoResize";
-import { SOURCE_SYSTEMS, type SourceSystem } from "../types";
+import { SOURCE_META } from "../../data-ingestion/data";
+import type { SourceSystem } from "../types";
 
 type ChatComposerProps = {
   /** Current draft text. */
@@ -15,6 +14,24 @@ type ChatComposerProps = {
   onStop: () => void;
   /** True while the assistant is thinking or streaming. */
   isBusy: boolean;
+  /**
+   * Whether a project is selected. Without one there is nothing to scope retrieval to, so
+   * sending is blocked here rather than failing silently after the fact.
+   */
+  hasProject: boolean;
+  /**
+   * The last question asked in this chat. Arrow-up in an empty composer recalls it, the way
+   * a shell recalls the previous command.
+   */
+  lastUserPrompt: string;
+  /**
+   * The source systems that can actually be filtered on. Offering the full hardcoded set
+   * meant a connector that was never configured was still selectable, and the prompt then
+   * failed instead of returning fewer results.
+   */
+  availableSources: SourceSystem[];
+  /** True while the connector list is still being fetched. */
+  sourcesLoading: boolean;
 
   /** Ref to the textarea, so the parent can focus / autosize it. */
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -43,6 +60,10 @@ export function ChatComposer({
   onSubmit,
   onStop,
   isBusy,
+  hasProject,
+  lastUserPrompt,
+  availableSources,
+  sourcesLoading,
   textareaRef,
   showFilters,
   onToggleFilters,
@@ -55,119 +76,170 @@ export function ChatComposer({
   activeFilterCount,
   clearFilters,
 }: ChatComposerProps) {
-  // Grows with the draft, and — unlike the previous inline version, which only
-  // ran while the user typed — shrinks back once the message is sent and
-  // `value` is cleared from the outside.
-  useAutoResize({ ref: textareaRef, value, minRows: 1, maxRows: 8 });
-
   // E7: surface a hint when the date range is inverted.
   const rangeInvalid = !!from && !!to && from > to;
+  const blocked = rangeInvalid || !hasProject;
 
   return (
     <footer className="app-page-frame shrink-0 border-t border-app-border bg-app-bg py-4">
       {showFilters && (
-        <div className="mb-3">
-          <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-app-border bg-app-surface-muted/70 px-4 py-3 backdrop-blur">
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="filter-from"
-                className="text-xs font-semibold tracking-wide text-app-text-muted uppercase"
-              >
-                From
-              </label>
-
-              <input
-                id="filter-from"
-                type="date"
-                max={to || undefined}
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="h-10 rounded-xl border border-app-border bg-app-bg px-3 text-sm outline-none focus:ring-2 focus:ring-app-focus/50"
-              />
+        <div className="mb-3 overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+          <div className="flex items-center justify-between gap-3 border-b border-app-border-muted px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-app-text-muted" />
+              <span className="text-sm font-semibold text-app-text">Narrow the sources</span>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="filter-to"
-                className="text-xs font-semibold tracking-wide text-app-text-muted uppercase"
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
               >
-                To
-              </label>
+                <X size={12} />
+                Reset
+              </button>
+            )}
+          </div>
 
-              <input
-                id="filter-to"
-                type="date"
-                min={from || undefined}
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="h-10 rounded-xl border border-app-border bg-app-bg px-3 text-sm outline-none focus:ring-2 focus:ring-app-focus/50"
-              />
-            </div>
+          <div className="flex flex-col gap-5 px-4 py-4">
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+                Sources
+              </legend>
 
-            <div className="hidden h-8 w-px self-center bg-app-border-muted lg:block" />
+              {availableSources.length === 0 ? (
+                <p className="text-sm text-app-text-muted">
+                  {sourcesLoading
+                    ? "Loading connected sources…"
+                    : "No sources are connected yet, so there is nothing to narrow down."}
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {availableSources.map((source) => {
+                    const selected = sourceSystems.includes(source);
+                    const meta = SOURCE_META[source];
+                    const Icon = meta.icon;
 
-            <div className="flex min-w-[240px] flex-1 flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
-                  Systems
-                </span>
-                {activeFilterCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
-                    Clear All
-                  </Button>
+                    return (
+                      <button
+                        key={source}
+                        type="button"
+                        aria-pressed={selected}
+                        title={meta.description}
+                        onClick={() => toggleSourceSystem(source)}
+                        className={`group flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                          selected
+                            ? "border-app-brand-border bg-app-brand/10 text-app-brand-text"
+                            : "border-app-border bg-app-bg text-app-text-muted hover:border-app-border-strong hover:text-app-text"
+                        }`}
+                      >
+                        <span
+                          className={`flex size-4 shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
+                            selected
+                              ? "border-app-brand bg-app-brand text-white"
+                              : "border-app-border-strong bg-transparent"
+                          }`}
+                        >
+                          {selected && <Check size={11} strokeWidth={3} />}
+                        </span>
+                        <Icon size={15} className="shrink-0 opacity-70" />
+                        {meta.type}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-xs text-app-text-subtle">
+                {sourceSystems.length === 0
+                  ? "Nothing selected — every connected source is searched."
+                  : "Only the selected sources are searched."}
+              </p>
+            </fieldset>
+
+            <div className="h-px bg-app-border-muted" />
+
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+                Indexed between
+              </legend>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  id="filter-from"
+                  type="date"
+                  aria-label="Earliest date"
+                  max={to || undefined}
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className={`h-10 rounded-xl border bg-app-bg px-3 text-sm text-app-text transition-colors outline-none focus-visible:ring-2 focus-visible:ring-app-focus/50 ${
+                    rangeInvalid ? "border-app-danger-border" : "border-app-border"
+                  }`}
+                />
+
+                <span className="text-sm text-app-text-subtle">to</span>
+
+                <input
+                  id="filter-to"
+                  type="date"
+                  aria-label="Latest date"
+                  min={from || undefined}
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className={`h-10 rounded-xl border bg-app-bg px-3 text-sm text-app-text transition-colors outline-none focus-visible:ring-2 focus-visible:ring-app-focus/50 ${
+                    rangeInvalid ? "border-app-danger-border" : "border-app-border"
+                  }`}
+                />
+
+                {(from || to) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFrom("");
+                      setTo("");
+                    }}
+                    className="rounded-lg px-2 py-1 text-xs font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                  >
+                    Clear dates
+                  </button>
                 )}
               </div>
 
-              <div
-                role="group"
-                aria-label="Source systems"
-                className="flex min-h-10 flex-wrap items-center gap-2"
-              >
-                {SOURCE_SYSTEMS.map((source) => {
-                  const selected = sourceSystems.includes(source);
-
-                  return (
-                    <button
-                      key={source}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => toggleSourceSystem(source)}
-                      className={`flex h-10 items-center gap-1.5 rounded-full border px-4 text-xs font-semibold tracking-wide uppercase transition-colors ${
-                        selected
-                          ? "border-app-brand bg-app-brand text-white"
-                          : "border-app-border bg-app-bg text-app-text hover:bg-app-surface"
-                      }`}
-                    >
-                      {selected && <Check size={13} />}
-                      {source}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+              {rangeInvalid ? (
+                <p className="text-xs text-app-danger-text" role="alert">
+                  The first date is after the second one, so nothing would match.
+                </p>
+              ) : (
+                <p className="text-xs text-app-text-subtle">
+                  Leave empty to search regardless of when a document was indexed.
+                </p>
+              )}
+            </fieldset>
           </div>
-
-          {rangeInvalid && (
-            <p className="mt-1 text-xs text-app-danger-text" role="alert">
-              The &ldquo;From&rdquo; date can&apos;t be after the &ldquo;To&rdquo; date.
-            </p>
-          )}
         </div>
       )}
 
       <form
-        onSubmit={onSubmit}
+        // The hint below is not enough on its own: Enter submits the
+        // form directly, so an inverted range would still reach the
+        // backend and come back as a validation error.
+        onSubmit={(e) => {
+          if (blocked) {
+            e.preventDefault();
+            return;
+          }
+          onSubmit(e);
+        }}
         className="flex items-end gap-2 rounded-2xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
       >
-        <Button
-          variant="secondary"
-          size="sm"
-          iconOnly
+        <button
+          type="button"
           aria-label="Toggle source filters"
           aria-expanded={showFilters}
           data-testid="chat-filters-toggle"
           onClick={onToggleFilters}
-          className="relative shrink-0"
+          className="relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-app-border-muted bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
         >
           <Filter size={18} />
           {activeFilterCount > 0 && (
@@ -175,54 +247,74 @@ export function ChatComposer({
               {activeFilterCount}
             </span>
           )}
-        </Button>
-        {/* Not a `Textarea`: this one is borderless and lives inside the
-                    composer's own box, so it needs the growing behaviour without
-                    the field styling. It shares the behaviour via the hook. */}
+        </button>
         <textarea
           ref={textareaRef}
           aria-label="Message"
           data-testid="chat-input"
-          placeholder="Ask anything about the project..."
-          className="flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+          placeholder={
+            hasProject
+              ? "Ask anything about the project..."
+              : "Select a project to start asking questions"
+          }
+          className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
           value={value}
           rows={1}
-          onChange={(e) => onChange(e.currentTarget.value)}
+          onChange={(e) => {
+            onChange(e.currentTarget.value);
+            e.currentTarget.style.height = "auto";
+            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               e.currentTarget.form?.requestSubmit();
+              return;
+            }
+
+            // Only from an empty composer: with text present, arrow-up has to keep
+            // moving the caret, or editing a multi-line draft becomes impossible.
+            if (e.key === "ArrowUp" && !value && lastUserPrompt) {
+              e.preventDefault();
+              onChange(lastUserPrompt);
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              requestAnimationFrame(() => {
+                el.style.height = `${el.scrollHeight}px`;
+                el.setSelectionRange(el.value.length, el.value.length);
+              });
             }
           }}
         />
 
         {isBusy ? (
-          <Button
-            variant="danger"
-            size="sm"
-            iconOnly
+          <button
+            type="button"
             aria-label="Stop generation"
             data-testid="chat-stop-button"
             onClick={onStop}
-            className="shrink-0"
+            className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
           >
             <Square size={16} className="fill-current" />
-          </Button>
+          </button>
         ) : (
-          <Button
-            variant="primary"
-            size="sm"
-            iconOnly
+          <button
             type="submit"
             aria-label="Send message"
             data-testid="chat-send-button"
-            disabled={!value.trim()}
-            className="shrink-0"
+            disabled={!value.trim() || blocked}
+            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Send size={18} />
-          </Button>
+          </button>
         )}
       </form>
+
+      {!hasProject && (
+        <p className="mt-2 text-center text-[11px] text-app-danger-text" role="alert">
+          No project selected — pick one in the header to ask a question.
+        </p>
+      )}
 
       <p className="mt-2 text-center text-[11px] text-app-text-disabled">
         Enter to send · Shift + Enter for a new line
