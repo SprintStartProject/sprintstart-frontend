@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { RocketGlyph } from "./RocketGlyph.tsx";
 import { flybyGeometry } from "../flightGeometry.ts";
+import { announceRocketFlight } from "../rocketWatch.ts";
 
 interface RocketFlybyProps {
   onDone: () => void;
@@ -39,6 +40,7 @@ const DURATION = 1.05;
  */
 export function RocketFlyby({ onDone }: RocketFlybyProps) {
   const [geometry] = useState(() => flybyGeometry(window.innerWidth, window.innerHeight));
+  const rocketRef = useRef<HTMLDivElement>(null);
 
   // Teardown is on a timer rather than on `onAnimationComplete`. The callback
   // is the animation's own report card: if the animation never starts, it
@@ -48,6 +50,16 @@ export function RocketFlyby({ onDone }: RocketFlybyProps) {
     const timer = window.setTimeout(onDone, DURATION * 1000 + 200);
     return () => window.clearTimeout(timer);
   }, [onDone]);
+
+  // Announces the pass, so anything with eyes on the page can turn and watch
+  // it go by. Tied to mount rather than to the animation, for the same reason
+  // the teardown is: the element existing is a fact, the animation running is
+  // a hope.
+  useEffect(() => {
+    const rocket = rocketRef.current;
+    if (!rocket) return;
+    return announceRocketFlight(rocket);
+  }, []);
 
   const { fromX, fromY, toX, toY, peakSize } = geometry;
 
@@ -72,6 +84,7 @@ export function RocketFlyby({ onDone }: RocketFlybyProps) {
       />
 
       <motion.div
+        ref={rocketRef}
         className="absolute"
         initial={{ x: fromX, y: fromY, scale: 0.25, opacity: 0 }}
         animate={{

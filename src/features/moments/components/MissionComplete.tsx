@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useScrollLock } from "../../../components/ui/useScrollLock";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { RocketGlyph } from "./RocketGlyph.tsx";
+import { StarField } from "./StarField.tsx";
 import { ConfettiBurst } from "./ConfettiBurst.tsx";
 import { rocketSizeFor } from "../flightGeometry.ts";
+import { momentStageRect } from "../momentStage.ts";
 import { celebrationSpringToken } from "../../../styles/tokens.ts";
+import { useScrollLock } from "../../../components/ui/useScrollLock";
 
 interface MissionCompleteProps {
   /** Greeted by name on the final card when the profile is loaded. */
@@ -18,29 +20,40 @@ interface MissionCompleteProps {
  * slice of a single long animation, so any of them can be retimed without
  * recomputing the rest.
  */
-type Stage = "ignition" | "ascent" | "arrival";
+type Stage = "approach" | "touchdown" | "arrival";
 
 const STAGE_MS: Record<Stage, number> = {
-  ignition: 900,
-  // Runs a little long on purpose: the rocket leaving the frame is the last
-  // thing to watch before the card, so it gets a beat to actually be gone.
-  ascent: 1250,
+  // The long one: the descent is the part worth watching.
+  approach: 1500,
+  touchdown: 950,
   // Terminal: the card stays until dismissed.
   arrival: 0,
 };
 
-const STAGE_ORDER: Stage[] = ["ignition", "ascent", "arrival"];
+const STAGE_ORDER: Stage[] = ["approach", "touchdown", "arrival"];
 
 /**
  * The finale: finishing the entire onboarding path.
  *
+ * The far end of the journey the app has been telling all along. `PathReveal`
+ * launched from Earth on the day the path was built, every step flyby was a leg
+ * of the trip, and this is the arrival: the rocket comes down onto the Moon,
+ * kicks up dust, and settles — with Earth a small blue dot in the sky behind
+ * it, which is the distance covered made visible.
+ *
  * This is the loudest thing the app does, and it is allowed to be, because it
  * happens exactly once per person. Everything else in the moments layer is
- * tuned to stay under it — a step flyby passes in under a second and never
- * dims the page, a phase celebration is a card. This one takes over the screen
- * for about three seconds and earns it.
+ * tuned to stay under it — a step flyby passes in under a second and never dims
+ * the page, a phase celebration is a card.
  *
- * Three beats: the rocket lights up, climbs away, and the arrival card lands.
+ * Landings are slow where launches are violent, and the timing follows that:
+ * the descent takes its time, the touchdown settles rather than lands hard.
+ * The stars hold still throughout — the ground is already in frame, and a sky
+ * that slides behind a fixed horizon reads as broken, not as descending.
+ *
+ * Covers the content area rather than the screen (see `momentStage`), so the
+ * sidebar stays put: the page the journey happened on is where it ends.
+ *
  * Skippable at any point — a sequence you cannot escape stops being a reward
  * the second time someone sees it — and reduced to the arrival card alone under
  * `prefers-reduced-motion`.
@@ -51,9 +64,12 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
   useScrollLock(true);
 
   const reduceMotion = useReducedMotion();
-  const [stage, setStage] = useState<Stage>(() => (reduceMotion ? "arrival" : "ignition"));
+  const [stage, setStage] = useState<Stage>(() => (reduceMotion ? "arrival" : "approach"));
 
-  const rocketSize = useMemo(() => rocketSizeFor(window.innerWidth) * 1.6, []);
+  // Resolved once: the landing is over in seconds, so a resize or sidebar
+  // toggle mid-sequence is not worth re-deriving for.
+  const stageRect = useMemo(() => momentStageRect(), []);
+  const rocketSize = useMemo(() => rocketSizeFor(stageRect.width) * 1.4, [stageRect]);
   const actionRef = useRef<HTMLButtonElement>(null);
 
   // Focus lands on the dismiss button once the card arrives, so a keyboard
@@ -89,108 +105,131 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
     };
   }, [stage]);
 
-  const isFlying = stage === "ignition" || stage === "ascent";
+  const hasLanded = stage === "touchdown" || stage === "arrival";
 
   return createPortal(
-    <div className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-app-bg">
-      {/* Ignition. Not one expanding circle — that reads as an explosion
-                going off next to the rocket rather than as thrust coming out of
-                it. Three parts instead: exhaust piling up against the pad and
-                spreading sideways, a short plume straight down from the nozzle,
-                and a brief flash at the moment of release. */}
-      <AnimatePresence>
-        {isFlying && !reduceMotion && (
+    <div
+      className="fixed z-[95] flex items-center justify-center overflow-hidden bg-app-bg"
+      style={{
+        left: stageRect.left,
+        top: stageRect.top,
+        width: stageRect.width,
+        height: stageRect.height,
+      }}
+    >
+      {!reduceMotion && (
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          // Dims behind the card rather than clearing out: the landing
+          // is what the card is talking about.
+          animate={{ opacity: stage === "arrival" ? 0.4 : 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          {/* Held still, unlike the launch's parallax: the surface is
+                        already in frame, so a sliding sky reads as the sky
+                        being broken rather than as descent — and seventy
+                        concurrently animated stars were where the touchdown
+                        dropped its frames. */}
+          <StarField seedOffset={3} />
+
+          {/* Earth, small and far behind: where this started. Nothing
+                        else in the frame says how far someone has come. */}
+          <span
+            className="absolute top-[16%] left-[22%] rounded-full"
+            style={{
+              width: 34,
+              height: 34,
+              background:
+                "radial-gradient(circle at 40% 32%, var(--brand-border-strong) 0%, var(--brand) 45%, var(--progress-fill-end) 100%)",
+              boxShadow: "0 0 26px 3px var(--brand-glow)",
+            }}
+          />
+
+          {/* The Moon: same trick as Earth in the launch — a disc far
+                        wider than the screen, mostly below it, so what shows is
+                        a horizon to land on rather than a ball to look at. */}
           <motion.div
-            key="ignition"
-            aria-hidden="true"
-            className="pointer-events-none absolute top-[62%] left-1/2 -translate-x-1/2"
-            style={{ marginTop: rocketSize * 0.42 }}
-            exit={{ opacity: 0, transition: { duration: 0.4 } }}
+            className="absolute left-1/2 w-[280vw] max-w-[2400px] -translate-x-1/2 rounded-full"
+            style={{
+              aspectRatio: "1 / 1",
+              top: "78%",
+              // Theme-stable greys, so the surface looks the same
+              // in light and dark instead of dissolving into one.
+              background:
+                "radial-gradient(circle at 44% 24%, var(--text-subtle) 0%, var(--text-muted) 40%, var(--border-strong) 100%)",
+              boxShadow: "0 0 90px 18px var(--brand-glow)",
+            }}
+            // Takes the weight of the landing: a surface that does
+            // not react is a backdrop, not ground.
+            animate={hasLanded ? { y: [0, 5, 0] } : { y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            {/* Exhaust hitting the pad: widens far more than it
-                            grows tall, which is what makes it read as ground. */}
-            <motion.span
-              className="absolute top-0 left-1/2 -translate-x-1/2 rounded-[50%]"
-              style={{
-                width: rocketSize * 1.5,
-                height: rocketSize * 0.5,
-                background:
-                  "radial-gradient(50% 50%, var(--progress-fill-end) 0%, var(--brand) 45%, transparent 72%)",
-                filter: "blur(14px)",
-              }}
-              initial={{ scaleX: 0.2, scaleY: 0.3, opacity: 0 }}
-              animate={{
-                scaleX: [0.2, 3.2, 4.4],
-                scaleY: [0.3, 1.15, 1.4],
-                opacity: [0, 0.9, stage === "ascent" ? 0 : 0.75],
-              }}
-              transition={{ duration: 1.1, ease: "easeOut" }}
-            />
-
-            {/* Plume straight down out of the nozzle. */}
-            <motion.span
-              className="absolute top-0 left-1/2 -translate-x-1/2 rounded-full"
-              style={{
-                width: rocketSize * 0.3,
-                height: rocketSize * 1.4,
-                transformOrigin: "50% 0%",
-                background:
-                  "linear-gradient(180deg, var(--progress-fill-end), var(--brand) 40%, transparent)",
-                filter: "blur(9px)",
-              }}
-              initial={{ scaleY: 0, opacity: 0 }}
-              animate={{
-                scaleY: [0, 1, 0.8, 1],
-                opacity: [0, 0.95, 0.8, 0.9],
-              }}
-              transition={{ duration: 0.9, ease: "easeOut" }}
-            />
-
-            {/* Release flash. Short and small — a long one turns the
-                            whole beat into a blast rather than a launch. */}
-            <motion.span
-              className="absolute top-0 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full"
-              style={{
-                background:
-                  "radial-gradient(circle, white 0%, var(--progress-fill-end) 40%, transparent 70%)",
-              }}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: [0, 9, 14], opacity: [0, 0.8, 0] }}
-              transition={{ duration: 0.42, ease: "easeOut" }}
-            />
+            {/* Craters. Low contrast on purpose — enough to give the
+                            limb some texture, not enough to look like a map. */}
+            <span className="absolute top-[5%] left-[30%] h-[6%] w-[13%] rounded-[50%] bg-app-bg opacity-[0.16] blur-lg" />
+            <span className="absolute top-[9%] left-[56%] h-[4%] w-[9%] rounded-[50%] bg-app-bg opacity-[0.13] blur-lg" />
+            <span className="absolute top-[15%] left-[44%] h-[3%] w-[6%] rounded-[50%] bg-app-bg opacity-10 blur-lg" />
           </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* The rocket: holds on the pad shaking, then climbs out of frame. */}
-      <AnimatePresence>
-        {isFlying && !reduceMotion && (
+          {/* Dust kicked out sideways at touchdown. Wide and low: it
+                        is being pushed along the ground, not thrown upward. */}
+          <AnimatePresence>
+            {hasLanded && (
+              <motion.span
+                key="dust"
+                className="absolute top-[78%] left-1/2 -translate-x-1/2 rounded-[50%]"
+                style={{
+                  width: rocketSize * 2.2,
+                  height: rocketSize * 0.45,
+                  marginTop: -rocketSize * 0.25,
+                  background:
+                    "radial-gradient(50% 50%, var(--text-subtle) 0%, var(--text-muted) 45%, transparent 74%)",
+                  filter: "blur(12px)",
+                }}
+                initial={{ scaleX: 0.3, scaleY: 0.5, opacity: 0 }}
+                animate={{
+                  scaleX: [0.3, 2.6, 3.4],
+                  scaleY: [0.5, 1.1, 1.25],
+                  opacity: [0, 0.7, 0],
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.4, ease: "easeOut" }}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* The rocket: drops in from above under retro thrust, and
+                        cuts its engine the moment it is down. */}
           <motion.div
-            key="rocket"
-            aria-hidden="true"
-            className="pointer-events-none absolute top-[62%] left-1/2 text-app-brand"
-            style={{ filter: "drop-shadow(0 0 26px var(--brand-glow))" }}
-            initial={{ x: "-50%", y: 0, scale: 1, opacity: 1 }}
-            animate={
-              stage === "ignition"
-                ? {
-                    // Held down by its own thrust before release.
-                    x: ["-50%", "-52%", "-48%", "-50%"],
-                    y: [0, -2, 2, 0],
-                  }
-                : { x: "-50%", y: "-135vh", scale: 0.55, opacity: [1, 1, 0] }
-            }
-            exit={{ opacity: 0 }}
-            transition={
-              stage === "ignition"
-                ? { duration: 0.16, repeat: Infinity }
-                : { duration: 1.05, ease: [0.5, 0, 0.75, 0] }
-            }
+            className="absolute top-[78%] left-1/2 text-app-brand"
+            style={{
+              marginLeft: -rocketSize / 2,
+              marginTop: -rocketSize,
+              filter: "drop-shadow(0 0 26px var(--brand-glow))",
+            }}
+            initial={{ y: -0.95 * stageRect.height, scale: 0.5, opacity: 0 }}
+            animate={{
+              y: 0,
+              scale: 1,
+              opacity: 1,
+              // A touch of drift on the way down, killed before it
+              // lands. Perfectly vertical reads as a lift being
+              // lowered; a small correction reads as flying.
+              x: hasLanded ? 0 : [6, -4, 0],
+            }}
+            transition={{
+              // Decelerating into the surface: fast while there is
+              // sky left, slow over the last few metres.
+              duration: 1.5,
+              ease: [0.35, 0.6, 0.2, 1],
+              x: { duration: 1.5, ease: "easeInOut" },
+            }}
           >
-            <RocketGlyph size={rocketSize} flame />
+            <RocketGlyph size={rocketSize} flame={stage === "approach"} />
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      )}
 
       {/* Arrival card. */}
       <AnimatePresence>

@@ -36,3 +36,14 @@ export interface Celebration {
 
 /** What callers pass to `celebrate` — id and seed are assigned by the provider. */
 export type CelebrationInput = Omit<Celebration, "id" | "seed">;
+
+/** Optional callbacks for `revealPath`. */
+export interface PathRevealHandlers {
+  /**
+   * The user has lit the fuse: the rocket is off the pad and the launch is
+   * theirs. This — not the launch merely being *offered* — is what a caller
+   * should treat as the moment being spent, so one that is dismissed
+   * unwatched can be offered again next time.
+   */
+  onLaunched?: () => void;
+}

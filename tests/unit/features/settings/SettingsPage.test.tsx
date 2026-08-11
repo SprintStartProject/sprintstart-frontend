@@ -44,6 +44,17 @@ vi.mock("../../../../src/features/settings/hooks/useGithubTokens", () => ({
   }),
 }));
 
+// The Moments section reads the celebratory layer, which lives behind its own
+// provider. This test is about which sections a permission group sees, not
+// about the rocket pet, so the hook is stubbed rather than the whole provider
+// mounted — same as the onboarding page tests do.
+vi.mock("../../../../src/features/moments", () => ({
+  useMoments: () => ({
+    showRocketPet: false,
+    setShowRocketPet: vi.fn(),
+  }),
+}));
+
 function mockAuth(group: PermissionGroup) {
   vi.mocked(useAuth).mockReturnValue({
     profile: {

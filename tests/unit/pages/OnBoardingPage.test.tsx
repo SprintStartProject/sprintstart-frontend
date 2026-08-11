@@ -12,6 +12,7 @@ vi.mock("../../../src/features/moments", () => ({
     celebrate: vi.fn(),
     flyby: vi.fn(),
     completeMission: vi.fn(),
+    revealPath: vi.fn(),
     playLaunchSequence: vi.fn(),
     isLaunching: false,
   }),

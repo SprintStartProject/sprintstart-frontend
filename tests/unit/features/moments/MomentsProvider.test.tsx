@@ -24,11 +24,13 @@ vi.mock("../../../../src/context/useAuth", () => ({
 
 /** Minimal consumer that triggers moments on demand. */
 function Trigger() {
-  const { celebrate, flyby, completeMission } = useMoments();
+  const { celebrate, flyby, completeMission, revealPath, playLaunchSequence } = useMoments();
   return (
     <>
+      <button onClick={playLaunchSequence}>launch</button>
       <button onClick={flyby}>fly</button>
       <button onClick={completeMission}>finish</button>
+      <button onClick={() => revealPath()}>reveal</button>
       <button
         onClick={() =>
           celebrate({
@@ -112,38 +114,80 @@ describe("MomentsProvider", () => {
     expect(await screen.findByText("All done")).toBeInTheDocument();
   });
 
-  it("plays the launch sequence on every page load", () => {
+  it("leaves boot to the splash instead of playing over it", () => {
     render(
       <MomentsProvider>
         <span>app</span>
       </MomentsProvider>,
     );
 
-    expect(screen.getByText("SprintStart")).toBeInTheDocument();
-  });
-
-  it("plays while auth is still resolving, so the app boots behind it", () => {
-    mockAuth.value = { status: "loading", profile: null };
-
-    render(
-      <MomentsProvider>
-        <span>app</span>
-      </MomentsProvider>,
-    );
-
-    expect(screen.getByText("SprintStart")).toBeInTheDocument();
-    // The app is mounted underneath the whole time, never gated by it.
+    // Keycloak's silent-SSO redirect used to black out a sequence started
+    // here and then replay it from the top. The CSS splash in index.html
+    // covers the load now; this must stay out of it.
+    expect(screen.queryByText("SprintStart")).not.toBeInTheDocument();
     expect(screen.getByText("app")).toBeInTheDocument();
   });
 
-  it("stays off the login screen", () => {
-    mockAuth.value = { status: "unauthenticated", profile: null };
+  it("takes down the boot splash once auth resolves", async () => {
+    const splash = document.createElement("div");
+    splash.id = "boot-splash";
+    document.body.appendChild(splash);
 
-    render(
+    mockAuth.value = { status: "loading", profile: null };
+    const { rerender } = render(
       <MomentsProvider>
         <span>app</span>
       </MomentsProvider>,
     );
+
+    // Still resolving: the splash is what the user is looking at.
+    expect(document.getElementById("boot-splash")).toBeInTheDocument();
+
+    mockAuth.value = {
+      status: "authenticated",
+      profile: { firstName: "Test" },
+    };
+    rerender(
+      <MomentsProvider>
+        <span>app</span>
+      </MomentsProvider>,
+    );
+
+    // Fades, then is removed on a timer, so the exit is never cut off
+    // halfway. Both are asynchronous: the fade itself waits for the launch
+    // to finish playing before it starts.
+    await waitFor(() => expect(splash).toHaveClass("is-ready"));
+    await waitFor(() => expect(document.getElementById("boot-splash")).not.toBeInTheDocument(), {
+      timeout: 2000,
+    });
+  });
+
+  it("plays the launch sequence on demand", async () => {
+    const user = userEvent.setup();
+    render(
+      <MomentsProvider>
+        <Trigger />
+      </MomentsProvider>,
+    );
+
+    expect(screen.queryByText("SprintStart")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("launch"));
+
+    expect(await screen.findByText("SprintStart")).toBeInTheDocument();
+  });
+
+  it("stays off the login screen", async () => {
+    mockAuth.value = { status: "unauthenticated", profile: null };
+    const user = userEvent.setup();
+
+    render(
+      <MomentsProvider>
+        <Trigger />
+      </MomentsProvider>,
+    );
+
+    await user.click(screen.getByText("launch"));
 
     expect(screen.queryByText("SprintStart")).not.toBeInTheDocument();
   });
@@ -214,18 +258,109 @@ describe("MomentsProvider", () => {
     expect(await screen.findByText("Press any key to skip")).toBeInTheDocument();
   });
 
-  it("stops the sequence if auth resolves to signed out mid-flight", () => {
-    const { rerender } = render(
+  it("plays the launch on demand", async () => {
+    const user = userEvent.setup();
+    render(
       <MomentsProvider>
-        <span>app</span>
+        <Trigger />
       </MomentsProvider>,
     );
-    expect(screen.getByText("SprintStart")).toBeInTheDocument();
+
+    await user.click(screen.getByText("reveal"));
+
+    // Opens waiting on the pad: the first input is the launch button, and
+    // the prompt says so.
+    expect(await screen.findByTestId("path-reveal")).toBeInTheDocument();
+    expect(screen.getByText("Press any key to launch")).toBeInTheDocument();
+  });
+
+  it("waits on the pad for as long as it takes, then flies itself out once lit", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MomentsProvider>
+        <Trigger />
+      </MomentsProvider>,
+    );
+
+    await user.click(screen.getByText("reveal"));
+    expect(screen.getByTestId("path-reveal")).toBeInTheDocument();
+
+    // No timer stands in for the user: someone who steps away comes back
+    // to a rocket still waiting for them, however long that was.
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getByText("Press any key to launch")).toBeInTheDocument();
+
+    // Once lit, the remaining beats run themselves out — the launch ends by
+    // handing over to the page, not by being dismissed. Advanced one beat
+    // at a time: each stage only schedules the next once its own state
+    // update has been flushed, so a single long jump would fire the first
+    // timer and then find an empty queue.
+    await user.keyboard("{Enter}");
+    for (let beat = 0; beat < 4; beat++) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+    expect(screen.queryByTestId("path-reveal")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("takes any input as a cue to get out of the way", async () => {
+    const user = userEvent.setup();
+    render(
+      <MomentsProvider>
+        <Trigger />
+      </MomentsProvider>,
+    );
+
+    await user.click(screen.getByText("reveal"));
+    expect(await screen.findByTestId("path-reveal")).toBeInTheDocument();
+
+    // First input is the launch itself...
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("Press any key to skip")).toBeInTheDocument();
+
+    // ...the second cuts to the hand-over, the third takes the rest.
+    await user.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByTestId("path-reveal")).not.toBeInTheDocument());
+  });
+
+  it("ignores a second launch while one is already running", async () => {
+    const user = userEvent.setup();
+    render(
+      <MomentsProvider>
+        <Trigger />
+      </MomentsProvider>,
+    );
+
+    await user.click(screen.getByText("reveal"));
+    await user.click(screen.getByText("reveal"));
+
+    expect(screen.getAllByTestId("path-reveal")).toHaveLength(1);
+  });
+
+  it("stops the sequence if auth resolves to signed out mid-flight", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <MomentsProvider>
+        <Trigger />
+      </MomentsProvider>,
+    );
+
+    await user.click(screen.getByText("launch"));
+    expect(await screen.findByText("SprintStart")).toBeInTheDocument();
 
     mockAuth.value = { status: "unauthenticated", profile: null };
     rerender(
       <MomentsProvider>
-        <span>app</span>
+        <Trigger />
       </MomentsProvider>,
     );
 

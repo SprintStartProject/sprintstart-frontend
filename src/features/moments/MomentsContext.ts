@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { CelebrationInput } from "./types.ts";
+import type { CelebrationInput, PathRevealHandlers } from "./types.ts";
 
 /**
  * Shape of the moments context.
@@ -27,10 +27,43 @@ export interface MomentsContextValue {
    * quieter than this.
    */
   completeMission: () => void;
-  /** Replays the launch sequence (used by the post-login trigger and dev tools). */
+  /**
+   * Puts a rocket on the pad, waiting for the user to launch it off Earth,
+   * and hands over to the page underneath once it has gone. For the first
+   * time someone opens a finished onboarding path — whether they watched it
+   * being generated or it was waiting for them when they arrived.
+   *
+   * Shows no copy: it is a transition onto the path, not a message about it.
+   * Deciding *whether* this is that first time is the caller's job (see
+   * `usePathRevealMoment`); this only offers it, and reports back through
+   * `onLaunched` when the user actually takes it.
+   *
+   * Returns a disposer that takes the launch back down. Callers should tie it
+   * to the lifetime of the page the moment belongs to — the launch outlives
+   * any single click, and only the page going away means the user has left.
+   * Calling it after the launch has already ended, or when another one has
+   * since taken over, does nothing.
+   */
+  revealPath: (handlers?: PathRevealHandlers) => () => void;
+  /**
+   * Plays the arcing launch sequence.
+   *
+   * No longer fires on boot — that is the CSS splash in `index.html`, which
+   * is the only thing that can cover a load that starts before this bundle
+   * and survives Keycloak's silent-SSO redirect. This is left for on-demand
+   * use (dev tools today).
+   */
   playLaunchSequence: () => void;
   /** True while the launch sequence covers the screen. */
   isLaunching: boolean;
+  /**
+   * Whether the rocket pet renders at all. A pure preference, not a moment
+   * itself — off by default (Aug 2026): it is a novelty someone opts into
+   * from Settings, not something everyone has to notice and dismiss.
+   * Persisted, so the choice survives a reload.
+   */
+  showRocketPet: boolean;
+  setShowRocketPet: (value: boolean) => void;
 }
 
 /**

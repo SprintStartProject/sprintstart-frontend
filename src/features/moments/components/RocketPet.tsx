@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { RocketGlyph } from "./RocketGlyph.tsx";
 import { petFlight, PET_ROCKET_SIZE } from "../flightGeometry.ts";
-import type { FlightPath } from "../loopFlight.ts";
-import {
-  FLIGHT_DURATION_S,
-  hoverSpringToken,
-  idleDriftToken,
-  petPeekSpringToken,
-} from "../../../styles/tokens.ts";
+import type { PetFlightPlan } from "../flightGeometry.ts";
+import { announceRocketFlight } from "../rocketWatch.ts";
+import { hoverSpringToken, idleDriftToken, petPeekSpringToken } from "../../../styles/tokens.ts";
 
 const LAUNCH_COUNT_KEY = "rocketLaunchCount";
 
@@ -144,9 +140,21 @@ export function RocketPet() {
   const [isPressed, setIsPressed] = useState(false);
   const [isWiggling, setIsWiggling] = useState(false);
   const [launchCount, setLaunchCount] = useState(readLaunchCount);
-  const [flight, setFlight] = useState<FlightPath | null>(null);
+  const [flight, setFlight] = useState<PetFlightPlan | null>(null);
+  const flightRef = useRef<HTMLDivElement>(null);
 
   const isEngaged = isHovered || isFocused || isTapHeld;
+
+  // Announces the flight for anything on the page that watches rockets go by
+  // (the chat bot, today). Keyed on the state rather than on the element's
+  // mount, because `AnimatePresence` keeps the element around during its exit
+  // — and a rocket that has faded out is not worth staring after.
+  useEffect(() => {
+    if (state !== "flying") return;
+    const rocket = flightRef.current;
+    if (!rocket) return;
+    return announceRocketFlight(rocket);
+  }, [state]);
 
   // Drives the hide/peek cycle and the wait after a launch. The peek cycle
   // pauses while the user is on the pet, so it never ducks away from under the
@@ -314,28 +322,35 @@ export function RocketPet() {
         {state === "flying" && flight && (
           <motion.div
             key="rocket-flight"
+            ref={flightRef}
             aria-hidden="true"
             className="pointer-events-none fixed right-[14px] z-30 flex h-10 w-10 items-center justify-center text-app-brand-text"
             style={{
               bottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
               filter: "drop-shadow(0 0 14px var(--brand-glow))",
             }}
-            initial={{ x: 0, y: 0, rotate: flight.rotate[0], scale: 1, opacity: 1 }}
+            initial={{
+              x: 0,
+              y: 0,
+              rotate: flight.path.rotate[0],
+              scale: 1,
+              opacity: 1,
+            }}
             animate={{
-              x: flight.x,
-              y: flight.y,
-              rotate: flight.rotate,
-              // Recedes rather than exits: shrinks away and fades
-              // over the last quarter of the flight.
-              scale: flight.progress.map((s) => 1 - 0.55 * s * s),
-              opacity: flight.progress.map((s) => (s < 0.75 ? 1 : Math.max(0, (1 - s) / 0.25))),
+              x: flight.path.x,
+              y: flight.path.y,
+              rotate: flight.path.rotate,
+              // Shrinks a little as it goes — depth, not an exit.
+              // The leaving is real now: the path ends past the
+              // screen edge, so there is nothing to fade.
+              scale: flight.path.progress.map((s) => 1 - 0.35 * s * s),
             }}
             exit={{ opacity: 0 }}
             // Linear on purpose: the easing is already baked into the
             // keyframes, and easing them again ripples the curve.
             transition={{
-              duration: FLIGHT_DURATION_S,
-              times: flight.times,
+              duration: flight.durationS,
+              times: flight.path.times,
               ease: "linear",
             }}
             onAnimationComplete={() => setState("away")}

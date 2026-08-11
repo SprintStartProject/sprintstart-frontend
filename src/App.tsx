@@ -5,11 +5,12 @@ import { ChatProvider } from "./context/ChatProvider";
 import { ChatPreferencesProvider } from "./context/ChatPreferencesProvider";
 import { ThemeProvider } from "./context/ThemeProvider";
 import { ProjectProvider } from "./features/projects/ProjectProvider";
-import { MomentsProvider, RocketPet } from "./features/moments";
+import { MomentsProvider, RocketPet, useMoments } from "./features/moments";
 import { useAuth } from "./context/useAuth";
 
 function AppContent() {
   const { status } = useAuth();
+  const { showRocketPet } = useMoments();
 
   // Show sidebar only if logged in (even if onboarding is needed)
   const showSidebar = status !== "unauthenticated" && status !== "loading";
@@ -18,13 +19,17 @@ function AppContent() {
     <div className="flex min-h-screen w-full bg-app-bg text-app-text">
       {showSidebar && <SideBar />}
 
-      <main className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
+      {/* `data-moment-stage`: the area the page-scoped moments (the
+          onboarding launch and landing) cover, instead of the whole
+          screen — see momentStage.ts in the moments feature. */}
+      <main data-moment-stage className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
         <AppRouter />
       </main>
 
       {/* Decorative easter egg; only for signed-in users, so it never
-                sits on top of the login screen. */}
-      {showSidebar && <RocketPet />}
+          sits on top of the login screen, and off unless turned on in
+          Settings (see MomentsSection). */}
+      {showSidebar && showRocketPet && <RocketPet />}
     </div>
   );
 }

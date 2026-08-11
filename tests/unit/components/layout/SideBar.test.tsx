@@ -103,7 +103,11 @@ describe("SideBar", () => {
   it("shows the OnBoarding entry while onboarding is still open", () => {
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
-      profile: { ...mockProfile, hasCompletedOnboarding: false },
+      profile: {
+        ...mockProfile,
+        hasCompletedOnboarding: false,
+        projectRoles: [{ id: "role-1", name: "Backend Engineer" }],
+      },
       login: vi.fn(),
       logout: vi.fn(),
       refetchProfile: vi.fn(),
@@ -112,6 +116,26 @@ describe("SideBar", () => {
     renderWithProviders(<SideBar />);
 
     expect(screen.getAllByText("OnBoarding").length).toBeGreaterThan(0);
+  });
+
+  it("hides the OnBoarding entry until a role has been assigned", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      // No project role yet, so the backend has no path to generate from.
+      // Linking to a page that can only fail is worse than not linking.
+      profile: {
+        ...mockProfile,
+        hasCompletedOnboarding: false,
+        projectRoles: [],
+      },
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    expect(screen.queryByText("OnBoarding")).not.toBeInTheDocument();
   });
 
   it("renders admin nav items for admin user", () => {
@@ -159,9 +183,13 @@ describe("SideBar", () => {
 
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
-      // Onboarding still open, so that entry is present and everything
-      // below it sits one row lower.
-      profile: { ...mockProfile, hasCompletedOnboarding: false },
+      // Onboarding still open *and* a role assigned, so that entry is
+      // present and everything below it sits one row lower.
+      profile: {
+        ...mockProfile,
+        hasCompletedOnboarding: false,
+        projectRoles: [{ id: "role-1", name: "Backend Engineer" }],
+      },
       login: vi.fn(),
       logout: vi.fn(),
       refetchProfile: vi.fn(),

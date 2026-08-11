@@ -99,14 +99,27 @@ export function canAccessRoute(
 }
 
 /**
- * Whether the onboarding experience is still available to this user.
+ * Whether the onboarding experience is available to this user.
  *
- * Onboarding is a one-time journey: once the user has completed it (i.e. passed the
- * final knowledge check and been promoted to an existing member), the `/onboarding`
- * routes and the sidebar entry are hidden. Independent of the permission group.
+ * Two gates, at opposite ends of the journey:
+ *
+ * - **Not yet started.** A path is generated from the user's project role, so a
+ *   user who has not been given one has nothing to generate from — the backend
+ *   returns no path at all. Offering the entry anyway leads to a page that can
+ *   only fail, so it stays hidden until a role is assigned. The path is built on
+ *   the next sign-in or reload after that, which is when the entry appears.
+ * - **Already finished.** Onboarding is a one-time journey: once the final
+ *   knowledge check is passed and the user is promoted to an existing member,
+ *   the routes and the sidebar entry are hidden again.
+ *
+ * Independent of the permission group.
  */
 export function isOnboardingAccessible(profile: UserProfile | null): boolean {
-  return !!profile && !profile.hasCompletedOnboarding;
+  if (!profile || profile.hasCompletedOnboarding) {
+    return false;
+  }
+
+  return profile.projectRoles.length > 0;
 }
 
 export function getDefaultRoute(profile: UserProfile | null): AppRoute {

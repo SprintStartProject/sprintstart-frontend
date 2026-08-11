@@ -4,9 +4,10 @@ import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
 import { UserAvatar } from "../common/UserAvatar";
 import { useAuth } from "../../context/useAuth";
-import { canAccessRoute, isOnboardingAccessible, type AppRoute } from "../../auth/accessPolicy";
+import { canAccessRoute, type AppRoute } from "../../auth/accessPolicy";
 import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitcher";
 import { useProjectContext } from "../../features/projects/useProjectContext";
+import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import {
   AdminIcon,
@@ -102,6 +103,7 @@ function SidebarContent({
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
+  const isOnboardingAvailable = useOnboardingAvailable();
   const location = useLocation();
   /**
    * Viewport y of the pointer while it is over the nav, `-Infinity` when it
@@ -118,8 +120,10 @@ function SidebarContent({
   const visibleNavItems = navItems.filter(
     (item) =>
       canAccessRoute(profile, item.path, canManageSelected) &&
-      // Hide onboarding once the user has completed it and been promoted.
-      (item.path !== "/onboarding" || isOnboardingAccessible(profile)),
+      // Onboarding only appears while a path can actually exist: after a
+      // role is assigned, before the journey is completed, and once the
+      // project has something to build the path from.
+      (item.path !== "/onboarding" || isOnboardingAvailable),
   );
   const visibleProjectManagerNavItems = projectManagerNavItems.filter((item) =>
     canAccessRoute(profile, item.path, canManageSelected),

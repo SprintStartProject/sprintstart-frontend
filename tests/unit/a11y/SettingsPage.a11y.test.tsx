@@ -24,6 +24,17 @@ vi.mock("../../../src/context/useAuth", () => ({
   }),
 }));
 
+// The Moments section reads the celebratory layer, which lives behind its own
+// provider. Stubbed rather than mounted: the toggle's markup is what axe needs
+// to see, and the real provider would drag the overlays and the boot-splash
+// hand-over into a page that is not being tested for either.
+vi.mock("../../../src/features/moments", () => ({
+  useMoments: () => ({
+    showRocketPet: false,
+    setShowRocketPet: vi.fn(),
+  }),
+}));
+
 describe("SettingsPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(

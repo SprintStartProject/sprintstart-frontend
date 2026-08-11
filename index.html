@@ -5,9 +5,711 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SprintStart</title>
+
+    <!--
+      Boot splash: the launch sequence, as the app's actual loading screen.
+
+      Inline on purpose — markup, styles, the theme resolution and the timing all
+      have to be here rather than in the app, because the whole point is that
+      this paints on the *first* frame, before the module graph is fetched,
+      before React mounts and before Keycloak's silent-SSO round-trip navigates
+      the page. Anything that ships inside the bundle is by definition too late
+      to cover the load it is meant to cover.
+
+      Four things worth knowing:
+
+      - **One reload is two document loads.** Keycloak runs `check-sso` without
+        the login iframe, which is a full redirect out to the identity provider
+        and straight back. So the page is parsed twice, and the flight must not
+        be split across the two: the outbound leg holds the rocket on the pad,
+        and the leg that comes back with the auth response flies the whole
+        thing from the beginning. Both legs paint the same pad in the same
+        place, so the cut between the documents lands on an identical frame.
+      - **The curve is the app's own.** The keyframes below are generated from
+        `src/features/moments/loopFlight.ts` — the same prolate cycloid, the
+        same 0.2 loop ratio, the same smoothstep easing and the same
+        nose-along-the-path rotations, sampled every other step and expressed in
+        the flight's own frame. That is why they must be played back `linear`:
+        the easing is already baked into the positions, and easing them again
+        would ripple the curve.
+      - **Everything animates `transform`/`opacity` only**, so the compositor
+        runs it and it keeps its frame rate while the main thread is busy
+        parsing the bundle and initialising Keycloak. A JS-driven animation
+        during boot stutters precisely when it is on screen.
+      - **The colours are literals.** They mirror the design tokens named beside
+        each one in src/styles/index.css; there is no stylesheet to read them
+        from yet. Keep them in sync if the palette moves.
+    -->
+    <style>
+      /* Fallback for the split second before the inline script below resolves
+         the stored theme, and for the case where it cannot run at all. */
+      :root {
+        --boot-bg: #f9fafb; /* --bg, light */
+        --boot-text: #111827; /* --text, light */
+        --boot-caption: #6b7280; /* --text-subtle, light */
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --boot-bg: #030712; /* --bg, dark */
+          --boot-text: #f9fafb; /* --text, dark */
+          --boot-caption: #9ca3af; /* --text-subtle, dark */
+        }
+      }
+      html.light {
+        --boot-bg: #f9fafb;
+        --boot-text: #111827;
+        --boot-caption: #6b7280;
+      }
+      html.dark {
+        --boot-bg: #030712;
+        --boot-text: #f9fafb;
+        --boot-caption: #9ca3af;
+      }
+
+      /* The page's own background, before the bundle brings the real one.
+         `body { background: var(--bg) }` lives in src/styles/index.css, which
+         does not exist yet at this point — so without this, every moment not
+         covered by the splash is unstyled white. That includes the whole
+         signed-out path, where the splash is deliberately not shown at all.
+         Tracks the same theme classes, so it never fights the app's version. */
+      html {
+        background: var(--boot-bg);
+      }
+
+      #boot-splash {
+        /* The flight vector. Length and bearing are all that change between
+           screen shapes — the curve itself is stored in the flight's own frame,
+           so one set of keyframes serves every viewport.
+
+           Capped against height for the same reason the app's `launchGeometry`
+           caps its band: past 16:9 the width alone would drive a loop taller
+           than the screen. */
+        --flight-d: min(77.7vw, 138vh);
+        --flight-angle: -17.71deg;
+
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: var(--boot-bg);
+        overflow: hidden;
+        /* Swallows the click that skips it. `none` would let that click land on
+           whatever the app has under the cursor, and pressing a button you
+           cannot see is a worse surprise than a splash. */
+        pointer-events: auto;
+        transform-origin: 50% 50%;
+      }
+
+      /* Portrait: the same flight, stood up. A phone has the height the width
+         will not give, and a shallow climb across the bottom of a tall screen
+         reads as the rocket taxiing rather than launching. */
+      @media (max-aspect-ratio: 1 / 1) {
+        #boot-splash {
+          --flight-d: 54vh;
+          --flight-angle: -51deg;
+        }
+      }
+
+      /* The launch pad: low and left of centre, where the app's own launch
+         sequence puts it. */
+      #boot-splash .boot-pad {
+        position: absolute;
+        left: 12vw;
+        top: 88vh;
+        width: 0;
+        height: 0;
+      }
+
+      #boot-splash .boot-glow {
+        position: absolute;
+        left: -110px;
+        top: -110px;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(37, 99, 235, 0.3) 0%,
+          rgba(37, 99, 235, 0) 68%
+        );
+        /* Idles on the pad; becomes the ignition bloom once the flight runs. */
+        animation: boot-pulse 1.9s ease-in-out infinite;
+      }
+
+      /* Exhaust trail along the flight line. Drawn as a fixed-length bar that is
+         scaled, rather than a width that grows, so it stays on the compositor —
+         and it takes its length and bearing from the flight vector, so it can
+         never end up pointing somewhere the rocket did not go. */
+      #boot-splash .boot-trail {
+        position: absolute;
+        left: 0;
+        top: -1.5px;
+        width: var(--flight-d);
+        height: 3px;
+        border-radius: 999px;
+        transform-origin: 0% 50%;
+        transform: rotate(var(--flight-angle)) scaleX(0);
+        background: linear-gradient(
+          90deg,
+          rgba(37, 99, 235, 0) 0%,
+          rgba(37, 99, 235, 0.75) 30%,
+          rgba(79, 70, 229, 0.9) 100%
+        );
+        box-shadow: 0 0 26px 3px rgba(37, 99, 235, 0.35);
+      }
+
+      /* Carries the flight's bearing, so the curve inside it can be stored once
+         in flight-local coordinates: along the flight is +x, the side the loop
+         bulges towards is -y. */
+      #boot-splash .boot-frame {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform: rotate(var(--flight-angle));
+      }
+
+      /* Parked on the pad until the flight runs. The counter-rotation is what
+         makes "up" mean up on screen rather than up the flight line. */
+      #boot-splash .boot-flight {
+        transform: rotate(calc(-1 * var(--flight-angle)));
+      }
+
+      #boot-splash .boot-rocket {
+        display: block;
+        width: clamp(28px, 8.5vw, 64px);
+        height: clamp(28px, 8.5vw, 64px);
+        margin: calc(clamp(28px, 8.5vw, 64px) / -2);
+        filter: drop-shadow(0 0 22px rgba(37, 99, 235, 0.5));
+        animation: boot-appear 0.22s ease-out both;
+      }
+
+      #boot-splash .boot-flame {
+        transform-origin: 12px 20.3px;
+        animation: boot-flame 0.42s ease-in-out infinite;
+      }
+
+      #boot-splash .boot-copy {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0 1.5rem;
+        text-align: center;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+
+      #boot-splash .boot-word {
+        font-size: clamp(1.875rem, 4vw, 2.25rem);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        color: var(--boot-text);
+        opacity: 0;
+      }
+
+      #boot-splash .boot-greeting {
+        max-width: 100%;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--boot-caption);
+        opacity: 0;
+      }
+
+      #boot-splash .boot-skip {
+        position: absolute;
+        left: 50%;
+        bottom: 2rem;
+        transform: translateX(-50%);
+        margin: 0;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--boot-caption);
+        opacity: 0;
+      }
+
+      /* The leg that keeps the user. Everything that moves is gated on this, so
+         the outbound leg — the one the SSO redirect is about to navigate away
+         from — shows a rocket waiting on the pad and nothing else. Starting the
+         flight there would only ever get it half-played before the redirect,
+         which is the jump this replaces. */
+      #boot-splash[data-leg="return"] .boot-flight {
+        animation: boot-flight 1.3s linear 0.25s both;
+      }
+      #boot-splash[data-leg="return"] .boot-glow {
+        animation: boot-ignite 1.4s ease-out both;
+      }
+      #boot-splash[data-leg="return"] .boot-trail {
+        animation: boot-trail 1.25s cubic-bezier(0.4, 0, 0.35, 1) 0.3s both;
+      }
+      #boot-splash[data-leg="return"] .boot-rocket {
+        animation: boot-appear 0.22s ease-out both,
+          boot-depart 0.3s ease-in 1.45s both;
+      }
+      #boot-splash[data-leg="return"] .boot-word {
+        animation: boot-resolve 0.85s ease-out 0.55s both;
+      }
+      #boot-splash[data-leg="return"] .boot-greeting {
+        /* Fades in behind the wordmark, then breathes for as long as the wait
+           lasts — the one thing on the held frame that says "still working". */
+        animation:
+          boot-fade-in 0.7s ease-out 0.85s both,
+          boot-breathe 2.4s ease-in-out 1.9s infinite;
+      }
+      /* Only offered once the wait is real: while the rocket is still flying
+         there is nothing to be impatient about yet. */
+      #boot-splash[data-leg="return"] .boot-skip {
+        animation: boot-fade-in 0.6s ease-out 2.6s both;
+      }
+
+      /* Ready: the held frame fades and lets the app through. A fade rather
+         than a warp — the flight already happened, and a second flourish on the
+         way out would be the app taking one more bow than it earned. */
+      #boot-splash.is-ready {
+        animation: boot-leave 0.45s ease-out both;
+      }
+
+      /* ── The flight ──────────────────────────────────────────────────────
+         Generated from src/features/moments/loopFlight.ts: a prolate cycloid
+         with a 0.2 loop ratio, sampled every other step of 60, in the flight's
+         own frame and normalised to its length. Play it `linear` — the easing
+         is in the numbers. Regenerate rather than hand-edit. */
+      @keyframes boot-flight {
+        0% {
+          transform: translate(calc(0 * var(--flight-d)), calc(0 * var(--flight-d)))
+            rotate(17.7deg);
+        }
+        3.33% {
+          transform: translate(calc(0.0074 * var(--flight-d)), calc(0 * var(--flight-d)))
+            rotate(30.9deg);
+        }
+        6.67% {
+          transform: translate(calc(0.0287 * var(--flight-d)), calc(-0.0006 * var(--flight-d)))
+            rotate(43.5deg);
+        }
+        10% {
+          transform: translate(calc(0.063 * var(--flight-d)), calc(-0.0031 * var(--flight-d)))
+            rotate(54.7deg);
+        }
+        13.33% {
+          transform: translate(calc(0.1087 * var(--flight-d)), calc(-0.0092 * var(--flight-d)))
+            rotate(63.9deg);
+        }
+        16.67% {
+          transform: translate(calc(0.1638 * var(--flight-d)), calc(-0.0213 * var(--flight-d)))
+            rotate(70.8deg);
+        }
+        20% {
+          transform: translate(calc(0.2256 * var(--flight-d)), calc(-0.0412 * var(--flight-d)))
+            rotate(69deg);
+        }
+        23.33% {
+          transform: translate(calc(0.2904 * var(--flight-d)), calc(-0.0705 * var(--flight-d)))
+            rotate(62.1deg);
+        }
+        26.67% {
+          transform: translate(calc(0.3538 * var(--flight-d)), calc(-0.1097 * var(--flight-d)))
+            rotate(54.4deg);
+        }
+        30% {
+          transform: translate(calc(0.4115 * var(--flight-d)), calc(-0.1576 * var(--flight-d)))
+            rotate(45.9deg);
+        }
+        33.33% {
+          transform: translate(calc(0.4589 * var(--flight-d)), calc(-0.2116 * var(--flight-d)))
+            rotate(36.5deg);
+        }
+        36.67% {
+          transform: translate(calc(0.493 * var(--flight-d)), calc(-0.2674 * var(--flight-d)))
+            rotate(26.1deg);
+        }
+        40% {
+          transform: translate(calc(0.5123 * var(--flight-d)), calc(-0.3196 * var(--flight-d)))
+            rotate(14deg);
+        }
+        43.33% {
+          transform: translate(calc(0.5175 * var(--flight-d)), calc(-0.3622 * var(--flight-d)))
+            rotate(-1.2deg);
+        }
+        46.67% {
+          transform: translate(calc(0.5118 * var(--flight-d)), calc(-0.3902 * var(--flight-d)))
+            rotate(-26.3deg);
+        }
+        50% {
+          transform: translate(calc(0.5 * var(--flight-d)), calc(-0.4 * var(--flight-d)))
+            rotate(-90deg);
+        }
+        53.33% {
+          transform: translate(calc(0.4882 * var(--flight-d)), calc(-0.3902 * var(--flight-d)))
+            rotate(-153.7deg);
+        }
+        56.67% {
+          transform: translate(calc(0.4825 * var(--flight-d)), calc(-0.3622 * var(--flight-d)))
+            rotate(-178.8deg);
+        }
+        60% {
+          transform: translate(calc(0.4877 * var(--flight-d)), calc(-0.3196 * var(--flight-d)))
+            rotate(-194deg);
+        }
+        63.33% {
+          transform: translate(calc(0.507 * var(--flight-d)), calc(-0.2674 * var(--flight-d)))
+            rotate(-206.1deg);
+        }
+        66.67% {
+          transform: translate(calc(0.5411 * var(--flight-d)), calc(-0.2116 * var(--flight-d)))
+            rotate(-216.5deg);
+        }
+        70% {
+          transform: translate(calc(0.5885 * var(--flight-d)), calc(-0.1576 * var(--flight-d)))
+            rotate(-225.9deg);
+        }
+        73.33% {
+          transform: translate(calc(0.6462 * var(--flight-d)), calc(-0.1097 * var(--flight-d)))
+            rotate(-234.4deg);
+        }
+        76.67% {
+          transform: translate(calc(0.7096 * var(--flight-d)), calc(-0.0705 * var(--flight-d)))
+            rotate(-242.1deg);
+        }
+        80% {
+          transform: translate(calc(0.7744 * var(--flight-d)), calc(-0.0412 * var(--flight-d)))
+            rotate(-249deg);
+        }
+        83.33% {
+          transform: translate(calc(0.8362 * var(--flight-d)), calc(-0.0213 * var(--flight-d)))
+            rotate(-255deg);
+        }
+        86.67% {
+          transform: translate(calc(0.8913 * var(--flight-d)), calc(-0.0092 * var(--flight-d)))
+            rotate(-260.1deg);
+        }
+        90% {
+          transform: translate(calc(0.937 * var(--flight-d)), calc(-0.0031 * var(--flight-d)))
+            rotate(-264.3deg);
+        }
+        93.33% {
+          transform: translate(calc(0.9713 * var(--flight-d)), calc(-0.0006 * var(--flight-d)))
+            rotate(-267.3deg);
+        }
+        96.67% {
+          transform: translate(calc(0.9926 * var(--flight-d)), calc(0 * var(--flight-d)))
+            rotate(-269.2deg);
+        }
+        100% {
+          transform: translate(calc(1 * var(--flight-d)), calc(0 * var(--flight-d)))
+            rotate(-269.9deg);
+        }
+      }
+
+      @keyframes boot-appear {
+        from {
+          opacity: 0;
+          transform: scale(0.6);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @keyframes boot-depart {
+        to {
+          opacity: 0;
+          transform: scale(0.75);
+        }
+      }
+      @keyframes boot-trail {
+        0% {
+          transform: rotate(var(--flight-angle)) scaleX(0);
+          opacity: 0;
+        }
+        25% {
+          opacity: 0.9;
+        }
+        100% {
+          transform: rotate(var(--flight-angle)) scaleX(1);
+          opacity: 0;
+        }
+      }
+      @keyframes boot-ignite {
+        0% {
+          opacity: 0.8;
+          transform: scale(0.6);
+        }
+        18% {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(2.6);
+        }
+      }
+      @keyframes boot-pulse {
+        0%,
+        100% {
+          opacity: 0.7;
+          transform: scale(0.92);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.14);
+        }
+      }
+      @keyframes boot-flame {
+        0%,
+        100% {
+          transform: scaleY(1);
+          opacity: 1;
+        }
+        30% {
+          transform: scaleY(0.62);
+          opacity: 0.75;
+        }
+        60% {
+          transform: scaleY(1.1);
+          opacity: 1;
+        }
+      }
+      @keyframes boot-resolve {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+          filter: blur(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+          filter: blur(0);
+        }
+      }
+      @keyframes boot-fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes boot-breathe {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      @keyframes boot-leave {
+        to {
+          opacity: 0;
+          transform: scale(1.04);
+        }
+      }
+
+      /* Reduced motion: the splash still covers the load — that is a function,
+         not a flourish — but it holds the frame the flight would have ended on
+         rather than flying to it, and leaves by fading. */
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash .boot-pad {
+          display: none;
+        }
+        #boot-splash[data-leg="return"] .boot-word,
+        #boot-splash[data-leg="return"] .boot-greeting,
+        #boot-splash[data-leg="return"] .boot-skip {
+          animation: none;
+          opacity: 1;
+        }
+        #boot-splash.is-ready {
+          animation: boot-fade-out 0.25s ease-out both;
+        }
+        @keyframes boot-fade-out {
+          to {
+            opacity: 0;
+          }
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash">
+      <div class="boot-pad">
+        <div class="boot-glow"></div>
+        <div class="boot-trail"></div>
+        <div class="boot-frame">
+          <div class="boot-flight">
+            <!-- Same silhouette as src/features/moments/components/RocketGlyph.tsx.
+                 Kept in sync by hand; it is the one drawing that has to exist
+                 before the bundle does. -->
+            <svg class="boot-rocket" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M7.65 13.1 4.25 18.6c-.4.65-.6 1.35-.6 2.1v1.05l4-2.35z"
+                fill="#2563eb"
+                opacity="0.5"
+              />
+              <path
+                d="M16.35 13.1l3.4 5.5c.4.65.6 1.35.6 2.1v1.05l-4-2.35z"
+                fill="#2563eb"
+                opacity="0.5"
+              />
+              <path d="M9.6 17.9h4.8l-.75 2.4h-3.3z" fill="#2563eb" opacity="0.75" />
+              <path
+                d="M12 1.2c2.75 2.6 4.35 6.7 4.35 10.9v5.5c0 .66-.54 1.2-1.2 1.2H8.85c-.66 0-1.2-.54-1.2-1.2v-5.5C7.65 7.9 9.25 3.8 12 1.2Z"
+                fill="#2563eb"
+              />
+              <ellipse cx="9.9" cy="12.8" rx="0.75" ry="3.6" fill="#fff" opacity="0.18" />
+              <path d="M7.65 15.1h8.7v1.7H7.65z" fill="#2563eb" opacity="0.35" />
+              <path
+                d="M12 1.2c1.45 1.4 2.62 3.3 3.32 5.5H8.68C9.38 4.5 10.55 2.6 12 1.2Z"
+                fill="#c2410c"
+              />
+              <circle cx="12" cy="9.7" r="2.4" fill="#0b1220" />
+              <circle cx="12" cy="9.7" r="2.4" fill="#2563eb" opacity="0.16" />
+              <g class="boot-flame">
+                <path
+                  d="M9.35 20.3h5.3c0 1.55-1.06 2.6-2.65 2.9-1.59-.3-2.65-1.35-2.65-2.9Z"
+                  fill="#c2410c"
+                />
+                <path
+                  d="M10.85 20.3h2.3c0 .95-.46 1.6-1.15 1.8-.69-.2-1.15-.85-1.15-1.8Z"
+                  fill="#fff"
+                  opacity="0.75"
+                />
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="boot-copy">
+        <span class="boot-word">SprintStart</span>
+        <span class="boot-greeting" id="boot-greeting">Welcome back</span>
+      </div>
+
+      <p class="boot-skip">Click anywhere to skip</p>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+      (function () {
+        var splash = document.getElementById("boot-splash");
+
+        // How long the flight runs, in ms: the last keyframe plus the rocket's
+        // fade-out. The app will not take the splash down before this — a
+        // launch cut off halfway is worse than a wait.
+        var FLIGHT_MS = 1750;
+
+        // How long to wait for the SSO redirect before concluding it is not
+        // coming and flying anyway. Covers any setup where the app boots
+        // without a round-trip; without it, such a load would sit on the pad
+        // until the app dismissed it and the flight would never play at all.
+        var NO_REDIRECT_MS = 1200;
+
+        var NAME_KEY = "sprintstart.boot.greeting";
+        var SIGNOUT_KEY = "sprintstart.boot.signout";
+
+        // Resolves the stored theme onto <html> before the first paint, so the
+        // splash (and the app behind it) never flashes the wrong palette.
+        // Mirrors ThemeProvider's key and its 'system' fallback exactly — if
+        // that changes, this has to change with it.
+        try {
+          var stored = window.localStorage.getItem("theme");
+          var dark =
+            stored === "dark" ||
+            ((stored === "system" || !stored) &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.add(dark ? "dark" : "light");
+        } catch (error) {
+          // Blocked storage: the media query fallback in the CSS still applies.
+        }
+
+        // Greets by name when there is one to greet by. Written by the app after
+        // a profile loads, so it is only ever a name this browser has already
+        // been shown.
+        try {
+          var name = window.localStorage.getItem(NAME_KEY);
+          if (name) {
+            document.getElementById("boot-greeting").textContent =
+              "Welcome back, " + name;
+          }
+        } catch (error) {
+          // Keep the generic greeting.
+        }
+
+        var url = window.location.search + window.location.hash;
+
+        // Signing out gets no launch at all — not a rocket on the pad, not a
+        // few frames of one. All or nothing: a send-off belongs to somebody
+        // arriving, and half of one in front of a login form reads as the
+        // animation breaking rather than as restraint.
+        //
+        // Two ways to know before painting anything. `error=` on the way back
+        // from the identity provider is a failed silent check — nobody is
+        // signed in, a login form is next. And the leg that lands here straight
+        // after a sign-out carries no auth parameters at all, so the app leaves
+        // a note for it on the way out (see markSigningOut in bootSplash.ts).
+        var signedOut = /[?&#]error=/.test(url);
+        try {
+          if (window.sessionStorage.getItem(SIGNOUT_KEY)) {
+            window.sessionStorage.removeItem(SIGNOUT_KEY);
+            signedOut = true;
+          }
+        } catch (error) {
+          // No session storage: the `error=` leg still gets caught below.
+        }
+
+        if (signedOut) {
+          splash.remove();
+          return;
+        }
+
+        // Which leg of the round-trip this load is. Keycloak comes back with
+        // its response on the URL — in the fragment by default, in the query
+        // when the client is configured that way — so the presence of a state
+        // plus a code is what says "this document is the one that stays".
+        // Everything else is the outbound leg, about to be navigated away from,
+        // and it only holds the rocket on the pad.
+        var isReturnLeg = /[?&#]state=/.test(url) && /[?&#]code=/.test(url);
+
+        function fly() {
+          if (!splash.isConnected || splash.dataset.exiting === "true") return;
+          splash.dataset.leg = "return";
+          // Read by src/bootSplash.ts, which owns the exit.
+          window.__bootSplash = { start: Date.now(), flightMs: FLIGHT_MS };
+        }
+
+        splash.dataset.leg = "outbound";
+        window.__bootSplash = { start: Date.now(), flightMs: 0 };
+
+        if (isReturnLeg) fly();
+        else window.setTimeout(fly, NO_REDIRECT_MS);
+
+        // Skipping is immediate and unconditional: someone who wants the real
+        // screen has said so, and making them watch the rest of a launch first
+        // is the opposite of respecting that.
+        function skip() {
+          splash.remove();
+          document.removeEventListener("keydown", skip);
+          document.removeEventListener("pointerdown", skip);
+        }
+        document.addEventListener("keydown", skip);
+        document.addEventListener("pointerdown", skip);
+
+        // Dead man's switch. The app takes the splash down as soon as auth
+        // resolves, but if the bundle fails to load or throws on the way up,
+        // nobody should be left staring at a rocket forever — least of all with
+        // the real error hidden underneath it.
+        window.setTimeout(skip, 15000);
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
