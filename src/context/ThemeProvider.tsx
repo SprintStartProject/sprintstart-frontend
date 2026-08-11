@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react';
-import { useEffect, useLayoutEffect, useState } from 'react';
-import type { Theme } from './ThemeContext';
-import { ThemeContext } from './ThemeContext';
+import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import type { Theme } from "./ThemeContext";
+import { ThemeContext } from "./ThemeContext";
 
-const STORAGE_KEY = 'theme';
+const STORAGE_KEY = "theme";
 
 /**
  * Reads the user's stored theme preference, falling back to the OS
@@ -12,27 +12,25 @@ const STORAGE_KEY = 'theme';
  * chosen by the user and stored.
  */
 function getInitialTheme(): Theme {
-    let stored: string | null = null;
-    try {
-        stored = window.localStorage.getItem(STORAGE_KEY);
-    } catch (error) {
-        // localStorage may be disabled (private mode) or throw on access.
-        console.warn('Failed to read theme preference', error);
-    }
-    if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        return stored;
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    // localStorage may be disabled (private mode) or throw on access.
+    console.warn("Failed to read theme preference", error);
+  }
+  if (stored === "light" || stored === "dark" || stored === "system") {
+    return stored;
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 /** Resolves a (possibly 'system') theme to the concrete light/dark mode in effect. */
 function resolveDark(theme: Theme): boolean {
-    if (theme === 'system') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return theme === 'dark';
+  if (theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  return theme === "dark";
 }
 
 /**
@@ -41,14 +39,14 @@ function resolveDark(theme: Theme): boolean {
  * swallowed — the in-memory theme still applies for the current session.
  */
 function applyTheme(theme: Theme) {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(resolveDark(theme) ? 'dark' : 'light');
-    try {
-        window.localStorage.setItem(STORAGE_KEY, theme);
-    } catch (error) {
-        console.warn('Failed to persist theme preference', error);
-    }
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+  root.classList.add(resolveDark(theme) ? "dark" : "light");
+  try {
+    window.localStorage.setItem(STORAGE_KEY, theme);
+  } catch (error) {
+    console.warn("Failed to persist theme preference", error);
+  }
 }
 
 /**
@@ -63,38 +61,38 @@ function applyTheme(theme: Theme) {
  * paints — avoiding a flash of the wrong theme on first load.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
+  const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
 
-    // Sync before paint to avoid a FOUC of the default light palette.
-    useLayoutEffect(() => {
-        applyTheme(theme);
-    }, [theme]);
+  // Sync before paint to avoid a FOUC of the default light palette.
+  useLayoutEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
-    // When the user picks 'system', keep the applied mode in sync with the OS.
-    useEffect(() => {
-        if (theme !== 'system') return;
+  // When the user picks 'system', keep the applied mode in sync with the OS.
+  useEffect(() => {
+    if (theme !== "system") return;
 
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = () => applyTheme('system');
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, [theme]);
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyTheme("system");
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [theme]);
 
-    const setTheme = (next: Theme) => {
-        setThemeState(next);
-    };
+  const setTheme = (next: Theme) => {
+    setThemeState(next);
+  };
 
-    // Sidebar quick toggle: cycle light <-> dark. 'system' is treated as the
-    // resolved mode so toggling from 'system' flips to the opposite concrete mode.
-    const toggleTheme = () => {
-        setThemeState((prev) => (resolveDark(prev) ? 'light' : 'dark'));
-    };
+  // Sidebar quick toggle: cycle light <-> dark. 'system' is treated as the
+  // resolved mode so toggling from 'system' flips to the opposite concrete mode.
+  const toggleTheme = () => {
+    setThemeState((prev) => (resolveDark(prev) ? "light" : "dark"));
+  };
 
-    const isDarkMode = resolveDark(theme);
+  const isDarkMode = resolveDark(theme);
 
-    return (
-        <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, isDarkMode }}>
-            {children}
-        </ThemeContext.Provider>
-    );
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, isDarkMode }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }

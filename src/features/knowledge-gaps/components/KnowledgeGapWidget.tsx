@@ -5,6 +5,7 @@
 // ============================================================
 
 import { useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useFetch } from "../../../hooks/useFetch";
@@ -12,23 +13,17 @@ import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { ClickableCard } from "../../../components/common/ClickableCard";
+import { Button } from "../../../components/ui/Button";
 import { useProjectContext } from "../../projects/useProjectContext";
 
-import {
-  ShieldAlert,
-  ArrowRight,
-  Loader2,
-  AlertCircle,
-  Clock,
-  RefreshCw,
-} from "lucide-react";
+import { ShieldAlert, ArrowRight, AlertCircle, Clock, RefreshCw } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: KnowledgeGapWidget
 // ─────────────────────────────────────────────────────────────
 
 export function KnowledgeGapWidget() {
-    const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -39,7 +34,10 @@ export function KnowledgeGapWidget() {
     data: overview,
     loading,
     error,
-  } = useFetch(() => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId), [refreshKey, selectedProjectId]);
+  } = useFetch(
+    () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
+    [refreshKey, selectedProjectId],
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -59,8 +57,8 @@ export function KnowledgeGapWidget() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex items-center justify-center min-h-48">
-        <Loader2 className="w-5 h-5 animate-spin text-app-brand" />
+      <div className="flex min-h-48 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }
@@ -69,31 +67,31 @@ export function KnowledgeGapWidget() {
 
   if (error || !overview || overview.gaps.length === 0) {
     return (
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6 flex flex-col items-center justify-center gap-3 min-h-48 text-center">
-        <AlertCircle className="w-5 h-5 text-app-text-muted" />
+      <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
+        <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-sm text-app-text-muted">
           No knowledge gaps yet. Trigger a refresh to detect them.
         </p>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => void handleRefresh()}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-app-brand hover:bg-app-brand-hover text-white text-xs font-medium transition-all disabled:opacity-60"
+            loading={refreshing}
+            icon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => void navigate("/insights/knowledge-gaps")}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors"
+            trailingIcon={<ArrowRight className="h-3.5 w-3.5" />}
           >
             Open page
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
-        {refreshError && (
-          <p className="text-xs text-app-danger-text max-w-xs">{refreshError}</p>
-        )}
+        {refreshError && <p className="max-w-xs text-xs text-app-danger-text">{refreshError}</p>}
       </div>
     );
   }
@@ -113,40 +111,40 @@ export function KnowledgeGapWidget() {
     <ClickableCard
       onClick={() => void navigate("/insights/knowledge-gaps")}
       interactive={false}
-      className="rounded-2xl border border-app-border bg-app-surface p-5 cursor-pointer transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[button:hover]:!border-app-border has-[button:hover]:!bg-app-surface"
+      className="cursor-pointer rounded-2xl border border-app-border bg-app-surface p-5 transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover has-[button:hover]:!border-app-border has-[button:hover]:!bg-app-surface"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-app-brand" />
-          <span className="text-sm font-semibold text-app-text">
-            Knowledge gaps
-          </span>
+          <ShieldAlert className="h-4 w-4 text-app-brand" />
+          <span className="text-sm font-semibold text-app-text">Knowledge gaps</span>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={(event) => {
               event.stopPropagation();
               void handleRefresh();
             }}
             disabled={refreshing}
+            aria-label="Refresh"
             title="Refresh"
-            className="flex items-center text-app-text-muted hover:text-app-text transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            type="button"
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={(event) => {
               event.stopPropagation();
               void navigate("/insights/knowledge-gaps");
             }}
-            className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+            trailingIcon={<ArrowRight className="h-3.5 w-3.5" />}
           >
             See all ({gapCount})
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -164,17 +162,17 @@ export function KnowledgeGapWidget() {
                 event.stopPropagation();
                 void navigate(`/insights/knowledge-gaps/${gap.id}`);
               }}
-              className="w-full text-left flex items-stretch gap-3 rounded-xl border border-app-border bg-app-surface hover:border-app-border-strong transition-colors p-3"
+              className="flex w-full items-stretch gap-3 rounded-xl border border-app-border bg-app-surface p-3 text-left transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
             >
               <SeverityBar severity={gap.severity} />
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-sm font-medium text-app-text truncate">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium text-app-text">
                     {gap.component}
                   </span>
                   <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${badge}`}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}
                   >
                     {label}
                   </span>
@@ -182,24 +180,24 @@ export function KnowledgeGapWidget() {
 
                 <div className="flex items-center gap-3 text-xs text-app-text-muted">
                   {/* Missing types as small chips */}
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex flex-wrap gap-1">
                     {gap.missingTypes.slice(0, 2).map((t) => (
                       <span
                         key={t}
-                        className="bg-app-surface-muted border border-app-border rounded px-1.5 py-0.5"
+                        className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5"
                       >
                         {t}
                       </span>
                     ))}
                     {gap.missingTypes.length > 2 && (
-                      <span className="bg-app-surface-muted border border-app-border rounded px-1.5 py-0.5">
+                      <span className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5">
                         +{gap.missingTypes.length - 2}
                       </span>
                     )}
                   </div>
 
-                  <span className="ml-auto flex items-center gap-1 shrink-0">
-                    <Clock className="w-3 h-3" />
+                  <span className="ml-auto flex shrink-0 items-center gap-1">
+                    <Clock className="h-3 w-3" />
                     {formatRelativeDate(gap.lastIngested)}
                   </span>
                 </div>

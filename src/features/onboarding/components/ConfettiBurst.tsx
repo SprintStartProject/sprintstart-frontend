@@ -86,14 +86,11 @@ export function ConfettiBurst() {
   // backdrop-filter (which makes a containing block for fixed children) can clip the
   // burst. z-[60] keeps it above the modal layer at z-50.
   return createPortal(
-    <div
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[60] overflow-hidden"
-    >
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
       {pieces.map((piece, index) => (
         <motion.span
           key={index}
-          className={`absolute left-1/2 top-1/2 h-2 w-2 rounded-[2px] ${piece.color}`}
+          className={`absolute top-1/2 left-1/2 h-2 w-2 rounded-[2px] ${piece.color}`}
           initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
           animate={{
             opacity: [1, 1, 0],

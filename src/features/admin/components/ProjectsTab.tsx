@@ -1,5 +1,6 @@
-import { ChevronRight, FileText, Folder, Users } from "lucide-react";
+import { ChevronRight, FileText, Folder, UserCog, Users } from "lucide-react";
 import { getProjectSourcesCount, getProjectUsersCount } from "../data";
+import type { ProjectManager } from "../../../services/projectService";
 import type { ProjectOverview, ProjectSource } from "../types";
 import { AccessBadge } from "./Badges";
 
@@ -9,6 +10,13 @@ type ProjectsTabProps = {
   hasSearchQuery?: boolean;
   totalCount?: number;
 };
+
+/** Manager display name, falling back to the username when no name is set. */
+function getManagerName(manager: ProjectManager) {
+  const fullName = [manager.firstName, manager.lastName].filter(Boolean).join(" ");
+
+  return fullName || manager.username;
+}
 
 function formatSourceType(type: string) {
   return type
@@ -46,27 +54,19 @@ export function ProjectsTab({
       <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-app-border bg-app-surface px-6 text-center">
         {noProjectsExist ? (
           <>
-            <p className="text-base font-medium text-app-text">
-              No projects yet
-            </p>
+            <p className="text-base font-medium text-app-text">No projects yet</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Create your first project to get started.
             </p>
           </>
         ) : hasSearchQuery ? (
           <>
-            <p className="text-base font-medium text-app-text">
-              No projects found
-            </p>
-            <p className="mt-1 text-sm text-app-text-muted">
-              Try adjusting your search term.
-            </p>
+            <p className="text-base font-medium text-app-text">No projects found</p>
+            <p className="mt-1 text-sm text-app-text-muted">Try adjusting your search term.</p>
           </>
         ) : (
           <>
-            <p className="text-base font-medium text-app-text">
-              No projects found
-            </p>
+            <p className="text-base font-medium text-app-text">No projects found</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Try another search term or create a new project first.
             </p>
@@ -87,7 +87,11 @@ export function ProjectsTab({
             key={project.id}
             type="button"
             onClick={() => onOpenProjectDetails(project)}
-            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-border-strong hover:bg-app-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow sm:flex-row sm:items-start sm:justify-between sm:p-5"
+            // Lifted rather than scaled on hover. Scaling resamples the card's
+            // 1px border from the pre-scale bitmap, and on a row this wide that
+            // reads as the outline thinning out and partly vanishing. A
+            // translation moves the same crisp pixels.
+            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow motion-reduce:hover:translate-y-0 sm:flex-row sm:items-start sm:justify-between sm:p-5"
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
@@ -97,14 +101,13 @@ export function ProjectsTab({
 
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="break-words text-sm font-semibold text-app-text">
+                  <span className="text-sm font-semibold break-words text-app-text">
                     {project.name}
                   </span>
                 </div>
 
                 <p className="line-clamp-2 text-sm leading-relaxed text-app-text-muted">
-                  {project.description ||
-                    "No project description available yet."}
+                  {project.description || "No project description available yet."}
                 </p>
 
                 {visibleSourceTypeBadges.length > 0 && (
@@ -117,12 +120,9 @@ export function ProjectsTab({
                       </AccessBadge>
                     ))}
 
-                    {sourceTypeBadges.length >
-                      visibleSourceTypeBadges.length && (
+                    {sourceTypeBadges.length > visibleSourceTypeBadges.length && (
                       <AccessBadge variant="neutral">
-                        +
-                        {sourceTypeBadges.length -
-                          visibleSourceTypeBadges.length}
+                        +{sourceTypeBadges.length - visibleSourceTypeBadges.length}
                       </AccessBadge>
                     )}
                   </div>
@@ -136,6 +136,14 @@ export function ProjectsTab({
                   <span className="flex items-center gap-1.5">
                     <FileText className="h-3.5 w-3.5" />
                     {getProjectSourcesCount(project)} sources
+                  </span>
+                  {/* Spelled out even when unset: a project without a manager
+                      is the state an admin most needs to spot from the list. */}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <UserCog className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {project.manager ? getManagerName(project.manager) : "No manager"}
+                    </span>
                   </span>
                 </div>
               </div>

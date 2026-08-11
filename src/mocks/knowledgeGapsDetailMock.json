@@ -1,14 +1,8 @@
 {
   "id": "1",
   "component": "auth-service",
-  "missingTypes": [
-    "runbook",
-    "adr"
-  ],
-  "presentTypes": [
-    "readme",
-    "api-documentation"
-  ],
+  "missingTypes": ["runbook", "adr"],
+  "presentTypes": ["readme", "api-documentation"],
   "owners": [
     {
       "id": "user_001",

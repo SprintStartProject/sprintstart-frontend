@@ -1,13 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import type {
-  ConnectorDto,
-  ConnectorSource,
-} from "../../services/connectorService.ts";
+import type { ConnectorDto, ConnectorSource } from "../../services/connectorService.ts";
 
-export type {
-  ConnectorDto,
-  ConnectorSource,
-} from "../../services/connectorService.ts";
+export type { ConnectorDto, ConnectorSource } from "../../services/connectorService.ts";
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
 

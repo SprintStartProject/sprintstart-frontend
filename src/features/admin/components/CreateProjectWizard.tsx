@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useId, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
+import { Select } from "../../../components/ui/Select";
+import { Textarea } from "../../../components/ui/Textarea";
 import { Stepper } from "../../../components/ui/Stepper";
 import { ApiError } from "../../../services/apiClient";
 import {
@@ -26,23 +31,38 @@ import { SOURCE_SYSTEMS } from "../../data-ingestion/data";
 import type { SourceSystem } from "../../data-ingestion/types";
 import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
 import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel";
+import { MemberPicker } from "./MemberPicker";
 import { StagedSourceList } from "./StagedSourceList";
+import { toggleSelectedUserId, toggleVisibleUserSelection } from "../data";
+import type { AdminUser } from "../types";
 
 type CreateProjectWizardProps = {
   isOpen: boolean;
   tokenNames: string[];
+  /**
+   * The user directory, already loaded by the admin page. Passed in rather than
+   * fetched here so opening the wizard does not repeat a request the page has
+   * made anyway.
+   */
+  users: AdminUser[];
   onClose: () => void;
   /** Fired once the project exists, before any source finished connecting. */
   onProjectCreated: (project: AdminProjectDetails) => void;
 };
 
-type WizardStep = "details" | "sources";
+type WizardStep = "details" | "people" | "sources";
 // Within the sources step, the source-type choice and the type-specific detail
 // are shown one after another (like the Data Ingestion "Add source" flow).
 type SourceStep = "type" | "detail";
 
 /**
- * Two-step flow for creating a project and optionally attaching sources to it.
+ * Three-step flow for creating a project: its metadata, who works on it, and
+ * optionally the sources to attach.
+ *
+ * People get a step of their own rather than sitting under the metadata fields:
+ * picking a manager and ticking members off a list is a different kind of work
+ * than typing a name, and putting both on one screen made the first step long
+ * enough to scroll.
  *
  * The project is created no earlier than the type-specific "connect" action, so
  * cancelling out of the wizard before then leaves nothing behind. Which action
@@ -57,6 +77,7 @@ type SourceStep = "type" | "detail";
 export function CreateProjectWizard({
   isOpen,
   tokenNames,
+  users,
   onClose,
   onProjectCreated,
 }: CreateProjectWizardProps) {
@@ -69,10 +90,9 @@ export function CreateProjectWizard({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [managerId, setManagerId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
 
-  const [managerCandidates, setManagerCandidates] = useState<ProjectManager[]>(
-    [],
-  );
+  const [managerCandidates, setManagerCandidates] = useState<ProjectManager[]>([]);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState("");
 
@@ -129,8 +149,7 @@ export function CreateProjectWizard({
     void Promise.resolve().then(() => {
       setJiraCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
-        return current &&
-          jiraCredentials.some((credential) => credential.displayName === current)
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
           : jiraCredentials[0].displayName;
       });
@@ -145,9 +164,7 @@ export function CreateProjectWizard({
       setManagerCandidates(await projectService.getManagerCandidates());
     } catch (error) {
       setCandidatesError(
-        error instanceof Error
-          ? error.message
-          : "Manager candidates could not be loaded.",
+        error instanceof Error ? error.message : "Manager candidates could not be loaded.",
       );
     } finally {
       setIsLoadingCandidates(false);
@@ -168,6 +185,7 @@ export function CreateProjectWizard({
     setName("");
     setDescription("");
     setManagerId("");
+    setSelectedUserIds(new Set());
     setSelectedType("GITHUB");
     setSelection([]);
     setJiraDisplayName("");
@@ -198,6 +216,13 @@ export function CreateProjectWizard({
   const selectedCount = selection.length;
   const hasFailures = hasFailedSources(sources);
 
+  const goToPeople = () => {
+    if (!isNameValid) return;
+
+    setSubmitError("");
+    setStep("people");
+  };
+
   const goToSources = () => {
     if (!isNameValid) return;
 
@@ -215,12 +240,24 @@ export function CreateProjectWizard({
       description: description.trim() || undefined,
     });
 
+    // Members before the manager, mirroring `applyPeopleChanges`: assigning a
+    // manager also makes them a member, so doing it the other way round would
+    // depend on the order the ids happen to be in.
+    let members = project.users;
+    if (selectedUserIds.size > 0) {
+      members = await projectService.assignUsersToProject(project.id, {
+        userIds: [...selectedUserIds],
+      });
+    }
+
     if (managerId) {
       await projectService.setProjectManager(project.id, managerId);
     }
 
     setCreatedProjectId(project.id);
-    onProjectCreated(project);
+    // The created-project response predates both calls above, so the members
+    // are folded back in before the page adds the project to its list.
+    onProjectCreated({ ...project, users: members });
 
     return project.id;
   };
@@ -236,9 +273,7 @@ export function CreateProjectWizard({
       // attempt; a retry reuses `sources`, which already carries per-repo status.
       let toConnect = sources;
       if (sources.length === 0 && selection.length > 0) {
-        toConnect = selection.map((item) =>
-          createDraftSourceFromDiscovery(item, tokenName),
-        );
+        toConnect = selection.map((item) => createDraftSourceFromDiscovery(item, tokenName));
         setSources(toConnect);
       }
 
@@ -250,27 +285,19 @@ export function CreateProjectWizard({
         return;
       }
 
-      const connectedSources = await connectDraftSources(
-        projectId,
-        toConnect,
-        setSources,
-      );
+      const connectedSources = await connectDraftSources(projectId, toConnect, setSources);
 
       if (hasFailedSources(connectedSources)) {
         // The project is already saved; keep the wizard open so the failed
         // repositories can be retried or dropped without losing the list.
-        setSubmitError(
-          "The project was created, but some repositories could not be connected.",
-        );
+        setSubmitError("The project was created, but some repositories could not be connected.");
         return;
       }
 
       resetWizard();
       onClose();
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Project could not be created.",
-      );
+      setSubmitError(error instanceof Error ? error.message : "Project could not be created.");
     } finally {
       setIsSubmitting(false);
     }
@@ -291,9 +318,8 @@ export function CreateProjectWizard({
           setSources((current) =>
             current.map(
               (currentSource) =>
-                progressSources.find(
-                  (progressSource) => progressSource.id === currentSource.id,
-                ) ?? currentSource,
+                progressSources.find((progressSource) => progressSource.id === currentSource.id) ??
+                currentSource,
             ),
           ),
       );
@@ -306,6 +332,21 @@ export function CreateProjectWizard({
     }
   };
 
+  const isDetailsStep = step === "details";
+  const isPeopleStep = step === "people";
+  // Once the project exists there is nothing left to cancel and going back
+  // would misrepresent the details as still editable, so the secondary button
+  // turns into a plain way out.
+  const isProjectCreated = Boolean(createdProjectId);
+  // The two halves of the sources step, shown only before the project exists.
+  const isTypeStep = step === "sources" && !isProjectCreated && sourceStep === "type";
+  const isDetailStep = step === "sources" && !isProjectCreated && sourceStep === "detail";
+
+  // Details → people → source type → repositories. The post-create staged list
+  // stays on the last step, which is where the repositories were being
+  // connected.
+  const stepIndex = isDetailsStep ? 0 : isPeopleStep ? 1 : isTypeStep ? 2 : 3;
+  const isBusy = isSubmitting || isUploadingFiles;
   /**
    * Creates the project and connects one Jira instance to it. The connect
    * endpoint returns 202 with an empty body (progress surfaces through the
@@ -326,9 +367,7 @@ export function CreateProjectWizard({
     }
 
     if (!url) {
-      setSubmitError(
-        "Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).",
-      );
+      setSubmitError("Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).");
       return;
     }
 
@@ -372,9 +411,7 @@ export function CreateProjectWizard({
         );
       } else {
         setSubmitError(
-          error instanceof Error
-            ? error.message
-            : "The Jira instance could not be connected.",
+          error instanceof Error ? error.message : "The Jira instance could not be connected.",
         );
       }
     } finally {
@@ -396,32 +433,18 @@ export function CreateProjectWizard({
     try {
       await ensureProject();
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Project could not be created.",
-      );
+      setSubmitError(error instanceof Error ? error.message : "Project could not be created.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const isDetailsStep = step === "details";
-  const isTypeStep = step === "sources" && sourceStep === "type";
-  const isDetailStep = step === "sources" && sourceStep === "detail";
-  const isProjectCreated = Boolean(createdProjectId);
-  const isBusy = isSubmitting || isUploadingFiles;
-
-  // Details → source type → connect. The Stepper mirrors the three phases.
-  const stepIndex = isDetailsStep ? 0 : isTypeStep ? 1 : 2;
 
   return (
     <Modal
       isOpen={isOpen}
       title="New Project"
       description={
-        <Stepper
-          steps={["Details", "Source type", "Connect"]}
-          current={stepIndex}
-        />
+        <Stepper steps={["Details", "People", "Source type", "Connect"]} current={stepIndex} />
       }
       size="xl"
       isDismissDisabled={isBusy}
@@ -429,8 +452,8 @@ export function CreateProjectWizard({
       closeLabel="Close new project wizard"
       footer={
         <>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={
               isDetailsStep
                 ? closeWizard
@@ -441,91 +464,66 @@ export function CreateProjectWizard({
                         setSubmitError("");
                         setSourceStep("type");
                       }
-                    : () => setStep("details")
+                    : isPeopleStep
+                      ? () => setStep("details")
+                      : () => setStep("people")
             }
             disabled={isBusy}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            icon={isDetailsStep || isProjectCreated ? undefined : <ArrowLeft className="h-4 w-4" />}
           >
-            {isDetailsStep ? (
-              "Cancel"
-            ) : isProjectCreated ? (
-              "Done"
-            ) : (
-              <>
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </>
-            )}
-          </button>
+            {isDetailsStep ? "Cancel" : isProjectCreated ? "Done" : "Back"}
+          </Button>
 
           {isTypeStep && (
             // Lets the user create the project straight away, choosing to attach
             // sources later from its Data Ingestion page instead of now.
-            <button
-              type="button"
-              onClick={() => void finish()}
-              disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button variant="secondary" onClick={() => void finish()} loading={isSubmitting}>
               Skip for now
-            </button>
+            </Button>
           )}
 
-          {isDetailsStep || isTypeStep ? (
-            <button
-              type="button"
-              onClick={isDetailsStep ? goToSources : () => setSourceStep("detail")}
+          {isDetailsStep || isPeopleStep || isTypeStep ? (
+            <Button
+              variant="primary"
+              onClick={
+                isDetailsStep
+                  ? goToPeople
+                  : isPeopleStep
+                    ? goToSources
+                    : () => setSourceStep("detail")
+              }
               disabled={(isDetailsStep && !isNameValid) || isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              trailingIcon={<ArrowRight className="h-4 w-4" />}
             >
               Continue
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            </Button>
           ) : isJira ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => void finishJira()}
-              disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              loading={isSubmitting}
+              icon={<Check className="h-4 w-4" />}
             >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
-              {isProjectCreated
-                ? "Retry Jira connection"
-                : "Create and connect Jira instance"}
-            </button>
+              {isProjectCreated ? "Retry Jira connection" : "Create and connect Jira instance"}
+            </Button>
           ) : isUpload ? (
             !isProjectCreated ? (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => void createProjectForUpload()}
-                disabled={isSubmitting}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+                loading={isSubmitting}
+                icon={<Check className="h-4 w-4" />}
               >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
                 Create project
-              </button>
+              </Button>
             ) : null
           ) : !isProjectCreated || hasFailures ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => void finish()}
-              disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              loading={isSubmitting}
+              icon={<Check className="h-4 w-4" />}
             >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
               {isProjectCreated
                 ? "Retry failed sources"
                 : selectedCount === 0
@@ -533,7 +531,7 @@ export function CreateProjectWizard({
                   : `Create and connect ${selectedCount} ${
                       selectedCount === 1 ? "repository" : "repositories"
                     }`}
-            </button>
+            </Button>
           ) : null}
         </>
       }
@@ -551,53 +549,36 @@ export function CreateProjectWizard({
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
+            goToPeople();
+          }}
+        >
+          <Field label="Name" controlId={nameInputId}>
+            <Input value={name} onChange={(event) => setName(event.target.value)} />
+          </Field>
+
+          <Field label="Description" controlId={descriptionInputId}>
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              minRows={4}
+              maxRows={12}
+            />
+          </Field>
+        </form>
+      ) : isPeopleStep ? (
+        <form
+          id="create-project-people-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
             goToSources();
           }}
         >
-          <div>
-            <label
-              htmlFor={nameInputId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Name
-            </label>
-            <input
-              id={nameInputId}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor={descriptionInputId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Description
-            </label>
-            <textarea
-              id={descriptionInputId}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              className="min-h-28 w-full resize-y rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-medium leading-relaxed text-app-text outline-none transition-colors placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor={managerSelectId}
-              className="mb-1.5 block text-sm text-app-text-muted"
-            >
-              Project manager
-            </label>
-            <select
-              id={managerSelectId}
+          <Field label="Project manager" controlId={managerSelectId}>
+            <Select
               value={managerId}
               onChange={(event) => setManagerId(event.target.value)}
               disabled={isLoadingCandidates || managerCandidates.length === 0}
-              className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition-colors focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">
                 {isLoadingCandidates
@@ -613,16 +594,44 @@ export function CreateProjectWizard({
                     : candidate.username}
                 </option>
               ))}
-            </select>
+            </Select>
 
             {candidatesError && (
-              <p className="mt-2 flex items-start gap-2 text-sm text-app-danger-text">
+              <p className="flex items-start gap-2 text-sm text-app-danger-text">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{candidatesError}</span>
               </p>
             )}
-          </div>
+
+            <p className="text-xs text-app-text-muted">
+              The manager becomes a member automatically, so they do not have to be ticked below.
+            </p>
+          </Field>
+
+          <MemberPicker
+            users={users}
+            selectedUserIds={selectedUserIds}
+            disabled={isSubmitting}
+            label="Members"
+            onToggleUser={(userId) =>
+              setSelectedUserIds((current) => toggleSelectedUserId(current, userId))
+            }
+            onToggleVisible={(visibleUsers, allSelected) =>
+              setSelectedUserIds((current) =>
+                toggleVisibleUserSelection(current, visibleUsers, allSelected),
+              )
+            }
+          />
         </form>
+      ) : isProjectCreated && isGithub ? (
+        // The project exists (e.g. after a partial failure): show the connect
+        // outcome per repository with retry/remove instead of the picker.
+        <StagedSourceList
+          sources={sources}
+          disabled={isSubmitting}
+          onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
+          onRetry={(sourceId) => void retrySource(sourceId)}
+        />
       ) : isTypeStep ? (
         <SourceTypeStep
           selectedType={selectedType}
@@ -638,9 +647,7 @@ export function CreateProjectWizard({
           <StagedSourceList
             sources={sources}
             disabled={isSubmitting}
-            onRemove={(sourceId) =>
-              setSources((current) => removeDraftSource(current, sourceId))
-            }
+            onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
             onRetry={(sourceId) => void retrySource(sourceId)}
           />
         ) : (
@@ -679,10 +686,9 @@ export function CreateProjectWizard({
         />
       ) : (
         <div className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-relaxed text-app-text-muted">
-          Uploaded files attach to the project, so the project is created first.
-          Choose <span className="font-medium text-app-text">Create project</span>{" "}
-          to add files now — you can connect more sources afterwards from its Data
-          Ingestion page.
+          Uploaded files attach to the project, so the project is created first. Choose{" "}
+          <span className="font-medium text-app-text">Create project</span> to add files now — you
+          can connect more sources afterwards from its Data Ingestion page.
         </div>
       )}
     </Modal>

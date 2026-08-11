@@ -4,12 +4,9 @@
 // Alle Interfaces für den Onboarding-Bereich.
 // ============================================================
 
-
-
 // ============================================================
 //  Backend
 // ============================================================
-
 
 // ─── Onboarding Path List (GET /onboarding/paths) ───────────────────────────
 
@@ -66,9 +63,7 @@ export interface OnboardingStepEndpoint {
 }
 
 // Why the backend considers a phase locked (see OnboardingPhaseEndpoint.unlockReason)
-export type PhaseUnlockReason =
-  | "PREVIOUS_PHASE_INCOMPLETE"
-  | "PREVIOUS_PHASE_CHECK_NOT_PASSED";
+export type PhaseUnlockReason = "PREVIOUS_PHASE_INCOMPLETE" | "PREVIOUS_PHASE_CHECK_NOT_PASSED";
 
 // Compact knowledge check state embedded into each phase of GET /onboarding/me/path
 export interface PhaseCheckSummaryEndpoint {
@@ -129,8 +124,8 @@ export interface OnboardingSkipEndpoint {
 }
 
 export interface OnboardingStepDetail extends OnboardingStepEndpoint {
-    tasks: OnboardingTaskEndpoint[];
-    resources: OnboardingResourceEndpoint[];
+  tasks: OnboardingTaskEndpoint[];
+  resources: OnboardingResourceEndpoint[];
 }
 
 // ─── Phase Knowledge Checks (GET/POST /onboarding/me/phases/{phaseId}/checks…) ─

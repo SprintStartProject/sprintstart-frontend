@@ -1,6 +1,8 @@
 import { CalendarClock } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
+import { Select } from "../../../components/ui/Select.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
 import type {
@@ -19,10 +21,7 @@ type ScheduleType = GithubScheduleSpec["type"];
  * GitHub repository and Jira instance sync schedules — the two connectors share
  * an identical schedule contract ({@link GithubScheduleSpec}).
  */
-export type SyncScheduleConfig = Pick<
-  GithubRepositoryConfig,
-  "autoUpdate" | "spec" | "nextSyncAt"
->;
+export type SyncScheduleConfig = Pick<GithubRepositoryConfig, "autoUpdate" | "spec" | "nextSyncAt">;
 
 type GithubRepositorySyncSettingsProps = {
   loadKey?: string;
@@ -81,18 +80,14 @@ export function GithubRepositorySyncSettings({
   const [scheduleType, setScheduleType] = useState<ScheduleType>("INTERVAL");
   const [everyMinutes, setEveryMinutes] = useState("60");
   const [time, setTime] = useState("02:00:00");
-  const [daysOfWeek, setDaysOfWeek] = useState<GithubScheduleDayOfWeek[]>([
-    "MONDAY",
-  ]);
+  const [daysOfWeek, setDaysOfWeek] = useState<GithubScheduleDayOfWeek[]>(["MONDAY"]);
   const [dayOfMonth, setDayOfMonth] = useState("1");
   const [cron, setCron] = useState("0 0 2 * * *");
   const [nextSyncAt, setNextSyncAt] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "idle" | "error">(
     loadConfig ? "loading" : "idle",
   );
-  const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">(
-    "idle",
-  );
+  const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Serialized snapshot of the last saved/loaded form values. Comparing the live
@@ -124,9 +119,7 @@ export function GithubRepositorySyncSettings({
         setCron,
       });
       setBaseline(
-        serializeFormValues(
-          toFormValues(initialConfig.autoUpdate, initialConfig.schedule),
-        ),
+        serializeFormValues(toFormValues(initialConfig.autoUpdate, initialConfig.schedule)),
       );
     });
   }, [initialConfig, loadConfig]);
@@ -166,18 +159,14 @@ export function GithubRepositorySyncSettings({
           setDayOfMonth,
           setCron,
         });
-        setBaseline(
-          serializeFormValues(toFormValues(config.autoUpdate, config.spec)),
-        );
+        setBaseline(serializeFormValues(toFormValues(config.autoUpdate, config.spec)));
         setNextSyncAt(config.nextSyncAt);
         setLoadState("idle");
       } catch (error) {
         if (!isMounted) return;
 
         setLoadState("error");
-        setErrorMessage(
-          error instanceof Error ? error.message : "Failed to load sync config",
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load sync config");
       }
     });
 
@@ -220,9 +209,7 @@ export function GithubRepositorySyncSettings({
           setDayOfMonth,
           setCron,
         });
-        setBaseline(
-          serializeFormValues(toFormValues(config.autoUpdate, config.spec)),
-        );
+        setBaseline(serializeFormValues(toFormValues(config.autoUpdate, config.spec)));
         setNextSyncAt(config.nextSyncAt);
       }
 
@@ -230,9 +217,7 @@ export function GithubRepositorySyncSettings({
       setMessage("Sync settings saved.");
     } catch (error) {
       setSaveState("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to save sync config",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save sync config");
     }
   };
 
@@ -255,7 +240,7 @@ export function GithubRepositorySyncSettings({
   const isDirty = currentSnapshot !== baseline;
 
   return (
-    <div className="rounded-xl border border-app-border bg-app-surface-muted p-4">
+    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
       {message && (
         <div className="mb-4 rounded-xl border border-app-success-border bg-app-success-bg px-3 py-2 text-sm text-app-success-text">
           {message}
@@ -302,33 +287,27 @@ export function GithubRepositorySyncSettings({
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor={scheduleTypeId}
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor={scheduleTypeId} className="text-sm font-medium text-app-text">
             Schedule
           </label>
-          <select
+          <Select
             id={scheduleTypeId}
             value={scheduleType}
             disabled={isBusy}
             onChange={(event) => setScheduleType(event.target.value as ScheduleType)}
-            className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           >
             {SCHEDULE_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
                 {type.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {scheduleType === "INTERVAL" && (
           <div>
-            <label
-              htmlFor={intervalInputId}
-              className="text-sm font-medium text-app-text"
-            >
+            <label htmlFor={intervalInputId} className="text-sm font-medium text-app-text">
               Minutes
             </label>
             <div className="mt-2 flex min-h-10 items-center rounded-xl border border-app-border bg-app-surface focus-within:border-app-brand focus-within:ring-2 focus-within:ring-app-focus">
@@ -348,30 +327,30 @@ export function GithubRepositorySyncSettings({
         )}
 
         {usesTimeInput && (
-          <label className="block">
+          <label htmlFor={timeInputId} className="block">
             <span className="text-sm font-medium text-app-text">Time</span>
-            <input
+            <Input
               id={timeInputId}
               type="time"
               step="1"
               value={time}
               disabled={isBusy}
               onChange={(event) => setTime(event.target.value)}
-              className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2"
             />
           </label>
         )}
 
         {scheduleType === "CUSTOM" && (
-          <label className="block">
+          <label htmlFor={cronInputId} className="block">
             <span className="text-sm font-medium text-app-text">Cron</span>
-            <input
+            <Input
               id={cronInputId}
               type="text"
               value={cron}
               disabled={isBusy}
               onChange={(event) => setCron(event.target.value)}
-              className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 font-mono text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 font-mono"
             />
           </label>
         )}
@@ -407,9 +386,9 @@ export function GithubRepositorySyncSettings({
       )}
 
       {scheduleType === "MONTHLY" && (
-        <label className="mt-4 block max-w-48">
+        <label htmlFor={dayOfMonthInputId} className="mt-4 block max-w-48">
           <span className="text-sm font-medium text-app-text">Day of month</span>
-          <input
+          <Input
             id={dayOfMonthInputId}
             type="number"
             min="1"
@@ -417,7 +396,7 @@ export function GithubRepositorySyncSettings({
             value={dayOfMonth}
             disabled={isBusy}
             onChange={(event) => setDayOfMonth(event.target.value)}
-            className="mt-2 h-10 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm font-semibold text-app-text focus:border-app-brand focus:outline-none focus:ring-2 focus:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           />
         </label>
       )}
@@ -667,10 +646,7 @@ function normalizeTimeOutput(value: string) {
   throw new Error("Time must use HH:mm:ss.");
 }
 
-function toggleDay(
-  selectedDays: GithubScheduleDayOfWeek[],
-  day: GithubScheduleDayOfWeek,
-) {
+function toggleDay(selectedDays: GithubScheduleDayOfWeek[], day: GithubScheduleDayOfWeek) {
   if (selectedDays.includes(day)) {
     return selectedDays.filter((selectedDay) => selectedDay !== day);
   }
@@ -679,7 +655,8 @@ function toggleDay(
 }
 
 function formatDayLabel(day: GithubScheduleDayOfWeek) {
-  return day.slice(0, 3).toLowerCase().replace(/^\w/, (char) =>
-    char.toUpperCase(),
-  );
+  return day
+    .slice(0, 3)
+    .toLowerCase()
+    .replace(/^\w/, (char) => char.toUpperCase());
 }

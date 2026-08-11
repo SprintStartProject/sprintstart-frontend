@@ -1,19 +1,12 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarClock, Plug } from "lucide-react";
+import { Badge } from "../components/ui/Badge.tsx";
+import { Button } from "../components/ui/Button.tsx";
 import { Modal } from "../components/ui/Modal.tsx";
+import { PanelPresence } from "../components/ui/PanelPresence.tsx";
 import { Pagination } from "../components/ui/Pagination.tsx";
-import {
-  SegmentedControl,
-  type SegmentedControlOption,
-} from "../components/ui/SegmentedControl.tsx";
+import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs.tsx";
 import { DataIngestionHeader } from "../features/data-ingestion/components/DataIngestionHeader.tsx";
 import { DataIngestionLoadingState } from "../features/data-ingestion/components/DataIngestionLoadingState.tsx";
 import { DataIngestionSectionFilter } from "../features/data-ingestion/components/DataIngestionSectionFilter.tsx";
@@ -58,10 +51,10 @@ import type {
   SourceInstanceIngestionStatus,
   SourceSystem,
 } from "../features/data-ingestion/types.ts";
-import {
-  getIngestionRunsPage,
-  getIngestionSourceStatuses,
-} from "../services/ingestionService.ts";
+import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
+import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/ingestionService.ts";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import {
@@ -83,10 +76,7 @@ import {
   type ConfigureJiraInstanceRequest,
   type JiraInstanceDto,
 } from "../services/sources/jiraService.ts";
-import {
-  projectService,
-  type ProjectSource,
-} from "../services/projectService.ts";
+import { projectService, type ProjectSource } from "../services/projectService.ts";
 import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
 const DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
@@ -101,11 +91,9 @@ const DEFAULT_GLOBAL_JIRA_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
 
 type SyncSettingsProvider = "github" | "jira";
 
-const SYNC_SETTINGS_PROVIDERS: ReadonlyArray<
-  SegmentedControlOption<SyncSettingsProvider>
-> = [
-  { id: "github", label: "GitHub" },
-  { id: "jira", label: "Jira" },
+const SYNC_SETTINGS_PROVIDERS: SegmentedTabOption<SyncSettingsProvider>[] = [
+  { value: "github", label: "GitHub" },
+  { value: "jira", label: "Jira" },
 ];
 
 // Small enough that the run table stays scannable and pagination is actually
@@ -144,11 +132,7 @@ type RunSourceFilterOption = {
 function toSourceSystem(value: string): SourceSystem | null {
   const normalized = value.toUpperCase();
 
-  if (
-    normalized === "GITHUB" ||
-    normalized === "JIRA" ||
-    normalized === "UPLOAD"
-  ) {
+  if (normalized === "GITHUB" || normalized === "JIRA" || normalized === "UPLOAD") {
     return normalized;
   }
 
@@ -177,9 +161,7 @@ function matchSourceInstance(
   projectSource: ProjectSource,
   instances: SourceInstanceIngestionStatus[],
 ): SourceInstanceIngestionStatus | null {
-  const byRepositoryId = instances.find(
-    (instance) => instance.repositoryId === projectSource.id,
-  );
+  const byRepositoryId = instances.find((instance) => instance.repositoryId === projectSource.id);
   if (byRepositoryId) return byRepositoryId;
 
   const reference =
@@ -190,13 +172,8 @@ function matchSourceInstance(
   const fullName = `${reference.owner}/${reference.name}`.toLowerCase();
 
   return (
-    instances.find(
-      (instance) => instance.sourceId.toLowerCase() === fullName,
-    ) ??
-    instances.find(
-      (instance) =>
-        `${instance.owner}/${instance.name}`.toLowerCase() === fullName,
-    ) ??
+    instances.find((instance) => instance.sourceId.toLowerCase() === fullName) ??
+    instances.find((instance) => `${instance.owner}/${instance.name}`.toLowerCase() === fullName) ??
     null
   );
 }
@@ -239,10 +216,7 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return;
 
-    sourceCountBySystem.set(
-      sourceSystem,
-      (sourceCountBySystem.get(sourceSystem) ?? 0) + 1,
-    );
+    sourceCountBySystem.set(sourceSystem, (sourceCountBySystem.get(sourceSystem) ?? 0) + 1);
   });
 
   // Runs arrive newest-first, so the first hit per key is the latest.
@@ -274,13 +248,9 @@ function buildProjectDataSources(
     const meta = SOURCE_META[sourceSystem];
     const latestRun = latestRunBySource.get(sourceSystem);
     const sharesSourceSystem = (sourceCountBySystem.get(sourceSystem) ?? 1) > 1;
-    const connectorEnabled = connectorEnabledById.get(
-      sourceSystem.toLowerCase(),
-    );
+    const connectorEnabled = connectorEnabledById.get(sourceSystem.toLowerCase());
     const instance =
-      sourceSystem === "GITHUB"
-        ? matchSourceInstance(projectSource, sourceInstances)
-        : null;
+      sourceSystem === "GITHUB" ? matchSourceInstance(projectSource, sourceInstances) : null;
 
     if (instance) {
       const effectiveBackendStatus: BackendProjectSourceStatus =
@@ -294,9 +264,7 @@ function buildProjectDataSources(
       // endpoint is authoritative for health anyway; a run only adds the
       // AI-sync stage, and having none loaded simply means "unknown".
       const repositoryRun =
-        (instance.repositoryId
-          ? latestRunByRepository.get(instance.repositoryId)
-          : undefined) ??
+        (instance.repositoryId ? latestRunByRepository.get(instance.repositoryId) : undefined) ??
         latestRunByRepository.get(instance.sourceId.toLowerCase()) ??
         null;
       const runStatus = repositoryRun?.status ?? null;
@@ -311,16 +279,8 @@ function buildProjectDataSources(
           status: getSourceStatusFromBackend(effectiveBackendStatus),
           backendStatus: effectiveBackendStatus,
           statusLabel: getBackendSourceStatusLabel(effectiveBackendStatus),
-          ingestionStatus: getSourceStatus(
-            hasNeverSynced,
-            hasErrors,
-            runStatus,
-          ),
-          ingestionStatusLabel: getIngestionStatusLabel(
-            hasNeverSynced,
-            hasErrors,
-            runStatus,
-          ),
+          ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, runStatus),
+          ingestionStatusLabel: getIngestionStatusLabel(hasNeverSynced, hasErrors, runStatus),
           statusView: deriveSourceStatus({
             backendStatus: effectiveBackendStatus,
             runStatus,
@@ -373,11 +333,7 @@ function buildProjectDataSources(
         backendStatus,
         statusLabel: getBackendSourceStatusLabel(backendStatus),
         ingestionStatus: getSourceStatus(hasNeverSynced, errors > 0, runStatus),
-        ingestionStatusLabel: getIngestionStatusLabel(
-          hasNeverSynced,
-          errors > 0,
-          runStatus,
-        ),
+        ingestionStatusLabel: getIngestionStatusLabel(hasNeverSynced, errors > 0, runStatus),
         statusView: deriveSourceStatus({
           backendStatus,
           runStatus,
@@ -443,32 +399,24 @@ export function DataIngestionPage() {
   // The selected run is captured as an object, not just an id: paging the
   // history replaces the loaded rows, and looking it up only in the current page
   // would snap an open run drawer shut as soon as the user moved to another page.
-  const [selectedRunSnapshot, setSelectedRunSnapshot] =
-    useState<IngestionRun | null>(null);
+  const [selectedRunSnapshot, setSelectedRunSnapshot] = useState<IngestionRun | null>(null);
 
   const [runs, setRuns] = useState<IngestionRun[]>([]);
   const [runPageMeta, setRunPageMeta] = useState<PageMetadata | null>(null);
   const [runPageNumber, setRunPageNumber] = useState(1);
-  const [runFilter, setRunFilter] =
-    useState<RunFilterState>(DEFAULT_RUN_FILTER);
+  const [runFilter, setRunFilter] = useState<RunFilterState>(DEFAULT_RUN_FILTER);
   // Monotonic id of the newest run request, so out-of-order responses are dropped.
   const runRequestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
   const [projectSources, setProjectSources] = useState<ProjectSource[]>([]);
-  const [sourceInstances, setSourceInstances] = useState<
-    SourceInstanceIngestionStatus[]
-  >([]);
+  const [sourceInstances, setSourceInstances] = useState<SourceInstanceIngestionStatus[]>([]);
   // Connected Jira instances for the selected project. Jira is not a
   // ProjectSourceProvider on the backend, so its instances never appear in
   // `projectSources`/`sourceInstances` and are loaded separately here.
   const [jiraInstances, setJiraInstances] = useState<JiraInstanceDto[]>([]);
   const [projectDataVersion, setProjectDataVersion] = useState(0);
-  const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<
-    string | null
-  >(null);
-  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<
-    string | null
-  >(null);
+  const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<string | null>(null);
+  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<string | null>(null);
   const [isProjectDataLoading, setIsProjectDataLoading] = useState(false);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -477,41 +425,25 @@ export function DataIngestionPage() {
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
   const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] = useState(false);
   const [globalGithubSyncConfig, setGlobalGithubSyncConfig] =
-    useState<ConfigureGithubRepositoryRequest>(
-      DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG,
-    );
+    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG);
   const [globalJiraSyncConfig, setGlobalJiraSyncConfig] =
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
-  const [syncSettingsProvider, setSyncSettingsProvider] =
-    useState<SyncSettingsProvider>("github");
+  const [syncSettingsProvider, setSyncSettingsProvider] = useState<SyncSettingsProvider>("github");
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
-  const [connectSuccessMessage, setConnectSuccessMessage] = useState<
-    string | null
-  >(null);
+  const [connectSuccessMessage, setConnectSuccessMessage] = useState<string | null>(null);
   const [pollingUntil, setPollingUntil] = useState<number | null>(null);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
-  const [connectorsLoadingState, setConnectorsLoadingState] =
-    useState<LoadingState>("idle");
-  const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<
-    string | null
-  >(null);
+  const [connectorsLoadingState, setConnectorsLoadingState] = useState<LoadingState>("idle");
+  const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<string | null>(null);
   const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
-  const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(
-    null,
-  );
-  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(
-    null,
-  );
+  const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
   // search param is still honoured so deep links from the admin view land on
   // the right project — it writes into the global selection below.
-  const {
-    selectedProject,
-    selectedProjectId,
-    setSelectedProjectId,
-    reloadProjects,
-  } = useProjectContext();
+  const { selectedProject, selectedProjectId, setSelectedProjectId, reloadProjects } =
+    useProjectContext();
 
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
@@ -541,13 +473,7 @@ export function DataIngestionPage() {
       nextSearchParams.delete("projectId");
       setSearchParams(nextSearchParams, { replace: true });
     });
-  }, [
-    requestedProjectId,
-    searchParams,
-    selectedProjectId,
-    setSearchParams,
-    setSelectedProjectId,
-  ]);
+  }, [requestedProjectId, searchParams, selectedProjectId, setSearchParams, setSelectedProjectId]);
 
   // A project's connected sources come from the project-scoped detail endpoint
   // any member may reach, not from the admin-only project listing behind the
@@ -588,12 +514,11 @@ export function DataIngestionPage() {
         setIsProjectDataLoading(true);
       }
 
-      const [projectResult, sourceStatusResult, jiraResult] =
-        await Promise.allSettled([
-          projectService.getAccessibleProject(selectedProjectId),
-          getIngestionSourceStatuses(selectedProjectId),
-          getJiraInstances(selectedProjectId),
-        ]);
+      const [projectResult, sourceStatusResult, jiraResult] = await Promise.allSettled([
+        projectService.getAccessibleProject(selectedProjectId),
+        getIngestionSourceStatuses(selectedProjectId),
+        getJiraInstances(selectedProjectId),
+      ]);
 
       if (!isMounted) return;
 
@@ -620,9 +545,7 @@ export function DataIngestionPage() {
       // Jira instances degrade quietly: a load failure (e.g. an HR user without
       // the PM/ADMIN role the endpoint requires) must not blank the page or
       // surface an error banner — it just means no Jira cards.
-      setJiraInstances(
-        jiraResult.status === "fulfilled" ? jiraResult.value : [],
-      );
+      setJiraInstances(jiraResult.status === "fulfilled" ? jiraResult.value : []);
 
       setIsProjectDataLoading(false);
     });
@@ -646,22 +569,13 @@ export function DataIngestionPage() {
         // GitHub scopes by repositoryId; Jira (and any connector-neutral source)
         // scopes by the run's sourceInstanceRef via sourceRef.
         repositoryId:
-          hasSource && runFilter.sourceSystem === "GITHUB"
-            ? runFilter.sourceValue
-            : undefined,
+          hasSource && runFilter.sourceSystem === "GITHUB" ? runFilter.sourceValue : undefined,
         sourceRef:
-          hasSource && runFilter.sourceSystem === "JIRA"
-            ? runFilter.sourceValue
-            : undefined,
+          hasSource && runFilter.sourceSystem === "JIRA" ? runFilter.sourceValue : undefined,
         status: runFilter.status !== "ALL" ? runFilter.status : undefined,
       };
     },
-    [
-      runFilter.sourceValue,
-      runFilter.sourceSystem,
-      runFilter.status,
-      selectedProjectId,
-    ],
+    [runFilter.sourceValue, runFilter.sourceSystem, runFilter.status, selectedProjectId],
   );
 
   // Loads exactly the page currently being viewed.
@@ -706,11 +620,7 @@ export function DataIngestionPage() {
         if (showLoading) {
           setLoadingState("error");
         }
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Failed to load ingestion data",
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load ingestion data");
       }
     },
     [loadRuns, runPageNumber],
@@ -756,8 +666,7 @@ export function DataIngestionPage() {
 
   useEffect(() => {
     const hasRunningRun = runs.some((run) => isRunInProgress(run.status));
-    const isPollingWindowActive =
-      pollingUntil !== null && Date.now() < pollingUntil;
+    const isPollingWindowActive = pollingUntil !== null && Date.now() < pollingUntil;
 
     if (!hasRunningRun && !isPollingWindowActive) {
       return undefined;
@@ -781,13 +690,7 @@ export function DataIngestionPage() {
   }, [loadData, pollingUntil, runs]);
 
   const connectorEnabledById = useMemo(
-    () =>
-      new Map(
-        connectors.map((connector) => [
-          connector.id.toLowerCase(),
-          connector.enabled,
-        ]),
-      ),
+    () => new Map(connectors.map((connector) => [connector.id.toLowerCase(), connector.enabled])),
     [connectors],
   );
 
@@ -805,10 +708,7 @@ export function DataIngestionPage() {
     // instance DTOs are merged in by URL purely for the credential shown in the
     // details panel and used by the update action.
     const jiraInstanceByUrl = new Map(
-      jiraInstances.map((instance) => [
-        instance.instanceUrl.toLowerCase(),
-        instance,
-      ]),
+      jiraInstances.map((instance) => [instance.instanceUrl.toLowerCase(), instance]),
     );
 
     const jiraSources = sourceInstances
@@ -822,13 +722,7 @@ export function DataIngestionPage() {
       );
 
     return [...githubAndUpload, ...jiraSources];
-  }, [
-    connectorEnabledById,
-    jiraInstances,
-    projectSources,
-    runs,
-    sourceInstances,
-  ]);
+  }, [connectorEnabledById, jiraInstances, projectSources, runs, sourceInstances]);
 
   const totalArtifactCount = useMemo(
     () => sourceInstances.reduce((sum, s) => sum + s.artifactCount, 0),
@@ -897,13 +791,9 @@ export function DataIngestionPage() {
   // instead: only the assigned project manager (or an admin) may connect a
   // source to a project.
   const canIngestIntoSelectedProject =
-    profile?.permissionGroup === "ADMIN" ||
-    (selectedProject?.isManaged ?? false);
+    profile?.permissionGroup === "ADMIN" || (selectedProject?.isManaged ?? false);
 
-  const runSourceLabels = useMemo(
-    () => buildRunSourceLabels(sources),
-    [sources],
-  );
+  const runSourceLabels = useMemo(() => buildRunSourceLabels(sources), [sources]);
 
   // Sources offered in the run filter, from the project's connected sources: a
   // GitHub repo filters by its repositoryId, a Jira instance by its URL
@@ -936,8 +826,7 @@ export function DataIngestionPage() {
     [sources],
   );
 
-  const isRunFilterActive =
-    runFilter.status !== "ALL" || runFilter.sourceValue !== "ALL";
+  const isRunFilterActive = runFilter.status !== "ALL" || runFilter.sourceValue !== "ALL";
 
   const handleResetRunFilter = useCallback(() => {
     setRunFilter(DEFAULT_RUN_FILTER);
@@ -992,48 +881,33 @@ export function DataIngestionPage() {
     }
   }, [connectorsLoadingState, hasLoadedConnectors, loadConnectors]);
 
-  const handleToggleConnectorEnabled = useCallback(
-    async (connector: ConnectorListItem) => {
-      setTogglingConnectorId(connector.id);
-      setConnectorsErrorMessage(null);
+  const handleToggleConnectorEnabled = useCallback(async (connector: ConnectorListItem) => {
+    setTogglingConnectorId(connector.id);
+    setConnectorsErrorMessage(null);
 
-      try {
-        const response = await connectorService.setConnectorEnabled(
-          connector.id,
-          !connector.enabled,
-        );
+    try {
+      const response = await connectorService.setConnectorEnabled(connector.id, !connector.enabled);
 
-        setConnectors((current) =>
-          current.map((item) =>
-            item.id === connector.id ? { ...item, ...response } : item,
-          ),
-        );
-      } catch (error) {
-        setConnectorsErrorMessage(
-          error instanceof Error ? error.message : "Failed to update connector",
-        );
-      } finally {
-        setTogglingConnectorId(null);
-      }
-    },
-    [],
-  );
-
-  const handleToggleConnectorSources = useCallback(
-    (connector: ConnectorListItem) => {
-      setSelectedConnectorId((current) =>
-        current === connector.id ? null : connector.id,
+      setConnectors((current) =>
+        current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
       );
-    },
-    [],
-  );
+    } catch (error) {
+      setConnectorsErrorMessage(
+        error instanceof Error ? error.message : "Failed to update connector",
+      );
+    } finally {
+      setTogglingConnectorId(null);
+    }
+  }, []);
+
+  const handleToggleConnectorSources = useCallback((connector: ConnectorListItem) => {
+    setSelectedConnectorId((current) => (current === connector.id ? null : connector.id));
+  }, []);
 
   const selectedSource = useMemo(() => {
     if (!selectedSourceId) return null;
 
-    return (
-      sources.find((source) => source.sourceId === selectedSourceId) ?? null
-    );
+    return sources.find((source) => source.sourceId === selectedSourceId) ?? null;
   }, [selectedSourceId, sources]);
 
   const loadGithubTokenNames = useCallback(() => {
@@ -1063,11 +937,9 @@ export function DataIngestionPage() {
     setPollingUntil(Date.now() + 60000);
     setActiveSection("sources");
 
-    void Promise.all([
-      loadData(false),
-      reloadProjects(),
-      reloadSourceStatuses(),
-    ]).then(() => setProjectDataVersion((version) => version + 1));
+    void Promise.all([loadData(false), reloadProjects(), reloadSourceStatuses()]).then(() =>
+      setProjectDataVersion((version) => version + 1),
+    );
 
     window.setTimeout(() => {
       void loadData(false);
@@ -1101,9 +973,7 @@ export function DataIngestionPage() {
     async (source: DataSource) => {
       if (source.sourceSystem === "JIRA") {
         if (!source.jiraInstance) {
-          throw new Error(
-            "Instance details are not available for this source.",
-          );
+          throw new Error("Instance details are not available for this source.");
         }
 
         await updateJiraInstance({
@@ -1114,15 +984,11 @@ export function DataIngestionPage() {
       }
 
       if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
-        throw new Error(
-          "Repository details are not available for this source.",
-        );
+        throw new Error("Repository details are not available for this source.");
       }
 
       await updateGithubRepository(source.githubRepository);
-      refreshAfterUpdate(
-        `Update for ${source.githubRepository.fullName} started.`,
-      );
+      refreshAfterUpdate(`Update for ${source.githubRepository.fullName} started.`);
     },
     [refreshAfterUpdate],
   );
@@ -1157,10 +1023,7 @@ export function DataIngestionPage() {
   );
 
   const handleSaveGithubRepositoryConfig = useCallback(
-    async (
-      repository: GithubRepositoryDetails,
-      request: ConfigureGithubRepositoryRequest,
-    ) => {
+    async (repository: GithubRepositoryDetails, request: ConfigureGithubRepositoryRequest) => {
       await configureGithubRepository(repository, request);
       // No reloadProjects(): see refreshSourceDetails — a per-repo sync-schedule
       // change never alters the project switcher, and reloading it can reset the
@@ -1176,10 +1039,7 @@ export function DataIngestionPage() {
   );
 
   const handleSaveJiraConfig = useCallback(
-    async (
-      instanceUrl: string,
-      request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
-    ) => {
+    async (instanceUrl: string, request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">) => {
       await configureJiraInstance({ instanceUrl, ...request });
       // Mirrors the GitHub path: no reloadProjects(), just refresh this page's
       // run list and per-source statuses so the next-sync time updates.
@@ -1217,9 +1077,7 @@ export function DataIngestionPage() {
   // service is notified, keyed by the instance URL.
   const handleSetJiraSourceEnabled = useCallback(
     async (instanceUrl: string, enabled: boolean) => {
-      await connectorService.patchConnectorSources("jira", [
-        { sourceId: instanceUrl, enabled },
-      ]);
+      await connectorService.patchConnectorSources("jira", [{ sourceId: instanceUrl, enabled }]);
       await refreshSourceDetails();
     },
     [refreshSourceDetails],
@@ -1236,10 +1094,7 @@ export function DataIngestionPage() {
           throw new Error("This source cannot be removed from the project.");
         }
 
-        await removeJiraInstanceFromProject(
-          source.jiraInstance.instanceUrl,
-          selectedProjectId,
-        );
+        await removeJiraInstanceFromProject(source.jiraInstance.instanceUrl, selectedProjectId);
 
         setSelectedSourceId(null);
         setConnectSuccessMessage(
@@ -1251,11 +1106,7 @@ export function DataIngestionPage() {
 
       const repositoryId = source.githubRepository?.repositoryId;
 
-      if (
-        source.sourceSystem !== "GITHUB" ||
-        !repositoryId ||
-        !selectedProjectId
-      ) {
+      if (source.sourceSystem !== "GITHUB" || !repositoryId || !selectedProjectId) {
         throw new Error("This repository cannot be removed from the project.");
       }
 
@@ -1272,14 +1123,20 @@ export function DataIngestionPage() {
 
   const isLoading = loadingState === "loading";
 
+  // Two-finger swipe between the sections, for people who would rather not aim
+  // at the bar.
+  const swipeRef = useSwipeableTabs<SectionKey, HTMLElement>({
+    order: SECTION_ORDER,
+    value: activeSection,
+    onChange: handleSectionChange,
+  });
+
   const showOverview = activeSection === "overview";
-  const showSources =
-    activeSection === "overview" || activeSection === "sources";
+  const showSources = activeSection === "overview" || activeSection === "sources";
   const showRuns = activeSection === "overview" || activeSection === "runs";
 
   const shouldShowInitialLoading =
-    (isLoading || (isProjectDataLoading && showSources)) &&
-    sources.length === 0;
+    (isLoading || (isProjectDataLoading && showSources)) && sources.length === 0;
 
   // Prefers the row from the currently loaded page, so an open drawer keeps
   // updating while polling refreshes the list, and falls back to the captured
@@ -1287,10 +1144,7 @@ export function DataIngestionPage() {
   const selectedRun = useMemo(() => {
     if (!selectedRunSnapshot) return null;
 
-    return (
-      runs.find((run) => run.runId === selectedRunSnapshot.runId) ??
-      selectedRunSnapshot
-    );
+    return runs.find((run) => run.runId === selectedRunSnapshot.runId) ?? selectedRunSnapshot;
   }, [runs, selectedRunSnapshot]);
 
   const selectedRunId = selectedRun?.runId ?? null;
@@ -1326,7 +1180,7 @@ export function DataIngestionPage() {
           }}
         />
 
-        <main className="app-page-shell">
+        <main ref={swipeRef} className="app-page-shell">
           <div className="space-y-8">
             {errorMessage && (
               <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-5 py-4 text-sm text-app-warning-text">
@@ -1370,7 +1224,13 @@ export function DataIngestionPage() {
             {shouldShowInitialLoading ? (
               <DataIngestionLoadingState />
             ) : (
-              <div className="space-y-8">
+              // Only the section content slides; the loading state above is not
+              // a section and would otherwise animate on its way in too.
+              <SlidingTabPanel
+                activeKey={activeSection}
+                index={SECTION_ORDER.indexOf(activeSection)}
+                className="space-y-8"
+              >
                 {showOverview ? (
                   <OverviewSection
                     sources={sources}
@@ -1384,7 +1244,7 @@ export function DataIngestionPage() {
                   <section aria-label="Sources">
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="mr-1 text-base font-bold tracking-tight text-app-text">
+                        <h2 className="mr-1 text-lg font-semibold tracking-tight text-app-text">
                           Sources
                         </h2>
                         {sourceHealth.connected > 0 && (
@@ -1393,9 +1253,7 @@ export function DataIngestionPage() {
                           </StatusBadge>
                         )}
                         {sourceHealth.syncing > 0 && (
-                          <StatusBadge tone="brand">
-                            {sourceHealth.syncing} syncing
-                          </StatusBadge>
+                          <StatusBadge tone="brand">{sourceHealth.syncing} syncing</StatusBadge>
                         )}
                         {sourceHealth.attention > 0 && (
                           <StatusBadge tone="warning">
@@ -1404,37 +1262,33 @@ export function DataIngestionPage() {
                           </StatusBadge>
                         )}
                         {sourceHealth.disabled > 0 && (
-                          <StatusBadge tone="neutral">
-                            {sourceHealth.disabled} disabled
-                          </StatusBadge>
+                          <StatusBadge tone="neutral">{sourceHealth.disabled} disabled</StatusBadge>
                         )}
                       </div>
 
                       {canManageGithubSyncSettings ? (
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={handleOpenConnectorsModal}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-semibold text-app-text transition hover:border-app-brand-border hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                            icon={<Plug className="h-4 w-4" />}
                           >
-                            <Plug className="h-4 w-4" />
                             Manage connectors
-                          </button>
+                          </Button>
 
                           {hasGithubSources || hasJiraSources ? (
-                            <button
-                              type="button"
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => {
-                                setSyncSettingsProvider(
-                                  hasGithubSources ? "github" : "jira",
-                                );
+                                setSyncSettingsProvider(hasGithubSources ? "github" : "jira");
                                 setIsSyncSettingsModalOpen(true);
                               }}
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm font-semibold text-app-text transition hover:border-app-brand-border hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+                              icon={<CalendarClock className="h-4 w-4" />}
                             >
-                              <CalendarClock className="h-4 w-4" />
                               Manage sync settings
-                            </button>
+                            </Button>
                           ) : null}
                         </div>
                       ) : null}
@@ -1455,13 +1309,11 @@ export function DataIngestionPage() {
                   <section aria-label="Runs">
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
-                        <h2 className="text-base font-bold tracking-tight text-app-text">
-                          Runs
-                        </h2>
+                        <h2 className="text-lg font-semibold tracking-tight text-app-text">Runs</h2>
                         {runPageMeta ? (
-                          <span className="rounded-full border border-app-border bg-app-bg-soft px-2.5 py-0.5 text-xs font-semibold tabular-nums text-app-text-subtle">
+                          <Badge variant="neutral" size="sm" className="tabular-nums">
                             {runPageMeta.totalElements} total
-                          </span>
+                          </Badge>
                         ) : null}
                       </div>
 
@@ -1505,38 +1357,40 @@ export function DataIngestionPage() {
                     ) : null}
                   </section>
                 ) : null}
-              </div>
+              </SlidingTabPanel>
             )}
           </div>
         </main>
       </div>
 
-      {selectedSource && (
-        <SourceDetailsPanel
-          source={selectedSource}
-          onUpdateSource={handleUpdateSource}
-          onRefreshDetails={refreshSourceDetails}
-          canManageSyncSettings={canManageGithubSyncSettings}
-          onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
-          onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
-          onLoadJiraConfig={handleLoadJiraConfig}
-          onSaveJiraConfig={handleSaveJiraConfig}
-          onSetSourceEnabled={handleSetSourceEnabled}
-          onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
-          onUnlinkSource={
-            canIngestIntoSelectedProject ? handleUnlinkSource : undefined
-          }
-          onClose={closeSourceDetails}
-        />
-      )}
+      <PanelPresence value={selectedSource}>
+        {(source) => (
+          <SourceDetailsPanel
+            source={source}
+            onUpdateSource={handleUpdateSource}
+            onRefreshDetails={refreshSourceDetails}
+            canManageSyncSettings={canManageGithubSyncSettings}
+            onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
+            onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
+            onLoadJiraConfig={handleLoadJiraConfig}
+            onSaveJiraConfig={handleSaveJiraConfig}
+            onSetSourceEnabled={handleSetSourceEnabled}
+            onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
+            onUnlinkSource={canIngestIntoSelectedProject ? handleUnlinkSource : undefined}
+            onClose={closeSourceDetails}
+          />
+        )}
+      </PanelPresence>
 
-      {selectedRun && (
-        <RunDetailsPanel
-          run={selectedRun}
-          sourceLabel={getRunSourceLabel(selectedRun, runSourceLabels)}
-          onClose={() => setSelectedRunSnapshot(null)}
-        />
-      )}
+      <PanelPresence value={selectedRun}>
+        {(run) => (
+          <RunDetailsPanel
+            run={run}
+            sourceLabel={getRunSourceLabel(run, runSourceLabels)}
+            onClose={() => setSelectedRunSnapshot(null)}
+          />
+        )}
+      </PanelPresence>
 
       <Modal
         isOpen={isConnectorsModalOpen}
@@ -1576,9 +1430,7 @@ export function DataIngestionPage() {
         isOpen={isSyncSettingsModalOpen}
         title={`${syncSettingsProvider === "github" ? "GitHub" : "Jira"} Sync Settings`}
         description={`Apply one sync policy to all connected ${
-          syncSettingsProvider === "github"
-            ? "GitHub repositories"
-            : "Jira instances"
+          syncSettingsProvider === "github" ? "GitHub repositories" : "Jira instances"
         }.`}
         size="lg"
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
@@ -1586,10 +1438,11 @@ export function DataIngestionPage() {
       >
         {hasGithubSources && hasJiraSources ? (
           <div className="mb-5">
-            <SegmentedControl
-              options={SYNC_SETTINGS_PROVIDERS}
+            <SegmentedTabs
               value={syncSettingsProvider}
+              options={SYNC_SETTINGS_PROVIDERS}
               onChange={setSyncSettingsProvider}
+              layoutId="sync-settings-provider-pill"
               ariaLabel="Sync settings connector"
             />
           </div>
@@ -1598,9 +1451,7 @@ export function DataIngestionPage() {
         <GithubRepositorySyncSettings
           key={syncSettingsProvider}
           initialConfig={
-            syncSettingsProvider === "github"
-              ? globalGithubSyncConfig
-              : globalJiraSyncConfig
+            syncSettingsProvider === "github" ? globalGithubSyncConfig : globalJiraSyncConfig
           }
           onSave={
             syncSettingsProvider === "github"

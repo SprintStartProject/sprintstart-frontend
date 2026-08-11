@@ -10,6 +10,11 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
   discoverRepositories,
@@ -106,12 +111,10 @@ export function GithubRepositoryDiscovery({
   const [hasMore, setHasMore] = useState(false);
   // "owner/name" (lowercased) -> repository id, for every repo connected anywhere,
   // plus the subset already belonging to the current project.
-  const [repositoryIdsByFullName, setRepositoryIdsByFullName] = useState<
-    Map<string, string>
-  >(new Map());
-  const [projectFullNames, setProjectFullNames] = useState<Set<string>>(
-    new Set(),
+  const [repositoryIdsByFullName, setRepositoryIdsByFullName] = useState<Map<string, string>>(
+    new Map(),
   );
+  const [projectFullNames, setProjectFullNames] = useState<Set<string>>(new Set());
 
   const [discoverState, setDiscoverState] = useState<
     "idle" | "loading" | "loadingMore" | "loaded" | "error"
@@ -136,18 +139,13 @@ export function GithubRepositoryDiscovery({
           // have none and are not link-by-repository candidates here.
           allConnected.flatMap((status) =>
             status.repositoryId
-              ? ([[status.sourceId.toLowerCase(), status.repositoryId]] as [
-                  string,
-                  string,
-                ][])
+              ? ([[status.sourceId.toLowerCase(), status.repositoryId]] as [string, string][])
               : [],
           ),
         ),
       );
       setProjectFullNames(
-        new Set(
-          connectedToProject.map((status) => status.sourceId.toLowerCase()),
-        ),
+        new Set(connectedToProject.map((status) => status.sourceId.toLowerCase())),
       );
     } catch {
       // Degrades gracefully: without ids, already-connected repos stay
@@ -199,9 +197,7 @@ export function GithubRepositoryDiscovery({
         setHasMore(result.hasMore);
         setPage(nextPage);
         setRepositories((current) =>
-          loadingMore
-            ? [...current, ...result.repositories]
-            : result.repositories,
+          loadingMore ? [...current, ...result.repositories] : result.repositories,
         );
         setDiscoverState("loaded");
 
@@ -219,14 +215,10 @@ export function GithubRepositoryDiscovery({
             `No GitHub organization or user "${owner}" was found for the selected token.`,
           );
         } else if (error instanceof ApiError && error.status === 429) {
-          setDiscoverError(
-            "GitHub rate limit reached. Please wait a moment and try again.",
-          );
+          setDiscoverError("GitHub rate limit reached. Please wait a moment and try again.");
         } else {
           setDiscoverError(
-            error instanceof Error
-              ? error.message
-              : "Repositories could not be discovered.",
+            error instanceof Error ? error.message : "Repositories could not be discovered.",
           );
         }
       }
@@ -238,9 +230,7 @@ export function GithubRepositoryDiscovery({
     const normalized = filter.trim().toLowerCase();
     if (!normalized) return repositories;
 
-    return repositories.filter((repository) =>
-      repository.name.toLowerCase().includes(normalized),
-    );
+    return repositories.filter((repository) => repository.name.toLowerCase().includes(normalized));
   }, [filter, repositories]);
 
   const linkStateByName = useMemo(() => {
@@ -316,13 +306,7 @@ export function GithubRepositoryDiscovery({
           repositoryId: repositoryIdsByFullName.get(fullName),
         };
       });
-  }, [
-    linkStateByName,
-    repositories,
-    repositoryIdsByFullName,
-    resolvedOwner,
-    selected,
-  ]);
+  }, [linkStateByName, repositories, repositoryIdsByFullName, resolvedOwner, selected]);
 
   // Report the resolved selection up. `onSelectionChange` must be stable (a
   // useState setter or a memoised callback) so this only fires when the
@@ -340,8 +324,8 @@ export function GithubRepositoryDiscovery({
     <div className="space-y-5">
       {!hasTokens && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Add a GitHub personal access token in Settings first, then come back to
-          discover repositories.
+          Add a GitHub personal access token in Settings first, then come back to discover
+          repositories.
         </div>
       )}
 
@@ -353,35 +337,29 @@ export function GithubRepositoryDiscovery({
         }}
       >
         <div>
-          <label
-            htmlFor="discovery-owner"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="discovery-owner" className="text-sm font-medium text-app-text">
             Organization, user, or URL
           </label>
-          <input
+          <Input
             id="discovery-owner"
             value={ownerInput}
             onChange={(event) => setOwnerInput(event.target.value)}
             disabled={isBusy || !hasTokens}
             placeholder="octocat, github.com/octocat, or a repo URL"
-            className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="discovery-token"
-            className="text-sm font-medium text-app-text"
-          >
+          <label htmlFor="discovery-token" className="text-sm font-medium text-app-text">
             Access token
           </label>
-          <select
+          <Select
             id="discovery-token"
             value={tokenName}
             onChange={(event) => onTokenNameChange(event.target.value)}
             disabled={isBusy || !hasTokens}
-            className="mt-2 h-11 w-full rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2"
           >
             {hasTokens ? (
               tokenNames.map((name) => (
@@ -392,21 +370,18 @@ export function GithubRepositoryDiscovery({
             ) : (
               <option value="">No saved tokens</option>
             )}
-          </select>
+          </Select>
         </div>
 
-        <button
+        <Button
+          variant="primary"
           type="submit"
           disabled={isBusy || !hasTokens}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-4 text-sm font-semibold text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          loading={discoverState === "loading"}
+          icon={<Search className="h-4 w-4" />}
         >
-          {discoverState === "loading" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Search className="h-4 w-4" />
-          )}
           Discover
-        </button>
+        </Button>
       </form>
 
       {discoverError && (
@@ -431,30 +406,23 @@ export function GithubRepositoryDiscovery({
       )}
 
       {discoverState === "loaded" && repositories.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-          <GitBranch className="mx-auto h-8 w-8 text-app-text-muted" />
-          <p className="mt-3 text-sm font-semibold text-app-text">
-            No repositories found
-          </p>
-          <p className="mt-1 text-sm text-app-text-muted">
-            The token may only see public repositories. Private repositories
-            require a token with broader scope (e.g. <code>read:org</code> / repo
-            access).
-          </p>
-        </div>
+        <EmptyState icon={<GitBranch className="h-8 w-8" />} title="No repositories found">
+          The token may only see public repositories. Private repositories require a token with
+          broader scope (e.g. <code>read:org</code> / repo access).
+        </EmptyState>
       )}
 
       {repositories.length > 0 && (
         <div className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative sm:max-w-xs sm:flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
-              <input
+            <div className="sm:max-w-xs sm:flex-1">
+              <Input
+                size="sm"
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
                 placeholder="Filter repositories"
                 aria-label="Filter repositories"
-                className="h-10 w-full rounded-xl border border-app-border bg-app-surface pl-9 pr-3 text-sm text-app-text outline-none transition placeholder:text-app-text-disabled focus:border-app-brand"
+                icon={<Search className="h-4 w-4" />}
               />
             </div>
 
@@ -474,10 +442,10 @@ export function GithubRepositoryDiscovery({
           {selectedLinkCount > 0 && (
             <p className="rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-2.5 text-xs text-app-brand-text">
               {selectedLinkCount} of the selected{" "}
-              {selectedLinkCount === 1 ? "repository is" : "repositories are"}{" "}
-              already ingested and will be linked to
-              {projectName ? ` ${projectName}` : " this project"} without fetching
-              or ingesting again.
+              {selectedLinkCount === 1 ? "repository is" : "repositories are"} already ingested and
+              will be linked to
+              {projectName ? ` ${projectName}` : " this project"} without fetching or ingesting
+              again.
             </p>
           )}
 
@@ -521,12 +489,8 @@ export function GithubRepositoryDiscovery({
                     {repository.alreadyConnected && (
                       <span
                         role="img"
-                        aria-label={
-                          repository.isEnabled === false ? "Disabled" : "Enabled"
-                        }
-                        title={
-                          repository.isEnabled === false ? "Disabled" : "Enabled"
-                        }
+                        aria-label={repository.isEnabled === false ? "Disabled" : "Enabled"}
+                        title={repository.isEnabled === false ? "Disabled" : "Enabled"}
                         className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                           repository.isEnabled === false
                             ? "bg-app-text-disabled"
@@ -539,44 +503,44 @@ export function GithubRepositoryDiscovery({
                       {repository.name}
                     </span>
 
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                        repository.isPrivate
-                          ? "border-app-orange-border bg-app-orange-bg text-app-orange-text"
-                          : "border-app-success-border bg-app-success-bg text-app-success-text"
-                      }`}
+                    <Badge
+                      variant={repository.isPrivate ? "orange" : "success"}
+                      size="sm"
+                      className="gap-1"
                     >
-                      {repository.isPrivate && (
-                        <Lock className="h-3 w-3" aria-hidden="true" />
-                      )}
+                      {repository.isPrivate && <Lock className="h-3 w-3" aria-hidden="true" />}
                       {repository.isPrivate ? "Private" : "Public"}
-                    </span>
+                    </Badge>
 
                     {linkState === "in-project" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-neutral-bg px-2 py-0.5 text-xs font-medium text-app-neutral-text">
+                      <Badge variant="neutral" size="sm" className="gap-1">
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         In this project
-                      </span>
+                      </Badge>
                     )}
 
                     {linkState === "linkable" && (
-                      <span
+                      <Badge
+                        variant="brand"
+                        size="sm"
+                        className="gap-1"
                         title="Already ingested — adding it here reuses its artifacts instead of ingesting again."
-                        className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text"
                       >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         Already ingested
-                      </span>
+                      </Badge>
                     )}
 
                     {linkState === "unresolved" && (
-                      <span
+                      <Badge
+                        variant="neutral"
+                        size="sm"
+                        className="gap-1"
                         title="Connected to another project, but its repository id could not be resolved."
-                        className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-neutral-bg px-2 py-0.5 text-xs font-medium text-app-neutral-text"
                       >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         Connected
-                      </span>
+                      </Badge>
                     )}
 
                     <a

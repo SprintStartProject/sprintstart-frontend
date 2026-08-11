@@ -34,7 +34,7 @@ export function CheckPassCelebration({
 
   return (
     <motion.div
-      className="mb-6 rounded-2xl border border-app-success-solid/30 bg-app-success-bg p-4 flex items-center gap-4"
+      className="mb-6 flex items-center gap-4 rounded-2xl border border-app-success-solid/30 bg-app-success-bg p-4"
       initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={centralSpringToken}
@@ -48,8 +48,8 @@ export function CheckPassCelebration({
         <Trophy className="h-6 w-6 text-app-success-solid" />
       </motion.div>
       <div className="min-w-0">
-        <div className="font-semibold text-app-text text-sm">Check passed — nice work!</div>
-        <div className="text-xs text-app-text-muted mt-0.5">
+        <div className="text-sm font-semibold text-app-text">Check passed — nice work!</div>
+        <div className="mt-0.5 text-xs text-app-text-muted">
           {correctCount}/{questionCount} correct ({percentage}%).
           {detail ? ` ${detail}` : ""}
         </div>

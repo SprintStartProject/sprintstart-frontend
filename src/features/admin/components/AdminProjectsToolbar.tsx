@@ -1,4 +1,6 @@
 import { Plus, Search } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 
 type AdminProjectsToolbarProps = {
   projectCount: number;
@@ -15,30 +17,27 @@ export function AdminProjectsToolbar({
 }: AdminProjectsToolbarProps) {
   return (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-sm font-semibold text-app-text">
-        {projectCount} projects
-      </span>
+      <span className="text-sm font-semibold text-app-text">{projectCount} projects</span>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
-          <input
+        <div className="w-full sm:w-64">
+          <Input
             value={projectSearchValue}
             onChange={(event) => onProjectSearchChange(event.target.value)}
             placeholder="Search projects..."
             aria-label="Search projects"
-            className="h-11 w-full rounded-xl border border-app-border bg-app-surface pl-10 pr-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+            icon={<Search className="h-4 w-4" />}
           />
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={onCreateProject}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
+          icon={<Plus className="h-4 w-4" />}
+          className="w-full sm:w-auto"
         >
-          <Plus className="h-4 w-4" />
           New Project
-        </button>
+        </Button>
       </div>
     </div>
   );

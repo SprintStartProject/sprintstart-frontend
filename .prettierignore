@@ -1,0 +1,23 @@
+dist
+build
+coverage
+node_modules
+package-lock.json
+
+# Vendored Keycloak theme. `keycloakify sync-extensions` runs on every
+# `npm install` and rewrites everything except the handful of "owned" files
+# listed in src/keycloak-theme/.gitignore — formatting the rest is churn that
+# the next install undoes anyway. So: ignore the tree, re-include what we own.
+src/keycloak-theme/**
+!src/keycloak-theme/main.tsx
+!src/keycloak-theme/main.dev.tsx
+!src/keycloak-theme/login/login.css
+!src/keycloak-theme/login/styleLevelCustomization.tsx
+!src/keycloak-theme/login/components/PasswordWrapper.tsx
+!src/keycloak-theme/login/components/Template/Template.tsx
+!src/keycloak-theme/login/pages/login-passkeys-conditional-authenticate/Page.tsx
+
+# Same story for the theme's static assets — vendored (partly minified)
+# Keycloak files, not ours to format.
+public/keycloak-theme
+public/keycloakify-dev-resources

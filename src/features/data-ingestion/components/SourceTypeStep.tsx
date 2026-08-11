@@ -1,3 +1,4 @@
+import { Badge } from "../../../components/ui/Badge.tsx";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 
@@ -34,9 +35,7 @@ export function SourceTypeStep({
       <div>
         <p className="text-sm font-medium text-app-text">{heading}</p>
         {description && (
-          <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
-            {description}
-          </p>
+          <p className="mt-1 text-sm leading-relaxed text-app-text-muted">{description}</p>
         )}
 
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -61,22 +60,18 @@ export function SourceTypeStep({
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-bg-soft">
                     <Icon
                       size={20}
-                      className={
-                        isSelected ? "text-app-brand" : "text-app-text-muted"
-                      }
+                      className={isSelected ? "text-app-brand" : "text-app-text-muted"}
                     />
                   </div>
 
                   {!isAvailable && (
-                    <span className="rounded-full bg-app-bg-soft px-2.5 py-1 text-xs font-medium text-app-text-subtle">
+                    <Badge variant="neutral" size="sm">
                       Soon
-                    </span>
+                    </Badge>
                   )}
                 </div>
 
-                <p className="mt-3 text-sm font-semibold text-app-text">
-                  {meta.type}
-                </p>
+                <p className="mt-3 text-sm font-semibold text-app-text">{meta.type}</p>
                 <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
                   {meta.description}
                 </p>

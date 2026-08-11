@@ -1,10 +1,4 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-  Database,
-  type LucideIcon,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Database, type LucideIcon } from "lucide-react";
 import { formatNumber } from "../data.ts";
 import type { DataSource } from "../types.ts";
 
@@ -28,9 +22,7 @@ export function IngestionMetrics({
   totalArtifactCount,
   compact = false,
 }: IngestionMetricsProps) {
-  const syncedSources = sources.filter(
-    (source) => source.lastRunAt !== null,
-  ).length;
+  const syncedSources = sources.filter((source) => source.lastRunAt !== null).length;
   const latestIngestedArtifacts = sources.reduce(
     (sum, source) => sum + source.latestIngestedCount,
     0,
@@ -59,9 +51,7 @@ export function IngestionMetrics({
           label="Errors"
           value={formatNumber(totalErrors)}
           icon={AlertTriangle}
-          iconColor={
-            totalErrors > 0 ? "text-app-warning-solid" : "text-app-text-muted"
-          }
+          iconColor={totalErrors > 0 ? "text-app-warning-solid" : "text-app-text-muted"}
         />
       </div>
     );
@@ -78,11 +68,7 @@ export function IngestionMetrics({
       />
 
       <MetricCard
-        title={
-          totalArtifactCount === undefined
-            ? "Latest Ingested"
-            : "All Artifacts Ingested"
-        }
+        title={totalArtifactCount === undefined ? "Latest Ingested" : "All Artifacts Ingested"}
         value={formatNumber(artifactCount)}
         subtitle={
           totalArtifactCount === undefined
@@ -146,7 +132,7 @@ function MetricCard({
   iconColor: string;
 }) {
   return (
-    <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+    <div className="rounded-2xl border border-app-border bg-app-surface p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm text-app-text-muted">{title}</p>

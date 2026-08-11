@@ -91,14 +91,9 @@ describe("SourceDetailsPanel", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("switch", { name: /Toggle ingestion for Team board/ }),
-    );
+    await user.click(screen.getByRole("switch", { name: /Toggle ingestion for Team board/ }));
 
-    expect(onSetJiraSourceEnabled).toHaveBeenCalledWith(
-      "https://acme.atlassian.net",
-      false,
-    );
+    expect(onSetJiraSourceEnabled).toHaveBeenCalledWith("https://acme.atlassian.net", false);
   });
 
   it('updates a Jira instance via the "Update instance" button', async () => {
@@ -106,11 +101,7 @@ describe("SourceDetailsPanel", () => {
     const onUpdateSource = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <SourceDetailsPanel
-        source={jiraSource}
-        onUpdateSource={onUpdateSource}
-        onClose={vi.fn()}
-      />,
+      <SourceDetailsPanel source={jiraSource} onUpdateSource={onUpdateSource} onClose={vi.fn()} />,
     );
 
     await user.click(screen.getByRole("button", { name: /Update instance/ }));
@@ -139,9 +130,7 @@ describe("SourceDetailsPanel", () => {
 
     expect(screen.getByText("Sync Schedule")).toBeInTheDocument();
     await waitFor(() => {
-      expect(onLoadJiraConfig).toHaveBeenCalledWith(
-        "https://acme.atlassian.net",
-      );
+      expect(onLoadJiraConfig).toHaveBeenCalledWith("https://acme.atlassian.net");
     });
   });
 
@@ -199,11 +188,7 @@ describe("SourceDetailsPanel", () => {
     const onUpdateSource = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <SourceDetailsPanel
-        source={mockSource}
-        onUpdateSource={onUpdateSource}
-        onClose={vi.fn()}
-      />,
+      <SourceDetailsPanel source={mockSource} onUpdateSource={onUpdateSource} onClose={vi.fn()} />,
     );
 
     await user.click(screen.getByRole("button", { name: /Update repo/ }));
@@ -211,9 +196,7 @@ describe("SourceDetailsPanel", () => {
     expect(onUpdateSource).toHaveBeenCalledWith(mockSource);
     await waitFor(() => {
       expect(
-        screen.getByText(
-          "Update started. Details will refresh while ingestion runs.",
-        ),
+        screen.getByText("Update started. Details will refresh while ingestion runs."),
       ).toBeInTheDocument();
     });
   });
@@ -234,9 +217,7 @@ describe("SourceDetailsPanel", () => {
 
     expect(onRefreshDetails).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(
-        screen.getByText("Repository details refreshed."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Repository details refreshed.")).toBeInTheDocument();
     });
   });
 
@@ -255,9 +236,7 @@ describe("SourceDetailsPanel", () => {
   it("does not show the remove-from-project action without onUnlinkSource", () => {
     render(<SourceDetailsPanel source={mockSource} onClose={vi.fn()} />);
 
-    expect(
-      screen.queryByRole("button", { name: /Remove from project/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
   });
 
   it("unlinks the source after confirming the dialog", async () => {
@@ -265,16 +244,10 @@ describe("SourceDetailsPanel", () => {
     const onUnlinkSource = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <SourceDetailsPanel
-        source={mockSource}
-        onUnlinkSource={onUnlinkSource}
-        onClose={vi.fn()}
-      />,
+      <SourceDetailsPanel source={mockSource} onUnlinkSource={onUnlinkSource} onClose={vi.fn()} />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /Remove from project/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Remove from project/ }));
 
     // The confirmation dialog gates the destructive call.
     expect(onUnlinkSource).not.toHaveBeenCalled();
@@ -294,16 +267,10 @@ describe("SourceDetailsPanel", () => {
     const onUnlinkSource = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <SourceDetailsPanel
-        source={jiraSource}
-        onUnlinkSource={onUnlinkSource}
-        onClose={vi.fn()}
-      />,
+      <SourceDetailsPanel source={jiraSource} onUnlinkSource={onUnlinkSource} onClose={vi.fn()} />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /Remove from project/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Remove from project/ }));
 
     // The Jira copy calls it an "instance", not a "repository".
     expect(
@@ -319,27 +286,17 @@ describe("SourceDetailsPanel", () => {
 
   it("surfaces the error message when unlinking fails", async () => {
     const user = userEvent.setup();
-    const onUnlinkSource = vi
-      .fn()
-      .mockRejectedValue(new Error("You cannot access this project."));
+    const onUnlinkSource = vi.fn().mockRejectedValue(new Error("You cannot access this project."));
 
     render(
-      <SourceDetailsPanel
-        source={mockSource}
-        onUnlinkSource={onUnlinkSource}
-        onClose={vi.fn()}
-      />,
+      <SourceDetailsPanel source={mockSource} onUnlinkSource={onUnlinkSource} onClose={vi.fn()} />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /Remove from project/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Remove from project/ }));
     await user.click(screen.getByRole("button", { name: /^Remove$/ }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText("You cannot access this project."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("You cannot access this project.")).toBeInTheDocument();
     });
   });
 
@@ -355,9 +312,7 @@ describe("SourceDetailsPanel", () => {
       />,
     );
 
-    expect(
-      screen.queryByRole("button", { name: /Remove from project/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
   });
 
   it("renders failed items from the source", () => {

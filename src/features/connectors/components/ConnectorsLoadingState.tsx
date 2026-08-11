@@ -1,15 +1,15 @@
+import { EmptyState } from "../../../components/ui/EmptyState.tsx";
+import { Spinner } from "../../../components/ui/Spinner.tsx";
+
+/**
+ * Shown while the connector list is being fetched. Deliberately the same box as
+ * the empty state that may follow it — only the words differ, so the page does
+ * not visibly reshape when the answer arrives.
+ */
 export function ConnectorsLoadingState() {
   return (
-    <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-      <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-app-brand border-t-transparent" />
-
-      <h3 className="mt-4 text-lg font-semibold text-app-text">
-        Loading connectors
-      </h3>
-
-      <p className="mt-2 text-sm text-app-text-muted">
-        Fetching registered connectors and their configuration from the backend.
-      </p>
-    </div>
+    <EmptyState icon={<Spinner size="lg" silent />} title="Loading connectors">
+      Fetching registered connectors and their configuration from the backend.
+    </EmptyState>
   );
 }

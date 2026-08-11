@@ -1,13 +1,10 @@
 import type { SourceStatusPresentation } from "../types.ts";
 
 const TONE_CLASSNAMES: Record<SourceStatusPresentation["tone"], string> = {
-  success:
-    "border border-app-success-border bg-app-success-bg text-app-success-text",
+  success: "border border-app-success-border bg-app-success-bg text-app-success-text",
   brand: "border border-app-brand-border bg-app-brand-soft text-app-brand-text",
-  warning:
-    "border border-app-warning-border bg-app-warning-bg text-app-warning-text",
-  danger:
-    "border border-app-danger-border bg-app-danger-bg text-app-danger-text",
+  warning: "border border-app-warning-border bg-app-warning-bg text-app-warning-text",
+  danger: "border border-app-danger-border bg-app-danger-bg text-app-danger-text",
   neutral: "border border-app-border bg-app-neutral-bg text-app-neutral-text",
 };
 
@@ -27,10 +24,7 @@ type SourceStatusChipProps = {
  * spins its icon. This is the only status badge a source shows — it replaces the
  * previous split of a backend badge next to a separate ingestion badge.
  */
-export function SourceStatusChip({
-  status,
-  size = "md",
-}: SourceStatusChipProps) {
+export function SourceStatusChip({ status, size = "md" }: SourceStatusChipProps) {
   const Icon = status.icon;
 
   return (

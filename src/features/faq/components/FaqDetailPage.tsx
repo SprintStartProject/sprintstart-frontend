@@ -5,11 +5,10 @@
 // ============================================================
 
 import { useParams, useNavigate } from "react-router-dom";
-import type {
-  FAQQuestion,
-  FAQDocument,
-} from "../../../features/faq/types";
+import type { FAQQuestion, FAQDocument } from "../../../features/faq/types";
 import { insightsService } from "../../../services/faqService";
+import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
 import { useFetch } from "../../../hooks/useFetch";
 import { useProjectContext } from "../../projects/useProjectContext";
 
@@ -29,7 +28,7 @@ import {
 // ─────────────────────────────────────────────────────────────
 
 export function FaqDetailPage() {
-    const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId } = useProjectContext();
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
 
@@ -37,18 +36,15 @@ export function FaqDetailPage() {
     data: detail,
     loading,
     error,
-  } = useFetch(
-    () => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
-    [groupId],
-  );
+  } = useFetch(() => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""), [groupId]);
 
   // ── LOADING ──────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
         <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="w-8 h-8 animate-spin text-app-brand" />
+          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
           <p className="text-sm">Loading group details...</p>
         </div>
       </div>
@@ -59,21 +55,14 @@ export function FaqDetailPage() {
 
   if (error || !detail) {
     return (
-      <div className="min-h-screen bg-app-bg flex items-center justify-center p-8">
+      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
         <div className="max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-app-danger-solid mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-app-text mb-2">
-            Could not load group
-          </h2>
-          <p className="text-sm text-app-text-muted mb-6">
-            This FAQ group may no longer exist.
-          </p>
-          <button
-            onClick={() => void navigate(-1)}
-            className="px-5 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
-          >
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+          <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load group</h2>
+          <p className="mb-6 text-sm text-app-text-muted">This FAQ group may no longer exist.</p>
+          <Button variant="primary" onClick={() => void navigate(-1)}>
             Go back
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -86,50 +75,45 @@ export function FaqDetailPage() {
       {/* ── HEADER ────────────────────────────────────────── */}
       <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-content py-4">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => void navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text transition-colors mb-4"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
             Back
-          </button>
+          </Button>
 
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-xl font-bold text-app-text leading-snug">
+            <h1 className="text-xl leading-snug font-semibold text-app-text sm:text-2xl">
               {detail.questions[0].text}
             </h1>
-            <span className="inline-flex items-center gap-1.5 bg-app-success-bg text-app-success-text text-xs font-medium px-3 py-1.5 rounded-full shrink-0">
-              <ArrowUp className="w-3 h-3" />
+            <Badge variant="success" className="shrink-0 gap-1.5">
+              <ArrowUp className="h-3 w-3" />
               {detail.count} times asked
-            </span>
+            </Badge>
           </div>
         </div>
       </div>
 
       {/* ── CONTENT ───────────────────────────────────────── */}
-      <main className="app-page-content py-8 pb-24 space-y-6">
-
+      <main className="app-page-content space-y-6 py-8 pb-24">
         {/* PM detail section */}
         <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-app-brand uppercase tracking-widest mb-4">
-            <ShieldAlert className="w-3.5 h-3.5" />
+          <div className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-widest text-app-brand uppercase">
+            <ShieldAlert className="h-3.5 w-3.5" />
             PM detail
           </div>
 
           {/* Individual questions */}
-          <div className="flex items-center gap-1.5 text-xs font-medium text-app-text-muted mb-3">
-            <MessageSquareMore className="w-3.5 h-3.5" />
+          <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
+            <MessageSquareMore className="h-3.5 w-3.5" />
             Individual questions ({detail.questions.length})
           </div>
-          <div className="space-y-2 mb-6">
+          <div className="mb-6 space-y-2">
             {detail.questions.map((q: FAQQuestion) => (
-              <div
-                key={q.id}
-                className="bg-app-surface-muted rounded-xl p-4"
-              >
-                <p className="text-sm text-app-text leading-snug mb-3">
-                  {q.text}
-                </p>
+              <div key={q.id} className="rounded-xl bg-app-surface-muted p-4">
+                <p className="mb-3 text-sm leading-snug text-app-text">{q.text}</p>
 
                 <div className="flex items-center justify-between text-xs text-app-text-muted">
                   <span>Question ID: {q.id}</span>
@@ -139,19 +123,17 @@ export function FaqDetailPage() {
           </div>
 
           {/* Answering documents */}
-          <div className="flex items-center gap-1.5 text-xs font-medium text-app-text-muted mb-3">
-            <BookOpen className="w-3.5 h-3.5" />
+          <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
+            <BookOpen className="h-3.5 w-3.5" />
             Answering documents
           </div>
           <div className="divide-y divide-app-border">
             {detail.answeringDocuments.map((doc: FAQDocument) => (
               <div key={doc.id} className="flex items-center gap-3 py-3">
-                <FileText className="w-4 h-4 text-app-text-disabled shrink-0" />
-                <span className="text-sm text-app-text flex-1 min-w-0 truncate">
-                  {doc.title}
-                </span>
+                <FileText className="h-4 w-4 shrink-0 text-app-text-disabled" />
+                <span className="min-w-0 flex-1 truncate text-sm text-app-text">{doc.title}</span>
                 {doc.source && (
-                  <span className="text-xs text-app-text-muted bg-app-surface-muted px-2 py-0.5 rounded shrink-0">
+                  <span className="shrink-0 rounded bg-app-surface-muted px-2 py-0.5 text-xs text-app-text-muted">
                     {doc.source}
                   </span>
                 )}

@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
+import { Spinner } from "../../../components/ui/Spinner";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  AlertCircle,
-  ArrowRight,
-  Loader2,
-  MessageSquareText,
-  SkipForward,
-  Users,
-} from "lucide-react";
+import { AlertCircle, ArrowRight, MessageSquareText, SkipForward, Users } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
+import { Button } from "../../../components/ui/Button";
 import { getTeamOverview } from "../../../services/teamManagementService";
 import type { TeamOverviewUser } from "../types";
 import { TeamMemberCard } from "./TeamMemberCard";
@@ -26,8 +21,7 @@ type TeamManagementWidgetProps = {
 };
 
 function CountBadge({ icon, count, label, variant }: CountBadgeProps) {
-  const base =
-    "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium";
+  const base = "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium";
   const styles =
     variant === "soft"
       ? `${base} bg-app-brand-soft text-app-brand-text`
@@ -41,9 +35,7 @@ function CountBadge({ icon, count, label, variant }: CountBadgeProps) {
   );
 }
 
-export function TeamManagementWidget({
-  projectId = "",
-}: TeamManagementWidgetProps) {
+export function TeamManagementWidget({ projectId = "" }: TeamManagementWidgetProps) {
   const [users, setUsers] = useState<TeamOverviewUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -86,7 +78,7 @@ export function TeamManagementWidget({
   if (loading) {
     return (
       <div className="flex min-h-48 items-center justify-center rounded-2xl border border-app-border bg-app-surface p-6">
-        <Loader2 className="h-5 w-5 animate-spin text-app-brand" />
+        <Spinner size="lg" label="Loading" />
       </div>
     );
   }
@@ -106,8 +98,7 @@ export function TeamManagementWidget({
       if (!b.currentStep?.startedAt) return -1;
 
       return (
-        new Date(a.currentStep.startedAt).getTime() -
-        new Date(b.currentStep.startedAt).getTime()
+        new Date(a.currentStep.startedAt).getTime() - new Date(b.currentStep.startedAt).getTime()
       );
     })
     .slice(0, 4);
@@ -126,22 +117,20 @@ export function TeamManagementWidget({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-app-brand" />
-          <span className="text-sm font-semibold text-app-text">
-            Team progress
-          </span>
+          <span className="text-sm font-semibold text-app-text">Team progress</span>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={(event) => {
             event.stopPropagation();
             void navigate("/team-management");
           }}
-          className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+          trailingIcon={<ArrowRight className="h-3.5 w-3.5" />}
         >
           See all ({users.length})
-          <ArrowRight className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       </div>
 
       {(pendingFeedbackCount > 0 || pendingSkipCount > 0) && (
@@ -158,9 +147,7 @@ export function TeamManagementWidget({
             <CountBadge
               icon={<SkipForward className="h-3 w-3" />}
               count={pendingSkipCount}
-              label={`${pendingSkipCount} open skip request${
-                pendingSkipCount > 1 ? "s" : ""
-              }`}
+              label={`${pendingSkipCount} open skip request${pendingSkipCount > 1 ? "s" : ""}`}
               variant="muted"
             />
           )}

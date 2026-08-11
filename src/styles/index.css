@@ -38,6 +38,12 @@
   --brand-text: #1d4ed8;
   --brand-glow: rgba(37, 99, 235, 0.1);
 
+  /* Cast shadow under a hovered primary button, in the brand color.
+     Offset down and heavily inset (-10px spread) so it reads as the button
+     lifting off the page rather than as a blurred halo around it. Only the
+     primary action gets this -- if every button glowed, none would. */
+  --shadow-brand-lift: 0 10px 26px -10px var(--brand);
+
   /* Success */
   --success-bg: #ecfdf5;
   --success-border: #a7f3d0;
@@ -62,15 +68,22 @@
   --orange-border: rgba(249, 115, 22, 0.35);
   --orange-text: #c2410c;
 
+  /* Purple — the counterpart to Orange for a *reached* state that is not the
+     app's ordinary Success. "Onboarding: Done" uses it so it does not read as
+     the same thing as "Account: Active" sitting directly above it. */
+  --purple-bg: rgba(147, 51, 234, 0.12);
+  --purple-border: rgba(147, 51, 234, 0.35);
+  --purple-text: #7e22ce;
+
   /* Neutral */
   --neutral-bg: #f3f4f6;
   --neutral-border: #e5e7eb;
   --neutral-text: #4b5563;
 
   /* Progress */
-  --progress-track: #e5e7eb;       /* gray-200 */
-  --progress-fill: #2563eb;        /* blue-600 */
-  --progress-fill-end: #4f46e5;    /* indigo-600 */
+  --progress-track: #e5e7eb; /* gray-200 */
+  --progress-fill: #2563eb; /* blue-600 */
+  --progress-fill-end: #4f46e5; /* indigo-600 */
 
   /* Overlay / Focus */
   --overlay: rgba(0, 0, 0, 0.6);
@@ -84,27 +97,27 @@
 
 .dark {
   /* Backgrounds */
-  --bg: #030712;                  /* gray-950 */
+  --bg: #030712; /* gray-950 */
   --bg-soft: #0d1117;
-  --surface: #111827;             /* gray-900 */
-  --surface-muted: #1f2937;       /* gray-800 */
+  --surface: #111827; /* gray-900 */
+  --surface-muted: #1f2937; /* gray-800 */
   --surface-hover: #182235;
 
   /* Borders */
-  --border: #1f2937;              /* gray-800 */
-  --border-muted: #374151;        /* gray-700 */
-  --border-strong: #4b5563;       /* gray-600 */
+  --border: #1f2937; /* gray-800 */
+  --border-muted: #374151; /* gray-700 */
+  --border-strong: #4b5563; /* gray-600 */
 
   /* Text */
-  --text: #f9fafb;                /* gray-50 */
-  --text-muted: #9ca3af;          /* gray-400 */
-  --text-subtle: #9ca3af;         /* gray-400 */
-  --text-disabled: #6b7280;       /* gray-500 */
+  --text: #f9fafb; /* gray-50 */
+  --text-muted: #9ca3af; /* gray-400 */
+  --text-subtle: #9ca3af; /* gray-400 */
+  --text-disabled: #6b7280; /* gray-500 */
   --text-inverse: #030712;
 
   /* Brand */
-  --brand: #2563eb;               /* blue-600 */
-  --brand-hover: #1d4ed8;         /* blue-700 */
+  --brand: #2563eb; /* blue-600 */
+  --brand-hover: #1d4ed8; /* blue-700 */
 
   /* Soft brand background for large selected areas.
      This stays close to dark:bg-blue-950/40 from the original onboarding UI. */
@@ -112,12 +125,17 @@
 
   /* Softer brand border for large containers and banners.
      This keeps the onboarding UI calmer than using blue-500 everywhere. */
-  --brand-border: #1e3a8a;        /* blue-900 */
+  --brand-border: #1e3a8a; /* blue-900 */
 
   /* Stronger brand border for active tabs, focus states, and small highlights. */
   --brand-border-strong: #3b82f6; /* blue-500 */
-  --brand-text: #60a5fa;          /* blue-400 */
+  --brand-text: #60a5fa; /* blue-400 */
   --brand-glow: rgba(59, 130, 246, 0.1);
+
+  /* Stronger on dark: a shadow cast onto a near-black background is almost
+     invisible at the light-theme opacity, so the lift is carried by a visible
+     brand-colored bloom instead. */
+  --shadow-brand-lift: 0 10px 30px -8px rgba(59, 130, 246, 0.45);
 
   /* Success */
   --success-bg: rgba(6, 78, 59, 0.25);
@@ -142,6 +160,11 @@
   --orange-border: rgba(249, 115, 22, 0.4);
   --orange-text: #fdba74;
 
+  /* Purple */
+  --purple-bg: rgba(168, 85, 247, 0.15);
+  --purple-border: rgba(168, 85, 247, 0.4);
+  --purple-text: #d8b4fe;
+
   /* Neutral */
   --neutral-bg: #1f2937;
   --neutral-border: #374151;
@@ -152,9 +175,9 @@
   --focus: #3b82f6;
 
   /* Progress */
-  --progress-track: #243044;      /* slightly lighter than gray-800, but still calm */
-  --progress-fill: #3b82f6;       /* blue-500, close to the original dark mode */
-  --progress-fill-end: #4f46e5;   /* indigo-600 */
+  --progress-track: #243044; /* slightly lighter than gray-800, but still calm */
+  --progress-fill: #3b82f6; /* blue-500, close to the original dark mode */
+  --progress-fill-end: #4f46e5; /* indigo-600 */
 }
 
 /* Tailwind theme tokens */
@@ -203,6 +226,10 @@
   --color-app-orange-border: var(--orange-border);
   --color-app-orange-text: var(--orange-text);
 
+  --color-app-purple-bg: var(--purple-bg);
+  --color-app-purple-border: var(--purple-border);
+  --color-app-purple-text: var(--purple-text);
+
   --color-app-neutral-bg: var(--neutral-bg);
   --color-app-neutral-border: var(--neutral-border);
   --color-app-neutral-text: var(--neutral-text);
@@ -213,6 +240,9 @@
   --color-app-progress-track: var(--progress-track);
   --color-app-progress-fill: var(--progress-fill);
   --color-app-progress-fill-end: var(--progress-fill-end);
+
+  /* Enables `shadow-app-brand-lift` as a Tailwind utility. */
+  --shadow-app-brand-lift: var(--shadow-brand-lift);
 
   --font-sans: var(--sans);
   --font-heading: var(--heading);
@@ -280,6 +310,20 @@
   margin-right: auto;
   padding-left: var(--app-page-gutter);
   padding-right: var(--app-page-gutter);
+}
+
+/*
+ * Keeps a two-finger horizontal swipe inside the app.
+ *
+ * Browsers read that gesture as back/forward once the scroll chain reaches the
+ * document with nothing left to scroll sideways, and by the time a `wheel`
+ * listener could call `preventDefault` the navigation is often already
+ * committed -- so the gesture has to be refused here rather than in JS. Only
+ * the horizontal axis: vertical rubber-banding stays as it is.
+ */
+html,
+body {
+  overscroll-behavior-x: contain;
 }
 
 /* Slim, theme-aware scrollbars (Chrome 121+, Firefox) */
@@ -466,8 +510,12 @@ body {
 }
 
 @keyframes barrelRoll {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .barrel-roll-active {

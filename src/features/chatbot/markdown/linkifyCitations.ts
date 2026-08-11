@@ -11,18 +11,18 @@ const CODE_SEGMENTS = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g;
 const MARKER = /\[(\d+)\](?!\()/g;
 
 export function linkifyCitations(markdown: string, max: number): string {
-    if (max <= 0 || !markdown.includes("[")) return markdown;
+  if (max <= 0 || !markdown.includes("[")) return markdown;
 
-    return markdown
-        .split(CODE_SEGMENTS)
-        .map((segment) => {
-            // Leave code spans / blocks exactly as they are.
-            if (/^(```|~~~|`)/.test(segment)) return segment;
+  return markdown
+    .split(CODE_SEGMENTS)
+    .map((segment) => {
+      // Leave code spans / blocks exactly as they are.
+      if (/^(```|~~~|`)/.test(segment)) return segment;
 
-            return segment.replace(MARKER, (whole, digits: string) => {
-                const n = Number(digits);
-                return n >= 1 && n <= max ? `[${n}](#cite-${n})` : whole;
-            });
-        })
-        .join("");
+      return segment.replace(MARKER, (whole, digits: string) => {
+        const n = Number(digits);
+        return n >= 1 && n <= max ? `[${n}](#cite-${n})` : whole;
+      });
+    })
+    .join("");
 }

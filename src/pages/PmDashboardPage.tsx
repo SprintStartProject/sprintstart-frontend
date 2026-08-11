@@ -30,11 +30,9 @@ export function PmDashboardPage() {
       <main className="app-page-frame space-y-5 py-6 lg:py-8">
         <IngestionStatusWidget />
 
-        <section className="rounded-3xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-app-text">
-              Team overview
-            </h2>
+            <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
             <p className="text-sm text-app-text-muted">
               Track the current status of your team and onboarding progress.
             </p>
@@ -43,7 +41,7 @@ export function PmDashboardPage() {
           <TeamManagementWidget projectId={selectedProjectId} />
         </section>
 
-        <section className="rounded-3xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-app-text">Insights</h2>
             <p className="text-sm text-app-text-muted">

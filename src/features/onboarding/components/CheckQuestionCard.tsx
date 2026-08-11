@@ -45,26 +45,26 @@ export function CheckQuestionCard({
       }`}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-brand-soft text-app-brand text-xs font-bold mt-0.5">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-brand-soft text-xs font-bold text-app-brand">
           {index + 1}
         </span>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           {/* Where a review-pool question originally came from */}
           {question.review && !hideReviewBadge && (
-            <div className="inline-flex items-center gap-1.5 mb-1.5 px-2 py-0.5 rounded-full bg-app-surface-muted text-app-text-muted text-[11px] font-medium">
-              <RotateCcw className="w-3 h-3" />
+            <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-app-surface-muted px-2 py-0.5 text-[11px] font-medium text-app-text-muted">
+              <RotateCcw className="h-3 w-3" />
               {question.reviewSourcePhaseTitle
                 ? `From ${question.reviewSourcePhaseTitle}`
                 : "Review question"}
             </div>
           )}
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-semibold text-app-text text-sm">{question.question}</h3>
+            <h3 className="text-sm font-semibold text-app-text">{question.question}</h3>
             {graded &&
               (result.correct ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-app-success-solid" />
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-app-success-solid" />
               ) : (
-                <XCircle className="w-5 h-5 shrink-0 text-app-danger-solid" />
+                <XCircle className="h-5 w-5 shrink-0 text-app-danger-solid" />
               ))}
           </div>
 
@@ -85,8 +85,8 @@ export function CheckQuestionCard({
                             ? "border-app-danger-solid/50 text-app-text"
                             : "border-app-border text-app-text-muted"
                         : selected
-                          ? "border-app-brand bg-app-brand-soft text-app-text cursor-pointer"
-                          : "border-app-border text-app-text hover:border-app-border-strong cursor-pointer"
+                          ? "cursor-pointer border-app-brand bg-app-brand-soft text-app-text"
+                          : "cursor-pointer border-app-border text-app-text hover:border-app-border-strong"
                     }`}
                   >
                     <input
@@ -129,7 +129,7 @@ export function CheckQuestionCard({
 
           {/* Explanation after grading */}
           {graded && result.explanation && (
-            <p className="mt-3 text-xs text-app-text-muted rounded-xl bg-app-surface-muted px-3 py-2">
+            <p className="mt-3 rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
               {result.explanation}
             </p>
           )}

@@ -17,10 +17,7 @@ export interface UseFetchResult<T> {
  * data). Results from a superseded call are ignored, so a fast-changing
  * dependency (e.g. a route param) can never apply stale data.
  */
-export function useFetch<T>(
-  loader: () => Promise<T>,
-  deps: DependencyList,
-): UseFetchResult<T> {
+export function useFetch<T>(loader: () => Promise<T>, deps: DependencyList): UseFetchResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);

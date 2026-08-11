@@ -155,15 +155,15 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
         {!poolCleared && (
           <button
             onClick={() => void continueWithRemaining()}
-            className="px-5 py-2.5 rounded-xl border border-app-border hover:border-app-border-strong text-app-text-muted hover:text-app-text text-sm font-medium transition-all flex items-center justify-center gap-2"
+            className="flex items-center justify-center gap-2 rounded-xl border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="h-4 w-4" />
             Keep going
           </button>
         )}
         <button
           onClick={close}
-          className="px-6 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
+          className="rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover"
         >
           Done
         </button>
@@ -172,9 +172,9 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       <button
         onClick={() => void submit()}
         disabled={answeredQuestions.length === 0 || submitting}
-        className="px-6 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+        {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
         Submit answers
       </button>
     ) : undefined
@@ -198,13 +198,13 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       {/* Loading / load error */}
       {!pool && !loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-app-text-muted">
-          <Loader2 className="w-6 h-6 animate-spin text-app-brand" />
+          <Loader2 className="h-6 w-6 animate-spin text-app-brand" />
           <p className="text-sm">Loading review questions...</p>
         </div>
       )}
       {loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <AlertCircle className="w-8 h-8 text-app-danger-solid" />
+          <AlertCircle className="h-8 w-8 text-app-danger-solid" />
           <p className="text-sm text-app-text-muted">{loadError}</p>
         </div>
       )}
@@ -212,11 +212,11 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       {/* Nothing left to review */}
       {pool && pool.questions.length === 0 && !result && (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <PartyPopper className="w-8 h-8 text-app-success-solid" />
-          <p className="font-semibold text-app-text text-sm">Nothing to review</p>
+          <PartyPopper className="h-8 w-8 text-app-success-solid" />
+          <p className="text-sm font-semibold text-app-text">Nothing to review</p>
           <p className="text-sm text-app-text-muted">
-            You have answered every question correctly so far. Anything you miss in a
-            knowledge check will show up here.
+            You have answered every question correctly so far. Anything you miss in a knowledge
+            check will show up here.
           </p>
         </div>
       )}
@@ -234,13 +234,13 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
         />
       )}
       {result && !poolCleared && (
-        <div className="mb-6 rounded-2xl border border-app-border bg-app-surface-muted p-4 flex items-center gap-3">
-          <RotateCcw className="w-6 h-6 shrink-0 text-app-text-muted" />
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4">
+          <RotateCcw className="h-6 w-6 shrink-0 text-app-text-muted" />
           <div>
-            <div className="font-semibold text-app-text text-sm">
+            <div className="text-sm font-semibold text-app-text">
               {result.correctCount} of {result.answeredCount} correct
             </div>
-            <div className="text-xs text-app-text-muted mt-0.5">
+            <div className="mt-0.5 text-xs text-app-text-muted">
               {result.remainingCount === 1
                 ? "1 question is still on your review list."
                 : `${result.remainingCount} questions are still on your review list.`}{" "}
@@ -268,8 +268,8 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       )}
 
       {submitError && (
-        <p className="mt-4 text-sm text-app-danger-solid flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <p className="mt-4 flex items-center gap-2 text-sm text-app-danger-solid">
+          <AlertCircle className="h-4 w-4 shrink-0" />
           {submitError}
         </p>
       )}

@@ -1,4 +1,4 @@
-import { ApiError } from './apiClient';
+import { ApiError } from "./apiClient";
 
 /**
  * Extracts a human-readable message from a service error.
@@ -9,16 +9,16 @@ import { ApiError } from './apiClient';
  * format hint vs. a generic "failed to delete").
  */
 export function parseApiError(error: unknown, fallback: string): string {
-    if (!(error instanceof ApiError)) {
-        return error instanceof Error ? error.message : 'An unexpected error occurred.';
-    }
-    try {
-        const body = JSON.parse(error.message) as { message?: string };
-        if (body.message) return body.message;
-    } catch {
-        // Body wasn't JSON — fall through to the caller-provided fallback.
-    }
-    return fallback;
+  if (!(error instanceof ApiError)) {
+    return error instanceof Error ? error.message : "An unexpected error occurred.";
+  }
+  try {
+    const body = JSON.parse(error.message) as { message?: string };
+    if (body.message) return body.message;
+  } catch {
+    // Body wasn't JSON — fall through to the caller-provided fallback.
+  }
+  return fallback;
 }
 
 /**
@@ -28,7 +28,6 @@ export function parseApiError(error: unknown, fallback: string): string {
  * generic mutation-error text.
  */
 export function describeRefreshFailure(error: unknown): string {
-    const detail =
-        error instanceof Error ? error.message : 'Unknown error';
-    return `Saved on the server, but the token list couldn't be refreshed (${detail}). Click Refresh to retry.`;
+  const detail = error instanceof Error ? error.message : "Unknown error";
+  return `Saved on the server, but the token list couldn't be refreshed (${detail}). Click Refresh to retry.`;
 }

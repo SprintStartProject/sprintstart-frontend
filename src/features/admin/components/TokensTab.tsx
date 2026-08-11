@@ -1,15 +1,15 @@
 import { useState, type FormEvent } from "react";
-import { Key, Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Key, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
 import { ApiError } from "../../../services/apiClient";
 import {
   addGithubPat,
   deleteGithubPat,
   updateGithubPat,
 } from "../../../services/sources/githubService";
-import {
-  SegmentedControl,
-  type SegmentedControlOption,
-} from "../../../components/ui/SegmentedControl";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { JiraCredentialsSection } from "../../settings/components/jira/JiraCredentialsSection";
 
 const INVALID_TOKEN_MESSAGE =
@@ -17,9 +17,7 @@ const INVALID_TOKEN_MESSAGE =
 
 function parseApiError(error: unknown, validationFallback: string): string {
   if (!(error instanceof ApiError)) {
-    return error instanceof Error
-      ? error.message
-      : "An unexpected error occurred.";
+    return error instanceof Error ? error.message : "An unexpected error occurred.";
   }
   try {
     const body = JSON.parse(error.message) as { message?: string };
@@ -32,9 +30,9 @@ function parseApiError(error: unknown, validationFallback: string): string {
 
 type Provider = "github" | "jira";
 
-const PROVIDERS: ReadonlyArray<SegmentedControlOption<Provider>> = [
-  { id: "github", label: "GitHub", testId: "admin-tokens-segment-github" },
-  { id: "jira", label: "Jira", testId: "admin-tokens-segment-jira" },
+const PROVIDERS: SegmentedTabOption<Provider>[] = [
+  { value: "github", label: "GitHub", testId: "admin-tokens-segment-github" },
+  { value: "jira", label: "Jira", testId: "admin-tokens-segment-jira" },
 ];
 
 type TokensTabProps = {
@@ -47,11 +45,7 @@ type TokensTabProps = {
   userEmail?: string | null;
 };
 
-export function TokensTab({
-  tokenNames,
-  onRefresh,
-  userEmail,
-}: TokensTabProps) {
+export function TokensTab({ tokenNames, onRefresh, userEmail }: TokensTabProps) {
   const [provider, setProvider] = useState<Provider>("github");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -64,9 +58,7 @@ export function TokensTab({
   const [rotateError, setRotateError] = useState("");
   const [isRotating, setIsRotating] = useState(false);
 
-  const [pendingDeleteName, setPendingDeleteName] = useState<string | null>(
-    null,
-  );
+  const [pendingDeleteName, setPendingDeleteName] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
@@ -166,10 +158,11 @@ export function TokensTab({
 
   return (
     <div className="space-y-5">
-      <SegmentedControl
-        options={PROVIDERS}
+      <SegmentedTabs
         value={provider}
+        options={PROVIDERS}
         onChange={setProvider}
+        layoutId="admin-tokens-provider-pill"
         ariaLabel="Access token provider"
       />
 
@@ -183,14 +176,14 @@ export function TokensTab({
             </span>
 
             {!isAddOpen && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleAddOpen}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover sm:w-auto"
+                icon={<Plus className="h-4 w-4" />}
+                className="w-full sm:w-auto"
               >
-                <Plus className="h-4 w-4" />
                 Add Token
-              </button>
+              </Button>
             )}
           </div>
 
@@ -200,85 +193,48 @@ export function TokensTab({
               className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
             >
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-sm font-semibold text-app-text">
-                  New GitHub PAT
-                </span>
-                <button
-                  type="button"
+                <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   onClick={handleAddCancel}
                   disabled={isAdding}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                   aria-label="Cancel"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
 
               <div className="space-y-3">
-                <div>
-                  <label
-                    htmlFor="add-token-name"
-                    className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                  >
-                    Token name
-                  </label>
-                  <input
-                    id="add-token-name"
+                <Field label="Token name" controlId="add-token-name" disabled={isAdding}>
+                  <Input
                     value={addName}
                     onChange={(e) => setAddName(e.target.value)}
                     placeholder="e.g. default"
                     required
-                    disabled={isAdding}
-                    className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                   />
-                </div>
+                </Field>
 
-                <div>
-                  <label
-                    htmlFor="add-token-value"
-                    className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                  >
-                    Token (ghp_...)
-                  </label>
-                  <input
-                    id="add-token-value"
+                <Field label="Token (ghp_...)" controlId="add-token-value" disabled={isAdding}>
+                  <Input
                     type="password"
                     value={addToken}
                     onChange={(e) => setAddToken(e.target.value)}
                     placeholder="ghp_... or github_pat_..."
                     required
-                    disabled={isAdding}
-                    className="h-11 w-full rounded-xl border border-app-border bg-app-surface px-4 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
                   />
-                </div>
+                </Field>
 
-                {addError && (
-                  <p className="text-sm text-app-danger-text">{addError}</p>
-                )}
+                {addError && <p className="text-sm text-app-danger-text">{addError}</p>}
 
                 <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={handleAddCancel}
-                    disabled={isAdding}
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-                  >
+                  <Button variant="secondary" onClick={handleAddCancel} disabled={isAdding}>
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isAdding}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isAdding ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Adding...
-                      </>
-                    ) : (
-                      "Add Token"
-                    )}
-                  </button>
+                  </Button>
+                  <Button variant="primary" type="submit" loading={isAdding}>
+                    {isAdding ? "Adding..." : "Add Token"}
+                  </Button>
                 </div>
               </div>
             </form>
@@ -289,12 +245,9 @@ export function TokensTab({
               <div className="flex flex-col items-center gap-3 text-center">
                 <Key className="h-8 w-8 text-app-text-disabled" />
                 <div>
-                  <p className="text-base font-medium text-app-text">
-                    No tokens yet
-                  </p>
+                  <p className="text-base font-medium text-app-text">No tokens yet</p>
                   <p className="mt-1 text-sm text-app-text-muted">
-                    Add a GitHub Personal Access Token to enable repository
-                    ingestion.
+                    Add a GitHub Personal Access Token to enable repository ingestion.
                   </p>
                 </div>
               </div>
@@ -302,42 +255,37 @@ export function TokensTab({
           ) : tokenNames.length > 0 ? (
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
               {tokenNames.map((name) => (
-                <div
-                  key={name}
-                  className="border-b border-app-border last:border-b-0"
-                >
+                <div key={name} className="border-b border-app-border last:border-b-0">
                   <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-app-border bg-app-surface-muted">
                       <Key className="h-4 w-4 text-app-text-muted" />
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="break-words text-sm font-semibold text-app-text">
-                        {name}
-                      </p>
-                      <p className="text-xs text-app-text-muted">
-                        GitHub PAT (classic)
-                      </p>
+                      <p className="text-sm font-semibold break-words text-app-text">{name}</p>
+                      <p className="text-xs text-app-text-muted">GitHub PAT (classic)</p>
                     </div>
 
                     {pendingDeleteName !== name && rotatingName !== name && (
                       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-                        <button
-                          type="button"
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => handleRotateOpen(name)}
-                          className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-3 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text sm:flex-none"
+                          icon={<RefreshCw className="h-3.5 w-3.5" />}
+                          className="flex-1 sm:flex-none"
                         >
-                          <RefreshCw className="h-3.5 w-3.5" />
                           Rotate
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button
+                          variant="dangerSoft"
+                          size="sm"
                           onClick={() => handleDeleteRequest(name)}
-                          className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-app-danger-bg bg-app-danger-bg px-3 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-solid hover:text-white sm:flex-none"
+                          icon={<Trash2 className="h-3.5 w-3.5" />}
+                          className="flex-1 sm:flex-none"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -345,38 +293,29 @@ export function TokensTab({
                   {pendingDeleteName === name && (
                     <div className="border-t border-app-border bg-app-danger-bg px-5 py-4">
                       <p className="mb-3 text-sm text-app-danger-text">
-                        Delete <strong>{name}</strong>? This cannot be undone
-                        and may break connected repositories.
+                        Delete <strong>{name}</strong>? This cannot be undone and may break
+                        connected repositories.
                       </p>
                       {deleteError && (
-                        <p className="mb-2 text-sm text-app-danger-text">
-                          {deleteError}
-                        </p>
+                        <p className="mb-2 text-sm text-app-danger-text">{deleteError}</p>
                       )}
                       <div className="flex flex-col gap-2 sm:flex-row">
-                        <button
-                          type="button"
+                        <Button
+                          variant="danger"
+                          size="sm"
                           onClick={() => void handleDeleteConfirm()}
-                          disabled={isDeleting}
-                          className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-app-danger-solid px-4 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                          loading={isDeleting}
                         >
-                          {isDeleting ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              Deleting...
-                            </>
-                          ) : (
-                            "Delete"
-                          )}
-                        </button>
-                        <button
-                          type="button"
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={handleDeleteCancel}
                           disabled={isDeleting}
-                          className="inline-flex h-9 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -388,66 +327,49 @@ export function TokensTab({
                     >
                       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-app-text">
-                            Rotate token
-                          </p>
+                          <p className="text-sm font-semibold text-app-text">Rotate token</p>
                         </div>
                       </div>
 
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                        <div className="min-w-0 flex-1">
-                          <label
-                            htmlFor="rotate-token-value"
-                            className="mb-1.5 block text-xs font-medium text-app-text-muted"
-                          >
-                            New GitHub PAT
-                          </label>
-                          <div className="relative">
-                            <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-disabled" />
-                            <input
-                              id="rotate-token-value"
-                              type="password"
-                              value={rotateToken}
-                              onChange={(event) =>
-                                setRotateToken(event.target.value)
-                              }
-                              placeholder="ghp_... or github_pat_..."
-                              required
-                              disabled={isRotating}
-                              className="h-11 w-full rounded-xl border border-app-brand-border bg-app-surface pl-11 pr-4 text-sm font-medium text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:opacity-60"
-                            />
-                          </div>
-                        </div>
+                        <Field
+                          label="New GitHub PAT"
+                          controlId="rotate-token-value"
+                          disabled={isRotating}
+                          className="min-w-0 flex-1"
+                        >
+                          <Input
+                            type="password"
+                            value={rotateToken}
+                            onChange={(event) => setRotateToken(event.target.value)}
+                            placeholder="ghp_... or github_pat_..."
+                            required
+                            icon={<Key className="h-4 w-4" />}
+                          />
+                        </Field>
 
                         <div className="grid grid-cols-2 gap-2 xl:flex xl:shrink-0">
-                          <button
+                          <Button
+                            variant="primary"
                             type="submit"
-                            disabled={isRotating}
-                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-4 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                            loading={isRotating}
+                            icon={<RefreshCw className="h-4 w-4" />}
                           >
-                            {isRotating ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4" />
-                            )}
                             {isRotating ? "Rotating..." : "Confirm"}
-                          </button>
+                          </Button>
 
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
                             onClick={handleRotateCancel}
                             disabled={isRotating}
-                            className="inline-flex h-11 items-center justify-center rounded-xl border border-app-border bg-app-surface px-4 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
                           >
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       </div>
 
                       {rotateError && (
-                        <p className="mt-3 text-sm text-app-danger-text">
-                          {rotateError}
-                        </p>
+                        <p className="mt-3 text-sm text-app-danger-text">{rotateError}</p>
                       )}
                     </form>
                   )}

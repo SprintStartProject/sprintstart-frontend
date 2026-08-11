@@ -29,22 +29,19 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
     name: "GitHub Repository",
     type: "GitHub",
     icon: GitBranch,
-    description:
-      "Indexes repositories, README files, pull requests, issues and source files.",
+    description: "Indexes repositories, README files, pull requests, issues and source files.",
   },
   JIRA: {
     name: "Jira Project Board",
     type: "Jira",
     icon: Database,
-    description:
-      "Indexes Jira issues, tasks, epics, comments and project-related metadata.",
+    description: "Indexes Jira issues, tasks, epics, comments and project-related metadata.",
   },
   UPLOAD: {
     name: "Uploaded Documentation",
     type: "Upload",
     icon: FileText,
-    description:
-      "Indexes manually uploaded documentation, markdown files and project knowledge.",
+    description: "Indexes manually uploaded documentation, markdown files and project knowledge.",
   },
 };
 
@@ -57,9 +54,7 @@ export const DETAILS_RUN_LIMIT = 10;
  * are shown per repository rather than per source system — the Data Ingestion
  * page overlays the project source's own id and display name on top of it.
  */
-export function createSourceFromInstance(
-  instance: SourceInstanceIngestionStatus,
-): DataSource {
+export function createSourceFromInstance(instance: SourceInstanceIngestionStatus): DataSource {
   const meta = SOURCE_META[instance.sourceSystem];
   const backendStatus: BackendProjectSourceStatus =
     instance.enabled === false ? "DISABLED" : instance.connectionStatus;
@@ -279,9 +274,7 @@ export function deriveSourceStatus({
   // must NOT count as syncing, otherwise the source (and the "Syncing now" KPI)
   // reads as busy while nothing is running.
   const isSyncing =
-    backendStatus === "UPDATING" ||
-    backendStatus === "INDEXING" ||
-    isRunInProgress(runStatus);
+    backendStatus === "UPDATING" || backendStatus === "INDEXING" || isRunInProgress(runStatus);
 
   if (isSyncing) {
     return {
@@ -347,9 +340,7 @@ export function deriveSourceStatus({
  * disabled source (or one under a disabled connector) reads as not-connected;
  * syncing, out-of-date and needs-attention are all still connected states.
  */
-export function deriveConnectionStatus(
-  source: DataSource,
-): SourceStatusPresentation {
+export function deriveConnectionStatus(source: DataSource): SourceStatusPresentation {
   if (source.statusView.state === "disabled") {
     return source.statusView;
   }
@@ -370,16 +361,10 @@ export function deriveConnectionStatus(
  * they pass through; the connection states (connected/disabled) collapse to the
  * freshness the source last reached — "Synced" once it has run, else "Not synced".
  */
-export function deriveSyncStatus(
-  source: DataSource,
-): SourceStatusPresentation {
+export function deriveSyncStatus(source: DataSource): SourceStatusPresentation {
   const view = source.statusView;
 
-  if (
-    view.state === "syncing" ||
-    view.state === "stale" ||
-    view.state === "attention"
-  ) {
+  if (view.state === "syncing" || view.state === "stale" || view.state === "attention") {
     return view;
   }
 
@@ -414,9 +399,7 @@ export function getSourceStatusLabel(
   return "Connected";
 }
 
-export function getBackendSourceStatusLabel(
-  backendStatus?: BackendProjectSourceStatus,
-) {
+export function getBackendSourceStatusLabel(backendStatus?: BackendProjectSourceStatus) {
   switch (backendStatus) {
     case "CONNECTED":
       return "Connected";
@@ -511,14 +494,11 @@ export function formatJiraInstanceDomain(instanceUrl: string): string {
  * (the repository's full name) and Jira the instance URL. Runs whose source is
  * no longer connected won't be in the map and fall back to the raw reference.
  */
-export function buildRunSourceLabels(
-  sources: DataSource[],
-): Map<string, string> {
+export function buildRunSourceLabels(sources: DataSource[]): Map<string, string> {
   const labels = new Map<string, string>();
 
   sources.forEach((source) => {
-    const ref =
-      source.jiraInstance?.instanceUrl ?? source.githubRepository?.fullName;
+    const ref = source.jiraInstance?.instanceUrl ?? source.githubRepository?.fullName;
     if (ref && !labels.has(ref)) {
       labels.set(ref, source.name);
     }
@@ -533,10 +513,7 @@ export function buildRunSourceLabels(
  * back to the raw `sourceId` the backend persists on the run, and finally to the
  * source-system label for uploads and legacy runs that carry no `sourceId`.
  */
-export function getRunSourceLabel(
-  run: IngestionRun,
-  labelBySourceRef?: Map<string, string>,
-) {
+export function getRunSourceLabel(run: IngestionRun, labelBySourceRef?: Map<string, string>) {
   if (run.sourceId) {
     return labelBySourceRef?.get(run.sourceId) ?? run.sourceId;
   }
@@ -559,10 +536,7 @@ export function formatDateTime(value: string | null) {
   }).format(date);
 }
 
-export function formatRunFinishedAt(
-  value: string | null,
-  status: IngestionRunStatus,
-) {
+export function formatRunFinishedAt(value: string | null, status: IngestionRunStatus) {
   if (value) return formatDateTime(value);
   if (isRunInProgress(status)) return "In progress";
   return "Not reported";

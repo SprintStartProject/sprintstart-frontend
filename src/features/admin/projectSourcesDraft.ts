@@ -13,11 +13,7 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
  * of failing the whole batch.
  */
 
-export type DraftSourceStatus =
-  | "pending"
-  | "connecting"
-  | "connected"
-  | "failed";
+export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
 export type DraftSource = {
   /** Client-side identity; the backend never sees this. */
@@ -81,10 +77,7 @@ export function isSameRepository(left: DraftSource, right: DraftSource) {
 }
 
 /** Appends a source unless the same repository is already staged. */
-export function addDraftSource(
-  sources: DraftSource[],
-  source: DraftSource,
-): DraftSource[] {
+export function addDraftSource(sources: DraftSource[], source: DraftSource): DraftSource[] {
   if (sources.some((current) => isSameRepository(current, source))) {
     return sources;
   }
@@ -92,10 +85,7 @@ export function addDraftSource(
   return [...sources, source];
 }
 
-export function removeDraftSource(
-  sources: DraftSource[],
-  sourceId: string,
-): DraftSource[] {
+export function removeDraftSource(sources: DraftSource[], sourceId: string): DraftSource[] {
   return sources.filter((source) => source.id !== sourceId);
 }
 
@@ -104,9 +94,7 @@ function patchDraftSource(
   sourceId: string,
   patch: Partial<DraftSource>,
 ): DraftSource[] {
-  return sources.map((source) =>
-    source.id === sourceId ? { ...source, ...patch } : source,
-  );
+  return sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source));
 }
 
 export function countUnconnectedSources(sources: DraftSource[]): number {
@@ -161,17 +149,13 @@ export async function connectDraftSources(
         });
       }
 
-      publish(
-        patchDraftSource(currentSources, source.id, { status: "connected" }),
-      );
+      publish(patchDraftSource(currentSources, source.id, { status: "connected" }));
     } catch (error) {
       publish(
         patchDraftSource(currentSources, source.id, {
           status: "failed",
           errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Repository could not be connected.",
+            error instanceof Error ? error.message : "Repository could not be connected.",
         }),
       );
     }

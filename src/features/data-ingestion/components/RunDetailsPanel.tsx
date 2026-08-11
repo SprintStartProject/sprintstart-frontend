@@ -36,13 +36,11 @@ type RunDetailsPanelProps = {
 type Tone = "success" | "running" | "warning" | "neutral";
 
 const TONE_CHIP: Record<Tone, string> = {
-  success:
-    "border border-app-success-border bg-app-success-bg text-app-success-text",
+  success: "border border-app-success-border bg-app-success-bg text-app-success-text",
   running: "border border-app-brand-border bg-app-brand-soft text-app-brand-text",
   // Danger palette: keeps failure labels red on red instead of amber-yellow on a
   // red-looking background.
-  warning:
-    "border border-app-danger-border bg-app-danger-bg text-app-danger-text",
+  warning: "border border-app-danger-border bg-app-danger-bg text-app-danger-text",
   neutral: "border border-app-border bg-app-neutral-bg text-app-neutral-text",
 };
 
@@ -52,11 +50,7 @@ const TONE_CHIP: Record<Tone, string> = {
  * (fetch → save → AI index) so the local run status and the separate AI-index
  * stage are legible at a glance rather than as two competing badges.
  */
-export function RunDetailsPanel({
-  run,
-  sourceLabel,
-  onClose,
-}: RunDetailsPanelProps) {
+export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelProps) {
   const runTone = getRunStatusTone(run.status) as Tone;
   const aiLabel = getAiSyncStatusLabel(run.aiSyncStatus);
   const duration = formatDuration(run.startedAt, run.finishedAt, run.status);
@@ -89,12 +83,8 @@ export function RunDetailsPanel({
     >
       {run.failureReason && (
         <div className="mb-6 rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3">
-          <p className="text-sm font-semibold text-app-warning-text">
-            This run failed
-          </p>
-          <p className="mt-1 wrap-break-word text-sm text-app-text-muted">
-            {run.failureReason}
-          </p>
+          <p className="text-sm font-semibold text-app-warning-text">This run failed</p>
+          <p className="mt-1 text-sm wrap-break-word text-app-text-muted">{run.failureReason}</p>
         </div>
       )}
 
@@ -126,9 +116,7 @@ export function RunDetailsPanel({
       <Section title="Timing">
         <dl className="overflow-hidden rounded-xl border border-app-border">
           <InfoRow label="Repository" value={repoLabel} />
-          {originRow && (
-            <InfoRow label={originRow.label} value={originRow.value} />
-          )}
+          {originRow && <InfoRow label={originRow.label} value={originRow.value} />}
           <InfoRow label="Started" value={formatDateTime(run.startedAt)} />
           <InfoRow
             label="Finished"
@@ -153,7 +141,7 @@ export function RunDetailsPanel({
                 key={`${item.artifactIdentifier}-${item.reason}`}
                 className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
               >
-                <p className="wrap-break-word text-sm font-medium text-app-warning-text">
+                <p className="text-sm font-medium wrap-break-word text-app-warning-text">
                   {item.artifactIdentifier}
                 </p>
                 <p className="mt-1 text-sm text-app-text-muted">{item.reason}</p>
@@ -173,13 +161,9 @@ export function RunDetailsPanel({
  * in `run.sourceId`). Both are already carried on the run, so no extra fetch is
  * needed. Returns null for uploads and runs with no attributable origin.
  */
-function buildOriginRow(
-  run: IngestionRun,
-): { label: string; value: string } | null {
+function buildOriginRow(run: IngestionRun): { label: string; value: string } | null {
   if (run.sourceSystem === "JIRA") {
-    return run.sourceId
-      ? { label: "Domain", value: formatJiraInstanceDomain(run.sourceId) }
-      : null;
+    return run.sourceId ? { label: "Domain", value: formatJiraInstanceDomain(run.sourceId) } : null;
   }
 
   if (run.sourceSystem === "GITHUB") {
@@ -195,16 +179,14 @@ type StageInfo = { title: string; meta: string; state: StageState };
 
 function buildStages(run: IngestionRun): StageInfo[] {
   const running = isRunInProgress(run.status);
-  const failedNote =
-    run.failedCount > 0 ? `, ${formatNumber(run.failedCount)} failed` : "";
+  const failedNote = run.failedCount > 0 ? `, ${formatNumber(run.failedCount)} failed` : "";
 
   const fetchStage: StageInfo = {
     title: `Fetched from ${getSourceLabel(run.sourceSystem)}`,
     meta: `${formatNumber(run.ingestedCount + run.failedCount)} items pulled`,
     state: "ok",
   };
-  const deletedNote =
-    run.deletedCount > 0 ? `, ${formatNumber(run.deletedCount)} deleted` : "";
+  const deletedNote = run.deletedCount > 0 ? `, ${formatNumber(run.deletedCount)} deleted` : "";
   const saveStage: StageInfo = {
     // A run-level failure reason explains the stage better than the counters do.
     meta:
@@ -263,7 +245,7 @@ function Chip({
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-8 border-t border-app-border pt-6 first:mt-0 first:border-t-0 first:pt-0">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-app-text-subtle">
+      <h3 className="mb-3 text-sm font-semibold tracking-wide text-app-text-subtle uppercase">
         {title}
       </h3>
       {children}
@@ -333,20 +315,12 @@ function Stage({ stage, isLast }: { stage: StageInfo; isLast: boolean }) {
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5 first:border-t-0">
       <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
       <dd
-        className={`min-w-0 break-words text-[13px] font-semibold text-app-text ${
+        className={`min-w-0 text-[13px] font-semibold break-words text-app-text ${
           mono ? "font-mono text-xs font-medium" : ""
         }`}
       >

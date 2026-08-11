@@ -1,5 +1,6 @@
-import { Loader2, Trash2, Users } from "lucide-react";
+import { Trash2, Users } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { Button } from "../../../components/ui/Button";
 import type { ProjectUser, ProjectUserSummary } from "../types";
 import { RoleBadgeList } from "./RoleBadgeList";
 
@@ -11,11 +12,7 @@ type ProjectUserListProps = {
 
 function getProjectUserDisplayName(user: ProjectUser | ProjectUserSummary) {
   if ("firstName" in user && "lastName" in user) {
-    return (
-      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.username ||
-      user.email
-    );
+    return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || user.email;
   }
 
   return user.username || user.email;
@@ -60,12 +57,8 @@ export function ProjectUserList({
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-app-text">
-                  {displayName}
-                </p>
-                <p className="truncate text-xs text-app-text-muted">
-                  {user.email}
-                </p>
+                <p className="truncate text-sm font-semibold text-app-text">{displayName}</p>
+                <p className="truncate text-xs text-app-text-muted">{user.email}</p>
               </div>
 
               <div className="flex w-full flex-wrap items-center gap-2 rounded-lg px-0 py-1 sm:w-auto sm:shrink-0 sm:gap-3 sm:px-3 sm:py-2">
@@ -87,19 +80,18 @@ export function ProjectUserList({
               </div>
 
               {onRemoveUser && (
-                <button
-                  type="button"
+                <Button
+                  variant="dangerGhost"
+                  size="sm"
+                  iconOnly
                   onClick={() => onRemoveUser(user.id)}
                   disabled={pendingUserId !== null}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-app-text-disabled transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-60"
+                  loading={isPending}
+                  className="shrink-0"
                   aria-label={`Remove ${displayName} from project`}
                 >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </button>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               )}
             </div>
           </div>

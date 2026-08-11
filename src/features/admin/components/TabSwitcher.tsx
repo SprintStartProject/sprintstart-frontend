@@ -1,52 +1,36 @@
-import { Key, Layers, Users } from "lucide-react";
-import type { AdminTab } from "../types";
+import { Key, Layers, Users, type LucideIcon } from "lucide-react";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import { ADMIN_TAB_ORDER, type AdminTab } from "../types";
 
-type TabSwitcherProps = {
-    activeTab: AdminTab;
-    onChange: (tab: AdminTab) => void;
+const TAB_META: Record<AdminTab, { label: string; icon: LucideIcon }> = {
+  users: { label: "Users", icon: Users },
+  projects: { label: "Projects", icon: Layers },
+  tokens: { label: "Tokens", icon: Key },
 };
 
+type TabSwitcherProps = {
+  activeTab: AdminTab;
+  onChange: (tab: AdminTab) => void;
+};
+
+/**
+ * Section navigation for the Access Management page. Each tab swaps the whole
+ * panel below it.
+ */
 export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
-    return (
-        <div className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-app-border bg-app-surface-muted p-1 sm:w-auto sm:flex">
-            <button
-                type="button"
-                onClick={() => onChange("users")}
-                className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
-                    activeTab === "users"
-                        ? "bg-app-surface text-app-text shadow-sm"
-                        : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                }`}
-            >
-                <Users className="h-4 w-4" />
-                Users
-            </button>
+  const options: SegmentedTabOption<AdminTab>[] = ADMIN_TAB_ORDER.map((key) => {
+    const { label, icon: Icon } = TAB_META[key];
+    return { value: key, label, icon: <Icon className="h-4 w-4" /> };
+  });
 
-            <button
-                type="button"
-                onClick={() => onChange("projects")}
-                className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
-                    activeTab === "projects"
-                        ? "bg-app-surface text-app-text shadow-sm"
-                        : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                }`}
-            >
-                <Layers className="h-4 w-4" />
-                Projects
-            </button>
-
-            <button
-                type="button"
-                onClick={() => onChange("tokens")}
-                className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
-                    activeTab === "tokens"
-                        ? "bg-app-surface text-app-text shadow-sm"
-                        : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                }`}
-            >
-                <Key className="h-4 w-4" />
-                Tokens
-            </button>
-        </div>
-    );
+  return (
+    <SegmentedTabs
+      value={activeTab}
+      options={options}
+      onChange={onChange}
+      layoutId="admin-tab-pill"
+      ariaLabel="Admin sections"
+      className="w-full sm:w-auto"
+    />
+  );
 }

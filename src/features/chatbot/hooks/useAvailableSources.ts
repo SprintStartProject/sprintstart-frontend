@@ -13,10 +13,10 @@ const ALWAYS_AVAILABLE: readonly SourceSystem[] = ["UPLOAD"];
  * lowercase (`github`, `jira`); the filter values are the uppercase enum constants.
  */
 function toSourceSystem(connectorId: string): SourceSystem | null {
-    const candidate = connectorId.toUpperCase();
-    return candidate === "GITHUB" || candidate === "JIRA" || candidate === "UPLOAD"
-        ? candidate
-        : null;
+  const candidate = connectorId.toUpperCase();
+  return candidate === "GITHUB" || candidate === "JIRA" || candidate === "UPLOAD"
+    ? candidate
+    : null;
 }
 
 /**
@@ -31,34 +31,34 @@ function toSourceSystem(connectorId: string): SourceSystem | null {
  * optional refinement, and blocking the composer over it would be worse than offering less.
  */
 export function useAvailableSources(): { sources: SourceSystem[]; loading: boolean } {
-    const [sources, setSources] = useState<SourceSystem[]>([...ALWAYS_AVAILABLE]);
-    const [loading, setLoading] = useState(true);
+  const [sources, setSources] = useState<SourceSystem[]>([...ALWAYS_AVAILABLE]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-        void (async () => {
-            try {
-                const connectors = await connectorService.listConnectors();
-                if (cancelled) return;
+    void (async () => {
+      try {
+        const connectors = await connectorService.listConnectors();
+        if (cancelled) return;
 
-                const enabled = connectors
-                    .filter(connector => connector.enabled)
-                    .map(connector => toSourceSystem(connector.id))
-                    .filter((system): system is SourceSystem => system !== null);
+        const enabled = connectors
+          .filter((connector) => connector.enabled)
+          .map((connector) => toSourceSystem(connector.id))
+          .filter((system): system is SourceSystem => system !== null);
 
-                setSources([...new Set([...enabled, ...ALWAYS_AVAILABLE])]);
-            } catch (e) {
-                console.error("Failed to load connectors for the chat source filter", e);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
+        setSources([...new Set([...enabled, ...ALWAYS_AVAILABLE])]);
+      } catch (e) {
+        console.error("Failed to load connectors for the chat source filter", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    return { sources, loading };
+  return { sources, loading };
 }

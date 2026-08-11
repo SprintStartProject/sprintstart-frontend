@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { ChevronsUpDown, FolderKanban } from "lucide-react";
 import { useProjectContext } from "../useProjectContext";
 import { ProjectSwitcherModal } from "./ProjectSwitcherModal";
+import { hoverSpringToken } from "../../../styles/tokens";
 
 type ProjectSwitcherProps = {
   className?: string;
@@ -67,30 +69,31 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
 
   return (
     <div className={className}>
-      <button
+      <motion.button
         type="button"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         aria-label={`Switch project. Current project: ${triggerLabel}`}
         onClick={() => setIsOpen(true)}
-        className="group flex h-[52px] w-full items-center gap-[10px] rounded-xl border border-app-border bg-app-surface px-[10px] text-left transition-all hover:border-app-border-strong hover:bg-app-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        transition={hoverSpringToken}
+        className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-brand-soft transition-colors group-hover:bg-app-brand group-hover:text-white">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-app-brand-soft transition-colors group-hover:bg-app-brand group-hover:text-white">
           <FolderKanban className="h-[18px] w-[18px] text-app-brand transition-colors group-hover:text-white" />
         </span>
 
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold text-app-text">
-            {triggerLabel}
-          </span>
+          <span className="truncate text-sm font-semibold text-app-text">{triggerLabel}</span>
 
-          <span className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-app-text-muted">
+          <span className="truncate text-[10px] font-medium tracking-[0.18em] text-app-text-muted uppercase">
             {triggerHint}
           </span>
         </span>
 
         <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 text-app-text-muted transition-colors group-hover:text-app-text" />
-      </button>
+      </motion.button>
 
       <ProjectSwitcherModal
         isOpen={isOpen}

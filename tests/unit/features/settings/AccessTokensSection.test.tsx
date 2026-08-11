@@ -79,9 +79,7 @@ describe("AccessTokensSection", () => {
 
     await user.click(screen.getByTestId("access-tokens-segment-jira"));
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("Jira credentials")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText("Jira credentials")).toBeInTheDocument());
     expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
 
     await user.click(screen.getByTestId("access-tokens-segment-github"));

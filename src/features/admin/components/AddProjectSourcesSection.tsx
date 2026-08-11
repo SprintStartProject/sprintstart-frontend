@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { getGithubPatNames } from "../../../services/sources/githubService";
 import {
   addDraftSource,
@@ -58,18 +59,14 @@ export function AddProjectSourcesSection({
     setStatusMessage("");
 
     try {
-      const result = await connectDraftSources(
-        projectId,
-        sourcesToConnect,
-        (progressSources) =>
-          setSources((current) =>
-            current.map(
-              (currentSource) =>
-                progressSources.find(
-                  (progressSource) => progressSource.id === currentSource.id,
-                ) ?? currentSource,
-            ),
+      const result = await connectDraftSources(projectId, sourcesToConnect, (progressSources) =>
+        setSources((current) =>
+          current.map(
+            (currentSource) =>
+              progressSources.find((progressSource) => progressSource.id === currentSource.id) ??
+              currentSource,
           ),
+        ),
       );
 
       if (result.some((source) => source.status === "connected")) {
@@ -97,7 +94,7 @@ export function AddProjectSourcesSection({
 
   return (
     <div>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+      <p className="mb-3 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
         Add sources
       </p>
 
@@ -105,35 +102,26 @@ export function AddProjectSourcesSection({
         sources={sources}
         tokenNames={tokenNames}
         disabled={isBusy}
-        onAdd={(source) =>
-          setSources((current) => addDraftSource(current, source))
-        }
-        onRemove={(sourceId) =>
-          setSources((current) => removeDraftSource(current, sourceId))
-        }
+        onAdd={(source) => setSources((current) => addDraftSource(current, source))}
+        onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
         onRetry={retrySource}
       />
 
-      {statusMessage && (
-        <p className="mt-3 text-sm text-app-text-muted">{statusMessage}</p>
-      )}
+      {statusMessage && <p className="mt-3 text-sm text-app-text-muted">{statusMessage}</p>}
 
       {pendingCount > 0 && (
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={() => void connectSources(sources)}
           disabled={isBusy}
-          className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-app-brand bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:border-app-brand-hover hover:bg-app-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60"
+          loading={isConnecting}
+          icon={
+            hasFailedSources(sources) ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />
+          }
+          className="mt-4"
         >
-          {isConnecting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : hasFailedSources(sources) ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
           Connect {pendingCount} {pendingCount === 1 ? "repository" : "repositories"}
-        </button>
+        </Button>
       )}
     </div>
   );

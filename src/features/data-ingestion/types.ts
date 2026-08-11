@@ -13,12 +13,7 @@ export type BackendProjectSourceStatus =
   | "ERROR"
   | (string & {});
 
-export type IngestionRunStatus =
-  | "CONNECTED"
-  | "RUNNING"
-  | "COMPLETED"
-  | "PARTIAL"
-  | "FAILED";
+export type IngestionRunStatus = "CONNECTED" | "RUNNING" | "COMPLETED" | "PARTIAL" | "FAILED";
 
 /**
  * The connection health a per-repo ingestion source reports (endpoint
@@ -26,23 +21,14 @@ export type IngestionRunStatus =
  * than {@link BackendProjectSourceStatus}; every value here is also a member of
  * that broader union, so it flows through the same status-derivation helpers.
  */
-export type ConnectionStatus =
-  | "CONNECTED"
-  | "UPDATING"
-  | "OUT_OF_DATE"
-  | "FAILED"
-  | "DISABLED";
+export type ConnectionStatus = "CONNECTED" | "UPDATING" | "OUT_OF_DATE" | "FAILED" | "DISABLED";
 
 /**
  * Whether a run's artifacts have actually reached the AI service's index, separate
  * from `IngestionRunStatus`. A run can show COMPLETED (fetched and saved locally)
  * while this is still PENDING or has moved to FAILED -- that gap is why this exists.
  */
-export type AiSyncStatus =
-  | "NOT_APPLICABLE"
-  | "PENDING"
-  | "SUCCEEDED"
-  | "FAILED";
+export type AiSyncStatus = "NOT_APPLICABLE" | "PENDING" | "SUCCEEDED" | "FAILED";
 
 export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST";
 
@@ -211,6 +197,13 @@ export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
  * other two narrow to a single section.
  */
 export type SectionKey = "overview" | "sources" | "runs";
+
+/**
+ * Left-to-right order of the section filter. Single source of truth: the filter
+ * renders in this order and the page derives the slide direction from it, so
+ * the content always travels the same way the active pill does.
+ */
+export const SECTION_ORDER: SectionKey[] = ["overview", "sources", "runs"];
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
 

@@ -163,15 +163,15 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
           {!result.passed && (
             <button
               onClick={retry}
-              className="px-5 py-2.5 rounded-xl border border-app-border hover:border-app-border-strong text-app-text-muted hover:text-app-text text-sm font-medium transition-all flex items-center justify-center gap-2"
+              className="flex items-center justify-center gap-2 rounded-xl border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="h-4 w-4" />
               Try again
             </button>
           )}
           <button
             onClick={close}
-            className="px-6 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all"
+            className="rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover"
           >
             Done
           </button>
@@ -180,9 +180,9 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
         <button
           onClick={() => void submit()}
           disabled={!allAnswered || submitting}
-          className="px-6 py-2.5 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-2 rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           Submit answers
         </button>
       )
@@ -206,13 +206,13 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       {/* Loading / load error */}
       {!check && !loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-app-text-muted">
-          <Loader2 className="w-6 h-6 animate-spin text-app-brand" />
+          <Loader2 className="h-6 w-6 animate-spin text-app-brand" />
           <p className="text-sm">Loading knowledge check...</p>
         </div>
       )}
       {loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <AlertCircle className="w-8 h-8 text-app-danger-solid" />
+          <AlertCircle className="h-8 w-8 text-app-danger-solid" />
           <p className="text-sm text-app-text-muted">{loadError}</p>
         </div>
       )}
@@ -226,11 +226,11 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
         />
       )}
       {result && !result.passed && (
-        <div className="mb-6 rounded-2xl border border-app-danger-solid/30 bg-app-surface-muted p-4 flex items-center gap-3">
-          <XCircle className="w-6 h-6 shrink-0 text-app-danger-solid" />
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-app-danger-solid/30 bg-app-surface-muted p-4">
+          <XCircle className="h-6 w-6 shrink-0 text-app-danger-solid" />
           <div>
-            <div className="font-semibold text-app-text text-sm">Not passed yet</div>
-            <div className="text-xs text-app-text-muted mt-0.5">
+            <div className="text-sm font-semibold text-app-text">Not passed yet</div>
+            <div className="mt-0.5 text-xs text-app-text-muted">
               {result.correctCount}/{result.questionCount} correct (
               {Math.round((result.correctCount / Math.max(result.questionCount, 1)) * 100)}% ·{" "}
               {result.requiredPercent}% required). Review the answers below and try again.
@@ -257,8 +257,8 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       )}
 
       {submitError && (
-        <p className="mt-4 text-sm text-app-danger-solid flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <p className="mt-4 flex items-center gap-2 text-sm text-app-danger-solid">
+          <AlertCircle className="h-4 w-4 shrink-0" />
           {submitError}
         </p>
       )}

@@ -4,6 +4,7 @@ Shared, committed guide for humans and AI agents working in `sprintstart-fronten
 Keep it current: if a rule here stops matching reality, fix the rule in the same PR.
 
 > **Related docs**
+>
 > - [docs/FRONTEND_ARCHITECTURE.md](./docs/FRONTEND_ARCHITECTURE.md) — system architecture (frontend-only; replaces the frontend section of root ARCHITECTURE.md): feature-first structure, routing, state, design system, animation.
 > - [docs/FRONTEND_CODING_STANDARDS.md](./docs/FRONTEND_CODING_STANDARDS.md) — TS / React / Tailwind / a11y rules (frontend-only; replaces the frontend section of root CODING_STANDARDS.md).
 > - [docs/FRONTEND_DOCUMENTATION_GUIDELINES.md](./docs/FRONTEND_DOCUMENTATION_GUIDELINES.md) — the full, committed documentation standards (summarized in §6).
@@ -28,18 +29,19 @@ React SPA, feature-first architecture, with Keycloak SSO and a Framer Motion ani
 
 Copy `.env.example` → `.env` and point Keycloak at the right IAM instance before running.
 
-| Purpose | Command |
-|---|---|
-| Install | `npm install` |
-| Dev server (`:5173`) | `npm run dev` |
-| Production build | `npm run build` (runs `tsc -b` + `vite build`) |
-| Lint | `npm run lint` |
-| Unit tests | `npm run test` |
-| Storybook | `npm run storybook` |
-| Keycloak theme dev / build | `npm run dev-keycloak-theme` / `npm run build-keycloak-theme` |
-| Full stack via Docker (`:3000`) | `docker compose up --build` |
+| Purpose                         | Command                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| Install                         | `npm install`                                                 |
+| Dev server (`:5173`)            | `npm run dev`                                                 |
+| Production build                | `npm run build` (runs `tsc -b` + `vite build`)                |
+| Lint                            | `npm run lint`                                                |
+| Format / check formatting       | `npm run format` / `npm run format:check`                     |
+| Unit tests                      | `npm run test`                                                |
+| Storybook                       | `npm run storybook`                                           |
+| Keycloak theme dev / build      | `npm run dev-keycloak-theme` / `npm run build-keycloak-theme` |
+| Full stack via Docker (`:3000`) | `docker compose up --build`                                   |
 
-**Definition of Done (frontend):** `npm run lint` **and** `npm run build` pass, relevant unit tests pass, and new/changed code is documented per §6.
+**Definition of Done (frontend):** `npm run lint`, `npm run format:check` **and** `npm run build` pass, relevant unit tests pass, and new/changed code is documented per §6. `npm run try` runs the whole chain in one go.
 
 ---
 
@@ -74,6 +76,7 @@ Enforced by ESLint (flat config: `typescript-eslint` recommended **+ type-checke
 - Prettier owns formatting — don't fight it; run lint before finishing.
 
 Conventions:
+
 - Code, identifiers and comments in **English**.
 - Keep components focused; extract hooks for non-trivial logic/state.
 - Services return typed responses and surface backend failures (don't silently swallow — no empty `catch`).
@@ -92,7 +95,7 @@ Conventions:
 
 ---
 
-## 6. Documentation (the *why*, not the obvious *what*)
+## 6. Documentation (the _why_, not the obvious _what_)
 
 Follow the documentation playbook — the full rules live in [docs/FRONTEND_DOCUMENTATION_GUIDELINES.md](./docs/FRONTEND_DOCUMENTATION_GUIDELINES.md). In short — use **TSDoc** blocks on exported symbols:
 
@@ -114,17 +117,39 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 - **Always use the palette tokens; never hardcode colors** (no `#2563eb`, no raw Tailwind colors like `text-blue-500`). Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-surface`, `bg-app-surface-muted`), text (`text-app-text`, `text-app-text-muted`, `text-app-text-subtle`), borders (`border-app-border`, …), brand (`bg-app-brand`, `text-app-brand`, …), and status (`success` / `warning` / `danger` / `neutral`, e.g. `bg-app-success-bg text-app-success-text`).
 - **Stay consistent beyond color, too:** use the shared Tailwind scale for spacing, radius and sizing instead of arbitrary one-off pixel values, so padding/margins/gaps match the rest of the app.
 - **Light/Dark:** controlled via the `.dark` class (`@custom-variant dark`), managed by `ThemeProvider`. Every color must work in both themes — which is automatic when you use tokens.
-- **Color-blind friendly (required):** never rely on color **alone** to convey meaning. Always back it with an **icon, text label, or shape** (e.g. status = chip text + icon, not just red/green) — this is why finished/skipped/locked steps use distinct icons *and* labels. Keep color pairs distinguishable for common color-vision deficiencies.
+- **Color-blind friendly (required):** never rely on color **alone** to convey meaning. Always back it with an **icon, text label, or shape** (e.g. status = chip text + icon, not just red/green) — this is why finished/skipped/locked steps use distinct icons _and_ labels. Keep color pairs distinguishable for common color-vision deficiencies.
 - **Contrast:** meet **WCAG 2.1 AA** for text and interactive elements.
 - **Focus:** keep visible focus via the `--app-focus` token (`focus-visible:ring-app-focus`) — don't remove outlines.
+
+### Shared UI primitives — use them, don't rebuild them
+
+`src/components/ui/` holds the primitives. Every one of them exists because the same widget had drifted into a dozen slightly different versions. **Reach for the component first; if it can't do what you need, extend the component — never patch it at the call site.**
+
+| Need                   | Use                                        | Not                                             |
+| ---------------------- | ------------------------------------------ | ----------------------------------------------- |
+| Any action control     | `ui/Button`                                | a hand-styled `<button>` or `<motion.button>`   |
+| Text field / dropdown  | `ui/Input`, `ui/Select`, `ui/Textarea`     | a bare `<input>` / `<select>` / `<textarea>`    |
+| Label + hint + error   | `ui/Field`                                 | a `<label>` next to an input, wired by hand     |
+| Status pill            | `ui/Badge`                                 | `rounded-full … px-2 … text-xs` on a `<span>`   |
+| Dialog / drawer        | `ui/Modal`, `ui/SidePanel`                 | a hand-rolled `fixed inset-0` overlay           |
+| Waiting                | `ui/Spinner`, or `Button`'s `loading` prop | a bare `<Loader2 className="animate-spin" />`   |
+| Nothing to show        | `ui/EmptyState`                            | an ad-hoc centred `<p>`                         |
+| Background scroll lock | `ui/useScrollLock`                         | setting `document.body.style.overflow` yourself |
+
+The primitives already carry the focus ring, the 44px touch target, the `disabled` / `aria-busy` treatment, the hover motion, the `aria-describedby` wiring for errors, and the focus trap. Rebuilding one by hand means getting all of that right again, which is how the drift started.
+
+- **Radius scale:** `rounded-lg` dense controls · `rounded-xl` standard controls and surfaces nested inside a card · `rounded-2xl` the card itself · `rounded-full` avatars/badges/pills · `rounded-3xl`+ dialog chrome only.
+- **Shadow scale:** `shadow-sm` card at rest · `hover:shadow-lg` that card hovered · `shadow-lg` anything floating over content (popover, tooltip, dropdown, toast, floating button) · `shadow-2xl` dialogs and drawers only. No backdrop behind it means it is not a dialog. `hover:shadow-app-brand-lift` belongs to `Button variant="primary"` alone.
+
+Legitimate exceptions are listed in [docs/FRONTEND_CODING_STANDARDS.md §4](./docs/FRONTEND_CODING_STANDARDS.md) — clickable cards and list rows, `aria-pressed` toggles and filter chips, `role="menuitem"` / combobox triggers, and the game surfaces. Everything else is a `Button`.
 
 ---
 
 ## 8. Responsive design
 
-- **Primary target is desktop** — that's where the app is mainly used, so design for the desktop layout first. (This is *not* mobile-first.)
+- **Primary target is desktop** — that's where the app is mainly used, so design for the desktop layout first. (This is _not_ mobile-first.)
 - But every page must still be **responsive**: it has to react to the viewport and look good down to phone size — widgets get narrower / stack vertically, the sidebar collapses, and tables/dialogs must not overflow.
-- Use Tailwind breakpoints (`sm:`, `md:`, `lg:`) to scale the desktop layout *down*. The app shell already does this: sticky sidebar on desktop → slide-out drawer + top bar below `lg` (see `components/layout/SideBar.tsx`; global token adjustments at `@media (max-width: 1024px)`).
+- Use Tailwind breakpoints (`sm:`, `md:`, `lg:`) to scale the desktop layout _down_. The app shell already does this: sticky sidebar on desktop → slide-out drawer + top bar below `lg` (see `components/layout/SideBar.tsx`; global token adjustments at `@media (max-width: 1024px)`).
 - Prefer fluid layouts (`flex`/`grid`, `max-w-*`, `min-w-0` to allow truncation) over fixed pixel widths.
 - **Test desktop (primary), then tablet and mobile** before finishing UI work — check that widgets reflow, the sidebar collapses, and nothing overflows.
 
@@ -132,7 +157,8 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 
 ## 9. Accessibility (WCAG 2.1 AA)
 
-- Icon-only buttons need an `aria-label`.
+- Icon-only buttons need an `aria-label` (`ui/Button` with `iconOnly` still needs you to pass one).
+- Form fields need a label **and**, when they can show an error or a hint, an `aria-describedby` pointing at it — `ui/Field` wires both plus `aria-invalid` for you.
 - Keep semantic HTML and label form fields; respect the `jsx-a11y` lint rules (don't disable them casually).
 - Keyboard-navigable interactive elements with visible focus (see §7).
 
@@ -149,6 +175,7 @@ We have **one shared palette** — a set of semantic design tokens (CSS variable
 ## 11. Animation (brief)
 
 - Use the **centralized spring transition tokens** (uniform velocity/stiffness) — don't inline ad-hoc spring configs. Canonical implementation: [`src/styles/tokens.ts`](./src/styles/tokens.ts), exporting `centralSpringToken` and `hoverSpringToken`.
+- **Don't add hover motion to buttons by hand.** `ui/Button` renders a `motion.button` with `buttonHoverMotion` built in, and honours `prefers-reduced-motion` and `disabled`. That it used to be opt-in is why half the refresh buttons reacted to hover and half didn't.
 - Wrap dynamically added/removed elements (lists, drawers) in `<AnimatePresence>` to avoid clipping on exit.
 - See [docs/FRONTEND_ARCHITECTURE.md §8](./docs/FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12) for the full animation system.
 

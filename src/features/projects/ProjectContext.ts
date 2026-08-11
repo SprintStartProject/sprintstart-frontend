@@ -43,6 +43,4 @@ export type ProjectContextValue = {
   reloadProjects: () => Promise<void>;
 };
 
-export const ProjectContext = createContext<ProjectContextValue | undefined>(
-  undefined,
-);
+export const ProjectContext = createContext<ProjectContextValue | undefined>(undefined);

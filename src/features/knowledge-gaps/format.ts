@@ -24,14 +24,8 @@ export function daysSince(iso: string): number {
   const now = new Date();
   const then = new Date(iso);
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startThen = new Date(
-    then.getFullYear(),
-    then.getMonth(),
-    then.getDate(),
-  );
-  return Math.round(
-    (startToday.getTime() - startThen.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const startThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  return Math.round((startToday.getTime() - startThen.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /**

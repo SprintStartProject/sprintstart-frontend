@@ -1,4 +1,5 @@
 import { ChevronRight, Plus } from "lucide-react";
+import { Button } from "../../../components/ui/Button.tsx";
 import {
   deriveConnectionStatus,
   deriveSyncStatus,
@@ -29,28 +30,27 @@ export function SourceList({
 }: SourceListProps) {
   if (sources.length === 0) {
     return (
-      <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
+      <div className="relative overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
         <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-app-brand-soft blur-3xl" />
 
         <div className="relative z-10 flex flex-col items-center">
-          <h3 className="text-xl font-bold text-app-text">
-            Connect your first source
-          </h3>
+          <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
 
           <p className="mt-2 max-w-md text-sm text-app-text-muted">
-            Discover repositories from a GitHub organization or user and connect
-            them to start ingesting artifacts into the knowledge base.
+            Discover repositories from a GitHub organization or user and connect them to start
+            ingesting artifacts into the knowledge base.
           </p>
 
           {onAddSource && (
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="lg"
               onClick={onAddSource}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-app-brand-hover"
+              icon={<Plus className="h-4 w-4" />}
+              className="mt-6"
             >
-              <Plus className="h-4 w-4" />
               Add sources
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -68,10 +68,13 @@ export function SourceList({
             key={source.sourceId}
             type="button"
             onClick={() => onSelectSource(source.sourceId)}
-            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg sm:p-6 ${
+            // Same hover language as the dashboard widgets: a small lift, a
+            // brand-coloured edge and a shadow, so "this is clickable" reads
+            // identically wherever it appears in the app.
+            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 sm:p-6 ${
               isSelected
                 ? "border-app-brand shadow-sm"
-                : "border-app-border hover:border-app-brand-border"
+                : "border-app-border hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg"
             }`}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -82,18 +85,18 @@ export function SourceList({
 
                 <div className="min-w-0">
                   <div>
-                    <h3 className="break-words text-lg font-semibold text-app-text">
+                    <h3 className="text-lg font-semibold break-words text-app-text">
                       {source.name}
                     </h3>
 
                     {source.githubRepository?.owner && (
-                      <p className="mt-0.5 break-words text-xs text-app-text-subtle">
+                      <p className="mt-0.5 text-xs break-words text-app-text-subtle">
                         {source.githubRepository.owner}
                       </p>
                     )}
 
                     {source.jiraInstance?.instanceUrl && (
-                      <p className="mt-0.5 break-words text-xs text-app-text-subtle">
+                      <p className="mt-0.5 text-xs break-words text-app-text-subtle">
                         {formatJiraInstanceDomain(source.jiraInstance.instanceUrl)}
                       </p>
                     )}
@@ -112,9 +115,7 @@ export function SourceList({
               <ChevronRight
                 size={20}
                 className={`shrink-0 text-app-text-disabled transition ${
-                  isSelected
-                    ? "rotate-180 text-app-brand"
-                    : "group-hover:translate-x-1"
+                  isSelected ? "rotate-180 text-app-brand" : "group-hover:translate-x-1"
                 }`}
               />
             </div>
@@ -127,10 +128,7 @@ export function SourceList({
 
               <InfoBlock label="Last Sync" value={source.lastSync} />
 
-              <InfoBlock
-                label="Latest Updated"
-                value={formatNumber(source.latestUpdatedCount)}
-              />
+              <InfoBlock label="Latest Updated" value={formatNumber(source.latestUpdatedCount)} />
 
               <InfoBlock
                 label="Errors"
@@ -147,8 +145,8 @@ export function SourceList({
                 </p>
 
                 <p className="mt-1 text-sm text-app-text-muted">
-                  Open the source details or check the backend response for
-                  failed artifact identifiers and reasons.
+                  Open the source details or check the backend response for failed artifact
+                  identifiers and reasons.
                 </p>
               </div>
             )}
@@ -158,11 +156,6 @@ export function SourceList({
     </div>
   );
 }
-
-/**
- * Hides the sync badge when it would only repeat the status chip's own label
- * (e.g. an in-flight "Syncing"/"Running" pair, or a duplicated "Not synced").
- */
 
 function InfoBlock({
   label,
@@ -175,12 +168,10 @@ function InfoBlock({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-app-text-subtle">
-        {label}
-      </p>
+      <p className="text-xs tracking-wide text-app-text-subtle uppercase">{label}</p>
 
       <p
-        className={`mt-2 break-words text-lg font-semibold ${
+        className={`mt-2 text-lg font-semibold break-words ${
           danger ? "text-app-danger-text" : "text-app-text"
         }`}
       >
@@ -189,4 +180,3 @@ function InfoBlock({
     </div>
   );
 }
-
