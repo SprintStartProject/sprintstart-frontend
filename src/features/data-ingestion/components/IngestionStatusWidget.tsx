@@ -48,7 +48,7 @@ export function IngestionStatusWidget() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center rounded-2xl border border-app-border bg-app-surface p-4">
+      <div className="flex items-center justify-center rounded-2xl p-4">
         <Spinner size="lg" label="Loading" />
       </div>
     );
@@ -58,7 +58,7 @@ export function IngestionStatusWidget() {
 
   if (error || !sources) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl border border-app-border bg-app-surface p-4 text-center">
+      <div className="flex items-center justify-center gap-2 rounded-2xl p-4 text-center">
         <Database className="h-4 w-4 text-app-text-muted" />
         <p className="text-sm text-app-text-muted">Could not load ingestion status.</p>
       </div>
@@ -71,7 +71,7 @@ export function IngestionStatusWidget() {
     <ClickableCard
       onClick={() => void navigate("/data-ingestion")}
       aria-label="View data ingestion details"
-      className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover sm:justify-between"
+      className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl p-4 transition-colors hover:bg-app-surface-hover sm:justify-between"
     >
       <div className="flex shrink-0 items-center gap-2">
         <Database className="h-4 w-4 text-app-brand" />

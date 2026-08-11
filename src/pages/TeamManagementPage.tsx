@@ -109,7 +109,7 @@ export function TeamManagementPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
+      <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-app-text-muted">Loading team overview...</p>
       </div>
     );

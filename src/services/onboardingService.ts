@@ -21,6 +21,11 @@ import type {
 } from "../features/onboarding/types";
 import onboardingStepMock from "../mocks/onboardingStepMock.json";
 
+/**
+ * Onboarding path, step, phase check and task CRUD.
+ * Streams AI path generation over SSE; falls back to mock data on fetch
+ * failures. Phase checks handle question/answer submission and review.
+ */
 export const onboardingService = {
   // ── PATH ─────────────────────────────────────────────────
 

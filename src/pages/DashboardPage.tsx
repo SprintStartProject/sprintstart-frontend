@@ -15,6 +15,7 @@ import { NextStepWidget } from "../features/dashboard/components/NextStepWidget"
 import { KnowledgeBaseWidget } from "../features/dashboard/components/KnowledgeBaseWidget";
 import { QuickChatWidget } from "../features/dashboard/components/QuickChatWidget";
 import { SkillsStrip } from "../features/dashboard/components/SkillsStrip";
+import { SpotlightCard } from "../components/ui/SpotlightCard";
 
 /**
  * Central hub displayed after login.
@@ -71,7 +72,7 @@ export function DashboardPage() {
   else if (hour < 17) greeting = "Good afternoon";
 
   return (
-    <div className="min-h-screen bg-app-bg">
+    <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader
@@ -88,16 +89,18 @@ export function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={centralSpringToken}
         >
-          <DashboardHero
-            greeting={greeting}
-            displayName={displayName}
-            formattedDate={formattedDate}
-            formattedTime={formattedTime}
-            profileIcon={profile?.profileIcon}
-            fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
-            seed={profile?.id}
-          />
-        </motion.div>
+          <SpotlightCard roundedClassName="rounded-3xl">
+                    <DashboardHero
+                      greeting={greeting}
+                      displayName={displayName}
+                      formattedDate={formattedDate}
+                      formattedTime={formattedTime}
+                      profileIcon={profile?.profileIcon}
+                      fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
+                      seed={profile?.id}
+                    />
+                    </SpotlightCard>
+                  </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -105,8 +108,12 @@ export function DashboardPage() {
           transition={{ ...centralSpringToken, delay: 0.08 }}
           className="grid grid-cols-1 gap-5 lg:grid-cols-2"
         >
+          <SpotlightCard roundedClassName="rounded-3xl">
           <NextStepWidget />
+          </SpotlightCard>
+          <SpotlightCard roundedClassName="rounded-3xl">
           <KnowledgeBaseWidget />
+          </SpotlightCard>
         </motion.div>
 
         <motion.div
@@ -114,7 +121,9 @@ export function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...centralSpringToken, delay: 0.16 }}
         >
+          <SpotlightCard roundedClassName="rounded-3xl">
           <QuickChatWidget />
+          </SpotlightCard>
         </motion.div>
 
         <motion.div
@@ -122,7 +131,9 @@ export function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...centralSpringToken, delay: 0.24 }}
         >
+          <SpotlightCard roundedClassName="rounded-3xl">
           <SkillsStrip />
+          </SpotlightCard>
         </motion.div>
       </main>
 

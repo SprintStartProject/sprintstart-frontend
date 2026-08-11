@@ -90,7 +90,7 @@ export function SettingsPage() {
   );
 
   return (
-    <div className="h-full min-h-screen w-full bg-app-bg">
+    <div className="h-full min-h-screen w-full">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-content py-6">
           <div className="max-w-4xl">

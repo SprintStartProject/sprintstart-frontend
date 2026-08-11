@@ -57,6 +57,12 @@ function getFocusableElements(container: HTMLElement) {
   );
 }
 
+/**
+ * Portal-based dialog overlay — the core modal primitive for all dialogs.
+ * Supports configurable size (sm/md/lg/xl), role (dialog/alertdialog),
+ * escape-key and backdrop dismiss, optional header actions, and a shared
+ * backdrop/dialog animation via modalBackdropVariants + getModalDialogVariants.
+ */
 export function Modal({
   isOpen,
   title,

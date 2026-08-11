@@ -245,9 +245,18 @@
   --shadow-app-brand-lift: var(--shadow-brand-lift);
 
   --font-sans: var(--sans);
-  --font-heading: var(--heading);
-  --font-mono: var(--mono);
-}
+    --font-heading: var(--heading);
+    --font-mono: var(--mono);
+
+    /* Glassmorphism */
+    --color-app-glass: var(--glass);
+    --color-app-glass-border: var(--glass-border);
+
+    /* Ambient glow */
+    --color-app-glow: var(--glow);
+    --color-app-glow-accent: var(--glow-accent);
+    --color-app-glow-alt: var(--glow-alt);
+  }
 
 @media (max-width: 1024px) {
   :root {
@@ -534,4 +543,138 @@ body {
   text-decoration-style: dotted;
   text-decoration-color: var(--danger-text);
   text-decoration-thickness: 2px;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Ambient "Aurora Glass" layer
+   Reusable background primitives for premium page surfaces.
+   All colors are driven by the semantic token variables above,
+   so light/dark themes stay consistent automatically.
+   ──────────────────────────────────────────────────────────── */
+
+@keyframes app-aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(5%, -7%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-6%, 5%, 0) scale(0.94);
+  }
+}
+
+@keyframes app-aurora-drift-alt {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(-7%, 8%, 0) scale(0.9);
+  }
+}
+
+/* Soft, slowly drifting gradient blobs. Position/size via utilities. */
+.app-aurora {
+  pointer-events: none;
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  animation: app-aurora-drift 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.app-aurora-alt {
+  animation: app-aurora-drift-alt 24s ease-in-out infinite;
+}
+
+/* Subtle blueprint grid that fades out towards the bottom. */
+.app-bg-grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 70%);
+}
+
+/* Translucent panel with backdrop blur — the core glass surface. */
+@utility app-glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+/* ── Mouse-follow spotlight (decorative, applied via AuroraBackground) ─── */
+
+.app-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle 320px at
+    var(--spot-x, 50%) var(--spot-y, 90%),
+    color-mix(in srgb, var(--color-app-glow) 90%, transparent), transparent 30%
+  );
+  mix-blend-mode: plus-lighter;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+/* Respect users who prefer reduced motion: collapse ALL decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  .app-spotlight { display: none; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Loading spinners are essential feedback, not decoration — keep them
+     turning even under reduced-motion (WCAG allows essential animation). */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────
+   "Dev Classic" style mode
+   Activated by the `.style-classic` class on <html> (managed by
+   ThemeProvider). Disables all glassmorphic glow, ambient animations,
+   and decorative layers, giving a flat surface matching the original look.
+   ──────────────────────────────────────────────────────────── */
+
+/* ── Decorative layers disabled ── */
+
+/* Mouse-follow spotlight. */
+.style-classic .app-spotlight {
+  display: none !important;
+}
+
+/* Aurora drift blobs. */
+.style-classic .app-aurora,
+.style-classic .app-aurora-alt {
+  display: none !important;
+}
+
+/* Blueprint grid overlay. */
+.style-classic .app-bg-grid {
+  display: none !important;
+}
+
+/* Glassmorphism reverted to flat surfaces. */
+.style-classic .app-glass {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

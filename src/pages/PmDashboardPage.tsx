@@ -5,6 +5,7 @@ import { FaqWidget } from "../features/faq/components/FaqWidget";
 import { KnowledgeGapWidget } from "../features/knowledge-gaps/components/KnowledgeGapWidget";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TeamManagementWidget } from "../features/team-management/components/TeamManagementWidget";
+import { SpotlightCard } from "../components/ui/SpotlightCard";
 
 /**
  * Landing page for PM/HR/Admin users. Surfaces at-a-glance widgets for
@@ -16,7 +17,7 @@ export function PmDashboardPage() {
   const { selectedProjectId } = useProjectContext();
 
   return (
-    <div className="min-h-screen bg-app-bg">
+    <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader
@@ -28,9 +29,12 @@ export function PmDashboardPage() {
       </header>
 
       <main className="app-page-frame space-y-5 py-6 lg:py-8">
+        <SpotlightCard roundedClassName="rounded-2xl">
         <IngestionStatusWidget />
+      </SpotlightCard>
 
-        <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <SpotlightCard roundedClassName="rounded-3xl">
+        <section className="p-4">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
             <p className="text-sm text-app-text-muted">
@@ -40,8 +44,10 @@ export function PmDashboardPage() {
 
           <TeamManagementWidget projectId={selectedProjectId} />
         </section>
+      </SpotlightCard>
 
-        <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <SpotlightCard roundedClassName="rounded-3xl">
+        <section className="p-4">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-app-text">Insights</h2>
             <p className="text-sm text-app-text-muted">
@@ -54,6 +60,7 @@ export function PmDashboardPage() {
             <KnowledgeGapWidget />
           </div>
         </section>
+      </SpotlightCard>
       </main>
     </div>
   );

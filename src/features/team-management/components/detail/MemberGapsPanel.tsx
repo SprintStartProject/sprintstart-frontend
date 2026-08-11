@@ -1,6 +1,7 @@
 import { Badge } from "../../../../components/ui/Badge";
 import type { KnowledgeGap } from "../../../knowledge-gaps/types";
 import type { UserSkillLevel } from "../../../../services/teamManagementService";
+import { SpotlightCard } from "../../../../components/ui/SpotlightCard";
 
 type MemberGapsPanelProps = {
   skillLevels: UserSkillLevel[];
@@ -31,7 +32,7 @@ export function MemberGapsPanel({
 
   return (
     <>
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6">
+      <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
         <h2 className="text-lg font-semibold text-app-text">Skill Assessment</h2>
 
         {skillLevels.length === 0 ? (
@@ -53,9 +54,9 @@ export function MemberGapsPanel({
             ))}
           </div>
         )}
-      </div>
+      </SpotlightCard>
 
-      <div className="rounded-2xl border border-app-border bg-app-surface p-6">
+      <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
         <h2 className="text-lg font-semibold text-app-text">Gaps</h2>
 
         <div className="mt-4 space-y-4">
@@ -66,7 +67,7 @@ export function MemberGapsPanel({
             onOpenKnowledgeGap={onOpenKnowledgeGap}
           />
         </div>
-      </div>
+      </SpotlightCard>
     </>
   );
 }

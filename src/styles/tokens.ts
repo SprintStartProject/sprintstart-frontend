@@ -216,3 +216,12 @@ export const petPeekSpringToken: Transition = {
   damping: 22,
   mass: 0.9,
 };
+
+/**
+ * Shared enter transition for page-level elements (AuroraBackground, etc.).
+ * A smooth tween ease — not a spring, so it pairs well with CSS-only layers.
+ */
+export const enterTransition: Transition = {
+    duration: 0.5,
+    ease: [0.22, 1, 0.36, 1],
+};

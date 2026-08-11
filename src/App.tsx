@@ -7,6 +7,7 @@ import { ThemeProvider } from "./context/ThemeProvider";
 import { ProjectProvider } from "./features/projects/ProjectProvider";
 import { MomentsProvider, RocketPet, useMoments } from "./features/moments";
 import { useAuth } from "./context/useAuth";
+import { AuroraBackground } from "./components/layout/AuroraBackground";
 
 function AppContent() {
   const { status } = useAuth();
@@ -17,12 +18,16 @@ function AppContent() {
 
   return (
     <div className="flex min-h-screen w-full bg-app-bg text-app-text">
+      <AuroraBackground />
       {showSidebar && <SideBar />}
 
       {/* `data-moment-stage`: the area the page-scoped moments (the
           onboarding launch and landing) cover, instead of the whole
           screen — see momentStage.ts in the moments feature. */}
-      <main data-moment-stage className="min-h-screen min-w-0 flex-1 bg-app-bg pt-[64px] lg:pt-0">
+      <main
+        data-moment-stage
+        className="relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0"
+      >
         <AppRouter />
       </main>
 
