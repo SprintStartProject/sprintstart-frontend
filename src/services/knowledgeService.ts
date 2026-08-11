@@ -287,16 +287,10 @@ export const knowledgeService = {
   /**
    * Deletes a single uploaded artifact by its id.
    *
-   * Sends a multipart DELETE to `/api/v1/uploads/{artifactId}` with a `request`
+   * Sends a multipart DELETE to `/api/v1/uploads` with a `request`
    * JSON part containing the artifactIds batch, the removerId (authenticated user)
-   * and the projectId scope. The backend mirrors the same multipart contract as
-   * the upload endpoint — the path variable is captured for REST semantics but
-   * the actual deletion target(s) are read from the body's `artifactIds` set.
-   *
-   * @remarks Permission: the backend currently allows any `USER` role. The
-   * frontend gates this call to PM/HR/ADMIN via `accessPolicy` Pattern A.
-   * Tightening the backend `@PreAuthorize` to `hasAnyRole('PM','HR','ADMIN')`
-   * is tracked as a restricted backend follow-up.
+   * and the projectId scope. The backend reads the deletion target(s)
+   * from the body's `artifactIds` set.
    *
    * @param projectId  UUID of the project that scopes the deletion.
    * @param artifactId UUID of the uploaded artifact to remove.
@@ -316,7 +310,7 @@ export const knowledgeService = {
       new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
     );
 
-    await apiClient.fetch<void>(`/api/v1/uploads/${encodeURIComponent(artifactId)}`, {
+    await apiClient.fetch<void>(`/api/v1/uploads`, {
       method: "DELETE",
       body: formData,
     });

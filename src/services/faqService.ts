@@ -12,6 +12,9 @@ export const insightsService = {
    * Fetches all recurring question groups sorted by frequency.
    */
   async fetchFAQGroups(projectId: string): Promise<FAQOverview> {
+    if (!projectId) {
+      return faqMock;
+    }
     try {
       return await apiClient.fetch<FAQOverview>(
         `/api/v1/insights/faq?projectId=${encodeURIComponent(projectId)}`,

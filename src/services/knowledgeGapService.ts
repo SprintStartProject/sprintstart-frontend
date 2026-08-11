@@ -15,6 +15,9 @@ import knowledgeGapDetailMock from "../mocks/knowledgeGapsDetailMock.json";
  */
 export const knowledgeGapService = {
   async fetchKnowledgeGaps(projectId: string): Promise<KnowledgeGapOverview> {
+    if (!projectId) {
+      return knowledgeGapMock as KnowledgeGapOverview;
+    }
     try {
       return await apiClient.fetch<KnowledgeGapOverview>(
         `/api/v1/insights/knowledge-gaps?projectId=${encodeURIComponent(projectId)}`,
