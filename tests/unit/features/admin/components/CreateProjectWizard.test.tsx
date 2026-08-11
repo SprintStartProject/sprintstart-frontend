@@ -24,12 +24,21 @@ vi.mock('../../../../../src/services/ingestionService', () => ({
     getIngestionSourceStatuses: vi.fn(),
 }));
 
+vi.mock('../../../../../src/services/sources/jiraService', () => ({
+    connectJiraInstance: vi.fn(),
+    getMyJiraCredentials: vi.fn(),
+}));
+
 import { projectService } from '../../../../../src/services/projectService';
 import {
     addRepositoryToProject,
     connectGithubRepository,
     discoverRepositories,
 } from '../../../../../src/services/sources/githubService';
+import {
+    connectJiraInstance,
+    getMyJiraCredentials,
+} from '../../../../../src/services/sources/jiraService';
 import { getIngestionSourceStatuses } from '../../../../../src/services/ingestionService';
 
 const createdProject: AdminProjectDetails = {
@@ -126,6 +135,10 @@ describe('CreateProjectWizard', () => {
             resolvedOwnerType: 'org',
         });
         vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
+        vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
+        vi.mocked(getMyJiraCredentials).mockResolvedValue([
+            { userEmail: 'me@example.com', displayName: 'Team token' },
+        ]);
     });
 
     it('blocks the step-1 continue button until a name is entered', async () => {
@@ -294,6 +307,70 @@ describe('CreateProjectWizard', () => {
         );
         // The retry must not create a second project.
         expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates the project and connects a Jira instance against the new project id', async () => {
+        const user = userEvent.setup();
+        const { onClose } = renderWizard();
+
+        await goToSourcesStep(user);
+        await user.click(screen.getByRole('button', { name: /indexes jira issues/i }));
+        await goToGithubDetail(user);
+
+        // The stored credential is adopted automatically once it loads.
+        await screen.findByRole('option', { name: /Team token - me@example.com/i });
+
+        await user.type(screen.getByLabelText('Display name'), 'Team board');
+        await user.type(
+            screen.getByLabelText('Instance URL'),
+            'https://acme.atlassian.net',
+        );
+
+        await user.click(
+            screen.getByRole('button', { name: /create and connect jira instance/i }),
+        );
+
+        await waitFor(() =>
+            expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
+                name: 'Apollo',
+                description: undefined,
+            }),
+        );
+        expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith({
+            displayName: 'Team board',
+            url: 'https://acme.atlassian.net',
+            userEmail: 'me@example.com',
+            tokenName: 'Team token',
+            projectId: 'proj-new',
+        });
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    it('creates the project first so files can be uploaded to it', async () => {
+        const user = userEvent.setup();
+        const { onProjectCreated } = renderWizard();
+
+        await goToSourcesStep(user);
+        await user.click(screen.getByRole('button', { name: /indexes manually uploaded/i }));
+        await goToGithubDetail(user);
+
+        // Before the project exists the drop zone is withheld behind an explicit
+        // "Create project" action, since uploads need a live project id.
+        expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole('button', { name: /create project/i }));
+
+        await waitFor(() =>
+            expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
+                name: 'Apollo',
+                description: undefined,
+            }),
+        );
+        expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
+        // The upload drop zone is now revealed against the created project.
+        expect(
+            await screen.findByText(/drag and drop .* files/i),
+        ).toBeInTheDocument();
     });
 
     it('does not create the project when the wizard is cancelled on the source step', async () => {
