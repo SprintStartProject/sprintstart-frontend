@@ -14,6 +14,7 @@ import type {
     OnboardingStepEndpoint,
     OnboardingTaskEndpoint,
 } from '../features/onboarding/types';
+import { findActivePhaseIndex } from '../features/onboarding/activePhase';
 import type {
     ProjectRole,
     TeamOverviewUser,
@@ -67,6 +68,11 @@ import { AddCustomStepModal } from '../features/team-management/components/detai
 import { MemberDetailDialogs } from '../features/team-management/components/detail/MemberDetailDialogs';
 import { MemberGapsPanel } from '../features/team-management/components/detail/MemberGapsPanel';
 import { MemberOnboardingSection } from '../features/team-management/components/detail/MemberOnboardingSection';
+import { MemberReviewPoolPanel } from '../features/team-management/components/detail/MemberReviewPoolPanel';
+import {
+    PhaseCheckAdminModal,
+    type PhaseCheckAdminTab,
+} from '../features/team-management/components/detail/PhaseCheckAdminModal';
 import { StepDetailsPanel } from '../features/team-management/components/detail/StepDetailsPanel';
 
 function formatMinutes(minutes?: number | null): string {
@@ -140,6 +146,8 @@ export function TeamMemberDetailPage() {
         phaseId: string;
         position: number;
     } | null>(null);
+    // Which tab of the knowledge-check modal is open for the selected phase (null = closed).
+    const [checkModalTab, setCheckModalTab] = useState<PhaseCheckAdminTab | null>(null);
     const [customStepTitle, setCustomStepTitle] = useState('');
     const [customStepDescription, setCustomStepDescription] = useState('');
     const [customStepExpectedOutcome, setCustomStepExpectedOutcome] = useState('');
@@ -204,11 +212,12 @@ export function TeamMemberDetailPage() {
             setKnowledgeGaps(knowledgeGapOverview.gaps);
             setFeedbackItems(feedback);
             setOnboardingPath(path);
-            setSelectedPhaseId(path?.phases?.[0]?.id ?? '');
+            // Open on the phase the member is actually working on. Phase 1 is almost never
+            // the interesting one for a reviewer, and it hides how far along they really are.
+            const activePhase = path?.phases?.[findActivePhaseIndex(path)];
+            setSelectedPhaseId(activePhase?.id ?? '');
             setSelectedStepId(
-                memberData?.currentStep?.id ??
-                    path?.phases?.[0]?.steps?.[0]?.id ??
-                    '',
+                memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? '',
             );
             setLoadingFeedback(false);
             setLoading(false);
@@ -288,8 +297,10 @@ export function TeamMemberDetailPage() {
         const path = await getUserOnboardingPath(userId);
         setOnboardingPath(path);
 
+        // Only when the selected phase disappeared; fall back to the active one rather than
+        // to phase 1, for the same reason as on load.
         if (path?.phases?.length && !path.phases.some((phase) => phase.id === selectedPhaseId)) {
-            setSelectedPhaseId(path.phases[0].id);
+            setSelectedPhaseId(path.phases[findActivePhaseIndex(path)].id);
         }
 
         const refreshedSteps = path?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
@@ -906,7 +917,10 @@ export function TeamMemberDetailPage() {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 pt-8">
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+                {/* items-start keeps both columns at their own height: without it the grid
+                    stretches the onboarding card to match the insights column, which grows
+                    when the review questions are expanded. */}
+                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
                     <MemberOnboardingSection
                         phases={phases}
                         selectedPhase={selectedPhase}
@@ -935,11 +949,13 @@ export function TeamMemberDetailPage() {
                                 overStepId,
                             )
                         }
+                        onOpenCheck={setCheckModalTab}
                         formatMinutes={formatMinutes}
                         getActualMinutes={getActualMinutes}
                         getStepStatusStyles={getStepStatusStyles}
                     />
                     <aside aria-label="Member insights" className="space-y-4">
+                    {userId && <MemberReviewPoolPanel userId={userId} />}
                     <div className="rounded-3xl border border-app-border bg-app-surface p-6">
                         <h2 className="text-lg font-semibold text-app-text">
                             Feedback & Skip Requests
@@ -1257,6 +1273,17 @@ export function TeamMemberDetailPage() {
                 onClose={() => setStepInsertTarget(null)}
                 onSubmit={() => void handleCreateCustomStep()}
             />
+            {checkModalTab && selectedPhase && userId && (
+                <PhaseCheckAdminModal
+                    userId={userId}
+                    phaseId={selectedPhase.id}
+                    phaseTitle={selectedPhase.title}
+                    memberName={`${user.firstname} ${user.lastname}`.trim()}
+                    initialTab={checkModalTab}
+                    onSaved={() => void refreshOnboardingPath()}
+                    onClose={() => setCheckModalTab(null)}
+                />
+            )}
             {detailStep && (
                 <StepDetailsPanel
                     step={detailStep}

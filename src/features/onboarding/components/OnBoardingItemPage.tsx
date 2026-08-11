@@ -25,12 +25,25 @@ import {
   AlertCircle,
   Trophy,
   CircleArrowRight,
+  ClipboardCheck,
   Lightbulb,
   ThumbsUp,
   ThumbsDown,
 } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
+
+/**
+ * Where the user goes once this step is behind them.
+ *
+ * Resolved from the path rather than assumed, because "next" is not always another step:
+ * clearing the last step of a phase leaves its knowledge check as the only thing standing
+ * between the user and the rest of their journey.
+ */
+type NextAction =
+  | { kind: "step"; stepId: string }
+  | { kind: "check"; phaseId: string }
+  | { kind: "done" };
 
 // ─────────────────────────────────────────────────────────────
 // HELPER
@@ -86,45 +99,80 @@ export function OnBoardingItemPage() {
   const [localFinished, setLocalFinished] = useState<Set<string>>(new Set());
 
   const [nextLoading, setNextLoading] = useState<boolean>(false);
+  const [nextAction, setNextAction] = useState<NextAction | null>(null);
+
+  const currentStepId = stepDetail?.id;
+  const currentPhaseId = stepDetail?.phaseId;
+  const currentStatus = stepDetail?.status;
 
   /**
-   * Jumps to the next actionable step in the user's path: fetches the whole path,
-   * picks the first step that isn't finished/skipped (excluding this one), starts it
-   * and navigates there. Falls back to the overview when nothing is left to do.
+   * Works out what comes after this step, once the step is behind the user.
+   *
+   * Resolved up front rather than on click so the button can say where it leads. A locked
+   * phase is never a candidate: while this phase's knowledge check is unpassed the next
+   * phase stays locked, and its steps are not reachable yet.
+   */
+  useEffect(() => {
+    if (!currentStepId || !currentPhaseId) return;
+    if (currentStatus !== "FINISHED" && currentStatus !== "SKIPPED") return;
+
+    const resolveNextAction = async () => {
+      try {
+        const path = await onboardingService.fetchPath();
+
+        const nextStep = path.phases
+          .filter((phase) => !phase.locked)
+          .flatMap((phase) => phase.steps)
+          .find(
+            (step) =>
+              step.id !== currentStepId &&
+              step.status !== "FINISHED" &&
+              step.status !== "SKIPPED",
+          );
+        if (nextStep) {
+          setNextAction({ kind: "step", stepId: nextStep.id });
+          return;
+        }
+
+        // No reachable step left: either this phase's own check is what blocks the way,
+        // or the whole journey is done.
+        const ownPhase = path.phases.find((phase) => phase.id === currentPhaseId);
+        setNextAction(
+          ownPhase?.checkSummary?.required && !ownPhase.checkSummary.passed
+            ? { kind: "check", phaseId: ownPhase.id }
+            : { kind: "done" },
+        );
+      } catch (err) {
+        console.error("Failed to resolve the next onboarding action:", err);
+      }
+    };
+
+    void resolveNextAction();
+  }, [currentStepId, currentPhaseId, currentStatus]);
+
+  /**
+   * Follows [nextAction]: starts and opens the next step, or returns to the overview —
+   * pointing it at the pending knowledge check when that is what is waiting.
    */
   const goToNextStep = async (): Promise<void> => {
+    if (!nextAction) return;
+
+    if (nextAction.kind !== "step") {
+      void navigate("/onboarding", {
+        state: nextAction.kind === "check" ? { focusCheckPhaseId: nextAction.phaseId } : undefined,
+      });
+      return;
+    }
+
     setNextLoading(true);
     try {
-      const path = await onboardingService.fetchPath();
-      // Never jump into a locked phase: if the current phase's knowledge check still
-      // blocks the next one, there is no reachable next step, so fall back to the
-      // overview where the pending check is shown.
-      const nextStep = path.phases
-        .filter((phase) => !phase.locked)
-        .flatMap((phase) => phase.steps)
-        .find(
-          (step) =>
-            step.id !== stepDetail?.id &&
-            step.status !== "FINISHED" &&
-            step.status !== "SKIPPED",
-        );
-
-      if (nextStep) {
-        try {
-          await onboardingService.startStep(nextStep.id);
-        } catch (err) {
-          console.error("Failed to start next onboarding step:", err);
-        }
-        void navigate(`/onboarding/${nextStep.id}`);
-      } else {
-        // Nothing pending left — journey complete, go back to the overview.
-        void navigate("/onboarding");
-      }
+      await onboardingService.startStep(nextAction.stepId);
     } catch (err) {
-      console.error("Error navigating to next step:", err);
+      console.error("Failed to start next onboarding step:", err);
     } finally {
       setNextLoading(false);
     }
+    void navigate(`/onboarding/${nextAction.stepId}`);
   };
 
   const updateStepStatus = async (newStatus: StepStatus) => {
@@ -507,13 +555,23 @@ export function OnBoardingItemPage() {
                 stepDetail.status === "SKIPPED") && (
                 <button
                   onClick={() => void goToNextStep()}
-                  disabled={nextLoading}
+                  disabled={nextLoading || !nextAction}
                   className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-app-brand hover:bg-app-brand-hover text-white text-sm font-medium transition-all disabled:cursor-not-allowed disabled:bg-app-border"
                 >
-                  {nextLoading ? (
+                  {nextLoading || !nextAction ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Loading...
+                    </>
+                  ) : nextAction.kind === "check" ? (
+                    <>
+                      Start knowledge check
+                      <ClipboardCheck className="w-4 h-4" />
+                    </>
+                  ) : nextAction.kind === "done" ? (
+                    <>
+                      Back to overview
+                      <CircleArrowRight className="w-4 h-4" />
                     </>
                   ) : (
                     <>
