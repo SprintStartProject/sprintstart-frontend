@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { TeamManagementPage } from "../../../src/pages/TeamManagementPage";
-import { http, HttpResponse } from "msw";
+import { http } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 
 describe("TeamManagementPage", () => {
@@ -27,7 +27,7 @@ describe("TeamManagementPage", () => {
     expect(screen.getByText("Loading team overview...")).toBeInTheDocument();
   });
 
-  it("hides the projects tab when the caller manages a single project", async () => {
+  it("offers user and role management, and nothing else", async () => {
     render(
       <MemoryRouter>
         <TeamManagementPage />
@@ -38,36 +38,9 @@ describe("TeamManagementPage", () => {
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     });
 
+    expect(screen.getByRole("button", { name: /User Management/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Role Management/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Project Management/ })).not.toBeInTheDocument();
-  });
-
-  it("shows the projects tab when the caller manages several projects", async () => {
-    server.use(
-      http.get("/api/v1/projects/managed", () =>
-        HttpResponse.json([
-          {
-            id: "p1",
-            name: "Alpha",
-            description: "",
-            memberCount: 1,
-          },
-          {
-            id: "p2",
-            name: "Beta",
-            description: "",
-            memberCount: 1,
-          },
-        ]),
-      ),
-    );
-
-    render(
-      <MemoryRouter>
-        <TeamManagementPage />
-      </MemoryRouter>,
-    );
-
-    expect(await screen.findByRole("button", { name: /Project Management/ })).toBeInTheDocument();
   });
 
   it("renders members and roles after loading", async () => {

@@ -5,7 +5,6 @@ import { Button } from "../components/ui/Button";
 import { TeamMemberFilters } from "../features/team-management/components/TeamMemberFilters";
 import { TeamMemberCard } from "../features/team-management/components/TeamMemberCard";
 import { RoleManagementTab } from "../features/team-management/components/RoleManagementTab";
-import { ProjectManagementTab } from "../features/team-management/components/ProjectManagementTab";
 import { TeamManagementTabSwitcher } from "../features/team-management/components/TeamManagementTabSwitcher";
 import {
   TEAM_MANAGEMENT_TAB_ORDER,
@@ -15,7 +14,6 @@ import {
   type ProjectRole,
 } from "../features/team-management/types";
 import { getTeamOverview, getProjectRoles } from "../services/teamManagementService";
-import { projectService, type ManagedProject } from "../services/projectService";
 import { ApiError } from "../services/apiClient";
 import { PageHeader } from "../components/layout/PageHeader";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
@@ -28,7 +26,6 @@ export function TeamManagementPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TeamManagementTab>("members");
-  const [managedProjects, setManagedProjects] = useState<ManagedProject[]>([]);
   const [filters, setFilters] = useState<TeamOverviewFilters>({
     roleId: "all",
     sortBy: "LONGEST_STEP",
@@ -44,17 +41,7 @@ export function TeamManagementPage() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        // The managed projects decide whether the projects tab exists
-        // at all, so they are needed before the tab bar can be rendered
-        // — not only once that tab is opened. A failure there must not
-        // take the page down: the other two tabs do not depend on it,
-        // and a manager-only endpoint answers 403 for HR.
-        const [, projects] = await Promise.all([
-          loadTeamOverview(),
-          projectService.getManagedProjects().catch(() => []),
-        ]);
-
-        setManagedProjects(projects);
+        await loadTeamOverview();
         setLoadError(null);
       } catch (error) {
         // Without this the page would sit on its loading text forever,
@@ -70,20 +57,10 @@ export function TeamManagementPage() {
     void loadInitialData();
   }, [loadTeamOverview]);
 
-  /**
-   * Moving people only makes sense with somewhere to move them to, so a
-   * manager with a single project never sees the projects tab.
-   */
-  const visibleTabs = useMemo(
-    () =>
-      TEAM_MANAGEMENT_TAB_ORDER.filter((tab) => tab !== "projects" || managedProjects.length > 1),
-    [managedProjects.length],
-  );
-
   // Two-finger swipe between the tabs, for people who would rather not aim
   // at the bar.
   const swipeRef = useSwipeableTabs<TeamManagementTab, HTMLElement>({
-    order: visibleTabs,
+    order: TEAM_MANAGEMENT_TAB_ORDER,
     value: activeTab,
     onChange: setActiveTab,
   });
@@ -123,23 +100,12 @@ export function TeamManagementPage() {
     return result;
   }, [users, filters]);
 
-  // One badge for all three tabs: the number shown always belongs to whatever
-  // the panel below is listing.
-  const [headerCount, headerLabel] = (() => {
-    switch (activeTab) {
-      case "members":
-        return [filteredUsers.length, "members"] as const;
-
-      case "roles":
-        return [roles.length, roles.length === 1 ? "role" : "roles"] as const;
-
-      default:
-        return [
-          managedProjects.length,
-          managedProjects.length === 1 ? "project" : "projects",
-        ] as const;
-    }
-  })();
+  // One badge for both tabs: the number shown always belongs to whatever the
+  // panel below is listing.
+  const [headerCount, headerLabel] =
+    activeTab === "members"
+      ? ([filteredUsers.length, "members"] as const)
+      : ([roles.length, roles.length === 1 ? "role" : "roles"] as const);
 
   if (loading) {
     return (
@@ -186,14 +152,10 @@ export function TeamManagementPage() {
 
       <main ref={swipeRef} className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <TeamManagementTabSwitcher
-            activeTab={activeTab}
-            onChange={setActiveTab}
-            tabs={visibleTabs}
-          />
+          <TeamManagementTabSwitcher activeTab={activeTab} onChange={setActiveTab} />
         </div>
 
-        <SlidingTabPanel activeKey={activeTab} index={visibleTabs.indexOf(activeTab)}>
+        <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
           {activeTab === "members" ? (
             <div className="min-w-0">
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -223,10 +185,8 @@ export function TeamManagementPage() {
                 </div>
               )}
             </div>
-          ) : activeTab === "roles" ? (
-            <RoleManagementTab roles={roles} users={users} onDataChanged={loadTeamOverview} />
           ) : (
-            <ProjectManagementTab projects={managedProjects} />
+            <RoleManagementTab roles={roles} users={users} onDataChanged={loadTeamOverview} />
           )}
         </SlidingTabPanel>
       </main>

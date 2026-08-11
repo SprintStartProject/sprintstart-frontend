@@ -1,11 +1,10 @@
-import { FolderKanban, Shield, Users, type LucideIcon } from "lucide-react";
+import { Shield, Users, type LucideIcon } from "lucide-react";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { TEAM_MANAGEMENT_TAB_ORDER, type TeamManagementTab } from "../types";
 
 const TAB_META: Record<TeamManagementTab, { label: string; icon: LucideIcon }> = {
   members: { label: "User Management", icon: Users },
   roles: { label: "Role Management", icon: Shield },
-  projects: { label: "Project Management", icon: FolderKanban },
 };
 
 type TeamManagementTabSwitcherProps = {

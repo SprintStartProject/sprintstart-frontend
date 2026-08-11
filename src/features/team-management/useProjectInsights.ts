@@ -64,7 +64,7 @@ function toAttentionItems(users: TeamOverviewUser[]): AttentionItem[] {
 }
 
 /**
- * Loads the extra project figures shown on the Project Management cards.
+ * Loads the extra project figures shown on `ProjectInsightsCard`.
  *
  * Every source is fetched independently and failures collapse to `null` rather
  * than rejecting the whole hook: a project whose ingestion endpoint is down

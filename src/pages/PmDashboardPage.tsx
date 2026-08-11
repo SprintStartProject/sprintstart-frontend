@@ -1,13 +1,10 @@
-import { BriefcaseBusiness, Plus } from "lucide-react";
-import { useState } from "react";
+import { BriefcaseBusiness } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
-import { Button } from "../components/ui/Button";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
 import { FaqWidget } from "../features/faq/components/FaqWidget";
 import { KnowledgeGapWidget } from "../features/knowledge-gaps/components/KnowledgeGapWidget";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TeamManagementWidget } from "../features/team-management/components/TeamManagementWidget";
-import { ProjectRolesModal } from "../features/team-management/components/ProjectRolesModal";
 
 /**
  * Landing page for PM/HR/Admin users. Surfaces at-a-glance widgets for
@@ -17,7 +14,6 @@ import { ProjectRolesModal } from "../features/team-management/components/Projec
 export function PmDashboardPage() {
   // The project is chosen globally in the sidebar switcher.
   const { selectedProjectId } = useProjectContext();
-  const [rolesModalOpen, setRolesModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-app-bg">
@@ -35,29 +31,15 @@ export function PmDashboardPage() {
         <IngestionStatusWidget />
 
         <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
-              <p className="text-sm text-app-text-muted">
-                Track the current status of your team and onboarding progress.
-              </p>
-            </div>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setRolesModalOpen(true)}
-              icon={<Plus className="h-4 w-4" />}
-              className="shrink-0"
-            >
-              Manage role
-            </Button>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
+            <p className="text-sm text-app-text-muted">
+              Track the current status of your team and onboarding progress.
+            </p>
           </div>
 
           <TeamManagementWidget projectId={selectedProjectId} />
         </section>
-
-        <ProjectRolesModal open={rolesModalOpen} onClose={() => setRolesModalOpen(false)} />
 
         <section className="rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
           <div className="mb-4">
