@@ -311,6 +311,9 @@ describe("CreateProjectWizard", () => {
     const { onClose } = renderWizard();
 
     await goToSourcesStep(user);
+    // Two steps back: the wizard runs details → people → source type, and the
+    // secondary button only reads "Cancel" once it is back on the first step.
+    await user.click(screen.getByRole("button", { name: /back/i }));
     await user.click(screen.getByRole("button", { name: /back/i }));
     await user.click(screen.getByRole("button", { name: /cancel/i }));
 

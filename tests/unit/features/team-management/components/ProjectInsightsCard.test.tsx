@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../../../setup/vitest.setup";
@@ -93,9 +93,14 @@ describe("ProjectInsightsCard", () => {
 
     render(<ProjectInsightsCard projectId={PROJECT_ID} />);
 
-    expect(await screen.findByText("Nothing connected")).toBeInTheDocument();
-    expect(screen.getByText("None assigned yet")).toBeInTheDocument();
+    expect(await screen.findByText("None assigned yet")).toBeInTheDocument();
     expect(screen.getByText("1 member")).toBeInTheDocument();
+
+    // Scoped to the Sources row: the ingestion block below says "Nothing
+    // connected" too when it has no sources, so an unscoped query matches both.
+    const sourcesRow = screen.getByText("Sources").closest("div");
+    expect(sourcesRow).not.toBeNull();
+    expect(within(sourcesRow!).getByText("Nothing connected")).toBeInTheDocument();
   });
 
   it("prefers an explicit title over the project name", async () => {
@@ -107,13 +112,18 @@ describe("ProjectInsightsCard", () => {
     expect(screen.queryByText("SprintStart Frontend")).not.toBeInTheDocument();
   });
 
-  it("shows an error instead of an empty card when the project cannot be loaded", async () => {
+  it("surfaces the server's reason instead of showing an empty card", async () => {
     server.use(
-      http.get(`/api/v1/projects/${PROJECT_ID}`, () => new HttpResponse(null, { status: 500 })),
+      http.get(`/api/v1/projects/${PROJECT_ID}`, () =>
+        HttpResponse.json({ message: "You do not manage this project." }, { status: 403 }),
+      ),
     );
 
     render(<ProjectInsightsCard projectId={PROJECT_ID} />);
 
-    expect(await screen.findByText(/could not be loaded/i)).toBeInTheDocument();
+    // The API's own message, not the generic fallback: a manager who lost
+    // access needs to know why, and "could not be loaded" would not say.
+    expect(await screen.findByText("You do not manage this project.")).toBeInTheDocument();
+    expect(screen.queryByText("Sources")).not.toBeInTheDocument();
   });
 });
