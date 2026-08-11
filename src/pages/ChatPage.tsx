@@ -325,7 +325,11 @@ export function ChatPage() {
 
       {/* Main content column */}
       <div
-        className={`relative flex min-w-0 flex-1 flex-col${desktopSidebarOpen ? "chat-sidebar-open" : ""}`}
+        /* The separating space belongs *before* `${`, never inside the string:
+           prettier-plugin-tailwindcss trims class strings when it sorts them,
+           which once silently glued `flex-col` to `chat-sidebar-open` and
+           turned the whole page into a flex row. */
+        className={`relative flex min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "chat-sidebar-open" : ""}`}
       >
         {/* Header: open-sidebar toggle floats at the far-left edge so it
                     doesn't crowd the page title's icon; title stays aligned with
