@@ -1,29 +1,60 @@
 #kc-header-wrapper {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   justify-content: center;
   align-items: center;
 }
 
-.sprintstart-logo {
-  color: var(--color-app-brand);
-  height: 3rem;
-  width: 3rem;
-}
+/* Wordmark next to the animated `SidebarLogo` badge — same
+   font-bold + tracking-tight + text-app-text recipe as every other
+   "SprintStart" wordmark in the app (LoginPage.tsx, LaunchSequence.tsx,
+   SideBar.tsx), just sized for a standalone page header rather than a
+   sidebar row.
 
+   `text-transform: none` undoes the default vendor stylesheet's
+   `#kc-header-wrapper { text-transform: uppercase; ... }` (see
+   node_modules/@keycloakify/login-ui's css/login.css) — that ID rule targets
+   the *parent*, not this element, so overriding font-size/letter-spacing
+   here (below) was not enough; text-transform inherits regardless of
+   specificity, and has to be reset directly on the element that carries the
+   text to stop "SprintStart" rendering as "SPRINTSTART". */
 .header {
   color: var(--color-app-text);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.025em;
+  text-transform: none;
+}
+
+@media (min-width: 640px) {
+  .header {
+    font-size: 1.75rem;
+  }
 }
 
 .login-pf body {
   background: var(--color-app-bg);
 }
 
+/* The login page is a transient stop on the way in or out of the app, not a
+   space to browse around in — unlike the app shell (see the matching rule in
+   src/styles/index.css), a two-finger swipe back here should behave like the
+   browser's own back button and actually navigate, not get swallowed. Import
+   order in styleLevelCustomization.tsx makes this line win the tie against
+   index.css's `html, body` rule. */
+html,
+body {
+  overscroll-behavior-x: auto;
+}
+
+/* Card radius (1.5rem) already matches the app's `rounded-3xl` scale used by
+   the standalone auth card on LoginPage.tsx. Border + shadow now match too,
+   instead of the borderless/shadowless surface this used to be. */
 .card-pf {
   background: var(--color-app-surface);
-  border: none;
+  border: 1px solid var(--color-app-border);
   border-radius: 1.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
 #kc-page-title {
@@ -38,23 +69,47 @@ div.kcFormGroupClass {
 
 .pf-c-form-control {
   background-color: var(--color-app-surface-muted);
-  border-color: var(--color-app-border-muted);
-  border-radius: 1.5rem;
-  padding-left: 0.8rem;
+  border-color: var(--color-app-border);
+  border-radius: 0.75rem;
+  height: 3rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
   color: var(--color-app-text);
   font-weight: 500;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
+/* Same focus treatment as the app's shared Input (fieldStyles.ts):
+   brand-colored border + a visible `--app-focus` ring, never just
+   `outline: none` with nothing to replace it (AGENTS.md §9). */
 .pf-c-form-control:focus {
   outline: none;
+  border-color: var(--color-app-brand-border-strong);
+  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .pf-c-input-group {
-  background-color: var(--color-app-surface);
+  background-color: transparent;
 }
 
 .password-visibility-btn {
-  margin: 0 1rem 0 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s ease;
+}
+
+.password-visibility-btn:hover {
+  background-color: var(--color-app-surface-hover);
+}
+
+.password-visibility-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .visibility-icon {
@@ -75,17 +130,51 @@ div.kcFormGroupClass {
 
 .kcButtonClass.pf-c-button {
   background-color: var(--color-app-brand);
-  border-radius: 1.5rem;
+  border-radius: 0.75rem;
+  height: 3rem;
+  padding: 0 1.5rem;
   font-weight: 600;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* Same "grows slightly on hover, settles back on press" feel as `ui/Button`'s
+   `buttonHoverMotion` (whileHover: scale 1.03, whileTap: scale 0.97) — a CSS
+   transform instead of framer-motion, since this is a plain form `<input>`
+   shared by every generated Keycloak page, not a `motion.button`. The
+   back-out easing approximates the spring's slight overshoot. */
 .kcButtonClass.pf-c-button:hover {
   background: var(--color-app-brand-hover);
+  box-shadow: var(--shadow-app-brand-lift);
+  transform: scale(1.03);
+}
+
+.kcButtonClass.pf-c-button:active {
+  transform: scale(0.97);
+}
+
+.kcButtonClass.pf-c-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .kcButtonClass.pf-c-button:disabled {
   background: var(--color-app-brand-soft);
   color: var(--color-app-text-disabled);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Respect the OS-level motion preference, same as the app's `buttonHoverMotion`
+   consumers (`ui/Button` checks `useReducedMotion`) — a growing button on
+   hover is exactly the kind of motion that setting asks to remove. */
+@media (prefers-reduced-motion: reduce) {
+  .kcButtonClass.pf-c-button:hover,
+  .kcButtonClass.pf-c-button:active {
+    transform: none;
+  }
 }
 
 input:autofill {
@@ -98,6 +187,7 @@ input[type="checkbox"] {
 }
 
 #kc-info-wrapper {
+  border-top: 1px solid var(--color-app-border);
   border-radius: 0 0 1.5rem 1.5rem;
   background-color: var(--color-app-surface-muted);
   color: var(--color-app-text-muted);

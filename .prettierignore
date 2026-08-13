@@ -14,6 +14,8 @@ src/keycloak-theme/**
 !src/keycloak-theme/login/login.css
 !src/keycloak-theme/login/styleLevelCustomization.tsx
 !src/keycloak-theme/login/components/PasswordWrapper.tsx
+!src/keycloak-theme/login/components/AuroraBackground.tsx
+!src/keycloak-theme/login/components/SpotlightCard.tsx
 !src/keycloak-theme/login/components/Template/Template.tsx
 !src/keycloak-theme/login/pages/login-passkeys-conditional-authenticate/Page.tsx
 
