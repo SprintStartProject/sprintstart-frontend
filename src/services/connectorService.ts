@@ -89,13 +89,10 @@ export const connectorService = {
     connectorId: string,
     enabled: boolean,
   ): Promise<ConfigureConnectorResponse> {
-    return apiClient.fetch<ConfigureConnectorResponse>(
-      `/api/v1/connectors/${connectorId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ enabled } satisfies ConfigureConnectorRequest),
-      },
-    );
+    return apiClient.fetch<ConfigureConnectorResponse>(`/api/v1/connectors/${connectorId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled } satisfies ConfigureConnectorRequest),
+    });
   },
 
   /**
@@ -112,9 +109,7 @@ export const connectorService = {
     connectorId: string,
     projectId?: string,
   ): Promise<GetSourcesOfConnectorResponse> {
-    const query = projectId
-      ? `?projectId=${encodeURIComponent(projectId)}`
-      : "";
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
 
     return apiClient.fetch<GetSourcesOfConnectorResponse>(
       `/api/v1/connectors/${connectorId}/sources${query}`,

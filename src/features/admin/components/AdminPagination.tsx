@@ -1,56 +1,48 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 
 type AdminPaginationProps = {
-    safePage: number;
-    totalPages: number;
-    onPageChange: (page: number) => void;
+  safePage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
 };
 
-export function AdminPagination({
-    safePage,
-    totalPages,
-    onPageChange,
-}: AdminPaginationProps) {
-    if (totalPages <= 1) return null;
+export function AdminPagination({ safePage, totalPages, onPageChange }: AdminPaginationProps) {
+  if (totalPages <= 1) return null;
 
-    return (
-        <div className="mt-4 flex items-center justify-start gap-1 overflow-x-auto pb-1 sm:justify-center">
-            <button
-                type="button"
-                onClick={() => onPageChange(Math.max(1, safePage - 1))}
-                disabled={safePage === 1}
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-app-text-muted"
-                aria-label="Previous page"
-            >
-                <ChevronLeft className="h-4 w-4" />
-            </button>
+  return (
+    <div className="mt-4 flex items-center justify-start gap-1 overflow-x-auto pb-1 sm:justify-center">
+      <Button
+        variant="ghost"
+        iconOnly
+        onClick={() => onPageChange(Math.max(1, safePage - 1))}
+        disabled={safePage === 1}
+        aria-label="Previous page"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
 
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-                (pageNumber) => (
-                    <button
-                        key={pageNumber}
-                        type="button"
-                        onClick={() => onPageChange(pageNumber)}
-                        className={`flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium transition-colors ${
-                            safePage === pageNumber
-                                ? "bg-app-surface-muted text-app-text"
-                                : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                        }`}
-                    >
-                        {pageNumber}
-                    </button>
-                ),
-            )}
+      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+        <Button
+          key={pageNumber}
+          variant={safePage === pageNumber ? "primary" : "ghost"}
+          iconOnly
+          onClick={() => onPageChange(pageNumber)}
+          aria-current={safePage === pageNumber ? "page" : undefined}
+        >
+          {pageNumber}
+        </Button>
+      ))}
 
-            <button
-                type="button"
-                onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
-                disabled={safePage === totalPages}
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-app-text-muted"
-                aria-label="Next page"
-            >
-                <ChevronRight className="h-4 w-4" />
-            </button>
-        </div>
-    );
+      <Button
+        variant="ghost"
+        iconOnly
+        onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
+        disabled={safePage === totalPages}
+        aria-label="Next page"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 }

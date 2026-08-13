@@ -13,12 +13,7 @@ export type BackendProjectSourceStatus =
   | "ERROR"
   | (string & {});
 
-export type IngestionRunStatus =
-  | "CONNECTED"
-  | "RUNNING"
-  | "COMPLETED"
-  | "PARTIAL"
-  | "FAILED";
+export type IngestionRunStatus = "CONNECTED" | "RUNNING" | "COMPLETED" | "PARTIAL" | "FAILED";
 
 /**
  * The connection health a per-repo ingestion source reports (endpoint
@@ -26,12 +21,7 @@ export type IngestionRunStatus =
  * than {@link BackendProjectSourceStatus}; every value here is also a member of
  * that broader union, so it flows through the same status-derivation helpers.
  */
-export type ConnectionStatus =
-  | "CONNECTED"
-  | "UPDATING"
-  | "OUT_OF_DATE"
-  | "FAILED"
-  | "DISABLED";
+export type ConnectionStatus = "CONNECTED" | "UPDATING" | "OUT_OF_DATE" | "FAILED" | "DISABLED";
 
 /**
  * Whether a run's artifacts have actually reached the AI service's index, separate
@@ -106,11 +96,19 @@ export type IngestionRun = {
  */
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
-  /** `"owner/name"`. */
+  /**
+   * Stable, connector-neutral key: GitHub `"owner/name"`, Jira the instance URL.
+   */
   sourceId: string;
-  repositoryId: string;
-  owner: string;
-  name: string;
+  /** Display name: GitHub `"owner/name"`, Jira the instance's display name. */
+  displayName: string;
+  /**
+   * GitHub-only repository identity. Null for connector-neutral rows such as
+   * Jira, which are identified by {@link sourceId} (the instance URL) instead.
+   */
+  repositoryId: string | null;
+  owner: string | null;
+  name: string | null;
   sourceUrl: string;
   /**
    * Connection health of the repo. Deliberately NOT called `status`: an
@@ -147,7 +145,14 @@ export type IngestionRunFilter = {
   page?: number;
   size?: number;
   sourceSystem?: SourceSystem;
+  /** GitHub repository UUID; matches runs of that repository. */
   repositoryId?: string;
+  /**
+   * Connector-neutral source-instance reference (the run's `sourceInstanceRef`).
+   * For Jira this is the instance URL, letting the history be scoped to a single
+   * Jira instance the way `repositoryId` scopes it to a GitHub repository.
+   */
+  sourceRef?: string;
   projectId?: string;
   status?: IngestionRunStatus;
   /** ISO datetime; inclusive lower bound on `startedAt`. */
@@ -171,6 +176,19 @@ export type GithubRepositoryDetails = GithubRepositoryReference & {
   enabled: boolean | null;
 };
 
+/**
+ * Jira-specific identity for a source card, mirroring
+ * {@link GithubRepositoryDetails} for the Jira connector. A connected Jira
+ * instance is identified by its URL (its primary key); the credential is the
+ * `(credentialUserEmail, credentialName)` pair used to authenticate.
+ */
+export type JiraInstanceSourceDetails = {
+  instanceUrl: string;
+  displayName: string;
+  credentialName: string;
+  credentialUserEmail: string;
+};
+
 export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
 
 /**
@@ -179,6 +197,13 @@ export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
  * other two narrow to a single section.
  */
 export type SectionKey = "overview" | "sources" | "runs";
+
+/**
+ * Left-to-right order of the section filter. Single source of truth: the filter
+ * renders in this order and the page derives the slide direction from it, so
+ * the content always travels the same way the active pill does.
+ */
+export const SECTION_ORDER: SectionKey[] = ["overview", "sources", "runs"];
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
 
@@ -239,6 +264,8 @@ export type SourceDetailsSource = {
   sharesSourceSystem?: boolean;
   failedItems?: FailedArtifact[];
   githubRepository?: GithubRepositoryDetails | null;
+  /** Jira instance identity; null/absent for non-Jira sources. */
+  jiraInstance?: JiraInstanceSourceDetails | null;
   description?: string;
   nextSync?: string;
 };

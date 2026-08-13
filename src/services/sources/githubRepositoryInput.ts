@@ -16,9 +16,7 @@ export type GithubRepositoryReference = {
  * or an SSH remote into its owner and name. Returns `null` when the value does
  * not carry both halves.
  */
-export function parseGithubRepositoryReference(
-  value: string,
-): GithubRepositoryReference | null {
+export function parseGithubRepositoryReference(value: string): GithubRepositoryReference | null {
   const normalizedInput = value
     .replace(/^https?:\/\/github\.com\//i, "")
     .replace(/^github\.com\//i, "")
@@ -26,9 +24,7 @@ export function parseGithubRepositoryReference(
     .replace(/\.git$/i, "")
     .replace(/^\/+|\/+$/g, "");
 
-  const [owner, name] = normalizedInput
-    .split("/")
-    .filter((segment) => segment.length > 0);
+  const [owner, name] = normalizedInput.split("/").filter((segment) => segment.length > 0);
 
   if (owner && name) {
     return { owner, name };
@@ -54,9 +50,7 @@ export function parseGithubOwnerInput(value: string): string | null {
     .replace(/\.git$/i, "")
     .replace(/^\/+|\/+$/g, "");
 
-  const [owner] = normalizedInput
-    .split("/")
-    .filter((segment) => segment.length > 0);
+  const [owner] = normalizedInput.split("/").filter((segment) => segment.length > 0);
 
   return owner ?? null;
 }

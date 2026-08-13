@@ -50,9 +50,13 @@ type CanonicalIngestionRunPageResponse = {
 type CanonicalSourceInstanceIngestionStatusResponse = {
   sourceSystem?: SourceSystem;
   sourceId: string;
-  repositoryId: string;
-  owner: string;
-  name: string;
+  /** Human-readable name; GitHub "owner/name", Jira the instance display name. */
+  displayName?: string | null;
+  // GitHub-only identity; null for connector-neutral rows such as Jira, whose
+  // stable key lives in `sourceId` (the instance URL) instead.
+  repositoryId?: string | null;
+  owner?: string | null;
+  name?: string | null;
   sourceUrl: string;
   connectionStatus?: ConnectionStatus | null;
   enabled?: boolean;
@@ -113,9 +117,7 @@ function normalizeRunStatus(
   }
 }
 
-function inferRunStatus(
-  run: CanonicalIngestionRunResponse,
-): IngestionRunStatus {
+function inferRunStatus(run: CanonicalIngestionRunResponse): IngestionRunStatus {
   const normalizedStatus = normalizeRunStatus(run.status);
 
   if (normalizedStatus) return normalizedStatus;
@@ -187,11 +189,14 @@ function mapSourceInstanceStatus(
   const failedItems = (status.failedItems ?? []).map(mapFailedArtifact);
 
   return {
+    // The backend now labels every row (GitHub and Jira); the fallback only
+    // covers legacy rows that predate the field, never a mislabel of Jira.
     sourceSystem: status.sourceSystem ?? "GITHUB",
     sourceId: status.sourceId,
-    repositoryId: status.repositoryId,
-    owner: status.owner,
-    name: status.name,
+    displayName: status.displayName ?? status.sourceId,
+    repositoryId: status.repositoryId ?? null,
+    owner: status.owner ?? null,
+    name: status.name ?? null,
     sourceUrl: status.sourceUrl,
     connectionStatus: normalizeConnectionStatus(status.connectionStatus),
     enabled: status.enabled ?? true,
@@ -215,8 +220,7 @@ function mapRunPageMetadata(
   const number = page?.number ?? 1;
   const size = page?.size ?? Math.max(itemCount, 1);
   const totalElements = page?.totalElements ?? itemCount;
-  const totalPages =
-    page?.totalPages ?? (size > 0 ? Math.ceil(totalElements / size) : 1);
+  const totalPages = page?.totalPages ?? (size > 0 ? Math.ceil(totalElements / size) : 1);
 
   return {
     number,
@@ -281,6 +285,7 @@ function buildRunPageQuery(filter: IngestionRunFilter): string {
 
   if (filter.sourceSystem) params.set("sourceSystem", filter.sourceSystem);
   if (filter.repositoryId) params.set("repositoryId", filter.repositoryId);
+  if (filter.sourceRef) params.set("sourceRef", filter.sourceRef);
   if (filter.projectId) params.set("projectId", filter.projectId);
   if (filter.status) params.set("status", filter.status);
   if (filter.since) params.set("since", filter.since);
@@ -335,16 +340,13 @@ export async function getIngestionRun(runId: string): Promise<IngestionRun> {
 export async function getIngestionSourceStatuses(
   projectId?: string,
 ): Promise<SourceInstanceIngestionStatus[]> {
-  const query = projectId
-    ? `?${new URLSearchParams({ projectId }).toString()}`
-    : "";
-  const data = await apiClient.fetch<
-    CanonicalSourceInstanceIngestionStatusResponse[]
-  >(`/api/v1/ingestion-sources/status${query}`);
+  const query = projectId ? `?${new URLSearchParams({ projectId }).toString()}` : "";
+  const data = await apiClient.fetch<CanonicalSourceInstanceIngestionStatusResponse[]>(
+    `/api/v1/ingestion-sources/status${query}`,
+  );
 
   return data.map(mapSourceInstanceStatus);
 }
-
 
 export async function getProjectArtifacts(
   projectId: string,
@@ -352,9 +354,7 @@ export async function getProjectArtifacts(
 ): Promise<ArtifactPage> {
   const query = buildArtifactQuery(options);
 
-  return apiClient.fetch<ArtifactPage>(
-    `/api/v1/projects/${projectId}/artifacts?${query}`,
-  );
+  return apiClient.fetch<ArtifactPage>(`/api/v1/projects/${projectId}/artifacts?${query}`);
 }
 
 export async function getProjectArtifactSnapshot(
@@ -380,10 +380,7 @@ export async function getProjectArtifactSnapshot(
   );
 
   return {
-    artifacts: [
-      ...firstPage.items,
-      ...remainingPages.flatMap((page) => page.items),
-    ],
+    artifacts: [...firstPage.items, ...remainingPages.flatMap((page) => page.items)],
     totalElements: firstPage.page.totalElements,
   };
 }

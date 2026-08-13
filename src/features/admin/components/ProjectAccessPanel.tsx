@@ -1,13 +1,7 @@
 import { useMemo, useState } from "react";
-import {
-  AlertCircle,
-  ExternalLink,
-  Folder,
-  Loader2,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 import type { ProjectSummary } from "../types";
 
 export type ProjectAccessPanelProps = {
@@ -45,12 +39,11 @@ export function ProjectAccessPanel({
     [assignedProjects],
   );
 
-  const [projectPickerState, setProjectPickerState] =
-    useState<ProjectPickerState>(() => ({
-      sourceKey: assignedProjectKey,
-      search: "",
-      isOpen: false,
-    }));
+  const [projectPickerState, setProjectPickerState] = useState<ProjectPickerState>(() => ({
+    sourceKey: assignedProjectKey,
+    search: "",
+    isOpen: false,
+  }));
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -120,9 +113,7 @@ export function ProjectAccessPanel({
       closeProjectPicker();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Project assignment could not be saved.",
+        error instanceof Error ? error.message : "Project assignment could not be saved.",
       );
     } finally {
       setPendingProjectId(null);
@@ -139,9 +130,7 @@ export function ProjectAccessPanel({
       await onRemoveProject(projectId);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Project assignment could not be removed.",
+        error instanceof Error ? error.message : "Project assignment could not be removed.",
       );
     } finally {
       setPendingProjectId(null);
@@ -149,44 +138,36 @@ export function ProjectAccessPanel({
   };
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:rounded-3xl sm:p-4">
+    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:p-4">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="items-center align-middle">
-          <p className="text-xl font-semibold text-app-text sm:text-2xl">
-            Projects
-          </p>
-          <p className="mt-1 text-sm text-app-text-muted">
-            Changes are saved immediately.
-          </p>
+          <p className="text-xl font-semibold text-app-text sm:text-2xl">Projects</p>
+          <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
         </div>
 
         <div className="relative">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={toggleProjectPicker}
-            disabled={hasPendingProjectChange}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            loading={hasPendingProjectChange}
+            icon={<Plus className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
-            {hasPendingProjectChange ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
             Add project
-          </button>
+          </Button>
 
           {openProjectPicker && (
-            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-xl">
-              <div className="relative mb-2">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-app-text-disabled" />
-                <input
-                  value={projectSearch}
-                  onChange={(event) => updateProjectSearch(event.target.value)}
-                  placeholder="Search projects..."
-                  disabled={hasPendingProjectChange}
-                  className="h-9 w-full rounded-xl border border-app-border bg-app-surface-muted pl-9 pr-3 text-sm text-app-text outline-none placeholder:text-app-text-disabled focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
+            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-lg">
+              <Input
+                size="sm"
+                value={projectSearch}
+                onChange={(event) => updateProjectSearch(event.target.value)}
+                placeholder="Search projects..."
+                aria-label="Search projects"
+                disabled={hasPendingProjectChange}
+                icon={<Search className="h-3.5 w-3.5" />}
+                className="mb-2"
+              />
 
               <div className="max-h-64 space-y-1 overflow-auto">
                 {projectOptions.length > 0 ? (
@@ -243,48 +224,45 @@ export function ProjectAccessPanel({
                   </div>
 
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-app-text">
-                      {project.name}
-                    </p>
-                    <p className="mt-1 break-all font-mono text-xs text-app-text-muted">
+                    <p className="truncate font-semibold text-app-text">{project.name}</p>
+                    <p className="mt-1 font-mono text-xs break-all text-app-text-muted">
                       {project.id}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={() => onOpenProjectDetails(project.id)}
                     disabled={hasPendingProjectChange}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-disabled transition-colors hover:bg-app-brand-soft hover:text-app-brand-text disabled:cursor-not-allowed disabled:opacity-60"
+                    className="hover:bg-app-brand-soft hover:text-app-brand-text"
                     aria-label={`Open ${project.name} project details`}
                   >
                     <ExternalLink className="h-4 w-4" />
-                  </button>
+                  </Button>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={() => void removeProject(project.id)}
                     disabled={hasPendingProjectChange}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-disabled transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-60"
+                    loading={pendingProjectId === project.id}
+                    className="hover:bg-app-danger-bg hover:text-app-danger-text"
                     aria-label={`Remove ${project.name}`}
                   >
-                    {pendingProjectId === project.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-app-border bg-app-surface px-4 py-8 text-center lg:col-span-2">
-            <p className="text-sm font-medium text-app-text">
-              No projects assigned
-            </p>
+            <p className="text-sm font-medium text-app-text">No projects assigned</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Add a project to assign this user to a project.
             </p>

@@ -1,4 +1,8 @@
-import { connectGithubRepository } from "../../services/sources/githubService";
+import {
+  addRepositoryToProject,
+  connectGithubRepository,
+} from "../../services/sources/githubService";
+import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
 
 /**
  * Staged GitHub sources waiting to be connected to a project.
@@ -9,11 +13,7 @@ import { connectGithubRepository } from "../../services/sources/githubService";
  * of failing the whole batch.
  */
 
-export type DraftSourceStatus =
-  | "pending"
-  | "connecting"
-  | "connected"
-  | "failed";
+export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
 export type DraftSource = {
   /** Client-side identity; the backend never sees this. */
@@ -23,6 +23,12 @@ export type DraftSource = {
   tokenName: string;
   status: DraftSourceStatus;
   errorMessage: string;
+  /**
+   * Set when the repository is already ingested elsewhere: connecting then only
+   * links it to the project (reusing its artifacts) instead of fetching and
+   * ingesting it again. Absent for genuinely new repositories.
+   */
+  repositoryId?: string;
 };
 
 let draftSourceCounter = 0;
@@ -31,6 +37,7 @@ export function createDraftSource(
   owner: string,
   name: string,
   tokenName: string,
+  repositoryId?: string,
 ): DraftSource {
   draftSourceCounter += 1;
 
@@ -41,7 +48,25 @@ export function createDraftSource(
     tokenName,
     status: "pending",
     errorMessage: "",
+    repositoryId,
   };
+}
+
+/**
+ * Stages a repository picked in the GitHub discovery flow. A `linkable`
+ * selection carries the repository id so it can be linked without re-ingesting;
+ * everything else is staged as a new repository to fetch and ingest.
+ */
+export function createDraftSourceFromDiscovery(
+  selection: DiscoverySelection,
+  tokenName: string,
+): DraftSource {
+  return createDraftSource(
+    selection.owner,
+    selection.name,
+    tokenName,
+    selection.linkState === "linkable" ? selection.repositoryId : undefined,
+  );
 }
 
 export function isSameRepository(left: DraftSource, right: DraftSource) {
@@ -52,10 +77,7 @@ export function isSameRepository(left: DraftSource, right: DraftSource) {
 }
 
 /** Appends a source unless the same repository is already staged. */
-export function addDraftSource(
-  sources: DraftSource[],
-  source: DraftSource,
-): DraftSource[] {
+export function addDraftSource(sources: DraftSource[], source: DraftSource): DraftSource[] {
   if (sources.some((current) => isSameRepository(current, source))) {
     return sources;
   }
@@ -63,10 +85,7 @@ export function addDraftSource(
   return [...sources, source];
 }
 
-export function removeDraftSource(
-  sources: DraftSource[],
-  sourceId: string,
-): DraftSource[] {
+export function removeDraftSource(sources: DraftSource[], sourceId: string): DraftSource[] {
   return sources.filter((source) => source.id !== sourceId);
 }
 
@@ -75,9 +94,7 @@ function patchDraftSource(
   sourceId: string,
   patch: Partial<DraftSource>,
 ): DraftSource[] {
-  return sources.map((source) =>
-    source.id === sourceId ? { ...source, ...patch } : source,
-  );
+  return sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source));
 }
 
 export function countUnconnectedSources(sources: DraftSource[]): number {
@@ -119,24 +136,26 @@ export async function connectDraftSources(
     );
 
     try {
-      await connectGithubRepository({
-        owner: source.owner,
-        name: source.name,
-        tokenName: source.tokenName,
-        projectId,
-      });
+      if (source.repositoryId) {
+        // Already ingested elsewhere: link it to this project, reusing its
+        // artifacts instead of fetching and ingesting the repository again.
+        await addRepositoryToProject(source.repositoryId, projectId);
+      } else {
+        await connectGithubRepository({
+          owner: source.owner,
+          name: source.name,
+          tokenName: source.tokenName,
+          projectId,
+        });
+      }
 
-      publish(
-        patchDraftSource(currentSources, source.id, { status: "connected" }),
-      );
+      publish(patchDraftSource(currentSources, source.id, { status: "connected" }));
     } catch (error) {
       publish(
         patchDraftSource(currentSources, source.id, {
           status: "failed",
           errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Repository could not be connected.",
+            error instanceof Error ? error.message : "Repository could not be connected.",
         }),
       );
     }

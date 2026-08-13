@@ -1,10 +1,6 @@
-import {
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  ListTree,
-  XCircle,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle2, ListTree, XCircle } from "lucide-react";
+import { Button } from "../../../components/ui/Button.tsx";
+import { EmptyState } from "../../../components/ui/EmptyState.tsx";
 import { formatConfiguredAt } from "../data.ts";
 import type { ConnectorListItem } from "../types.ts";
 import { ConnectorSourcesSection } from "./ConnectorSourcesSection.tsx";
@@ -39,14 +35,9 @@ export function ConnectorList({
 }: ConnectorListProps) {
   if (connectors.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted p-8 text-center">
-        <p className="text-sm font-medium text-app-text">
-          No connectors registered
-        </p>
-        <p className="mt-1 text-sm text-app-text-muted">
-          Connectors will appear here once they are registered on the backend.
-        </p>
-      </div>
+      <EmptyState title="No connectors registered">
+        Connectors will appear here once they are registered on the backend.
+      </EmptyState>
     );
   }
 
@@ -69,15 +60,9 @@ export function ConnectorList({
                 </div>
 
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-app-text">
-                    {connector.meta.label}
-                  </p>
-                  <p className="mt-1 font-mono text-xs text-app-text-muted">
-                    {connector.id}
-                  </p>
-                  <p className="mt-2 text-sm text-app-text-muted">
-                    {connector.meta.description}
-                  </p>
+                  <p className="truncate font-semibold text-app-text">{connector.meta.label}</p>
+                  <p className="mt-1 font-mono text-xs text-app-text-muted">{connector.id}</p>
+                  <p className="mt-2 text-sm text-app-text-muted">{connector.meta.description}</p>
                 </div>
               </div>
 
@@ -97,45 +82,41 @@ export function ConnectorList({
                 )}
 
                 <p className="text-xs text-app-text-subtle">
-                  Last configured:{" "}
-                  {formatConfiguredAt(connector.lastConfiguredAt)}
+                  Last configured: {formatConfiguredAt(connector.lastConfiguredAt)}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
+              <Button
+                variant={connector.enabled ? "dangerSoft" : "primary"}
                 onClick={() => onToggleEnabled(connector)}
-                disabled={isToggling}
-                className={[
-                  "flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-                  connector.enabled
-                    ? "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:bg-app-danger-solid hover:text-white"
-                    : "border-app-brand-border-strong bg-app-brand text-white hover:bg-app-brand-hover",
-                ].join(" ")}
+                loading={isToggling}
+                className="flex-1"
               >
                 {isToggling
                   ? "Saving..."
                   : connector.enabled
                     ? "Disable connector"
                     : "Enable connector"}
-              </button>
+              </Button>
 
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => onToggleSources(connector)}
                 aria-expanded={isExpanded}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface-muted px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover"
+                icon={<ListTree className="h-4 w-4" />}
+                trailingIcon={
+                  isExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )
+                }
+                className="flex-1"
               >
-                <ListTree className="h-4 w-4" />
                 {isExpanded ? "Hide sources" : "Manage sources"}
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </button>
+              </Button>
             </div>
 
             {isExpanded && (

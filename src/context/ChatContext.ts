@@ -10,8 +10,8 @@ type MessagesByChat = Record<string, ChatMessage[]>;
  * popover position itself near the click instead of at a hardcoded location.
  */
 export type SelectedCitation = {
-    citation: Citation;
-    rect: DOMRect;
+  citation: Citation;
+  rect: DOMRect;
 };
 
 /**
@@ -20,61 +20,84 @@ export type SelectedCitation = {
  * background even when the user leaves the chat page and returns later.
  */
 export type ChatContextValue = {
-    chats: Chat[];
-    sortedChats: Chat[];
-    messagesByChat: MessagesByChat;
+  chats: Chat[];
+  sortedChats: Chat[];
 
-    isThinking: boolean;
-    isStreaming: boolean;
-    streamingMessageId: string | null;
-    thinkingState: string | null;
+  /**
+   * The project `chats` was loaded for, or `null` while a load is pending. Lets consumers
+   * distinguish "this project has no such chat" from "the list has not arrived yet".
+   */
+  chatsProjectId: string | null;
 
-    selectedCitation: SelectedCitation | null;
-    setSelectedCitation: (value: SelectedCitation | null) => void;
+  /** The globally selected project, mirrored here so chat consumers need only one context. */
+  selectedProjectId: string;
+  messagesByChat: MessagesByChat;
 
-    newRequest: string;
-    setNewRequest: (value: string) => void;
+  isThinking: boolean;
+  isStreaming: boolean;
+  streamingMessageId: string | null;
+  thinkingState: string | null;
 
-    showFilters: boolean;
-    setShowFilters: (value: boolean | ((prev: boolean) => boolean)) => void;
+  /**
+   * The chat the in-flight stream belongs to, or `null` when nothing is
+   * running. The four flags above are global (only one stream runs at a
+   * time), so consumers MUST gate them on this id — otherwise the thinking
+   * indicator, the composer's busy state and the stop button leak into
+   * whatever chat the user has since navigated to. `useChat` does this
+   * gating; prefer its derived values over reading the raw flags here.
+   */
+  streamingChatId: string | null;
 
-    from: string;
-    setFrom: (value: string) => void;
+  selectedCitation: SelectedCitation | null;
+  setSelectedCitation: (value: SelectedCitation | null) => void;
 
-    to: string;
-    setTo: (value: string) => void;
+  newRequest: string;
+  setNewRequest: (value: string) => void;
 
-    sourceSystems: SourceSystem[];
-    toggleSourceSystem: (source: SourceSystem) => void;
+  showFilters: boolean;
+  setShowFilters: (value: boolean | ((prev: boolean) => boolean)) => void;
 
-    activeFilterCount: number;
-    clearFilters: () => void;
+  from: string;
+  setFrom: (value: string) => void;
 
-    /**
-     * Loads messages for a chat from the backend (if not already cached in
-     * `messagesByChat`). Called by the `useChat` hook when a chat is opened.
-     */
-    loadMessages: (chatId: string) => Promise<void>;
+  to: string;
+  setTo: (value: string) => void;
 
-    /**
-     * Sends a user message and streams the AI response. Takes the routing
-     * `chatId` and `navigate` as parameters so the provider itself has no
-     * router dependency and stays mounted across route changes.
-     */
-    sendMessage: (chatId: string | undefined, text: string, navigate: NavigateFunction) => Promise<void>;
+  sourceSystems: SourceSystem[];
+  toggleSourceSystem: (source: SourceSystem) => void;
 
-    /**
-     * Aborts the in-flight chat stream (if any). The partial content already
-     * streamed stays visible — this is a clean stop, not an error. Called by
-     * the "Stop" button in the chat UI.
-     */
-    stopStreaming: () => void;
+  activeFilterCount: number;
+  clearFilters: () => void;
 
-    /**
-     * Refreshes the chat list from the backend. Called internally after a
-     * stream finishes; also exposed so the hook can call it on mount.
-     */
-    refreshChats: () => Promise<void>;
+  /**
+   * Loads messages for a chat from the backend (if not already cached in
+   * `messagesByChat`). Called by the `useChat` hook when a chat is opened.
+   */
+  loadMessages: (chatId: string) => Promise<void>;
+
+  /**
+   * Sends a user message and streams the AI response. Takes the routing
+   * `chatId` and `navigate` as parameters so the provider itself has no
+   * router dependency and stays mounted across route changes.
+   */
+  sendMessage: (
+    chatId: string | undefined,
+    text: string,
+    navigate: NavigateFunction,
+  ) => Promise<void>;
+
+  /**
+   * Aborts the in-flight chat stream (if any). The partial content already
+   * streamed stays visible — this is a clean stop, not an error. Called by
+   * the "Stop" button in the chat UI.
+   */
+  stopStreaming: () => void;
+
+  /**
+   * Refreshes the chat list from the backend. Called internally after a
+   * stream finishes; also exposed so the hook can call it on mount.
+   */
+  refreshChats: () => Promise<void>;
 };
 
 export const ChatContext = createContext<ChatContextValue | undefined>(undefined);

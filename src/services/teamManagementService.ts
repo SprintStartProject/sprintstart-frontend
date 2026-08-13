@@ -16,12 +16,15 @@ import type {
   StepType,
 } from "../features/onboarding/types";
 
-let mockUsers = teamOverviewMock.users as TeamOverviewUser[];
+// The fixture predates the `projects` list and still carries a single
+// `project`, so it goes through the same normalization as an API response.
+let mockUsers = (teamOverviewMock.users as unknown as BackendTeamOverviewUser[]).map((user) => ({
+  ...user,
+  projects: toTeamOverviewProjects(user),
+}));
 
 let mockProjectRoles: ProjectRole[] = Array.from(
-  new Map(
-    mockUsers.flatMap((user) => user.roles).map((role) => [role.id, role]),
-  ).values(),
+  new Map(mockUsers.flatMap((user) => user.roles).map((role) => [role.id, role])).values(),
 );
 
 type LegacySkill = {
@@ -45,6 +48,40 @@ function normalizeSkill(skill: LegacySkill): Skill {
 
 let mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
 
+/**
+ * Team-overview user as the API actually sends it.
+ *
+ * The projects arrive under `projectIds` as objects keyed by `projectId`. The
+ * older single `project` shape is still accepted because fixtures and the
+ * `me/team-overview` endpoint use it.
+ */
+type BackendTeamOverviewUser = Omit<TeamOverviewUser, "projects"> & {
+  projectIds?: { projectId?: string; id?: string; name?: string }[];
+  project?: { id?: string; name?: string };
+};
+
+/** Normalizes whichever project shape the API returned into `projects`. */
+function toTeamOverviewProjects(user: BackendTeamOverviewUser): TeamOverviewUser["projects"] {
+  const fromList = (user.projectIds ?? []).flatMap((project) => {
+    const id = project.projectId ?? project.id;
+
+    return id ? [{ id, name: project.name ?? "" }] : [];
+  });
+
+  if (fromList.length > 0) return fromList;
+
+  return user.project?.id ? [{ id: user.project.id, name: user.project.name ?? "" }] : [];
+}
+
+/**
+ * Skill levels for the *currently authenticated* user.
+ *
+ * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
+ * open to the USER role — the admin endpoint behind `getUserSkillLevels`
+ * would 403 for a regular user looking at their own dashboard. The raw
+ * assessments only carry skill IDs, so names and roles are joined in from
+ * the skill and project-role lists.
+ */
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,
@@ -60,12 +97,13 @@ export async function getTeamOverview(
     const query = params.toString();
     const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
 
-    const response = await apiClient.fetch<{ content: TeamOverviewUser[] }>(
-      url,
-    );
+    const response = await apiClient.fetch<{
+      content: BackendTeamOverviewUser[];
+    }>(url);
 
     const users = response.content.map((user) => ({
       ...user,
+      projects: toTeamOverviewProjects(user),
       roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
         ...role,
         id: role.id || role.roleId || "",
@@ -93,9 +131,7 @@ export async function getTeamOverview(
   }
 }
 
-export async function getTeamMember(
-  userId: string,
-): Promise<TeamOverviewUser | undefined> {
+export async function getTeamMember(userId: string): Promise<TeamOverviewUser | undefined> {
   const users = await getTeamOverview();
 
   return users.find((user) => user.userId === userId);
@@ -103,11 +139,12 @@ export async function getTeamMember(
 
 export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
   try {
-    const user = await apiClient.fetch<TeamOverviewUser>(
+    const user = await apiClient.fetch<BackendTeamOverviewUser>(
       "/api/v1/onboarding/me/team-overview",
     );
     return {
       ...user,
+      projects: toTeamOverviewProjects(user),
       roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
         ...role,
         id: role.id || role.roleId || "",
@@ -121,9 +158,9 @@ export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
 
 export async function getProjectRoles(): Promise<ProjectRole[]> {
   try {
-    const response = await apiClient.fetch<
-      { projectRoles?: ProjectRole[] } | ProjectRole[]
-    >("/api/v1/projectRoles");
+    const response = await apiClient.fetch<{ projectRoles?: ProjectRole[] } | ProjectRole[]>(
+      "/api/v1/projectRoles",
+    );
 
     return Array.isArray(response) ? response : (response.projectRoles ?? []);
   } catch {
@@ -131,10 +168,7 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
   }
 }
 
-export async function createProjectRole(
-  name: string,
-  description: string,
-): Promise<ProjectRole> {
+export async function createProjectRole(name: string, description: string): Promise<ProjectRole> {
   try {
     return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
       method: "POST",
@@ -156,10 +190,7 @@ export async function createProjectRole(
   }
 }
 
-export async function assignProjectRoleToUser(
-  userId: string,
-  roleId: string,
-): Promise<void> {
+export async function assignProjectRoleToUser(userId: string, roleId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/users/${userId}/project-roles`, {
       method: "POST",
@@ -170,18 +201,14 @@ export async function assignProjectRoleToUser(
 
     return;
   } catch {
-    const role = mockProjectRoles.find(
-      (projectRole) => projectRole.id === roleId,
-    );
+    const role = mockProjectRoles.find((projectRole) => projectRole.id === roleId);
 
     if (!role) return;
 
     mockUsers = mockUsers.map((user) => {
       if (user.userId !== userId) return user;
 
-      const alreadyAssigned = user.roles.some(
-        (userRole) => userRole.id === roleId,
-      );
+      const alreadyAssigned = user.roles.some((userRole) => userRole.id === roleId);
 
       if (alreadyAssigned) return user;
 
@@ -193,10 +220,7 @@ export async function assignProjectRoleToUser(
   }
 }
 
-export async function unassignProjectRoleFromUser(
-  userId: string,
-  roleId: string,
-): Promise<void> {
+export async function unassignProjectRoleFromUser(userId: string, roleId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/users/${userId}/project-roles/${roleId}`, {
       method: "DELETE",
@@ -215,6 +239,32 @@ export async function unassignProjectRoleFromUser(
   }
 }
 
+/**
+ * Anything that can change whether the PM dashboard still needs attention
+ * announces itself here: deciding a skip request, or marking feedback read.
+ *
+ * A tiny emitter rather than a context, because the only listener is the
+ * sidebar badge and the callers are plain service functions. Without it the
+ * badge would keep bouncing until the next rate-limited check, long after the
+ * user has dealt with the thing it was pointing at.
+ */
+type PmAttentionListener = () => void;
+
+const pmAttentionListeners = new Set<PmAttentionListener>();
+
+export function onPmAttentionChanged(listener: PmAttentionListener): () => void {
+  pmAttentionListeners.add(listener);
+  return () => {
+    pmAttentionListeners.delete(listener);
+  };
+}
+
+function notifyPmAttentionChanged(): void {
+  pmAttentionListeners.forEach((listener) => {
+    listener();
+  });
+}
+
 export async function acceptOnboardingSkipRequest(
   skipId: string,
   reviewComment = "",
@@ -225,18 +275,19 @@ export async function acceptOnboardingSkipRequest(
       reviewComment,
     }),
   });
+
+  notifyPmAttentionChanged();
 }
 
-export async function denyOnboardingSkipRequest(
-  skipId: string,
-  reviewComment = "",
-): Promise<void> {
+export async function denyOnboardingSkipRequest(skipId: string, reviewComment = ""): Promise<void> {
   await apiClient.fetch(`/api/v1/admin/onboarding/skips/${skipId}/deny`, {
     method: "POST",
     body: JSON.stringify({
       reviewComment,
     }),
   });
+
+  notifyPmAttentionChanged();
 }
 
 export type OnboardingFeedback = {
@@ -252,9 +303,7 @@ export type OnboardingFeedback = {
   readAt?: string | null;
 };
 
-export async function getUserOnboardingFeedback(
-  userId: string,
-): Promise<OnboardingFeedback[]> {
+export async function getUserOnboardingFeedback(userId: string): Promise<OnboardingFeedback[]> {
   const feedback = await apiClient.fetch<OnboardingFeedback[]>(
     `/api/v1/admin/onboarding/users/${userId}/feedback`,
   );
@@ -265,12 +314,8 @@ export async function getUserOnboardingFeedback(
   }));
 }
 
-export async function getAllOnboardingFeedback(): Promise<
-  OnboardingFeedback[]
-> {
-  const feedback = await apiClient.fetch<OnboardingFeedback[]>(
-    "/api/v1/admin/onboarding/feedback",
-  );
+export async function getAllOnboardingFeedback(): Promise<OnboardingFeedback[]> {
+  const feedback = await apiClient.fetch<OnboardingFeedback[]>("/api/v1/admin/onboarding/feedback");
 
   return feedback.map((item) => ({
     ...item,
@@ -278,15 +323,12 @@ export async function getAllOnboardingFeedback(): Promise<
   }));
 }
 
-export async function markOnboardingFeedbackRead(
-  feedbackId: string,
-): Promise<void> {
-  await apiClient.fetch(
-    `/api/v1/admin/onboarding/feedback/${feedbackId}/read`,
-    {
-      method: "POST",
-    },
-  );
+export async function markOnboardingFeedbackRead(feedbackId: string): Promise<void> {
+  await apiClient.fetch(`/api/v1/admin/onboarding/feedback/${feedbackId}/read`, {
+    method: "POST",
+  });
+
+  notifyPmAttentionChanged();
 }
 
 export async function getUserOnboardingPath(
@@ -384,13 +426,10 @@ export async function createOnboardingTaskForStep(
   stepId: string,
   request: CreateOnboardingTaskRequest,
 ): Promise<OnboardingTaskEndpoint> {
-  return await apiClient.fetch<OnboardingTaskEndpoint>(
-    `/api/v1/onboarding/steps/${stepId}/tasks`,
-    {
-      method: "POST",
-      body: JSON.stringify(request),
-    },
-  );
+  return await apiClient.fetch<OnboardingTaskEndpoint>(`/api/v1/onboarding/steps/${stepId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
 }
 
 export async function deleteOnboardingStep(stepId: string): Promise<void> {
@@ -421,9 +460,7 @@ export async function updateOnboardingTask(
   });
 }
 
-export async function getOnboardingTasksByStep(
-  stepId: string,
-): Promise<OnboardingTaskEndpoint[]> {
+export async function getOnboardingTasksByStep(stepId: string): Promise<OnboardingTaskEndpoint[]> {
   try {
     return await apiClient.fetch<OnboardingTaskEndpoint[]>(
       `/api/v1/onboarding/steps/${stepId}/tasks`,
@@ -474,8 +511,7 @@ function toSkill(skill: SkillResponseDto): Skill {
 
 export async function getSkills(): Promise<Skill[]> {
   try {
-    const response =
-      await apiClient.fetch<SkillResponseDto[]>("/api/v1/skills");
+    const response = await apiClient.fetch<SkillResponseDto[]>("/api/v1/skills");
 
     return response.map(toSkill);
   } catch {
@@ -484,9 +520,7 @@ export async function getSkills(): Promise<Skill[]> {
 }
 
 export async function getSkillById(skillId: string): Promise<Skill> {
-  const response = await apiClient.fetch<SkillResponseDto>(
-    `/api/v1/skills/${skillId}`,
-  );
+  const response = await apiClient.fetch<SkillResponseDto>(`/api/v1/skills/${skillId}`);
 
   return toSkill(response);
 }
@@ -495,13 +529,10 @@ export async function updateSkill(
   skillId: string,
   data: { name?: string; roleIds?: string[] },
 ): Promise<Skill> {
-  const response = await apiClient.fetch<SkillResponseDto>(
-    `/api/v1/admin/skills/${skillId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    },
-  );
+  const response = await apiClient.fetch<SkillResponseDto>(`/api/v1/admin/skills/${skillId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 
   return toSkill(response);
 }
@@ -514,10 +545,7 @@ export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
   return response.map(toSkill);
 }
 
-export async function updateRoleSkills(
-  roleId: string,
-  skillIds: string[],
-): Promise<Skill[]> {
+export async function updateRoleSkills(roleId: string, skillIds: string[]): Promise<Skill[]> {
   const response = await apiClient.fetch<SkillResponseDto[]>(
     `/api/v1/projectRoles/${roleId}/skills`,
     {
@@ -535,16 +563,13 @@ export async function reactivateSkill(
   roleIds: string[],
 ): Promise<Skill> {
   try {
-    const response = await apiClient.fetch<SkillResponseDto>(
-      "/api/v1/admin/skills",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          roleIds,
-        }),
-      },
-    );
+    const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        roleIds,
+      }),
+    });
 
     return toSkill(response);
   } catch {
@@ -563,35 +588,26 @@ export async function reactivateSkill(
   }
 }
 
-export async function createSkill(
-  name: string,
-  roleIds: string[],
-): Promise<Skill> {
+export async function createSkill(name: string, roleIds: string[]): Promise<Skill> {
   try {
-    const response = await apiClient.fetch<SkillResponseDto>(
-      "/api/v1/admin/skills",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          roleIds,
-        }),
-      },
-    );
+    const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        roleIds,
+      }),
+    });
 
     return toSkill(response);
   } catch {
     const existing = mockSkills.find(
-      (s) =>
-        s.name.toLowerCase() === name.toLowerCase() && s.status === "RETIRED",
+      (s) => s.name.toLowerCase() === name.toLowerCase() && s.status === "RETIRED",
     );
 
     if (existing) {
       const reactivated: Skill = { ...existing, roleIds, status: "ACTIVE" };
 
-      mockSkills = mockSkills.map((s) =>
-        s.id === existing.id ? reactivated : s,
-      );
+      mockSkills = mockSkills.map((s) => (s.id === existing.id ? reactivated : s));
 
       return reactivated;
     }
@@ -663,14 +679,10 @@ function getSkillAssessmentPromptStateKey(userId: string) {
   return `${skillAssessmentPromptStatePrefix}:${userId}`;
 }
 
-export function getSkillAssessmentPromptState(
-  userId: string,
-): SkillAssessmentPromptState | null {
+export function getSkillAssessmentPromptState(userId: string): SkillAssessmentPromptState | null {
   if (typeof window === "undefined") return null;
 
-  const value = window.localStorage.getItem(
-    getSkillAssessmentPromptStateKey(userId),
-  );
+  const value = window.localStorage.getItem(getSkillAssessmentPromptStateKey(userId));
 
   return value === "dismissed" || value === "completed" ? value : null;
 }
@@ -678,33 +690,22 @@ export function getSkillAssessmentPromptState(
 export function markSkillAssessmentPromptDismissed(userId: string): void {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(
-    getSkillAssessmentPromptStateKey(userId),
-    "dismissed",
-  );
+  window.localStorage.setItem(getSkillAssessmentPromptStateKey(userId), "dismissed");
 }
 
 export function markSkillAssessmentPromptCompleted(userId: string): void {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(
-    getSkillAssessmentPromptStateKey(userId),
-    "completed",
-  );
+  window.localStorage.setItem(getSkillAssessmentPromptStateKey(userId), "completed");
 }
 
-export async function hasCompletedSkillAssessment(
-  userId: string,
-): Promise<boolean> {
+export async function hasCompletedSkillAssessment(userId: string): Promise<boolean> {
   try {
-    const response =
-      await apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills");
+    const response = await apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills");
 
     return response.length > 0;
   } catch {
-    return mockSkillAssessments.some(
-      (assessment) => assessment.userId === userId,
-    );
+    return mockSkillAssessments.some((assessment) => assessment.userId === userId);
   }
 }
 
@@ -726,8 +727,7 @@ export async function saveUserSkillAssessments(
       (assessment) =>
         !assessments.some(
           (incoming) =>
-            incoming.userId === assessment.userId &&
-            incoming.skillId === assessment.skillId,
+            incoming.userId === assessment.userId && incoming.skillId === assessment.skillId,
         ),
     );
 
@@ -743,17 +743,13 @@ export type UserSkillLevel = {
   level: SkillLevel;
 };
 
-async function getCompletedSkillAssessments(
-  userId: string,
-): Promise<SkillAssessmentResponseDto[]> {
+async function getCompletedSkillAssessments(userId: string): Promise<SkillAssessmentResponseDto[]> {
   return await apiClient.fetch<SkillAssessmentResponseDto[]>(
     `/api/v1/admin/users/${userId}/skill-assessments/completed`,
   );
 }
 
-export async function getUserSkillLevels(
-  userId: string,
-): Promise<UserSkillLevel[]> {
+export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel[]> {
   try {
     const [assessments, skills, roles] = await Promise.all([
       getCompletedSkillAssessments(userId),
@@ -769,6 +765,42 @@ export async function getUserSkillLevels(
 
       return {
         id: `${userId}-${assessment.skillId}`,
+        skillId: assessment.skillId,
+        skillName: skill?.name ?? "Unknown skill",
+        roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",
+        level: assessment.level,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Skill levels for the *currently authenticated* user.
+ *
+ * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
+ * open to the USER role — the admin endpoint behind `getUserSkillLevels`
+ * would 403 for a regular user looking at their own dashboard. The raw
+ * assessments only carry skill IDs, so names and roles are joined in from
+ * the skill and project-role lists.
+ */
+export async function getMySkillLevels(): Promise<UserSkillLevel[]> {
+  try {
+    const [assessments, skills, roles] = await Promise.all([
+      apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills"),
+      getSkills(),
+      getProjectRoles(),
+    ]);
+
+    return assessments.map((assessment) => {
+      const skill = skills.find((s) => s.id === assessment.skillId);
+      const roleNames = roles
+        .filter((role) => skill?.roleIds.includes(role.id))
+        .map((role) => role.name);
+
+      return {
+        id: `${assessment.userId}-${assessment.skillId}`,
         skillId: assessment.skillId,
         skillName: skill?.name ?? "Unknown skill",
         roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",

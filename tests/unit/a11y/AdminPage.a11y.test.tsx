@@ -7,17 +7,17 @@ import { MemoryRouter } from "react-router-dom";
 import { AdminPage } from "../../../src/pages/AdminPage";
 import { server } from "../setup/vitest.setup";
 
-vi.mock('../../../src/features/projects/useProjectContext', async () => {
-    const { createProjectContextValue } = await import('../setup/projectContext');
-    return { useProjectContext: () => createProjectContextValue() };
+vi.mock("../../../src/features/projects/useProjectContext", async () => {
+  const { createProjectContextValue } = await import("../setup/projectContext");
+  return { useProjectContext: () => createProjectContextValue() };
 });
 
-vi.mock('../../../src/context/useAuth', () => ({
-    useAuth: () => ({
-        profile: { id: 'admin-1', username: 'admin', permissionGroup: 'ADMIN' },
-        status: 'authenticated',
-        logout: vi.fn(),
-    }),
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "admin-1", username: "admin", permissionGroup: "ADMIN" },
+    status: "authenticated",
+    logout: vi.fn(),
+  }),
 }));
 
 const adminUsers = [
@@ -59,9 +59,7 @@ describe("AdminPage Accessibility", () => {
 
     await user.click(screen.getByRole("button", { name: "Projects" }));
     await waitFor(() => {
-      expect(
-        screen.getByRole("textbox", { name: "Search projects" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Search projects" })).toBeInTheDocument();
     });
     expect(await axe(baseElement)).toHaveNoViolations();
 

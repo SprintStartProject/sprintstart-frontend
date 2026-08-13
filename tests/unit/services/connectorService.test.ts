@@ -51,14 +51,10 @@ describe("connectorService", () => {
 
   it("setConnectorEnabled rejects with an ApiError on 403", async () => {
     server.use(
-      http.patch("/api/v1/connectors/github", () =>
-        HttpResponse.text("", { status: 403 }),
-      ),
+      http.patch("/api/v1/connectors/github", () => HttpResponse.text("", { status: 403 })),
     );
 
-    await expect(
-      connectorService.setConnectorEnabled("github", true),
-    ).rejects.toThrow();
+    await expect(connectorService.setConnectorEnabled("github", true)).rejects.toThrow();
   });
 
   it("getConnectorSources returns the sources of a connector", async () => {
@@ -87,24 +83,21 @@ describe("connectorService", () => {
 
   it("patchConnectorSources sends a batched update and returns patched sources", async () => {
     server.use(
-      http.patch(
-        "/api/v1/connectors/github/sources/status",
-        async ({ request }) => {
-          const body = (await request.json()) as {
-            sources: { sourceId: string; enabled: boolean }[];
-          };
+      http.patch("/api/v1/connectors/github/sources/status", async ({ request }) => {
+        const body = (await request.json()) as {
+          sources: { sourceId: string; enabled: boolean }[];
+        };
 
-          return HttpResponse.json({
-            connectorId: "github",
-            sources: body.sources.map((source) => ({
-              id: source.sourceId,
-              name: source.sourceId,
-              url: `https://github.com/${source.sourceId}`,
-              enabled: source.enabled,
-            })),
-          });
-        },
-      ),
+        return HttpResponse.json({
+          connectorId: "github",
+          sources: body.sources.map((source) => ({
+            id: source.sourceId,
+            name: source.sourceId,
+            url: `https://github.com/${source.sourceId}`,
+            enabled: source.enabled,
+          })),
+        });
+      }),
     );
 
     const response = await connectorService.patchConnectorSources("github", [
@@ -117,15 +110,10 @@ describe("connectorService", () => {
   it("patchConnectorSources rejects with an ApiError on 400", async () => {
     server.use(
       http.patch("/api/v1/connectors/github/sources/status", () =>
-        HttpResponse.json(
-          { message: "sources must not be empty" },
-          { status: 400 },
-        ),
+        HttpResponse.json({ message: "sources must not be empty" }, { status: 400 }),
       ),
     );
 
-    await expect(
-      connectorService.patchConnectorSources("github", []),
-    ).rejects.toThrow();
+    await expect(connectorService.patchConnectorSources("github", [])).rejects.toThrow();
   });
 });

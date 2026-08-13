@@ -66,13 +66,7 @@ export type UpdateGithubRepositoryRequest = {
 };
 
 export type GithubScheduleDayOfWeek =
-  | "MONDAY"
-  | "TUESDAY"
-  | "WEDNESDAY"
-  | "THURSDAY"
-  | "FRIDAY"
-  | "SATURDAY"
-  | "SUNDAY";
+  "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
 
 export type GithubScheduleSpec =
   | {
@@ -124,18 +118,13 @@ export type GithubRepositoryConfig = {
 export async function connectGithubRepository(
   request: ConnectGithubRepositoryRequest,
 ): Promise<ConnectGithubRepositoryResponse> {
-  return apiClient.fetch<ConnectGithubRepositoryResponse>(
-    "/api/v1/github/connect",
-    {
-      method: "POST",
-      body: JSON.stringify(request),
-    },
-  );
+  return apiClient.fetch<ConnectGithubRepositoryResponse>("/api/v1/github/connect", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
 }
 
-function mapDiscoveredRepository(
-  repository: BackendDiscoveredRepository,
-): DiscoveredRepository {
+function mapDiscoveredRepository(repository: BackendDiscoveredRepository): DiscoveredRepository {
   return {
     name: repository.name,
     isPrivate: repository.private,
@@ -147,11 +136,7 @@ function mapDiscoveredRepository(
 
 const DEFAULT_DISCOVER_PAGE_SIZE = 20;
 
-function buildDiscoverQuery(
-  tokenName: string,
-  page: number,
-  pageSize: number,
-): string {
+function buildDiscoverQuery(tokenName: string, page: number, pageSize: number): string {
   return new URLSearchParams({
     tokenName,
     page: String(page),
@@ -218,10 +203,19 @@ export async function discoverUserRepositories(
  * Discovers repositories for an owner that may be either an organization or a
  * user. A GitHub owner is one or the other, and the backend exposes them under
  * separate endpoints, so `"auto"` tries the org endpoint first and falls back to
- * the user endpoint when the org is not found (404). Callers that already know
- * the owner type can pass `"org"`/`"user"` to skip the probe.
+ * the user endpoint when the org lookup fails in a way that means "not an org".
+ * Callers that already know the owner type can pass `"org"`/`"user"` to skip the
+ * probe.
  *
- * @throws ApiError — propagates non-404 failures (403, invalid token, GitHub rate-limit).
+ * GitHub answers `/orgs/{owner}/repos` with a 404 when `owner` is a user, but the
+ * backend does not translate that GitHub 404 and surfaces it as a 5xx instead, so
+ * both a 404 and any server error from the org endpoint are treated as the
+ * wrong-owner-type signal and retried against the user endpoint. Deterministic
+ * auth/limit failures (401/403/429) are not a wrong-owner-type signal and
+ * propagate unchanged.
+ *
+ * @throws ApiError — propagates auth/permission/rate-limit failures, and any
+ *   failure of the user endpoint after the org endpoint was retried.
  */
 export async function discoverRepositories(
   owner: string,
@@ -241,9 +235,10 @@ export async function discoverRepositories(
   try {
     return await discoverOrgRepositories(owner, tokenName, page, pageSize);
   } catch (error) {
-    // Only a "not an org" 404 justifies retrying as a user; anything else
-    // (403, invalid token, rate-limit) must surface unchanged.
-    if (error instanceof ApiError && error.status === 404) {
+    const isWrongOwnerType =
+      error instanceof ApiError && (error.status === 404 || error.status >= 500);
+
+    if (isWrongOwnerType) {
       return discoverUserRepositories(owner, tokenName, page, pageSize);
     }
 
@@ -267,20 +262,17 @@ export async function connectRepositories(
   tokenName: string,
   projectId: string,
 ): Promise<ConnectRepositoriesResult> {
-  return apiClient.fetch<ConnectRepositoriesResult>(
-    "/api/v1/github/connect/all",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        repositories: repositories.map((repository) => ({
-          owner: repository.owner,
-          name: repository.name,
-          tokenName,
-          projectId,
-        })),
-      }),
-    },
-  );
+  return apiClient.fetch<ConnectRepositoriesResult>("/api/v1/github/connect/all", {
+    method: "POST",
+    body: JSON.stringify({
+      repositories: repositories.map((repository) => ({
+        owner: repository.owner,
+        name: repository.name,
+        tokenName,
+        projectId,
+      })),
+    }),
+  });
 }
 
 /**
@@ -290,10 +282,8 @@ export async function connectRepositories(
  * request (e.g. when a newer fetch is triggered before the previous one
  * resolves); the underlying `apiClient.fetch` passes it through to `fetch`.
  */
-export async function getGithubPatNames(
-    signal?: AbortSignal,
-): Promise<string[]> {
-    return apiClient.fetch<string[]>("/api/v1/github/pat", { signal });
+export async function getGithubPatNames(signal?: AbortSignal): Promise<string[]> {
+  return apiClient.fetch<string[]>("/api/v1/github/pat", { signal });
 }
 
 export async function addGithubPat(name: string, token: string): Promise<void> {
@@ -303,10 +293,7 @@ export async function addGithubPat(name: string, token: string): Promise<void> {
   });
 }
 
-export async function updateGithubPat(
-  name: string,
-  newToken: string,
-): Promise<void> {
+export async function updateGithubPat(name: string, newToken: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat/update", {
     method: "PUT",
     body: JSON.stringify({ name, newToken }),
@@ -320,15 +307,10 @@ export async function deleteGithubPat(name: string): Promise<void> {
   });
 }
 
-export async function updateAllGithubRepositories(): Promise<
-  UpdateGithubRepositoryResponse[]
-> {
-  return apiClient.fetch<UpdateGithubRepositoryResponse[]>(
-    "/api/v1/github/update-all",
-    {
-      method: "POST",
-    },
-  );
+export async function updateAllGithubRepositories(): Promise<UpdateGithubRepositoryResponse[]> {
+  return apiClient.fetch<UpdateGithubRepositoryResponse[]>("/api/v1/github/update-all", {
+    method: "POST",
+  });
 }
 
 /**
@@ -388,13 +370,10 @@ export async function removeRepositoryFromProject(
 export async function updateGithubRepository(
   request: UpdateGithubRepositoryRequest,
 ): Promise<UpdateGithubRepositoryResponse> {
-  return apiClient.fetch<UpdateGithubRepositoryResponse>(
-    "/api/v1/github/update",
-    {
-      method: "POST",
-      body: JSON.stringify(request),
-    },
-  );
+  return apiClient.fetch<UpdateGithubRepositoryResponse>("/api/v1/github/update", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
 }
 
 /**
@@ -419,9 +398,7 @@ export async function getGithubRepositoryConfig(
   const owner = encodeURIComponent(request.owner);
   const name = encodeURIComponent(request.name);
 
-  return apiClient.fetch<GithubRepositoryConfig>(
-    `/api/v1/github/config/${owner}/${name}`,
-  );
+  return apiClient.fetch<GithubRepositoryConfig>(`/api/v1/github/config/${owner}/${name}`);
 }
 
 /**

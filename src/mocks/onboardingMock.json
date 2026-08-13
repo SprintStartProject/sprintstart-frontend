@@ -130,10 +130,7 @@
             "id": "task-5",
             "title": "Security Grundlagen verstehen",
             "description": "Arbeite die Security-Dokumentation durch.",
-            "motivation": [
-              "Vermeide Sicherheitslücken",
-              "Arbeite sicher an produktivem Code"
-            ],
+            "motivation": ["Vermeide Sicherheitslücken", "Arbeite sicher an produktivem Code"],
             "steps": [
               { "id": "step-1", "title": "Authentifizierung lesen", "completed": false },
               { "id": "step-2", "title": "Berechtigungskonzept lesen", "completed": false }
@@ -152,10 +149,7 @@
             "id": "task-6",
             "title": "Feature Ownership übernehmen",
             "description": "Von Anforderung bis Deployment.",
-            "motivation": [
-              "Eigenverantwortung übernehmen",
-              "Produktverständnis vertiefen"
-            ],
+            "motivation": ["Eigenverantwortung übernehmen", "Produktverständnis vertiefen"],
             "steps": [
               { "id": "step-1", "title": "Anforderungen analysieren", "completed": false },
               { "id": "step-2", "title": "Implementieren", "completed": false },

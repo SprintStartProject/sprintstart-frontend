@@ -1,8 +1,7 @@
 import type { SourceStatus } from "../types.ts";
 
 const TONE_CLASSNAMES: Record<SourceStatus, string> = {
-  connected:
-    "border-app-success-border bg-app-success-bg text-app-success-text",
+  connected: "border-app-success-border bg-app-success-bg text-app-success-text",
   running: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
   // Danger, not warning: the warning palette renders amber-yellow text on a
   // red-looking background in dark mode.
@@ -28,11 +27,7 @@ type SourceSyncBadgeProps = {
  * this adds the sync freshness the chip collapses away. Shared by the source
  * list, the details drawer and the admin project view so all three agree.
  */
-export function SourceSyncBadge({
-  label,
-  status,
-  size = "md",
-}: SourceSyncBadgeProps) {
+export function SourceSyncBadge({ label, status, size = "md" }: SourceSyncBadgeProps) {
   return (
     <span
       className={`inline-flex items-center rounded-full border font-medium ${TONE_CLASSNAMES[status]} ${SIZE_CLASSNAMES[size]}`}

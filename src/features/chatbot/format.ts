@@ -6,21 +6,15 @@
  * whose `createdAt` hasn't been populated yet don't produce NaN.
  */
 export function daysSince(iso: string): number {
-    if (!iso) return 0;
+  if (!iso) return 0;
 
-    const then = new Date(iso);
-    if (isNaN(then.getTime())) return 0;
+  const then = new Date(iso);
+  if (isNaN(then.getTime())) return 0;
 
-    const now = new Date();
-    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startThen = new Date(
-        then.getFullYear(),
-        then.getMonth(),
-        then.getDate(),
-    );
-    return Math.round(
-        (startToday.getTime() - startThen.getTime()) / (1000 * 60 * 60 * 24),
-    );
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  return Math.round((startToday.getTime() - startThen.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /**
@@ -29,12 +23,12 @@ export function daysSince(iso: string): number {
  * agrees with the relative timestamp shown on each item.
  */
 export function dateBucketLabel(iso: string): string {
-    const days = daysSince(iso);
+  const days = daysSince(iso);
 
-    if (days <= 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 7) return "This week";
-    return "Older";
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return "This week";
+  return "Older";
 }
 
 /**
@@ -42,12 +36,12 @@ export function dateBucketLabel(iso: string): string {
  * (e.g. "Today", "Yesterday", "5d ago", "3mo ago") for the chat sidebar.
  */
 export function formatRelativeDate(iso: string): string {
-    const days = daysSince(iso);
+  const days = daysSince(iso);
 
-    if (days <= 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 30) return `${days}d ago`;
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days}d ago`;
 
-    const months = Math.floor(days / 30);
-    return `${months}mo ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }

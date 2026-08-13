@@ -7,7 +7,8 @@
 // PM Dashboard never re-implements ingestion status handling.
 // ============================================================
 
-import { ArrowRight, Database, Loader2 } from "lucide-react";
+import { ArrowRight, Database } from "lucide-react";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { createSourceFromInstance } from "../data.ts";
 import { getIngestionSourceStatuses } from "../../../services/ingestionService.ts";
@@ -23,9 +24,9 @@ import { IngestionMetrics } from "./IngestionMetrics.tsx";
  * with three connected repos reported "1/1 synced".
  */
 async function fetchIngestionSources(projectId: string) {
-    const instances = await getIngestionSourceStatuses(projectId);
+  const instances = await getIngestionSourceStatuses(projectId);
 
-    return instances.map(createSourceFromInstance);
+  return instances.map(createSourceFromInstance);
 }
 
 /**
@@ -35,57 +36,54 @@ async function fetchIngestionSources(projectId: string) {
  * numbers computed from the same source data.
  */
 export function IngestionStatusWidget() {
-    const navigate = useNavigate();
-    const { selectedProjectId } = useProjectContext();
-    const { data: sources, loading, error } = useFetch(
-        () => fetchIngestionSources(selectedProjectId),
-        [selectedProjectId],
-    );
+  const navigate = useNavigate();
+  const { selectedProjectId } = useProjectContext();
+  const {
+    data: sources,
+    loading,
+    error,
+  } = useFetch(() => fetchIngestionSources(selectedProjectId), [selectedProjectId]);
 
-    // ── LOADING ──────────────────────────────────────────────
+  // ── LOADING ──────────────────────────────────────────────
 
-    if (loading) {
-        return (
-            <div className="rounded-2xl border border-app-border bg-app-surface p-4 flex items-center justify-center">
-                <Loader2 className="w-4 h-4 animate-spin text-app-brand" />
-            </div>
-        );
-    }
-
-    // ── ERROR ────────────────────────────────────────────────
-
-    if (error || !sources) {
-        return (
-            <div className="rounded-2xl border border-app-border bg-app-surface p-4 flex items-center justify-center gap-2 text-center">
-                <Database className="w-4 h-4 text-app-text-muted" />
-                <p className="text-sm text-app-text-muted">
-                    Could not load ingestion status.
-                </p>
-            </div>
-        );
-    }
-
-    // ── RENDER ───────────────────────────────────────────────
-
+  if (loading) {
     return (
-        <ClickableCard
-            onClick={() => void navigate("/data-ingestion")}
-            aria-label="View data ingestion details"
-            className="rounded-2xl border border-app-border bg-app-surface p-4 cursor-pointer transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover flex flex-wrap items-center gap-4 sm:justify-between"
-        >
-            <div className="flex items-center gap-2 shrink-0">
-                <Database className="w-4 h-4 text-app-brand" />
-                <span className="text-sm font-semibold text-app-text">
-                    Data ingestion
-                </span>
-            </div>
-
-            <IngestionMetrics sources={sources} compact />
-
-            <span className="flex items-center gap-1 text-xs text-app-text-muted shrink-0">
-                View details
-                <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-        </ClickableCard>
+      <div className="flex items-center justify-center rounded-2xl p-4">
+        <Spinner size="lg" label="Loading" />
+      </div>
     );
+  }
+
+  // ── ERROR ────────────────────────────────────────────────
+
+  if (error || !sources) {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-2xl p-4 text-center">
+        <Database className="h-4 w-4 text-app-text-muted" />
+        <p className="text-sm text-app-text-muted">Could not load ingestion status.</p>
+      </div>
+    );
+  }
+
+  // ── RENDER ───────────────────────────────────────────────
+
+  return (
+    <ClickableCard
+      onClick={() => void navigate("/data-ingestion")}
+      aria-label="View data ingestion details"
+      className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl p-4 transition-colors hover:bg-app-surface-hover sm:justify-between"
+    >
+      <div className="flex shrink-0 items-center gap-2">
+        <Database className="h-4 w-4 text-app-brand" />
+        <span className="text-sm font-semibold text-app-text">Data ingestion</span>
+      </div>
+
+      <IngestionMetrics sources={sources} compact />
+
+      <span className="flex shrink-0 items-center gap-1 text-xs text-app-text-muted">
+        View details
+        <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </ClickableCard>
+  );
 }

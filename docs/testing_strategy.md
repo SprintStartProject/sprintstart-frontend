@@ -2,9 +2,11 @@
 
 This document describes the actual testing setup for `sprintstart-frontend`. It
 replaces the previous `mocking_strategy.md`, which described a Playwright + axios
-+ `cross-env` pipeline that does not match the current codebase.
+
+- `cross-env` pipeline that does not match the current codebase.
 
 > **Related docs**
+>
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — system architecture (routing, services, state).
 > - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) §8 — testing rules summary.
 
@@ -12,17 +14,18 @@ replaces the previous `mocking_strategy.md`, which described a Playwright + axio
 
 ## 1. Overview
 
-| Area | Tool |
-| --- | --- |
-| Test runner | **Vitest 4** (configured in `vite.config.ts` `test:` block) |
-| Component testing | **@testing-library/react** + **@testing-library/user-event** |
-| DOM matchers | **@testing-library/jest-dom** |
-| HTTP mocking | **msw** ^2.14 (`setupServer` from `msw/node`) |
-| Accessibility | **vitest-axe** ^0.1 (axe-core assertions via `expect().toPassAxe()`) |
-| Browser environment | **jsdom** ^29 |
-| Coverage | built-in Vitest coverage (configured via `vitest` in `vite.config.ts`) |
+| Area                | Tool                                                                   |
+| ------------------- | ---------------------------------------------------------------------- |
+| Test runner         | **Vitest 4** (configured in `vite.config.ts` `test:` block)            |
+| Component testing   | **@testing-library/react** + **@testing-library/user-event**           |
+| DOM matchers        | **@testing-library/jest-dom**                                          |
+| HTTP mocking        | **msw** ^2.14 (`setupServer` from `msw/node`)                          |
+| Accessibility       | **vitest-axe** ^0.1 (axe-core assertions via `expect().toPassAxe()`)   |
+| Browser environment | **jsdom** ^29                                                          |
+| Coverage            | built-in Vitest coverage (configured via `vitest` in `vite.config.ts`) |
 
 **What we do NOT use:**
+
 - ❌ Playwright (the old `mocking_strategy.md` claimed we did — it was wrong)
 - ❌ axios-mock-adapter (the old doc showed `axios.get` — the codebase uses native `fetch` via `apiClient`)
 - ❌ `cross-env` (the old doc claimed mock mode is activated via `cross-env VITE_USE_MOCK_MODE=true vite` — actually it's activated via the `VITE_USE_MOCK_MODE` env var, which a dev can set in `.env.development`; see §8)
@@ -31,21 +34,21 @@ replaces the previous `mocking_strategy.md`, which described a Playwright + axio
 
 ## 2. Commands
 
-| Purpose | Command |
-| --- | --- |
-| All unit tests (CI-friendly, non-watch) | `npm run test` |
-| Unit tests only (excludes `tests/unit/a11y/**/*`) | `npm run unit` |
-| A11y tests only (`tests/unit/a11y/`) | `npm run a11y` |
-| Full DoD verification (install + build + lint + unit + a11y) | `npm run try` |
+| Purpose                                                      | Command        |
+| ------------------------------------------------------------ | -------------- |
+| All unit tests (CI-friendly, non-watch)                      | `npm run test` |
+| Unit tests only (excludes `tests/unit/a11y/**/*`)            | `npm run unit` |
+| A11y tests only (`tests/unit/a11y/`)                         | `npm run a11y` |
+| Full DoD verification (install + build + lint + unit + a11y) | `npm run try`  |
 
 Scripts (from `package.json`):
 
 ```json
 {
   "test": "vitest run",
-  "unit":  "vitest run --exclude 'tests/unit/a11y/**/*'",
-  "a11y":  "vitest run tests/unit/a11y/",
-  "try":   "npm install && npm run build && npm run lint && npm run unit && npm run a11y"
+  "unit": "vitest run --exclude 'tests/unit/a11y/**/*'",
+  "a11y": "vitest run tests/unit/a11y/",
+  "try": "npm install && npm run build && npm run lint && npm run unit && npm run a11y"
 }
 ```
 
@@ -126,7 +129,7 @@ Wraps a component in `MemoryRouter` + `ThemeProvider` before rendering with
 Testing Library. Accepts a `route` option to set the initial URL:
 
 ```tsx
-const { getByText } = renderWithProviders(<MyPage />, { route: '/team/123' });
+const { getByText } = renderWithProviders(<MyPage />, { route: "/team/123" });
 ```
 
 ### `createMockProfile(permissionGroup, overrides)`
@@ -135,7 +138,7 @@ Returns a fully-typed `UserProfile` for tests, defaulting to `PermissionGroup.US
 Spread `overrides` to customize fields:
 
 ```tsx
-const admin = createMockProfile(PermissionGroup.ADMIN, { id: 'admin-1' });
+const admin = createMockProfile(PermissionGroup.ADMIN, { id: "admin-1" });
 ```
 
 ---
@@ -246,16 +249,15 @@ and `npm run storybook`.
 
 ## 9. A11y testing
 
-Accessibility tests live under `tests/unit/a11y/` and alongside page tests as
-`*.a11y.test.tsx` files. They render a component with `renderWithProviders` and
+Accessibility tests live under `tests/unit/a11y/`. They render a component with `renderWithProviders` and
 assert the output passes axe-core checks:
 
 ```tsx
-import { renderWithProviders } from '../setup/test-utils';
-import { expect } from 'vitest';
-import { MyComponent } from '../../../src/features/.../MyComponent';
+import { renderWithProviders } from "../setup/test-utils";
+import { expect } from "vitest";
+import { MyComponent } from "../../../src/features/.../MyComponent";
 
-it('passes axe accessibility checks', async () => {
+it("passes axe accessibility checks", async () => {
   const { container } = renderWithProviders(<MyComponent />);
   await expect(container).toPassAxe();
 });
@@ -274,18 +276,18 @@ npm run a11y
 
 ## 10. Test doubles
 
-| Concern | Tool |
-| --- | --- |
-| Component rendering | `@testing-library/react` `render` / `renderWithProviders` |
-| User interactions | `@testing-library/user-event` |
-| DOM matchers | `@testing-library/jest-dom` |
-| HTTP mocking | `msw` (`setupServer`, `http.get/post/patch/...`) |
-| Browser environment | `jsdom` |
-| axe-core assertions | `vitest-axe` (`toPassAxe()`) |
-| Module mocks | Vitest `vi.mock()` / `vi.fn()` |
-| React Router | `MemoryRouter` from `react-router-dom` (real module, not mocked) |
-| Framer Motion | mocked in `vitest.setup.ts` (passthrough — prevents jsdom layout issues) |
-| Keycloak JS | mocked in `vitest.setup.ts` (`mockKeycloakInstance` exported for per-test config) |
+| Concern             | Tool                                                                              |
+| ------------------- | --------------------------------------------------------------------------------- |
+| Component rendering | `@testing-library/react` `render` / `renderWithProviders`                         |
+| User interactions   | `@testing-library/user-event`                                                     |
+| DOM matchers        | `@testing-library/jest-dom`                                                       |
+| HTTP mocking        | `msw` (`setupServer`, `http.get/post/patch/...`)                                  |
+| Browser environment | `jsdom`                                                                           |
+| axe-core assertions | `vitest-axe` (`toPassAxe()`)                                                      |
+| Module mocks        | Vitest `vi.mock()` / `vi.fn()`                                                    |
+| React Router        | `MemoryRouter` from `react-router-dom` (real module, not mocked)                  |
+| Framer Motion       | mocked in `vitest.setup.ts` (passthrough — prevents jsdom layout issues)          |
+| Keycloak JS         | mocked in `vitest.setup.ts` (`mockKeycloakInstance` exported for per-test config) |
 
 ---
 
@@ -303,11 +305,7 @@ declare:
  * Menu toggle button. Contains only a Lucide icon, requiring
  * an aria-label for screen-reader compliance.
  */
-<button
-  onClick={toggleSidebar}
-  aria-label="Toggle navigation menu"
-  data-testid="sidebar-toggle"
->
+<button onClick={toggleSidebar} aria-label="Toggle navigation menu" data-testid="sidebar-toggle">
   <MenuIcon />
 </button>
 ```

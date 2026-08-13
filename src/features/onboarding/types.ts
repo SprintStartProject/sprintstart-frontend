@@ -4,12 +4,9 @@
 // Alle Interfaces für den Onboarding-Bereich.
 // ============================================================
 
-
-
 // ============================================================
 //  Backend
 // ============================================================
-
 
 // ─── Onboarding Path List (GET /onboarding/paths) ───────────────────────────
 
@@ -66,9 +63,7 @@ export interface OnboardingStepEndpoint {
 }
 
 // Why the backend considers a phase locked (see OnboardingPhaseEndpoint.unlockReason)
-export type PhaseUnlockReason =
-  | "PREVIOUS_PHASE_INCOMPLETE"
-  | "PREVIOUS_PHASE_CHECK_NOT_PASSED";
+export type PhaseUnlockReason = "PREVIOUS_PHASE_INCOMPLETE" | "PREVIOUS_PHASE_CHECK_NOT_PASSED";
 
 // Compact knowledge check state embedded into each phase of GET /onboarding/me/path
 export interface PhaseCheckSummaryEndpoint {
@@ -129,8 +124,8 @@ export interface OnboardingSkipEndpoint {
 }
 
 export interface OnboardingStepDetail extends OnboardingStepEndpoint {
-    tasks: OnboardingTaskEndpoint[];
-    resources: OnboardingResourceEndpoint[];
+  tasks: OnboardingTaskEndpoint[];
+  resources: OnboardingResourceEndpoint[];
 }
 
 // ─── Phase Knowledge Checks (GET/POST /onboarding/me/phases/{phaseId}/checks…) ─
@@ -150,7 +145,8 @@ export interface PhaseCheckQuestionEndpoint {
   question: string;
   // Only present for MULTIPLE_CHOICE questions
   options?: PhaseCheckOptionEndpoint[];
-  // True when this is a carried-over repeat question from an earlier phase.
+  // True for questions from the review pool. A phase check never returns these; they
+  // only appear in the standalone review check (see ReviewCheckEndpoint).
   review?: boolean;
   reviewSourcePhaseTitle?: string | null;
 }
@@ -178,7 +174,7 @@ export interface PhaseCheckAnswerResult {
   explanation: string | null;
   // AI feedback for short-text answers; null for multiple choice.
   feedback: string | null;
-  // True when this result is for a carried-over repeat question from an earlier phase.
+  // True when this result is for a question from the review pool.
   review?: boolean;
   reviewSourcePhaseTitle?: string | null;
 }
@@ -195,6 +191,36 @@ export interface PhaseCheckAttemptResult {
   requiredPercent: number;
   phaseCheckSummary: PhaseCheckSummaryEndpoint;
   nextPhaseUnlocked: boolean;
+  // Questions waiting in the review pool after this attempt, including any collected from
+  // it. Passing the final phase check does not finish onboarding while this is > 0.
+  openReviewCount: number;
+  // True when this attempt completed the entire onboarding journey.
+  onboardingCompleted: boolean;
+  results: PhaseCheckAnswerResult[];
+}
+
+// ─── Review Check (GET/POST /onboarding/me/review-check) ──────────────────────
+
+/**
+ * The user's review pool: questions they answered incorrectly in earlier phases and
+ * still have to answer correctly once. Asked separately from the phase checks, where
+ * they would be off-topic, and cleared before onboarding counts as finished.
+ */
+export interface ReviewCheckEndpoint {
+  openCount: number;
+  questions: PhaseCheckQuestionEndpoint[];
+}
+
+/**
+ * Result of answering review questions. There is no pass threshold: correct answers
+ * leave the pool for good, wrong ones stay open for another try.
+ */
+export interface ReviewCheckResult {
+  answeredCount: number;
+  correctCount: number;
+  remainingCount: number;
+  // True when clearing the pool completed the entire onboarding journey.
+  onboardingCompleted: boolean;
   results: PhaseCheckAnswerResult[];
 }
 
@@ -223,6 +249,15 @@ export interface AdminPhaseCheckEndpoint {
 }
 
 export interface UpsertPhaseCheckQuestion {
+  /**
+   * ID of an existing question, so it survives the update with its identity intact.
+   * Omit for questions being created.
+   *
+   * Sending it back matters: review pool items and stored attempt answers reference
+   * questions by ID, so a question recreated instead of updated loses that history and
+   * silently drops out of every member's review pool.
+   */
+  id?: string | null;
   position: number;
   type: CheckQuestionType;
   question: string;
@@ -231,6 +266,8 @@ export interface UpsertPhaseCheckQuestion {
   correctAnswer?: string | null;
   // MULTIPLE_CHOICE only
   options?: {
+    /** ID of an existing option; omit for new ones. Stored answers reference these. */
+    id?: string | null;
     position: number;
     label: string;
     correct: boolean;

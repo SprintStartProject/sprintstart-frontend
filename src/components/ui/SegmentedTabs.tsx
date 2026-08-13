@@ -1,0 +1,133 @@
+import { useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { dockMagnifySpringToken, slidingIndicatorSpringToken } from "../../styles/tokens";
+
+/** Matches the dock magnification of the sidebar, scaled down for dense bars. */
+const TAB_HOVER_SCALE = 1.06;
+
+export type SegmentedTabOption<TValue extends string> = {
+  value: TValue;
+  label: string;
+  /** Optional leading icon, already sized by the caller. */
+  icon?: ReactNode;
+  /** Optional trailing count badge. */
+  count?: number;
+  /**
+   * Optional `data-testid` for end-to-end targeting, per AGENTS.md §5.
+   *
+   * Only for options whose label is not a stable handle — a provider switch
+   * whose labels are product names, say. Prefer the accessible name where it
+   * is stable, so the test asserts what a user can actually see.
+   */
+  testId?: string;
+};
+
+type SegmentedTabsProps<TValue extends string> = {
+  value: TValue;
+  options: SegmentedTabOption<TValue>[];
+  onChange: (value: TValue) => void;
+  /**
+   * Unique id for the sliding pill. Framer Motion matches `layoutId` globally,
+   * so two bars sharing one id would animate the pill between them.
+   */
+  layoutId: string;
+  ariaLabel: string;
+  /** Stretch options to fill the row instead of sizing them to their label. */
+  fullWidth?: boolean;
+  className?: string;
+};
+
+/**
+ * The one segmented control for switching sections, used by every tab bar in
+ * the app.
+ *
+ * Exists because the three bars that grew independently had drifted into three
+ * different looks. Motion matches the sidebar: the hovered option magnifies,
+ * and the active fill is a single shared element that slides between options
+ * rather than blinking from one to the next.
+ *
+ * Deliberately a group of toggle buttons rather than an ARIA tablist. A real
+ * tablist promises things this does not implement -- `aria-controls` pointing
+ * at a `tabpanel`, and arrow-key navigation within the bar -- and a screen
+ * reader announcing "tab 1 of 3" would set an expectation the component then
+ * fails to meet. `aria-pressed` describes exactly what these buttons do.
+ */
+export function SegmentedTabs<TValue extends string>({
+  value,
+  options,
+  onChange,
+  layoutId,
+  ariaLabel,
+  fullWidth = false,
+  className = "",
+}: SegmentedTabsProps<TValue>) {
+  const [hovered, setHovered] = useState<TValue | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      // `p-1` is what a magnified option grows into: the row may scroll
+      // horizontally, and overflow clips at the padding box.
+      className={`${
+        fullWidth ? "flex w-full" : "inline-flex max-w-full"
+      } gap-1 overflow-x-auto rounded-2xl border border-app-border/70 bg-app-bg-soft/70 p-1 backdrop-blur-md ${className}`}
+    >
+      {options.map((option) => {
+        const isActive = value === option.value;
+        const isMagnified = !prefersReducedMotion && hovered === option.value;
+
+        return (
+          <motion.button
+            key={option.value}
+            type="button"
+            aria-pressed={isActive}
+            data-testid={option.testId}
+            onClick={() => onChange(option.value)}
+            onHoverStart={() => setHovered(option.value)}
+            onHoverEnd={() => setHovered((current) => (current === option.value ? null : current))}
+            animate={{ scale: isMagnified ? TAB_HOVER_SCALE : 1 }}
+            transition={dockMagnifySpringToken}
+            className={`group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+              fullWidth ? "flex-1" : ""
+            } ${isActive ? "text-white" : "text-app-text-muted hover:text-app-text"}`}
+          >
+            {isActive ? (
+              <motion.span
+                aria-hidden="true"
+                layoutId={layoutId}
+                transition={prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken}
+                className="absolute inset-0 rounded-xl bg-app-brand shadow-[0_6px_18px_-8px_var(--color-app-brand)]"
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl bg-app-surface opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100"
+              />
+            )}
+
+            {option.icon ? (
+              <span className="relative z-10 flex items-center">{option.icon}</span>
+            ) : null}
+
+            <span className="relative z-10 leading-none">{option.label}</span>
+
+            {typeof option.count === "number" && (
+              // `leading-none` on both label and count is what
+              // actually centres them: the count's smaller font
+              // otherwise brings a smaller line box.
+              <span
+                className={`relative z-10 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] leading-none font-bold tabular-nums ${
+                  isActive ? "bg-white/20 text-white" : "bg-app-surface text-app-text-subtle"
+                }`}
+              >
+                {option.count}
+              </span>
+            )}
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}

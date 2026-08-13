@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { SCROLL_CONTAINER_ATTRIBUTE } from "../components/ui/useScrollLock";
 import {
   DRAWER_CLOSE_DELAY_MS,
   areAllVisibleUsersSelected,
@@ -32,6 +33,7 @@ import { UsersTab } from "../features/admin/components/UsersTab";
 import { useAdminData } from "../features/admin/hooks/useAdminData";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { ADMIN_TAB_ORDER } from "../features/admin/types";
 import type {
   AdminProjectDetails,
   AdminTab,
@@ -39,6 +41,8 @@ import type {
   ProjectOverview,
   UserFilter,
 } from "../features/admin/types";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { adminUserService } from "../services/adminUserService";
 import { projectService } from "../services/projectService";
 
@@ -47,21 +51,16 @@ export function AdminPage() {
   const { profile } = useAuth();
   const { reloadProjects } = useProjectContext();
   const [activeTab, setActiveTab] = useState<AdminTab>("users");
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
-  const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
-  const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(
-    null,
-  );
+  const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [deleteUserErrorMessage, setDeleteUserErrorMessage] = useState("");
 
@@ -70,6 +69,21 @@ export function AdminPage() {
   const [bulkDeleteErrorMessage, setBulkDeleteErrorMessage] = useState("");
 
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
+
+  /**
+   * Ref for the animated drawer-close timeout. Cleaned up on unmount so
+   * that setState calls after teardown don't hit a missing `window` in
+   * test environments.
+   */
+  const drawerCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (drawerCloseTimeoutRef.current !== null) {
+        clearTimeout(drawerCloseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const {
     users,
@@ -89,10 +103,7 @@ export function AdminPage() {
     loadTokenNames,
   } = useAdminData();
 
-  const availableProjects = useMemo(
-    () => getAvailableProjects(projects),
-    [projects],
-  );
+  const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
 
   const filteredUsers = useMemo(() => {
     return filterAdminUsers(users, searchValue, userFilter);
@@ -109,10 +120,7 @@ export function AdminPage() {
     return getPaginatedUsers(filteredUsers, safePage);
   }, [filteredUsers, safePage]);
 
-  const allVisibleUsersSelected = areAllVisibleUsersSelected(
-    paginatedUsers,
-    selectedUserIds,
-  );
+  const allVisibleUsersSelected = areAllVisibleUsersSelected(paginatedUsers, selectedUserIds);
 
   const openCreateWizard = useCallback(() => {
     // Step 2 of the wizard needs the saved PAT names; without visiting the
@@ -138,11 +146,7 @@ export function AdminPage() {
 
   const toggleAllVisibleUsers = () => {
     setSelectedUserIds((current) => {
-      return toggleVisibleUserSelection(
-        current,
-        paginatedUsers,
-        allVisibleUsersSelected,
-      );
+      return toggleVisibleUserSelection(current, paginatedUsers, allVisibleUsersSelected);
     });
   };
 
@@ -153,20 +157,12 @@ export function AdminPage() {
     setIsDrawerOpen(true);
   };
 
-  const toggleUserContextMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    userId: string,
-  ) => {
+  const toggleUserContextMenu = (event: MouseEvent<HTMLButtonElement>, userId: string) => {
     event.stopPropagation();
-    setOpenUserMenuId((currentUserMenuId) =>
-      currentUserMenuId === userId ? null : userId,
-    );
+    setOpenUserMenuId((currentUserMenuId) => (currentUserMenuId === userId ? null : userId));
   };
 
-  const openUserDetailsFromMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    user: AdminUser,
-  ) => {
+  const openUserDetailsFromMenu = (event: MouseEvent<HTMLButtonElement>, user: AdminUser) => {
     event.stopPropagation();
     openUserDetails(user);
   };
@@ -177,10 +173,7 @@ export function AdminPage() {
     setUserPendingDelete(user);
   };
 
-  const requestUserDeleteFromMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    user: AdminUser,
-  ) => {
+  const requestUserDeleteFromMenu = (event: MouseEvent<HTMLButtonElement>, user: AdminUser) => {
     event.stopPropagation();
     requestUserDelete(user);
   };
@@ -203,13 +196,9 @@ export function AdminPage() {
     try {
       await adminUserService.deleteUser(userId);
 
-      setUsers((currentUsers) =>
-        currentUsers.filter((currentUser) => currentUser.id !== userId),
-      );
+      setUsers((currentUsers) => currentUsers.filter((currentUser) => currentUser.id !== userId));
 
-      setProjects((currentProjects) =>
-        removeUsersFromProjects(currentProjects, new Set([userId])),
-      );
+      setProjects((currentProjects) => removeUsersFromProjects(currentProjects, new Set([userId])));
 
       setSelectedUserIds((currentSelectedUserIds) => {
         const nextSelectedUserIds = new Set(currentSelectedUserIds);
@@ -264,14 +253,10 @@ export function AdminPage() {
     setBulkDeleteErrorMessage("");
 
     try {
-      await Promise.all(
-        userIdsToDelete.map((userId) => adminUserService.deleteUser(userId)),
-      );
+      await Promise.all(userIdsToDelete.map((userId) => adminUserService.deleteUser(userId)));
 
       setUsers((currentUsers) =>
-        currentUsers.filter(
-          (currentUser) => !userIdsToDeleteSet.has(currentUser.id),
-        ),
+        currentUsers.filter((currentUser) => !userIdsToDeleteSet.has(currentUser.id)),
       );
 
       setProjects((currentProjects) =>
@@ -292,9 +277,7 @@ export function AdminPage() {
       setIsBulkDeleteDialogOpen(false);
     } catch (error) {
       setBulkDeleteErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Selected users could not be deleted.",
+        error instanceof Error ? error.message : "Selected users could not be deleted.",
       );
     } finally {
       setIsBulkDeletingUsers(false);
@@ -309,9 +292,7 @@ export function AdminPage() {
   };
 
   const openProjectDetailsFromUserDrawer = (projectId: string) => {
-    const project = projects.find(
-      (currentProject) => currentProject.id === projectId,
-    );
+    const project = projects.find((currentProject) => currentProject.id === projectId);
 
     if (!project) return;
 
@@ -342,15 +323,11 @@ export function AdminPage() {
         id: updatedProject.id,
         name: updatedProject.name,
       };
-      const assignedUserIds = new Set(
-        updatedProject.users.map((projectUser) => projectUser.id),
-      );
+      const assignedUserIds = new Set(updatedProject.users.map((projectUser) => projectUser.id));
 
       setProjects((currentProjects) =>
         currentProjects.map((currentProject) =>
-          currentProject.id === updatedProject.id
-            ? updatedProject
-            : currentProject,
+          currentProject.id === updatedProject.id ? updatedProject : currentProject,
         ),
       );
 
@@ -370,18 +347,14 @@ export function AdminPage() {
 
             return {
               ...currentUser,
-              projects: nextProjects.sort((left, right) =>
-                left.name.localeCompare(right.name),
-              ),
+              projects: nextProjects.sort((left, right) => left.name.localeCompare(right.name)),
             };
           }
 
           if (hasProject) {
             return {
               ...currentUser,
-              projects: currentUser.projects.filter(
-                (project) => project.id !== updatedProject.id,
-              ),
+              projects: currentUser.projects.filter((project) => project.id !== updatedProject.id),
             };
           }
 
@@ -390,9 +363,7 @@ export function AdminPage() {
       );
 
       setSelectedProject((currentSelectedProject) =>
-        currentSelectedProject?.id === updatedProject.id
-          ? updatedProject
-          : currentSelectedProject,
+        currentSelectedProject?.id === updatedProject.id ? updatedProject : currentSelectedProject,
       );
     },
     [setProjects, setSelectedProject, setUsers],
@@ -411,23 +382,21 @@ export function AdminPage() {
         ),
       );
       setSelectedUser((currentSelectedUser) =>
-        currentSelectedUser?.id === updatedUser.id
-          ? updatedUser
-          : currentSelectedUser,
+        currentSelectedUser?.id === updatedUser.id ? updatedUser : currentSelectedUser,
       );
     },
     [setSelectedUser, setUsers],
   );
 
   const closeDetails = () => {
-    setOpenUserMenuId(null);
-    setIsDrawerOpen(false);
+      setOpenUserMenuId(null);
+      setIsDrawerOpen(false);
 
-    window.setTimeout(() => {
-      setSelectedUser(null);
-      setSelectedProject(null);
-    }, DRAWER_CLOSE_DELAY_MS);
-  };
+      drawerCloseTimeoutRef.current = setTimeout(() => {
+        setSelectedUser(null);
+        setSelectedProject(null);
+      }, DRAWER_CLOSE_DELAY_MS);
+    };
 
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);
@@ -438,135 +407,152 @@ export function AdminPage() {
     }
   };
 
-  const showInitialLoading =
-    loadingState === "idle" || loadingState === "loading";
+  // Two-finger swipe between the sections, for people who would rather not aim
+  // at the bar.
+  const swipeRef = useSwipeableTabs<AdminTab, HTMLElement>({
+    order: ADMIN_TAB_ORDER,
+    value: activeTab,
+    onChange: handleTabChange,
+  });
+
+  const showInitialLoading = loadingState === "idle" || loadingState === "loading";
 
   return (
-    <div className="h-dvh overflow-y-scroll overscroll-contain bg-app-bg">
+    // The swipe listens on the page rather than the panel: needing to be over
+    // the content to change section makes the gesture feel like it only works
+    // in some places.
+    <div
+      ref={swipeRef}
+      // This page scrolls here rather than letting the document scroll, so a
+      // dialog's scroll lock has to be told where to look — see
+      // `SCROLL_CONTAINER_ATTRIBUTE`.
+      {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
+      className="h-dvh overflow-y-scroll overscroll-contain"
+    >
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">
           <PageHeader
             icon={Terminal}
             title="Access Management"
             subtitle="Manage users, projects and access tokens."
-            actions={
-              <AdminMetrics
-                userCount={users.length}
-                projectCount={projects.length}
-              />
-            }
+            actions={<AdminMetrics userCount={users.length} projectCount={projects.length} />}
           />
         </div>
       </header>
 
       <main className="admin-page-frame py-4 sm:py-6">
-        <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm sm:rounded-3xl">
-          <div className="flex flex-col gap-4 border-b border-app-border px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-            <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
+        {/* No card around the sections, matching the other tabbed pages: the
+            box drew a second frame inside the page frame and made the tab bar
+            look like it belonged to a widget rather than to the page. */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
 
-            <button
-              type="button"
-              onClick={() => void refreshAdminData()}
-              disabled={isRefreshing}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:w-11"
-              aria-label="Refresh admin data"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => void refreshAdminData()}
+            disabled={isRefreshing}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:w-11"
+            aria-label="Refresh admin data"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </button>
+        </div>
 
-          <div className="p-3 sm:p-6">
-            {showInitialLoading ? (
-              <div className="flex min-h-96 items-center justify-center">
-                <div className="flex flex-col items-center gap-3 text-app-text-muted">
-                  <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-                  <p className="text-sm">Loading admin data...</p>
-                </div>
+        {/* Clipped horizontally because the section content slides in from
+              the side; without it the travel briefly widens the page. `clip`
+              rather than `hidden`, so this does not become a scroll container
+              and swallow sticky positioning inside the sections. */}
+        <div className="overflow-x-clip">
+          {showInitialLoading ? (
+            <div className="flex min-h-96 items-center justify-center">
+              <div className="flex flex-col items-center gap-3 text-app-text-muted">
+                <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+                <p className="text-sm">Loading admin data...</p>
               </div>
-            ) : loadingState === "error" ? (
-              <div className="flex min-h-96 items-center justify-center px-6 text-center">
-                <div className="max-w-md">
-                  <AlertCircle className="mx-auto mb-4 h-10 w-10 text-app-danger-solid" />
-                  <h3 className="text-base font-semibold text-app-text">
-                    Admin data could not be loaded
-                  </h3>
-                  <p className="mt-2 text-sm text-app-text-muted">
-                    {errorMessage}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void refreshAdminData()}
-                    className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-app-text px-5 py-2.5 text-sm font-medium text-app-text-inverse transition-colors hover:opacity-90"
-                  >
-                    Try again
-                  </button>
-                </div>
+            </div>
+          ) : loadingState === "error" ? (
+            <div className="flex min-h-96 items-center justify-center px-6 text-center">
+              <div className="max-w-md">
+                <AlertCircle className="mx-auto mb-4 h-10 w-10 text-app-danger-solid" />
+                <h3 className="text-sm font-semibold text-app-text">
+                  Admin data could not be loaded
+                </h3>
+                <p className="mt-2 text-sm text-app-text-muted">{errorMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => void refreshAdminData()}
+                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-app-text px-5 py-2.5 text-sm font-medium text-app-text-inverse transition-colors hover:opacity-90"
+                >
+                  Try again
+                </button>
               </div>
-            ) : activeTab === "users" ? (
-              <>
-                <AdminUsersToolbar
-                  userCount={filteredUsers.length}
-                  selectedUserCount={selectedUserIds.size}
-                  searchValue={searchValue}
-                  userFilter={userFilter}
-                  showFilters={showFilters}
-                  onSearchChange={(value) => {
-                    setSearchValue(value);
-                    setPage(1);
-                  }}
-                  onFilterChange={(value) => {
-                    setUserFilter(value);
-                    setShowFilters(false);
-                    setPage(1);
-                  }}
-                  onToggleFilters={() => setShowFilters((current) => !current)}
-                  onRequestBulkDelete={requestBulkUserDelete}
-                />
+            </div>
+          ) : (
+            // Only the tab content slides; the loading and error states above
+            // are not tabs and would otherwise animate on their way in too.
+            <SlidingTabPanel activeKey={activeTab} index={ADMIN_TAB_ORDER.indexOf(activeTab)}>
+              {activeTab === "users" ? (
+                <>
+                  <AdminUsersToolbar
+                    userCount={filteredUsers.length}
+                    selectedUserCount={selectedUserIds.size}
+                    searchValue={searchValue}
+                    userFilter={userFilter}
+                    onSearchChange={(value) => {
+                      setSearchValue(value);
+                      setPage(1);
+                    }}
+                    onFilterChange={(value) => {
+                      setUserFilter(value);
+                      setPage(1);
+                    }}
+                    onRequestBulkDelete={requestBulkUserDelete}
+                  />
 
-                <UsersTab
-                  paginatedUsers={paginatedUsers}
-                  selectedUserIds={selectedUserIds}
-                  allVisibleUsersSelected={allVisibleUsersSelected}
-                  openUserMenuId={openUserMenuId}
-                  onToggleAllVisibleUsers={toggleAllVisibleUsers}
-                  onToggleUserSelection={toggleUserSelection}
-                  onOpenUserDetails={openUserDetails}
-                  onToggleUserContextMenu={toggleUserContextMenu}
-                  onOpenUserDetailsFromMenu={openUserDetailsFromMenu}
-                  onRequestUserDeleteFromMenu={requestUserDeleteFromMenu}
-                />
+                  <UsersTab
+                    paginatedUsers={paginatedUsers}
+                    selectedUserIds={selectedUserIds}
+                    allVisibleUsersSelected={allVisibleUsersSelected}
+                    openUserMenuId={openUserMenuId}
+                    onToggleAllVisibleUsers={toggleAllVisibleUsers}
+                    onToggleUserSelection={toggleUserSelection}
+                    onOpenUserDetails={openUserDetails}
+                    onToggleUserContextMenu={toggleUserContextMenu}
+                    onOpenUserDetailsFromMenu={openUserDetailsFromMenu}
+                    onRequestUserDeleteFromMenu={requestUserDeleteFromMenu}
+                  />
 
-                <AdminPagination
-                  safePage={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                />
-              </>
-            ) : activeTab === "projects" ? (
-              <>
-                <AdminProjectsToolbar
-                  projectCount={filteredProjects.length}
-                  projectSearchValue={projectSearchValue}
-                  onProjectSearchChange={setProjectSearchValue}
-                  onCreateProject={openCreateWizard}
-                />
+                  <AdminPagination
+                    safePage={safePage}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
+                </>
+              ) : activeTab === "projects" ? (
+                <>
+                  <AdminProjectsToolbar
+                    projectCount={filteredProjects.length}
+                    projectSearchValue={projectSearchValue}
+                    onProjectSearchChange={setProjectSearchValue}
+                    onCreateProject={openCreateWizard}
+                  />
 
-                <ProjectsTab
-                  filteredProjects={filteredProjects}
-                  hasSearchQuery={projectSearchValue.trim().length > 0}
-                  totalCount={projects.length}
-                  onOpenProjectDetails={openProjectDetails}
+                  <ProjectsTab
+                    filteredProjects={filteredProjects}
+                    hasSearchQuery={projectSearchValue.trim().length > 0}
+                    totalCount={projects.length}
+                    onOpenProjectDetails={openProjectDetails}
+                  />
+                </>
+              ) : (
+                <TokensTab
+                  tokenNames={tokenNames}
+                  onRefresh={() => void loadTokenNames()}
+                  userEmail={profile?.email ?? null}
                 />
-              </>
-            ) : (
-              <TokensTab
-                tokenNames={tokenNames}
-                onRefresh={() => void loadTokenNames()}
-              />
-            )}
-          </div>
+              )}
+            </SlidingTabPanel>
+          )}
         </div>
       </main>
 
@@ -615,9 +601,8 @@ export function AdminPage() {
         description={
           userPendingDelete ? (
             <>
-              Are you sure you want to delete{" "}
-              <strong>{getDisplayName(userPendingDelete)}</strong>? This action
-              cannot be undone.
+              Are you sure you want to delete <strong>{getDisplayName(userPendingDelete)}</strong>?
+              This action cannot be undone.
             </>
           ) : undefined
         }
@@ -636,10 +621,9 @@ export function AdminPage() {
         title="Delete selected users?"
         description={
           <>
-            Are you sure you want to delete{" "}
-            <strong>{selectedUserIds.size}</strong>{" "}
-            {selectedUserIds.size === 1 ? "selected user" : "selected users"}?
-            This action cannot be undone.
+            Are you sure you want to delete <strong>{selectedUserIds.size}</strong>{" "}
+            {selectedUserIds.size === 1 ? "selected user" : "selected users"}? This action cannot be
+            undone.
           </>
         }
         confirmLabel="Delete All"
@@ -655,6 +639,7 @@ export function AdminPage() {
       <CreateProjectWizard
         isOpen={isCreateWizardOpen}
         tokenNames={tokenNames}
+        users={users}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
       />

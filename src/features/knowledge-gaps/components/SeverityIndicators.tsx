@@ -8,7 +8,7 @@ import { SEVERITIES, SEVERITY_STYLES } from "../severity";
 export function SeverityBar({ severity }: { severity: KnowledgeGapSeverity }) {
   const { bar } = SEVERITY_STYLES[severity];
   return (
-    <div className="w-1 self-stretch rounded-full shrink-0 bg-app-border">
+    <div className="w-1 shrink-0 self-stretch rounded-full bg-app-border">
       <div className={`w-full rounded-full ${bar}`} style={{ height: "100%" }} />
     </div>
   );
@@ -38,7 +38,7 @@ export function SeveritySummaryBar({
   return (
     <div className={className}>
       {/* Stacked bar */}
-      <div className="flex h-2 rounded-full overflow-hidden gap-0.5 mb-2">
+      <div className="mb-2 flex h-2 gap-0.5 overflow-hidden rounded-full">
         {SEVERITIES.map((s) =>
           counts[s] > 0 ? (
             <div
@@ -54,13 +54,8 @@ export function SeveritySummaryBar({
       <div className="flex items-center gap-3">
         {SEVERITIES.map((s) =>
           counts[s] > 0 ? (
-            <span
-              key={s}
-              className="flex items-center gap-1 text-xs text-app-text-muted"
-            >
-              <span
-                className={`inline-block w-2 h-2 rounded-full ${SEVERITY_STYLES[s].bar}`}
-              />
+            <span key={s} className="flex items-center gap-1 text-xs text-app-text-muted">
+              <span className={`inline-block h-2 w-2 rounded-full ${SEVERITY_STYLES[s].bar}`} />
               {counts[s]} {SEVERITY_STYLES[s].label}
             </span>
           ) : null,

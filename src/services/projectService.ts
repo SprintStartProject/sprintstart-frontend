@@ -4,16 +4,19 @@
 
 import { ApiError, apiClient } from "./apiClient";
 
+/**
+ * Moves one user out of `sourceProjectId` and into the project addressed by the
+ * request path.
+ *
+ * Deliberately a single request rather than a remove followed by an assign: a
+ * project manager only sees users mapped to their own projects, so a failed
+ * second call would leave them unable to undo the first.
+ */
 export type GlobalUserRole = "ADMIN" | "HR" | "PM" | "USER" | (string & {});
 
 export type ProjectRole = "MEMBER" | "MANAGER" | "TEAMLEAD" | (string & {});
 
-export type ProjectSourceType =
-  | "GITHUB"
-  | "JIRA"
-  | "SONARQUBE"
-  | "UPLOAD"
-  | (string & {});
+export type ProjectSourceType = "GITHUB" | "JIRA" | "SONARQUBE" | "UPLOAD" | (string & {});
 
 export type ProjectSourceStatus =
   | "CONNECTED"
@@ -175,9 +178,7 @@ function toProjectSource(source: BackendProjectSource): ProjectSource {
   };
 }
 
-function toProjectUserSummary(
-  user: BackendProjectUserSummary,
-): ProjectUserSummary {
+function toProjectUserSummary(user: BackendProjectUserSummary): ProjectUserSummary {
   return {
     id: user.id,
     username: user.username,
@@ -233,9 +234,7 @@ function toAdminProject(project: BackendAdminProject): AdminProject {
   };
 }
 
-function toAdminProjectDetails(
-  project: BackendAdminProjectDetails,
-): AdminProjectDetails {
+function toAdminProjectDetails(project: BackendAdminProjectDetails): AdminProjectDetails {
   return {
     id: project.id,
     name: project.name,
@@ -246,9 +245,7 @@ function toAdminProjectDetails(
   };
 }
 
-function toBackendProjectRequest(
-  request: CreateProjectRequest | UpdateProjectRequest,
-) {
+function toBackendProjectRequest(request: CreateProjectRequest | UpdateProjectRequest) {
   return {
     name: request.name,
     description: request.description,
@@ -287,13 +284,16 @@ async function getProjectsFromCurrentUser(): Promise<AdminProject[]> {
 }
 
 async function fetchAdminProjects(): Promise<AdminProject[]> {
-  const projects = await apiClient.fetch<BackendAdminProject[]>(
-    "/api/v1/admin/projects",
-  );
+  const projects = await apiClient.fetch<BackendAdminProject[]>("/api/v1/admin/projects");
 
   return projects.map(toAdminProject);
 }
 
+/**
+ * Project CRUD, membership and manager assignment.
+ * Admin-only endpoints throw ApiError 403 for non-admin callers.
+ * Falls back to user-scoped endpoints for PM-level operations.
+ */
 export const projectService = {
   async getProjects(): Promise<AdminProject[]> {
     try {
@@ -332,16 +332,11 @@ export const projectService = {
     return toAdminProjectDetails(project);
   },
 
-  async createProject(
-    request: CreateProjectRequest,
-  ): Promise<AdminProjectDetails> {
-    const project = await apiClient.fetch<BackendAdminProjectDetails>(
-      "/api/v1/admin/projects",
-      {
-        method: "POST",
-        body: JSON.stringify(toBackendProjectRequest(request)),
-      },
-    );
+  async createProject(request: CreateProjectRequest): Promise<AdminProjectDetails> {
+    const project = await apiClient.fetch<BackendAdminProjectDetails>("/api/v1/admin/projects", {
+      method: "POST",
+      body: JSON.stringify(toBackendProjectRequest(request)),
+    });
 
     return toAdminProjectDetails(project);
   },
@@ -362,12 +357,9 @@ export const projectService = {
   },
 
   async deleteProject(projectId: string): Promise<DeleteProjectResponse> {
-    return apiClient.fetch<DeleteProjectResponse>(
-      `/api/v1/admin/projects/${projectId}`,
-      {
-        method: "DELETE",
-      },
-    );
+    return apiClient.fetch<DeleteProjectResponse>(`/api/v1/admin/projects/${projectId}`, {
+      method: "DELETE",
+    });
   },
 
   async getProjectUsers(projectId: string): Promise<ProjectUser[]> {
@@ -393,16 +385,10 @@ export const projectService = {
     return users.map(toProjectUser);
   },
 
-  async removeUserFromProject(
-    projectId: string,
-    userId: string,
-  ): Promise<void> {
-    await apiClient.fetch<void>(
-      `/api/v1/admin/projects/${projectId}/users/${userId}`,
-      {
-        method: "DELETE",
-      },
-    );
+  async removeUserFromProject(projectId: string, userId: string): Promise<void> {
+    await apiClient.fetch<void>(`/api/v1/admin/projects/${projectId}/users/${userId}`, {
+      method: "DELETE",
+    });
   },
 
   /**
@@ -412,9 +398,7 @@ export const projectService = {
    * assigned manager of. Requires the PM or ADMIN role.
    */
   async getManagedProjects(): Promise<ManagedProject[]> {
-    const projects = await apiClient.fetch<BackendManagedProject[]>(
-      "/api/v1/projects/managed",
-    );
+    const projects = await apiClient.fetch<BackendManagedProject[]>("/api/v1/projects/managed");
 
     return projects.map(toManagedProject);
   },
@@ -437,10 +421,7 @@ export const projectService = {
    * A project has at most one manager, so this overwrites rather than appends.
    * Admin-only.
    */
-  async setProjectManager(
-    projectId: string,
-    managerUserId: string,
-  ): Promise<AdminProjectDetails> {
+  async setProjectManager(projectId: string, managerUserId: string): Promise<AdminProjectDetails> {
     const project = await apiClient.fetch<BackendAdminProjectDetails>(
       `/api/v1/admin/projects/${projectId}/manager`,
       {
@@ -454,11 +435,8 @@ export const projectService = {
 
   /** Removes the manager assignment from a project. Admin-only. */
   async clearProjectManager(projectId: string): Promise<void> {
-    await apiClient.fetch<void>(
-      `/api/v1/admin/projects/${projectId}/manager`,
-      {
-        method: "DELETE",
-      },
-    );
+    await apiClient.fetch<void>(`/api/v1/admin/projects/${projectId}/manager`, {
+      method: "DELETE",
+    });
   },
 };

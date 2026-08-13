@@ -46,13 +46,9 @@ describe("ConnectorSourcesSection", () => {
       expect(screen.getByText("org/repo")).toBeInTheDocument();
     });
 
-    await user.click(
-      screen.getByRole("button", { name: /exclude org\/repo/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /exclude org\/repo/i }));
 
-    expect(
-      screen.getByRole("button", { name: /save 1 change/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save 1 change/i })).toBeInTheDocument();
   });
 
   it("shows a soft warning (not a hard error) when the save fails but the change is confirmed to have persisted", async () => {
@@ -78,9 +74,7 @@ describe("ConnectorSourcesSection", () => {
       expect(screen.getByText("org/repo")).toBeInTheDocument();
     });
 
-    await user.click(
-      screen.getByRole("button", { name: /exclude org\/repo/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /exclude org\/repo/i }));
 
     server.use(
       http.get("/api/v1/connectors/github/sources", () =>
@@ -99,9 +93,7 @@ describe("ConnectorSourcesSection", () => {
       ).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByRole("button", { name: /include org\/repo/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /include org\/repo/i })).toBeInTheDocument();
   });
 
   it("shows a hard error when the save fails and the refetched state does not match the intended change", async () => {
@@ -119,9 +111,7 @@ describe("ConnectorSourcesSection", () => {
       expect(screen.getByText("org/repo")).toBeInTheDocument();
     });
 
-    await user.click(
-      screen.getByRole("button", { name: /exclude org\/repo/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /exclude org\/repo/i }));
 
     server.use(
       http.get("/api/v1/connectors/github/sources", () =>
@@ -151,13 +141,9 @@ describe("ConnectorSourcesSection", () => {
       expect(screen.getByText("org/repo")).toBeInTheDocument();
     });
 
-    await user.click(
-      screen.getByRole("button", { name: /exclude org\/repo/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /exclude org\/repo/i }));
 
-    server.use(
-      http.get("/api/v1/connectors/github/sources", () => HttpResponse.error()),
-    );
+    server.use(http.get("/api/v1/connectors/github/sources", () => HttpResponse.error()));
 
     await user.click(screen.getByRole("button", { name: /save 1 change/i }));
 
@@ -165,8 +151,6 @@ describe("ConnectorSourcesSection", () => {
       expect(screen.getByText(/save failed/)).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByRole("button", { name: /save 1 change/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save 1 change/i })).toBeInTheDocument();
   });
 });

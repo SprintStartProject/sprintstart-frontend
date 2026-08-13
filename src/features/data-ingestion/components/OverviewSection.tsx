@@ -39,26 +39,18 @@ export function OverviewSection({
   runs,
   onNavigate,
 }: OverviewSectionProps) {
-  const attention = sources.filter(
-    (source) => source.statusView.state === "attention",
-  ).length;
+  const attention = sources.filter((source) => source.statusView.state === "attention").length;
   const syncErrors = sources.reduce((sum, source) => sum + source.errors, 0);
 
   const recentRuns = useMemo(
     () =>
       [...runs]
-        .sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-        )
+        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
         .slice(0, 4),
     [runs],
   );
 
-  const runSourceLabels = useMemo(
-    () => buildRunSourceLabels(sources),
-    [sources],
-  );
+  const runSourceLabels = useMemo(() => buildRunSourceLabels(sources), [sources]);
 
   const bySource = useMemo(() => {
     const ranked = [...sources]
@@ -86,9 +78,7 @@ export function OverviewSection({
   return (
     <section aria-label="Overview">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-bold tracking-tight text-app-text">
-          Overview
-        </h2>
+        <h2 className="text-lg font-semibold tracking-tight text-app-text">Overview</h2>
       </div>
 
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
@@ -111,11 +101,7 @@ export function OverviewSection({
           foot={syncErrors > 0 ? "Review failing sources" : "No failed items"}
           icon={XCircle}
           tone={syncErrors > 0 ? "warning" : "neutral"}
-          onClick={
-            onNavigate && syncErrors > 0
-              ? () => onNavigate("sources")
-              : undefined
-          }
+          onClick={onNavigate && syncErrors > 0 ? () => onNavigate("sources") : undefined}
         />
         <Kpi
           label="Needs attention"
@@ -123,9 +109,7 @@ export function OverviewSection({
           foot={attention > 0 ? "Review these sources" : "All healthy"}
           icon={AlertTriangle}
           tone={attention > 0 ? "warning" : "neutral"}
-          onClick={
-            onNavigate && attention > 0 ? () => onNavigate("sources") : undefined
-          }
+          onClick={onNavigate && attention > 0 ? () => onNavigate("sources") : undefined}
         />
       </div>
 
@@ -142,10 +126,8 @@ export function OverviewSection({
                 {bySource.map((row) => (
                   <li key={row.id} className="space-y-1.5">
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="min-w-0 truncate font-medium text-app-text">
-                        {row.name}
-                      </span>
-                      <span className="shrink-0 font-semibold tabular-nums text-app-text">
+                      <span className="min-w-0 truncate font-medium text-app-text">{row.name}</span>
+                      <span className="shrink-0 font-semibold text-app-text tabular-nums">
                         {formatNumber(row.count)}
                         <span className="ml-1 font-normal text-app-text-subtle">
                           ({row.share}%)
@@ -170,7 +152,7 @@ export function OverviewSection({
 
               <div className="mt-4 flex items-center justify-between border-t border-app-border pt-3 text-xs">
                 <span className="text-app-text-subtle">Total artifacts</span>
-                <span className="font-semibold tabular-nums text-app-text">
+                <span className="font-semibold text-app-text tabular-nums">
                   {formatNumber(totalArtifactCount)}
                 </span>
               </div>
@@ -184,9 +166,7 @@ export function OverviewSection({
 
         <div className="rounded-2xl border border-app-border bg-app-surface p-5">
           <h3 className="text-sm font-bold text-app-text">Recent activity</h3>
-          <p className="mt-0.5 text-xs text-app-text-subtle">
-            Latest ingestion runs
-          </p>
+          <p className="mt-0.5 text-xs text-app-text-subtle">Latest ingestion runs</p>
 
           {recentRuns.length > 0 ? (
             <ul className="mt-3">
@@ -199,9 +179,7 @@ export function OverviewSection({
               ))}
             </ul>
           ) : (
-            <p className="mt-8 text-center text-sm text-app-text-muted">
-              No ingestion runs yet.
-            </p>
+            <p className="mt-8 text-center text-sm text-app-text-muted">No ingestion runs yet.</p>
           )}
         </div>
       </div>
@@ -242,9 +220,7 @@ function Kpi({
           className={`shrink-0 ${TONE_TILE[tone]} ${iconSpin ? "animate-spin" : ""}`}
         />
       </div>
-      <p className="mt-2.5 text-3xl font-bold tracking-tight tabular-nums text-app-text">
-        {value}
-      </p>
+      <p className="mt-2.5 text-3xl font-bold tracking-tight text-app-text tabular-nums">{value}</p>
       <p
         className={`mt-1 flex items-center gap-1 text-xs ${
           onClick ? "font-medium text-app-brand-text" : "text-app-text-subtle"
@@ -268,20 +244,14 @@ function Kpi({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-app-border bg-app-surface p-4 text-left transition hover:border-app-brand-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus sm:p-[18px]"
+      className="rounded-2xl border border-app-border bg-app-surface p-4 text-left transition hover:border-app-brand-border focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none sm:p-[18px]"
     >
       {body}
     </button>
   );
 }
 
-function ActivityRow({
-  run,
-  sourceLabel,
-}: {
-  run: IngestionRun;
-  sourceLabel: string;
-}) {
+function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: string }) {
   const tone = getRunStatusTone(run.status);
   const label = getRunStatusLabel(run.status);
 
@@ -296,9 +266,7 @@ function ActivityRow({
 
   return (
     <li className="flex items-center gap-3 border-t border-app-border py-2 first:border-t-0">
-      <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
-      >
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>
         {tone === "success" ? (
           <CheckCircle2 size={15} />
         ) : tone === "running" ? (
@@ -308,9 +276,7 @@ function ActivityRow({
         )}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold text-app-text">
-          {sourceLabel}
-        </p>
+        <p className="truncate text-[13px] font-semibold text-app-text">{sourceLabel}</p>
         <p className="text-[11.5px] text-app-text-subtle">
           {formatNumber(run.ingestedCount)} artifacts
         </p>
@@ -318,15 +284,14 @@ function ActivityRow({
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none ${toneClass}`}
+          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] leading-none font-semibold ${toneClass}`}
         >
           {label}
         </span>
-        <span className="whitespace-nowrap text-[11.5px] text-app-text-subtle">
+        <span className="text-[11.5px] whitespace-nowrap text-app-text-subtle">
           {formatDateTime(run.startedAt)}
         </span>
       </div>
     </li>
   );
 }
-

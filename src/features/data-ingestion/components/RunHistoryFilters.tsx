@@ -1,22 +1,27 @@
-import { useId } from "react";
 import { RotateCcw } from "lucide-react";
+import { Button } from "../../../components/ui/Button.tsx";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import type { IngestionRunStatus } from "../types.ts";
 
 /** `"ALL"` means "no status filter", i.e. the query param is omitted. */
 export type RunStatusFilter = IngestionRunStatus | "ALL";
 
-export type RunRepositoryOption = {
-  repositoryId: string;
+/**
+ * One selectable source in the run filter. `value` is a GitHub repository id or
+ * a Jira instance URL; the parent decides which query param it maps to.
+ */
+export type RunSourceOption = {
+  value: string;
   label: string;
 };
 
 type RunHistoryFiltersProps = {
   status: RunStatusFilter;
-  /** A repository id, or `"ALL"` for every repository in the project. */
-  repositoryId: string;
-  repositories: RunRepositoryOption[];
+  /** A source `value`, or `"ALL"` for every source in the project. */
+  sourceValue: string;
+  sources: RunSourceOption[];
   onStatusChange: (status: RunStatusFilter) => void;
-  onRepositoryChange: (repositoryId: string) => void;
+  onSourceChange: (value: string) => void;
   onReset: () => void;
   disabled?: boolean;
 };
@@ -26,16 +31,13 @@ type RunHistoryFiltersProps = {
  * UI already labels "Running", and offering both would give two identical-looking
  * options for a filter the backend matches on a single exact value.
  */
-const STATUS_OPTIONS: { value: RunStatusFilter; label: string }[] = [
+const STATUS_OPTIONS: FilterSelectOption<RunStatusFilter>[] = [
   { value: "ALL", label: "All statuses" },
   { value: "RUNNING", label: "Running" },
   { value: "COMPLETED", label: "Success" },
   { value: "PARTIAL", label: "Partial" },
   { value: "FAILED", label: "Failed" },
 ];
-
-const SELECT_CLASSNAME =
-  "h-9 rounded-lg border border-app-border bg-app-surface px-2.5 text-sm text-app-text outline-none transition focus:border-app-brand disabled:cursor-not-allowed disabled:opacity-60";
 
 /**
  * Filter toolbar for the run history. The selections are applied server-side by
@@ -44,77 +46,53 @@ const SELECT_CLASSNAME =
  */
 export function RunHistoryFilters({
   status,
-  repositoryId,
-  repositories,
+  sourceValue,
+  sources,
   onStatusChange,
-  onRepositoryChange,
+  onSourceChange,
   onReset,
   disabled = false,
 }: RunHistoryFiltersProps) {
-  const statusId = useId();
-  const repositoryId_ = useId();
-  const hasActiveFilter = status !== "ALL" || repositoryId !== "ALL";
+  const hasActiveFilter = status !== "ALL" || sourceValue !== "ALL";
+
+  const sourceOptions: FilterSelectOption<string>[] = [
+    { value: "ALL", label: "All sources" },
+    ...sources.map((source) => ({ value: source.value, label: source.label })),
+  ];
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      role="group"
-      aria-label="Filter runs"
-    >
-      <label htmlFor={statusId} className="sr-only">
-        Filter runs by status
-      </label>
-      <select
-        id={statusId}
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter runs">
+      <FilterSelect
+        label="Filter runs by status"
         value={status}
+        options={STATUS_OPTIONS}
+        onChange={onStatusChange}
         disabled={disabled}
-        onChange={(event) =>
-          onStatusChange(event.target.value as RunStatusFilter)
-        }
-        className={SELECT_CLASSNAME}
-      >
-        {STATUS_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        className="w-40"
+      />
 
-      {repositories.length > 1 && (
-        <>
-          <label htmlFor={repositoryId_} className="sr-only">
-            Filter runs by repository
-          </label>
-          <select
-            id={repositoryId_}
-            value={repositoryId}
-            disabled={disabled}
-            onChange={(event) => onRepositoryChange(event.target.value)}
-            className={SELECT_CLASSNAME}
-          >
-            <option value="ALL">All repositories</option>
-            {repositories.map((repository) => (
-              <option
-                key={repository.repositoryId}
-                value={repository.repositoryId}
-              >
-                {repository.label}
-              </option>
-            ))}
-          </select>
-        </>
+      {sources.length > 1 && (
+        <FilterSelect
+          label="Filter runs by source"
+          value={sourceValue}
+          options={sourceOptions}
+          onChange={onSourceChange}
+          disabled={disabled}
+          className="w-52"
+        />
       )}
 
       {hasActiveFilter && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onReset}
           disabled={disabled}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-app-brand-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+          icon={<RotateCcw className="h-3.5 w-3.5" />}
+          className="text-app-brand-text"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
           Reset
-        </button>
+        </Button>
       )}
     </div>
   );

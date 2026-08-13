@@ -72,9 +72,7 @@ export const handlers = [
     });
   }),
 
-  http.delete("/api/v1/admin/users/:userId", () =>
-    HttpResponse.json({ id: "123", deleted: true }),
-  ),
+  http.delete("/api/v1/admin/users/:userId", () => HttpResponse.json({ id: "123", deleted: true })),
 
   http.get("/api/v1/admin/projects", () =>
     HttpResponse.json([
@@ -98,6 +96,22 @@ export const handlers = [
   http.get("/api/v1/users/me/projects", () =>
     HttpResponse.json([{ id: "project-1", name: "SprintStart Project" }]),
   ),
+
+  // A single managed project by default, which is what most pages assume. Tests
+  // that care about managing several projects override this handler.
+  http.get("/api/v1/projects/managed", () =>
+    HttpResponse.json([
+      {
+        id: "project-1",
+        name: "SprintStart Project",
+        description: "Default test project",
+        memberCount: 2,
+      },
+    ]),
+  ),
+
+  // No connected sources by default; tests that care override this handler.
+  http.get("/api/v1/ingestion-sources/status", () => HttpResponse.json([])),
 
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
@@ -125,28 +139,62 @@ export const handlers = [
     }),
   ),
 
+  http.get("/api/v1/chats/me", () =>
+    HttpResponse.json({
+      chats: [
+        {
+          id: "chat1",
+          userId: "user1",
+          title: "Chat 1",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }),
+  ),
+
   http.post("/api/v1/chats", async ({ request }) => {
-    const body = (await request.json()) as { userId: string };
+    const body = (await request.json().catch(() => ({}))) as { userId?: string };
     return HttpResponse.json({
       id: "new-chat-id",
-      userId: body.userId,
+      userId: body.userId ?? "user1",
       title: "",
       createdAt: new Date().toISOString(),
     });
   }),
 
-  http.patch(
-    "/api/v1/admin/users/:userId/enabled",
-    async ({ request, params }) => {
-      const body = (await request.json()) as Record<string, unknown>;
-      return HttpResponse.json({
-        ...backendUser,
-        id: params.userId,
-        ...body,
-      });
-    },
-  ),
+  http.post("/api/v1/chats/me", () => {
+    return HttpResponse.json({
+      id: "new-chat-id",
+      userId: "user1",
+      title: "",
+      createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.patch("/api/v1/admin/users/:userId/enabled", async ({ request, params }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({
+      ...backendUser,
+      id: params.userId,
+      ...body,
+    });
+  }),
+
   http.get("/api/v1/chats/:chatId", ({ params }) =>
+    HttpResponse.json({
+      messages: [
+        {
+          id: "msg1",
+          content: "Hello",
+          role: "USER",
+          chat: null,
+          chatId: params.chatId,
+        },
+      ],
+    }),
+  ),
+
+  http.get("/api/v1/chats/me/:chatId", ({ params }) =>
     HttpResponse.json({
       messages: [
         {
@@ -162,6 +210,19 @@ export const handlers = [
 
   http.post(
     "/api/v1/chats/prompt",
+    () =>
+      new HttpResponse(
+        sseStream(
+          JSON.stringify({ type: "token", content: "Hello " }),
+          JSON.stringify({ type: "token", content: "world" }),
+          JSON.stringify({ type: "done" }),
+        ),
+        { headers: { "Content-Type": "text/event-stream" } },
+      ),
+  ),
+
+  http.post(
+    "/api/v1/chats/me/prompt",
     () =>
       new HttpResponse(
         sseStream(
@@ -294,9 +355,28 @@ export const handlers = [
     }),
   ),
 
-  http.put(
-    "/api/v1/onboarding/me/tasks/:taskId",
-    () => new HttpResponse(null, { status: 200 }),
+  http.put("/api/v1/onboarding/me/tasks/:taskId", () => new HttpResponse(null, { status: 200 })),
+
+  http.get("/api/v1/onboarding/me/team-overview", () =>
+    HttpResponse.json({
+      userId: "user1",
+      firstname: "Alice",
+      lastname: "Smith",
+      email: "alice@example.com",
+      roles: [{ id: "role1", name: "Backend" }],
+      skills: [],
+      progressPercentage: 0.4,
+      currentPhase: { id: "phase1", title: "Phase 1" },
+      currentStep: {
+        id: "step1",
+        title: "Set up your environment",
+        startedAt: "2023-01-01T10:00:00Z",
+        skip: null,
+      },
+      hasFeedback: false,
+      // Mirrors the API: a list under `projectIds`, keyed by `projectId`.
+      projectIds: [{ projectId: "project-1", name: "SprintStart Project", description: null }],
+    }),
   ),
 
   http.get("/api/v1/onboarding/team-overview", ({ request }) => {
@@ -312,6 +392,7 @@ export const handlers = [
         progressPercentage: 80,
         currentStep: { startedAt: "2023-01-01T10:00:00Z" },
         skills: [],
+        projectIds: [{ projectId: "project-1", name: "SprintStart Project", description: null }],
       },
       {
         userId: "user2",
@@ -322,11 +403,10 @@ export const handlers = [
         progressPercentage: 20,
         currentStep: { startedAt: "2023-01-02T10:00:00Z" },
         skills: [],
+        projectIds: [{ projectId: "project-1", name: "SprintStart Project", description: null }],
       },
     ];
-    const filtered = roleId
-      ? users.filter((u) => u.roles.some((r) => r.id === roleId))
-      : users;
+    const filtered = roleId ? users.filter((u) => u.roles.some((r) => r.id === roleId)) : users;
     return HttpResponse.json({ content: filtered });
   }),
 
@@ -394,25 +474,19 @@ export const handlers = [
     ]),
   ),
 
-  http.put(
-    "/api/v1/projectRoles/:roleId/skills",
-    async ({ request, params }) => {
-      const body = (await request.json()) as { skillIds: string[] };
-      return HttpResponse.json(
-        body.skillIds.map((skillId) => ({
-          id: skillId,
-          name: "Skill " + skillId,
-          roleIds: [params.roleId],
-          status: "ACTIVE" as const,
-        })),
-      );
-    },
-  ),
+  http.put("/api/v1/projectRoles/:roleId/skills", async ({ request, params }) => {
+    const body = (await request.json()) as { skillIds: string[] };
+    return HttpResponse.json(
+      body.skillIds.map((skillId) => ({
+        id: skillId,
+        name: "Skill " + skillId,
+        roleIds: [params.roleId],
+        status: "ACTIVE" as const,
+      })),
+    );
+  }),
 
-  http.delete(
-    "/api/v1/admin/skills/:skillId",
-    () => new HttpResponse(null, { status: 204 }),
-  ),
+  http.delete("/api/v1/admin/skills/:skillId", () => new HttpResponse(null, { status: 204 })),
 
   http.get("/api/v1/me/skills", () => HttpResponse.json([])),
 
@@ -426,9 +500,7 @@ export const handlers = [
     });
   }),
 
-  http.get("/api/v1/admin/users/:userId/skill-assessments/completed", () =>
-    HttpResponse.json([]),
-  ),
+  http.get("/api/v1/admin/users/:userId/skill-assessments/completed", () => HttpResponse.json([])),
 
   http.post("/api/v1/projectRoles", async ({ request }) => {
     const body = (await request.json()) as {
@@ -442,8 +514,5 @@ export const handlers = [
     });
   }),
 
-  http.post(
-    "/api/v1/users/:userId/project-roles",
-    () => new HttpResponse(null, { status: 200 }),
-  ),
+  http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
 ];

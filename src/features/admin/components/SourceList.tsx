@@ -61,7 +61,7 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-semibold leading-5 text-app-text">
+                <p className="text-sm leading-5 font-semibold break-words text-app-text">
                   {source.name}
                 </p>
 
@@ -91,7 +91,7 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
               key={source.id}
               type="button"
               onClick={() => onOpenSourceDetails(source.id)}
-              className="flex min-h-36 flex-col rounded-xl border border-app-border bg-app-surface-muted p-4 text-left transition hover:border-app-border-strong hover:bg-app-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow"
+              className="flex min-h-36 flex-col rounded-2xl border border-app-border bg-app-surface-muted p-4 text-left transition hover:border-app-border-strong hover:bg-app-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow"
               aria-label={`Open ingestion details for ${source.name}`}
             >
               {content}
@@ -102,7 +102,7 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
         return (
           <div
             key={source.id}
-            className="flex min-h-36 flex-col rounded-xl border border-app-border bg-app-surface-muted p-4 transition hover:border-app-border-strong hover:bg-app-surface-hover"
+            className="flex min-h-36 flex-col rounded-2xl border border-app-border bg-app-surface-muted p-4 transition hover:border-app-border-strong hover:bg-app-surface-hover"
           >
             {content}
           </div>

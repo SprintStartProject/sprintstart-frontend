@@ -13,18 +13,13 @@ import type { ProjectUser } from "./types";
  * through (e.g. the user lost the role between load and save).
  */
 function toManagerAssignmentError(error: unknown): Error {
-  if (
-    error instanceof ApiError &&
-    (error.status === 400 || error.status === 409)
-  ) {
+  if (error instanceof ApiError && (error.status === 400 || error.status === 409)) {
     return new Error(
       "This user must have the Project Manager (PM) role before they can be assigned as project manager.",
     );
   }
 
-  return error instanceof Error
-    ? error
-    : new Error("The project manager could not be assigned.");
+  return error instanceof Error ? error : new Error("The project manager could not be assigned.");
 }
 
 /**
@@ -66,20 +61,13 @@ export function createEmptyPeopleDraft(snapshotKey: string): PeopleDraft {
 }
 
 /** Returns the draft if it still matches the snapshot, otherwise an empty one. */
-export function resolvePeopleDraft(
-  draft: PeopleDraft,
-  snapshotKey: string,
-): PeopleDraft {
-  return draft.snapshotKey === snapshotKey
-    ? draft
-    : createEmptyPeopleDraft(snapshotKey);
+export function resolvePeopleDraft(draft: PeopleDraft, snapshotKey: string): PeopleDraft {
+  return draft.snapshotKey === snapshotKey ? draft : createEmptyPeopleDraft(snapshotKey);
 }
 
 export function countPeopleChanges(draft: PeopleDraft): number {
   return (
-    draft.addedUserIds.size +
-    draft.removedUserIds.size +
-    (draft.managerId === undefined ? 0 : 1)
+    draft.addedUserIds.size + draft.removedUserIds.size + (draft.managerId === undefined ? 0 : 1)
   );
 }
 
@@ -98,10 +86,7 @@ export function stageAddUser(draft: PeopleDraft, userId: string): PeopleDraft {
 }
 
 /** Toggles a user between staged-for-removal and unchanged. */
-export function stageToggleRemoveUser(
-  draft: PeopleDraft,
-  userId: string,
-): PeopleDraft {
+export function stageToggleRemoveUser(draft: PeopleDraft, userId: string): PeopleDraft {
   const addedUserIds = new Set(draft.addedUserIds);
   const removedUserIds = new Set(draft.removedUserIds);
 
@@ -116,10 +101,7 @@ export function stageToggleRemoveUser(
   return { ...draft, addedUserIds, removedUserIds };
 }
 
-export function stageManager(
-  draft: PeopleDraft,
-  managerId: string | null,
-): PeopleDraft {
+export function stageManager(draft: PeopleDraft, managerId: string | null): PeopleDraft {
   return { ...draft, managerId };
 }
 
@@ -130,10 +112,7 @@ export function stageManager(
  * promoted in the same save, and removals run last because the backend rejects
  * removing whoever currently manages the project.
  */
-export async function applyPeopleChanges(
-  projectId: string,
-  draft: PeopleDraft,
-): Promise<void> {
+export async function applyPeopleChanges(projectId: string, draft: PeopleDraft): Promise<void> {
   if (draft.addedUserIds.size > 0) {
     await projectService.assignUsersToProject(projectId, {
       userIds: [...draft.addedUserIds],

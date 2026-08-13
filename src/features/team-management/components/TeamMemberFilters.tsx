@@ -1,59 +1,44 @@
-import type {
-    TeamOverviewFilters,
-    ProjectRole,
-} from '../types';
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import type { TeamOverviewFilters, ProjectRole } from "../types";
+
+type SortOption = TeamOverviewFilters["sortBy"];
+
+const SORT_OPTIONS: FilterSelectOption<SortOption>[] = [
+  { value: "LONGEST_STEP", label: "Longest on step" },
+  { value: "SHORTEST_STEP", label: "Shortest on step" },
+  { value: "HIGHEST_PROGRESS", label: "Highest progress" },
+  { value: "LOWEST_PROGRESS", label: "Lowest progress" },
+];
 
 type TeamMemberFiltersProps = {
-    roles: ProjectRole[];
-    filters: TeamOverviewFilters;
-    onFiltersChange: (filters: TeamOverviewFilters) => void;
+  roles: ProjectRole[];
+  filters: TeamOverviewFilters;
+  onFiltersChange: (filters: TeamOverviewFilters) => void;
 };
 
-export function TeamMemberFilters({
-    roles,
-    filters,
-    onFiltersChange,
-}: TeamMemberFiltersProps) {
+export function TeamMemberFilters({ roles, filters, onFiltersChange }: TeamMemberFiltersProps) {
+  const roleOptions: FilterSelectOption<string>[] = [
+    { value: "all", label: "All roles" },
+    ...(roles || []).map((role) => ({ value: role.id, label: role.name })),
+  ];
 
-    return (
-        <div className="flex flex-wrap items-center gap-2">
-            <select
-                aria-label="Filter team members by role"
-                value={filters.roleId}
-                onChange={(event) =>
-                    onFiltersChange({
-                        ...filters,
-                        roleId: event.target.value,
-                    })
-                }
-                className="h-9 rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none hover:border-app-border-strong"
-            >
-                <option value="all">All roles</option>
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <FilterSelect
+        label="Filter team members by role"
+        value={filters.roleId}
+        options={roleOptions}
+        onChange={(roleId) => onFiltersChange({ ...filters, roleId })}
+        className="w-44"
+      />
 
-                {(roles || []).map((role) => (
-                    <option key={role.id} value={role.id}>
-                        {role.name}
-                    </option>
-                ))}
-            </select>
-
-            <select
-                aria-label="Sort team members"
-                value={filters.sortBy}
-                onChange={(event) =>
-                    onFiltersChange({
-                        ...filters,
-                        sortBy:
-                            event.target.value as TeamOverviewFilters['sortBy'],
-                    })
-                }
-                className="h-9 rounded-xl border border-app-border bg-app-surface px-3 text-sm text-app-text outline-none hover:border-app-border-strong"
-            >
-                <option value="LONGEST_STEP">Longest on step</option>
-                <option value="SHORTEST_STEP">Shortest on step</option>
-                <option value="HIGHEST_PROGRESS">Highest progress</option>
-                <option value="LOWEST_PROGRESS">Lowest progress</option>
-            </select>
-        </div>
-    );
+      <FilterSelect
+        label="Sort team members"
+        value={filters.sortBy}
+        options={SORT_OPTIONS}
+        onChange={(sortBy) => onFiltersChange({ ...filters, sortBy })}
+        className="w-48"
+      />
+    </div>
+  );
 }
