@@ -102,9 +102,23 @@ src/
   route access is centralized in `auth/accessPolicy.ts` (`AppRoute` union +
   `canAccessRoute`). Four permission groups are enforced: `USER`, `PM`, `HR`, and `ADMIN`.
 - **API layer & proxying** — All backend communication goes through `src/services/`
-  (typed responses; SSE for streaming). The Vite dev server proxies `/api`, `/v1`
-  → `http://127.0.0.1:8080` (backend) and `/auth` → `http://127.0.0.1:8081`
-  (Keycloak). In Docker production, Nginx handles the identical reverse proxy routing.
+  (typed responses; SSE for streaming). Nothing addresses the backend or Keycloak by
+  absolute URL: both are reached through the frontend's own origin and resolved by a
+  reverse proxy, which differs per deployment target:
+
+  | Route   | Vite dev (`vite.config.ts`) | Docker (`nginx.conf`)       | Kubernetes (`k8s/frontend/01-configmap.yaml`) |
+  | ------- | --------------------------- | --------------------------- | --------------------------------------------- |
+  | `/api`  | `127.0.0.1:8080`            | `host.docker.internal:8080` | `sprintstart-backend:8080`                    |
+  | `/v1`   | `127.0.0.1:8080`            | not proxied                 | `sprintstart-backend:8080`                    |
+  | `/auth` | `127.0.0.1:8081`            | `host.docker.internal:8081` | not proxied                                   |
+
+  The gaps are real, not omissions in this table. `/v1` is currently unused by the
+  SPA, so its absence in Docker costs nothing today. The missing `/auth` route under
+  Kubernetes does matter: `config/keycloak.ts` builds the Keycloak URL as
+  `window.location.origin + /auth`, and the ingress forwards everything to the
+  frontend service, so that path would fall through to the SPA. Adding a route
+  before relying on the Kubernetes manifests is tracked separately.
+
 - **Design system** — One shared semantic palette (CSS variables → Tailwind
   `app-*` classes) defined in `src/styles/index.css`. Always use tokens, never
   hardcode colors. Light/dark is controlled via the `.dark` class managed by `ThemeProvider`.
@@ -146,11 +160,16 @@ VITE_KEYCLOAK_CLIENT_ID=sprintstart-frontend
 ```
 
 > **Note on Reverse Proxying:**
-> You do not need to configure API or Keycloak authority URLs. Both Vite (`npm run dev`)
-> and Nginx (`docker compose up`) automatically reverse-proxy:
+> You do not need to configure API or Keycloak authority URLs. Requests go to the
+> frontend's own origin and are forwarded from there. Running `npm run dev`, Vite
+> proxies:
 >
 > - `/api` & `/v1` → `http://127.0.0.1:8080` (Spring Boot backend)
 > - `/auth` → `http://127.0.0.1:8081` (Keycloak IAM)
+>
+> Under `docker compose up`, Nginx forwards `/api` and `/auth` to
+> `host.docker.internal` on the same two ports. See the routing table under
+> [Architecture](#architecture) for how the targets differ per deployment.
 
 ---
 
