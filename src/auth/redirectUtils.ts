@@ -11,7 +11,8 @@ export const AUTH_REDIRECT_STORAGE_KEY = "sprintstart_auth_redirect";
  * 2. Is a relative path on the same origin (starts with a single `/`).
  * 3. Does NOT start with `//` or `/\\` (protocol-relative URLs).
  * 4. Does NOT contain URI schemes (e.g. `javascript:`, `data:`, `https:`).
- * 5. Does NOT point back to `/login` (to prevent infinite redirect loops).
+ * 5. Does NOT point back to `/login`, in any casing or with a trailing slash
+ *    (to prevent infinite redirect loops).
  *
  * @param raw - The candidate raw path string.
  * @returns The sanitized path if valid and safe, or `null` if invalid.
@@ -37,8 +38,15 @@ export function sanitizeRedirectPath(raw: string | null | undefined): string | n
     return null;
   }
 
-  // Prevent redirecting back to the login page itself
-  if (pathWithoutQueryOrHash === "/login") {
+  // Prevent redirecting back to the login page itself. The router matches routes
+  // case-insensitively and tolerates a trailing slash, so "/Login" and "/login/"
+  // reach the same page as "/login" and have to be rejected too -- otherwise an
+  // authenticated user lands on the login page that no redirect rule applies to.
+  const normalizedPath =
+    pathWithoutQueryOrHash.length > 1
+      ? pathWithoutQueryOrHash.replace(/\/+$/, "").toLowerCase()
+      : pathWithoutQueryOrHash.toLowerCase();
+  if (normalizedPath === "/login") {
     return null;
   }
 

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthGuard } from "../../../src/router/AuthGuard";
@@ -338,6 +339,43 @@ describe("AuthGuard", () => {
       expect(screen.getByTestId("location")).toHaveTextContent("/insights/faq/42");
     });
     expect(sessionStorage.getItem("sprintstart_auth_redirect")).toBeNull();
+  });
+
+  // The app mounts inside StrictMode, which invokes the component body twice per
+  // render. Reading the stored target must not consume it, or the second pass finds
+  // nothing left to restore and the user silently stays on the landing page.
+  it("restores the stored session target when the component body runs twice", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    sessionStorage.setItem("sprintstart_auth_redirect", "/insights/faq/42?filter=active#details");
+
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/insights/faq/:id" element={<LocationDisplay />} />
+            <Route
+              path="/"
+              element={
+                <AuthGuard>
+                  <div>Root Dashboard</div>
+                </AuthGuard>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/insights/faq/42");
+    });
   });
 
   it("renders children when authenticated and no skill assessment needed", async () => {

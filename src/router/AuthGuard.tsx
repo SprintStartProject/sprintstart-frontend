@@ -11,7 +11,6 @@ import {
   clearRedirectTarget,
   extractFullPath,
   resolveRedirectTarget,
-  retrieveAndClearRedirectTarget,
   retrieveRedirectTarget,
   storeRedirectTarget,
 } from "../auth/redirectUtils";
@@ -96,7 +95,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (status === "authenticated") {
     if (location.pathname === "/login") {
       const searchParams = new URLSearchParams(location.search);
-      const storedTarget = retrieveAndClearRedirectTarget();
+      const storedTarget = retrieveRedirectTarget();
       const fallback = getDefaultRoute(profile);
 
       const destination = resolveRedirectTarget({
@@ -109,17 +108,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return <Navigate to={destination} replace />;
     }
 
-    // If Keycloak redirected back to "/" or base URL, restore the stored deep link
+    // If Keycloak redirected back to "/" or base URL, restore the stored deep link.
+    // The stored target is only read here -- clearing it is left to the effect above,
+    // which runs after the navigation commits. Clearing during render would make the
+    // restore depend on how often React invokes this component: under StrictMode the
+    // body runs twice, and a first pass that emptied the storage would leave the second
+    // pass with nothing to restore.
     const currentFullPath = extractFullPath(location);
     const storedTarget = retrieveRedirectTarget();
     if (storedTarget && storedTarget !== currentFullPath) {
       if (location.pathname === "/" && storedTarget !== "/") {
-        clearRedirectTarget();
         return <Navigate to={storedTarget} replace />;
       }
       // If the path matches but the hash fragment was stripped by OAuth, restore full path
       if (storedTarget.startsWith(location.pathname) && storedTarget.includes("#")) {
-        clearRedirectTarget();
         return <Navigate to={storedTarget} replace />;
       }
     }
