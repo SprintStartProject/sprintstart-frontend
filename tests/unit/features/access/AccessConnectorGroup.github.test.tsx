@@ -4,6 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { AccessConnectorGroup } from "../../../../src/features/access/components/AccessConnectorGroup";
 import { githubConnector } from "../../../../src/features/access/registry";
 
@@ -53,7 +54,9 @@ function renderGroup() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <GroupHarness />
+        <ToastProvider>
+          <GroupHarness />
+        </ToastProvider>
       </ThemeProvider>
     </MemoryRouter>,
   );

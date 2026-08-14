@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
+import { useToast } from "../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../services/apiError";
 import { updateGithubPat } from "../../../services/sources/githubService";
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from "../utils/patValidation";
@@ -19,9 +20,12 @@ type TokenRotateFormProps = {
  */
 export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps) {
   const [token, setToken] = useState("");
+  // Only the client-side format check stays inline; API and refresh outcomes
+  // are surfaced as toasts.
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const toast = useToast();
 
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -50,15 +54,17 @@ export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps
       try {
         await updateGithubPat(name, trimmed);
       } catch (mutationError) {
-        setError(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
+        toast.error(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
         return;
       }
       try {
         await onSaved();
       } catch (refreshError) {
-        setError(describeRefreshFailure(refreshError));
+        toast.warning(describeRefreshFailure(refreshError));
+        onClose();
         return;
       }
+      toast.success("GitHub token rotated");
       onClose();
     } finally {
       savingRef.current = false;

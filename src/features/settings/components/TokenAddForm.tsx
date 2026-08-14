@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
+import { useToast } from "../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../services/apiError";
 import { addGithubPat } from "../../../services/sources/githubService";
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from "../utils/patValidation";
@@ -20,9 +21,12 @@ type TokenAddFormProps = {
 export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
+  // `error` now holds only the client-side format check, which stays inline at
+  // the field; server and refresh outcomes are surfaced as toasts.
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const toast = useToast();
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -52,17 +56,22 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
       try {
         await addGithubPat(trimmedName, trimmedToken);
       } catch (mutationError) {
-        setError(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
+        // Keep the form open so the user can correct the input (e.g. a name
+        // clash); the reason rides along in an error toast.
+        toast.error(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
         return;
       }
-      // Mutation succeeded — closing now; if the refetch fails we surface
-      // a distinct message but still close the form (server state is correct).
+      // Mutation succeeded — the server state is correct, so close either way.
+      // A failed refetch is a warning (saved, but the list is stale), not a
+      // failure of the action.
       try {
         await onSaved();
       } catch (refreshError) {
-        setError(describeRefreshFailure(refreshError));
+        toast.warning(describeRefreshFailure(refreshError));
+        onClose();
         return;
       }
+      toast.success("GitHub token added");
       onClose();
     } finally {
       savingRef.current = false;
