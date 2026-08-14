@@ -292,9 +292,16 @@ export const knowledgeService = {
    * and the projectId scope. The backend reads the deletion target(s)
    * from the body's `artifactIds` set.
    *
+   * @remarks Permission: the backend requires `PM` or `ADMIN`, while the frontend
+   * reaches this call from `/data-ingestion`, which `accessPolicy` also opens to
+   * `HR`. An HR user therefore sees the delete action but gets a 403 — aligning
+   * the two sides is tracked as a follow-up.
+   *
    * @param projectId  UUID of the project that scopes the deletion.
    * @param artifactId UUID of the uploaded artifact to remove.
    * @param removerId  UUID of the authenticated user requesting the deletion.
+   *   Sent for symmetry with the upload contract, but ignored by the backend,
+   *   which resolves the remover from the JWT subject.
    * @throws ApiError on a non-2xx response (e.g. 403 if the caller lacks access
    *   to the supplied projectId, 404 if the artifact does not exist).
    */
