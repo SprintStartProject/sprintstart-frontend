@@ -84,7 +84,7 @@ export function SpotlightCard({
   // hook count when the tilt toggle flips and crash React. Only the rendered
   // overlay is conditional.
   const spotlightBackground = useMotionTemplate`radial-gradient(
-                    500px circle at ${mouseX}px ${mouseY}px,
+                    312.5px circle at ${mouseX}px ${mouseY}px,
                     var(--brand-glow),
                     transparent 80%
                 )`;

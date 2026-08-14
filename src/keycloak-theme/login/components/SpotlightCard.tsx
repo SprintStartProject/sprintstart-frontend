@@ -88,7 +88,7 @@ export function SpotlightCard({
     : {};
 
   const spotlightBackground = useMotionTemplate`radial-gradient(
-                500px circle at ${mouseX}px ${mouseY}px,
+                312.5px circle at ${mouseX}px ${mouseY}px,
                 var(--brand-glow),
                 transparent 80%
             )`;

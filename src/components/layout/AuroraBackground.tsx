@@ -108,8 +108,8 @@ export function AuroraBackground({
 
   // How many extra pixels to extend the canvas beyond the viewport on each
   // side, so the interactive glow trail isn't clipped at the screen edges.
-  // Half the maximum line width (160px) is enough.
-  const OVERSCAN = 80;
+  // Half the maximum line width (60px) is enough.
+  const OVERSCAN = 30;
 
   useEffect(() => {
     if (!effectiveInteractive) return;
@@ -170,7 +170,7 @@ export function AuroraBackground({
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.strokeStyle = `rgba(${getColor(life)}, ${life * 0.36})`;
-          ctx.lineWidth = 160 * life; // tapers from 160px down to 0
+          ctx.lineWidth = 60 * life; // tapers from 60px down to 0
           ctx.stroke();
         }
       }
