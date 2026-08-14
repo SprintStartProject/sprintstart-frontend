@@ -28,4 +28,10 @@ export interface KnowledgeGap {
 
 export interface KnowledgeGapOverview {
   gaps: KnowledgeGap[];
+  // True while a rescan triggered by newly ingested documentation is still
+  // running. The gaps alongside it are the previous result, so the panel can
+  // say so instead of showing stale numbers with no explanation.
+  refreshing?: boolean;
+  // When the returned gaps were computed. Null before the first scan.
+  refreshedAt?: string | null;
 }

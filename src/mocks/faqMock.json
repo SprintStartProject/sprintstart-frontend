@@ -4,6 +4,10 @@
       "groupId": "vpn-access",
       "count": 14,
       "question": "How do I get VPN access?",
+      "category": "Access & Accounts",
+      "recentCount": 9,
+      "trend": "RISING",
+      "lastAskedAt": "2026-08-13T09:12:00Z",
       "topDocuments": [
         {
           "id": "doc_001",
@@ -15,6 +19,10 @@
       "groupId": "vacation-days",
       "count": 11,
       "question": "How many vacation days do I have left?",
+      "category": "People & Policies",
+      "recentCount": 4,
+      "trend": "STEADY",
+      "lastAskedAt": "2026-08-11T14:40:00Z",
       "topDocuments": [
         {
           "id": "doc_002",
@@ -26,6 +34,10 @@
       "groupId": "laptop-request",
       "count": 9,
       "question": "How can I request a new laptop?",
+      "category": "Equipment & Expenses",
+      "recentCount": 1,
+      "trend": "FADING",
+      "lastAskedAt": "2026-07-30T08:05:00Z",
       "topDocuments": [
         {
           "id": "doc_003",
@@ -37,6 +49,10 @@
       "groupId": "expense-report",
       "count": 8,
       "question": "How do I submit a travel expense report?",
+      "category": "Equipment & Expenses",
+      "recentCount": 5,
+      "trend": "RISING",
+      "lastAskedAt": "2026-08-12T16:20:00Z",
       "topDocuments": [
         {
           "id": "doc_004",
@@ -48,6 +64,10 @@
       "groupId": "jira-access",
       "count": 6,
       "question": "How do I get access to Jira?",
+      "category": "Access & Accounts",
+      "recentCount": 3,
+      "trend": "STEADY",
+      "lastAskedAt": "2026-08-10T11:00:00Z",
       "topDocuments": [
         {
           "id": "doc_005",
@@ -55,5 +75,32 @@
         }
       ]
     }
-  ]
+  ],
+  "categories": [
+    {
+      "name": "Access & Accounts",
+      "groupCount": 2,
+      "questionCount": 20,
+      "recentQuestionCount": 12,
+      "trend": "RISING",
+      "lastAskedAt": "2026-08-13T09:12:00Z"
+    },
+    {
+      "name": "Equipment & Expenses",
+      "groupCount": 2,
+      "questionCount": 17,
+      "recentQuestionCount": 6,
+      "trend": "STEADY",
+      "lastAskedAt": "2026-08-12T16:20:00Z"
+    },
+    {
+      "name": "People & Policies",
+      "groupCount": 1,
+      "questionCount": 11,
+      "recentQuestionCount": 4,
+      "trend": "STEADY",
+      "lastAskedAt": "2026-08-11T14:40:00Z"
+    }
+  ],
+  "lastAskedAt": "2026-08-13T09:12:00Z"
 }

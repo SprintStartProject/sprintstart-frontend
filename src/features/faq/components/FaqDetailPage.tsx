@@ -11,6 +11,8 @@ import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { useFetch } from "../../../hooks/useFetch";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { TrendBadge } from "./TrendBadge";
+import { formatAskedAt } from "../format";
 
 import {
   ArrowLeft,
@@ -86,12 +88,30 @@ export function FaqDetailPage() {
 
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-xl leading-snug font-semibold text-app-text sm:text-2xl">
-              {detail.questions[0].text}
+              {/* A group rebuilt from scratch can carry a count without a stored
+                  sample, so this must not assume there is a first question. */}
+              {detail.questions[0]?.text ?? "Recurring question"}
             </h1>
             <Badge variant="success" className="shrink-0 gap-1.5">
               <ArrowUp className="h-3 w-3" />
               {detail.count} times asked
             </Badge>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {detail.category && (
+              <Badge variant="brand" size="sm">
+                {detail.category}
+              </Badge>
+            )}
+            {detail.trend && (
+              <TrendBadge trend={detail.trend} recentCount={detail.recentCount} />
+            )}
+            {detail.lastAskedAt && (
+              <span className="text-xs text-app-text-muted">
+                Last asked {formatAskedAt(detail.lastAskedAt).toLowerCase()}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -105,19 +125,22 @@ export function FaqDetailPage() {
             PM detail
           </div>
 
-          {/* Individual questions */}
+          {/* Individual questions — newest first, capped by the backend */}
           <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
             <MessageSquareMore className="h-3.5 w-3.5" />
-            Individual questions ({detail.questions.length})
+            How it is being asked ({detail.questions.length}
+            {detail.count > detail.questions.length && ` of ${detail.count}`})
           </div>
           <div className="mb-6 space-y-2">
             {detail.questions.map((q: FAQQuestion) => (
               <div key={q.id} className="rounded-xl bg-app-surface-muted p-4">
-                <p className="mb-3 text-sm leading-snug text-app-text">{q.text}</p>
+                <p className="text-sm leading-snug text-app-text">{q.text}</p>
 
-                <div className="flex items-center justify-between text-xs text-app-text-muted">
-                  <span>Question ID: {q.id}</span>
-                </div>
+                {q.askedAt && (
+                  <p className="mt-2 text-xs text-app-text-muted">
+                    {formatAskedAt(q.askedAt)}
+                  </p>
+                )}
               </div>
             ))}
           </div>

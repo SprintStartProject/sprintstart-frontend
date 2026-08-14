@@ -1,19 +1,22 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
-import { useFetch } from "../../../hooks/useFetch";
+import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { TrendBadge } from "./TrendBadge";
+import { toCategorySections } from "../grouping";
 
 import {
   TrendingUp,
   FileText,
   AlertCircle,
   ArrowLeft,
-  Users,
+  ChevronDown,
+  Layers,
   MessageSquareMore,
   RefreshCw,
 } from "lucide-react";
@@ -24,44 +27,55 @@ export function FaqPage() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildError, setRebuildError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
 
   const {
     data: overview,
     loading,
+    revalidating,
     error,
-  } = useFetch(
-    () => insightsService.fetchFAQGroups(selectedProjectId),
-    [refreshKey, selectedProjectId],
-  );
+    refresh,
+  } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setRefreshError(null);
+  const sections = useMemo(() => (overview ? toCategorySections(overview) : []), [overview]);
+
+  const handleRebuild = async () => {
+    setRebuilding(true);
+    setRebuildError(null);
     try {
       await insightsService.refreshFAQGroups(selectedProjectId);
-      setRefreshKey((key) => key + 1);
+      refresh();
     } catch (err) {
-      console.error("FAQ refresh failed", err);
-      setRefreshError(
-        "Refresh failed. Is the AI service running and are there questions to group?",
+      console.error("FAQ rebuild failed", err);
+      setRebuildError(
+        "Rebuild failed. Is the AI service running and are there questions to group?",
       );
     } finally {
-      setRefreshing(false);
+      setRebuilding(false);
     }
   };
 
-  const refreshButton = (
+  const toggleSection = (key: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
+  // The FAQ now updates itself as questions are asked, so this is a rebuild of
+  // the whole grouping rather than the only way to see new questions.
+  const rebuildButton = (
     <Button
-      variant="primary"
-      onClick={() => void handleRefresh()}
-      loading={refreshing}
+      variant="secondary"
+      onClick={() => void handleRebuild()}
+      loading={rebuilding}
       icon={<RefreshCw className="h-4 w-4" />}
       className="shrink-0"
+      title="Regroup every question from scratch"
     >
-      {refreshing ? "Refreshing…" : "Refresh"}
+      {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
     </Button>
   );
 
@@ -77,27 +91,21 @@ export function FaqPage() {
     return (
       <div className="flex flex-col items-center gap-3 py-20">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
-        <p className="text-app-text-muted">
-          No FAQ groups yet. Trigger a refresh to generate them.
+        <p className="max-w-md text-center text-app-text-muted">
+          No recurring questions yet. They appear here as soon as someone asks the AI Buddy
+          something.
         </p>
-        {refreshButton}
-        {refreshError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
+        {rebuildButton}
+        {rebuildError && (
+          <p className="max-w-md text-center text-sm text-app-danger-text">{rebuildError}</p>
         )}
       </div>
     );
   }
 
-  const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
-
-  const [hero, ...rest] = sorted;
-
   const totalGroups = overview.groups.length;
-
   const totalQuestions = overview.groups.reduce((sum, group) => sum + group.count, 0);
-
-  const mostAskedCount = hero?.count ?? 0;
-
+  const totalCategories = sections.filter((section) => section.category).length;
   const totalDocuments = new Set(
     overview.groups.flatMap((group) => group.topDocuments.map((doc) => doc.id)),
   ).size;
@@ -122,20 +130,23 @@ export function FaqPage() {
             <PageHeader
               icon={MessageSquareMore}
               title="Recurring Questions"
-              subtitle="Frequently asked questions grouped by topic and ranked by frequency."
+              subtitle="Grouped by topic and updated as questions are asked."
             />
-            {refreshButton}
+            <div className="flex shrink-0 items-center gap-3">
+              {revalidating && <Spinner size="sm" label="Updating" />}
+              {rebuildButton}
+            </div>
           </div>
-          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
+          {rebuildError && <p className="mb-4 text-sm text-app-danger-text">{rebuildError}</p>}
 
           {/* Statistics */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-app-brand" />
+                <Layers className="h-5 w-5 text-app-brand" />
                 <div>
-                  <div className="text-2xl font-semibold text-app-brand">{totalGroups}</div>
-                  <div className="text-xs text-app-text-muted">Question groups</div>
+                  <div className="text-2xl font-semibold text-app-brand">{totalCategories}</div>
+                  <div className="text-xs text-app-text-muted">Topics</div>
                 </div>
               </div>
             </div>
@@ -144,10 +155,8 @@ export function FaqPage() {
               <div className="flex items-center gap-3">
                 <MessageSquareMore className="h-5 w-5 text-app-success-solid" />
                 <div>
-                  <div className="text-2xl font-semibold text-app-success-solid">
-                    {totalQuestions}
-                  </div>
-                  <div className="text-xs text-app-text-muted">Total questions</div>
+                  <div className="text-2xl font-semibold text-app-success-solid">{totalGroups}</div>
+                  <div className="text-xs text-app-text-muted">Question groups</div>
                 </div>
               </div>
             </div>
@@ -157,9 +166,9 @@ export function FaqPage() {
                 <TrendingUp className="h-5 w-5 text-app-danger-solid" />
                 <div>
                   <div className="text-2xl font-semibold text-app-danger-solid">
-                    {mostAskedCount}
+                    {totalQuestions}
                   </div>
-                  <div className="text-xs text-app-text-muted">Top frequency</div>
+                  <div className="text-xs text-app-text-muted">Total questions</div>
                 </div>
               </div>
             </div>
@@ -181,59 +190,75 @@ export function FaqPage() {
 
       {/* Content */}
       <main className="app-page-content py-8">
-        {/* Hero Card */}
-        <div className="mb-4">
-          <button
-            onClick={() => goToDetail(hero)}
-            // The hero had no hover state at all despite being clickable.
-            // 1.01 rather than the 1.02 used on grid cards: these rows span the
-            // full content column, so the same percentage travels much further.
-            className="relative mb-2 w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface p-5 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
-          >
-            <div className="absolute top-4 right-4 flex items-center gap-2 text-app-text-muted">
-              <TrendingUp className="h-5 w-5 text-app-brand" />
-              <span className="text-2xl font-semibold text-app-brand">{hero.count}</span>
-            </div>
+        {/* Topic sections. No "most asked" hero here: every question already
+            appears under its topic, and a hero would show the top one twice. */}
+        <div className="space-y-4">
+          {sections.map((section) => {
+            const isCollapsed = collapsed.has(section.key);
+            const sectionQuestions =
+              section.category?.questionCount ??
+              section.groups.reduce((sum, group) => sum + group.count, 0);
 
-            <p className="mb-4 pr-16 text-lg leading-snug font-semibold text-app-text">
-              {hero.question}
-            </p>
+            return (
+              <section key={section.key} className="rounded-2xl border border-app-border">
+                <button
+                  onClick={() => toggleSection(section.key)}
+                  aria-expanded={!isCollapsed}
+                  className="flex w-full items-center justify-between gap-4 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-app-surface-hover"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-app-text-muted transition-transform ${
+                        isCollapsed ? "-rotate-90" : ""
+                      }`}
+                    />
+                    <h2 className="truncate font-semibold text-app-text">{section.name}</h2>
+                    {section.category && (
+                      <TrendBadge
+                        trend={section.category.trend}
+                        recentCount={section.category.recentQuestionCount}
+                      />
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-app-text-muted">
+                    {section.groups.length} {section.groups.length === 1 ? "group" : "groups"} ·{" "}
+                    {sectionQuestions} asked
+                  </span>
+                </button>
 
-            <div className="flex flex-wrap gap-2">
-              {hero.topDocuments.map((doc) => (
-                <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
-                  <FileText className="h-3 w-3" />
-                  {doc.title}
-                </Badge>
-              ))}
-            </div>
-          </button>
-        </div>
+                {!isCollapsed && (
+                  <div className="space-y-2 px-3 pb-3">
+                    {section.groups.map((group) => (
+                      <button
+                        key={group.groupId}
+                        onClick={() => goToDetail(group)}
+                        className="w-full rounded-xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
+                      >
+                        <div className="mb-2 flex items-start justify-between gap-4">
+                          <p className="text-sm font-medium text-app-text">{group.question}</p>
+                          <span className="shrink-0 text-lg font-semibold text-app-brand">
+                            {group.count}
+                          </span>
+                        </div>
 
-        {/* FAQ List */}
-        <div className="space-y-3">
-          {rest.map((group) => (
-            <button
-              key={group.groupId}
-              onClick={() => goToDetail(group)}
-              className="w-full rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
-            >
-              <div className="mb-2 flex items-start justify-between gap-4">
-                <p className="text-sm font-medium text-app-text">{group.question}</p>
-
-                <span className="shrink-0 text-lg font-semibold text-app-brand">{group.count}</span>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {group.topDocuments.map((doc) => (
-                  <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
-                    <FileText className="h-3 w-3" />
-                    {doc.title}
-                  </Badge>
-                ))}
-              </div>
-            </button>
-          ))}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {group.trend && (
+                            <TrendBadge trend={group.trend} recentCount={group.recentCount} />
+                          )}
+                          {group.topDocuments.map((doc) => (
+                            <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
+                              <FileText className="h-3 w-3" />
+                              {doc.title}
+                            </Badge>
+                          ))}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       </main>
     </div>

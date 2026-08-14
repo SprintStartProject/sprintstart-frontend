@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import type { KnowledgeGapSeverity } from "../types";
 
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
-import { useFetch } from "../../../hooks/useFetch";
+import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
@@ -51,7 +51,6 @@ export function KnowledgeGapsPage() {
 
   const navigate = useNavigate();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -59,17 +58,22 @@ export function KnowledgeGapsPage() {
     data: overview,
     loading,
     error,
-  } = useFetch(
+    refresh,
+  } = useLiveFetch(
     () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [refreshKey, selectedProjectId],
+    [selectedProjectId],
   );
+
+  // The backend rescans on its own once new documentation is indexed; while it
+  // does, the gaps below are the previous result.
+  const rescanning = overview?.refreshing ?? false;
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setRefreshError(null);
     try {
       await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
-      setRefreshKey((key) => key + 1);
+      refresh();
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
       setRefreshError("Refresh failed. Is the AI service running?");
@@ -82,11 +86,11 @@ export function KnowledgeGapsPage() {
     <Button
       variant="primary"
       onClick={() => void handleRefresh()}
-      loading={refreshing}
+      loading={refreshing || rescanning}
       icon={<RefreshCw className="h-4 w-4" />}
       className="shrink-0"
     >
-      {refreshing ? "Refreshing…" : "Refresh"}
+      {refreshing || rescanning ? "Scanning…" : "Rescan now"}
     </Button>
   );
 
@@ -101,9 +105,13 @@ export function KnowledgeGapsPage() {
   if (error || !overview || overview.gaps.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-20">
-        <AlertCircle className="h-5 w-5 text-app-text-muted" />
+        {rescanning ? <Spinner size="lg" label="Scanning for knowledge gaps" /> : (
+          <AlertCircle className="h-5 w-5 text-app-text-muted" />
+        )}
         <p className="text-app-text-muted">
-          No knowledge gaps yet. Trigger a refresh to detect them.
+          {rescanning
+            ? "Scanning the newly ingested documentation…"
+            : "No knowledge gaps yet. Trigger a scan to detect them."}
         </p>
         {refreshButton}
         {refreshError && (

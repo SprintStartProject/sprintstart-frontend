@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
-import { useFetch } from "../../../hooks/useFetch";
+import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
@@ -26,7 +26,6 @@ export function KnowledgeGapWidget() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -34,17 +33,23 @@ export function KnowledgeGapWidget() {
     data: overview,
     loading,
     error,
-  } = useFetch(
+    refresh,
+  } = useLiveFetch(
     () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [refreshKey, selectedProjectId],
+    [selectedProjectId],
   );
+
+  // The backend rescans on its own once new documentation is indexed; while it
+  // does, the gaps below are the previous result and the panel says so instead
+  // of showing numbers that quietly went stale.
+  const rescanning = overview?.refreshing ?? false;
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setRefreshError(null);
     try {
       await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
-      setRefreshKey((key) => key + 1);
+      refresh();
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
       setRefreshError("Refresh failed. Is the AI service running?");
@@ -68,19 +73,23 @@ export function KnowledgeGapWidget() {
   if (error || !overview || overview.gaps.length === 0) {
     return (
       <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
-        <AlertCircle className="h-5 w-5 text-app-text-muted" />
+        {rescanning ? <Spinner size="lg" label="Scanning for knowledge gaps" /> : (
+          <AlertCircle className="h-5 w-5 text-app-text-muted" />
+        )}
         <p className="text-sm text-app-text-muted">
-          No knowledge gaps yet. Trigger a refresh to detect them.
+          {rescanning
+            ? "Scanning the newly ingested documentation…"
+            : "No knowledge gaps yet. Trigger a scan to detect them."}
         </p>
         <div className="flex items-center gap-2">
           <Button
             variant="primary"
             size="sm"
             onClick={() => void handleRefresh()}
-            loading={refreshing}
+            loading={refreshing || rescanning}
             icon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            {refreshing ? "Refreshing…" : "Refresh"}
+            {refreshing || rescanning ? "Scanning…" : "Rescan now"}
           </Button>
           <Button
             variant="secondary"
@@ -118,6 +127,12 @@ export function KnowledgeGapWidget() {
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-app-brand" />
           <span className="text-sm font-semibold text-app-text">Knowledge gaps</span>
+          {rescanning && (
+            <span className="flex items-center gap-1.5 text-xs text-app-text-muted">
+              <Spinner size="sm" silent />
+              Rescanning
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -128,11 +143,11 @@ export function KnowledgeGapWidget() {
               event.stopPropagation();
               void handleRefresh();
             }}
-            disabled={refreshing}
-            aria-label="Refresh"
-            title="Refresh"
+            disabled={refreshing || rescanning}
+            aria-label="Rescan now"
+            title="Rescan now"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing || rescanning ? "animate-spin" : ""}`} />
           </Button>
           <Button
             variant="ghost"

@@ -17,7 +17,9 @@ export const insightsService = {
         `/api/v1/insights/faq?projectId=${encodeURIComponent(projectId)}`,
       );
     } catch (_error) {
-      return faqMock;
+      // Asserted rather than inferred: a JSON import widens the trend literals
+      // to `string`, which no longer matches the union.
+      return faqMock as FAQOverview;
     }
   },
 

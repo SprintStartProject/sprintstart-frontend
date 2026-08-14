@@ -37,17 +37,17 @@ const mockOverview: KnowledgeGapOverview = {
   ],
 };
 
-vi.mock("../../../../../src/hooks/useFetch", () => ({
-  useFetch: vi.fn(),
+vi.mock("../../../../../src/hooks/useLiveFetch", () => ({
+  useLiveFetch: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/knowledgeGapService", () => ({
   knowledgeGapService: { fetchKnowledgeGaps: vi.fn() },
 }));
 
-import { useFetch } from "../../../../../src/hooks/useFetch";
+import { useLiveFetch } from "../../../../../src/hooks/useLiveFetch";
 
-vi.mocked(useFetch).mockReturnValue({ data: mockOverview, loading: false, error: false });
+vi.mocked(useLiveFetch).mockReturnValue({ data: mockOverview, loading: false, revalidating: false, error: false, refresh: () => {} });
 
 function renderPage() {
   return render(
@@ -60,7 +60,7 @@ function renderPage() {
 describe("KnowledgeGapsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useFetch).mockReturnValue({ data: mockOverview, loading: false, error: false });
+    vi.mocked(useLiveFetch).mockReturnValue({ data: mockOverview, loading: false, revalidating: false, error: false, refresh: () => {} });
   });
 
   it("renders the page title and gap cards", () => {
@@ -72,18 +72,18 @@ describe("KnowledgeGapsPage", () => {
   });
 
   it("shows loading state", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: null, loading: true, error: false });
+    vi.mocked(useLiveFetch).mockReturnValueOnce({ data: null, loading: true, revalidating: false, error: false, refresh: () => {} });
     const { container } = renderPage();
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
   it("shows the empty/refresh state on error", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: null, loading: false, error: true });
+    vi.mocked(useLiveFetch).mockReturnValueOnce({ data: null, loading: false, revalidating: false, error: true, refresh: () => {} });
     renderPage();
     expect(
-      screen.getByText("No knowledge gaps yet. Trigger a refresh to detect them."),
+      screen.getByText("No knowledge gaps yet. Trigger a scan to detect them."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /refresh/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /rescan/i })).toBeInTheDocument();
   });
 
   // The controls are no longer behind a disclosure -- they are always on the

@@ -4,8 +4,8 @@ import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { FaqWidget } from "../../../src/features/faq/components/FaqWidget";
 
-vi.mock("../../../src/hooks/useFetch", () => ({
-  useFetch: () => ({
+vi.mock("../../../src/hooks/useLiveFetch", () => ({
+  useLiveFetch: () => ({
     data: {
       groups: [
         {
@@ -23,7 +23,9 @@ vi.mock("../../../src/hooks/useFetch", () => ({
       ],
     },
     loading: false,
+    revalidating: false,
     error: false,
+    refresh: () => {},
   }),
 }));
 
