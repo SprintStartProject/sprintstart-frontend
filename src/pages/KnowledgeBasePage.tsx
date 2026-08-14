@@ -18,11 +18,10 @@ import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeB
 import { useProjectContext } from "../features/projects/useProjectContext";
 
 /** Roles allowed to delete uploaded artifacts. Pattern A gate mirroring
- *  `SettingsPage`'s PAT_ALLOWED_GROUPS — keeps destructive uploads deletion
- *  out of reach of plain USER accounts. */
+ *  the backend `@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")` — keeps
+ *  destructive uploads deletion out of reach of plain USER accounts. */
 const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
   PermissionGroup.PM,
-  PermissionGroup.HR,
   PermissionGroup.ADMIN,
 ]);
 
@@ -40,14 +39,14 @@ const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
  */
 export function KnowledgeBasePage() {
   const { profile } = useAuth();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, isLoading: isProjectLoading } = useProjectContext();
   const projectId = selectedProjectId || (profile?.projectIds?.[0] ?? null);
 
   const canDeleteUpload = profile !== null && DELETE_ALLOWED_GROUPS.has(profile.permissionGroup);
 
   const {
     artifacts,
-    isLoading,
+    isLoading: isArtifactsLoading,
     fetchError,
     fetchArtifacts,
     searchQuery,
@@ -63,7 +62,16 @@ export function KnowledgeBasePage() {
     hasActiveFilters,
   } = useKnowledgeBase(projectId);
 
+  const isLoading = isProjectLoading || isArtifactsLoading;
+
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [prevProjectId, setPrevProjectId] = useState(projectId);
+
+  // Reset active drawer selection whenever the project scope changes.
+  if (prevProjectId !== projectId) {
+    setPrevProjectId(projectId);
+    setSelectedArtifactId(null);
+  }
 
   const selectedArtifact = useMemo(
     () => artifacts.find((a) => a.id === selectedArtifactId) ?? null,

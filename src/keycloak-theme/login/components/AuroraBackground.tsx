@@ -51,9 +51,9 @@ export function AuroraBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Half the maximum trail line width (160px) is enough to keep the glow
+  // Half the maximum trail line width (60px) is enough to keep the glow
   // from clipping at the viewport edges.
-  const OVERSCAN = 80;
+  const OVERSCAN = 30;
 
   useEffect(() => {
     if (!enabled) return;
@@ -113,7 +113,7 @@ export function AuroraBackground() {
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.strokeStyle = `rgba(${getColor(life)}, ${life * 0.36})`;
-          ctx.lineWidth = 160 * life;
+          ctx.lineWidth = 60 * life;
           ctx.stroke();
         }
       }
