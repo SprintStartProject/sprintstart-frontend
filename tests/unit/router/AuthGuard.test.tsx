@@ -42,6 +42,7 @@ const mockProfile: UserProfile = {
 describe("AuthGuard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     vi.mocked(teamManagementService.hasCompletedSkillAssessment).mockResolvedValue(true);
     vi.mocked(teamManagementService.getMyTeamOverview).mockResolvedValue({
       userId: "user1",
@@ -164,6 +165,179 @@ describe("AuthGuard", () => {
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent("/");
     });
+  });
+
+  it("preserves full deep link with search and hash when unauthenticated", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "unauthenticated",
+      profile: null,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/insights/faq/42?filter=active#details"]}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <div>
+                <LocationDisplay />
+                <span data-testid="search">{window.location.search}</span>
+              </div>
+            }
+          />
+          <Route
+            path="/insights/faq/:id"
+            element={
+              <AuthGuard>
+                <LocationDisplay />
+              </AuthGuard>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/login");
+    });
+    expect(sessionStorage.getItem("sprintstart_auth_redirect")).toBe(
+      "/insights/faq/42?filter=active#details",
+    );
+  });
+
+  it("redirects authenticated user on /login to the intended deep link in query parameter", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/login?redirect=%2Finsights%2Ffaq%2F42%3Ftab%3D1%23sec"]}>
+        <Routes>
+          <Route path="/insights/faq/:id" element={<LocationDisplay />} />
+          <Route
+            path="/login"
+            element={
+              <AuthGuard>
+                <div>Login Page</div>
+              </AuthGuard>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/insights/faq/42");
+    });
+  });
+
+  it("redirects authenticated user on /login to target stored in location state", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/login",
+            state: {
+              from: { pathname: "/team/user-42", search: "?tab=skills" },
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/team/:userId" element={<LocationDisplay />} />
+          <Route
+            path="/login"
+            element={
+              <AuthGuard>
+                <div>Login Page</div>
+              </AuthGuard>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/team/user-42");
+    });
+  });
+
+  it("safely falls back to default route when redirect parameter is external or malicious", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/login?redirect=https%3A%2F%2Fmalicious.com%2Fsteal"]}>
+        <Routes>
+          <Route path="/" element={<LocationDisplay />} />
+          <Route
+            path="/login"
+            element={
+              <AuthGuard>
+                <div>Login Page</div>
+              </AuthGuard>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/");
+    });
+  });
+
+  it("restores stored session target when authenticated user lands on /", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    sessionStorage.setItem("sprintstart_auth_redirect", "/insights/faq/42?filter=active#details");
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/insights/faq/:id" element={<LocationDisplay />} />
+          <Route
+            path="/"
+            element={
+              <AuthGuard>
+                <div>Root Dashboard</div>
+              </AuthGuard>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/insights/faq/42");
+    });
+    expect(sessionStorage.getItem("sprintstart_auth_redirect")).toBeNull();
   });
 
   it("renders children when authenticated and no skill assessment needed", async () => {

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useContext } from "react";
 import { AuthProvider } from "../../../src/context/AuthProvider";
@@ -120,5 +121,85 @@ describe("AuthProvider", () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  it("passes constructed redirectUri to Keycloak when login is invoked with redirectPath", async () => {
+    mockKeycloakInstance.init.mockResolvedValue(false);
+    const user = userEvent.setup();
+
+    const LoginConsumer = () => {
+      const { login } = useContext(AuthContext)!;
+      return (
+        <button onClick={() => void login({ redirectPath: "/insights/faq/42?tab=1" })}>
+          Login
+        </button>
+      );
+    };
+
+    render(
+      <AuthProvider>
+        <LoginConsumer />
+      </AuthProvider>,
+    );
+
+    const button = await screen.findByRole("button", { name: "Login" });
+    await user.click(button);
+
+    expect(mockKeycloakInstance.login).toHaveBeenCalledWith({
+      redirectUri: `${window.location.origin}/insights/faq/42?tab=1`,
+    });
+  });
+
+  it("passes custom redirectUri directly to Keycloak when specified", async () => {
+    mockKeycloakInstance.init.mockResolvedValue(false);
+    const user = userEvent.setup();
+
+    const LoginConsumer = () => {
+      const { login } = useContext(AuthContext)!;
+      return (
+        <button onClick={() => void login({ redirectUri: "https://custom.app/callback" })}>
+          Login
+        </button>
+      );
+    };
+
+    render(
+      <AuthProvider>
+        <LoginConsumer />
+      </AuthProvider>,
+    );
+
+    const button = await screen.findByRole("button", { name: "Login" });
+    await user.click(button);
+
+    expect(mockKeycloakInstance.login).toHaveBeenCalledWith({
+      redirectUri: "https://custom.app/callback",
+    });
+  });
+
+  it("clears stored redirect targets and directs Keycloak to /login on logout", async () => {
+    mockKeycloakInstance.init.mockResolvedValue(true);
+    mockKeycloakInstance.logout.mockResolvedValue(undefined);
+    sessionStorage.setItem("sprintstart_auth_redirect", "/deep/link");
+    const user = userEvent.setup();
+
+    const LogoutConsumer = () => {
+      const { logout } = useContext(AuthContext)!;
+      return <button onClick={() => void logout()}>Logout</button>;
+    };
+
+    render(
+      <AuthProvider>
+        <LogoutConsumer />
+      </AuthProvider>,
+    );
+
+    const button = await screen.findByRole("button", { name: "Logout" });
+    await user.click(button);
+
+    expect(mockKeycloakInstance.logout).toHaveBeenCalledWith({
+      redirectUri: `${window.location.origin}/login`,
+    });
+    expect(sessionStorage.getItem("sprintstart_auth_redirect")).toBeNull();
   });
 });
