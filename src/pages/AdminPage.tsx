@@ -19,6 +19,7 @@ import {
   toggleSelectedUserId,
   toggleVisibleUserSelection,
 } from "../features/admin/data";
+import { DEFAULT_ACCESS_SOURCE_FILTER } from "../features/access/components/AccessManagementView";
 import { AdminMetrics } from "../features/admin/components/AdminMetrics";
 import { AdminPagination } from "../features/admin/components/AdminPagination";
 import { AdminProjectsToolbar } from "../features/admin/components/AdminProjectsToolbar";
@@ -57,6 +58,12 @@ export function AdminPage() {
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
+  // Lives here, not in the tokens section, for the same reason as the two
+  // above: only one tab is mounted at a time, so a filter kept inside a section
+  // would reset every time you leave and come back.
+  const [accessSourceFilter, setAccessSourceFilter] = useState<string>(
+    DEFAULT_ACCESS_SOURCE_FILTER,
+  );
 
   const [page, setPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
@@ -544,7 +551,10 @@ export function AdminPage() {
                   />
                 </>
               ) : (
-                <TokensTab />
+                <TokensTab
+                  sourceFilter={accessSourceFilter}
+                  onSourceFilterChange={setAccessSourceFilter}
+                />
               )}
             </SlidingTabPanel>
           )}

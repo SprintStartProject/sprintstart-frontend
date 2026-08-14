@@ -83,7 +83,7 @@ export const sidePanelSlideToken: Transition = {
 };
 
 /**
- * Hover and press feedback for buttons and other small controls.
+ * Press feedback for buttons and other small controls.
  *
  * Spread onto a `motion.button` so every action in the app answers the pointer
  * the same way:
@@ -92,28 +92,33 @@ export const sidePanelSlideToken: Transition = {
  * <motion.button {...buttonHoverMotion} className="...">Save</motion.button>
  * ```
  *
- * Deliberately gentler than the sidebar's dock magnification (1.03 rather than
- * 1.12): buttons sit inside dense toolbars and rows, where a large scale would
- * collide with neighbours or push a layout around.
+ * **The scale never goes above 1, and that is the point.** This used to grow
+ * the control to 1.03 on hover, with an underdamped spring that then sprang
+ * past 1 again on release. A control sitting flush against the right end of a
+ * toolbar has nothing to grow into: the extra sliver landed outside the
+ * surrounding panel and was visibly sliced off — on the admin filters, and
+ * again on the access view's add button. Hover feedback is carried by the
+ * `hover:` colours every button variant already has, which no layout can clip.
+ *
+ * `dockMagnifySpringToken` rather than `hoverSpringToken` for the same reason:
+ * it is damped to the point of not overshooting, so releasing a press returns
+ * to the resting size from below instead of bouncing through it.
  *
  * Pass `disabled` controls `buttonHoverMotionDisabled` instead, so a dead
  * button also feels dead.
  */
 export const buttonHoverMotion: {
-  whileHover: TargetAndTransition;
   whileTap: TargetAndTransition;
   transition: Transition;
 } = {
-  whileHover: { scale: 1.03 },
   whileTap: { scale: 0.97 },
-  transition: hoverSpringToken,
+  transition: dockMagnifySpringToken,
 };
 
 /** No-op counterpart to {@link buttonHoverMotion} for disabled controls. */
 export const buttonHoverMotionDisabled = {
-  whileHover: undefined,
   whileTap: undefined,
-  transition: hoverSpringToken,
+  transition: dockMagnifySpringToken,
 };
 
 /**
@@ -222,6 +227,6 @@ export const petPeekSpringToken: Transition = {
  * A smooth tween ease — not a spring, so it pairs well with CSS-only layers.
  */
 export const enterTransition: Transition = {
-    duration: 0.5,
-    ease: [0.22, 1, 0.36, 1],
+  duration: 0.5,
+  ease: [0.22, 1, 0.36, 1],
 };

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,11 +22,38 @@ import {
 } from "../../../../src/services/sources/githubService";
 import { ApiError } from "../../../../src/services/apiClient";
 
+/** Stable identity, so the group's report effect does not re-run every render. */
+const noop = () => {};
+
+/**
+ * The add form's open state lives in the view, whose single "Add credential"
+ * button drives any source — the group has no button of its own. This harness
+ * stands in for that owner, with a plain trigger in its place.
+ */
+function GroupHarness() {
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => setIsAddOpen(true)}>
+        open add form
+      </button>
+      <AccessConnectorGroup
+        connector={githubConnector}
+        isHidden={false}
+        isAddOpen={isAddOpen}
+        onAddClose={() => setIsAddOpen(false)}
+        onStateChange={noop}
+      />
+    </>
+  );
+}
+
 function renderGroup() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <AccessConnectorGroup connector={githubConnector} />
+        <GroupHarness />
       </ThemeProvider>
     </MemoryRouter>,
   );
@@ -78,7 +106,7 @@ describe("AccessConnectorGroup — GitHub", () => {
     renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
-    await user.click(screen.getByTestId("access-add-open-github"));
+    await user.click(screen.getByRole("button", { name: "open add form" }));
     await user.type(screen.getByTestId("settings-add-token-name"), "ci");
     await user.type(screen.getByTestId("settings-add-token-value"), "ghp_aBcDef123");
     await user.click(screen.getByTestId("settings-add-token-submit"));
@@ -93,7 +121,7 @@ describe("AccessConnectorGroup — GitHub", () => {
     renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
-    await user.click(screen.getByTestId("access-add-open-github"));
+    await user.click(screen.getByRole("button", { name: "open add form" }));
     await user.type(screen.getByTestId("settings-add-token-name"), "bad");
     await user.type(screen.getByTestId("settings-add-token-value"), "not-a-pat");
     await user.click(screen.getByTestId("settings-add-token-submit"));
@@ -111,7 +139,7 @@ describe("AccessConnectorGroup — GitHub", () => {
     renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
-    await user.click(screen.getByTestId("access-add-open-github"));
+    await user.click(screen.getByRole("button", { name: "open add form" }));
     await user.type(screen.getByTestId("settings-add-token-name"), "default");
     await user.type(screen.getByTestId("settings-add-token-value"), "ghp_abc123");
     await user.click(screen.getByTestId("settings-add-token-submit"));

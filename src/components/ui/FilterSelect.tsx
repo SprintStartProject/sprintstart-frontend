@@ -1,7 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
-import { dockMagnifySpringToken, slidingIndicatorSpringToken } from "../../styles/tokens";
+import {
+  buttonHoverMotion,
+  buttonHoverMotionDisabled,
+  dockMagnifySpringToken,
+  slidingIndicatorSpringToken,
+} from "../../styles/tokens";
 
 /**
  * Magnification of the highlighted option. Much gentler than the sidebar's
@@ -27,33 +32,6 @@ type FilterSelectProps<TValue extends string> = {
 
 /** How long a typed sequence keeps accumulating before it starts a new search. */
 const TYPEAHEAD_RESET_MS = 500;
-
-/**
- * Motion for the trigger. Deliberately *not* `buttonHoverMotion`: unlike a
- * button, this control is normally the last thing in a right-aligned toolbar,
- * so growing it by 3% on hover pushed its right edge past the boundary of the
- * surrounding panel and the grown sliver was visibly cut off.
- *
- * The press-shrink stays — it only ever moves inward — and hover is carried by
- * the border and surface colours on the trigger instead, which is feedback the
- * layout cannot clip.
- *
- * The transition matters as much as the target: `hoverSpringToken` is
- * underdamped, so releasing a press sprang back *past* the resting size and the
- * overshoot was clipped in exactly the same way. `dockMagnifySpringToken` is
- * damped to the point of not overshooting, so the scale only ever approaches 1
- * from below.
- */
-const triggerMotion = {
-  whileTap: { scale: 0.97 },
-  transition: dockMagnifySpringToken,
-};
-
-/** No-op counterpart for a disabled trigger, so a dead control also feels dead. */
-const triggerMotionDisabled = {
-  whileTap: undefined,
-  transition: dockMagnifySpringToken,
-};
 
 /**
  * Filter and sort dropdown used across the app.
@@ -234,7 +212,7 @@ export function FilterSelect<TValue extends string>({
         disabled={disabled}
         onClick={() => (isOpen ? close() : open())}
         onKeyDown={handleKeyDown}
-        {...(disabled ? triggerMotionDisabled : triggerMotion)}
+        {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
         className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors outline-none hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70"
       >
         <span className="truncate">{selectedLabel}</span>

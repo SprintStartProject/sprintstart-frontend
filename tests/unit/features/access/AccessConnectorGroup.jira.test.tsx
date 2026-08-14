@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -61,11 +62,38 @@ function mockAuthEmail(email: string | null) {
   } as unknown as ReturnType<typeof useAuth>);
 }
 
+/** Stable identity, so the group's report effect does not re-run every render. */
+const noop = () => {};
+
+/**
+ * The add form's open state lives in the view, whose single "Add credential"
+ * button drives any source — the group has no button of its own. This harness
+ * stands in for that owner, with a plain trigger in its place.
+ */
+function GroupHarness() {
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => setIsAddOpen(true)}>
+        open add form
+      </button>
+      <AccessConnectorGroup
+        connector={jiraConnector}
+        isHidden={false}
+        isAddOpen={isAddOpen}
+        onAddClose={() => setIsAddOpen(false)}
+        onStateChange={noop}
+      />
+    </>
+  );
+}
+
 function renderGroup() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <AccessConnectorGroup connector={jiraConnector} />
+        <GroupHarness />
       </ThemeProvider>
     </MemoryRouter>,
   );
@@ -117,7 +145,7 @@ describe("AccessConnectorGroup — Jira", () => {
     expect(await screen.findByText("default")).toBeInTheDocument();
     expect(getMyJiraCredentials).toHaveBeenCalled();
 
-    await userEvent.setup().click(screen.getByTestId("access-add-open-jira"));
+    await userEvent.setup().click(screen.getByRole("button", { name: "open add form" }));
     expect(screen.getByTestId("settings-jira-add-email")).toHaveValue("");
   });
 
@@ -138,7 +166,7 @@ describe("AccessConnectorGroup — Jira", () => {
     renderGroup();
     await screen.findByText("default");
 
-    await user.click(screen.getByTestId("access-add-open-jira"));
+    await user.click(screen.getByRole("button", { name: "open add form" }));
     expect(screen.getByTestId("settings-jira-add-email")).toHaveValue(EMAIL);
     await user.type(screen.getByTestId("settings-jira-add-name"), "ci");
     await user.type(screen.getByTestId("settings-jira-add-token"), "secret-token");
@@ -159,7 +187,7 @@ describe("AccessConnectorGroup — Jira", () => {
     renderGroup();
     await screen.findByText("default");
 
-    await user.click(screen.getByTestId("access-add-open-jira"));
+    await user.click(screen.getByRole("button", { name: "open add form" }));
     const emailInput = screen.getByTestId("settings-jira-add-email");
     await user.clear(emailInput);
     await user.type(emailInput, "jira-account@atlassian.com");
