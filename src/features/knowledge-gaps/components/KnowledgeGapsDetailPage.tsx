@@ -113,6 +113,12 @@ export function KnowledgeGapsDetailPage() {
   const daysSinceIngest = daysSince(gap.lastIngested);
   const isStale = daysSinceIngest > STALE_AFTER_DAYS;
 
+  // Opens the source's details panel straight away instead of dropping the PM
+  // on a list to find the repository again. A gap's component is `owner/repo`,
+  // which is exactly the `sourceId` the Data Ingestion page deep-links by; an
+  // unknown one simply leaves the panel closed.
+  const dataIngestionLink = `/data-ingestion?sourceId=${encodeURIComponent(gap.component)}`;
+
   // ── RENDER ─────────────────────────────────────────────
 
   return (
@@ -303,7 +309,7 @@ export function KnowledgeGapsDetailPage() {
             </div>
             <Button
               variant="primary"
-              onClick={() => void navigate("/data-ingestion")}
+              onClick={() => void navigate(dataIngestionLink)}
               icon={<Database className="h-4 w-4" />}
               className="shrink-0"
             >

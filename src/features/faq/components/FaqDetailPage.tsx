@@ -106,7 +106,7 @@ export function FaqDetailPage() {
             )}
             {detail.lastAskedAt && (
               <span className="text-xs text-app-text-muted">
-                Last asked {formatAskedAt(detail.lastAskedAt).toLowerCase()}
+                Last asked {formatAskedAt(detail.lastAskedAt)}
               </span>
             )}
           </div>

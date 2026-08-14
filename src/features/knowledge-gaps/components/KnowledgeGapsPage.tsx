@@ -147,6 +147,15 @@ export function KnowledgeGapsPage() {
     return b.missingTypes.length - a.missingTypes.length;
   });
 
+  // The newest ingestion across the components, i.e. how fresh the documentation
+  // these gaps were read from actually is.
+  const lastIngestedAt = overview.gaps
+    .map((gap) => gap.lastIngested)
+    .reduce<string | null>((newest, at) => (!newest || at > newest ? at : newest), null);
+  // Falls back to a gap's own stamp for a backend that predates the field; the
+  // gaps are rebuilt as one set, so any row's stamp is the set's.
+  const lastAnalyzedAt = overview.refreshedAt ?? overview.gaps[0]?.refreshedAt ?? null;
+
   const toggleSeverityFilter = (severity: KnowledgeGapSeverity) => {
     setSeverityFilter((prev) =>
       prev.includes(severity) ? prev.filter((s) => s !== severity) : [...prev, severity],
@@ -171,11 +180,19 @@ export function KnowledgeGapsPage() {
               title="Knowledge Gaps"
               subtitle="Documentation gaps identified across the organization and prioritized by impact."
             />
-            <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
               {refreshButton}
-              {overview.gaps[0] && (
+              {/* Both, because they answer different questions: how old the
+                  documentation is, and how old this reading of it is. A scan
+                  is only ever as current as the ingestion behind it. */}
+              {lastIngestedAt && (
                 <span className="text-xs text-app-text-muted">
-                  Last analyzed {formatRelativeDate(overview.gaps[0].refreshedAt)}
+                  Last ingested {formatRelativeDate(lastIngestedAt)}
+                </span>
+              )}
+              {lastAnalyzedAt && (
+                <span className="text-xs text-app-text-muted">
+                  Last analyzed {formatRelativeDate(lastAnalyzedAt)}
                 </span>
               )}
             </div>

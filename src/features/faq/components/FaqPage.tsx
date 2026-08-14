@@ -121,9 +121,19 @@ export function FaqPage() {
               title="Recurring Questions"
               subtitle="Ranked by frequency and updated as questions are asked."
             />
-            <div className="flex shrink-0 items-center gap-3">
-              {revalidating && <Spinner size="sm" label="Updating" />}
-              {rebuildButton}
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
+              <div className="flex items-center gap-3">
+                {revalidating && <Spinner size="sm" label="Updating" />}
+                {rebuildButton}
+              </div>
+              {/* How current the panel is, in the only terms that mean anything
+                  here: the FAQ follows the Buddy, so its freshness *is* the
+                  last question someone asked. */}
+              {overview.lastAskedAt && (
+                <span className="text-xs text-app-text-muted">
+                  Last question {formatAskedAt(overview.lastAskedAt)}
+                </span>
+              )}
             </div>
           </div>
           {rebuildError && <p className="mb-4 text-sm text-app-danger-text">{rebuildError}</p>}
@@ -212,7 +222,7 @@ export function FaqPage() {
                 ))}
                 {group.lastAskedAt && (
                   <span className="ml-auto text-xs text-app-text-muted">
-                    Last asked {formatAskedAt(group.lastAskedAt).toLowerCase()}
+                    Last asked {formatAskedAt(group.lastAskedAt)}
                   </span>
                 )}
               </div>
