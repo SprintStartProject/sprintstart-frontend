@@ -7,8 +7,9 @@ answers questions grounded in the team's own knowledge base, and actionable
 insights into where documentation is missing.
 
 This repository contains the React single-page application (SPA). It communicates
-with a separate [backend](http://localhost:8080) API and an AI service, and uses
-**Keycloak** for identity and access management.
+with the **Spring Boot backend** ([http://localhost:8080](http://localhost:8080)), which
+orchestrates business domain events and AI retrieval services, and uses **Keycloak**
+([http://localhost:8081](http://localhost:8081)) for identity and access management.
 
 ---
 
@@ -18,14 +19,14 @@ with a separate [backend](http://localhost:8080) API and an AI service, and uses
 | ------------------------- | ----------------------------------------------------------------------------------------------- |
 | UI framework              | **React 19**                                                                                    |
 | Routing                   | **React Router v7**                                                                             |
-| Language                  | **TypeScript** (strict)                                                                         |
-| Build tooling             | **Vite 8**                                                                                      |
-| Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes)                                 |
-| Animation                 | **Framer Motion 12** (centralized spring tokens)                                                |
+| Language                  | **TypeScript** (strict, `verbatimModuleSyntax`)                                                 |
+| Build tooling             | **Vite 8** (`@vitejs/plugin-react`, `@tailwindcss/vite`)                                        |
+| Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes via `ThemeProvider`)             |
+| Animation                 | **Framer Motion 12** (centralized spring tokens, `<AnimatePresence>`)                           |
 | Authentication            | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11**           |
 | Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter`       |
 | Icons                     | `lucide-react`                                                                                  |
-| Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`)                               |
+| Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw` ^2.14, `vitest-axe`)                         |
 | Component dev             | **Storybook 10**                                                                                |
 | Linting / formatting      | **ESLint 9** (flat config: `typescript-eslint`, `react`, `react-hooks`, `jsx-a11y`, `prettier`) |
 
@@ -39,42 +40,19 @@ with a separate [backend](http://localhost:8080) API and an AI service, and uses
 The application is organized around the following capability areas, each
 self-contained under `src/features/` and surfaced through dedicated routes:
 
-- **AI Assistant / Chatbot** — A streaming chat interface (Server-Sent Events)
-  that answers questions grounded in the indexed knowledge base. Supports
-  multiple conversations, chat history, and inline **citations** back to the
-  source artifacts (files, lines, PDF pages). Responses render Markdown, code
-  blocks, and math (KaTeX).
-- **Knowledge Base** — Browse and search indexed **artifacts** (commits, files,
-  issues, pull requests) ingested from GitHub, Jira, or direct uploads. Each
-  artifact can be summarized on demand via a streamed, citation-backed AI
-  summary.
-- **Onboarding** — Personalized, AI-generated onboarding **paths** composed of
-  phases, steps, tasks, and resources (video, document, task, link). Includes
-  phase **knowledge checks** (multiple choice + short-text, AI-graded), a
-  **skip-request** review workflow, step feedback, and phase locking until
-  prerequisites pass.
-- **Data Ingestion** — Connect data sources (GitHub, Jira, Upload), trigger
-  ingestion runs, track run status (running / completed / partial / failed), and
-  inspect failed artifacts. Artifacts are browsable with pagination.
-- **Connectors** — Manage project connectors and their source allow/deny lists
-  (GitHub today, extensible to Jira).
-- **Team Management** — A project-manager view of the team: onboarding
-  progress, current phase/step, project roles, skills (beginner → expert), and
-  per-user skill assessments. Supports filtering and sorting (progress, step
-  duration) and a per-member detail page. Includes the **Skill Wizard**
-  (`/skill-wizard`) for creating and editing skills linked to project roles.
-- **PM Dashboard** — A project-manager overview surface for monitoring team
-  progress.
-- **Admin** — User management (enable/disable, onboarding status, permission
-  groups), project management (sources, members), API token management, and
-  authoring of phase-check questions/options plus attempt review.
-- **Insights — Knowledge Gaps** — AI-detected missing documentation per
-  component, with severity (high / medium / low), component owners, and
-  refresh tracking.
-- **Insights — FAQ** — AI-generated clusters of frequently asked questions and
-  the documents that answer them.
-- **Settings** — Per-user application settings (e.g. chat preferences).
-- **Profile** — View and edit the current user's profile.
+- **Dashboard** — The main landing hub featuring onboarding progress, next recommended steps (`NextStepWidget`), and quick access to team and knowledge features.
+- **AI Assistant / Chatbot** — A streaming chat interface (Server-Sent Events) that answers questions grounded in the indexed knowledge base. Supports multiple conversations, chat history, and inline **citations** back to the source artifacts (files, lines, PDF pages). Responses render Markdown, syntax-highlighted code blocks, and math (KaTeX).
+- **Knowledge Base** — Browse, search, and upload indexed **artifacts** (commits, files, issues, pull requests, documents) ingested from GitHub, Jira, or direct uploads. Each artifact can be summarized on demand via a streamed, citation-backed AI summary.
+- **Onboarding** — Personalized, AI-generated onboarding **paths** composed of phases, steps, tasks, and resources (video, document, task, link). Includes phase **knowledge checks** (multiple choice + short-text, AI-graded), a **skip-request** review workflow, step feedback, and phase locking until prerequisites pass.
+- **Data Ingestion** — Connect data sources (GitHub, Jira, Upload), trigger ingestion runs, track run status (running / completed / partial / failed), inspect failed artifacts, and review run history with pagination.
+- **Connectors** — Manage project connectors and their source allow/deny lists (GitHub, extensible to Jira).
+- **Team Management** — A project-manager view of the team: onboarding progress, current phase/step, project roles, skills (beginner → expert), and per-user skill assessments. Supports filtering and sorting (progress, step duration) and a per-member detail page. Includes the **Skill Wizard** (`/skill-wizard`) for authoring skills linked to project roles.
+- **PM Dashboard** — A project-manager overview surface for monitoring team onboarding trajectories, velocity, and skill acquisition.
+- **Admin** — User management (enable/disable, onboarding status, permission groups), project management (sources, members, project managers), API token management, and authoring of phase-check questions/options plus attempt review.
+- **Insights — Knowledge Gaps** — AI-detected missing documentation per component, with severity (high / medium / low), component owners, and refresh tracking.
+- **Insights — FAQ** — AI-generated clusters of frequently asked questions and the documents that answer them.
+- **Settings & Profile** — Central configuration hub with tabs for user profile management (avatar, display name, password update), appearance (light/dark/system theme), chat preferences, moments toggles, and access tokens (GitHub PAT / Jira credential management for authorized roles).
+- **Moments & Easter Eggs** — Gamified celebrations (confetti, achievement moments, sound effects) and interactive easter eggs (`dino`, `game2048`, `space-invaders`).
 
 ---
 
@@ -86,45 +64,50 @@ The codebase follows a **feature-first** organization: domain code lives in
 
 ```
 src/
-├── features/        # Self-contained domain slices
+├── features/            # Self-contained domain slices
 │   ├── admin/           # User, project & token management
-│   ├── chatbot/         # Streaming AI assistant (useChat hook)
+│   ├── chatbot/         # Streaming AI assistant (SSE prompt stream)
 │   ├── connectors/      # Connector + source allow/deny management
-│   ├── data-ingestion/  # Sources, ingestion runs, artifacts
+│   ├── dashboard/       # Dashboard hero & NextStepWidget
+│   ├── data-ingestion/  # Sources, ingestion runs, artifact tables
+│   ├── dino/            # Dino easter-egg mini game
+│   ├── easter-eggs/     # Easter-egg trigger hooks & modals
 │   ├── faq/             # AI FAQ clusters (insights)
-│   ├── knowledge-base/  # Artifact browsing + streamed summaries
+│   ├── game2048/        # 2048 easter-egg mini game
+│   ├── knowledge-base/  # Artifact browsing + streamed summaries + file upload
 │   ├── knowledge-gaps/  # AI-detected documentation gaps (insights)
-│   ├── onboarding/      # AI onboarding paths, checks, skip workflow
-│   ├── profile/         # User profile
-│   ├── projects/        # Project selection
-│   ├── settings/        # User settings (chat preferences, etc.)
+│   ├── moments/         # Celebrations, confetti, rocket animations
+│   ├── onboarding/      # AI onboarding paths, knowledge checks, skip workflow
+│   ├── profile/         # Profile form components
+│   ├── projects/        # Multi-project switching & global ProjectContext
+│   ├── settings/        # User settings tabs, themes & credentials
+│   ├── space-invaders/  # Space Invaders easter-egg mini game
 │   └── team-management/ # Team overview, member detail, Skill Wizard
-├── pages/           # Route-level views (one per user-facing flow)
-├── router/          # React Router v7 config + AuthGuard
-├── auth/            # Access policy (AppRoute union, canAccessRoute)
-├── context/         # Global providers (AuthProvider, ThemeProvider)
-├── services/        # Backend communication (one module per domain; SSE streaming)
-├── components/      # Shared UI: common/, layout/, ui/ primitives
-├── config/          # Integration config (keycloak.ts)
-├── hooks/           # Shared hooks
-├── styles/          # Global CSS + semantic design tokens
-├── mocks/           # Dev mock data
-└── keycloak-theme/  # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
+├── pages/               # Route-level views (one per user-facing flow)
+├── router/              # React Router v7 config + AuthGuard
+├── auth/                # Access policy (AppRoute union, canAccessRoute)
+├── context/             # Global providers (AuthProvider, ThemeProvider, ChatProvider)
+├── services/            # Backend communication (one module per domain; SSE streaming via sse.ts)
+├── components/          # Shared UI: common/, layout/, ui/ primitives
+├── config/              # Integration config (keycloak.ts)
+├── hooks/               # Shared hooks
+├── styles/              # Global CSS + semantic design tokens + centralized spring tokens
+├── mocks/               # Dev mock datasets and fallback fixtures
+└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
 ```
 
 **Key conventions**
 
 - **Routing & access control** — Protected routes are wrapped in `AuthGuard`;
   route access is centralized in `auth/accessPolicy.ts` (`AppRoute` union +
-  `canAccessRoute`). New protected routes must be registered there or they
-  won't be access-controlled.
-- **API layer** — All backend communication goes through `src/services/`
-  (typed responses; SSE for streaming). The dev server proxies `/api`, `/v1`
+  `canAccessRoute`). Four permission groups are enforced: `USER`, `PM`, `HR`, and `ADMIN`.
+- **API layer & proxying** — All backend communication goes through `src/services/`
+  (typed responses; SSE for streaming). The Vite dev server proxies `/api`, `/v1`
   → `http://127.0.0.1:8080` (backend) and `/auth` → `http://127.0.0.1:8081`
-  (Keycloak).
+  (Keycloak). In Docker production, Nginx handles the identical reverse proxy routing.
 - **Design system** — One shared semantic palette (CSS variables → Tailwind
   `app-*` classes) defined in `src/styles/index.css`. Always use tokens, never
-  hardcode colors. Light/dark via the `.dark` class managed by `ThemeProvider`.
+  hardcode colors. Light/dark is controlled via the `.dark` class managed by `ThemeProvider`.
 - **Accessibility** — Targets WCAG 2.1 AA; meaning is never conveyed by color
   alone (icons + labels back every status). E2E-targeted elements declare
   `data-testid`.
@@ -151,62 +134,44 @@ src/
 
 ### Environment Variables
 
-Create a `.env` file in the root of the `sprintstart-frontend` directory with the
-following configuration (see `.env.example` for the canonical source):
+Copy `.env.example` to `.env` in the root of `sprintstart-frontend`:
+
+```bash
+cp .env.example .env
+```
 
 ```env
-# Keycloak Configuration
-VITE_KEYCLOAK_AUTHORITY=http://localhost:8081/auth/realms/sprintstart
+# Keycloak Client ID registered in the 'sprintstart' realm
 VITE_KEYCLOAK_CLIENT_ID=sprintstart-frontend
-# Use :5173 for `npm run dev`, :3000 for `docker compose up --build`
-VITE_KEYCLOAK_REDIRECT_URI=http://localhost:5173
-
-# GitHub PAT (classic) — used by the frontend for GitHub API calls
-VITE_GITHUB_PAT=ghp_yor_token
-
-# Knowledge Base test project UUID (until backend exposes project membership in /users/me)
-VITE_KB_PROJECT_ID=00000000-0000-0000-0000-00000000000x
 ```
 
-### Mock mode (optional)
+> **Note on Reverse Proxying:**
+> You do not need to configure API or Keycloak authority URLs. Both Vite (`npm run dev`)
+> and Nginx (`docker compose up`) automatically reverse-proxy:
+>
+> - `/api` & `/v1` → `http://127.0.0.1:8080` (Spring Boot backend)
+> - `/auth` → `http://127.0.0.1:8081` (Keycloak IAM)
 
-`npm run dev` on a fresh clone will attempt to call the real backend at
-`127.0.0.1:8080` and Keycloak at `127.0.0.1:8081`. If those aren't running
-locally, enable **mock mode** to make the dev server return mock DTOs from
-`src/mocks/` instead of making real HTTP calls.
+---
 
-Create a `.env.development` file (gitignored) in the repo root with one line:
+## Commands & Scripts
 
-```env
-VITE_USE_MOCK_MODE=true
-```
-
-Vite auto-loads `.env.development` in `npm run dev` (mode = development), so
-mock mode stays on for every `npm run dev` without re-typing. To disable it,
-delete the file or set `VITE_USE_MOCK_MODE=false`.
-
-For one-off use and other options (PowerShell / bash / `.env`), see
-[docs/testing_strategy.md §8](./docs/testing_strategy.md#8-mock-mode-vite_use_mock_mode).
-
-### Development
-
-To start the local development server, run:
-
-```bash
-npm run dev
-```
-
-The application will be accessible in your browser at: **http://localhost:5173/**
-
-### One Command Start
-
-To start the local deployment via docker compose in command, run:
-
-```bash
-docker compose up --build
-```
-
-The application will be accessible in your browser at: **http://localhost:3000/**
+| Purpose                      | Command                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| **Full DoD Verification**    | `npm run try` (Runs install + format check + build + lint + unit tests + a11y tests)    |
+| **Development Server**       | `npm run dev` (Starts Vite dev server at `http://localhost:5173`)                       |
+| **Production Build**         | `npm run build` (Runs `tsc -b` + `vite build`)                                          |
+| **Preview Production Build** | `npm run preview`                                                                       |
+| **Linting**                  | `npm run lint` (ESLint flat config)                                                     |
+| **Formatting**               | `npm run format` / `npm run format:check` (Prettier)                                    |
+| **All Unit Tests**           | `npm run test` (Vitest non-watch)                                                       |
+| **Unit Tests Only**          | `npm run unit` (Excludes a11y tests)                                                    |
+| **A11y Tests Only**          | `npm run a11y` (`vitest-axe` WCAG 2.1 AA checks)                                        |
+| **Storybook**                | `npm run storybook` (`http://localhost:6006`)                                           |
+| **Build Storybook**          | `npm run build-storybook`                                                               |
+| **Keycloak Theme Dev**       | `npm run dev-keycloak-theme` (Runs Vite with `VITE_KC_DEV=true` for mock theme preview) |
+| **Build Keycloak Theme**     | `npm run build-keycloak-theme` (Builds JAR via Keycloakify & Maven)                     |
+| **Docker Full Stack**        | `docker compose up --build` (Nginx container serving SPA at `http://localhost:3000`)    |
 
 ---
 
@@ -214,20 +179,28 @@ The application will be accessible in your browser at: **http://localhost:3000/*
 
 ### 🔑 Authentication & User Setup
 
-The application uses **Keycloak** for Identity and Access Management. There are two ways to get started:
+The application uses **Keycloak** for Identity and Access Management. When developing locally against a live backend stack:
 
-#### Option A: Create a Real User (Full Flow)
+1. **Access Keycloak Admin**: Go to [http://localhost:8081/auth/admin](http://localhost:8081/auth/admin) (or [http://localhost:8081/admin](http://localhost:8081/admin)).
+   - **Username**: `admin`
+   - **Password**: `admin`
+2. **Create / Inspect User**:
+   - Switch to the **`sprintstart`** realm.
+   - Navigate to **Users** -> **Add user**.
+   - In the **Credentials** tab, set a password and disable **Temporary**.
+3. **Assign Roles**:
+   - Go to the user's **Role mapping** tab -> **Assign role**.
+   - Filter by realm roles and assign the appropriate role for testing:
+     - `USER` — Standard developer onboarding and chat access.
+     - `PM` — Project Manager (access to PM dashboard, team management, skill wizard, data ingestion).
+     - `HR` — Human Resources (team management, project overview).
+     - `ADMIN` — System Administrator (full user/project management, token configuration, system administration).
+4. **Log In**: Open [http://localhost:5173](http://localhost:5173). You will be redirected to the Keycloak login screen, authenticate, and return to the application.
 
-To test the full login experience:
+---
 
-1.  **Access Keycloak Admin**: Go to [http://localhost:8081](http://localhost:8081/admin).
-    - **Username**: `admin`
-    - **Password**: `admin` (or as set in your `.env`)
-2.  **Create User**:
-    - Switch to the `sprintstart` realm.
-    - Go to **Users** -> **Add user**.
-    - After creating, go to the **Credentials** tab and set a password (turn off "Temporary").
-3.  **Role Assignment**: Go to the **Role mapping** tab.
-    - **For regular users**: Ensure the user has the `USER` role.
-    - **For administrators**: Click **Assign role**, change the filter dropdown to **Filter by realm roles**, select `ADMIN`, and save.
-4.  **Login**: Now, when you open the frontend, you will be redirected to the Keycloak login page (8081). Once logged in, it will redirect back to the app, which then communicates with the **Backend** ([http://localhost:8080](http://localhost:8080)).
+## Testing & Mocking Strategy
+
+- **HTTP Mocking in Tests**: Unit and component tests use **MSW (Mock Service Worker)** via `setupServer` in `tests/unit/setup/msw-handlers.ts` to intercept `fetch` and SSE streams.
+- **Service Resilience**: Services are designed with graceful fallback handling to allow UI development to proceed smoothly even when backend modules are evolving.
+- For complete details on testing conventions, coverage expectations, and axe-core rules, consult [docs/testing_strategy.md](./docs/testing_strategy.md).
