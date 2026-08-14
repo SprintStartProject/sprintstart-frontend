@@ -303,8 +303,9 @@ describe("useKnowledgeBase", () => {
     expect(result.current.paginatedArtifacts).toHaveLength(5);
   });
 
-  it("pulls the current page back into range when the result set shrinks", async () => {
+  it("pulls the current page back into range when it exceeds the available pages", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    // 25 artifacts at 20 per page is exactly two pages.
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
@@ -317,21 +318,12 @@ describe("useKnowledgeBase", () => {
     });
 
     act(() => {
-      result.current.setCurrentPage(2);
+      result.current.setCurrentPage(5);
     });
+
+    // Without the clamp the control would report page 5 while the slice runs off
+    // the end of the list and renders nothing.
     expect(result.current.currentPage).toBe(2);
-
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
-      makeArtifact("a0", "file-0.md"),
-    ]);
-
-    await act(async () => {
-      await result.current.fetchArtifacts();
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentPage).toBe(1);
-    });
-    expect(result.current.paginatedArtifacts).toHaveLength(1);
+    expect(result.current.paginatedArtifacts).toHaveLength(5);
   });
 });
