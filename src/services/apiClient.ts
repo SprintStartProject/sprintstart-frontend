@@ -1,4 +1,5 @@
 import keycloak from "../config/keycloak";
+import { buildRedirectUri, storeRedirectTarget } from "../auth/redirectUtils";
 
 /**
  * Standard API response error class.
@@ -74,7 +75,9 @@ export const apiClient = {
       }
     } catch (error) {
       console.error("Failed to refresh Keycloak token", error);
-      void keycloak.login(); // Redirect to login if token refresh fails completely
+      const currentPath = window.location.pathname + window.location.search + window.location.hash;
+      storeRedirectTarget(currentPath);
+      void keycloak.login({ redirectUri: buildRedirectUri(currentPath) });
     }
 
     const headers = new Headers(options.headers);
@@ -95,7 +98,9 @@ export const apiClient = {
 
     if (response.status === 401) {
       // Token likely expired or invalid, force re-auth
-      void keycloak.login();
+      const currentPath = window.location.pathname + window.location.search + window.location.hash;
+      storeRedirectTarget(currentPath);
+      void keycloak.login({ redirectUri: buildRedirectUri(currentPath) });
       throw new ApiError(401, "Unauthorized");
     }
 

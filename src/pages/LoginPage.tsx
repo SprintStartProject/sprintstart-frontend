@@ -1,8 +1,10 @@
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { Rocket, LogIn } from "lucide-react";
 import { ThemeToggle } from "../components/common/ThemeToggle";
 import { Button } from "../components/ui/Button";
 import { SpotlightCard } from "../components/ui/SpotlightCard";
+import { resolveRedirectTarget, retrieveRedirectTarget } from "../auth/redirectUtils";
 
 /**
  * The authentication entry point.
@@ -10,13 +12,23 @@ import { SpotlightCard } from "../components/ui/SpotlightCard";
  */
 export function LoginPage() {
   const { login, status } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const handleLogin = () => {
-    void login();
+    const storedTarget = retrieveRedirectTarget();
+    const redirectPath = resolveRedirectTarget({
+      searchParams,
+      locationState: location.state,
+      sessionTarget: storedTarget,
+      fallback: "/",
+    });
+
+    void login({ redirectPath });
   };
 
   return (
-      <div className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
+    <div className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
       <div className="absolute top-4 right-4 sm:top-8 sm:right-8">
         <ThemeToggle
           showLabel={false}
@@ -24,7 +36,10 @@ export function LoginPage() {
         />
       </div>
 
-      <SpotlightCard roundedClassName="rounded-3xl" className="w-full max-w-md space-y-8 p-6 text-center shadow-lg backdrop-blur-sm sm:p-10">
+      <SpotlightCard
+        roundedClassName="rounded-3xl"
+        className="w-full max-w-md space-y-8 p-6 text-center shadow-lg backdrop-blur-sm sm:p-10"
+      >
         <div className="flex flex-col items-center space-y-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-brand shadow-lg">
             <Rocket className="h-9 w-9 text-white" />
@@ -65,7 +80,7 @@ export function LoginPage() {
             Securely managed by Keycloak OpenID Connect
           </p>
         </div>
-              </SpotlightCard>
-            </div>
-          );
-        }
+      </SpotlightCard>
+    </div>
+  );
+}

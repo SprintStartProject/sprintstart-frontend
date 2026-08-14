@@ -17,11 +17,16 @@ const OPTIONS: ReadonlyArray<{ value: Theme; label: string; icon: typeof Sun }> 
  * meaning never conveyed by colour alone).
  */
 export function AppearanceSection() {
-  const { theme, setTheme, isAuroraEnabled, setIsAuroraEnabled, isTiltEnabled, setIsTiltEnabled } = useTheme();
+  const { theme, setTheme, isAuroraEnabled, setIsAuroraEnabled, isTiltEnabled, setIsTiltEnabled } =
+    useTheme();
 
   return (
     <div className="flex flex-col gap-6">
-      <div role="radiogroup" aria-label="Theme preference" className="flex flex-col gap-3 sm:flex-row">
+      <div
+        role="radiogroup"
+        aria-label="Theme preference"
+        className="flex flex-col gap-3 sm:flex-row"
+      >
         {OPTIONS.map(({ value, label, icon: Icon }) => {
           const isActive = theme === value;
           return (
@@ -33,7 +38,7 @@ export function AppearanceSection() {
               data-testid={`theme-option-${value}`}
               onClick={() => setTheme(value)}
               className={[
-                "flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+                "flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
                 isActive
                   ? "border-app-brand bg-app-brand-soft text-app-text"
                   : "border-app-border bg-app-bg text-app-text-muted hover:bg-app-surface-hover hover:text-app-text",
@@ -65,7 +70,7 @@ export function AppearanceSection() {
           aria-checked={isAuroraEnabled}
           onClick={() => setIsAuroraEnabled(!isAuroraEnabled)}
           className={[
-            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
             isAuroraEnabled ? "bg-app-brand" : "bg-app-border-strong",
           ].join(" ")}
         >
@@ -97,7 +102,7 @@ export function AppearanceSection() {
           aria-checked={isTiltEnabled}
           onClick={() => setIsTiltEnabled(!isTiltEnabled)}
           className={[
-            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
             isTiltEnabled ? "bg-app-brand" : "bg-app-border-strong",
           ].join(" ")}
         >

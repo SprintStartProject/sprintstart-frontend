@@ -245,18 +245,18 @@
   --shadow-app-brand-lift: var(--shadow-brand-lift);
 
   --font-sans: var(--sans);
-    --font-heading: var(--heading);
-    --font-mono: var(--mono);
+  --font-heading: var(--heading);
+  --font-mono: var(--mono);
 
-    /* Glassmorphism */
-    --color-app-glass: var(--glass);
-    --color-app-glass-border: var(--glass-border);
+  /* Glassmorphism */
+  --color-app-glass: var(--glass);
+  --color-app-glass-border: var(--glass-border);
 
-    /* Ambient glow */
-    --color-app-glow: var(--glow);
-    --color-app-glow-accent: var(--glow-accent);
-    --color-app-glow-alt: var(--glow-alt);
-  }
+  /* Ambient glow */
+  --color-app-glow: var(--glow);
+  --color-app-glow-accent: var(--glow-accent);
+  --color-app-glow-alt: var(--glow-alt);
+}
 
 @media (max-width: 1024px) {
   :root {
@@ -617,9 +617,9 @@ body {
   inset: 0;
   pointer-events: none;
   background: radial-gradient(
-    circle 320px at
-    var(--spot-x, 50%) var(--spot-y, 90%),
-    color-mix(in srgb, var(--color-app-glow) 90%, transparent), transparent 30%
+    circle 320px at var(--spot-x, 50%) var(--spot-y, 90%),
+    color-mix(in srgb, var(--color-app-glow) 90%, transparent),
+    transparent 30%
   );
   mix-blend-mode: plus-lighter;
   transition: opacity 0.3s ease;
@@ -628,7 +628,9 @@ body {
 
 /* Respect users who prefer reduced motion: collapse ALL decorative animation. */
 @media (prefers-reduced-motion: reduce) {
-  .app-spotlight { display: none; }
+  .app-spotlight {
+    display: none;
+  }
 
   *,
   *::before,

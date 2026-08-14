@@ -1,5 +1,6 @@
 import { Button } from "../../../components/ui/Button";
 import keycloak from "../../../config/keycloak";
+import { buildRedirectUri } from "../../../auth/redirectUtils";
 
 /**
  * Form component for changing the user's password.
@@ -7,8 +8,11 @@ import keycloak from "../../../config/keycloak";
  */
 export function PasswordForm() {
   const handleRedirect = () => {
-    // Trigger Keycloak's direct password update flow instead of the general account console
-    void keycloak.login({ action: "UPDATE_PASSWORD" });
+    // Trigger Keycloak's direct password update flow and redirect back to Settings
+    void keycloak.login({
+      action: "UPDATE_PASSWORD",
+      redirectUri: buildRedirectUri("/settings"),
+    });
   };
 
   return (

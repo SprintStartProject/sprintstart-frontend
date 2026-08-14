@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
+import { MemoryRouter } from "react-router-dom";
 import { LoginPage } from "../../../src/pages/LoginPage";
 
 vi.mock("../../../src/context/useAuth", () => ({
@@ -14,9 +15,11 @@ vi.mock("../../../src/components/common/ThemeToggle", () => ({
 describe("LoginPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
-          <main>
-            <LoginPage />
-          </main>,
+      <MemoryRouter>
+        <main>
+          <LoginPage />
+        </main>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("SprintStart")).toBeInTheDocument();

@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 import { useEffect, useState, useRef } from "react";
 import { userService } from "../services/userService";
 import type { UserProfile } from "../services/types";
-import { AuthContext, type AuthStatus } from "./AuthContext";
+import { AuthContext, type AuthStatus, type LoginOptions } from "./AuthContext";
 import keycloak from "../config/keycloak";
 import { markSigningOut } from "../bootSplash";
+import { buildRedirectUri, clearRedirectTarget, storeRedirectTarget } from "../auth/redirectUtils";
 /**
  * Provider component that manages the global authentication state via Keycloak.
  */
@@ -58,7 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStatus("unauthenticated");
         }
       } catch (error) {
-        console.error("Keycloak initialization failed", error);
+        const isLoginRequired =
+          typeof error === "object" &&
+          error !== null &&
+          "error" in error &&
+          error.error === "login_required";
+
+        if (!isLoginRequired) {
+          console.error("Keycloak initialization failed", error);
+        }
         setStatus("unauthenticated");
       }
     };
@@ -66,8 +75,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void initAuth();
   }, []);
 
-  const login = async () => {
-    await keycloak.login();
+  const login = async (options?: LoginOptions) => {
+    let redirectUri = options?.redirectUri;
+    if (!redirectUri && options?.redirectPath) {
+      redirectUri = buildRedirectUri(options.redirectPath);
+      storeRedirectTarget(options.redirectPath);
+    }
+
+    if (redirectUri) {
+      await keycloak.login({ redirectUri });
+    } else {
+      await keycloak.login();
+    }
   };
 
   const logout = async () => {
@@ -75,7 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // lands here afterwards looks exactly like a cold start. The note is
     // what stops the boot splash starting a launch for somebody leaving.
     markSigningOut();
-    await keycloak.logout();
+    clearRedirectTarget();
+    await keycloak.logout({ redirectUri: `${window.location.origin}/login` });
   };
 
   const refetchProfile = async () => {
