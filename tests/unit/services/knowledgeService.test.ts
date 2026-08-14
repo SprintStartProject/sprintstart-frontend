@@ -75,7 +75,7 @@ describe("knowledgeService", () => {
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [endpoint, options] = fetchSpy.mock.calls[0];
-      expect(endpoint).toBe("/api/v1/uploads/up-1");
+      expect(endpoint).toBe("/api/v1/uploads");
       expect(options?.method).toBe("DELETE");
       expect(options?.body).toBeInstanceOf(FormData);
 
@@ -92,7 +92,7 @@ describe("knowledgeService", () => {
 
     it("resolves on 204 No Content", async () => {
       server.use(
-        http.delete("/api/v1/uploads/:artifactId", () => new HttpResponse(null, { status: 204 })),
+        http.delete("/api/v1/uploads", () => new HttpResponse(null, { status: 204 })),
       );
 
       await expect(
@@ -102,7 +102,7 @@ describe("knowledgeService", () => {
 
     it("rejects with ApiError on 403", async () => {
       server.use(
-        http.delete("/api/v1/uploads/:artifactId", () =>
+        http.delete("/api/v1/uploads", () =>
           HttpResponse.json({ detail: "Forbidden" }, { status: 403 }),
         ),
       );
