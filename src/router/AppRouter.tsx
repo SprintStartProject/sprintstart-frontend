@@ -21,6 +21,10 @@ import { FaqPage } from "../features/faq/components/FaqPage.tsx";
 import { FaqDetailPage } from "../features/faq/components/FaqDetailPage.tsx";
 import { KnowledgeGapsPage } from "../features/knowledge-gaps/components/KnowledgeGapsPage.tsx";
 import { KnowledgeGapsDetailPage } from "../features/knowledge-gaps/components/KnowledgeGapsDetailPage.tsx";
+import { KnowledgeRequestInboxPage } from "../features/knowledge-request/components/KnowledgeRequestInboxPage.tsx";
+import { OnboardingMetricsPage } from "../features/onboarding-metrics/components/OnboardingMetricsPage.tsx";
+import { ArrivalStepsPage } from "../pages/ArrivalStepsPage";
+import { StarterWorkPage } from "../pages/StarterWorkPage";
 import { NotFoundPage } from "../pages/NotFoundPage.tsx";
 
 /**
@@ -85,6 +89,10 @@ export function AppRouter() {
         <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
         <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
         <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
+        <Route path="/insights/knowledge-requests" element={<KnowledgeRequestInboxPage />} />
+        <Route path="/insights/onboarding" element={<OnboardingMetricsPage />} />
+        <Route path="/arrival-steps" element={<ArrivalStepsPage />} />
+        <Route path="/starter-work" element={<StarterWorkPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="*" element={<NotFoundPage />} />
