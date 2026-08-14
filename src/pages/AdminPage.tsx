@@ -19,6 +19,7 @@ import {
   toggleSelectedUserId,
   toggleVisibleUserSelection,
 } from "../features/admin/data";
+import { DEFAULT_ACCESS_SOURCE_FILTER } from "../features/access/components/AccessManagementView";
 import { AdminMetrics } from "../features/admin/components/AdminMetrics";
 import { AdminPagination } from "../features/admin/components/AdminPagination";
 import { AdminProjectsToolbar } from "../features/admin/components/AdminProjectsToolbar";
@@ -57,6 +58,12 @@ export function AdminPage() {
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
+  // Lives here, not in the tokens section, for the same reason as the two
+  // above: only one tab is mounted at a time, so a filter kept inside a section
+  // would reset every time you leave and come back.
+  const [accessSourceFilter, setAccessSourceFilter] = useState<string>(
+    DEFAULT_ACCESS_SOURCE_FILTER,
+  );
 
   const [page, setPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
@@ -398,13 +405,12 @@ export function AdminPage() {
     }, DRAWER_CLOSE_DELAY_MS);
   };
 
+  // The tokens section loads its own data through the access connector
+  // registry; only the create-project wizard still needs the PAT names here.
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);
     closeDetails();
     setActiveTab(tab);
-    if (tab === "tokens" && !tokensLoaded) {
-      void loadTokenNames();
-    }
   };
 
   // Two-finger swipe between the sections, for people who would rather not aim
@@ -546,9 +552,8 @@ export function AdminPage() {
                 </>
               ) : (
                 <TokensTab
-                  tokenNames={tokenNames}
-                  onRefresh={() => void loadTokenNames()}
-                  userEmail={profile?.email ?? null}
+                  sourceFilter={accessSourceFilter}
+                  onSourceFilterChange={setAccessSourceFilter}
                 />
               )}
             </SlidingTabPanel>

@@ -149,12 +149,13 @@ const spinnerClasses: Record<ButtonSize, string> = {
  * feature-specific accent), but reach for it rarely: if a variant is missing,
  * add it here rather than patching it at the call site.
  *
- * **Hover motion is not opt-in.** Every button magnifies slightly on hover and
- * sinks on press, using the shared `buttonHoverMotion` token. It used to be
- * applied by hand at 18 call sites, which is why the same "Refresh" icon
- * button reacted on one page header and sat dead on another. A disabled or
- * loading button gets `buttonHoverMotionDisabled` so it also *feels* dead, and
- * `prefers-reduced-motion` removes the movement entirely.
+ * **Press motion is not opt-in.** Every button sinks on press through the
+ * shared `buttonHoverMotion` token. It used to be applied by hand at 18 call
+ * sites, which is why the same "Refresh" icon button reacted on one page header
+ * and sat dead on another. Hover is a colour change per variant, not a scale —
+ * see the token for why nothing here may grow past its resting size. A disabled
+ * or loading button gets `buttonHoverMotionDisabled` so it also *feels* dead,
+ * and `prefers-reduced-motion` removes the movement entirely.
  *
  * ```tsx
  * <Button onClick={save} loading={saving} icon={<Check className="h-4 w-4" />}>

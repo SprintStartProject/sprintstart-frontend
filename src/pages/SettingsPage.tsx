@@ -61,7 +61,9 @@ const ALL_SECTIONS: ReadonlyArray<SectionDef> = [
     label: "Access Tokens",
     icon: Key,
     title: "Access Tokens",
-    description: "GitHub Personal Access Tokens and Jira credentials used for source ingestion.",
+    // Deliberately source-agnostic: the section lists whatever connectors the
+    // access registry declares, so naming them here would go stale.
+    description: "Credentials for the connected sources, used for ingestion.",
     render: () => <AccessTokensSection />,
   },
 ];

@@ -99,14 +99,10 @@ vi.mock("../../../src/features/admin/components/ProjectsTab", () => ({
   ),
 }));
 
+// The tokens section loads its own data through the access connector registry,
+// so the stub takes no props.
 vi.mock("../../../src/features/admin/components/TokensTab", () => ({
-  TokensTab: (props: { tokenNames: string[]; onRefresh: () => void }) => (
-    <div data-testid="tokens-tab">
-      {props.tokenNames.map((name) => (
-        <span key={name}>{name}</span>
-      ))}
-    </div>
-  ),
+  TokensTab: () => <div data-testid="tokens-tab" />,
 }));
 
 vi.mock("../../../src/features/admin/components/UserDetailsDrawer", () => ({
