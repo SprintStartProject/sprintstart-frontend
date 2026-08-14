@@ -42,7 +42,7 @@ export function QuickChatWidget() {
   }
 
   return (
-    <div className="relative rounded-2xl border border-app-border bg-app-surface p-6 transition-colors hover:border-app-brand-border-strong">
+    <div className="relative rounded-2xl p-6">
       {/* The clip lives on this layer rather than on the card itself, so
           the glow blobs stay inside the rounded edge while the content
           above is free to leave it — which is how the bot's Z's get to

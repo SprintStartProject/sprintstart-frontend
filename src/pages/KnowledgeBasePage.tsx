@@ -79,7 +79,7 @@ export function KnowledgeBasePage() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-app-bg text-app-text">
+    <div className="flex min-h-screen flex-col text-app-text">
       <header className="border-b border-app-border bg-app-bg">
         <motion.div
           initial={{ opacity: 0, x: -20 }}

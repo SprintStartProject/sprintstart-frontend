@@ -73,6 +73,15 @@ function toTeamOverviewProjects(user: BackendTeamOverviewUser): TeamOverviewUser
   return user.project?.id ? [{ id: user.project.id, name: user.project.name ?? "" }] : [];
 }
 
+/**
+ * Skill levels for the *currently authenticated* user.
+ *
+ * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
+ * open to the USER role — the admin endpoint behind `getUserSkillLevels`
+ * would 403 for a regular user looking at their own dashboard. The raw
+ * assessments only carry skill IDs, so names and roles are joined in from
+ * the skill and project-role lists.
+ */
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,

@@ -7,8 +7,11 @@
 
 import type { ReactNode } from "react";
 import type { ClassKey } from "@keycloakify/login-ui/useKcClsx";
-import "./login.css";
+// Order matters: `index.css` first so `login.css`'s rules win any tie on an
+// identical selector (both declare `html, body` — see the overscroll-behavior
+// override in login.css for why that has to hold).
 import "../../styles/index.css";
+import "./login.css";
 
 type Classes = { [key in ClassKey]?: string };
 

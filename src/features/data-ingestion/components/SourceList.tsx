@@ -7,6 +7,7 @@ import {
   formatNumber,
 } from "../data.ts";
 import type { DataSource } from "../types.ts";
+import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
@@ -30,30 +31,32 @@ export function SourceList({
 }: SourceListProps) {
   if (sources.length === 0) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-8 text-center sm:p-10">
-        <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-app-brand-soft blur-3xl" />
+      <SpotlightCard roundedClassName="rounded-3xl">
+        <div className="relative overflow-hidden rounded-3xl p-8 text-center sm:p-10">
+          <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-app-brand-soft blur-3xl" />
 
-        <div className="relative z-10 flex flex-col items-center">
-          <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
+          <div className="relative z-10 flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
 
-          <p className="mt-2 max-w-md text-sm text-app-text-muted">
-            Discover repositories from a GitHub organization or user and connect them to start
-            ingesting artifacts into the knowledge base.
-          </p>
+            <p className="mt-2 max-w-md text-sm text-app-text-muted">
+              Discover repositories from a GitHub organization or user and connect them to start
+              ingesting artifacts into the knowledge base.
+            </p>
 
-          {onAddSource && (
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={onAddSource}
-              icon={<Plus className="h-4 w-4" />}
-              className="mt-6"
-            >
-              Add sources
-            </Button>
-          )}
+            {onAddSource && (
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={onAddSource}
+                icon={<Plus className="h-4 w-4" />}
+                className="mt-6"
+              >
+                Add sources
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      </SpotlightCard>
     );
   }
 

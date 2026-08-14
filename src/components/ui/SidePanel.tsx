@@ -43,6 +43,12 @@ function getFocusableElements(container: HTMLElement) {
   );
 }
 
+/**
+ * Slide-in drawer panel. Uses sidePanelSlideToken for animation and
+ * PanelPresence for guaranteed unmount timing. Supports optional overlay,
+ * title, description, leading content, badge, header actions, and footer.
+ * Used by admin drawers, team member detail panels, and source details.
+ */
 export function SidePanel({
   isOpen: isOpenProp,
   onClose,

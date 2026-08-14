@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
@@ -69,6 +69,21 @@ export function AdminPage() {
   const [bulkDeleteErrorMessage, setBulkDeleteErrorMessage] = useState("");
 
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
+
+  /**
+   * Ref for the animated drawer-close timeout. Cleaned up on unmount so
+   * that setState calls after teardown don't hit a missing `window` in
+   * test environments.
+   */
+  const drawerCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (drawerCloseTimeoutRef.current !== null) {
+        clearTimeout(drawerCloseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const {
     users,
@@ -374,14 +389,14 @@ export function AdminPage() {
   );
 
   const closeDetails = () => {
-    setOpenUserMenuId(null);
-    setIsDrawerOpen(false);
+      setOpenUserMenuId(null);
+      setIsDrawerOpen(false);
 
-    window.setTimeout(() => {
-      setSelectedUser(null);
-      setSelectedProject(null);
-    }, DRAWER_CLOSE_DELAY_MS);
-  };
+      drawerCloseTimeoutRef.current = setTimeout(() => {
+        setSelectedUser(null);
+        setSelectedProject(null);
+      }, DRAWER_CLOSE_DELAY_MS);
+    };
 
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);
@@ -412,7 +427,7 @@ export function AdminPage() {
       // dialog's scroll lock has to be told where to look — see
       // `SCROLL_CONTAINER_ATTRIBUTE`.
       {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
-      className="h-dvh overflow-y-scroll overscroll-contain bg-app-bg"
+      className="h-dvh overflow-y-scroll overscroll-contain"
     >
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">

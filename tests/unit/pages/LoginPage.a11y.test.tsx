@@ -14,9 +14,9 @@ vi.mock("../../../src/components/common/ThemeToggle", () => ({
 describe("LoginPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
-      <main>
-        <LoginPage />
-      </main>,
+          <main>
+            <LoginPage />
+          </main>,
     );
 
     expect(screen.getByText("SprintStart")).toBeInTheDocument();

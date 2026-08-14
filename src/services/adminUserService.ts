@@ -194,6 +194,10 @@ function toBackendUpdateRequest(request: UpdateAdminUserRequest) {
   };
 }
 
+/**
+ * Admin user, project and token CRUD. Admin-only endpoints — non-admin
+ * callers get 403. All methods throw ApiError on non-2xx responses.
+ */
 export const adminUserService = {
   /**
    * GET /api/v1/users/me

@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, Clock3, Database, type LucideIcon } from "lucide-react";
 import { formatNumber } from "../data.ts";
 import type { DataSource } from "../types.ts";
+import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 
 type IngestionMetricsProps = {
   sources: DataSource[];
@@ -132,18 +133,20 @@ function MetricCard({
   iconColor: string;
 }) {
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm text-app-text-muted">{title}</p>
+    <SpotlightCard roundedClassName="rounded-3xl">
+      <div className="rounded-3xl p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm text-app-text-muted">{title}</p>
 
-          <h3 className="mt-3 text-4xl font-bold text-app-text">{value}</h3>
+            <h3 className="mt-3 text-4xl font-bold text-app-text">{value}</h3>
 
-          <p className="mt-2 text-sm text-app-text-muted">{subtitle}</p>
+            <p className="mt-2 text-sm text-app-text-muted">{subtitle}</p>
+          </div>
+
+          <Icon size={22} className={`shrink-0 ${iconColor}`} />
         </div>
-
-        <Icon size={22} className={`shrink-0 ${iconColor}`} />
       </div>
-    </div>
+    </SpotlightCard>
   );
 }

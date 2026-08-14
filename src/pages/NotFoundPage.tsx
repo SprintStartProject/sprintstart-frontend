@@ -5,6 +5,10 @@ import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { Button } from "../components/ui/Button.tsx";
 import { Rocket } from "lucide-react";
 
+/**
+ * Catch-all 404 page. Shows a "not found" message with a dashboard link and
+ * auto-opens the Space Invaders easter egg.
+ */
 export function NotFoundPage() {
   const navigate = useNavigate();
   // Auto-open the game on the 404 page (the canonical easter-egg entry
@@ -12,7 +16,7 @@ export function NotFoundPage() {
   const [invadersOpen, setInvadersOpen] = useState(true);
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-app-bg text-app-text">
+    <div className="flex h-screen w-full flex-col overflow-hidden text-app-text">
       <PageHeader
         title="404 Not Found"
         subtitle="The page you are looking for does not exist."

@@ -18,6 +18,11 @@ type AlertDialogProps = {
   onConfirm: () => void;
 };
 
+/**
+ * Confirmation dialog wrapping Modal. Supports danger/default variants,
+ * loading state with spinner, and error display.
+ * Used for destructive actions across admin, team management and settings.
+ */
 export function AlertDialog({
   isOpen,
   title,

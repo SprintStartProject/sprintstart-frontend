@@ -265,7 +265,7 @@ export function ChatPage() {
   const profileFallbackName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : "User";
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-app-bg text-app-text lg:h-screen">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden text-app-text lg:h-screen">
       {/* Mobile slide-out drawer — slides in from the left on mobile */}
       <aside
         id="chat-mobile-sidebar"
