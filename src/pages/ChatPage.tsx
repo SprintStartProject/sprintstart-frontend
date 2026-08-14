@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAvailableSources } from "../features/chatbot/hooks/useAvailableSources.ts";
-import { useChatPreferences } from "../context/useChatPreferences";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
@@ -72,7 +71,6 @@ export function ChatPage() {
     scrollToBottom,
   } = useChat();
 
-  const { showThoughtProcess } = useChatPreferences();
   const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
 
   // Resolved from the chat, not from the switcher: a citation points at an artifact
@@ -384,7 +382,6 @@ export function ChatPage() {
                     isThinking={isThinking}
                     isStreaming={isStreaming}
                     streamingMessageId={streamingMessageId}
-                    showThoughtProcess={showThoughtProcess}
                     profileIcon={profile?.profileIcon ?? undefined}
                     profileFallbackName={profileFallbackName}
                     profileSeed={profile?.id ?? undefined}

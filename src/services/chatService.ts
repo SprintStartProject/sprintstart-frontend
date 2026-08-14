@@ -70,7 +70,7 @@ export async function getMessages(chatId: string) {
 type ChatEvent =
   | { type: "tool_use"; name: string }
   | { type: "token"; content: string }
-  | { type: "reasoning"; content: string }
+  | { type: "reasoning"; reasoning?: string; content?: string }
   | {
       type: "citation";
       artifact_id: string;
@@ -200,11 +200,13 @@ export async function streamMessage(
           }
           break;
 
-        case "reasoning":
-          if (event.content !== undefined) {
-            handlers.onReasoning(event.content);
+        case "reasoning": {
+          const reasoningText = event.reasoning ?? event.content;
+          if (reasoningText !== undefined) {
+            handlers.onReasoning(reasoningText);
           }
           break;
+        }
 
         case "token":
           if (event.content !== undefined) {

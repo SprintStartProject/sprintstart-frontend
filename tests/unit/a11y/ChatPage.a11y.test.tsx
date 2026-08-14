@@ -14,13 +14,6 @@ vi.mock("../../../src/context/useAuth", () => ({
   }),
 }));
 
-vi.mock("../../../src/context/useChatPreferences", () => ({
-  useChatPreferences: () => ({
-    showThoughtProcess: true,
-    setShowThoughtProcess: vi.fn(),
-  }),
-}));
-
 vi.mock("../../../src/features/projects/useProjectContext", () => ({
   useProjectContext: () => ({ selectedProjectId: "project1" }),
 }));

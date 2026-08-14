@@ -259,6 +259,85 @@ describe("chatService", () => {
       expect(onDone).toHaveBeenCalledTimes(1);
     });
 
+    it("processes reasoning events with reasoning field", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"type":"reasoning","reasoning":"Checking sources..."}\n\n'),
+          );
+          controller.enqueue(
+            encoder.encode('data: {"type":"reasoning","reasoning":"Synthesizing..."}\n\n'),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+
+      server.use(
+        http.post(
+          "/api/v1/chats/me/prompt",
+          () =>
+            new HttpResponse(stream, {
+              headers: { "Content-Type": "text/event-stream" },
+            }),
+        ),
+      );
+
+      const onReasoning = vi.fn();
+      const onDone = vi.fn();
+
+      await streamMessage("chat1", "hello", [], "", "", {
+        onToken: vi.fn(),
+        onReasoning,
+        onCitation: vi.fn(),
+        onToolUse: vi.fn(),
+        onDone,
+      });
+
+      expect(onReasoning).toHaveBeenCalledTimes(2);
+      expect(onReasoning).toHaveBeenNthCalledWith(1, "Checking sources...");
+      expect(onReasoning).toHaveBeenNthCalledWith(2, "Synthesizing...");
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+
+    it("processes reasoning events with fallback content field", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"type":"reasoning","content":"Fallback thought"}\n\n'),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+
+      server.use(
+        http.post(
+          "/api/v1/chats/me/prompt",
+          () =>
+            new HttpResponse(stream, {
+              headers: { "Content-Type": "text/event-stream" },
+            }),
+        ),
+      );
+
+      const onReasoning = vi.fn();
+      const onDone = vi.fn();
+
+      await streamMessage("chat1", "hello", [], "", "", {
+        onToken: vi.fn(),
+        onReasoning,
+        onCitation: vi.fn(),
+        onToolUse: vi.fn(),
+        onDone,
+      });
+
+      expect(onReasoning).toHaveBeenCalledWith("Fallback thought");
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+
     it("handles stream error event", async () => {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({

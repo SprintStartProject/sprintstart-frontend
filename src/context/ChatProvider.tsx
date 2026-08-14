@@ -293,7 +293,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         draftRef.current = null;
         // Partial content stays visible, exactly like a manual stop. Only a
         // bubble that never received a token needs an explanation.
-        if (!orphan.content) {
+        if (!orphan.content && !orphan.reasoning) {
           setMessagesByChat((prev) => ({
             ...prev,
             [orphan.chatId]: (prev[orphan.chatId] ?? []).map((m) =>
@@ -460,7 +460,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             onReasoning: (reasoningText) => {
               if (!isCurrentStream()) return;
               armStreamTimeout();
-              setIsThinking(false);
+              if (!streamingStartedRef.current) {
+                streamingStartedRef.current = true;
+                setIsStreaming(true);
+                setIsThinking(false);
+                setStreamingMessageId(assistantId);
+              }
 
               const draft = draftRef.current;
               if (draft) {
@@ -599,9 +604,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setThinkingState(null);
     setStreamingChatId(null);
 
-    // Stopping before the first token would otherwise leave a bare empty
+    // Stopping before the first token or reasoning would otherwise leave a bare empty
     // bubble — the placeholder is only hidden while `isThinking` is true.
-    if (stopped && !stopped.content) {
+    if (stopped && !stopped.content && !stopped.reasoning) {
       setMessagesByChat((prev) => ({
         ...prev,
         [stopped.chatId]: (prev[stopped.chatId] ?? []).map((m) =>
