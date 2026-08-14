@@ -389,22 +389,21 @@ export function AdminPage() {
   );
 
   const closeDetails = () => {
-      setOpenUserMenuId(null);
-      setIsDrawerOpen(false);
+    setOpenUserMenuId(null);
+    setIsDrawerOpen(false);
 
-      drawerCloseTimeoutRef.current = setTimeout(() => {
-        setSelectedUser(null);
-        setSelectedProject(null);
-      }, DRAWER_CLOSE_DELAY_MS);
-    };
+    drawerCloseTimeoutRef.current = setTimeout(() => {
+      setSelectedUser(null);
+      setSelectedProject(null);
+    }, DRAWER_CLOSE_DELAY_MS);
+  };
 
+  // The tokens section loads its own data through the access connector
+  // registry; only the create-project wizard still needs the PAT names here.
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);
     closeDetails();
     setActiveTab(tab);
-    if (tab === "tokens" && !tokensLoaded) {
-      void loadTokenNames();
-    }
   };
 
   // Two-finger swipe between the sections, for people who would rather not aim
@@ -545,11 +544,7 @@ export function AdminPage() {
                   />
                 </>
               ) : (
-                <TokensTab
-                  tokenNames={tokenNames}
-                  onRefresh={() => void loadTokenNames()}
-                  userEmail={profile?.email ?? null}
-                />
+                <TokensTab />
               )}
             </SlidingTabPanel>
           )}

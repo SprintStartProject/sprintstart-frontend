@@ -3,7 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
-import { TokensSection } from "../../../../src/features/settings/components/TokensSection";
+import { AccessConnectorGroup } from "../../../../src/features/access/components/AccessConnectorGroup";
+import { githubConnector } from "../../../../src/features/access/registry";
 
 vi.mock("../../../../src/services/sources/githubService", () => ({
   getGithubPatNames: vi.fn(),
@@ -20,17 +21,17 @@ import {
 } from "../../../../src/services/sources/githubService";
 import { ApiError } from "../../../../src/services/apiClient";
 
-function renderSection() {
+function renderGroup() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <TokensSection />
+        <AccessConnectorGroup connector={githubConnector} />
       </ThemeProvider>
     </MemoryRouter>,
   );
 }
 
-describe("TokensSection", () => {
+describe("AccessConnectorGroup — GitHub", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getGithubPatNames).mockResolvedValue(["default"]);
@@ -40,7 +41,7 @@ describe("TokensSection", () => {
   });
 
   it("renders the list of token names on mount", async () => {
-    renderSection();
+    renderGroup();
 
     await waitFor(() => {
       expect(screen.getByText("default")).toBeInTheDocument();
@@ -51,7 +52,7 @@ describe("TokensSection", () => {
   it("shows the empty state when there are no tokens", async () => {
     vi.mocked(getGithubPatNames).mockResolvedValue([]);
 
-    renderSection();
+    renderGroup();
 
     await waitFor(() => {
       expect(screen.getByText("No tokens yet")).toBeInTheDocument();
@@ -61,10 +62,10 @@ describe("TokensSection", () => {
   it("surfaces a server error in the error banner", async () => {
     vi.mocked(getGithubPatNames).mockRejectedValue(new Error("Server 500"));
 
-    renderSection();
+    renderGroup();
 
     await waitFor(() => {
-      expect(screen.getByTestId("settings-tokens-error")).toHaveTextContent("Server 500");
+      expect(screen.getByTestId("access-error-github")).toHaveTextContent("Server 500");
     });
   });
 
@@ -74,10 +75,10 @@ describe("TokensSection", () => {
       .mockResolvedValueOnce(["default"])
       .mockResolvedValueOnce(["default", "ci"]);
 
-    renderSection();
+    renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
-    await user.click(screen.getByTestId("settings-add-token-open"));
+    await user.click(screen.getByTestId("access-add-open-github"));
     await user.type(screen.getByTestId("settings-add-token-name"), "ci");
     await user.type(screen.getByTestId("settings-add-token-value"), "ghp_aBcDef123");
     await user.click(screen.getByTestId("settings-add-token-submit"));
@@ -89,10 +90,10 @@ describe("TokensSection", () => {
   it("rejects an invalid PAT format client-side without calling the API", async () => {
     const user = userEvent.setup();
 
-    renderSection();
+    renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
-    await user.click(screen.getByTestId("settings-add-token-open"));
+    await user.click(screen.getByTestId("access-add-open-github"));
     await user.type(screen.getByTestId("settings-add-token-name"), "bad");
     await user.type(screen.getByTestId("settings-add-token-value"), "not-a-pat");
     await user.click(screen.getByTestId("settings-add-token-submit"));
@@ -107,10 +108,10 @@ describe("TokensSection", () => {
       new ApiError(409, '{"message":"Name already exists"}'),
     );
 
-    renderSection();
+    renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
-    await user.click(screen.getByTestId("settings-add-token-open"));
+    await user.click(screen.getByTestId("access-add-open-github"));
     await user.type(screen.getByTestId("settings-add-token-name"), "default");
     await user.type(screen.getByTestId("settings-add-token-value"), "ghp_abc123");
     await user.click(screen.getByTestId("settings-add-token-submit"));
@@ -122,7 +123,7 @@ describe("TokensSection", () => {
     const user = userEvent.setup();
     vi.mocked(getGithubPatNames).mockResolvedValueOnce(["default"]).mockResolvedValueOnce([]);
 
-    renderSection();
+    renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
     await user.click(screen.getByTestId("settings-delete-open-default"));
@@ -135,7 +136,7 @@ describe("TokensSection", () => {
   it("rotates a token with a valid PAT", async () => {
     const user = userEvent.setup();
 
-    renderSection();
+    renderGroup();
     await waitFor(() => expect(screen.getByText("default")).toBeInTheDocument());
 
     await user.click(screen.getByTestId("settings-rotate-open-default"));
@@ -147,7 +148,7 @@ describe("TokensSection", () => {
     );
   });
 
-  it("marks the section aria-busy while refreshing", async () => {
+  it("marks the group aria-busy while refreshing", async () => {
     let resolveRefresh: (v: string[]) => void = () => {};
     vi.mocked(getGithubPatNames).mockReturnValue(
       new Promise<string[]>((resolve) => {
@@ -155,15 +156,15 @@ describe("TokensSection", () => {
       }),
     );
 
-    renderSection();
+    renderGroup();
 
     await waitFor(() =>
-      expect(screen.getByLabelText("GitHub access tokens")).toHaveAttribute("aria-busy", "true"),
+      expect(screen.getByLabelText("GitHub access")).toHaveAttribute("aria-busy", "true"),
     );
 
     resolveRefresh(["default"]);
     await waitFor(() =>
-      expect(screen.getByLabelText("GitHub access tokens")).toHaveAttribute("aria-busy", "false"),
+      expect(screen.getByLabelText("GitHub access")).toHaveAttribute("aria-busy", "false"),
     );
   });
 });
