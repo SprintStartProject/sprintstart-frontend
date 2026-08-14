@@ -11,14 +11,20 @@ export type FAQTrend = "RISING" | "STEADY" | "FADING";
 
 // ── FAQ OVERVIEW ────────────────────────────────────────────
 
+/**
+ * One recurring question — the same thing asked in different words.
+ *
+ * `title` is what the list is read by: a generated phrase naming what the
+ * entry is about, so a PM scans "Getting VPN access" instead of reading a
+ * sentence per row. `question` is the wording users actually ask it in, kept
+ * for the detail view.
+ */
 export interface FAQGroup {
   groupId: string;
   count: number;
+  title: string;
   question: string;
   topDocuments: FAQDocumentPreview[];
-  // Topic bucket the group is filed under. Null for groups that predate
-  // categories and haven't been re-classified yet.
-  category?: string | null;
   // Questions in the current trend window.
   recentCount?: number;
   trend?: FAQTrend;
@@ -30,24 +36,8 @@ export interface FAQDocumentPreview {
   title: string;
 }
 
-/**
- * A topic bucket holding several question groups. Ordered by *recent* volume
- * rather than all-time count, so a topic that is picking up sits above one
- * that was busy months ago and has gone quiet since.
- */
-export interface FAQCategory {
-  name: string;
-  groupCount: number;
-  questionCount: number;
-  recentQuestionCount: number;
-  trend: FAQTrend;
-  lastAskedAt: string;
-}
-
 export interface FAQOverview {
   groups: FAQGroup[];
-  // Absent on responses from a backend that predates categories.
-  categories?: FAQCategory[];
   lastAskedAt?: string | null;
 }
 
@@ -77,9 +67,10 @@ export interface FAQDocument {
 export interface FAQDetail {
   groupId: string;
   count: number;
+  title: string;
+  question: string;
   questions: FAQQuestion[];
   answeringDocuments: FAQDocument[];
-  category?: string | null;
   recentCount?: number;
   trend?: FAQTrend;
   firstAskedAt?: string | null;

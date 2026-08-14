@@ -33,7 +33,9 @@ export const insightsService = {
       );
     } catch (error) {
       console.error(`Error fetching FAQ group with ID ${groupId}:`, error);
-      return faqDetailMock;
+      // Asserted rather than inferred: a JSON import widens the trend literal
+      // to `string`, which no longer matches the union.
+      return faqDetailMock as FAQDetail;
     }
   },
 

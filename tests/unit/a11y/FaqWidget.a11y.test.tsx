@@ -11,12 +11,14 @@ vi.mock("../../../src/hooks/useLiveFetch", () => ({
         {
           groupId: "g1",
           count: 5,
+          title: "Resetting your password",
           question: "How do I reset my password?",
           topDocuments: [{ id: "d1", title: "Password Guide" }],
         },
         {
           groupId: "g2",
           count: 3,
+          title: "Inviting a teammate",
           question: "How do I invite a teammate?",
           topDocuments: [{ id: "d2", title: "Team Guide" }],
         },
@@ -46,7 +48,7 @@ describe("FaqWidget Accessibility", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("How do I reset my password?")).toBeInTheDocument();
+      expect(screen.getByText("Resetting your password")).toBeInTheDocument();
     });
 
     expect(await axe(baseElement)).toHaveNoViolations();

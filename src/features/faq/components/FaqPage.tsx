@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
@@ -8,15 +8,13 @@ import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { TrendBadge } from "./TrendBadge";
-import { toCategorySections } from "../grouping";
+import { formatAskedAt } from "../format";
 
 import {
   TrendingUp,
   FileText,
   AlertCircle,
   ArrowLeft,
-  ChevronDown,
-  Layers,
   MessageSquareMore,
   RefreshCw,
 } from "lucide-react";
@@ -29,7 +27,6 @@ export function FaqPage() {
 
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildError, setRebuildError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
 
   const {
     data: overview,
@@ -38,8 +35,6 @@ export function FaqPage() {
     error,
     refresh,
   } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
-
-  const sections = useMemo(() => (overview ? toCategorySections(overview) : []), [overview]);
 
   const handleRebuild = async () => {
     setRebuilding(true);
@@ -56,13 +51,6 @@ export function FaqPage() {
       setRebuilding(false);
     }
   };
-
-  const toggleSection = (key: string) =>
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
 
   // The FAQ now updates itself as questions are asked, so this is a rebuild of
   // the whole grouping rather than the only way to see new questions.
@@ -103,11 +91,12 @@ export function FaqPage() {
     );
   }
 
-  const totalGroups = overview.groups.length;
-  const totalQuestions = overview.groups.reduce((sum, group) => sum + group.count, 0);
-  const totalCategories = sections.filter((section) => section.category).length;
+  const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
+  const totalGroups = sorted.length;
+  const totalQuestions = sorted.reduce((sum, group) => sum + group.count, 0);
+  const risingCount = sorted.filter((group) => group.trend === "RISING").length;
   const totalDocuments = new Set(
-    overview.groups.flatMap((group) => group.topDocuments.map((doc) => doc.id)),
+    sorted.flatMap((group) => group.topDocuments.map((doc) => doc.id)),
   ).size;
 
   const goToDetail = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
@@ -130,7 +119,7 @@ export function FaqPage() {
             <PageHeader
               icon={MessageSquareMore}
               title="Recurring Questions"
-              subtitle="Grouped by topic and updated as questions are asked."
+              subtitle="Ranked by frequency and updated as questions are asked."
             />
             <div className="flex shrink-0 items-center gap-3">
               {revalidating && <Spinner size="sm" label="Updating" />}
@@ -143,10 +132,10 @@ export function FaqPage() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
               <div className="flex items-center gap-3">
-                <Layers className="h-5 w-5 text-app-brand" />
+                <MessageSquareMore className="h-5 w-5 text-app-brand" />
                 <div>
-                  <div className="text-2xl font-semibold text-app-brand">{totalCategories}</div>
-                  <div className="text-xs text-app-text-muted">Topics</div>
+                  <div className="text-2xl font-semibold text-app-brand">{totalGroups}</div>
+                  <div className="text-xs text-app-text-muted">Questions tracked</div>
                 </div>
               </div>
             </div>
@@ -155,8 +144,10 @@ export function FaqPage() {
               <div className="flex items-center gap-3">
                 <MessageSquareMore className="h-5 w-5 text-app-success-solid" />
                 <div>
-                  <div className="text-2xl font-semibold text-app-success-solid">{totalGroups}</div>
-                  <div className="text-xs text-app-text-muted">Question groups</div>
+                  <div className="text-2xl font-semibold text-app-success-solid">
+                    {totalQuestions}
+                  </div>
+                  <div className="text-xs text-app-text-muted">Times asked</div>
                 </div>
               </div>
             </div>
@@ -165,10 +156,8 @@ export function FaqPage() {
               <div className="flex items-center gap-3">
                 <TrendingUp className="h-5 w-5 text-app-danger-solid" />
                 <div>
-                  <div className="text-2xl font-semibold text-app-danger-solid">
-                    {totalQuestions}
-                  </div>
-                  <div className="text-xs text-app-text-muted">Total questions</div>
+                  <div className="text-2xl font-semibold text-app-danger-solid">{risingCount}</div>
+                  <div className="text-xs text-app-text-muted">Picking up</div>
                 </div>
               </div>
             </div>
@@ -190,75 +179,45 @@ export function FaqPage() {
 
       {/* Content */}
       <main className="app-page-content py-8">
-        {/* Topic sections. No "most asked" hero here: every question already
-            appears under its topic, and a hero would show the top one twice. */}
-        <div className="space-y-4">
-          {sections.map((section) => {
-            const isCollapsed = collapsed.has(section.key);
-            const sectionQuestions =
-              section.category?.questionCount ??
-              section.groups.reduce((sum, group) => sum + group.count, 0);
+        <div className="space-y-3">
+          {sorted.map((group) => (
+            <button
+              key={group.groupId}
+              onClick={() => goToDetail(group)}
+              // 1.01 rather than the 1.02 used on grid cards: these rows span
+              // the full content column, so the same percentage travels much
+              // further.
+              className="w-full rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
+            >
+              <div className="mb-2 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-base leading-snug font-semibold text-app-text">
+                    {group.title}
+                  </p>
+                  {/* The wording users actually use, under the summary. */}
+                  <p className="mt-0.5 truncate text-sm text-app-text-muted">{group.question}</p>
+                </div>
+                <span className="shrink-0 text-2xl leading-none font-semibold text-app-brand">
+                  {group.count}
+                </span>
+              </div>
 
-            return (
-              <section key={section.key} className="rounded-2xl border border-app-border">
-                <button
-                  onClick={() => toggleSection(section.key)}
-                  aria-expanded={!isCollapsed}
-                  className="flex w-full items-center justify-between gap-4 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-app-surface-hover"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-app-text-muted transition-transform ${
-                        isCollapsed ? "-rotate-90" : ""
-                      }`}
-                    />
-                    <h2 className="truncate font-semibold text-app-text">{section.name}</h2>
-                    {section.category && (
-                      <TrendBadge
-                        trend={section.category.trend}
-                        recentCount={section.category.recentQuestionCount}
-                      />
-                    )}
-                  </div>
-                  <span className="shrink-0 text-xs text-app-text-muted">
-                    {section.groups.length} {section.groups.length === 1 ? "group" : "groups"} ·{" "}
-                    {sectionQuestions} asked
+              <div className="flex flex-wrap items-center gap-1.5">
+                {group.trend && <TrendBadge trend={group.trend} recentCount={group.recentCount} />}
+                {group.topDocuments.map((doc) => (
+                  <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
+                    <FileText className="h-3 w-3" />
+                    {doc.title}
+                  </Badge>
+                ))}
+                {group.lastAskedAt && (
+                  <span className="ml-auto text-xs text-app-text-muted">
+                    Last asked {formatAskedAt(group.lastAskedAt).toLowerCase()}
                   </span>
-                </button>
-
-                {!isCollapsed && (
-                  <div className="space-y-2 px-3 pb-3">
-                    {section.groups.map((group) => (
-                      <button
-                        key={group.groupId}
-                        onClick={() => goToDetail(group)}
-                        className="w-full rounded-xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
-                      >
-                        <div className="mb-2 flex items-start justify-between gap-4">
-                          <p className="text-sm font-medium text-app-text">{group.question}</p>
-                          <span className="shrink-0 text-lg font-semibold text-app-brand">
-                            {group.count}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {group.trend && (
-                            <TrendBadge trend={group.trend} recentCount={group.recentCount} />
-                          )}
-                          {group.topDocuments.map((doc) => (
-                            <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
-                              <FileText className="h-3 w-3" />
-                              {doc.title}
-                            </Badge>
-                          ))}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
                 )}
-              </section>
-            );
-          })}
+              </div>
+            </button>
+          ))}
         </div>
       </main>
     </div>

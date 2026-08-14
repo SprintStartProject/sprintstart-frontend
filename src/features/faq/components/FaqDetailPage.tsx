@@ -87,11 +87,13 @@ export function FaqDetailPage() {
           </Button>
 
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-xl leading-snug font-semibold text-app-text sm:text-2xl">
-              {/* A group rebuilt from scratch can carry a count without a stored
-                  sample, so this must not assume there is a first question. */}
-              {detail.questions[0]?.text ?? "Recurring question"}
-            </h1>
+            <div className="min-w-0">
+              <h1 className="text-xl leading-snug font-semibold text-app-text sm:text-2xl">
+                {detail.title}
+              </h1>
+              {/* The wording users actually use, under the summary. */}
+              <p className="mt-1 text-sm text-app-text-muted">{detail.question}</p>
+            </div>
             <Badge variant="success" className="shrink-0 gap-1.5">
               <ArrowUp className="h-3 w-3" />
               {detail.count} times asked
@@ -99,11 +101,6 @@ export function FaqDetailPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {detail.category && (
-              <Badge variant="brand" size="sm">
-                {detail.category}
-              </Badge>
-            )}
             {detail.trend && (
               <TrendBadge trend={detail.trend} recentCount={detail.recentCount} />
             )}

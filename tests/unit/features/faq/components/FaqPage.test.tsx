@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FaqPage } from "../../../../../src/features/faq/components/FaqPage";
 import type { FAQOverview } from "../../../../../src/features/faq/types";
@@ -10,8 +9,8 @@ const mockOverview: FAQOverview = {
     {
       groupId: "g1",
       count: 10,
+      title: "Deploying to production",
       question: "How to deploy?",
-      category: "Deployment",
       recentCount: 7,
       trend: "RISING",
       topDocuments: [{ id: "d1", title: "Deploy Guide" }],
@@ -19,35 +18,11 @@ const mockOverview: FAQOverview = {
     {
       groupId: "g2",
       count: 5,
+      title: "Understanding what X is",
       question: "What is X?",
-      category: "Concepts",
       recentCount: 1,
       trend: "FADING",
       topDocuments: [{ id: "d2", title: "X Doc" }],
-    },
-    {
-      groupId: "g3",
-      count: 2,
-      question: "Where is the changelog?",
-      topDocuments: [],
-    },
-  ],
-  categories: [
-    {
-      name: "Deployment",
-      groupCount: 1,
-      questionCount: 10,
-      recentQuestionCount: 7,
-      trend: "RISING",
-      lastAskedAt: "2026-08-13T09:00:00Z",
-    },
-    {
-      name: "Concepts",
-      groupCount: 1,
-      questionCount: 5,
-      recentQuestionCount: 1,
-      trend: "FADING",
-      lastAskedAt: "2026-07-20T09:00:00Z",
     },
   ],
 };
@@ -89,53 +64,41 @@ describe("FaqPage", () => {
     expect(screen.getByText("Recurring Questions")).toBeInTheDocument();
   });
 
-  it("renders the statistics header with topic and question counts", () => {
+  it("renders the statistics header", () => {
     renderPage();
-    expect(screen.getByText("Topics")).toBeInTheDocument();
-    expect(screen.getByText("Question groups")).toBeInTheDocument();
-    expect(screen.getByText("Total questions")).toBeInTheDocument();
+    expect(screen.getByText("Questions tracked")).toBeInTheDocument();
+    expect(screen.getByText("Times asked")).toBeInTheDocument();
+    expect(screen.getByText("Picking up")).toBeInTheDocument();
   });
 
-  it("groups the questions under their topic instead of listing them flat", () => {
+  it("headlines each entry with its generated title", () => {
     renderPage();
-    expect(screen.getByRole("heading", { name: "Deployment" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Concepts" })).toBeInTheDocument();
+    // The title is what makes the list scannable — a verbatim question would
+    // mean reading a sentence per row.
+    expect(screen.getByText("Deploying to production")).toBeInTheDocument();
+    expect(screen.getByText("Understanding what X is")).toBeInTheDocument();
+  });
+
+  it("keeps the wording users actually ask it in under the title", () => {
+    renderPage();
+    expect(screen.getByText("How to deploy?")).toBeInTheDocument();
     expect(screen.getByText("What is X?")).toBeInTheDocument();
   });
 
-  it("shows the most asked question exactly once", () => {
+  it("lists the entries flat, most asked first", () => {
     renderPage();
-    // It already appears under its topic; a "most asked" hero on top of that
-    // would put the same question on the page twice.
-    expect(screen.getAllByText("How to deploy?")).toHaveLength(1);
+    const titles = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent)
+      .filter((text) => text?.includes("Deploying") ?? text?.includes("Understanding"));
+    expect(titles[0]).toContain("Deploying to production");
   });
 
-  it("keeps the backend's topic order, so a topic that is picking up sits on top", () => {
-    renderPage();
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Deployment", "Concepts", "Not yet categorised"]);
-  });
-
-  it("surfaces uncategorised questions rather than dropping them", () => {
-    renderPage();
-    expect(screen.getByRole("heading", { name: "Not yet categorised" })).toBeInTheDocument();
-    expect(screen.getByText("Where is the changelog?")).toBeInTheDocument();
-  });
-
-  it("shows which way each topic is moving", () => {
+  it("shows which way each entry is moving", () => {
     renderPage();
     // The count answers "rising from what?" without the reader opening anything.
-    expect(screen.getAllByText("Rising · 7").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Quiet · 1").length).toBeGreaterThan(0);
-  });
-
-  it("collapses a topic section when its header is clicked", async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.click(screen.getByRole("button", { name: /Concepts/ }));
-
-    expect(screen.queryByText("What is X?")).not.toBeInTheDocument();
+    expect(screen.getByText("Rising · 7")).toBeInTheDocument();
+    expect(screen.getByText("Quiet · 1")).toBeInTheDocument();
   });
 
   it("shows loading state", () => {

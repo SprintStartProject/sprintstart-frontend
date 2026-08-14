@@ -9,8 +9,8 @@ const mockOverview: FAQOverview = {
     {
       groupId: "g1",
       count: 10,
+      title: "Deploying to production",
       question: "How to deploy?",
-      category: "Deployment",
       recentCount: 7,
       trend: "RISING",
       topDocuments: [{ id: "d1", title: "Deploy Guide" }],
@@ -18,34 +18,16 @@ const mockOverview: FAQOverview = {
     {
       groupId: "g2",
       count: 8,
+      title: "Configuring the service",
       question: "How to configure?",
-      category: "Deployment",
       topDocuments: [{ id: "d2", title: "Config Doc" }],
     },
     {
       groupId: "g3",
       count: 5,
+      title: "Understanding what X is",
       question: "What is X?",
-      category: "Concepts",
       topDocuments: [{ id: "d3", title: "X Doc" }],
-    },
-  ],
-  categories: [
-    {
-      name: "Deployment",
-      groupCount: 2,
-      questionCount: 18,
-      recentQuestionCount: 7,
-      trend: "RISING",
-      lastAskedAt: "2026-08-13T09:00:00Z",
-    },
-    {
-      name: "Concepts",
-      groupCount: 1,
-      questionCount: 5,
-      recentQuestionCount: 0,
-      trend: "FADING",
-      lastAskedAt: "2026-07-01T09:00:00Z",
     },
   ],
 };
@@ -82,19 +64,19 @@ describe("FaqWidget", () => {
     vi.mocked(useLiveFetch).mockReturnValue(loaded);
   });
 
-  it("renders the hero card with the most asked question", () => {
+  it("renders the hero card with the most asked entry", () => {
     renderWidget();
+    expect(screen.getByText("Deploying to production")).toBeInTheDocument();
     expect(screen.getByText("How to deploy?")).toBeInTheDocument();
     expect(screen.getByText("Most asked")).toBeInTheDocument();
   });
 
-  it("summarises the topics rather than listing individual questions", () => {
+  it("lists the remaining entries by title", () => {
     renderWidget();
-    // The topic is the level a PM scans by once the question set grows; a
-    // second flat list of questions would be the problem, not the summary.
-    expect(screen.getByText("Concepts")).toBeInTheDocument();
-    expect(screen.getByText("2 groups")).toBeInTheDocument();
-    expect(screen.queryByText("How to configure?")).not.toBeInTheDocument();
+    // Titles rather than verbatim questions: the tiles are small, and a
+    // sentence per tile is not something a PM can scan.
+    expect(screen.getByText("Configuring the service")).toBeInTheDocument();
+    expect(screen.getByText("Understanding what X is")).toBeInTheDocument();
   });
 
   it('shows the header with "Recurring questions"', () => {

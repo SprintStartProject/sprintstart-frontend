@@ -1,10 +1,9 @@
 // ============================================================
 // FaqWidget.tsx
-// Dashboard widget — most asked question plus the topics it sits
-// among; click navigates to /insights/faq
+// Dashboard widget — the most asked questions by title; click
+// navigates to /insights/faq/:groupId
 // ============================================================
 
-import { useMemo } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import type { FAQGroup } from "../types";
@@ -14,13 +13,12 @@ import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { TrendBadge } from "./TrendBadge";
-import { toCategorySections } from "../grouping";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 import { TrendingUp, FileText, ArrowRight, AlertCircle } from "lucide-react";
 
-/** Topics shown before the widget stops being a glance and starts being a list. */
-const MAX_CATEGORIES = 4;
+/** Entries shown before the widget stops being a glance and starts being a list. */
+const MAX_ENTRIES = 5;
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: FaqWidget
@@ -36,8 +34,6 @@ export function FaqWidget() {
     revalidating,
     error,
   } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
-
-  const sections = useMemo(() => (overview ? toCategorySections(overview) : []), [overview]);
 
   // ── LOADING ──────────────────────────────────────────────
 
@@ -72,8 +68,7 @@ export function FaqWidget() {
   }
 
   const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
-  const hero = sorted[0];
-  const topCategories = sections.filter((section) => section.category).slice(0, MAX_CATEGORIES);
+  const [hero, ...rest] = sorted.slice(0, MAX_ENTRIES);
 
   const goToDetail = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
 
@@ -123,16 +118,11 @@ export function FaqWidget() {
           Most asked
         </Badge>
 
-        <p className="mb-3 pr-12 text-sm leading-snug font-semibold text-app-text">
-          {hero.question}
-        </p>
+        <p className="mb-1 pr-12 text-sm leading-snug font-semibold text-app-text">{hero.title}</p>
+        <p className="mb-3 truncate pr-12 text-xs text-app-text-muted">{hero.question}</p>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {hero.category && (
-            <Badge variant="brand" size="sm">
-              {hero.category}
-            </Badge>
-          )}
+          {hero.trend && <TrendBadge trend={hero.trend} recentCount={hero.recentCount} />}
           {hero.topDocuments.map((doc) => (
             <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
               <FileText className="h-3 w-3" />
@@ -142,30 +132,30 @@ export function FaqWidget() {
         </div>
       </button>
 
-      {/* Topics — the level a PM scans by once the question set grows */}
-      {topCategories.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {topCategories.map((section) => (
-            <div
-              key={section.key}
-              className="rounded-xl border border-app-border bg-app-surface p-3"
-            >
-              <div className="mb-1 flex items-baseline justify-between gap-2">
-                <p className="truncate text-xs font-medium text-app-text">{section.name}</p>
-                <span className="shrink-0 text-lg leading-none font-semibold text-app-brand">
-                  {section.category?.questionCount}
-                </span>
+      {/* 2x2 grid for the next four */}
+      <div className="grid grid-cols-2 gap-2">
+        {rest.map((group) => (
+          <button
+            key={group.groupId}
+            onClick={(event) => {
+              event.stopPropagation();
+              goToDetail(group);
+            }}
+            className="rounded-xl border border-app-border bg-app-surface p-3 text-left transition-all duration-200 hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
+          >
+            <div className="mb-1 text-xl font-semibold text-app-brand">{group.count}</div>
+            <p className="mb-2 line-clamp-2 text-xs leading-snug font-medium text-app-text">
+              {group.title}
+            </p>
+            {group.topDocuments[0] && (
+              <div className="flex items-center gap-1 overflow-hidden text-xs text-app-text-muted">
+                <FileText className="h-3 w-3 shrink-0" />
+                <span className="truncate">{group.topDocuments[0].title}</span>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-app-text-muted">
-                  {section.groups.length} {section.groups.length === 1 ? "group" : "groups"}
-                </span>
-                {section.category && <TrendBadge trend={section.category.trend} />}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+          </button>
+        ))}
+      </div>
     </ClickableCard>
   );
 }
