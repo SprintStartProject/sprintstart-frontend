@@ -34,8 +34,22 @@ export function useKnowledgeBase(projectId: string | null) {
 
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Paging resets when the project scope changes. This deliberately does not live
+  // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
+  // Refresh on page 3 should leave the reader on page 3 rather than snapping back.
+  const [pagedProjectId, setPagedProjectId] = useState(projectId);
+  if (pagedProjectId !== projectId) {
+    setPagedProjectId(projectId);
+    setCurrentPage(1);
+  }
+
   const fetchArtifacts = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId) {
+      setArtifacts([]);
+      setIsLoading(false);
+      setFetchError(null);
+      return;
+    }
     const generation = ++fetchGenerationRef.current;
     setIsLoading(true);
     setFetchError(null);
@@ -59,9 +73,9 @@ export function useKnowledgeBase(projectId: string | null) {
    * Depends on the authenticated user's projectId to fetch the correct project scope.
    */
   useEffect(() => {
-    // Defer to a microtask so setState calls happen outside the effect body
-    // (avoids the cascading-render smell flagged by react-hooks/set-state-in-effect).
-    void Promise.resolve().then(fetchArtifacts);
+    // Deferred to a microtask so synchronous setState calls at the top of
+    // fetchArtifacts do not run inside the effect body and cascade a render.
+    void Promise.resolve().then(() => fetchArtifacts());
   }, [fetchArtifacts]);
 
   const filteredArtifacts = useMemo(() => {
@@ -99,12 +113,21 @@ export function useKnowledgeBase(projectId: string | null) {
     });
   }, [artifacts, deferredSearchQuery, activeTab]);
 
-  const totalPages = Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
+
+  // Pull the page back into range when the result set shrinks -- deleting the last
+  // artifact on a page, or a filter narrowing while the reader is deep in the list.
+  // Without this the control keeps advertising a page the list no longer has, while
+  // the clamped slice below quietly shows a different one.
+  if (currentPage > totalPages) {
+    setCurrentPage(totalPages);
+  }
 
   const paginatedArtifacts = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const safePage = Math.min(currentPage, totalPages);
+    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredArtifacts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredArtifacts, currentPage]);
+  }, [filteredArtifacts, currentPage, totalPages]);
 
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);

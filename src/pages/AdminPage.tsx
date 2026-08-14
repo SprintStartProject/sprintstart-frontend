@@ -389,14 +389,14 @@ export function AdminPage() {
   );
 
   const closeDetails = () => {
-      setOpenUserMenuId(null);
-      setIsDrawerOpen(false);
+    setOpenUserMenuId(null);
+    setIsDrawerOpen(false);
 
-      drawerCloseTimeoutRef.current = setTimeout(() => {
-        setSelectedUser(null);
-        setSelectedProject(null);
-      }, DRAWER_CLOSE_DELAY_MS);
-    };
+    drawerCloseTimeoutRef.current = setTimeout(() => {
+      setSelectedUser(null);
+      setSelectedProject(null);
+    }, DRAWER_CLOSE_DELAY_MS);
+  };
 
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);

@@ -24,10 +24,7 @@ function AppContent() {
       {/* `data-moment-stage`: the area the page-scoped moments (the
           onboarding launch and landing) cover, instead of the whole
           screen — see momentStage.ts in the moments feature. */}
-      <main
-        data-moment-stage
-        className="relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0"
-      >
+      <main data-moment-stage className="relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0">
         <AppRouter />
       </main>
 
