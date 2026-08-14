@@ -54,6 +54,19 @@ describe("redirectUtils", () => {
       expect(sanitizeRedirectPath("/login")).toBeNull();
       expect(sanitizeRedirectPath("/login?redirect=/foo")).toBeNull();
     });
+
+    it("rejects /login variants the router treats as the same route", () => {
+      expect(sanitizeRedirectPath("/login/")).toBeNull();
+      expect(sanitizeRedirectPath("/login//")).toBeNull();
+      expect(sanitizeRedirectPath("/Login")).toBeNull();
+      expect(sanitizeRedirectPath("/LOGIN/")).toBeNull();
+      expect(sanitizeRedirectPath("/Login/?redirect=/foo")).toBeNull();
+    });
+
+    it("keeps paths that merely start with the login segment", () => {
+      expect(sanitizeRedirectPath("/login-help")).toBe("/login-help");
+      expect(sanitizeRedirectPath("/settings/login")).toBe("/settings/login");
+    });
   });
 
   describe("extractFullPath", () => {

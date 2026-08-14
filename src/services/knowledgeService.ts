@@ -269,20 +269,22 @@ export const knowledgeService = {
   /**
    * Deletes a single uploaded artifact by its id.
    *
-   * Sends a multipart DELETE to `/api/v1/uploads/{artifactId}` with a `request`
+   * Sends a multipart DELETE to `/api/v1/uploads` with a `request`
    * JSON part containing the artifactIds batch, the removerId (authenticated user)
-   * and the projectId scope. The backend mirrors the same multipart contract as
-   * the upload endpoint — the path variable is captured for REST semantics but
-   * the actual deletion target(s) are read from the body's `artifactIds` set.
+   * and the projectId scope. The backend reads the deletion target(s)
+   * from the body's `artifactIds` set.
    *
-   * @remarks Permission: the backend currently allows any `USER` role. The
-   * frontend gates this call to PM/HR/ADMIN via `accessPolicy` Pattern A.
-   * Tightening the backend `@PreAuthorize` to `hasAnyRole('PM','HR','ADMIN')`
-   * is tracked as a restricted backend follow-up.
+   * @remarks Permission: the backend requires `PM` or `ADMIN`. The call is reached
+   * from the Knowledge Base page, whose `/knowledge-base` route is open to every
+   * group, so the page carries its own `DELETE_ALLOWED_GROUPS` gate mirroring the
+   * backend rule -- the delete action stays hidden from the remaining groups
+   * instead of handing them a button that returns 403.
    *
    * @param projectId  UUID of the project that scopes the deletion.
    * @param artifactId UUID of the uploaded artifact to remove.
    * @param removerId  UUID of the authenticated user requesting the deletion.
+   *   Sent for symmetry with the upload contract, but ignored by the backend,
+   *   which resolves the remover from the JWT subject.
    * @throws ApiError on a non-2xx response (e.g. 403 if the caller lacks access
    *   to the supplied projectId, 404 if the artifact does not exist).
    */

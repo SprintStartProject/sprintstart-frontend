@@ -276,4 +276,62 @@ describe("useKnowledgeBase", () => {
       expect(result.current.currentPage).toBe(1);
     });
   });
+
+  it("keeps the current page when refreshing the same result set", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(25);
+    });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    expect(result.current.currentPage).toBe(2);
+
+    await act(async () => {
+      await result.current.fetchArtifacts();
+    });
+
+    expect(result.current.currentPage).toBe(2);
+    expect(result.current.paginatedArtifacts).toHaveLength(5);
+  });
+
+  it("pulls the current page back into range when the result set shrinks", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(25);
+    });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    expect(result.current.currentPage).toBe(2);
+
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+      makeArtifact("a0", "file-0.md"),
+    ]);
+
+    await act(async () => {
+      await result.current.fetchArtifacts();
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(1);
+    });
+    expect(result.current.paginatedArtifacts).toHaveLength(1);
+  });
 });

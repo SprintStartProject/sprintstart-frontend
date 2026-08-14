@@ -34,8 +34,16 @@ export function useKnowledgeBase(projectId: string | null) {
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchArtifacts = useCallback(async () => {
+  // Paging resets when the project scope changes. This deliberately does not live
+  // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
+  // Refresh on page 3 should leave the reader on page 3 rather than snapping back.
+  const [pagedProjectId, setPagedProjectId] = useState(projectId);
+  if (pagedProjectId !== projectId) {
+    setPagedProjectId(projectId);
     setCurrentPage(1);
+  }
+
+  const fetchArtifacts = useCallback(async () => {
     if (!projectId) {
       setArtifacts([]);
       setIsLoading(false);
@@ -106,6 +114,14 @@ export function useKnowledgeBase(projectId: string | null) {
   }, [artifacts, deferredSearchQuery, activeTab]);
 
   const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
+
+  // Pull the page back into range when the result set shrinks -- deleting the last
+  // artifact on a page, or a filter narrowing while the reader is deep in the list.
+  // Without this the control keeps advertising a page the list no longer has, while
+  // the clamped slice below quietly shows a different one.
+  if (currentPage > totalPages) {
+    setCurrentPage(totalPages);
+  }
 
   const paginatedArtifacts = useMemo(() => {
     const safePage = Math.min(currentPage, totalPages);

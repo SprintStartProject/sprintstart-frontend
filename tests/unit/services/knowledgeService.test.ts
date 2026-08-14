@@ -68,7 +68,7 @@ describe("knowledgeService", () => {
   });
 
   describe("deleteUpload", () => {
-    it("calls apiClient.fetch with DELETE method, the artifactId path, and a FormData body containing the DeleteArtifactsRequest JSON part", async () => {
+    it("calls apiClient.fetch with DELETE method, the collection path, and a FormData body containing the DeleteArtifactsRequest JSON part", async () => {
       const fetchSpy = vi.spyOn(apiClient, "fetch").mockResolvedValue(undefined);
 
       await knowledgeService.deleteUpload("proj-1", "up-1", "remover-1");
