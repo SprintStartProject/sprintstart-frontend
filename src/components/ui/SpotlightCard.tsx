@@ -4,13 +4,13 @@ import type { MouseEvent, ReactNode } from "react";
 import { useTheme } from "../../context/useTheme";
 
 export interface SpotlightCardProps extends HTMLMotionProps<"div"> {
-    className?: string;
-    /**
-     * Corner radius utility (default `rounded-xl`).
-     * Overridable so cards on large surfaces (dashboard widgets at `rounded-3xl`)
-     * keep their radius when wrapped for tilt/glow.
-     */
-    roundedClassName?: string;
+  className?: string;
+  /**
+   * Corner radius utility (default `rounded-xl`).
+   * Overridable so cards on large surfaces (dashboard widgets at `rounded-3xl`)
+   * keep their radius when wrapped for tilt/glow.
+   */
+  roundedClassName?: string;
 }
 
 /**
@@ -34,86 +34,82 @@ export interface SpotlightCardProps extends HTMLMotionProps<"div"> {
  * ```
  */
 export function SpotlightCard({
-    children,
-    className = "",
-    roundedClassName = "rounded-xl",
-    onClick,
-    style,
-    ...props
+  children,
+  className = "",
+  roundedClassName = "rounded-xl",
+  onClick,
+  style,
+  ...props
 }: SpotlightCardProps) {
-    const { isTiltEnabled } = useTheme();
+  const { isTiltEnabled } = useTheme();
 
-    const mouseX = useMotionValue(0);
-    const mouseY = useMotionValue(0);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
 
-    // Spring config: stiff so there's no wobble, soft enough to feel organic
-    const springConfig: Transition = {
-        type: "spring",
-        stiffness: 400,
-        damping: 30,
-    };
-    const rotateX = useSpring(0, springConfig);
-    const rotateY = useSpring(0, springConfig);
+  // Spring config: stiff so there's no wobble, soft enough to feel organic
+  const springConfig: Transition = {
+    type: "spring",
+    stiffness: 400,
+    damping: 30,
+  };
+  const rotateX = useSpring(0, springConfig);
+  const rotateY = useSpring(0, springConfig);
 
-    function handleMouseMove({ currentTarget, clientX, clientY }: MouseEvent) {
-        const { left, top, width, height } = currentTarget.getBoundingClientRect();
-        const x = clientX - left;
-        const y = clientY - top;
-        mouseX.set(x);
-        mouseY.set(y);
+  function handleMouseMove({ currentTarget, clientX, clientY }: MouseEvent) {
+    const { left, top, width, height } = currentTarget.getBoundingClientRect();
+    const x = clientX - left;
+    const y = clientY - top;
+    mouseX.set(x);
+    mouseY.set(y);
 
-        if (!isTiltEnabled) return;
+    if (!isTiltEnabled) return;
 
-        // Calculate tilt from center (-6° to +6° range)
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const maxTilt = 6;
-        rotateX.set(((y - centerY) / centerY) * -maxTilt);
-        rotateY.set(((x - centerX) / centerX) * maxTilt);
-    }
+    // Calculate tilt from center (-6° to +6° range)
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxTilt = 6;
+    rotateX.set(((y - centerY) / centerY) * -maxTilt);
+    rotateY.set(((x - centerX) / centerX) * maxTilt);
+  }
 
-    function handleMouseLeave() {
-        rotateX.set(0);
-        rotateY.set(0);
-    }
+  function handleMouseLeave() {
+    rotateX.set(0);
+    rotateY.set(0);
+  }
 
-    const tiltStyle = isTiltEnabled
-        ? { rotateX, rotateY, transformPerspective: 800 as const }
-        : {};
+  const tiltStyle = isTiltEnabled ? { rotateX, rotateY, transformPerspective: 800 as const } : {};
 
-    // `useMotionTemplate` is a hook, so it must be called unconditionally on
-    // every render — gating the *call* behind `isTiltEnabled` would change the
-    // hook count when the tilt toggle flips and crash React. Only the rendered
-    // overlay is conditional.
-    const spotlightBackground = useMotionTemplate`radial-gradient(
+  // `useMotionTemplate` is a hook, so it must be called unconditionally on
+  // every render — gating the *call* behind `isTiltEnabled` would change the
+  // hook count when the tilt toggle flips and crash React. Only the rendered
+  // overlay is conditional.
+  const spotlightBackground = useMotionTemplate`radial-gradient(
                     500px circle at ${mouseX}px ${mouseY}px,
                     var(--brand-glow),
                     transparent 80%
                 )`;
 
-    const spotlightOverlay = isTiltEnabled ? (
-        <motion.div
-                    className={`pointer-events-none absolute -inset-px ${roundedClassName} opacity-0 transition duration-300 group-hover:opacity-100 z-0`}
-            style={{ background: spotlightBackground }}
-        />
-    ) : null;
+  const spotlightOverlay = isTiltEnabled ? (
+    <motion.div
+      className={`pointer-events-none absolute -inset-px ${roundedClassName} z-0 opacity-0 transition duration-300 group-hover:opacity-100`}
+      style={{ background: spotlightBackground }}
+    />
+  ) : null;
 
-    return (
-        <motion.div
-            className={`group relative overflow-hidden ${roundedClassName} border border-app-border bg-app-surface transition-colors hover:border-app-brand-border-strong ${className}`}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onClick={onClick}
-            style={{ ...tiltStyle, ...style }}
-            {...props}
-        >
-            {/* Spotlight Gradient Overlay */}
-            {spotlightOverlay}
+  return (
+    <motion.div
+      className={`group relative overflow-hidden ${roundedClassName} border border-app-border bg-app-surface transition-colors hover:border-app-brand-border-strong ${className}`}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={onClick}
+      style={{ ...tiltStyle, ...style }}
+      {...props}
+    >
+      {/* Spotlight Gradient Overlay */}
+      {spotlightOverlay}
 
-            {/* Content Wrapper (z-index keeps text above spotlight) */}
-            <div className="relative z-10 h-full w-full">
-                {children as ReactNode}
-            </div>
-        </motion.div>
-    );
+      {/* Content Wrapper (z-index keeps text above spotlight) */}
+      <div className="relative z-10 h-full w-full">{children as ReactNode}</div>
+    </motion.div>
+  );
 }

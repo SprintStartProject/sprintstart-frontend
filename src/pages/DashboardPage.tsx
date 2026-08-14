@@ -90,17 +90,19 @@ export function DashboardPage() {
           transition={centralSpringToken}
         >
           <SpotlightCard roundedClassName="rounded-3xl">
-                    <DashboardHero
-                      greeting={greeting}
-                      displayName={displayName}
-                      formattedDate={formattedDate}
-                      formattedTime={formattedTime}
-                      profileIcon={profile?.profileIcon}
-                      fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName}
-                      seed={profile?.id}
-                    />
-                    </SpotlightCard>
-                  </motion.div>
+            <DashboardHero
+              greeting={greeting}
+              displayName={displayName}
+              formattedDate={formattedDate}
+              formattedTime={formattedTime}
+              profileIcon={profile?.profileIcon}
+              fallbackName={
+                profile ? `${profile.firstName} ${profile.lastName}`.trim() : displayName
+              }
+              seed={profile?.id}
+            />
+          </SpotlightCard>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -109,10 +111,10 @@ export function DashboardPage() {
           className="grid grid-cols-1 gap-5 lg:grid-cols-2"
         >
           <SpotlightCard roundedClassName="rounded-3xl">
-          <NextStepWidget />
+            <NextStepWidget />
           </SpotlightCard>
           <SpotlightCard roundedClassName="rounded-3xl">
-          <KnowledgeBaseWidget />
+            <KnowledgeBaseWidget />
           </SpotlightCard>
         </motion.div>
 
@@ -122,7 +124,7 @@ export function DashboardPage() {
           transition={{ ...centralSpringToken, delay: 0.16 }}
         >
           <SpotlightCard roundedClassName="rounded-3xl">
-          <QuickChatWidget />
+            <QuickChatWidget />
           </SpotlightCard>
         </motion.div>
 
@@ -132,7 +134,7 @@ export function DashboardPage() {
           transition={{ ...centralSpringToken, delay: 0.24 }}
         >
           <SpotlightCard roundedClassName="rounded-3xl">
-          <SkillsStrip />
+            <SkillsStrip />
           </SpotlightCard>
         </motion.div>
       </main>

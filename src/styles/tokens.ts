@@ -222,6 +222,6 @@ export const petPeekSpringToken: Transition = {
  * A smooth tween ease — not a spring, so it pairs well with CSS-only layers.
  */
 export const enterTransition: Transition = {
-    duration: 0.5,
-    ease: [0.22, 1, 0.36, 1],
+  duration: 0.5,
+  ease: [0.22, 1, 0.36, 1],
 };

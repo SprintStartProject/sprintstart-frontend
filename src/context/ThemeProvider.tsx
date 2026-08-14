@@ -68,7 +68,10 @@ function getInitialStyleMode(): StyleMode {
   }
   // Auto-activate classic mode when the OS has requested reduced motion,
   // with localStorage still taking priority (checked above).
-  if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
     return "classic";
   }
   return "ultra";
@@ -149,7 +152,9 @@ function getInitialTiltEnabled(): boolean {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
   const [styleMode, setStyleModeState] = useState<StyleMode>(() => getInitialStyleMode());
-  const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() => getInitialAuroraEnabled());
+  const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() =>
+    getInitialAuroraEnabled(),
+  );
   const [isTiltEnabled, setIsTiltEnabledState] = useState<boolean>(() => getInitialTiltEnabled());
 
   // Sync before paint to avoid a FOUC of the default light palette.

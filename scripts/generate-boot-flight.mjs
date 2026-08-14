@@ -52,12 +52,12 @@ const radius = LOOP_RATIO * distance;
 const xs = [];
 const ys = [];
 for (let step = 0; step <= FLIGHT_STEPS; step++) {
-    const s = smoothstep(step / FLIGHT_STEPS);
-    const angle = s * Math.PI * 2;
-    const along = radius * Math.sin(angle);
-    const across = radius * (1 - Math.cos(angle));
-    xs.push(dx * s + forwardX * along + perpX * across);
-    ys.push(dy * s + forwardY * along + perpY * across);
+  const s = smoothstep(step / FLIGHT_STEPS);
+  const angle = s * Math.PI * 2;
+  const along = radius * Math.sin(angle);
+  const across = radius * (1 - Math.cos(angle));
+  xs.push(dx * s + forwardX * along + perpX * across);
+  ys.push(dy * s + forwardY * along + perpY * across);
 }
 
 // Nose along the path, unwrapped, tipping in out of a resting angle of 0
@@ -65,15 +65,15 @@ for (let step = 0; step <= FLIGHT_STEPS; step++) {
 const rotate = [];
 let previous = null;
 for (let i = 0; i < xs.length; i++) {
-    const before = Math.max(0, i - 1);
-    const after = Math.min(xs.length - 1, i + 1);
-    let angle = bearing(xs[after] - xs[before], ys[after] - ys[before]);
-    if (previous !== null) angle += Math.round((previous - angle) / 360) * 360;
-    previous = angle;
+  const before = Math.max(0, i - 1);
+  const after = Math.min(xs.length - 1, i + 1);
+  let angle = bearing(xs[after] - xs[before], ys[after] - ys[before]);
+  if (previous !== null) angle += Math.round((previous - angle) / 360) * 360;
+  previous = angle;
 
-    const t = i / (xs.length - 1);
-    if (t < TIP_IN) angle *= t / TIP_IN;
-    rotate.push(angle);
+  const t = i / (xs.length - 1);
+  if (t < TIP_IN) angle *= t / TIP_IN;
+  rotate.push(angle);
 }
 
 // Screen space -> flight frame (the frame element carries rotate(ANGLE_DEG)).
@@ -83,17 +83,17 @@ const trim = (value) => String(Number(value.toFixed(4)));
 
 const lines = [];
 for (let i = 0; i <= FLIGHT_STEPS; i += EVERY) {
-    const u = trim(xs[i] * cos - ys[i] * sin);
-    const v = trim(xs[i] * sin + ys[i] * cos);
-    const local = (rotate[i] - ANGLE_DEG).toFixed(1).replace(/\.0$/, "");
-    const pct = String(Number(((i / FLIGHT_STEPS) * 100).toFixed(2)));
+  const u = trim(xs[i] * cos - ys[i] * sin);
+  const v = trim(xs[i] * sin + ys[i] * cos);
+  const local = (rotate[i] - ANGLE_DEG).toFixed(1).replace(/\.0$/, "");
+  const pct = String(Number(((i / FLIGHT_STEPS) * 100).toFixed(2)));
 
-    lines.push(
-        `        ${pct}% {\n` +
-            `          transform: translate(calc(${u} * var(--flight-d)), calc(${v} * var(--flight-d)))\n` +
-            `            rotate(${local}deg);\n` +
-            `        }`,
-    );
+  lines.push(
+    `        ${pct}% {\n` +
+      `          transform: translate(calc(${u} * var(--flight-d)), calc(${v} * var(--flight-d)))\n` +
+      `            rotate(${local}deg);\n` +
+      `        }`,
+  );
 }
 
 console.log(`      @keyframes boot-flight {\n${lines.join("\n")}\n      }`);
@@ -103,16 +103,16 @@ console.log(`      @keyframes boot-flight {\n${lines.join("\n")}\n      }`);
 let turning = 0;
 let heading = null;
 for (let i = 1; i < xs.length; i++) {
-    const stepX = xs[i] - xs[i - 1];
-    const stepY = ys[i] - ys[i - 1];
-    if (Math.hypot(stepX, stepY) < 1e-9) continue;
-    const angle = Math.atan2(stepY, stepX);
-    if (heading !== null) {
-        let delta = angle - heading;
-        while (delta > Math.PI) delta -= 2 * Math.PI;
-        while (delta < -Math.PI) delta += 2 * Math.PI;
-        turning += delta;
-    }
-    heading = angle;
+  const stepX = xs[i] - xs[i - 1];
+  const stepY = ys[i] - ys[i - 1];
+  if (Math.hypot(stepX, stepY) < 1e-9) continue;
+  const angle = Math.atan2(stepY, stepX);
+  if (heading !== null) {
+    let delta = angle - heading;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    turning += delta;
+  }
+  heading = angle;
 }
 console.error(`turning: ${((turning * 180) / Math.PI).toFixed(1)}deg (must be ~360)`);

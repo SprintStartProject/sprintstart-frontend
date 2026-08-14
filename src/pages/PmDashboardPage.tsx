@@ -30,37 +30,37 @@ export function PmDashboardPage() {
 
       <main className="app-page-frame space-y-5 py-6 lg:py-8">
         <SpotlightCard roundedClassName="rounded-2xl">
-        <IngestionStatusWidget />
-      </SpotlightCard>
+          <IngestionStatusWidget />
+        </SpotlightCard>
 
         <SpotlightCard roundedClassName="rounded-3xl">
-        <section className="p-4">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
-            <p className="text-sm text-app-text-muted">
-              Track the current status of your team and onboarding progress.
-            </p>
-          </div>
+          <section className="p-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
+              <p className="text-sm text-app-text-muted">
+                Track the current status of your team and onboarding progress.
+              </p>
+            </div>
 
-          <TeamManagementWidget projectId={selectedProjectId} />
-        </section>
-      </SpotlightCard>
+            <TeamManagementWidget projectId={selectedProjectId} />
+          </section>
+        </SpotlightCard>
 
         <SpotlightCard roundedClassName="rounded-3xl">
-        <section className="p-4">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-app-text">Insights</h2>
-            <p className="text-sm text-app-text-muted">
-              Frequently asked questions and onboarding knowledge gaps.
-            </p>
-          </div>
+          <section className="p-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-app-text">Insights</h2>
+              <p className="text-sm text-app-text-muted">
+                Frequently asked questions and onboarding knowledge gaps.
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <FaqWidget />
-            <KnowledgeGapWidget />
-          </div>
-        </section>
-      </SpotlightCard>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <FaqWidget />
+              <KnowledgeGapWidget />
+            </div>
+          </section>
+        </SpotlightCard>
       </main>
     </div>
   );

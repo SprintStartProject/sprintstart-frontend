@@ -40,7 +40,9 @@ describe("apiClient", () => {
 
     const result = await apiClient.fetch<{ ok: boolean }>("/api/v1/ping");
 
-    expect(mockKeycloakInstance.login).toHaveBeenCalled();
+    expect(mockKeycloakInstance.login).toHaveBeenCalledWith({
+      redirectUri: `${window.location.origin}/`,
+    });
     expect(result.ok).toBe(true);
   });
 
@@ -125,7 +127,9 @@ describe("apiClient", () => {
       name: "ApiError",
       status: 401,
     });
-    expect(mockKeycloakInstance.login).toHaveBeenCalled();
+    expect(mockKeycloakInstance.login).toHaveBeenCalledWith({
+      redirectUri: `${window.location.origin}/`,
+    });
   });
 
   it("throws ApiError with the response status and body for other non-OK responses", async () => {
