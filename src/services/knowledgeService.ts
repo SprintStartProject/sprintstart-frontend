@@ -76,52 +76,34 @@ export const knowledgeService = {
   },
 
   /**
-   * Fetches all unified artifacts for a specific project, merged with the
-   * authenticated user's personal uploads (mapped into the same Artifact shape).
+   * Fetches all unified artifacts for a specific project.
    *
    * @param projectId UUID of the project to scope the artifact listing.
-   * @returns Merged list of project-scoped artifacts and the user's uploads.
-   *
-   * @remarks Failure behavior: both downstream endpoints are best-effort. If the
-   * project artifacts endpoint or the personal-uploads endpoint fails, the error
-   * is logged via `console.warn` and the function returns whatever it could fetch
-   * (possibly an empty array) rather than throwing. This keeps the KB page usable
-   * while the ingestion service is still being rolled out.
-   *
-   * @remarks Known limitation: uploads are de-duplicated against project artifacts
-   * by `title` (filename) because the backend does not yet return `sourceId` for
-   * ingested artifacts. Two unrelated uploads sharing a filename will collide.
+   * @returns List of project-scoped artifacts.
+   * @throws ApiError when the backend request fails so callers can distinguish
+   *   between an empty project and a failed fetch.
    */
   async getUnifiedArtifacts(projectId: string): Promise<Artifact[]> {
     let artifacts: Artifact[] = [];
 
-    try {
-      interface PageResponse {
-        items: Artifact[];
-        page: {
-          totalPages: number;
-        };
-      }
-
-      let currentPage = 1;
-      let totalPages = 1;
-
-      while (currentPage <= totalPages) {
-        const response = await apiClient.fetch<PageResponse>(
-          `/api/v1/projects/${projectId}/artifacts?page=${currentPage}&size=100`,
-        );
-        artifacts = [...artifacts, ...(response.items || [])];
-        totalPages = response.page?.totalPages || 1;
-        currentPage++;
-      }
-    } catch (e) {
-      console.warn("Unified artifacts endpoint failed (expected if missing), continuing...", e);
+    interface PageResponse {
+      items: Artifact[];
+      page: {
+        totalPages: number;
+      };
     }
 
-    // Personal uploads are now fetched via the unified project artifacts
-    // endpoint above (the backend's GET /api/v1/uploads was changed to
-    // require a projectId query param and use JWT auth instead of the old
-    // uploaderId param, so the separate uploads fetch was removed).
+    let currentPage = 1;
+    let totalPages = 1;
+
+    while (currentPage <= totalPages) {
+      const response = await apiClient.fetch<PageResponse>(
+        `/api/v1/projects/${projectId}/artifacts?page=${currentPage}&size=100`,
+      );
+      artifacts = [...artifacts, ...(response.items || [])];
+      totalPages = response.page?.totalPages ?? 1;
+      currentPage++;
+    }
 
     return artifacts;
   },
@@ -316,7 +298,7 @@ export const knowledgeService = {
       new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
     );
 
-    await apiClient.fetch<void>(`/api/v1/uploads/${encodeURIComponent(artifactId)}`, {
+    await apiClient.fetch<void>(`/api/v1/uploads`, {
       method: "DELETE",
       body: formData,
     });

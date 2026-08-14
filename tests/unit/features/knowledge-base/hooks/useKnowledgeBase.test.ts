@@ -196,4 +196,84 @@ describe("useKnowledgeBase", () => {
     expect(result.current.isLoading).toBe(false);
     expect(result.current.artifacts).toHaveLength(0);
   });
+
+  it("resets artifacts and loading state when projectId transitions to null", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+      makeArtifact("a1", "first.md"),
+    ]);
+
+    const initialProps: { pid: string | null } = { pid: "proj-1" };
+    const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      initialProps,
+    });
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(1);
+    });
+
+    rerender({ pid: null });
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(0);
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.fetchError).toBeNull();
+    });
+  });
+
+  it("safely indexes paginatedArtifacts when totalPages decreases", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(25);
+    });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    expect(result.current.currentPage).toBe(2);
+    expect(result.current.paginatedArtifacts).toHaveLength(5);
+
+    // Switch tab to UPLOADS where there are 0 items
+    act(() => {
+      result.current.handleTabChange("UPLOADS");
+    });
+
+    expect(result.current.currentPage).toBe(1);
+    expect(result.current.paginatedArtifacts).toHaveLength(0);
+  });
+
+  it("resets currentPage to 1 when switching projectId", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+
+    const initialProps: { pid: string | null } = { pid: "proj-1" };
+    const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      initialProps,
+    });
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(25);
+    });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    expect(result.current.currentPage).toBe(2);
+
+    rerender({ pid: "proj-2" });
+
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(1);
+    });
+  });
 });

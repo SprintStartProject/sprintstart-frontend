@@ -35,7 +35,13 @@ export function useKnowledgeBase(projectId: string | null) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchArtifacts = useCallback(async () => {
-    if (!projectId) return;
+    setCurrentPage(1);
+    if (!projectId) {
+      setArtifacts([]);
+      setIsLoading(false);
+      setFetchError(null);
+      return;
+    }
     const generation = ++fetchGenerationRef.current;
     setIsLoading(true);
     setFetchError(null);
@@ -59,9 +65,9 @@ export function useKnowledgeBase(projectId: string | null) {
    * Depends on the authenticated user's projectId to fetch the correct project scope.
    */
   useEffect(() => {
-    // Defer to a microtask so setState calls happen outside the effect body
-    // (avoids the cascading-render smell flagged by react-hooks/set-state-in-effect).
-    void Promise.resolve().then(fetchArtifacts);
+    // Deferred to a microtask so synchronous setState calls at the top of
+    // fetchArtifacts do not run inside the effect body and cascade a render.
+    void Promise.resolve().then(() => fetchArtifacts());
   }, [fetchArtifacts]);
 
   const filteredArtifacts = useMemo(() => {
@@ -99,12 +105,13 @@ export function useKnowledgeBase(projectId: string | null) {
     });
   }, [artifacts, deferredSearchQuery, activeTab]);
 
-  const totalPages = Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
 
   const paginatedArtifacts = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const safePage = Math.min(currentPage, totalPages);
+    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredArtifacts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredArtifacts, currentPage]);
+  }, [filteredArtifacts, currentPage, totalPages]);
 
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);

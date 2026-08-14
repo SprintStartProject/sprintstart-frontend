@@ -4,28 +4,36 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeBasePage } from "../../../src/pages/KnowledgeBasePage";
 import type { Artifact } from "../../../src/features/knowledge-base/types";
+import type { ProjectContextValue } from "../../../src/features/projects/ProjectContext";
+import type { UserProfile } from "../../../src/services/types";
 
-vi.mock("../../../src/features/projects/useProjectContext", async () => {
-  const { createProjectContextValue, createSelectableProject } =
-    await import("../setup/projectContext");
-  const project = createSelectableProject({ id: "proj1" });
+const { mockProfileRef, mockUseProjectContext } = vi.hoisted(() => {
+  const profile: UserProfile = {
+    id: "user1",
+    authId: "auth1",
+    firstName: "Test",
+    lastName: "User",
+    email: "test@example.com",
+    username: "testuser",
+    permissionGroup: "USER",
+    projectRoles: [],
+    projectIds: ["p1"],
+    enabled: true,
+    profileIcon: null,
+    hasCompletedOnboarding: true,
+  };
   return {
-    useProjectContext: () =>
-      createProjectContextValue({
-        projects: [project],
-        selectedProject: project,
-        selectedProjectId: "proj1",
-        canManageSelected: true,
-      }),
+    mockProfileRef: { current: profile },
+    mockUseProjectContext: vi.fn<() => ProjectContextValue>(),
   };
 });
 
-const { mockProfile } = vi.hoisted(() => ({
-  mockProfile: { id: "user1", firstName: "Test", lastName: "User", projectIds: ["p1"] },
+vi.mock("../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => mockUseProjectContext(),
 }));
 
 vi.mock("../../../src/context/useAuth", () => ({
-  useAuth: () => ({ profile: mockProfile }),
+  useAuth: () => ({ profile: mockProfileRef.current }),
 }));
 
 const { mockGetUnifiedArtifacts } = vi.hoisted(() => ({
@@ -101,9 +109,22 @@ function makeArtifact(overrides: Partial<Artifact> = {}): Artifact {
 }
 
 describe("KnowledgeBasePage", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockGetUnifiedArtifacts.mockResolvedValue([]);
+
+    const { createProjectContextValue, createSelectableProject } =
+      await import("../setup/projectContext");
+    const project = createSelectableProject({ id: "proj1" });
+    mockUseProjectContext.mockReturnValue(
+      createProjectContextValue({
+        projects: [project],
+        selectedProject: project,
+        selectedProjectId: "proj1",
+        canManageSelected: true,
+        isLoading: false,
+      }),
+    );
   });
 
   it("renders the artifact list after loading artifacts", async () => {
@@ -119,6 +140,27 @@ describe("KnowledgeBasePage", () => {
     await waitFor(() => {
       expect(screen.getByText("readme.md")).toBeInTheDocument();
     });
+  });
+
+  it("shows loading spinner when project context is loading", async () => {
+    const { createProjectContextValue } = await import("../setup/projectContext");
+    mockUseProjectContext.mockReturnValue(
+      createProjectContextValue({
+        projects: [],
+        selectedProject: null,
+        selectedProjectId: "",
+        isLoading: true,
+      }),
+    );
+
+    const { container } = render(
+      <MemoryRouter>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    expect(screen.queryByText("No project available")).not.toBeInTheDocument();
   });
 
   it("no longer offers uploading here — that moved into the Add source wizard", async () => {
