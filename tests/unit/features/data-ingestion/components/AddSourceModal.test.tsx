@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { AddSourceModal } from "../../../../../src/features/data-ingestion/components/AddSourceModal";
+import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { server } from "../../../setup/vitest.setup";
 
 function renderModal(overrides: Partial<Parameters<typeof AddSourceModal>[0]> = {}) {
@@ -15,7 +16,9 @@ function renderModal(overrides: Partial<Parameters<typeof AddSourceModal>[0]> = 
     onConnected: vi.fn(),
     ...overrides,
   };
-  render(<AddSourceModal {...props} />);
+  // The connect request's own failures/successes are toasts now, so the modal
+  // needs a ToastProvider around it for those to mount.
+  render(<AddSourceModal {...props} />, { wrapper: ToastProvider });
   return props;
 }
 

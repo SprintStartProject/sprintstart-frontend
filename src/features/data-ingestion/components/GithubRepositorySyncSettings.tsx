@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
+import { useToast } from "../../../context/useToast.ts";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
 import type {
@@ -88,8 +89,11 @@ export function GithubRepositorySyncSettings({
     loadConfig ? "loading" : "idle",
   );
   const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
+  // `errorMessage` now only carries the *load* failure, which stays inline
+  // because the form has nothing to show without a config; save outcomes are
+  // surfaced as toasts.
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
   // Serialized snapshot of the last saved/loaded form values. Comparing the live
   // form against it is how the Save button knows whether there are unsaved
   // changes, so it can stay muted until the user actually edits something.
@@ -177,8 +181,6 @@ export function GithubRepositorySyncSettings({
 
   const saveSettings = async () => {
     setSaveState("loading");
-    setMessage(null);
-    setErrorMessage(null);
 
     try {
       const schedule = buildScheduleSpec({
@@ -214,10 +216,10 @@ export function GithubRepositorySyncSettings({
       }
 
       setSaveState("success");
-      setMessage("Sync settings saved.");
+      toast.success("Sync settings saved");
     } catch (error) {
       setSaveState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Failed to save sync config");
+      toast.error(error instanceof Error ? error.message : "Couldn't save the sync settings.");
     }
   };
 
@@ -241,12 +243,6 @@ export function GithubRepositorySyncSettings({
 
   return (
     <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
-      {message && (
-        <div className="mb-4 rounded-xl border border-app-success-border bg-app-success-bg px-3 py-2 text-sm text-app-success-text">
-          {message}
-        </div>
-      )}
-
       {errorMessage && (
         <div className="mb-4 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-2 text-sm text-app-warning-text">
           {errorMessage}
