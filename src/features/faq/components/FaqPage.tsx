@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
+import { useToast } from "../../../context/useToast";
 import { useFetch } from "../../../hooks/useFetch";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -26,7 +27,10 @@ export function FaqPage() {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const toast = useToast();
+  // Set when a manual refresh has kicked off a refetch, so the effect below can
+  // tell the user when a refresh they asked for still turned up nothing.
+  const pendingRefreshRef = useRef(false);
 
   const {
     data: overview,
@@ -39,19 +43,30 @@ export function FaqPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setRefreshError(null);
     try {
       await insightsService.refreshFAQGroups(selectedProjectId);
+      pendingRefreshRef.current = true;
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("FAQ refresh failed", err);
-      setRefreshError(
-        "Refresh failed. Is the AI service running and are there questions to group?",
-      );
+      toast.error("Refresh failed. Is the AI service running and are there questions to group?");
     } finally {
       setRefreshing(false);
     }
   };
+
+  // After a manual refresh finishes reloading, tell the user if it still found
+  // nothing to group — otherwise a click on Refresh with an empty result looks
+  // like it did nothing.
+  useEffect(() => {
+    if (loading || !pendingRefreshRef.current) return;
+    pendingRefreshRef.current = false;
+    if (overview && overview.groups.length === 0) {
+      toast.info("Nothing to group yet", {
+        description: "No recurring questions were found for this project.",
+      });
+    }
+  }, [loading, overview, toast]);
 
   const refreshButton = (
     <Button
@@ -81,9 +96,6 @@ export function FaqPage() {
           No FAQ groups yet. Trigger a refresh to generate them.
         </p>
         {refreshButton}
-        {refreshError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
-        )}
       </div>
     );
   }
@@ -126,7 +138,6 @@ export function FaqPage() {
             />
             {refreshButton}
           </div>
-          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
 
           {/* Statistics */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

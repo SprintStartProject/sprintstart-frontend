@@ -10,6 +10,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from "../types";
 import { preprocessMarkdown } from "../markdown";
 import { knowledgeService } from "../../../services/knowledgeService";
+import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient";
 import { SidePanel } from "../../../components/ui/SidePanel";
@@ -48,7 +49,6 @@ interface DrawerState {
   isIndexing: boolean;
   isDeleting: boolean;
   isConfirmDeleteOpen: boolean;
-  deleteError: string | null;
   stageDetail?: string;
   error: string | null;
 }
@@ -68,8 +68,7 @@ type DrawerAction =
   | { type: "showRaw" }
   | { type: "deleteStart" }
   | { type: "deleteSuccess" }
-  | { type: "deleteError"; error: string }
-  | { type: "clearDeleteError" }
+  | { type: "deleteFailed" }
   | { type: "openDeleteConfirm" }
   | { type: "closeDeleteConfirm" };
 
@@ -83,7 +82,6 @@ const initialState: DrawerState = {
   isIndexing: false,
   isDeleting: false,
   isConfirmDeleteOpen: false,
-  deleteError: null,
   stageDetail: undefined,
   error: null,
 };
@@ -124,15 +122,13 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
     case "showRaw":
       return { ...state, viewMode: "raw" };
     case "deleteStart":
-      return { ...state, isDeleting: true, deleteError: null };
+      return { ...state, isDeleting: true };
     case "deleteSuccess":
-      return { ...state, isDeleting: false, deleteError: null };
-    case "deleteError":
-      return { ...state, isDeleting: false, deleteError: action.error };
-    case "clearDeleteError":
-      return { ...state, deleteError: null };
+      return { ...state, isDeleting: false };
+    case "deleteFailed":
+      return { ...state, isDeleting: false };
     case "openDeleteConfirm":
-      return { ...state, isConfirmDeleteOpen: true, deleteError: null };
+      return { ...state, isConfirmDeleteOpen: true };
     case "closeDeleteConfirm":
       return { ...state, isConfirmDeleteOpen: false };
     default:
@@ -242,6 +238,7 @@ export function ArtifactViewerDrawer({
 }: ArtifactViewerDrawerProps) {
   const { profile } = useAuth();
   const [state, dispatch] = useReducer(drawerReducer, initialState);
+  const toast = useToast();
 
   const abortRef = useRef<AbortController | null>(null);
   // Bumped each time the user switches artifact or unmounts. Long-running
@@ -405,7 +402,6 @@ export function ArtifactViewerDrawer({
     isIndexing,
     isDeleting,
     isConfirmDeleteOpen,
-    deleteError,
     stageDetail,
     error,
   } = state;
@@ -432,15 +428,12 @@ export function ArtifactViewerDrawer({
     if (!artifact) return;
     const removerId = profile?.id;
     if (!removerId) {
-      dispatch({ type: "deleteError", error: "Could not resolve authenticated user id." });
+      toast.error("Could not resolve the authenticated user id.");
       return;
     }
     const uploadArtifactId = artifact.sourceId;
     if (!uploadArtifactId) {
-      dispatch({
-        type: "deleteError",
-        error: "Cannot resolve the uploaded artifact id for deletion.",
-      });
+      toast.error("Couldn't resolve the uploaded artifact id for deletion.");
       return;
     }
 
@@ -450,9 +443,13 @@ export function ArtifactViewerDrawer({
       dispatch({ type: "deleteSuccess" });
       dispatch({ type: "closeDeleteConfirm" });
       onDelete(artifact.id);
+      toast.success("Artifact deleted");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to delete artifact";
-      dispatch({ type: "deleteError", error: message });
+      // Reset the deleting state (the reducer clears the flag) and surface the
+      // reason as a toast; the confirm dialog stays open for a retry.
+      const message = err instanceof Error ? err.message : "Couldn't delete the artifact.";
+      dispatch({ type: "deleteFailed" });
+      toast.error(message);
     }
   };
 
@@ -652,16 +649,6 @@ export function ArtifactViewerDrawer({
         description={`This will permanently remove "${artifact?.title ?? "this artifact"}" and its indexed content. This cannot be undone.`}
         size="sm"
       >
-        {deleteError && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-4 rounded-lg border border-app-danger-border bg-app-danger-bg p-3 text-sm text-app-danger-text"
-            data-testid="delete-error-banner"
-          >
-            {deleteError}
-          </div>
-        )}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
