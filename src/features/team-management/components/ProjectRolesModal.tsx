@@ -5,6 +5,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { Modal } from "../../../components/ui/Modal";
+import { useToast } from "../../../context/useToast";
 import {
   createProjectRole,
   createSkill,
@@ -31,6 +32,7 @@ export function ProjectRolesModal({ open, onClose }: ProjectRolesModalProps) {
   const [skillName, setSkillName] = useState("");
   const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
   const [deleteSkillId, setDeleteSkillId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (!open) return;
@@ -48,69 +50,94 @@ export function ProjectRolesModal({ open, onClose }: ProjectRolesModalProps) {
   async function handleCreateRole() {
     if (!roleName.trim()) return;
 
-    const newRole = await createProjectRole(roleName.trim(), roleDescription.trim());
+    try {
+      const newRole = await createProjectRole(roleName.trim(), roleDescription.trim());
 
-    setRoles((current) => [...current, newRole]);
-    setSelectedRole(newRole);
-    setRoleName("");
-    setRoleDescription("");
+      setRoles((current) => [...current, newRole]);
+      setSelectedRole(newRole);
+      setRoleName("");
+      setRoleDescription("");
+      toast.success("Role created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't create the role.");
+    }
   }
 
   async function handleCreateSkill() {
     if (!selectedRole || !skillName.trim()) return;
 
-    const newSkill = await createSkill(skillName.trim(), [selectedRole.id]);
+    try {
+      const newSkill = await createSkill(skillName.trim(), [selectedRole.id]);
 
-    setSkills((current) => {
-      const exists = current.some((s) => s.id === newSkill.id);
+      setSkills((current) => {
+        const exists = current.some((s) => s.id === newSkill.id);
 
-      return exists
-        ? current.map((s) => (s.id === newSkill.id ? newSkill : s))
-        : [...current, newSkill];
-    });
+        return exists
+          ? current.map((s) => (s.id === newSkill.id ? newSkill : s))
+          : [...current, newSkill];
+      });
 
-    setSkillName("");
+      setSkillName("");
+      toast.success("Skill added");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't add the skill.");
+    }
   }
 
   async function confirmDeleteRole() {
     if (!deleteRoleId) return;
 
-    await deleteProjectRole(deleteRoleId);
-
-    setRoles((current) => current.filter((role) => role.id !== deleteRoleId));
-
-    setSkills((current) =>
-      current.map((skill) => ({
-        ...skill,
-        roleIds: skill.roleIds.filter((roleId) => roleId !== deleteRoleId),
-      })),
-    );
-
-    if (selectedRole?.id === deleteRoleId) {
-      setSelectedRole(null);
-    }
-
+    const roleId = deleteRoleId;
     setDeleteRoleId(null);
+
+    try {
+      await deleteProjectRole(roleId);
+
+      setRoles((current) => current.filter((role) => role.id !== roleId));
+
+      setSkills((current) =>
+        current.map((skill) => ({
+          ...skill,
+          roleIds: skill.roleIds.filter((id) => id !== roleId),
+        })),
+      );
+
+      if (selectedRole?.id === roleId) {
+        setSelectedRole(null);
+      }
+      toast.success("Role deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't delete the role.");
+    }
   }
 
   async function handleReactivateSkill(skill: Skill) {
-    const updated = await reactivateSkill(skill.id, skill.name, skill.roleIds);
+    try {
+      const updated = await reactivateSkill(skill.id, skill.name, skill.roleIds);
 
-    setSkills((current) => current.map((s) => (s.id === skill.id ? updated : s)));
+      setSkills((current) => current.map((s) => (s.id === skill.id ? updated : s)));
+      toast.success("Skill reactivated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't reactivate the skill.");
+    }
   }
 
   async function confirmDeleteSkill() {
     if (!deleteSkillId) return;
 
-    await deleteSkill(deleteSkillId);
-
-    setSkills((current) =>
-      current.map((skill) =>
-        skill.id === deleteSkillId ? { ...skill, status: "RETIRED" } : skill,
-      ),
-    );
-
+    const skillId = deleteSkillId;
     setDeleteSkillId(null);
+
+    try {
+      await deleteSkill(skillId);
+
+      setSkills((current) =>
+        current.map((skill) => (skill.id === skillId ? { ...skill, status: "RETIRED" } : skill)),
+      );
+      toast.success("Skill retired");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't retire the skill.");
+    }
   }
 
   const selectedRoleSkills = selectedRole
