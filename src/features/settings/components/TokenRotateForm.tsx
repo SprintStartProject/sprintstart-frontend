@@ -54,14 +54,14 @@ export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps
       try {
         await updateGithubPat(name, trimmed);
       } catch (mutationError) {
-        toast.error(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
+        // Token errors (bad format) belong at the field, not in a toast.
+        setError(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
         return;
       }
       try {
         await onSaved();
       } catch (refreshError) {
-        toast.warning(describeRefreshFailure(refreshError));
-        onClose();
+        setError(describeRefreshFailure(refreshError));
         return;
       }
       toast.success("GitHub token rotated");

@@ -21,8 +21,9 @@ type TokenAddFormProps = {
 export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
-  // `error` now holds only the client-side format check, which stays inline at
-  // the field; server and refresh outcomes are surfaced as toasts.
+  // `error` holds the inline messages shown next to the inputs: the client-side
+  // format check and the post-save refresh failure. Server-side mutation
+  // failures (e.g. a name clash) are surfaced as toasts instead.
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
@@ -56,19 +57,15 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
       try {
         await addGithubPat(trimmedName, trimmedToken);
       } catch (mutationError) {
-        // Keep the form open so the user can correct the input (e.g. a name
-        // clash); the reason rides along in an error toast.
-        toast.error(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
+        // Server-side failures (e.g. a name clash) surface as a toast; the
+        // inline error is reserved for the client-side format check above.
+        toast.error(parseApiError(mutationError, "Failed to add GitHub token."));
         return;
       }
-      // Mutation succeeded — the server state is correct, so close either way.
-      // A failed refetch is a warning (saved, but the list is stale), not a
-      // failure of the action.
       try {
         await onSaved();
       } catch (refreshError) {
-        toast.warning(describeRefreshFailure(refreshError));
-        onClose();
+        setError(describeRefreshFailure(refreshError));
         return;
       }
       toast.success("GitHub token added");
