@@ -11,7 +11,6 @@ const defaultProps = {
   estimatedMinutes: "30",
   tasks: [{ title: "", description: "" }],
   addingStep: false,
-  errorMessage: "",
   onTitleChange: vi.fn(),
   onDescriptionChange: vi.fn(),
   onExpectedOutcomeChange: vi.fn(),
@@ -110,11 +109,6 @@ describe("AddCustomStepModal", () => {
     render(<AddCustomStepModal {...defaultProps} tasks={[{ title: "T1", description: "" }]} />);
 
     expect(screen.queryByRole("button", { name: /Remove task \d/ })).not.toBeInTheDocument();
-  });
-
-  it("shows the error message when provided", () => {
-    render(<AddCustomStepModal {...defaultProps} errorMessage="Something went wrong" />);
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
   });
 
   it('shows the "Adding..." label when addingStep is true', () => {

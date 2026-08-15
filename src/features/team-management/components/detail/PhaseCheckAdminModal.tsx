@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from "react";
 import { Modal } from "../../../../components/ui/Modal";
+import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
 import type {
   AdminPhaseCheckQuestionEndpoint,
@@ -161,8 +162,10 @@ export function PhaseCheckAdminModal({
   const [attempts, setAttempts] = useState<PhaseCheckAttemptsReviewEndpoint | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // `saveError` now only carries the inline draft validation; the save request's
+  // own outcome is a toast.
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const toast = useToast();
 
   // Both tabs need the questions: the editor edits them, the results tab joins them
   // onto the attempts, which only carry question ids.
@@ -200,10 +203,10 @@ export function PhaseCheckAdminModal({
       const saved = await onboardingService.savePhaseCheck(phaseId, toPayload(drafts));
       setQuestions(saved.questions);
       setDrafts(saved.questions.map(toDraft));
-      setSavedAt(Date.now());
       onSaved();
+      toast.success("Questions saved");
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Unknown error");
+      toast.error(err instanceof Error ? err.message : "Couldn't save the questions.");
     } finally {
       setSaving(false);
     }
@@ -259,7 +262,6 @@ export function PhaseCheckAdminModal({
       {questions && tab === "questions" && (
         <QuestionsEditor
           drafts={drafts}
-          savedAt={savedAt}
           saveError={saveError}
           onUpdate={updateDraft}
           onRemove={(key) => setDrafts((current) => current.filter((draft) => draft.key !== key))}
@@ -384,14 +386,12 @@ function ResultsTab({
 
 function QuestionsEditor({
   drafts,
-  savedAt,
   saveError,
   onUpdate,
   onRemove,
   onAdd,
 }: {
   drafts: QuestionDraft[];
-  savedAt: number | null;
   saveError: string | null;
   onUpdate: (key: string, patch: Partial<QuestionDraft>) => void;
   onRemove: (key: string) => void;
@@ -538,12 +538,6 @@ function QuestionsEditor({
         <p className="flex items-center gap-2 text-sm text-app-danger-solid">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {saveError}
-        </p>
-      )}
-      {savedAt !== null && !saveError && (
-        <p className="flex items-center gap-2 text-sm text-app-success-text">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          Questions saved.
         </p>
       )}
     </div>
