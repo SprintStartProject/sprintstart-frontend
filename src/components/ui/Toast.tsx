@@ -222,7 +222,7 @@ export function ToastViewport({
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <ol aria-live="polite" aria-label="Notifications" className={VIEWPORT_CLASSES}>
+    <ol aria-label="Notifications" className={VIEWPORT_CLASSES}>
       <AnimatePresence initial={false}>
         {toasts.map((toast) => (
           <ToastCard key={toast.id} toast={toast} onDismiss={onDismiss} />
