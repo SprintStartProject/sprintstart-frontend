@@ -173,7 +173,9 @@ export function AddSourceModal({
       }
 
       setConnectState("idle");
-      toast.success("Sources connected");
+      toast.success("Sources connected", {
+        description: "Initial ingestion is running in the background.",
+      });
       onConnected();
       onClose();
     } catch (error) {
@@ -234,7 +236,9 @@ export function AddSourceModal({
       });
 
       setConnectState("idle");
-      toast.success("Repository connected");
+      toast.success("Repository connected", {
+        description: "Initial ingestion is running in the background.",
+      });
       onConnected();
       onClose();
     } catch (error) {
@@ -308,7 +312,9 @@ export function AddSourceModal({
       });
 
       setConnectState("idle");
-      toast.success("Jira instance connected");
+      toast.success("Jira instance connected", {
+        description: "Initial ingestion is running in the background.",
+      });
       onConnected();
       onClose();
     } catch (error) {

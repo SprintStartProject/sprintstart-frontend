@@ -56,6 +56,7 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
 import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/ingestionService.ts";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import {
   configureAllGithubRepositories,
@@ -430,13 +431,15 @@ export function DataIngestionPage() {
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
   const [syncSettingsProvider, setSyncSettingsProvider] = useState<SyncSettingsProvider>("github");
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
-  const [connectSuccessMessage, setConnectSuccessMessage] = useState<string | null>(null);
   const [pollingUntil, setPollingUntil] = useState<number | null>(null);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [connectorsLoadingState, setConnectorsLoadingState] = useState<LoadingState>("idle");
+  // Kept for the connectors *load* failure (shown inline in the connectors
+  // modal); the enable/disable toggle reports its outcome via a toast.
   const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<string | null>(null);
   const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
   const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(null);
+  const toast = useToast();
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
@@ -881,24 +884,28 @@ export function DataIngestionPage() {
     }
   }, [connectorsLoadingState, hasLoadedConnectors, loadConnectors]);
 
-  const handleToggleConnectorEnabled = useCallback(async (connector: ConnectorListItem) => {
-    setTogglingConnectorId(connector.id);
-    setConnectorsErrorMessage(null);
+  const handleToggleConnectorEnabled = useCallback(
+    async (connector: ConnectorListItem) => {
+      setTogglingConnectorId(connector.id);
 
-    try {
-      const response = await connectorService.setConnectorEnabled(connector.id, !connector.enabled);
+      try {
+        const response = await connectorService.setConnectorEnabled(
+          connector.id,
+          !connector.enabled,
+        );
 
-      setConnectors((current) =>
-        current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
-      );
-    } catch (error) {
-      setConnectorsErrorMessage(
-        error instanceof Error ? error.message : "Failed to update connector",
-      );
-    } finally {
-      setTogglingConnectorId(null);
-    }
-  }, []);
+        setConnectors((current) =>
+          current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
+        );
+        toast.success(connector.enabled ? "Connector disabled" : "Connector enabled");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't update the connector.");
+      } finally {
+        setTogglingConnectorId(null);
+      }
+    },
+    [toast],
+  );
 
   const handleToggleConnectorSources = useCallback((connector: ConnectorListItem) => {
     setSelectedConnectorId((current) => (current === connector.id ? null : connector.id));
@@ -928,12 +935,11 @@ export function DataIngestionPage() {
   };
 
   // Runs after the wizard connects a source (GitHub repositories or a Jira
-  // instance): surface a success message, kick the polling window and refresh
-  // the page's data.
+  // instance): kick the polling window and refresh the page's data (the modal
+  // owns the confirming toast).
   const handleDiscoveryConnected = useCallback(() => {
-    setConnectSuccessMessage(
-      `Selected sources are connecting to ${selectedProject?.name ?? "the project"}. Initial ingestion is running in the background.`,
-    );
+    // The Add-source modal owns the "connected" toast; this only starts the
+    // polling window and jumps to the sources list.
     setPollingUntil(Date.now() + 60000);
     setActiveSection("sources");
 
@@ -947,27 +953,25 @@ export function DataIngestionPage() {
       void reloadSourceStatuses();
       setProjectDataVersion((version) => version + 1);
     }, 1500);
-  }, [loadData, reloadSourceStatuses, reloadProjects, selectedProject]);
+  }, [loadData, reloadSourceStatuses, reloadProjects]);
 
   // Shared post-update refresh: polling window + an immediate and a delayed
   // reload, so a just-started run appears without a manual refresh.
-  const refreshAfterUpdate = useCallback(
-    (startedMessage: string) => {
-      setPollingUntil(Date.now() + 60000);
-      setConnectSuccessMessage(startedMessage);
+  const refreshAfterUpdate = useCallback(() => {
+    // The drawer that triggers the update owns the "Update started" toast, so
+    // this only kicks the polling window and refreshes the page data.
+    setPollingUntil(Date.now() + 60000);
 
-      void Promise.all([loadData(false), reloadSourceStatuses()]).then(() =>
-        setProjectDataVersion((version) => version + 1),
-      );
+    void Promise.all([loadData(false), reloadSourceStatuses()]).then(() =>
+      setProjectDataVersion((version) => version + 1),
+    );
 
-      window.setTimeout(() => {
-        void loadData(false);
-        void reloadSourceStatuses();
-        setProjectDataVersion((version) => version + 1);
-      }, 1500);
-    },
-    [loadData, reloadSourceStatuses],
-  );
+    window.setTimeout(() => {
+      void loadData(false);
+      void reloadSourceStatuses();
+      setProjectDataVersion((version) => version + 1);
+    }, 1500);
+  }, [loadData, reloadSourceStatuses]);
 
   const handleUpdateSource = useCallback(
     async (source: DataSource) => {
@@ -979,7 +983,7 @@ export function DataIngestionPage() {
         await updateJiraInstance({
           instanceUrl: source.jiraInstance.instanceUrl,
         });
-        refreshAfterUpdate(`Update for ${source.name} started.`);
+        refreshAfterUpdate();
         return;
       }
 
@@ -988,7 +992,7 @@ export function DataIngestionPage() {
       }
 
       await updateGithubRepository(source.githubRepository);
-      refreshAfterUpdate(`Update for ${source.githubRepository.fullName} started.`);
+      refreshAfterUpdate();
     },
     [refreshAfterUpdate],
   );
@@ -1097,9 +1101,6 @@ export function DataIngestionPage() {
         await removeJiraInstanceFromProject(source.jiraInstance.instanceUrl, selectedProjectId);
 
         setSelectedSourceId(null);
-        setConnectSuccessMessage(
-          `${source.name} was removed from ${selectedProject?.name ?? "the project"}.`,
-        );
         await refreshSourceDetails();
         return;
       }
@@ -1113,12 +1114,9 @@ export function DataIngestionPage() {
       await removeRepositoryFromProject(repositoryId, selectedProjectId);
 
       setSelectedSourceId(null);
-      setConnectSuccessMessage(
-        `${source.githubRepository?.fullName ?? "Repository"} was removed from ${selectedProject?.name ?? "the project"}.`,
-      );
       await refreshSourceDetails();
     },
-    [refreshSourceDetails, selectedProject?.name, selectedProjectId],
+    [refreshSourceDetails, selectedProjectId],
   );
 
   const isLoading = loadingState === "loading";
@@ -1197,20 +1195,6 @@ export function DataIngestionPage() {
             {projectSourcesErrorMessage && (
               <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-5 py-4 text-sm text-app-warning-text">
                 {projectSourcesErrorMessage}
-              </div>
-            )}
-
-            {connectSuccessMessage && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-app-success-border bg-app-success-bg px-5 py-4 text-sm text-app-success-text sm:flex-row sm:items-center sm:justify-between">
-                <p>{connectSuccessMessage}</p>
-
-                <button
-                  type="button"
-                  onClick={() => setConnectSuccessMessage(null)}
-                  className="self-start rounded-lg px-2 py-1 text-xs font-semibold transition hover:bg-app-surface sm:self-auto"
-                >
-                  Dismiss
-                </button>
               </div>
             )}
 
