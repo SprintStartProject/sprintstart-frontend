@@ -1,9 +1,12 @@
+import { FileText, X } from "lucide-react";
+import { Button } from "../../../../../components/ui/Button";
 import {
   GithubRepositoryDiscovery,
   type DiscoverySelection,
 } from "../../../../data-ingestion/components/GithubRepositoryDiscovery";
 import { JiraConnectStep } from "../../../../data-ingestion/components/JiraConnectStep";
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
+import { FileUploadZone } from "../../../../knowledge-base/components/FileUploadZone";
 import type { SourceSystem } from "../../../../data-ingestion/types";
 import type { JiraCredentialsDto } from "../../../../../services/sources/jiraService";
 
@@ -35,20 +38,68 @@ type JiraDetailProps = {
   onSubmit: () => void;
 };
 
+/** Upload detail — files are staged in memory and uploaded during provisioning. */
+type UploadDetailProps = {
+  files: File[];
+  /** Appends the newly selected/dropped valid files to the staged list. */
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (index: number) => void;
+};
+
 type AddSourceFlowProps = {
   step: AddSourceStep;
   selectedType: SourceSystem;
   /**
-   * The source types that can actually be staged here. Jira and Upload still
-   * render in the grid (with a "Soon" badge) when not listed, so the shape of
-   * the flow does not change as later phases enable them.
+   * The source types that can actually be staged here. Any type not listed
+   * still renders in the grid (with a "Soon" badge), so the shape of the flow
+   * does not change as later phases enable them.
    */
   availableTypes: SourceSystem[];
   onSelectType: (type: SourceSystem) => void;
   isBusy?: boolean;
   github: GithubDetailProps;
   jira: JiraDetailProps;
+  upload: UploadDetailProps;
 };
+
+/** The staged-files detail screen for an upload source. */
+function UploadDetail({ files, onAddFiles, onRemoveFile }: UploadDetailProps) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm font-medium text-app-text">Upload documentation</p>
+        <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
+          Files are staged now and uploaded right after the project is created.
+        </p>
+      </div>
+
+      <FileUploadZone onUpload={onAddFiles} isUploading={false} />
+
+      {files.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {files.map((file, index) => (
+            <li
+              key={`${file.name}-${index}`}
+              className="flex items-center gap-2 rounded-full border border-app-border bg-app-surface px-3 py-1 text-xs text-app-text"
+            >
+              <FileText className="h-3.5 w-3.5 shrink-0 text-app-text-muted" />
+              <span className="max-w-[16rem] truncate">{file.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => onRemoveFile(index)}
+                aria-label={`Remove ${file.name}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * The "Add source" sub-flow shown inside the wizard's Sources step: a type grid
@@ -68,6 +119,7 @@ export function AddSourceFlow({
   isBusy = false,
   github,
   jira,
+  upload,
 }: AddSourceFlowProps) {
   if (step === "type") {
     return (
@@ -102,7 +154,17 @@ export function AddSourceFlow({
     );
   }
 
-  // GitHub detail. Upload arrives in a later phase and slots in here.
+  if (selectedType === "UPLOAD") {
+    return (
+      <UploadDetail
+        files={upload.files}
+        onAddFiles={upload.onAddFiles}
+        onRemoveFile={upload.onRemoveFile}
+      />
+    );
+  }
+
+  // GitHub detail.
   return (
     <GithubRepositoryDiscovery
       tokenNames={github.tokenNames}

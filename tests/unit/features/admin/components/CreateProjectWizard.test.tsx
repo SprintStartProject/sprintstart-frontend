@@ -31,6 +31,10 @@ vi.mock("../../../../../src/services/sources/jiraService", () => ({
   getMyJiraCredentials: vi.fn(),
 }));
 
+vi.mock("../../../../../src/services/knowledgeService", () => ({
+  knowledgeService: { uploadDocuments: vi.fn() },
+}));
+
 import { projectService } from "../../../../../src/services/projectService";
 import {
   addRepositoryToProject,
@@ -41,6 +45,7 @@ import {
   connectJiraInstance,
   getMyJiraCredentials,
 } from "../../../../../src/services/sources/jiraService";
+import { knowledgeService } from "../../../../../src/services/knowledgeService";
 import { getIngestionSourceStatuses } from "../../../../../src/services/ingestionService";
 
 const createdProject: AdminProjectDetails = {
@@ -180,6 +185,9 @@ describe("CreateProjectWizard", () => {
     vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
     vi.mocked(getMyJiraCredentials).mockResolvedValue([
       { userEmail: "me@example.com", displayName: "Team token" },
+    ]);
+    vi.mocked(knowledgeService.uploadDocuments).mockResolvedValue([
+      { filename: "spec.md", status: "success" },
     ]);
   });
 
@@ -442,6 +450,32 @@ describe("CreateProjectWizard", () => {
     expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith(
       expect.objectContaining({ url: "https://acme.atlassian.net", projectId: "proj-new" }),
     );
+  });
+
+  it("stages uploaded files and uploads them against the new project on Create", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes manually uploaded/i }));
+
+    const file = new File(["hello"], "spec.md", { type: "text/markdown" });
+    await user.upload(screen.getByTestId("file-input"), file);
+
+    // The staged file is listed before anything is uploaded.
+    expect(screen.getByText("spec.md")).toBeInTheDocument();
+    expect(vi.mocked(knowledgeService.uploadDocuments)).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(knowledgeService.uploadDocuments)).toHaveBeenCalledWith("proj-new", [file]),
+    );
+    // Uploads run only after the project exists.
+    expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
   });
 
   it("does not create the project when cancelled on the first step", async () => {

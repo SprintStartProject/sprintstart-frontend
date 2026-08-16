@@ -14,6 +14,7 @@ import {
   connectDraftSources,
   createDraftSourceFromDiscovery,
   createJiraDraft,
+  createUploadDraft,
   hasFailedSources,
   removeDraftSource,
   type DraftSource,
@@ -55,9 +56,8 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   review: 3,
 };
 
-// GitHub and Jira can be staged; Upload still renders in the type grid (as
-// "Soon") and is wired in the following phase.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA"];
+// All three connectors can now be staged from the add-source sub-flow.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -104,6 +104,10 @@ export function CreateProjectWizard({
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
+
+  // Upload files staged in memory; uploaded during provisioning once a project
+  // id exists.
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
 
   const [createdProjectId, setCreatedProjectId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -182,6 +186,7 @@ export function CreateProjectWizard({
     setAddType("GITHUB");
     setGithubSelection([]);
     resetJiraDraftFields();
+    setUploadFiles([]);
     setCreatedProjectId("");
   };
 
@@ -189,6 +194,12 @@ export function CreateProjectWizard({
     setJiraDisplayName("");
     setJiraUrl("");
     setJiraCredentialName("");
+  };
+
+  const resetSourceDraftFields = () => {
+    setGithubSelection([]);
+    resetJiraDraftFields();
+    setUploadFiles([]);
   };
 
   const closeWizard = () => {
@@ -222,8 +233,7 @@ export function CreateProjectWizard({
   // --- Add-source sub-flow ---
 
   const openAddSource = () => {
-    setGithubSelection([]);
-    resetJiraDraftFields();
+    resetSourceDraftFields();
     setAddType("GITHUB");
     setAddStep("type");
     setAddFlowKey((key) => key + 1);
@@ -232,8 +242,7 @@ export function CreateProjectWizard({
 
   const closeAddSource = () => {
     setIsAddingSource(false);
-    setGithubSelection([]);
-    resetJiraDraftFields();
+    resetSourceDraftFields();
   };
 
   const handleSelectAddType = (type: SourceSystem) => {
@@ -246,8 +255,7 @@ export function CreateProjectWizard({
 
   const backToTypeGrid = () => {
     setAddStep("type");
-    setGithubSelection([]);
-    resetJiraDraftFields();
+    resetSourceDraftFields();
   };
 
   const selectedJiraCredential = jiraCredentials.find(
@@ -259,7 +267,9 @@ export function CreateProjectWizard({
       ? githubSelection.length > 0
       : addType === "JIRA"
         ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
-        : false;
+        : addType === "UPLOAD"
+          ? uploadFiles.length > 0
+          : false;
 
   const commitAddSource = () => {
     if (!canAddSource) return;
@@ -284,6 +294,9 @@ export function CreateProjectWizard({
           }),
         ),
       );
+    } else if (addType === "UPLOAD") {
+      const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
+      setSources((current) => addDraftSource(current, createUploadDraft(displayName, uploadFiles)));
     }
 
     closeAddSource();
@@ -559,6 +572,12 @@ export function CreateProjectWizard({
               onUrlChange: setJiraUrl,
               onCredentialNameChange: setJiraCredentialName,
               onSubmit: commitAddSource,
+            }}
+            upload={{
+              files: uploadFiles,
+              onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
+              onRemoveFile: (index) =>
+                setUploadFiles((current) => current.filter((_, position) => position !== index)),
             }}
           />
         ) : (
