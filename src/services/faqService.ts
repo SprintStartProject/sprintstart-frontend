@@ -1,5 +1,10 @@
 import { apiClient } from "./apiClient";
-import type { FAQOverview, FAQDetail, FAQRebuildScope } from "../features/faq/types";
+import type {
+  FAQOverview,
+  FAQDetail,
+  FAQRebuildScope,
+  FAQRebuildPreview,
+} from "../features/faq/types";
 import faqMock from "../mocks/faqMock.json";
 import faqDetailMock from "../mocks/faqDetailMock.json";
 
@@ -40,6 +45,24 @@ export const insightsService = {
   },
 
   /**
+   * Asks how much material a rebuild would have, per time window.
+   *
+   * Errors propagate: the caller uses this to describe a destructive action, and
+   * guessing the numbers would be worse than showing none.
+   */
+  async fetchRebuildPreview(
+    projectId: string,
+    windowsInDays: number[],
+  ): Promise<FAQRebuildPreview> {
+    const params = new URLSearchParams({ projectId });
+    windowsInDays.forEach((days) => params.append("sinceDays", String(days)));
+
+    return await apiClient.fetch<FAQRebuildPreview>(
+      `/api/v1/insights/faq/rebuild-preview?${params.toString()}`,
+    );
+  },
+
+  /**
    * Triggers the backend to regroup the project's questions from scratch.
    *
    * Destructive: it replaces the stored entries, so anything outside `scope` is
@@ -57,8 +80,8 @@ export const insightsService = {
     if (scope.questionLimit !== undefined) {
       params.set("questionLimit", String(scope.questionLimit));
     }
-    if (scope.sinceMonths !== undefined) {
-      params.set("sinceMonths", String(scope.sinceMonths));
+    if (scope.sinceDays !== undefined) {
+      params.set("sinceDays", String(scope.sinceDays));
     }
 
     return await apiClient.fetch<{ groupCount: number }>(

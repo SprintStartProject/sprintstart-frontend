@@ -80,8 +80,7 @@ export function FaqPage() {
   const rebuildDialog = (
     <RebuildFaqDialog
       isOpen={isRebuildDialogOpen}
-      questionCount={overview?.questionCount}
-      questionLimit={overview?.rebuildQuestionLimit}
+      projectId={selectedProjectId}
       isRebuilding={rebuilding}
       errorMessage={rebuildError}
       onClose={() => setRebuildDialogOpen(false)}

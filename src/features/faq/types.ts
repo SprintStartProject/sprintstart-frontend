@@ -57,7 +57,20 @@ export interface FAQOverview {
  */
 export interface FAQRebuildScope {
   questionLimit?: number;
-  sinceMonths?: number;
+  sinceDays?: number;
+}
+
+/** How many questions a rebuild scoped to one window would send — already capped. */
+export interface FAQRebuildWindow {
+  sinceDays: number;
+  questionCount: number;
+}
+
+export interface FAQRebuildPreview {
+  /** Questions asked in the project, over all time and uncapped. */
+  totalQuestionCount: number;
+  rebuildQuestionLimit: number;
+  windows: FAQRebuildWindow[];
 }
 
 // ── FAQ DETAIL ──────────────────────────────────────────────

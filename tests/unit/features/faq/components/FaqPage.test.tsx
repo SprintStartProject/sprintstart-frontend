@@ -35,7 +35,11 @@ vi.mock("../../../../../src/hooks/useLiveFetch", () => ({
 }));
 
 vi.mock("../../../../../src/services/faqService", () => ({
-  insightsService: { fetchFAQGroups: vi.fn(), refreshFAQGroups: vi.fn() },
+  insightsService: {
+    fetchFAQGroups: vi.fn(),
+    refreshFAQGroups: vi.fn(),
+    fetchRebuildPreview: vi.fn(),
+  },
 }));
 
 import { useLiveFetch } from "../../../../../src/hooks/useLiveFetch";
@@ -61,6 +65,16 @@ describe("FaqPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useLiveFetch).mockReturnValue(loaded);
+    vi.mocked(insightsService.fetchRebuildPreview).mockResolvedValue({
+      totalQuestionCount: 15,
+      rebuildQuestionLimit: 2000,
+      windows: [
+        { sinceDays: 1, questionCount: 2 },
+        { sinceDays: 7, questionCount: 5 },
+        { sinceDays: 30, questionCount: 11 },
+        { sinceDays: 90, questionCount: 15 },
+      ],
+    });
   });
 
   it("renders the page title and header", () => {
@@ -118,13 +132,39 @@ describe("FaqPage", () => {
     expect(insightsService.refreshFAQGroups).not.toHaveBeenCalled();
   });
 
-  it("says how much material the rebuild has to work with", async () => {
+  it("says how much each scope would cover, so the choice can be made on numbers", async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
 
-    expect(await screen.findByText("15 questions asked in this project.")).toBeInTheDocument();
+    expect(await screen.findByRole("radio", { name: /All questions/ })).toBeChecked();
+    expect(await screen.findByText("2 questions")).toBeInTheDocument();
+    expect(screen.getByText("11 questions")).toBeInTheDocument();
+  });
+
+  it("rebuilds only over the chosen window", async () => {
+    const user = userEvent.setup();
+    vi.mocked(insightsService.refreshFAQGroups).mockResolvedValue({ groupCount: 1 });
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+    await user.click(await screen.findByRole("radio", { name: /Asked today/ }));
+    await user.click(screen.getByRole("button", { name: "Rebuild" }));
+
+    expect(insightsService.refreshFAQGroups).toHaveBeenCalledWith("proj1", { sinceDays: 1 });
+  });
+
+  it("warns that a narrowed scope drops the rest", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+    await user.click(await screen.findByRole("radio", { name: /Asked today/ }));
+
+    // A rebuild replaces the FAQ, so anything outside the window leaves the
+    // counts with it. That belongs before the click, not after.
+    expect(screen.getByText(/dropped from the FAQ/)).toBeInTheDocument();
   });
 
   it("rebuilds over everything by default", async () => {
