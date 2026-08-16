@@ -26,12 +26,21 @@ vi.mock("../../../../../src/services/ingestionService", () => ({
   getIngestionSourceStatuses: vi.fn(),
 }));
 
+vi.mock("../../../../../src/services/sources/jiraService", () => ({
+  connectJiraInstance: vi.fn(),
+  getMyJiraCredentials: vi.fn(),
+}));
+
 import { projectService } from "../../../../../src/services/projectService";
 import {
   addRepositoryToProject,
   connectGithubRepository,
   discoverRepositories,
 } from "../../../../../src/services/sources/githubService";
+import {
+  connectJiraInstance,
+  getMyJiraCredentials,
+} from "../../../../../src/services/sources/jiraService";
 import { getIngestionSourceStatuses } from "../../../../../src/services/ingestionService";
 
 const createdProject: AdminProjectDetails = {
@@ -168,7 +177,24 @@ describe("CreateProjectWizard", () => {
     });
     vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
     vi.mocked(projectService.assignUsersToProject).mockResolvedValue([]);
+    vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
+    vi.mocked(getMyJiraCredentials).mockResolvedValue([
+      { userEmail: "me@example.com", displayName: "Team token" },
+    ]);
   });
+
+  /** From the sources step, stage a Jira board through the add-source sub-flow. */
+  async function stageJiraBoard(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
+
+    // The stored credential is adopted automatically once it loads.
+    await screen.findByRole("option", { name: /Team token - me@example.com/i });
+
+    await user.type(screen.getByLabelText("Display name"), "Team board");
+    await user.type(screen.getByLabelText("Instance URL"), "https://acme.atlassian.net");
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+  }
 
   it("blocks the details continue button until a name is entered", async () => {
     const user = userEvent.setup();
@@ -372,6 +398,50 @@ describe("CreateProjectWizard", () => {
     await waitFor(() => expect(screen.getByText(/Connected · team-pat/i)).toBeInTheDocument());
     // The retry must not create a second project.
     expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
+  });
+
+  it("stages a Jira board and connects it against the new project on Create", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageJiraBoard(user);
+
+    // Back on the sources list, the board is staged under its display name.
+    expect(screen.getByText("Team board")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith({
+        displayName: "Team board",
+        url: "https://acme.atlassian.net",
+        userEmail: "me@example.com",
+        tokenName: "Team token",
+        projectId: "proj-new",
+      }),
+    );
+  });
+
+  it("connects a mixed batch of a GitHub repo and a Jira board", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageWidgets(user);
+    await stageJiraBoard(user);
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(connectGithubRepository)).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "widgets", projectId: "proj-new" }),
+    );
+    expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://acme.atlassian.net", projectId: "proj-new" }),
+    );
   });
 
   it("does not create the project when cancelled on the first step", async () => {

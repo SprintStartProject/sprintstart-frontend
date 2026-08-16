@@ -13,12 +13,14 @@ import {
   addDraftSource,
   connectDraftSources,
   createDraftSourceFromDiscovery,
+  createJiraDraft,
   hasFailedSources,
   removeDraftSource,
   type DraftSource,
 } from "../projectSourcesDraft";
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
+import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
 import { WizardDetailsStep } from "./wizard/steps/WizardDetailsStep";
@@ -53,9 +55,9 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   review: 3,
 };
 
-// Phase 2 stages GitHub repositories only; Jira and Upload still render in the
-// type grid (as "Soon") and are wired in the following phases.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB"];
+// GitHub and Jira can be staged; Upload still renders in the type grid (as
+// "Soon") and is wired in the following phase.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA"];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -99,12 +101,24 @@ export function CreateProjectWizard({
   const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
   const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
 
+  const [jiraDisplayName, setJiraDisplayName] = useState("");
+  const [jiraUrl, setJiraUrl] = useState("");
+  const [jiraCredentialName, setJiraCredentialName] = useState("");
+
   const [createdProjectId, setCreatedProjectId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
 
   const trimmedName = name.trim();
   const isNameValid = trimmedName.length > 0;
+
+  const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
+  const {
+    credentials: jiraCredentials,
+    loaded: jiraCredentialsLoaded,
+    error: jiraCredentialsError,
+    isRefreshing: jiraCredentialsLoading,
+  } = useJiraCredentials(isOpen && isJiraDetail);
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -117,6 +131,21 @@ export function CreateProjectWizard({
       );
     });
   }, [tokenNames]);
+
+  // Same adoption pattern for the Jira credential picker: select the first
+  // stored credential once the list arrives, keeping a still-valid choice.
+  useEffect(() => {
+    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
+
+    void Promise.resolve().then(() => {
+      setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+    });
+  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
@@ -152,7 +181,14 @@ export function CreateProjectWizard({
     setAddStep("type");
     setAddType("GITHUB");
     setGithubSelection([]);
+    resetJiraDraftFields();
     setCreatedProjectId("");
+  };
+
+  const resetJiraDraftFields = () => {
+    setJiraDisplayName("");
+    setJiraUrl("");
+    setJiraCredentialName("");
   };
 
   const closeWizard = () => {
@@ -187,6 +223,7 @@ export function CreateProjectWizard({
 
   const openAddSource = () => {
     setGithubSelection([]);
+    resetJiraDraftFields();
     setAddType("GITHUB");
     setAddStep("type");
     setAddFlowKey((key) => key + 1);
@@ -196,6 +233,7 @@ export function CreateProjectWizard({
   const closeAddSource = () => {
     setIsAddingSource(false);
     setGithubSelection([]);
+    resetJiraDraftFields();
   };
 
   const handleSelectAddType = (type: SourceSystem) => {
@@ -209,17 +247,41 @@ export function CreateProjectWizard({
   const backToTypeGrid = () => {
     setAddStep("type");
     setGithubSelection([]);
+    resetJiraDraftFields();
   };
 
-  const canAddSource = addType === "GITHUB" && githubSelection.length > 0;
+  const selectedJiraCredential = jiraCredentials.find(
+    (credential) => credential.displayName === jiraCredentialName,
+  );
+
+  const canAddSource =
+    addType === "GITHUB"
+      ? githubSelection.length > 0
+      : addType === "JIRA"
+        ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
+        : false;
 
   const commitAddSource = () => {
+    if (!canAddSource) return;
+
     if (addType === "GITHUB") {
       setSources((current) =>
         githubSelection.reduce(
           (accumulated, selection) =>
             addDraftSource(accumulated, createDraftSourceFromDiscovery(selection, githubTokenName)),
           current,
+        ),
+      );
+    } else if (addType === "JIRA" && selectedJiraCredential) {
+      setSources((current) =>
+        addDraftSource(
+          current,
+          createJiraDraft({
+            displayName: jiraDisplayName.trim(),
+            url: jiraUrl.trim(),
+            userEmail: selectedJiraCredential.userEmail,
+            tokenName: selectedJiraCredential.displayName,
+          }),
         ),
       );
     }
@@ -479,10 +541,25 @@ export function CreateProjectWizard({
             selectedType={addType}
             availableTypes={AVAILABLE_SOURCE_TYPES}
             onSelectType={handleSelectAddType}
-            tokenNames={tokenNames}
-            githubTokenName={githubTokenName}
-            onGithubTokenNameChange={setGithubTokenName}
-            onGithubSelectionChange={setGithubSelection}
+            github={{
+              tokenNames,
+              tokenName: githubTokenName,
+              onTokenNameChange: setGithubTokenName,
+              onSelectionChange: setGithubSelection,
+            }}
+            jira={{
+              displayName: jiraDisplayName,
+              url: jiraUrl,
+              credentialName: jiraCredentialName,
+              credentials: jiraCredentials,
+              credentialsLoaded: jiraCredentialsLoaded,
+              credentialsLoading: jiraCredentialsLoading,
+              credentialsError: jiraCredentialsError,
+              onDisplayNameChange: setJiraDisplayName,
+              onUrlChange: setJiraUrl,
+              onCredentialNameChange: setJiraCredentialName,
+              onSubmit: commitAddSource,
+            }}
           />
         ) : (
           <WizardSourcesStep
