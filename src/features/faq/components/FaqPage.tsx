@@ -21,6 +21,15 @@ import {
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { useProjectContext } from "../../projects/useProjectContext";
 
+/**
+ * Thousands separator, pinned to the same locale the app formats dates in
+ * rather than the visitor's — an unpinned one renders differently depending on
+ * the machine, which makes the number untestable for no benefit.
+ */
+function formatCount(value: number): string {
+  return value.toLocaleString("en-GB");
+}
+
 export function FaqPage() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
@@ -91,6 +100,12 @@ export function FaqPage() {
     );
   }
 
+  const rebuildQuestionCount = overview.rebuildQuestionCount;
+  // Equal means the project has more questions than the rebuild may send, so
+  // the older ones drop out of the FAQ when it runs.
+  const rebuildIsCapped =
+    rebuildQuestionCount !== undefined && rebuildQuestionCount === overview.rebuildQuestionLimit;
+
   const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
   const totalGroups = sorted.length;
   const totalQuestions = sorted.reduce((sum, group) => sum + group.count, 0);
@@ -132,6 +147,18 @@ export function FaqPage() {
               {overview.lastAskedAt && (
                 <span className="text-xs text-app-text-muted">
                   Last question {formatAskedAt(overview.lastAskedAt)}
+                </span>
+              )}
+              {/* What the button is about to work on. Named before the click,
+                  because a rebuild replaces the FAQ — including throwing away
+                  anything past the cap. */}
+              {rebuildQuestionCount !== undefined && (
+                <span
+                  className={`text-xs ${rebuildIsCapped ? "text-app-warning-text" : "text-app-text-muted"}`}
+                >
+                  {rebuildIsCapped
+                    ? `Rebuild uses the newest ${formatCount(rebuildQuestionCount)} questions`
+                    : `Rebuild uses ${formatCount(rebuildQuestionCount)} questions`}
                 </span>
               )}
             </div>

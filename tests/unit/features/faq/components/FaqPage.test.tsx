@@ -25,6 +25,8 @@ const mockOverview: FAQOverview = {
       topDocuments: [{ id: "d2", title: "X Doc" }],
     },
   ],
+  rebuildQuestionCount: 15,
+  rebuildQuestionLimit: 2000,
 };
 
 vi.mock("../../../../../src/hooks/useLiveFetch", () => ({
@@ -99,6 +101,22 @@ describe("FaqPage", () => {
     // The count answers "rising from what?" without the reader opening anything.
     expect(screen.getByText("Rising · 7")).toBeInTheDocument();
     expect(screen.getByText("Quiet · 1")).toBeInTheDocument();
+  });
+
+  it("says how many questions the rebuild would use", () => {
+    renderPage();
+    expect(screen.getByText("Rebuild uses 15 questions")).toBeInTheDocument();
+  });
+
+  it("warns when the rebuild would drop the older questions", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      ...loaded,
+      data: { ...mockOverview, rebuildQuestionCount: 2000 },
+    });
+    renderPage();
+    // A rebuild replaces the FAQ, so anything past the cap leaves the counts
+    // with it. That belongs before the click, not after.
+    expect(screen.getByText("Rebuild uses the newest 2,000 questions")).toBeInTheDocument();
   });
 
   it("shows loading state", () => {

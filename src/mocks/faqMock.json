@@ -76,5 +76,7 @@
       ]
     }
   ],
-  "lastAskedAt": "2026-08-13T09:12:00Z"
+  "lastAskedAt": "2026-08-13T09:12:00Z",
+  "rebuildQuestionCount": 48,
+  "rebuildQuestionLimit": 2000
 }

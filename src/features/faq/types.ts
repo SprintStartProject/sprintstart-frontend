@@ -39,6 +39,14 @@ export interface FAQDocumentPreview {
 export interface FAQOverview {
   groups: FAQGroup[];
   lastAskedAt?: string | null;
+  /**
+   * How many questions a rebuild would send to the AI service — already
+   * capped, so this is what would actually happen rather than what exists.
+   * When it equals `rebuildQuestionLimit` the project has more, and a rebuild
+   * drops the older ones from the FAQ.
+   */
+  rebuildQuestionCount?: number;
+  rebuildQuestionLimit?: number;
 }
 
 // ── FAQ DETAIL ──────────────────────────────────────────────
