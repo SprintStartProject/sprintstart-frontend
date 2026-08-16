@@ -136,7 +136,7 @@ async function settleModalFocus() {
 /** Fills in the name on the details step. */
 async function fillName(user: ReturnType<typeof userEvent.setup>) {
   await settleModalFocus();
-  await user.type(screen.getByLabelText("Name"), "Apollo");
+  await user.type(screen.getByLabelText(/^Name/), "Apollo");
 }
 
 /** Details → members. */
@@ -214,16 +214,87 @@ describe("CreateProjectWizard", () => {
     await user.click(screen.getByRole("button", { name: /add to list/i }));
   }
 
-  it("blocks the details continue button until a name is entered", async () => {
+  it("keeps details on a blank name and explains why instead of a dead button", async () => {
     const user = userEvent.setup();
     renderWizard();
     await settleModalFocus();
 
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+    // Continue stays enabled so the click can surface the reason rather than
+    // sitting there disabled with no explanation.
+    await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    await user.type(screen.getByLabelText("Name"), "Apollo");
+    expect(await screen.findByText("Name is required.")).toBeInTheDocument();
+    // Still on the Details step — the manager picker is a details-only control.
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    // A valid name advances to the members step.
+    expect(await screen.findByLabelText("Add members")).toBeInTheDocument();
+  });
+
+  it("flags a duplicate name before the commit and keeps the user on details", async () => {
+    const user = userEvent.setup();
+    renderWizard({ existingProjectNames: ["Apollo"] });
+    await settleModalFocus();
+
+    // Case-insensitive clash with an existing project.
+    await user.type(screen.getByLabelText(/^Name/), "apollo");
+
+    expect(await screen.findByText("A project with this name already exists.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Blocked on details; nothing was sent to the backend.
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
+    expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
+  });
+
+  it("asks before discarding a dirty wizard and only closes on confirm", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderWizard();
+    await fillName(user);
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    // The confirmation intercepts; the wizard is still open.
+    expect(await screen.findByText("Discard this project?")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /keep editing/i }));
+    await waitFor(() =>
+      expect(screen.queryByText("Discard this project?")).not.toBeInTheDocument(),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Cancelling again and confirming the discard closes the wizard.
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    await user.click(screen.getByRole("button", { name: /discard/i }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("closes a pristine wizard without a discard prompt", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderWizard();
+    await settleModalFocus();
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(screen.queryByText("Discard this project?")).not.toBeInTheDocument();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("jumps back to a completed step from the stepper", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+
+    // Completed steps are buttons; the current/future ones are not.
+    await user.click(screen.getByRole("button", { name: "Go to Details" }));
+
+    expect(await screen.findByLabelText(/^Name/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
   });
 
   it("keeps the manager on the details step and members on their own step", async () => {
@@ -280,7 +351,7 @@ describe("CreateProjectWizard", () => {
     await user.click(managerSelect);
     await user.click(await screen.findByRole("option", { name: "Jane Doe" }));
 
-    await user.type(screen.getByLabelText("Name"), "Apollo");
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /create without sources/i }));

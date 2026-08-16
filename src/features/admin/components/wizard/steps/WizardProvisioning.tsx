@@ -42,8 +42,9 @@ export function WizardProvisioning({
       </div>
 
       <p className="text-sm leading-relaxed text-app-text-muted">
-        Connecting {sources.length} {sources.length === 1 ? "source" : "sources"}. Ingestion runs in
-        the background. You can close this once it is done.
+        Connecting {sources.length} {sources.length === 1 ? "source" : "sources"}. Each one&rsquo;s
+        ingestion then continues in the background, so you can close this dialog and follow progress
+        on the Data Ingestion page.
       </p>
 
       <StagedSourceList sources={sources} disabled={disabled} onRetry={onRetry} />

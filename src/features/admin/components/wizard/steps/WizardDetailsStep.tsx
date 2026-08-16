@@ -8,12 +8,16 @@ import type { ProjectManager } from "../../../../../services/projectService";
 
 type WizardDetailsStepProps = {
   name: string;
+  /** Validation message for the name field; its presence flags the error state. */
+  nameError?: string;
   description: string;
   managerId: string;
   managerCandidates: ProjectManager[];
   isLoadingCandidates: boolean;
   candidatesError: string;
   onNameChange: (value: string) => void;
+  /** Marks the name field as touched so a blank-name error can appear on leave. */
+  onNameBlur?: () => void;
   onDescriptionChange: (value: string) => void;
   onManagerChange: (value: string) => void;
   /** Advances to the next step, so Enter in a field submits the wizard's step. */
@@ -33,12 +37,14 @@ function managerLabel(candidate: ProjectManager): string {
  */
 export function WizardDetailsStep({
   name,
+  nameError,
   description,
   managerId,
   managerCandidates,
   isLoadingCandidates,
   candidatesError,
   onNameChange,
+  onNameBlur,
   onDescriptionChange,
   onManagerChange,
   onSubmit,
@@ -69,10 +75,11 @@ export function WizardDetailsStep({
         onSubmit();
       }}
     >
-      <Field label="Name" controlId={nameInputId}>
+      <Field label="Name" controlId={nameInputId} required error={nameError}>
         <Input
           value={name}
           onChange={(event) => onNameChange(event.target.value)}
+          onBlur={onNameBlur}
           placeholder="e.g. Customer Portal"
         />
       </Field>

@@ -36,7 +36,7 @@ describe("CreateProjectWizard Accessibility", () => {
     );
 
     await screen.findByRole("dialog", { name: "New Project" });
-    await waitFor(() => expect(screen.getByLabelText("Name")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText(/^Name/)).toBeInTheDocument());
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

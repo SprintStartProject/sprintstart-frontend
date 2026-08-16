@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
+import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import { Stepper } from "../../../components/ui/Stepper";
@@ -46,6 +47,12 @@ type CreateProjectWizardProps = {
    * made anyway.
    */
   users: AdminUser[];
+  /**
+   * Names of the projects that already exist, used to flag a duplicate name on
+   * the Details step before the user reaches the commit. Case-insensitive; the
+   * backend stays the source of truth and its own conflict is surfaced too.
+   */
+  existingProjectNames?: string[];
   onClose: () => void;
   /** Fired once the project exists, before any source finished connecting. */
   onProjectCreated: (project: AdminProjectDetails) => void;
@@ -82,12 +89,19 @@ export function CreateProjectWizard({
   isOpen,
   tokenNames,
   users,
+  existingProjectNames = [],
   onClose,
   onProjectCreated,
 }: CreateProjectWizardProps) {
   const [phase, setPhase] = useState<WizardPhase>("details");
 
   const [name, setName] = useState("");
+  // Turns the "Name is required" message on only after the user has left the
+  // field or tried to advance, so the step never opens already showing red.
+  const [nameTouched, setNameTouched] = useState(false);
+  // A name conflict reported by the backend at commit time (the client list may
+  // be stale). Cleared as soon as the name is edited.
+  const [nameServerError, setNameServerError] = useState("");
   const [description, setDescription] = useState("");
   const [managerId, setManagerId] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
@@ -130,10 +144,35 @@ export function CreateProjectWizard({
   // True while the desktop "add credential" companion is open, so the modal
   // slides left to make room for it beside itself.
   const [companionOpen, setCompanionOpen] = useState(false);
+  // Guards the "discard unsaved work?" confirmation over a dirty wizard.
+  const [confirmingClose, setConfirmingClose] = useState(false);
   const toast = useToast();
 
   const trimmedName = name.trim();
-  const isNameValid = trimmedName.length > 0;
+
+  // Case-insensitive clash with an existing project, only once something is
+  // typed. The server error takes precedence over both other messages.
+  const nameCollision =
+    trimmedName.length > 0 &&
+    existingProjectNames.some(
+      (existing) => existing.trim().toLowerCase() === trimmedName.toLowerCase(),
+    );
+
+  const isNameValid = trimmedName.length > 0 && !nameCollision;
+
+  const nameError = nameServerError
+    ? nameServerError
+    : nameCollision
+      ? "A project with this name already exists."
+      : nameTouched && trimmedName.length === 0
+        ? "Name is required."
+        : "";
+
+  const handleNameChange = (value: string) => {
+    setName(value);
+    // Any edit invalidates a stale server-side "already exists".
+    if (nameServerError) setNameServerError("");
+  };
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
   const {
@@ -222,6 +261,9 @@ export function CreateProjectWizard({
   const resetWizard = () => {
     setPhase("details");
     setName("");
+    setNameTouched(false);
+    setNameServerError("");
+    setConfirmingClose(false);
     setDescription("");
     setManagerId("");
     setSelectedUserIds(new Set());
@@ -252,6 +294,34 @@ export function CreateProjectWizard({
 
     resetWizard();
     onClose();
+  };
+
+  // Anything the user has drafted that a close would throw away. The provisioning
+  // screen is excluded — the project already exists there, so there is nothing
+  // to discard and closing just dismisses the status view.
+  const isDirty =
+    trimmedName.length > 0 ||
+    description.trim().length > 0 ||
+    Boolean(managerId) ||
+    selectedUserIds.size > 0 ||
+    sources.length > 0;
+
+  // Every dismissal path (backdrop, Escape, the header ✕, the footer Cancel)
+  // routes through here so a dirty wizard asks before discarding.
+  const requestClose = () => {
+    if (isSubmitting) return;
+
+    if (phase !== "provisioning" && isDirty) {
+      setConfirmingClose(true);
+      return;
+    }
+
+    closeWizard();
+  };
+
+  const confirmDiscard = () => {
+    setConfirmingClose(false);
+    closeWizard();
   };
 
   // The manager for Review, resolved from the user directory when possible so
@@ -411,7 +481,15 @@ export function CreateProjectWizard({
   };
 
   const handleCreate = async () => {
-    if (!isNameValid || isSubmitting) return;
+    if (isSubmitting) return;
+
+    // A shortcut ("Create, skip review") could fire with an invalid name; send
+    // the user back to Details with the error rather than failing silently.
+    if (!isNameValid) {
+      setPhase("details");
+      setNameTouched(true);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -439,7 +517,18 @@ export function CreateProjectWizard({
         toast.success("Project created");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't create the project.");
+      const message = error instanceof Error ? error.message : "Couldn't create the project.";
+
+      // A name clash the client list missed comes back here (the project was
+      // never created). Send the user to Details with the field flagged rather
+      // than only flashing a toast they have to decode.
+      if (!createdProjectId && /name.*(exist|taken|already|duplicate)/i.test(message)) {
+        setPhase("details");
+        setNameTouched(true);
+        setNameServerError("A project with this name already exists.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -505,9 +594,27 @@ export function CreateProjectWizard({
   };
 
   const goForward = () => {
-    if (phase === "details" && isNameValid) setPhase("members");
-    else if (phase === "members") setPhase("sources");
+    if (phase === "details") {
+      // Continue stays enabled so the click can explain itself: an invalid name
+      // reveals the inline error and keeps the user on the step instead of a
+      // silently disabled button.
+      if (!isNameValid) {
+        setNameTouched(true);
+        return;
+      }
+      setPhase("members");
+    } else if (phase === "members") setPhase("sources");
     else if (phase === "sources") setPhase("review");
+  };
+
+  // Backwards jump from the stepper. Any in-progress add-source sub-flow is
+  // closed first so the target step renders its own content, not the sub-flow.
+  const goToStep = (index: number) => {
+    if (isSubmitting) return;
+    if (isAddingSource) closeAddSource();
+
+    const target = (["details", "members", "sources", "review"] as const)[index];
+    if (target) setPhase(target);
   };
 
   const skipLabel = sources.length === 0 ? "Create without sources" : "Create, skip review";
@@ -560,7 +667,7 @@ export function CreateProjectWizard({
       <>
         <Button
           variant="secondary"
-          onClick={isDetails ? closeWizard : goBack}
+          onClick={isDetails ? requestClose : goBack}
           disabled={isSubmitting}
           icon={isDetails ? undefined : <ArrowLeft className="h-4 w-4" />}
           className="sm:mr-auto"
@@ -588,7 +695,7 @@ export function CreateProjectWizard({
           <Button
             variant="primary"
             onClick={goForward}
-            disabled={(isDetails && !isNameValid) || isSubmitting}
+            disabled={isSubmitting}
             trailingIcon={<ArrowRight className="h-4 w-4" />}
           >
             Continue
@@ -599,123 +706,142 @@ export function CreateProjectWizard({
   })();
 
   return (
-    <Modal
-      isOpen={isOpen}
-      title="New Project"
-      description={
-        isProvisioning ? (
-          <p className="text-sm font-medium text-app-text">Creating project…</p>
-        ) : (
-          <Stepper steps={STEP_LABELS} current={stepIndex} />
-        )
-      }
-      size="xl"
-      isDismissDisabled={isSubmitting}
-      contentInsetRight={companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
-      onClose={closeWizard}
-      closeLabel="Close new project wizard"
-      footer={footer}
-    >
-      <p className="sr-only" aria-live="polite">
-        {screenAnnouncement}
-      </p>
-
-      <div ref={bodyRef} tabIndex={-1} className="focus:outline-none">
-        {phase === "details" && (
-          <WizardDetailsStep
-            name={name}
-            description={description}
-            managerId={managerId}
-            managerCandidates={managerCandidates}
-            isLoadingCandidates={isLoadingCandidates}
-            candidatesError={candidatesError}
-            onNameChange={setName}
-            onDescriptionChange={setDescription}
-            onManagerChange={setManagerId}
-            onSubmit={goForward}
-          />
-        )}
-
-        {phase === "members" && (
-          <WizardMembersStep
-            users={users}
-            selectedUserIds={selectedUserIds}
-            managerId={managerId}
-            onChange={setSelectedUserIds}
-            onManagerRemoved={() => setManagerId("")}
-          />
-        )}
-
-        {phase === "sources" &&
-          (isAddingSource ? (
-            <AddSourceFlow
-              key={addFlowKey}
-              step={addStep}
-              selectedType={addType}
-              availableTypes={AVAILABLE_SOURCE_TYPES}
-              onSelectType={handleSelectAddType}
-              onBack={backToTypeGrid}
-              onCompanionOpenChange={setCompanionOpen}
-              github={{
-                tokenNames: effectiveTokenNames,
-                tokenName: githubTokenName,
-                onTokenNameChange: setGithubTokenName,
-                onSelectionChange: setGithubSelection,
-                onTokenSaved: handleTokenSaved,
-              }}
-              jira={{
-                displayName: jiraDisplayName,
-                url: jiraUrl,
-                credentialName: jiraCredentialName,
-                credentials: jiraCredentials,
-                credentialsLoaded: jiraCredentialsLoaded,
-                credentialsLoading: jiraCredentialsLoading,
-                credentialsError: jiraCredentialsError,
-                defaultUserEmail: null,
-                onDisplayNameChange: setJiraDisplayName,
-                onUrlChange: setJiraUrl,
-                onCredentialNameChange: setJiraCredentialName,
-                onSubmit: commitAddSource,
-                onCredentialSaved: handleCredentialSaved,
-              }}
-              upload={{
-                files: uploadFiles,
-                onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
-                onRemoveFile: (index) =>
-                  setUploadFiles((current) => current.filter((_, position) => position !== index)),
-              }}
-            />
+    <>
+      <Modal
+        isOpen={isOpen}
+        title="New Project"
+        description={
+          isProvisioning ? (
+            <p className="text-sm font-medium text-app-text">Creating project…</p>
           ) : (
-            <WizardSourcesStep
-              sources={sources}
-              onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
-              onAddSource={openAddSource}
+            <Stepper steps={STEP_LABELS} current={stepIndex} onStepSelect={goToStep} />
+          )
+        }
+        size="xl"
+        isDismissDisabled={isSubmitting || confirmingClose}
+        contentInsetRight={companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
+        onClose={requestClose}
+        closeLabel="Close new project wizard"
+        footer={footer}
+      >
+        <p className="sr-only" aria-live="polite">
+          {screenAnnouncement}
+        </p>
+
+        <div ref={bodyRef} tabIndex={-1} className="focus:outline-none">
+          {phase === "details" && (
+            <WizardDetailsStep
+              name={name}
+              nameError={nameError}
+              description={description}
+              managerId={managerId}
+              managerCandidates={managerCandidates}
+              isLoadingCandidates={isLoadingCandidates}
+              candidatesError={candidatesError}
+              onNameChange={handleNameChange}
+              onNameBlur={() => setNameTouched(true)}
+              onDescriptionChange={setDescription}
+              onManagerChange={setManagerId}
+              onSubmit={goForward}
             />
-          ))}
+          )}
 
-        {phase === "review" && (
-          <WizardReviewStep
-            name={name}
-            description={description}
-            manager={reviewManager}
-            members={reviewMembers}
-            sources={sources}
-            onEditDetails={() => setPhase("details")}
-            onEditMembers={() => setPhase("members")}
-            onEditSources={() => setPhase("sources")}
-          />
-        )}
+          {phase === "members" && (
+            <WizardMembersStep
+              users={users}
+              selectedUserIds={selectedUserIds}
+              managerId={managerId}
+              onChange={setSelectedUserIds}
+              onManagerRemoved={() => setManagerId("")}
+            />
+          )}
 
-        {phase === "provisioning" && (
-          <WizardProvisioning
-            projectName={trimmedName}
-            memberCount={memberCount}
-            sources={sources}
-            disabled={isSubmitting}
-            onRetry={(sourceId) => void retrySource(sourceId)}
-          />
-        )}
-      </div>
-    </Modal>
+          {phase === "sources" &&
+            (isAddingSource ? (
+              <AddSourceFlow
+                key={addFlowKey}
+                step={addStep}
+                selectedType={addType}
+                availableTypes={AVAILABLE_SOURCE_TYPES}
+                onSelectType={handleSelectAddType}
+                onBack={backToTypeGrid}
+                onCompanionOpenChange={setCompanionOpen}
+                github={{
+                  tokenNames: effectiveTokenNames,
+                  tokenName: githubTokenName,
+                  onTokenNameChange: setGithubTokenName,
+                  onSelectionChange: setGithubSelection,
+                  onTokenSaved: handleTokenSaved,
+                }}
+                jira={{
+                  displayName: jiraDisplayName,
+                  url: jiraUrl,
+                  credentialName: jiraCredentialName,
+                  credentials: jiraCredentials,
+                  credentialsLoaded: jiraCredentialsLoaded,
+                  credentialsLoading: jiraCredentialsLoading,
+                  credentialsError: jiraCredentialsError,
+                  defaultUserEmail: null,
+                  onDisplayNameChange: setJiraDisplayName,
+                  onUrlChange: setJiraUrl,
+                  onCredentialNameChange: setJiraCredentialName,
+                  onSubmit: commitAddSource,
+                  onCredentialSaved: handleCredentialSaved,
+                }}
+                upload={{
+                  files: uploadFiles,
+                  onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
+                  onRemoveFile: (index) =>
+                    setUploadFiles((current) =>
+                      current.filter((_, position) => position !== index),
+                    ),
+                }}
+              />
+            ) : (
+              <WizardSourcesStep
+                sources={sources}
+                onRemove={(sourceId) =>
+                  setSources((current) => removeDraftSource(current, sourceId))
+                }
+                onAddSource={openAddSource}
+              />
+            ))}
+
+          {phase === "review" && (
+            <WizardReviewStep
+              name={name}
+              description={description}
+              manager={reviewManager}
+              members={reviewMembers}
+              sources={sources}
+              onEditDetails={() => setPhase("details")}
+              onEditMembers={() => setPhase("members")}
+              onEditSources={() => setPhase("sources")}
+            />
+          )}
+
+          {phase === "provisioning" && (
+            <WizardProvisioning
+              projectName={trimmedName}
+              memberCount={memberCount}
+              sources={sources}
+              disabled={isSubmitting}
+              onRetry={(sourceId) => void retrySource(sourceId)}
+            />
+          )}
+        </div>
+      </Modal>
+
+      <AlertDialog
+        isOpen={confirmingClose}
+        title="Discard this project?"
+        description="The project hasn't been created yet. Closing now discards the name, members and sources you've added."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        variant="danger"
+        onClose={() => setConfirmingClose(false)}
+        onConfirm={confirmDiscard}
+      />
+    </>
   );
 }
