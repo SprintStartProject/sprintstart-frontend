@@ -65,6 +65,7 @@ export function ProjectSourcesStep({
 
     const alreadyStaged = sources.some(
       (source) =>
+        source.type === "GITHUB" &&
         source.owner.toLowerCase() === parsedRepository.owner.toLowerCase() &&
         source.name.toLowerCase() === parsedRepository.name.toLowerCase(),
     );
