@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
 import {
@@ -28,6 +29,16 @@ type FilterSelectProps<TValue extends string> = {
   onChange: (value: TValue) => void;
   disabled?: boolean;
   className?: string;
+  /**
+   * Render the open menu into `document.body` instead of next to the trigger.
+   *
+   * For use inside a modal, whose panel clips its own overflow and whose footer
+   * sits in a sibling stacking context — an in-flow menu is cut off by the first
+   * and painted under the second, however high its `z-index`. Off by default:
+   * on a page the in-flow menu is anchored by layout and needs no repositioning
+   * as the page scrolls.
+   */
+  menuInPortal?: boolean;
 };
 
 /** How long a typed sequence keeps accumulating before it starts a new search. */
@@ -53,11 +64,20 @@ export function FilterSelect<TValue extends string>({
   onChange,
   disabled = false,
   className = "",
+  menuInPortal = false,
 }: FilterSelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  // Where a portalled menu sits. Null until measured, which is also what keeps
+  // it from flashing at the top-left corner on the first frame.
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const typeaheadRef = useRef<{ query: string; timeoutId: number | null }>({
     query: "",
     timeoutId: null,
@@ -98,7 +118,11 @@ export function FilterSelect<TValue extends string>({
     if (!isOpen) return;
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // The menu is checked separately because a portalled one is not inside
+      // the container -- without this, clicking an option would dismiss the
+      // menu before the click reached it.
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
         close();
       }
     };
@@ -108,6 +132,27 @@ export function FilterSelect<TValue extends string>({
       document.removeEventListener("mousedown", handlePointerDown);
     };
   }, [isOpen]);
+
+  // A portalled menu is out of flow, so nothing moves it when the trigger moves.
+  // Measured on open and followed while it is open; `true` on the scroll
+  // listener catches scrolling in any container, not just the page.
+  useEffect(() => {
+    if (!isOpen || !menuInPortal) return;
+
+    const place = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuPosition({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [isOpen, menuInPortal]);
 
   useEffect(() => {
     const typeahead = typeaheadRef.current;
@@ -198,6 +243,11 @@ export function FilterSelect<TValue extends string>({
     }
   };
 
+  // AnimatePresence goes inside the portal rather than around it, so the exit
+  // animation still has a motion child to run on.
+  const hostMenu = (node: ReactNode) =>
+    menuInPortal ? createPortal(node, document.body) : node;
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <motion.button
@@ -225,9 +275,11 @@ export function FilterSelect<TValue extends string>({
         />
       </motion.button>
 
-      <AnimatePresence>
-        {isOpen && (
+      {hostMenu(
+        <AnimatePresence>
+          {isOpen && (!menuInPortal || menuPosition) && (
           <motion.ul
+            ref={menuRef}
             id={listboxId}
             role="listbox"
             aria-label={label}
@@ -235,9 +287,25 @@ export function FilterSelect<TValue extends string>({
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
             transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+            style={
+              menuInPortal && menuPosition
+                ? {
+                    position: "fixed",
+                    top: menuPosition.top,
+                    left: menuPosition.left,
+                    minWidth: menuPosition.width,
+                  }
+                : undefined
+            }
             // `p-1.5` is not cosmetic: the list clips its own overflow, so this
             // padding is the only room a magnified option has to grow into.
-            className="absolute top-[calc(100%+6px)] left-0 z-50 max-h-64 min-w-full overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+            className={`max-h-64 overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl ${
+              menuInPortal
+                ? // Above the modal overlay's own z-50, since a body portal is
+                  // only a sibling of it rather than a descendant.
+                  "z-[60]"
+                : "absolute top-[calc(100%+6px)] left-0 z-50 min-w-full"
+            }`}
           >
             {options.map((option, index) => {
               const isSelected = option.value === value;
@@ -294,8 +362,9 @@ export function FilterSelect<TValue extends string>({
               );
             })}
           </motion.ul>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
-import { Select } from "../../../components/ui/Select";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { Spinner } from "../../../components/ui/Spinner";
 import { insightsService } from "../../../services/faqService";
 import type { FAQRebuildPreview, FAQRebuildScope } from "../types";
@@ -21,6 +21,14 @@ const WINDOW_LABELS: Record<(typeof WINDOWS_IN_DAYS)[number], string> = {
 
 const ALL_SCOPE_KEY = "all";
 type ScopeKey = typeof ALL_SCOPE_KEY | `${(typeof WINDOWS_IN_DAYS)[number]}`;
+
+const SCOPE_OPTIONS: FilterSelectOption<ScopeKey>[] = [
+  { value: ALL_SCOPE_KEY, label: "All questions" },
+  ...WINDOWS_IN_DAYS.map((days) => ({
+    value: `${days}` as ScopeKey,
+    label: WINDOW_LABELS[days],
+  })),
+];
 
 /** Thousands separator pinned to the locale the app already formats dates in. */
 function formatCount(value: number): string {
@@ -46,10 +54,11 @@ export interface RebuildFaqDialogProps {
  * closes, because a rebuild takes as long as an AI call and there is nothing to
  * watch — the page reports the progress from then on.
  *
- * A native `<select>` rather than the app's `FilterSelect`: the OS draws the open
- * list, so it is not clipped by the modal's own rounding, and it cannot be
- * painted under the modal's footer the way a React-rendered popup inside a
- * z-indexed section is.
+ * The scope picker is the app's `FilterSelect` in its portalled mode, so it
+ * matches the dropdowns on the page behind it. The portal is what makes that
+ * possible here: the modal panel clips its overflow and its footer sits in a
+ * sibling stacking context, which would otherwise cut the open list off and
+ * paint what is left of it underneath the buttons.
  */
 export function RebuildFaqDialog({ isOpen, projectId, onClose, onConfirm }: RebuildFaqDialogProps) {
   const [scope, setScope] = useState<ScopeKey>(ALL_SCOPE_KEY);
@@ -126,26 +135,20 @@ export function RebuildFaqDialog({ isOpen, projectId, onClose, onConfirm }: Rebu
           </p>
 
           <div className="space-y-1.5">
-            <label
-              htmlFor="faq-rebuild-scope"
-              className="flex items-center gap-2 text-xs font-medium text-app-text"
-            >
+            {/* A caption rather than a `<label>`: FilterSelect is a combobox
+                built from a button, and it names itself through `label`. */}
+            <div className="flex items-center gap-2 text-xs font-medium text-app-text">
               Questions to regroup
               {isLoadingPreview && <Spinner size="sm" label="Counting questions" />}
-            </label>
-            <Select
-              id="faq-rebuild-scope"
+            </div>
+            <FilterSelect
+              label="Questions to regroup"
               value={scope}
-              onChange={(event) => setScope(event.target.value as ScopeKey)}
+              options={SCOPE_OPTIONS}
+              onChange={setScope}
+              menuInPortal
               className="w-full"
-            >
-              <option value={ALL_SCOPE_KEY}>All questions</option>
-              {WINDOWS_IN_DAYS.map((days) => (
-                <option key={days} value={days}>
-                  {WINDOW_LABELS[days]}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
 
           {scope !== ALL_SCOPE_KEY && (

@@ -127,4 +127,38 @@ describe("FilterSelect", () => {
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
+
+  // The portalled mode exists for modals, whose panel clips its overflow and
+  // whose footer would otherwise be painted over the open list.
+  describe("in a portal", () => {
+    it("renders the menu outside the control but still picks from it", async () => {
+      const user = userEvent.setup();
+      const { onChange, trigger } = renderSelect({ menuInPortal: true });
+
+      await user.click(trigger);
+
+      const listbox = await screen.findByRole("listbox");
+      expect(listbox).toBeInTheDocument();
+      // Out of the control's subtree entirely — that is the whole point.
+      expect(trigger.parentElement?.contains(listbox)).toBe(false);
+      expect(listbox).toHaveStyle({ position: "fixed" });
+
+      // Regression: the dismiss-on-outside-click handler only knew about the
+      // control, so a click on a portalled option closed the menu before the
+      // click could land on it.
+      await user.click(screen.getByRole("option", { name: "Failed" }));
+      expect(onChange).toHaveBeenCalledWith("FAILED");
+    });
+
+    it("still closes when the pointer goes down outside", async () => {
+      const user = userEvent.setup();
+      const { trigger } = renderSelect({ menuInPortal: true });
+
+      await user.click(trigger);
+      expect(await screen.findByRole("listbox")).toBeInTheDocument();
+
+      await user.click(document.body);
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    });
+  });
 });

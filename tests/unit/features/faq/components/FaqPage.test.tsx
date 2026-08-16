@@ -70,6 +70,19 @@ function renderPage() {
   );
 }
 
+/**
+ * Picks a rebuild scope.
+ *
+ * The picker is the app's combobox rather than a native select, so it is opened
+ * and then clicked rather than driven with `selectOptions`. Its menu is
+ * portalled out of the modal, which `screen` reaches because it queries the
+ * whole document.
+ */
+async function chooseScope(user: ReturnType<typeof userEvent.setup>, optionLabel: string) {
+  await user.click(await screen.findByRole("combobox", { name: "Questions to regroup" }));
+  await user.click(await screen.findByRole("option", { name: optionLabel }));
+}
+
 describe("FaqPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -150,7 +163,7 @@ describe("FaqPage", () => {
     // consumes it cannot drift apart on screen.
     expect(await screen.findByRole("button", { name: "Rebuild 15 questions" })).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText(/Questions to regroup/), "30");
+    await chooseScope(user, "Asked in the last 30 days");
     expect(await screen.findByRole("button", { name: "Rebuild 11 questions" })).toBeInTheDocument();
   });
 
@@ -160,7 +173,7 @@ describe("FaqPage", () => {
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
-    await user.selectOptions(await screen.findByLabelText(/Questions to regroup/), "30");
+    await chooseScope(user, "Asked in the last 30 days");
     await user.click(screen.getByRole("button", { name: /^Rebuild \d/ }));
 
     expect(insightsService.refreshFAQGroups).toHaveBeenCalledWith("proj1", { sinceDays: 30 });
@@ -171,7 +184,7 @@ describe("FaqPage", () => {
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
-    await user.selectOptions(await screen.findByLabelText(/Questions to regroup/), "30");
+    await chooseScope(user, "Asked in the last 30 days");
 
     // A rebuild replaces the FAQ, so anything outside the window leaves the
     // counts with it. That belongs before the click, not after.
