@@ -39,14 +39,25 @@ export interface FAQDocumentPreview {
 export interface FAQOverview {
   groups: FAQGroup[];
   lastAskedAt?: string | null;
+  /** Questions asked in this project's chats — the material a rebuild has. */
+  questionCount?: number;
   /**
-   * How many questions a rebuild would send to the AI service — already
-   * capped, so this is what would actually happen rather than what exists.
-   * When it equals `rebuildQuestionLimit` the project has more, and a rebuild
-   * drops the older ones from the FAQ.
+   * Ceiling on what a rebuild may send, whatever scope is chosen. Past it the
+   * older questions drop out of the FAQ with the rebuild.
    */
-  rebuildQuestionCount?: number;
   rebuildQuestionLimit?: number;
+}
+
+/**
+ * How much history a manual rebuild should regroup.
+ *
+ * Both bounds are optional and combine; neither can widen the backend's own
+ * ceiling. Narrowing is destructive — a rebuild replaces the FAQ, so anything
+ * outside the scope leaves the counts with it.
+ */
+export interface FAQRebuildScope {
+  questionLimit?: number;
+  sinceMonths?: number;
 }
 
 // ── FAQ DETAIL ──────────────────────────────────────────────

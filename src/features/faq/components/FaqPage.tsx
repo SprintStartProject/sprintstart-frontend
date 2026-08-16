@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
-import type { FAQGroup } from "../types";
+import type { FAQGroup, FAQRebuildScope } from "../types";
 import { insightsService } from "../../../services/faqService";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { TrendBadge } from "./TrendBadge";
+import { RebuildFaqDialog } from "./RebuildFaqDialog";
 import { formatAskedAt } from "../format";
 
 import {
@@ -21,21 +22,13 @@ import {
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { useProjectContext } from "../../projects/useProjectContext";
 
-/**
- * Thousands separator, pinned to the same locale the app formats dates in
- * rather than the visitor's — an unpinned one renders differently depending on
- * the machine, which makes the number untestable for no benefit.
- */
-function formatCount(value: number): string {
-  return value.toLocaleString("en-GB");
-}
-
 export function FaqPage() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
+  const [isRebuildDialogOpen, setRebuildDialogOpen] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
-  const [rebuildError, setRebuildError] = useState<string | null>(null);
+  const [rebuildError, setRebuildError] = useState<string | undefined>(undefined);
 
   const {
     data: overview,
@@ -45,14 +38,17 @@ export function FaqPage() {
     refresh,
   } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
 
-  const handleRebuild = async () => {
+  const handleRebuild = async (scope: FAQRebuildScope) => {
     setRebuilding(true);
-    setRebuildError(null);
+    setRebuildError(undefined);
     try {
-      await insightsService.refreshFAQGroups(selectedProjectId);
+      await insightsService.refreshFAQGroups(selectedProjectId, scope);
       refresh();
+      setRebuildDialogOpen(false);
     } catch (err) {
       console.error("FAQ rebuild failed", err);
+      // Kept in the dialog rather than behind it: the choice that failed is
+      // still on screen, and retrying is one click from here.
       setRebuildError(
         "Rebuild failed. Is the AI service running and are there questions to group?",
       );
@@ -61,19 +57,36 @@ export function FaqPage() {
     }
   };
 
+  const openRebuildDialog = () => {
+    setRebuildError(undefined);
+    setRebuildDialogOpen(true);
+  };
+
   // The FAQ now updates itself as questions are asked, so this is a rebuild of
-  // the whole grouping rather than the only way to see new questions.
+  // the whole grouping rather than the only way to see new questions — and it
+  // is destructive, so it asks first.
   const rebuildButton = (
     <Button
       variant="secondary"
-      onClick={() => void handleRebuild()}
-      loading={rebuilding}
+      onClick={openRebuildDialog}
       icon={<RefreshCw className="h-4 w-4" />}
       className="shrink-0"
       title="Regroup every question from scratch"
     >
-      {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
+      Rebuild grouping
     </Button>
+  );
+
+  const rebuildDialog = (
+    <RebuildFaqDialog
+      isOpen={isRebuildDialogOpen}
+      questionCount={overview?.questionCount}
+      questionLimit={overview?.rebuildQuestionLimit}
+      isRebuilding={rebuilding}
+      errorMessage={rebuildError}
+      onClose={() => setRebuildDialogOpen(false)}
+      onConfirm={(scope) => void handleRebuild(scope)}
+    />
   );
 
   if (loading) {
@@ -93,18 +106,10 @@ export function FaqPage() {
           something.
         </p>
         {rebuildButton}
-        {rebuildError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{rebuildError}</p>
-        )}
+        {rebuildDialog}
       </div>
     );
   }
-
-  const rebuildQuestionCount = overview.rebuildQuestionCount;
-  // Equal means the project has more questions than the rebuild may send, so
-  // the older ones drop out of the FAQ when it runs.
-  const rebuildIsCapped =
-    rebuildQuestionCount !== undefined && rebuildQuestionCount === overview.rebuildQuestionLimit;
 
   const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
   const totalGroups = sorted.length;
@@ -149,22 +154,8 @@ export function FaqPage() {
                   Last question {formatAskedAt(overview.lastAskedAt)}
                 </span>
               )}
-              {/* What the button is about to work on. Named before the click,
-                  because a rebuild replaces the FAQ — including throwing away
-                  anything past the cap. */}
-              {rebuildQuestionCount !== undefined && (
-                <span
-                  className={`text-xs ${rebuildIsCapped ? "text-app-warning-text" : "text-app-text-muted"}`}
-                >
-                  {rebuildIsCapped
-                    ? `Rebuild uses the newest ${formatCount(rebuildQuestionCount)} questions`
-                    : `Rebuild uses ${formatCount(rebuildQuestionCount)} questions`}
-                </span>
-              )}
             </div>
           </div>
-          {rebuildError && <p className="mb-4 text-sm text-app-danger-text">{rebuildError}</p>}
-
           {/* Statistics */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-app-border bg-app-surface p-3">
@@ -257,6 +248,8 @@ export function FaqPage() {
           ))}
         </div>
       </main>
+
+      {rebuildDialog}
     </div>
   );
 }

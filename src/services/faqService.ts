@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { FAQOverview, FAQDetail } from "../features/faq/types";
+import type { FAQOverview, FAQDetail, FAQRebuildScope } from "../features/faq/types";
 import faqMock from "../mocks/faqMock.json";
 import faqDetailMock from "../mocks/faqDetailMock.json";
 
@@ -40,16 +40,29 @@ export const insightsService = {
   },
 
   /**
-   * Triggers the backend to (re)build the FAQ groups via the AI service.
+   * Triggers the backend to regroup the project's questions from scratch.
    *
-   * Unlike the fetch methods, this does not fall back to mock data: the caller
-   * needs to know whether the refresh actually succeeded, so errors propagate.
+   * Destructive: it replaces the stored entries, so anything outside `scope` is
+   * gone from the counts afterwards. Unlike the fetch methods this does not
+   * fall back to mock data — the caller needs to know whether it succeeded, so
+   * errors propagate.
    *
-   * @returns The number of groups stored after the refresh.
+   * @returns The number of groups stored after the rebuild.
    */
-  async refreshFAQGroups(projectId: string): Promise<{ groupCount: number }> {
+  async refreshFAQGroups(
+    projectId: string,
+    scope: FAQRebuildScope = {},
+  ): Promise<{ groupCount: number }> {
+    const params = new URLSearchParams({ projectId });
+    if (scope.questionLimit !== undefined) {
+      params.set("questionLimit", String(scope.questionLimit));
+    }
+    if (scope.sinceMonths !== undefined) {
+      params.set("sinceMonths", String(scope.sinceMonths));
+    }
+
     return await apiClient.fetch<{ groupCount: number }>(
-      `/api/v1/insights/faq/refresh?projectId=${encodeURIComponent(projectId)}`,
+      `/api/v1/insights/faq/refresh?${params.toString()}`,
       { method: "POST" },
     );
   },

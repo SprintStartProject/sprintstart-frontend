@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FaqPage } from "../../../../../src/features/faq/components/FaqPage";
 import type { FAQOverview } from "../../../../../src/features/faq/types";
@@ -25,7 +26,7 @@ const mockOverview: FAQOverview = {
       topDocuments: [{ id: "d2", title: "X Doc" }],
     },
   ],
-  rebuildQuestionCount: 15,
+  questionCount: 15,
   rebuildQuestionLimit: 2000,
 };
 
@@ -38,6 +39,7 @@ vi.mock("../../../../../src/services/faqService", () => ({
 }));
 
 import { useLiveFetch } from "../../../../../src/hooks/useLiveFetch";
+import { insightsService } from "../../../../../src/services/faqService";
 
 const loaded = {
   data: mockOverview,
@@ -103,20 +105,37 @@ describe("FaqPage", () => {
     expect(screen.getByText("Quiet · 1")).toBeInTheDocument();
   });
 
-  it("says how many questions the rebuild would use", () => {
+  it("asks before rebuilding instead of doing it on the click", async () => {
+    const user = userEvent.setup();
     renderPage();
-    expect(screen.getByText("Rebuild uses 15 questions")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+
+    // A rebuild replaces the entries, rewrites the titles and breaks entry
+    // links — none of it undoable by pressing the button again.
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText(/replaces the current entries/)).toBeInTheDocument();
+    expect(insightsService.refreshFAQGroups).not.toHaveBeenCalled();
   });
 
-  it("warns when the rebuild would drop the older questions", () => {
-    vi.mocked(useLiveFetch).mockReturnValueOnce({
-      ...loaded,
-      data: { ...mockOverview, rebuildQuestionCount: 2000 },
-    });
+  it("says how much material the rebuild has to work with", async () => {
+    const user = userEvent.setup();
     renderPage();
-    // A rebuild replaces the FAQ, so anything past the cap leaves the counts
-    // with it. That belongs before the click, not after.
-    expect(screen.getByText("Rebuild uses the newest 2,000 questions")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+
+    expect(await screen.findByText("15 questions asked in this project.")).toBeInTheDocument();
+  });
+
+  it("rebuilds over everything by default", async () => {
+    const user = userEvent.setup();
+    vi.mocked(insightsService.refreshFAQGroups).mockResolvedValue({ groupCount: 2 });
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+    await user.click(await screen.findByRole("button", { name: "Rebuild" }));
+
+    expect(insightsService.refreshFAQGroups).toHaveBeenCalledWith("proj1", {});
   });
 
   it("shows loading state", () => {
