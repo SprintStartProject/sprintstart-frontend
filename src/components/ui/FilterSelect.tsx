@@ -299,7 +299,13 @@ export function FilterSelect<TValue extends string>({
             }
             // `p-1.5` is not cosmetic: the list clips its own overflow, so this
             // padding is the only room a magnified option has to grow into.
-            className={`max-h-64 overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl ${
+            //
+            // The horizontal axis is pinned shut rather than left to itself:
+            // `overflow-y: auto` alone makes the other axis compute to `auto`
+            // too, and the magnified option is 3% wider than the list — beyond
+            // roughly 200px of width that exceeds the padding it grows into and
+            // raises a horizontal scrollbar for the 6px it overshoots by.
+            className={`max-h-64 overflow-x-hidden overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl ${
               menuInPortal
                 ? // Above the modal overlay's own z-50, since a body portal is
                   // only a sibling of it rather than a descendant.
