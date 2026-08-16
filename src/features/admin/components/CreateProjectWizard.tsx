@@ -1,41 +1,32 @@
-import { useCallback, useEffect, useId, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { Field } from "../../../components/ui/Field";
-import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
-import { Select } from "../../../components/ui/Select";
-import { Textarea } from "../../../components/ui/Textarea";
 import { Stepper } from "../../../components/ui/Stepper";
 import { useToast } from "../../../context/useToast";
-import { ApiError } from "../../../services/apiClient";
 import {
   projectService,
   type AdminProjectDetails,
   type ProjectManager,
 } from "../../../services/projectService";
-import { connectJiraInstance } from "../../../services/sources/jiraService";
 import {
+  addDraftSource,
   connectDraftSources,
   createDraftSourceFromDiscovery,
   hasFailedSources,
   removeDraftSource,
   type DraftSource,
 } from "../projectSourcesDraft";
-import {
-  GithubRepositoryDiscovery,
-  type DiscoverySelection,
-} from "../../data-ingestion/components/GithubRepositoryDiscovery";
-import { JiraConnectStep } from "../../data-ingestion/components/JiraConnectStep";
-import { SourceTypeStep } from "../../data-ingestion/components/SourceTypeStep";
-import { SOURCE_SYSTEMS } from "../../data-ingestion/data";
+import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
-import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
-import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel";
-import { MemberPicker } from "./MemberPicker";
-import { StagedSourceList } from "./StagedSourceList";
-import { toggleSelectedUserId, toggleVisibleUserSelection } from "../data";
+import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
+import { WizardDetailsStep } from "./wizard/steps/WizardDetailsStep";
+import { WizardMembersStep } from "./wizard/steps/WizardMembersStep";
+import { WizardSourcesStep } from "./wizard/steps/WizardSourcesStep";
+import { WizardReviewStep } from "./wizard/steps/WizardReviewStep";
+import { WizardProvisioning } from "./wizard/steps/WizardProvisioning";
+import { AddSourceFlow, type AddSourceStep } from "./wizard/sources/AddSourceFlow";
 
 type CreateProjectWizardProps = {
   isOpen: boolean;
@@ -51,29 +42,33 @@ type CreateProjectWizardProps = {
   onProjectCreated: (project: AdminProjectDetails) => void;
 };
 
-type WizardStep = "details" | "people" | "sources";
-// Within the sources step, the source-type choice and the type-specific detail
-// are shown one after another (like the Data Ingestion "Add source" flow).
-type SourceStep = "type" | "detail";
+/** The four editable steps plus the terminal provisioning screen. */
+type WizardPhase = "details" | "members" | "sources" | "review" | "provisioning";
+
+const STEP_LABELS = ["Details", "Members", "Sources", "Review"];
+const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
+  details: 0,
+  members: 1,
+  sources: 2,
+  review: 3,
+};
+
+// Phase 2 stages GitHub repositories only; Jira and Upload still render in the
+// type grid (as "Soon") and are wired in the following phases.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB"];
 
 /**
- * Three-step flow for creating a project: its metadata, who works on it, and
- * optionally the sources to attach.
+ * Transactional create-project wizard: everything is drafted locally across the
+ * Details → Members → Sources → Review steps and committed by a single "Create
+ * project". That commit drives the provisioning screen, the one place real work
+ * happens — the project is created, members and the manager are assigned, and
+ * each staged source is connected with live per-row status and retry.
  *
- * People get a step of their own rather than sitting under the metadata fields:
- * picking a manager and ticking members off a list is a different kind of work
- * than typing a name, and putting both on one screen made the first step long
- * enough to scroll.
- *
- * The project is created no earlier than the type-specific "connect" action, so
- * cancelling out of the wizard before then leaves nothing behind. Which action
- * that is depends on the connector: GitHub stages the selected repositories and
- * connects them on finish; Jira creates the project and connects the instance in
- * one step; Upload has to attach files to a live project, so it creates the
- * project explicitly first and then reveals the drop zone. Because creation and
- * connecting are separate backend calls, a source failure cannot roll the
- * project back — the wizard therefore stays open on a partial failure and offers
- * a retry rather than pretending the whole operation failed.
+ * Nothing hits the backend before that commit, so cancelling out of any step
+ * leaves nothing behind. Because creating the project and connecting its sources
+ * are separate calls, a source failure cannot roll the project back — the wizard
+ * therefore stays on the provisioning screen and offers a per-source retry that
+ * reuses the already-created project instead of making a second one.
  */
 export function CreateProjectWizard({
   isOpen,
@@ -82,12 +77,8 @@ export function CreateProjectWizard({
   onClose,
   onProjectCreated,
 }: CreateProjectWizardProps) {
-  const nameInputId = useId();
-  const descriptionInputId = useId();
-  const managerSelectId = useId();
+  const [phase, setPhase] = useState<WizardPhase>("details");
 
-  const [step, setStep] = useState<WizardStep>("details");
-  const [sourceStep, setSourceStep] = useState<SourceStep>("type");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [managerId, setManagerId] = useState("");
@@ -97,41 +88,23 @@ export function CreateProjectWizard({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState("");
 
-  // Source type chosen on step 2. All three connectors are now wired: GitHub
-  // stages repositories, Jira connects an instance, Upload attaches files.
-  const [selectedType, setSelectedType] = useState<SourceSystem>("GITHUB");
-  // The resolved multi-select from the GitHub discovery picker, staged until the
-  // project is created and the repositories are connected against it.
-  const [selection, setSelection] = useState<DiscoverySelection[]>([]);
-  const [tokenName, setTokenName] = useState(tokenNames[0] ?? "");
-
-  // --- Jira connect form ---
-  const [jiraDisplayName, setJiraDisplayName] = useState("");
-  const [jiraUrl, setJiraUrl] = useState("");
-  const [jiraCredentialName, setJiraCredentialName] = useState("");
-
   const [sources, setSources] = useState<DraftSource[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  // Locks Back/Cancel while an upload batch is in flight.
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
-  // `submitError` now only carries the inline, pre-submit validation shown at
-  // the step; the create/connect requests report their own outcome via toasts.
-  const [submitError, setSubmitError] = useState("");
-  // Set once the project exists, so a retry after a partial failure connects
-  // the remaining sources instead of creating a second project.
+
+  // Add-source sub-flow, shown over the Sources step. `addFlowKey` remounts the
+  // GitHub picker on each open so a new "Add source" starts from a clean slate.
+  const [isAddingSource, setIsAddingSource] = useState(false);
+  const [addStep, setAddStep] = useState<AddSourceStep>("type");
+  const [addType, setAddType] = useState<SourceSystem>("GITHUB");
+  const [addFlowKey, setAddFlowKey] = useState(0);
+  const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
+  const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
+
   const [createdProjectId, setCreatedProjectId] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
 
-  const isGithub = selectedType === "GITHUB";
-  const isJira = selectedType === "JIRA";
-  const isUpload = selectedType === "UPLOAD";
-
-  const {
-    credentials: jiraCredentials,
-    loaded: jiraCredentialsLoaded,
-    error: jiraCredentialsError,
-    isRefreshing: jiraCredentialsLoading,
-  } = useJiraCredentials(isOpen && isJira);
+  const trimmedName = name.trim();
+  const isNameValid = trimmedName.length > 0;
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -139,26 +112,11 @@ export function CreateProjectWizard({
     if (tokenNames.length === 0) return;
 
     void Promise.resolve().then(() => {
-      setTokenName((current) =>
+      setGithubTokenName((current) =>
         current && tokenNames.includes(current) ? current : tokenNames[0],
       );
     });
   }, [tokenNames]);
-
-  // Same adoption pattern for the Jira credential picker: select the first
-  // stored credential once the list arrives, keeping a still-valid choice.
-  useEffect(() => {
-    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
-
-    void Promise.resolve().then(() => {
-      setJiraCredentialName((current) => {
-        if (jiraCredentials.length === 0) return "";
-        return current && jiraCredentials.some((credential) => credential.displayName === current)
-          ? current
-          : jiraCredentials[0].displayName;
-      });
-    });
-  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
@@ -184,58 +142,95 @@ export function CreateProjectWizard({
   }, [isOpen, loadManagerCandidates]);
 
   const resetWizard = () => {
-    setStep("details");
-    setSourceStep("type");
+    setPhase("details");
     setName("");
     setDescription("");
     setManagerId("");
     setSelectedUserIds(new Set());
-    setSelectedType("GITHUB");
-    setSelection([]);
-    setJiraDisplayName("");
-    setJiraUrl("");
-    setJiraCredentialName("");
     setSources([]);
-    setSubmitError("");
+    setIsAddingSource(false);
+    setAddStep("type");
+    setAddType("GITHUB");
+    setGithubSelection([]);
     setCreatedProjectId("");
   };
 
-  // Switching type clears the state that belongs to the previous connector so
-  // the footer count and each step stay consistent with the current choice.
-  const handleSelectType = (type: SourceSystem) => {
-    setSelectedType(type);
-    setSubmitError("");
-    if (type !== "GITHUB") setSelection([]);
-  };
-
   const closeWizard = () => {
-    if (isSubmitting || isUploadingFiles) return;
+    if (isSubmitting) return;
 
     resetWizard();
     onClose();
   };
 
-  const trimmedName = name.trim();
-  const isNameValid = trimmedName.length > 0;
-  const selectedCount = selection.length;
-  const hasFailures = hasFailedSources(sources);
+  const managerName = useMemo(() => {
+    if (!managerId) return null;
 
-  const goToPeople = () => {
-    if (!isNameValid) return;
+    const candidate = managerCandidates.find((current) => current.id === managerId);
+    if (!candidate) return null;
 
-    setSubmitError("");
-    setStep("people");
+    const fullName = `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim();
+    return fullName || candidate.username;
+  }, [managerCandidates, managerId]);
+
+  // Members shown on Review, excluding the manager (rendered separately there).
+  const memberNames = useMemo(
+    () =>
+      users
+        .filter((user) => selectedUserIds.has(user.id) && user.id !== managerId)
+        .map(getDisplayName),
+    [users, selectedUserIds, managerId],
+  );
+
+  const memberCount = selectedUserIds.size + (managerId && !selectedUserIds.has(managerId) ? 1 : 0);
+
+  // --- Add-source sub-flow ---
+
+  const openAddSource = () => {
+    setGithubSelection([]);
+    setAddType("GITHUB");
+    setAddStep("type");
+    setAddFlowKey((key) => key + 1);
+    setIsAddingSource(true);
   };
 
-  const goToSources = () => {
-    if (!isNameValid) return;
-
-    setSubmitError("");
-    setSourceStep("type");
-    setStep("sources");
+  const closeAddSource = () => {
+    setIsAddingSource(false);
+    setGithubSelection([]);
   };
 
-  /** Creates the project unless a previous attempt already did. */
+  const handleSelectAddType = (type: SourceSystem) => {
+    // A "Soon" type (not yet wired) is inert until its phase lands.
+    if (!AVAILABLE_SOURCE_TYPES.includes(type)) return;
+
+    setAddType(type);
+    setAddStep("detail");
+  };
+
+  const backToTypeGrid = () => {
+    setAddStep("type");
+    setGithubSelection([]);
+  };
+
+  const canAddSource = addType === "GITHUB" && githubSelection.length > 0;
+
+  const commitAddSource = () => {
+    if (addType === "GITHUB") {
+      setSources((current) =>
+        githubSelection.reduce(
+          (accumulated, selection) =>
+            addDraftSource(accumulated, createDraftSourceFromDiscovery(selection, githubTokenName)),
+          current,
+        ),
+      );
+    }
+
+    closeAddSource();
+  };
+
+  // --- Commit + provisioning ---
+
+  /** Creates the project and assigns its people. Guarded so a retry never
+   * creates a second project. */
   const ensureProject = async (): Promise<string> => {
     if (createdProjectId) return createdProjectId;
 
@@ -244,9 +239,8 @@ export function CreateProjectWizard({
       description: description.trim() || undefined,
     });
 
-    // Members before the manager, mirroring `applyPeopleChanges`: assigning a
-    // manager also makes them a member, so doing it the other way round would
-    // depend on the order the ids happen to be in.
+    // Members before the manager: assigning a manager also makes them a member,
+    // so the reverse order would depend on the id order.
     let members = project.users;
     if (selectedUserIds.size > 0) {
       members = await projectService.assignUsersToProject(project.id, {
@@ -259,52 +253,41 @@ export function CreateProjectWizard({
     }
 
     setCreatedProjectId(project.id);
-    // The created-project response predates both calls above, so the members
-    // are folded back in before the page adds the project to its list.
+    // The created-project response predates both calls above, so the members are
+    // folded back in before the page adds the project to its list.
     onProjectCreated({ ...project, users: members });
 
     return project.id;
   };
 
-  const finish = async () => {
-    if (!isNameValid) return;
+  const handleCreate = async () => {
+    if (!isNameValid || isSubmitting) return;
 
     setIsSubmitting(true);
-    setSubmitError("");
 
     try {
-      // Materialize the staged drafts from the discovery selection on the first
-      // attempt; a retry reuses `sources`, which already carries per-repo status.
-      let toConnect = sources;
-      if (sources.length === 0 && selection.length > 0) {
-        toConnect = selection.map((item) => createDraftSourceFromDiscovery(item, tokenName));
-        setSources(toConnect);
-      }
-
       const projectId = await ensureProject();
 
-      if (toConnect.length === 0) {
+      if (sources.length === 0) {
         resetWizard();
         onClose();
         toast.success("Project created");
         return;
       }
 
-      const connectedSources = await connectDraftSources(projectId, toConnect, setSources);
+      setPhase("provisioning");
 
-      if (hasFailedSources(connectedSources)) {
-        // The project is already saved; keep the wizard open so the failed
-        // repositories can be retried or dropped without losing the list. The
-        // per-source rows already show which failed; the toast is the summary.
+      const connected = await connectDraftSources(projectId, sources, setSources);
+
+      if (hasFailedSources(connected)) {
+        // The project is saved; the failed rows stay on the provisioning screen
+        // with a retry. The per-source rows show which failed; the toast sums up.
         toast.warning("Project created", {
-          description: "Some repositories couldn't be connected.",
+          description: "Some sources couldn't be connected.",
         });
-        return;
+      } else {
+        toast.success("Project created");
       }
-
-      resetWizard();
-      onClose();
-      toast.success("Project created");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't create the project.");
     } finally {
@@ -314,391 +297,222 @@ export function CreateProjectWizard({
 
   const retrySource = async (sourceId: string) => {
     const source = sources.find((current) => current.id === sourceId);
-    if (!source || !createdProjectId) return;
+    if (!source || !createdProjectId || isSubmitting) return;
 
     setIsSubmitting(true);
-    setSubmitError("");
 
     try {
-      const retriedSources = await connectDraftSources(
-        createdProjectId,
-        [source],
-        (progressSources) =>
-          setSources((current) =>
-            current.map(
-              (currentSource) =>
-                progressSources.find((progressSource) => progressSource.id === currentSource.id) ??
-                currentSource,
-            ),
+      const retried = await connectDraftSources(createdProjectId, [source], (progressSources) =>
+        setSources((current) =>
+          current.map(
+            (currentSource) =>
+              progressSources.find((progress) => progress.id === currentSource.id) ?? currentSource,
           ),
+        ),
       );
 
-      if (hasFailedSources(retriedSources)) {
-        toast.error("Couldn't connect the repository.");
+      if (hasFailedSources(retried)) {
+        toast.error("Couldn't connect the source.");
       } else {
-        toast.success("Repository connected");
+        toast.success("Source connected");
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isDetailsStep = step === "details";
-  const isPeopleStep = step === "people";
-  // Once the project exists there is nothing left to cancel and going back
-  // would misrepresent the details as still editable, so the secondary button
-  // turns into a plain way out.
-  const isProjectCreated = Boolean(createdProjectId);
-  // The two halves of the sources step, shown only before the project exists.
-  const isTypeStep = step === "sources" && !isProjectCreated && sourceStep === "type";
-  const isDetailStep = step === "sources" && !isProjectCreated && sourceStep === "detail";
+  // --- Rendering ---
 
-  // Details → people → source type → repositories. The post-create staged list
-  // stays on the last step, which is where the repositories were being
-  // connected.
-  const stepIndex = isDetailsStep ? 0 : isPeopleStep ? 1 : isTypeStep ? 2 : 3;
-  const isBusy = isSubmitting || isUploadingFiles;
-  /**
-   * Creates the project and connects one Jira instance to it. The connect
-   * endpoint returns 202 with an empty body (progress surfaces through the
-   * ingestion-run history), so on success we just close. If the project was
-   * created but the connect failed, `createdProjectId` keeps the wizard on a
-   * retry that reuses the same project instead of creating another.
-   */
-  const finishJira = async () => {
-    if (!isNameValid) return;
+  const isProvisioning = phase === "provisioning";
+  const stepIndex = isProvisioning ? STEP_INDEX.review : STEP_INDEX[phase];
 
-    const displayName = jiraDisplayName.trim();
-    const url = jiraUrl.trim();
-    const credentialName = jiraCredentialName.trim();
+  const goBack = () => {
+    if (phase === "members") setPhase("details");
+    else if (phase === "sources") setPhase("members");
+    else if (phase === "review") setPhase("sources");
+  };
 
-    if (!displayName) {
-      setSubmitError("Enter a display name for the Jira instance.");
-      return;
+  const goForward = () => {
+    if (phase === "details" && isNameValid) setPhase("members");
+    else if (phase === "members") setPhase("sources");
+    else if (phase === "sources") setPhase("review");
+  };
+
+  const skipLabel = sources.length === 0 ? "Create without sources" : "Create, skip review";
+
+  const footer = (() => {
+    if (isProvisioning) {
+      return (
+        <Button
+          variant="primary"
+          onClick={closeWizard}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+        >
+          Done
+        </Button>
+      );
     }
 
-    if (!url) {
-      setSubmitError("Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).");
-      return;
-    }
-
-    if (!credentialName) {
-      setSubmitError("Select a stored Jira credential.");
-      return;
-    }
-
-    const selectedCredential = jiraCredentials.find(
-      (credential) => credential.displayName === credentialName,
-    );
-    if (!selectedCredential) {
-      setSubmitError("The selected Jira credential is no longer available.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setSubmitError("");
-
-    try {
-      const projectId = await ensureProject();
-
-      await connectJiraInstance({
-        displayName,
-        url,
-        userEmail: selectedCredential.userEmail,
-        tokenName: selectedCredential.displayName,
-        projectId,
-      });
-
-      resetWizard();
-      onClose();
-      toast.success("Project created");
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        toast.error(
-          "The Jira instance or credential could not be found. Check the URL and the selected credential.",
+    if (isAddingSource) {
+      if (addStep === "type") {
+        return (
+          <Button
+            variant="secondary"
+            onClick={closeAddSource}
+            icon={<ArrowLeft className="h-4 w-4" />}
+          >
+            Back to list
+          </Button>
         );
-      } else if (error instanceof ApiError && error.status === 502) {
-        toast.error("The Jira server could not be reached. Check the instance URL and try again.");
-      } else {
-        toast.error(error instanceof Error ? error.message : "Couldn't connect the Jira instance.");
       }
-    } finally {
-      setIsSubmitting(false);
+
+      return (
+        <>
+          <Button
+            variant="secondary"
+            onClick={backToTypeGrid}
+            icon={<ArrowLeft className="h-4 w-4" />}
+          >
+            Back
+          </Button>
+          <Button
+            variant="primary"
+            onClick={commitAddSource}
+            disabled={!canAddSource}
+            icon={<Plus className="h-4 w-4" />}
+          >
+            Add to list
+          </Button>
+        </>
+      );
     }
-  };
 
-  /**
-   * Creates the project so files can be attached to it. Uploads go to a live
-   * project id, so unlike the staged connectors the project must exist before
-   * the drop zone is usable.
-   */
-  const createProjectForUpload = async () => {
-    if (!isNameValid) return;
+    const isDetails = phase === "details";
 
-    setIsSubmitting(true);
-    setSubmitError("");
+    return (
+      <>
+        <Button
+          variant="secondary"
+          onClick={isDetails ? closeWizard : goBack}
+          disabled={isSubmitting}
+          icon={isDetails ? undefined : <ArrowLeft className="h-4 w-4" />}
+        >
+          {isDetails ? "Cancel" : "Back"}
+        </Button>
 
-    try {
-      await ensureProject();
-      toast.success("Project created", { description: "Add files below to ingest them." });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't create the project.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+        {phase === "sources" && (
+          <Button variant="secondary" onClick={() => void handleCreate()} loading={isSubmitting}>
+            {skipLabel}
+          </Button>
+        )}
+
+        {phase === "review" ? (
+          <Button
+            variant="primary"
+            onClick={() => void handleCreate()}
+            loading={isSubmitting}
+            disabled={!isNameValid}
+            icon={<Check className="h-4 w-4" />}
+          >
+            Create project
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            onClick={goForward}
+            disabled={(isDetails && !isNameValid) || isSubmitting}
+            trailingIcon={<ArrowRight className="h-4 w-4" />}
+          >
+            Continue
+          </Button>
+        )}
+      </>
+    );
+  })();
 
   return (
     <Modal
       isOpen={isOpen}
       title="New Project"
       description={
-        <Stepper steps={["Details", "People", "Source type", "Connect"]} current={stepIndex} />
+        isProvisioning ? (
+          <p className="text-sm font-medium text-app-text">Creating project…</p>
+        ) : (
+          <Stepper steps={STEP_LABELS} current={stepIndex} />
+        )
       }
       size="xl"
-      isDismissDisabled={isBusy}
+      isDismissDisabled={isSubmitting}
       onClose={closeWizard}
       closeLabel="Close new project wizard"
-      footer={
-        <>
-          <Button
-            variant="secondary"
-            onClick={
-              isDetailsStep
-                ? closeWizard
-                : isProjectCreated
-                  ? closeWizard
-                  : isDetailStep
-                    ? () => {
-                        setSubmitError("");
-                        setSourceStep("type");
-                      }
-                    : isPeopleStep
-                      ? () => setStep("details")
-                      : () => setStep("people")
-            }
-            disabled={isBusy}
-            icon={isDetailsStep || isProjectCreated ? undefined : <ArrowLeft className="h-4 w-4" />}
-          >
-            {isDetailsStep ? "Cancel" : isProjectCreated ? "Done" : "Back"}
-          </Button>
-
-          {isTypeStep && (
-            // Lets the user create the project straight away, choosing to attach
-            // sources later from its Data Ingestion page instead of now.
-            <Button variant="secondary" onClick={() => void finish()} loading={isSubmitting}>
-              Skip for now
-            </Button>
-          )}
-
-          {isDetailsStep || isPeopleStep || isTypeStep ? (
-            <Button
-              variant="primary"
-              onClick={
-                isDetailsStep
-                  ? goToPeople
-                  : isPeopleStep
-                    ? goToSources
-                    : () => setSourceStep("detail")
-              }
-              disabled={(isDetailsStep && !isNameValid) || isSubmitting}
-              trailingIcon={<ArrowRight className="h-4 w-4" />}
-            >
-              Continue
-            </Button>
-          ) : isJira ? (
-            <Button
-              variant="primary"
-              onClick={() => void finishJira()}
-              loading={isSubmitting}
-              icon={<Check className="h-4 w-4" />}
-            >
-              {isProjectCreated ? "Retry Jira connection" : "Create and connect Jira instance"}
-            </Button>
-          ) : isUpload ? (
-            !isProjectCreated ? (
-              <Button
-                variant="primary"
-                onClick={() => void createProjectForUpload()}
-                loading={isSubmitting}
-                icon={<Check className="h-4 w-4" />}
-              >
-                Create project
-              </Button>
-            ) : null
-          ) : !isProjectCreated || hasFailures ? (
-            <Button
-              variant="primary"
-              onClick={() => void finish()}
-              loading={isSubmitting}
-              icon={<Check className="h-4 w-4" />}
-            >
-              {isProjectCreated
-                ? "Retry failed sources"
-                : selectedCount === 0
-                  ? "Create without sources"
-                  : `Create and connect ${selectedCount} ${
-                      selectedCount === 1 ? "repository" : "repositories"
-                    }`}
-            </Button>
-          ) : null}
-        </>
-      }
+      footer={footer}
     >
-      {submitError && (
-        <div className="mb-5 flex items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{submitError}</span>
-        </div>
+      {phase === "details" && (
+        <WizardDetailsStep
+          name={name}
+          description={description}
+          managerId={managerId}
+          managerCandidates={managerCandidates}
+          isLoadingCandidates={isLoadingCandidates}
+          candidatesError={candidatesError}
+          onNameChange={setName}
+          onDescriptionChange={setDescription}
+          onManagerChange={setManagerId}
+          onSubmit={goForward}
+        />
       )}
 
-      {isDetailsStep ? (
-        <form
-          id="create-project-details-form"
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            goToPeople();
-          }}
-        >
-          <Field label="Name" controlId={nameInputId}>
-            <Input value={name} onChange={(event) => setName(event.target.value)} />
-          </Field>
-
-          <Field label="Description" controlId={descriptionInputId}>
-            <Textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              minRows={4}
-              maxRows={12}
-            />
-          </Field>
-        </form>
-      ) : isPeopleStep ? (
-        <form
-          id="create-project-people-form"
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            goToSources();
-          }}
-        >
-          <Field label="Project manager" controlId={managerSelectId}>
-            <Select
-              value={managerId}
-              onChange={(event) => setManagerId(event.target.value)}
-              disabled={isLoadingCandidates || managerCandidates.length === 0}
-            >
-              <option value="">
-                {isLoadingCandidates
-                  ? "Loading candidates..."
-                  : managerCandidates.length === 0
-                    ? "No candidates available"
-                    : "No manager"}
-              </option>
-              {managerCandidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.firstName || candidate.lastName
-                    ? `${candidate.firstName} ${candidate.lastName}`.trim()
-                    : candidate.username}
-                </option>
-              ))}
-            </Select>
-
-            {candidatesError && (
-              <p className="flex items-start gap-2 text-sm text-app-danger-text">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{candidatesError}</span>
-              </p>
-            )}
-
-            <p className="text-xs text-app-text-muted">
-              The manager becomes a member automatically, so they do not have to be ticked below.
-            </p>
-          </Field>
-
-          <MemberPicker
-            users={users}
-            selectedUserIds={selectedUserIds}
-            disabled={isSubmitting}
-            label="Members"
-            onToggleUser={(userId) =>
-              setSelectedUserIds((current) => toggleSelectedUserId(current, userId))
-            }
-            onToggleVisible={(visibleUsers, allSelected) =>
-              setSelectedUserIds((current) =>
-                toggleVisibleUserSelection(current, visibleUsers, allSelected),
-              )
-            }
-          />
-        </form>
-      ) : isProjectCreated && isGithub ? (
-        // The project exists (e.g. after a partial failure): show the connect
-        // outcome per repository with retry/remove instead of the picker.
-        <StagedSourceList
-          sources={sources}
-          disabled={isSubmitting}
-          onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
-          onRetry={(sourceId) => void retrySource(sourceId)}
+      {phase === "members" && (
+        <WizardMembersStep
+          users={users}
+          selectedUserIds={selectedUserIds}
+          onChange={setSelectedUserIds}
         />
-      ) : isTypeStep ? (
-        <SourceTypeStep
-          selectedType={selectedType}
-          onSelectType={handleSelectType}
-          heading="Start data ingestion"
-          description="Connect a data source to this project now, or skip for now and add sources later from its Data Ingestion page."
-          availableTypes={SOURCE_SYSTEMS}
-        />
-      ) : isGithub ? (
-        isProjectCreated ? (
-          // The project exists (e.g. after a partial failure): show the connect
-          // outcome per repository with retry/remove instead of the picker.
-          <StagedSourceList
-            sources={sources}
-            disabled={isSubmitting}
-            onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
-            onRetry={(sourceId) => void retrySource(sourceId)}
+      )}
+
+      {phase === "sources" &&
+        (isAddingSource ? (
+          <AddSourceFlow
+            key={addFlowKey}
+            step={addStep}
+            selectedType={addType}
+            availableTypes={AVAILABLE_SOURCE_TYPES}
+            onSelectType={handleSelectAddType}
+            tokenNames={tokenNames}
+            githubTokenName={githubTokenName}
+            onGithubTokenNameChange={setGithubTokenName}
+            onGithubSelectionChange={setGithubSelection}
           />
         ) : (
-          <GithubRepositoryDiscovery
-            tokenNames={tokenNames}
-            projectId={null}
-            tokenName={tokenName}
-            onTokenNameChange={setTokenName}
-            onSelectionChange={setSelection}
-            isConnecting={isSubmitting}
+          <WizardSourcesStep
+            sources={sources}
+            onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
+            onAddSource={openAddSource}
           />
-        )
-      ) : isJira ? (
-        <JiraConnectStep
-          displayName={jiraDisplayName}
-          url={jiraUrl}
-          credentialName={jiraCredentialName}
-          credentials={jiraCredentials}
-          credentialsLoaded={jiraCredentialsLoaded}
-          credentialsLoading={jiraCredentialsLoading}
-          credentialsError={jiraCredentialsError}
-          isBusy={isSubmitting}
-          canIngest
-          errorMessage={null}
-          onDisplayNameChange={setJiraDisplayName}
-          onUrlChange={setJiraUrl}
-          onCredentialNameChange={setJiraCredentialName}
-          onSubmit={() => void finishJira()}
+        ))}
+
+      {phase === "review" && (
+        <WizardReviewStep
+          name={name}
+          description={description}
+          managerName={managerName}
+          memberNames={memberNames}
+          sources={sources}
+          onEditDetails={() => setPhase("details")}
+          onEditMembers={() => setPhase("members")}
+          onEditSources={() => setPhase("sources")}
         />
-      ) : createdProjectId ? (
-        <UploadArtifactPanel
-          projectId={createdProjectId}
-          onUploadSuccess={() => {}}
-          onFinished={closeWizard}
-          onUploadingChange={setIsUploadingFiles}
+      )}
+
+      {phase === "provisioning" && (
+        <WizardProvisioning
+          projectName={trimmedName}
+          memberCount={memberCount}
+          sources={sources}
+          disabled={isSubmitting}
+          onRetry={(sourceId) => void retrySource(sourceId)}
         />
-      ) : (
-        <div className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-relaxed text-app-text-muted">
-          Uploaded files attach to the project, so the project is created first. Choose{" "}
-          <span className="font-medium text-app-text">Create project</span> to add files now — you
-          can connect more sources afterwards from its Data Ingestion page.
-        </div>
       )}
     </Modal>
   );

@@ -15,7 +15,11 @@ type StagedSourceListProps = {
   sources: DraftSource[];
   /** Blocks the row actions while the parent runs a connect batch. */
   disabled?: boolean;
-  onRemove: (sourceId: string) => void;
+  /**
+   * Removes a staged source. Omitted on the provisioning screen, where the
+   * project already exists and dropping a row from the list would do nothing.
+   */
+  onRemove?: (sourceId: string) => void;
   /** Omitted where retrying makes no sense, e.g. before anything ran. */
   onRetry?: (sourceId: string) => void;
   /** Shown in place of the list when there are no staged sources. */
@@ -139,7 +143,7 @@ export function StagedSourceList({
               </Button>
             )}
 
-            {source.status !== "connected" && (
+            {source.status !== "connected" && onRemove && (
               <Button
                 variant="secondary"
                 size="sm"
