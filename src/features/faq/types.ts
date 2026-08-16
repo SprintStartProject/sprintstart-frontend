@@ -75,10 +75,13 @@ export interface FAQRebuildPreview {
 
 // ── FAQ DETAIL ──────────────────────────────────────────────
 
+/** One distinct phrasing an entry was asked in. */
 export interface FAQQuestion {
   id: string;
   text: string;
   askedAt?: string | null;
+  /** How often the entry was asked in exactly this wording. */
+  occurrences?: number;
   // askedBy: FAQAskedBy[];
 }
 

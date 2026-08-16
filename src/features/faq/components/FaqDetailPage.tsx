@@ -122,19 +122,30 @@ export function FaqDetailPage() {
             PM detail
           </div>
 
-          {/* Individual questions — newest first, capped by the backend */}
+          {/* Distinct phrasings — newest first, capped and de-duplicated by the backend */}
           <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
             <MessageSquareMore className="h-3.5 w-3.5" />
             How it is being asked ({detail.questions.length}
-            {detail.count > detail.questions.length && ` of ${detail.count}`})
+            {detail.questions.length === 1 ? " wording" : " wordings"} of {detail.count} asks)
           </div>
           <div className="mb-6 space-y-2">
             {detail.questions.map((q: FAQQuestion) => (
               <div key={q.id} className="rounded-xl bg-app-surface-muted p-4">
-                <p className="text-sm leading-snug text-app-text">{q.text}</p>
+                <p className="text-sm leading-snug text-app-text">
+                  {q.text}
+                  {/* Repeats collapse into a multiplier rather than repeating the
+                      line: ten identical rows say nothing the count does not, and
+                      they push the genuinely different wordings out of view. */}
+                  {(q.occurrences ?? 1) > 1 && (
+                    <span className="ml-1.5 text-xs font-medium text-app-text-muted">
+                      ({q.occurrences}×)
+                    </span>
+                  )}
+                </p>
 
                 {q.askedAt && (
                   <p className="mt-2 text-xs text-app-text-muted">
+                    {(q.occurrences ?? 1) > 1 ? "Last asked " : ""}
                     {formatAskedAt(q.askedAt)}
                   </p>
                 )}

@@ -7,6 +7,7 @@ import { insightsService } from "../../../services/faqService";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { TrendBadge } from "./TrendBadge";
 import { RebuildFaqDialog } from "./RebuildFaqDialog";
 import { formatAskedAt } from "../format";
@@ -16,15 +17,49 @@ import {
   FileText,
   AlertCircle,
   ArrowLeft,
+  Filter,
   MessageSquareMore,
   RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { useProjectContext } from "../../projects/useProjectContext";
 
+type FaqSortOption = "count" | "recent" | "trend" | "title";
+
+const SORT_OPTIONS: FilterSelectOption<FaqSortOption>[] = [
+  { value: "count", label: "Most asked" },
+  { value: "recent", label: "Recently asked" },
+  { value: "trend", label: "Picking up first" },
+  { value: "title", label: "Title" },
+];
+
+const TREND_ORDER: Record<NonNullable<FAQGroup["trend"]>, number> = {
+  RISING: 0,
+  STEADY: 1,
+  FADING: 2,
+};
+
+/**
+ * Every sort falls back to the times-asked order, so entries that tie on the
+ * chosen key still come out in a stable and meaningful sequence rather than
+ * whatever the backend happened to return.
+ */
+const SORTERS: Record<FaqSortOption, (a: FAQGroup, b: FAQGroup) => number> = {
+  count: (a, b) => b.count - a.count,
+  recent: (a, b) => (b.lastAskedAt ?? "").localeCompare(a.lastAskedAt ?? "") || b.count - a.count,
+  trend: (a, b) =>
+    TREND_ORDER[a.trend ?? "STEADY"] - TREND_ORDER[b.trend ?? "STEADY"] ||
+    (b.recentCount ?? 0) - (a.recentCount ?? 0) ||
+    b.count - a.count,
+  title: (a, b) => a.title.localeCompare(b.title),
+};
+
 export function FaqPage() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
+
+  const [sortBy, setSortBy] = useState<FaqSortOption>("count");
+  const [hideOneOffs, setHideOneOffs] = useState(false);
 
   const [isRebuildDialogOpen, setRebuildDialogOpen] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
@@ -38,23 +73,24 @@ export function FaqPage() {
     refresh,
   } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
 
-  const handleRebuild = async (scope: FAQRebuildScope) => {
+  // Closes first, then works. A rebuild takes as long as an AI call and there is
+  // nothing to watch — holding the dialog open would pin the PM to a spinner for
+  // no information, so the button carries the progress and the page stays usable.
+  const handleRebuild = (scope: FAQRebuildScope) => {
+    setRebuildDialogOpen(false);
     setRebuilding(true);
     setRebuildError(undefined);
-    try {
-      await insightsService.refreshFAQGroups(selectedProjectId, scope);
-      refresh();
-      setRebuildDialogOpen(false);
-    } catch (err) {
-      console.error("FAQ rebuild failed", err);
-      // Kept in the dialog rather than behind it: the choice that failed is
-      // still on screen, and retrying is one click from here.
-      setRebuildError(
-        "Rebuild failed. Is the AI service running and are there questions to group?",
-      );
-    } finally {
-      setRebuilding(false);
-    }
+
+    void insightsService
+      .refreshFAQGroups(selectedProjectId, scope)
+      .then(() => refresh())
+      .catch((err: unknown) => {
+        console.error("FAQ rebuild failed", err);
+        setRebuildError(
+          "Rebuild failed. Is the AI service running and are there questions to group?",
+        );
+      })
+      .finally(() => setRebuilding(false));
   };
 
   const openRebuildDialog = () => {
@@ -69,11 +105,12 @@ export function FaqPage() {
     <Button
       variant="secondary"
       onClick={openRebuildDialog}
+      loading={rebuilding}
       icon={<RefreshCw className="h-4 w-4" />}
       className="shrink-0"
       title="Regroup every question from scratch"
     >
-      Rebuild grouping
+      {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
     </Button>
   );
 
@@ -81,10 +118,8 @@ export function FaqPage() {
     <RebuildFaqDialog
       isOpen={isRebuildDialogOpen}
       projectId={selectedProjectId}
-      isRebuilding={rebuilding}
-      errorMessage={rebuildError}
       onClose={() => setRebuildDialogOpen(false)}
-      onConfirm={(scope) => void handleRebuild(scope)}
+      onConfirm={handleRebuild}
     />
   );
 
@@ -105,18 +140,28 @@ export function FaqPage() {
           something.
         </p>
         {rebuildButton}
+        {rebuildError && (
+          <p className="max-w-md text-center text-sm text-app-danger-text">{rebuildError}</p>
+        )}
         {rebuildDialog}
       </div>
     );
   }
 
-  const sorted = [...overview.groups].sort((a, b) => b.count - a.count);
-  const totalGroups = sorted.length;
-  const totalQuestions = sorted.reduce((sum, group) => sum + group.count, 0);
-  const risingCount = sorted.filter((group) => group.trend === "RISING").length;
+  const allGroups = overview.groups;
+  const totalGroups = allGroups.length;
+  const totalQuestions = allGroups.reduce((sum, group) => sum + group.count, 0);
+  const risingCount = allGroups.filter((group) => group.trend === "RISING").length;
   const totalDocuments = new Set(
-    sorted.flatMap((group) => group.topDocuments.map((doc) => doc.id)),
+    allGroups.flatMap((group) => group.topDocuments.map((doc) => doc.id)),
   ).size;
+  const oneOffCount = allGroups.filter((group) => group.count <= 1).length;
+
+  // A question asked once is not yet a recurring question — it is noise in a
+  // panel whose whole subject is repetition, and at the entry ceiling it is
+  // most of what fills the list.
+  const visible = hideOneOffs ? allGroups.filter((group) => group.count > 1) : allGroups;
+  const sorted = [...visible].sort(SORTERS[sortBy]);
 
   const goToDetail = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
 
@@ -206,6 +251,37 @@ export function FaqPage() {
 
       {/* Content */}
       <main className="app-page-content py-8">
+        <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button
+            variant={hideOneOffs ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setHideOneOffs((hidden) => !hidden)}
+            icon={<Filter className="h-3.5 w-3.5" />}
+            aria-pressed={hideOneOffs}
+          >
+            Asked more than once
+          </Button>
+          <span className="text-xs text-app-text-muted">
+            {hideOneOffs
+              ? `${oneOffCount} one-off ${oneOffCount === 1 ? "question" : "questions"} hidden`
+              : `${sorted.length} of ${totalGroups} shown`}
+          </span>
+
+          <FilterSelect
+            label="Sort recurring questions"
+            value={sortBy}
+            options={SORT_OPTIONS}
+            onChange={setSortBy}
+            className="ml-auto"
+          />
+        </div>
+
+        {sorted.length === 0 && (
+          <p className="py-12 text-center text-sm text-app-text-muted">
+            Every question here has only been asked once so far.
+          </p>
+        )}
+
         <div className="space-y-3">
           {sorted.map((group) => (
             <button

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FaqPage } from "../../../../../src/features/faq/components/FaqPage";
@@ -24,6 +24,15 @@ const mockOverview: FAQOverview = {
       recentCount: 1,
       trend: "FADING",
       topDocuments: [{ id: "d2", title: "X Doc" }],
+    },
+    {
+      groupId: "g3",
+      count: 1,
+      title: "Asked once only",
+      question: "Where is the changelog?",
+      recentCount: 1,
+      trend: "RISING",
+      topDocuments: [],
     },
   ],
   questionCount: 15,
@@ -69,7 +78,6 @@ describe("FaqPage", () => {
       totalQuestionCount: 15,
       rebuildQuestionLimit: 2000,
       windows: [
-        { sinceDays: 1, questionCount: 2 },
         { sinceDays: 7, questionCount: 5 },
         { sinceDays: 30, questionCount: 11 },
         { sinceDays: 90, questionCount: 15 },
@@ -132,15 +140,18 @@ describe("FaqPage", () => {
     expect(insightsService.refreshFAQGroups).not.toHaveBeenCalled();
   });
 
-  it("says how much each scope would cover, so the choice can be made on numbers", async () => {
+  it("puts the selected scope's question count on the confirm button", async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
 
-    expect(await screen.findByRole("radio", { name: /All questions/ })).toBeChecked();
-    expect(await screen.findByText("2 questions")).toBeInTheDocument();
-    expect(screen.getByText("11 questions")).toBeInTheDocument();
+    // In the label rather than beside it, so the number and the action that
+    // consumes it cannot drift apart on screen.
+    expect(await screen.findByRole("button", { name: "Rebuild 15 questions" })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/Questions to regroup/), "30");
+    expect(await screen.findByRole("button", { name: "Rebuild 11 questions" })).toBeInTheDocument();
   });
 
   it("rebuilds only over the chosen window", async () => {
@@ -149,10 +160,10 @@ describe("FaqPage", () => {
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
-    await user.click(await screen.findByRole("radio", { name: /Asked today/ }));
-    await user.click(screen.getByRole("button", { name: "Rebuild" }));
+    await user.selectOptions(await screen.findByLabelText(/Questions to regroup/), "30");
+    await user.click(screen.getByRole("button", { name: /^Rebuild \d/ }));
 
-    expect(insightsService.refreshFAQGroups).toHaveBeenCalledWith("proj1", { sinceDays: 1 });
+    expect(insightsService.refreshFAQGroups).toHaveBeenCalledWith("proj1", { sinceDays: 30 });
   });
 
   it("warns that a narrowed scope drops the rest", async () => {
@@ -160,7 +171,7 @@ describe("FaqPage", () => {
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
-    await user.click(await screen.findByRole("radio", { name: /Asked today/ }));
+    await user.selectOptions(await screen.findByLabelText(/Questions to regroup/), "30");
 
     // A rebuild replaces the FAQ, so anything outside the window leaves the
     // counts with it. That belongs before the click, not after.
@@ -173,9 +184,45 @@ describe("FaqPage", () => {
     renderPage();
 
     await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
-    await user.click(await screen.findByRole("button", { name: "Rebuild" }));
+    await user.click(await screen.findByRole("button", { name: /^Rebuild \d/ }));
 
     expect(insightsService.refreshFAQGroups).toHaveBeenCalledWith("proj1", {});
+  });
+
+  it("closes the dialog immediately and reports progress on the button", async () => {
+    const user = userEvent.setup();
+    let finish: (value: { groupCount: number }) => void = () => {};
+    vi.mocked(insightsService.refreshFAQGroups).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+    await user.click(await screen.findByRole("button", { name: /^Rebuild \d/ }));
+
+    // A rebuild takes as long as an AI call and there is nothing to watch;
+    // pinning the PM to a spinner would buy no information.
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Rebuilding/ })).toBeInTheDocument();
+
+    finish({ groupCount: 2 });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Rebuild grouping/ })).toBeInTheDocument(),
+    );
+  });
+
+  it("hides one-off questions when asked to", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /Asked more than once/ }));
+
+    // A question asked once is not yet recurring — it is noise in a panel whose
+    // whole subject is repetition.
+    expect(screen.getByText("Deploying to production")).toBeInTheDocument();
+    expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
   });
 
   it("shows loading state", () => {
