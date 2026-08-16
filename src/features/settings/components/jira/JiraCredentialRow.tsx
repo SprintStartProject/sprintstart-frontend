@@ -4,6 +4,7 @@ import { KeyRound, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { Field } from "../../../../components/ui/Field";
 import { Input } from "../../../../components/ui/Input";
+import { useToast } from "../../../../context/useToast";
 import { centralSpringToken } from "../../../../styles/tokens";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
 import {
@@ -32,53 +33,55 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
 
   const [panel, setPanel] = useState<Panel>("none");
   const [value, setValue] = useState("");
-  const [error, setError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const busyRef = useRef(false);
+  const toast = useToast();
 
   const openRename = () => {
     setPanel("rename");
     setValue(displayName);
-    setError("");
   };
   const openRotate = () => {
     setPanel("rotate");
     setValue("");
-    setError("");
   };
   const openDelete = () => {
     setPanel("delete");
-    setError("");
   };
   const close = () => {
     if (busyRef.current) return;
     setPanel("none");
-    setError("");
   };
 
   /**
-   * Runs a mutation, then refreshes the list. A failed mutation keeps the
-   * panel open with the server message; a mutation that succeeds but whose
-   * refetch fails still closes with a distinct "couldn't refresh" note.
+   * Runs a mutation, then refreshes the list. A failed mutation keeps the panel
+   * open and surfaces the server message as an error toast; a mutation that
+   * succeeds but whose refetch fails still closes, with a "saved, but stale"
+   * warning toast; a full success closes with a success toast.
    */
-  const runMutation = async (mutate: () => Promise<unknown>, fallback: string) => {
+  const runMutation = async (
+    mutate: () => Promise<unknown>,
+    fallback: string,
+    successMessage: string,
+  ) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setIsBusy(true);
-    setError("");
     try {
       try {
         await mutate();
       } catch (mutationError) {
-        setError(parseApiError(mutationError, fallback));
+        toast.error(parseApiError(mutationError, fallback));
         return;
       }
       try {
         await onSaved();
       } catch (refreshError) {
-        setError(describeRefreshFailure(refreshError));
+        toast.warning(describeRefreshFailure(refreshError));
+        setPanel("none");
         return;
       }
+      toast.success(successMessage);
       setPanel("none");
     } finally {
       busyRef.current = false;
@@ -94,7 +97,8 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
           oldName: displayName,
           newName: value.trim(),
         }),
-      "Failed to rename credential.",
+      "Couldn't rename the credential.",
+      "Credential renamed",
     );
 
   const submitRotate = () =>
@@ -105,13 +109,15 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
           tokenName: displayName,
           newToken: value.trim(),
         }),
-      "Failed to rotate token.",
+      "Couldn't rotate the token.",
+      "Jira token rotated",
     );
 
   const confirmDelete = () =>
     void runMutation(
       () => deleteJiraCredential({ userEmail, tokenName: displayName }),
-      "Failed to delete credential.",
+      "Couldn't delete the credential.",
+      "Credential deleted",
     );
 
   return (
@@ -219,11 +225,6 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
                 </Button>
               </div>
             </div>
-            {error && (
-              <p role="alert" className="mt-3 text-sm text-app-danger-text">
-                {error}
-              </p>
-            )}
           </motion.form>
         )}
 
@@ -275,11 +276,6 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
                 </Button>
               </div>
             </div>
-            {error && (
-              <p role="alert" className="mt-3 text-sm text-app-danger-text">
-                {error}
-              </p>
-            )}
           </motion.form>
         )}
 
@@ -296,11 +292,6 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               Delete <strong>{displayName}</strong>? This cannot be undone and may break connected
               Jira instances.
             </p>
-            {error && (
-              <p role="alert" className="mb-2 text-sm text-app-danger-text">
-                {error}
-              </p>
-            )}
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 variant="danger"

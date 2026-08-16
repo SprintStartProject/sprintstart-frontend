@@ -1,13 +1,21 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GitBranch } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { SourceDetailsPanel } from "../../../../../src/features/data-ingestion/components/SourceDetailsPanel";
 import type {
   DataSource,
   GithubRepositoryDetails,
 } from "../../../../../src/features/data-ingestion/types";
 import { deriveSourceStatus } from "../../../../../src/features/data-ingestion/data";
+
+/**
+ * The panel now surfaces action outcomes through the app-wide toast system, so
+ * every render is wrapped in a ToastProvider — otherwise `useToast` no-ops and
+ * the success/error toasts never mount.
+ */
+const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
 
 const githubRepository: GithubRepositoryDetails = {
   owner: "acme",
@@ -195,9 +203,7 @@ describe("SourceDetailsPanel", () => {
 
     expect(onUpdateSource).toHaveBeenCalledWith(mockSource);
     await waitFor(() => {
-      expect(
-        screen.getByText("Update started. Details will refresh while ingestion runs."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Update started")).toBeInTheDocument();
     });
   });
 
@@ -217,7 +223,7 @@ describe("SourceDetailsPanel", () => {
 
     expect(onRefreshDetails).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(screen.getByText("Repository details refreshed.")).toBeInTheDocument();
+      expect(screen.getByText("Repository details refreshed")).toBeInTheDocument();
     });
   });
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import type { FAQGroup, FAQRebuildScope } from "../types";
 import { insightsService } from "../../../services/faqService";
+import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -63,7 +64,7 @@ export function FaqPage() {
 
   const [isRebuildDialogOpen, setRebuildDialogOpen] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
-  const [rebuildError, setRebuildError] = useState<string | undefined>(undefined);
+  const toast = useToast();
 
   const {
     data: overview,
@@ -76,27 +77,35 @@ export function FaqPage() {
   // Closes first, then works. A rebuild takes as long as an AI call and there is
   // nothing to watch — holding the dialog open would pin the PM to a spinner for
   // no information, so the button carries the progress and the page stays usable.
+  //
+  // Which is also why the outcome is reported as a toast: by the time it lands,
+  // the PM may be anywhere on the page, and an inline message next to the button
+  // was only ever rendered in the empty state.
   const handleRebuild = (scope: FAQRebuildScope) => {
     setRebuildDialogOpen(false);
     setRebuilding(true);
-    setRebuildError(undefined);
 
     void insightsService
       .refreshFAQGroups(selectedProjectId, scope)
-      .then(() => refresh())
+      .then((result) => {
+        refresh();
+        // Taken from the rebuild's own result rather than from the reloaded
+        // panel: useLiveFetch keeps the previous entries on screen while it
+        // revalidates, so no render marks the moment the new result arrived.
+        if (result.groupCount === 0) {
+          toast.info("Nothing to group yet", {
+            description: "No recurring questions were found for this project.",
+          });
+        }
+      })
       .catch((err: unknown) => {
         console.error("FAQ rebuild failed", err);
-        setRebuildError(
-          "Rebuild failed. Is the AI service running and are there questions to group?",
-        );
+        toast.error("Rebuild failed. Is the AI service running and are there questions to group?");
       })
       .finally(() => setRebuilding(false));
   };
 
-  const openRebuildDialog = () => {
-    setRebuildError(undefined);
-    setRebuildDialogOpen(true);
-  };
+  const openRebuildDialog = () => setRebuildDialogOpen(true);
 
   // The FAQ now updates itself as questions are asked, so this is a rebuild of
   // the whole grouping rather than the only way to see new questions — and it
@@ -140,9 +149,6 @@ export function FaqPage() {
           something.
         </p>
         {rebuildButton}
-        {rebuildError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{rebuildError}</p>
-        )}
         {rebuildDialog}
       </div>
     );

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import type { KnowledgeGapSeverity } from "../types";
 
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
 import { describeEmptyState } from "../emptyState";
@@ -53,7 +54,7 @@ export function KnowledgeGapsPage() {
   const navigate = useNavigate();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const toast = useToast();
 
   const {
     data: overview,
@@ -71,13 +72,20 @@ export function KnowledgeGapsPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setRefreshError(null);
     try {
-      await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
+      const result = await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
       refresh();
+      // Read off the refresh's own result rather than off the reloaded panel:
+      // useLiveFetch deliberately keeps the previous data on screen while it
+      // revalidates, so no render marks the moment the new result arrived.
+      if (result.gapCount === 0) {
+        toast.info("No knowledge gaps found", {
+          description: "Nothing needs attention for this project right now.",
+        });
+      }
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
-      setRefreshError("Refresh failed. Is the AI service running?");
+      toast.error("Refresh failed. Is the AI service running?");
     } finally {
       setRefreshing(false);
     }
@@ -118,9 +126,6 @@ export function KnowledgeGapsPage() {
           </p>
         )}
         {refreshButton}
-        {refreshError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
-        )}
       </div>
     );
   }
@@ -201,7 +206,6 @@ export function KnowledgeGapsPage() {
               )}
             </div>
           </div>
-          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
           <SeveritySummaryBar gaps={overview.gaps} className="mb-6" />
         </div>
       </section>

@@ -9,6 +9,7 @@ import { Select } from "../../../components/ui/Select";
 import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { getTeamOverview } from "../../../services/teamManagementService";
+import { useToast } from "../../../context/useToast";
 import { useFetch } from "../../../hooks/useFetch";
 import { formatDateTime, formatRelativeDate, daysSince } from "../format";
 import { SEVERITY_STYLES } from "../severity";
@@ -42,6 +43,7 @@ export function KnowledgeGapsDetailPage() {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [savingOwners, setSavingOwners] = useState(false);
+  const toast = useToast();
 
   const {
     data: gap,
@@ -97,8 +99,10 @@ export function KnowledgeGapsDetailPage() {
     try {
       await knowledgeGapService.setComponentOwners(selectedProjectId, gap.component, userIds);
       setRefreshKey((key) => key + 1);
+      toast.success(userIds.length === 0 ? "Owner removed" : "Owner updated");
     } catch (err) {
       console.error("Failed to update owner", err);
+      toast.error(err instanceof Error ? err.message : "Couldn't update the owner.");
     } finally {
       setSavingOwners(false);
     }

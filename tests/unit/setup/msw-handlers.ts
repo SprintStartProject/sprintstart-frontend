@@ -113,6 +113,12 @@ export const handlers = [
   // No connected sources by default; tests that care override this handler.
   http.get("/api/v1/ingestion-sources/status", () => HttpResponse.json([])),
 
+  // Stored credentials, empty by default. Any page rendering the access
+  // management view mounts every connector at once, so both are needed even in
+  // tests that are not about credentials at all.
+  http.get("/api/v1/github/pat", () => HttpResponse.json([])),
+  http.get("/api/v1/jira/credentials", () => HttpResponse.json([])),
+
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],

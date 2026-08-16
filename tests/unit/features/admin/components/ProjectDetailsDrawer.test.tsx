@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { ProjectDetailsDrawer } from "../../../../../src/features/admin/components/ProjectDetailsDrawer";
 import type {
   AdminProjectDetails,
@@ -21,6 +22,13 @@ vi.mock("../../../../../src/services/projectService", () => ({
 }));
 
 import { projectService } from "../../../../../src/services/projectService";
+
+/**
+ * Save/delete outcomes are toasts now, so every render is wrapped in a
+ * ToastProvider — otherwise `useToast` no-ops and the error/success toasts
+ * (e.g. a failed delete) never mount.
+ */
+const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
 
 const projectOverview: ProjectOverview = {
   id: "proj-1",

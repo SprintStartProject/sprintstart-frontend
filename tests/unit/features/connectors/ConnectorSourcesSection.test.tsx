@@ -1,11 +1,18 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { ConnectorSourcesSection } from "../../../../src/features/connectors/components/ConnectorSourcesSection";
 import { GitBranch } from "lucide-react";
 import type { ConnectorListItem } from "../../../../src/features/connectors/types";
+
+/**
+ * Save outcomes are surfaced as toasts now, so each render is wrapped in a
+ * ToastProvider — without it `useToast` no-ops and nothing would mount.
+ */
+const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
 
 const connector: ConnectorListItem = {
   id: "github",
@@ -89,7 +96,7 @@ describe("ConnectorSourcesSection", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Sources were updated, but confirming the change/i),
+        screen.getByText(/Confirming the change with the AI service failed/i),
       ).toBeInTheDocument();
     });
 

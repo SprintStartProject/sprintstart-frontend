@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { onboardingService } from "../../../services/onboardingService";
+import { useToast } from "../../../context/useToast";
 import { Modal } from "../../../components/ui/Modal";
 import type {
   PhaseCheckEndpoint,
@@ -61,8 +62,8 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
   const [loadError, setLoadError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, DraftAnswer>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<PhaseCheckAttemptResult | null>(null);
+  const toast = useToast();
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   // Anchor at the very top of the scrollable modal body. After grading, the user is
@@ -125,7 +126,6 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
   const submit = async () => {
     if (!check) return;
     setSubmitting(true);
-    setSubmitError(null);
     try {
       const payload: PhaseCheckAnswerSubmission[] = check.questions.map((question) =>
         toSubmission(question, getDraft(question.id)),
@@ -134,7 +134,7 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
       setResult(attemptResult);
       setHasSubmitted(true);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Unknown error");
+      toast.error(err instanceof Error ? err.message : "Couldn't submit the check.");
     } finally {
       setSubmitting(false);
     }
@@ -143,7 +143,6 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
   const retry = () => {
     setAnswers({});
     setResult(null);
-    setSubmitError(null);
   };
 
   const resultFor = (questionId: string): PhaseCheckAnswerResult | null =>
@@ -254,13 +253,6 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
             />
           ))}
         </div>
-      )}
-
-      {submitError && (
-        <p className="mt-4 flex items-center gap-2 text-sm text-app-danger-solid">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {submitError}
-        </p>
       )}
     </Modal>
   );

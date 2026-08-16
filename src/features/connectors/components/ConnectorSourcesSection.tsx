@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, RefreshCw, XCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
+import { useToast } from "../../../context/useToast.ts";
 import { connectorService } from "../../../services/connectorService.ts";
 import { buildSourceKey } from "../data.ts";
 import type {
@@ -41,8 +42,7 @@ export function ConnectorSourcesSection({
   const [loadedConnectorId, setLoadedConnectorId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftSourceChanges>(EMPTY_DRAFT);
   const [saveState, setSaveState] = useState<LoadingState>("idle");
-  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
-  const [saveMessageTone, setSaveMessageTone] = useState<"error" | "warning">("error");
+  const toast = useToast();
 
   const sourceKey = useMemo(() => buildSourceKey(sources), [sources]);
 
@@ -118,22 +118,17 @@ export function ConnectorSourcesSection({
       return { sourceKey, changedSourceIds };
     });
     setSaveState("idle");
-    setSaveErrorMessage(null);
-    setSaveMessageTone("error");
   };
 
   const discardChanges = () => {
     setDraft(EMPTY_DRAFT);
     setSaveState("idle");
-    setSaveErrorMessage(null);
-    setSaveMessageTone("error");
   };
 
   const saveChanges = async () => {
     if (!hasPendingChanges) return;
 
     setSaveState("loading");
-    setSaveErrorMessage(null);
 
     const patches = draftSources
       .filter((source) => activeDraft.changedSourceIds.has(source.id))
@@ -145,6 +140,7 @@ export function ConnectorSourcesSection({
       setSources(response.sources);
       setDraft(EMPTY_DRAFT);
       setSaveState("success");
+      toast.success("Sources updated");
       onSourcesSaved?.();
     } catch (error) {
       // The batch update may have persisted on the backend even though
@@ -168,22 +164,20 @@ export function ConnectorSourcesSection({
 
         if (matchesIntendedState) {
           setSaveState("success");
-          setSaveMessageTone("warning");
-          setSaveErrorMessage(
-            "Sources were updated, but confirming the change with the AI service failed. The in-scope list shown above is up to date.",
-          );
+          toast.warning("Sources updated", {
+            description:
+              "Confirming the change with the AI service failed, but the in-scope list above is up to date.",
+          });
           onSourcesSaved?.();
         } else {
           setSaveState("error");
-          setSaveMessageTone("error");
-          setSaveErrorMessage(error instanceof Error ? error.message : "Failed to update sources");
+          toast.error(error instanceof Error ? error.message : "Couldn't update the sources.");
         }
       } catch {
         // Could not confirm the true state either - fall back to a
         // plain failure and keep the draft so nothing is lost.
         setSaveState("error");
-        setSaveMessageTone("error");
-        setSaveErrorMessage(error instanceof Error ? error.message : "Failed to update sources");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the sources.");
       }
     }
   };
@@ -282,18 +276,6 @@ export function ConnectorSourcesSection({
               </div>
             );
           })}
-        </div>
-      )}
-
-      {saveErrorMessage && (
-        <div
-          className={
-            saveMessageTone === "warning"
-              ? "rounded-2xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text"
-              : "rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text"
-          }
-        >
-          {saveErrorMessage}
         </div>
       )}
 
