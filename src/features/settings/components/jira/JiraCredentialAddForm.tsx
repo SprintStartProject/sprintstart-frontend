@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { Field } from "../../../../components/ui/Field";
 import { Input } from "../../../../components/ui/Input";
+import { useToast } from "../../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
 import { addJiraCredential } from "../../../../services/sources/jiraService";
 
@@ -28,9 +29,9 @@ export function JiraCredentialAddForm({
   const [userEmail, setUserEmail] = useState(defaultUserEmail ?? "");
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
-  const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const toast = useToast();
 
   const emailInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +54,6 @@ export function JiraCredentialAddForm({
 
     savingRef.current = true;
     setIsSaving(true);
-    setError("");
     try {
       try {
         await addJiraCredential({
@@ -62,15 +62,18 @@ export function JiraCredentialAddForm({
           authToken: token.trim(),
         });
       } catch (mutationError) {
-        setError(parseApiError(mutationError, ADD_FALLBACK));
+        // Keep the form open so the user can correct the input.
+        toast.error(parseApiError(mutationError, ADD_FALLBACK));
         return;
       }
       try {
         await onSaved();
       } catch (refreshError) {
-        setError(describeRefreshFailure(refreshError));
+        toast.warning(describeRefreshFailure(refreshError));
+        onClose();
         return;
       }
+      toast.success("Jira credential added");
       onClose();
     } finally {
       savingRef.current = false;
@@ -140,12 +143,6 @@ export function JiraCredentialAddForm({
             autoComplete="off"
           />
         </Field>
-
-        {error && (
-          <p role="alert" className="text-sm text-app-danger-text">
-            {error}
-          </p>
-        )}
 
         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={handleClose} disabled={isSaving}>

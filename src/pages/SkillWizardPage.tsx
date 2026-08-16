@@ -12,10 +12,12 @@ import {
 import type { CreateSkillAssessmentRequest } from "../services/teamManagementService";
 import type { Skill, TeamOverviewUser } from "../features/team-management/types";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 
 export function SkillWizardPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const toast = useToast();
 
   const [user, setUser] = useState<TeamOverviewUser | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -61,7 +63,15 @@ export function SkillWizardPage() {
   }
 
   async function handleSubmit(assessments: CreateSkillAssessmentRequest[]) {
-    await saveUserSkillAssessments(assessments);
+    try {
+      await saveUserSkillAssessments(assessments);
+    } catch (error) {
+      // Re-throw so the wizard keeps itself open (and resets its saving state)
+      // instead of closing on a failed save.
+      toast.error(error instanceof Error ? error.message : "Couldn't save your assessment.");
+      throw error;
+    }
+
     if (user?.userId) {
       markSkillAssessmentPromptCompleted(user.userId);
     }
@@ -69,6 +79,7 @@ export function SkillWizardPage() {
       markSkillAssessmentPromptCompleted(profile.id);
     }
 
+    toast.success("Skill assessment saved");
     void navigate("/onboarding");
   }
 

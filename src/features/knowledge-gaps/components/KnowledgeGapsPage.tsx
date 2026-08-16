@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { KnowledgeGapSeverity } from "../types";
 
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { useToast } from "../../../context/useToast";
 import { useFetch } from "../../../hooks/useFetch";
 import { formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
@@ -53,7 +54,8 @@ export function KnowledgeGapsPage() {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const toast = useToast();
+  const pendingRefreshRef = useRef(false);
 
   const {
     data: overview,
@@ -66,17 +68,28 @@ export function KnowledgeGapsPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setRefreshError(null);
     try {
       await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
+      pendingRefreshRef.current = true;
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
-      setRefreshError("Refresh failed. Is the AI service running?");
+      toast.error("Refresh failed. Is the AI service running?");
     } finally {
       setRefreshing(false);
     }
   };
+
+  // Tell the user when a refresh they triggered still detected no gaps.
+  useEffect(() => {
+    if (loading || !pendingRefreshRef.current) return;
+    pendingRefreshRef.current = false;
+    if (overview && overview.gaps.length === 0) {
+      toast.info("No knowledge gaps found", {
+        description: "Nothing needs attention for this project right now.",
+      });
+    }
+  }, [loading, overview, toast]);
 
   const refreshButton = (
     <Button
@@ -106,9 +119,6 @@ export function KnowledgeGapsPage() {
           No knowledge gaps yet. Trigger a refresh to detect them.
         </p>
         {refreshButton}
-        {refreshError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
-        )}
       </div>
     );
   }
@@ -172,7 +182,6 @@ export function KnowledgeGapsPage() {
               )}
             </div>
           </div>
-          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
           <SeveritySummaryBar gaps={overview.gaps} className="mb-6" />
         </div>
       </section>

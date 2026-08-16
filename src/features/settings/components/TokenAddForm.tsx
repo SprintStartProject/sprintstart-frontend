@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
+import { useToast } from "../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../services/apiError";
 import { addGithubPat } from "../../../services/sources/githubService";
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from "../utils/patValidation";
@@ -20,9 +21,13 @@ type TokenAddFormProps = {
 export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
+  // `error` holds the inline messages shown next to the inputs: the client-side
+  // format check and the post-save refresh failure. Server-side mutation
+  // failures (e.g. a name clash) are surfaced as toasts instead.
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const toast = useToast();
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -52,17 +57,18 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
       try {
         await addGithubPat(trimmedName, trimmedToken);
       } catch (mutationError) {
-        setError(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
+        // Server-side failures (e.g. a name clash) surface as a toast; the
+        // inline error is reserved for the client-side format check above.
+        toast.error(parseApiError(mutationError, "Failed to add GitHub token."));
         return;
       }
-      // Mutation succeeded — closing now; if the refetch fails we surface
-      // a distinct message but still close the form (server state is correct).
       try {
         await onSaved();
       } catch (refreshError) {
         setError(describeRefreshFailure(refreshError));
         return;
       }
+      toast.success("GitHub token added");
       onClose();
     } finally {
       savingRef.current = false;

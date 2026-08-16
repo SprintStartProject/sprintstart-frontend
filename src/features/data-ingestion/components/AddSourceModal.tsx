@@ -5,6 +5,7 @@ import { Input } from "../../../components/ui/Input.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { Stepper } from "../../../components/ui/Stepper.tsx";
+import { useToast } from "../../../context/useToast.ts";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
   addRepositoryToProject,
@@ -89,7 +90,11 @@ export function AddSourceModal({
   const [selection, setSelection] = useState<DiscoverySelection[]>([]);
 
   const [connectState, setConnectState] = useState<"idle" | "loading" | "error">("idle");
+  // `connectError` holds only the inline, pre-submit validation shown at the
+  // step (no project, bad input, missing token); the connect request's own
+  // failure is surfaced as an error toast instead.
   const [connectError, setConnectError] = useState<string | null>(null);
+  const toast = useToast();
 
   const isGithub = selectedType === "GITHUB";
   const isJira = selectedType === "JIRA";
@@ -168,14 +173,15 @@ export function AddSourceModal({
       }
 
       setConnectState("idle");
+      toast.success("Sources connected", {
+        description: "Initial ingestion is running in the background.",
+      });
       onConnected();
       onClose();
     } catch (error) {
-      setConnectState("error");
-      setConnectError(
-        error instanceof Error
-          ? error.message
-          : "The selected repositories could not be connected.",
+      setConnectState("idle");
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't connect the selected repositories.",
       );
     }
   };
@@ -230,13 +236,14 @@ export function AddSourceModal({
       });
 
       setConnectState("idle");
+      toast.success("Repository connected", {
+        description: "Initial ingestion is running in the background.",
+      });
       onConnected();
       onClose();
     } catch (error) {
-      setConnectState("error");
-      setConnectError(
-        error instanceof Error ? error.message : "The repository could not be connected.",
-      );
+      setConnectState("idle");
+      toast.error(error instanceof Error ? error.message : "Couldn't connect the repository.");
     }
   };
 
@@ -305,23 +312,22 @@ export function AddSourceModal({
       });
 
       setConnectState("idle");
+      toast.success("Jira instance connected", {
+        description: "Initial ingestion is running in the background.",
+      });
       onConnected();
       onClose();
     } catch (error) {
-      setConnectState("error");
+      setConnectState("idle");
 
       if (error instanceof ApiError && error.status === 404) {
-        setConnectError(
+        toast.error(
           "The Jira instance or credential could not be found. Check the URL and the selected credential.",
         );
       } else if (error instanceof ApiError && error.status === 502) {
-        setConnectError(
-          "The Jira server could not be reached. Check the instance URL and try again.",
-        );
+        toast.error("The Jira server could not be reached. Check the instance URL and try again.");
       } else {
-        setConnectError(
-          error instanceof Error ? error.message : "The Jira instance could not be connected.",
-        );
+        toast.error(error instanceof Error ? error.message : "Couldn't connect the Jira instance.");
       }
     }
   };

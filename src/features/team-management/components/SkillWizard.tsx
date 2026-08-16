@@ -60,10 +60,15 @@ export function SkillWizard({
 
     setSaving(true);
 
-    await onSubmit(payload);
-
-    setSaving(false);
-    onClose();
+    try {
+      await onSubmit(payload);
+      onClose();
+    } catch {
+      // The submitter surfaces the failure (a toast); keep the wizard open so
+      // the ratings are not lost and the user can retry.
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

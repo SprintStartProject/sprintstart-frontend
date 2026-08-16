@@ -27,7 +27,6 @@ function AddCustomStepModalHarness() {
         estimatedMinutes={estimatedMinutes}
         tasks={tasks}
         addingStep={false}
-        errorMessage=""
         onTitleChange={setTitle}
         onDescriptionChange={setDescription}
         onExpectedOutcomeChange={setExpectedOutcome}

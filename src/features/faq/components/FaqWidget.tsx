@@ -4,11 +4,12 @@
 // zur Detailpage /insights/faq/:groupId
 // ============================================================
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import type { FAQGroup } from "../types";
 import { insightsService } from "../../../services/faqService";
+import { useToast } from "../../../context/useToast";
 import { useFetch } from "../../../hooks/useFetch";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Badge } from "../../../components/ui/Badge";
@@ -27,7 +28,8 @@ export function FaqWidget() {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const toast = useToast();
+  const pendingRefreshRef = useRef(false);
 
   const {
     data: overview,
@@ -40,19 +42,28 @@ export function FaqWidget() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setRefreshError(null);
     try {
       await insightsService.refreshFAQGroups(selectedProjectId);
+      pendingRefreshRef.current = true;
       setRefreshKey((key) => key + 1);
     } catch (err) {
       console.error("FAQ refresh failed", err);
-      setRefreshError(
-        "Refresh failed. Is the AI service running and are there questions to group?",
-      );
+      toast.error("Refresh failed. Is the AI service running and are there questions to group?");
     } finally {
       setRefreshing(false);
     }
   };
+
+  // Tell the user when a refresh they triggered still found nothing to group.
+  useEffect(() => {
+    if (loading || !pendingRefreshRef.current) return;
+    pendingRefreshRef.current = false;
+    if (overview && overview.groups.length === 0) {
+      toast.info("Nothing to group yet", {
+        description: "No recurring questions were found for this project.",
+      });
+    }
+  }, [loading, overview, toast]);
 
   // ── LOADING ──────────────────────────────────────────────
 
@@ -92,7 +103,6 @@ export function FaqWidget() {
             Open FAQ page
           </Button>
         </div>
-        {refreshError && <p className="max-w-xs text-xs text-app-danger-text">{refreshError}</p>}
       </div>
     );
   }

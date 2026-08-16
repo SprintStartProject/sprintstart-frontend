@@ -3,6 +3,7 @@ import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { useToast } from "../../../context/useToast";
 import type { UserProfile } from "../../../services/types";
 
 type AccountFormProps = {
@@ -21,6 +22,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isChoosingIcon, setIsChoosingIcon] = useState(false);
   const [iconOptions, setIconOptions] = useState<string[]>([]);
+  const toast = useToast();
 
   const generateOptions = () => {
     const options = Array.from({ length: 5 }, () => Math.random().toString(36).substring(7));
@@ -44,6 +46,9 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
     setIsSaving(true);
     try {
       await onUpdate({ firstName, lastName, email, profileIcon });
+      toast.success("Profile saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save your profile.");
     } finally {
       setIsSaving(false);
     }

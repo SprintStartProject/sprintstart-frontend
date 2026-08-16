@@ -7,6 +7,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { Stepper } from "../../../components/ui/Stepper";
+import { useToast } from "../../../context/useToast";
 import { ApiError } from "../../../services/apiClient";
 import {
   projectService,
@@ -113,10 +114,13 @@ export function CreateProjectWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Locks Back/Cancel while an upload batch is in flight.
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  // `submitError` now only carries the inline, pre-submit validation shown at
+  // the step; the create/connect requests report their own outcome via toasts.
   const [submitError, setSubmitError] = useState("");
   // Set once the project exists, so a retry after a partial failure connects
   // the remaining sources instead of creating a second project.
   const [createdProjectId, setCreatedProjectId] = useState("");
+  const toast = useToast();
 
   const isGithub = selectedType === "GITHUB";
   const isJira = selectedType === "JIRA";
@@ -282,6 +286,7 @@ export function CreateProjectWizard({
       if (toConnect.length === 0) {
         resetWizard();
         onClose();
+        toast.success("Project created");
         return;
       }
 
@@ -289,15 +294,19 @@ export function CreateProjectWizard({
 
       if (hasFailedSources(connectedSources)) {
         // The project is already saved; keep the wizard open so the failed
-        // repositories can be retried or dropped without losing the list.
-        setSubmitError("The project was created, but some repositories could not be connected.");
+        // repositories can be retried or dropped without losing the list. The
+        // per-source rows already show which failed; the toast is the summary.
+        toast.warning("Project created", {
+          description: "Some repositories couldn't be connected.",
+        });
         return;
       }
 
       resetWizard();
       onClose();
+      toast.success("Project created");
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Project could not be created.");
+      toast.error(error instanceof Error ? error.message : "Couldn't create the project.");
     } finally {
       setIsSubmitting(false);
     }
@@ -325,7 +334,9 @@ export function CreateProjectWizard({
       );
 
       if (hasFailedSources(retriedSources)) {
-        setSubmitError("The repository could not be connected.");
+        toast.error("Couldn't connect the repository.");
+      } else {
+        toast.success("Repository connected");
       }
     } finally {
       setIsSubmitting(false);
@@ -400,19 +411,16 @@ export function CreateProjectWizard({
 
       resetWizard();
       onClose();
+      toast.success("Project created");
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        setSubmitError(
+        toast.error(
           "The Jira instance or credential could not be found. Check the URL and the selected credential.",
         );
       } else if (error instanceof ApiError && error.status === 502) {
-        setSubmitError(
-          "The Jira server could not be reached. Check the instance URL and try again.",
-        );
+        toast.error("The Jira server could not be reached. Check the instance URL and try again.");
       } else {
-        setSubmitError(
-          error instanceof Error ? error.message : "The Jira instance could not be connected.",
-        );
+        toast.error(error instanceof Error ? error.message : "Couldn't connect the Jira instance.");
       }
     } finally {
       setIsSubmitting(false);
@@ -432,8 +440,9 @@ export function CreateProjectWizard({
 
     try {
       await ensureProject();
+      toast.success("Project created", { description: "Add files below to ingest them." });
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Project could not be created.");
+      toast.error(error instanceof Error ? error.message : "Couldn't create the project.");
     } finally {
       setIsSubmitting(false);
     }
