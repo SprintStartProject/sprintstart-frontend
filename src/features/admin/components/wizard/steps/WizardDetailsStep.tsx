@@ -106,11 +106,6 @@ export function WizardDetailsStep({
             <span>{candidatesError}</span>
           </p>
         )}
-
-        <p className="text-xs text-app-text-muted">
-          The manager becomes a member automatically, so they do not have to be ticked on the next
-          step.
-        </p>
       </div>
     </form>
   );

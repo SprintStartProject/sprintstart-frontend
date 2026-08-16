@@ -312,7 +312,7 @@ export function DropdownSelect<TValue extends string>({
               // transformed ancestor can't clip it. `p-1.5` is not cosmetic: the
               // list clips its own overflow, so this padding is the only room a
               // magnified option has to grow into.
-              className="z-[60] overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+              className="z-[60] overflow-x-hidden overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl"
             >
               {options.map((option, index) => {
                 const isSelected = option.value === value;

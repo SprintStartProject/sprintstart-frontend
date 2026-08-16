@@ -43,7 +43,7 @@ export function WizardProvisioning({
 
       <p className="text-sm leading-relaxed text-app-text-muted">
         Connecting {sources.length} {sources.length === 1 ? "source" : "sources"}. Ingestion runs in
-        the background — you can close this once it is done.
+        the background. You can close this once it is done.
       </p>
 
       <StagedSourceList sources={sources} disabled={disabled} onRetry={onRetry} />

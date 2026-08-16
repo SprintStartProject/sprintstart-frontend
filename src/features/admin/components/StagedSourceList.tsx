@@ -93,7 +93,7 @@ function sourceDetail(source: DraftSource): string {
  */
 function statusDescription(source: DraftSource): string {
   if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
-    return "Already ingested — will be linked";
+    return "Already ingested, will be linked";
   }
 
   return `${statusLabels[source.status]} · ${sourceDetail(source)}`;

@@ -114,13 +114,13 @@ export function WizardReviewStep({
           <div className="flex gap-3">
             <dt className="w-24 shrink-0 text-app-text-muted">Name</dt>
             <dd className="text-app-text">
-              {name.trim() || <span className="text-app-danger-text">— required —</span>}
+              {name.trim() || <span className="text-app-danger-text">Required</span>}
             </dd>
           </div>
           <div className="flex gap-3">
             <dt className="w-24 shrink-0 text-app-text-muted">Description</dt>
             <dd className="text-app-text">
-              {description.trim() || <span className="text-app-text-muted">—</span>}
+              {description.trim() || <span className="text-app-text-muted">None</span>}
             </dd>
           </div>
           <div className="flex items-center gap-3">
@@ -152,7 +152,7 @@ export function WizardReviewStep({
       <ReviewBlock title="Sources" count={sources.length} onEdit={onEditSources}>
         {sources.length === 0 ? (
           <span className="text-app-text-muted">
-            No sources — you can add them later from Data Ingestion.
+            No sources. You can add them later from Data Ingestion.
           </span>
         ) : (
           <ul className="space-y-1.5">

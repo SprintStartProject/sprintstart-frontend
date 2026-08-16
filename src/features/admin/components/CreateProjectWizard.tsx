@@ -30,7 +30,12 @@ import { WizardMembersStep } from "./wizard/steps/WizardMembersStep";
 import { WizardSourcesStep } from "./wizard/steps/WizardSourcesStep";
 import { WizardReviewStep, type ReviewPerson } from "./wizard/steps/WizardReviewStep";
 import { WizardProvisioning } from "./wizard/steps/WizardProvisioning";
-import { AddSourceFlow, type AddSourceStep } from "./wizard/sources/AddSourceFlow";
+import {
+  AddSourceFlow,
+  COMPANION_GAP,
+  COMPANION_WIDTH,
+  type AddSourceStep,
+} from "./wizard/sources/AddSourceFlow";
 
 type CreateProjectWizardProps = {
   isOpen: boolean;
@@ -122,6 +127,9 @@ export function CreateProjectWizard({
 
   const [createdProjectId, setCreatedProjectId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // True while the desktop "add credential" companion is open, so the modal
+  // slides left to make room for it beside itself.
+  const [companionOpen, setCompanionOpen] = useState(false);
   const toast = useToast();
 
   const trimmedName = name.trim();
@@ -525,30 +533,24 @@ export function CreateProjectWizard({
             variant="secondary"
             onClick={closeAddSource}
             icon={<ArrowLeft className="h-4 w-4" />}
+            className="sm:mr-auto"
           >
-            Back to list
+            Back to source list
           </Button>
         );
       }
 
+      // The detail screen's "back to types" lives in its own navigation header
+      // (master-detail), so the footer carries only the primary action.
       return (
-        <>
-          <Button
-            variant="secondary"
-            onClick={backToTypeGrid}
-            icon={<ArrowLeft className="h-4 w-4" />}
-          >
-            Back
-          </Button>
-          <Button
-            variant="primary"
-            onClick={commitAddSource}
-            disabled={!canAddSource}
-            icon={<Plus className="h-4 w-4" />}
-          >
-            Add to list
-          </Button>
-        </>
+        <Button
+          variant="primary"
+          onClick={commitAddSource}
+          disabled={!canAddSource}
+          icon={<Plus className="h-4 w-4" />}
+        >
+          Add to list
+        </Button>
       );
     }
 
@@ -561,6 +563,7 @@ export function CreateProjectWizard({
           onClick={isDetails ? closeWizard : goBack}
           disabled={isSubmitting}
           icon={isDetails ? undefined : <ArrowLeft className="h-4 w-4" />}
+          className="sm:mr-auto"
         >
           {isDetails ? "Cancel" : "Back"}
         </Button>
@@ -608,6 +611,7 @@ export function CreateProjectWizard({
       }
       size="xl"
       isDismissDisabled={isSubmitting}
+      contentInsetRight={companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
       onClose={closeWizard}
       closeLabel="Close new project wizard"
       footer={footer}
@@ -636,7 +640,9 @@ export function CreateProjectWizard({
           <WizardMembersStep
             users={users}
             selectedUserIds={selectedUserIds}
+            managerId={managerId}
             onChange={setSelectedUserIds}
+            onManagerRemoved={() => setManagerId("")}
           />
         )}
 
@@ -648,6 +654,8 @@ export function CreateProjectWizard({
               selectedType={addType}
               availableTypes={AVAILABLE_SOURCE_TYPES}
               onSelectType={handleSelectAddType}
+              onBack={backToTypeGrid}
+              onCompanionOpenChange={setCompanionOpen}
               github={{
                 tokenNames: effectiveTokenNames,
                 tokenName: githubTokenName,

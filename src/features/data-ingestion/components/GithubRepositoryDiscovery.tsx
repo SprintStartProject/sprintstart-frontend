@@ -74,6 +74,12 @@ type GithubRepositoryDiscoveryProps = {
   isConnecting?: boolean;
   /** Connect error from the parent, shown below any discovery error. */
   connectError?: string | null;
+  /**
+   * Hides the built-in "no stored token" banner. Set when the parent shows its
+   * own missing-token hint (e.g. the wizard's compact notice next to its inline
+   * "Add token" button) so the message is not duplicated.
+   */
+  suppressMissingTokenNotice?: boolean;
 };
 
 const PAGE_SIZE = 20;
@@ -90,12 +96,12 @@ const PAGE_SIZE = 20;
 export function GithubRepositoryDiscovery({
   tokenNames,
   projectId,
-  projectName,
   tokenName,
   onTokenNameChange,
   onSelectionChange,
   isConnecting = false,
   connectError,
+  suppressMissingTokenNotice = false,
 }: GithubRepositoryDiscoveryProps) {
   const hasTokens = tokenNames.length > 0;
 
@@ -316,13 +322,10 @@ export function GithubRepositoryDiscovery({
   }, [onSelectionChange, selection]);
 
   const selectedCount = selection.length;
-  const selectedLinkCount = selection.filter(
-    (repository) => repository.linkState === "linkable",
-  ).length;
 
   return (
     <div className="space-y-5">
-      {!hasTokens && (
+      {!hasTokens && !suppressMissingTokenNotice && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           Add a GitHub personal access token in Settings first, then come back to discover
           repositories.
@@ -432,16 +435,6 @@ export function GithubRepositoryDiscovery({
             </div>
           </div>
 
-          {selectedLinkCount > 0 && (
-            <p className="rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-2.5 text-xs text-app-brand-text">
-              {selectedLinkCount} of the selected{" "}
-              {selectedLinkCount === 1 ? "repository is" : "repositories are"} already ingested and
-              will be linked to
-              {projectName ? ` ${projectName}` : " this project"} without fetching or ingesting
-              again.
-            </p>
-          )}
-
           <ul className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
             {filteredRepositories.map((repository) => {
               const isSelected = selected.has(repository.name);
@@ -517,7 +510,7 @@ export function GithubRepositoryDiscovery({
                         variant="brand"
                         size="sm"
                         className="gap-1"
-                        title="Already ingested — adding it here reuses its artifacts instead of ingesting again."
+                        title="Already ingested. Adding it here reuses its artifacts instead of ingesting again."
                       >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         Already ingested

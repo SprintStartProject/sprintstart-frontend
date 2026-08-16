@@ -233,11 +233,11 @@ describe("CreateProjectWizard", () => {
 
     // Manager lives with the details, members do not.
     expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Members")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Add members")).not.toBeInTheDocument();
 
     await goToMembers(user);
 
-    expect(screen.getByLabelText("Members")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add members")).toBeInTheDocument();
     expect(screen.queryByLabelText("Project manager")).not.toBeInTheDocument();
   });
 
@@ -561,7 +561,7 @@ describe("CreateProjectWizard", () => {
 
     await goToMembers(user);
     await user.click(screen.getByRole("checkbox", { name: "Add Max Mustermann to the project" }));
-    await user.type(screen.getByLabelText("Members"), "lena");
+    await user.type(screen.getByLabelText("Add members"), "lena");
 
     expect(
       screen.queryByRole("checkbox", { name: "Add Max Mustermann to the project" }),

@@ -27,8 +27,7 @@ export function WizardSourcesStep({
       <div>
         <p className="text-sm font-medium text-app-text">Data sources</p>
         <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
-          Everything here is ingested right after you create the project. Optional — you can add
-          sources later from the Data Ingestion page too.
+          Optional. Sources are ingested right after you create the project.
         </p>
       </div>
 
@@ -36,7 +35,7 @@ export function WizardSourcesStep({
         sources={sources}
         disabled={disabled}
         onRemove={onRemove}
-        emptyMessage="No sources yet. Add a GitHub repository — you can mix in more source types later."
+        emptyMessage="No sources yet. Add a GitHub repository to start."
       />
 
       <Button

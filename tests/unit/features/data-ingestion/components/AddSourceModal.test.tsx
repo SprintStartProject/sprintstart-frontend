@@ -236,8 +236,6 @@ describe("AddSourceModal", () => {
     });
     await user.click(within(connectedRow).getByRole("checkbox"));
 
-    expect(await screen.findByText(/already ingested and will be linked/i)).toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: /connect 1 selected/i }));
 
     await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));

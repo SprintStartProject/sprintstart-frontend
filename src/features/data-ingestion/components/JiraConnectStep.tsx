@@ -28,6 +28,7 @@ export function JiraConnectStep({
   onUrlChange,
   onCredentialNameChange,
   onSubmit,
+  suppressMissingCredentialNotice = false,
 }: {
   displayName: string;
   url: string;
@@ -44,9 +45,16 @@ export function JiraConnectStep({
   onUrlChange: (value: string) => void;
   onCredentialNameChange: (value: string) => void;
   onSubmit: () => void;
+  /**
+   * Hides the built-in "no stored credential" banner. Set when the parent shows
+   * its own missing-credential hint (e.g. the wizard's compact notice next to
+   * its inline "Add credential" button) so the message is not duplicated.
+   */
+  suppressMissingCredentialNotice?: boolean;
 }) {
   const hasCredentials = credentials.length > 0;
-  const showNoCredentials = credentialsLoaded && !credentialsLoading && !hasCredentials;
+  const showNoCredentials =
+    credentialsLoaded && !credentialsLoading && !hasCredentials && !suppressMissingCredentialNotice;
 
   return (
     <form
