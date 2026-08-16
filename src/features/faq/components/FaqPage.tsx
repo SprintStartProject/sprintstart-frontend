@@ -145,8 +145,8 @@ export function FaqPage() {
       <div className="flex flex-col items-center gap-3 py-20">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="max-w-md text-center text-app-text-muted">
-          No recurring questions yet. They appear here as soon as someone asks the AI Buddy
-          something.
+          No recurring questions yet. They appear here as soon as someone asks a question in the
+          chat.
         </p>
         {rebuildButton}
         {rebuildDialog}
@@ -197,7 +197,7 @@ export function FaqPage() {
                 {rebuildButton}
               </div>
               {/* How current the panel is, in the only terms that mean anything
-                  here: the FAQ follows the Buddy, so its freshness *is* the
+                  here: the FAQ follows the chat, so its freshness *is* the
                   last question someone asked. */}
               {overview.lastAskedAt && (
                 <span className="text-xs text-app-text-muted">

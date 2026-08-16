@@ -52,8 +52,8 @@ export function FaqWidget() {
       <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-sm text-app-text-muted">
-          No recurring questions yet. They appear here as soon as someone asks the AI Buddy
-          something.
+          No recurring questions yet. They appear here as soon as someone asks a question in the
+          chat.
         </p>
         <Button
           variant="secondary"
@@ -84,7 +84,7 @@ export function FaqWidget() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-app-text">Recurring questions</span>
-          {/* No refresh button any more: the panel follows the Buddy on its own. */}
+          {/* No refresh button any more: the panel follows the chat on its own. */}
           {revalidating && <Spinner size="sm" label="Updating recurring questions" />}
         </div>
         <Button
