@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { Search, Users } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { UserAvatar } from "../../../components/common/UserAvatar";
 import { SelectionCheckbox } from "./SelectionCheckbox";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -107,6 +108,7 @@ export function MemberPicker({
                   onChange={() => !disabled && onToggleUser(user.id)}
                   ariaLabel={`Add ${displayName} to the project`}
                 />
+                <UserAvatar profileIcon={user.profileIcon} fallbackName={displayName} size={32} />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-app-text">{displayName}</p>
                   <p className="truncate text-xs text-app-text-muted">{user.email}</p>

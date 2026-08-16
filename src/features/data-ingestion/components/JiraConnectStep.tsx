@@ -1,8 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 
+import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
-import { Select } from "../../../components/ui/Select.tsx";
 import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
 
 /**
@@ -87,25 +87,28 @@ export function JiraConnectStep({
         />
       </Field>
 
-      <Field label="Credential" controlId="jira-credential" disabled={isBusy || !hasCredentials}>
-        <Select
-          data-testid="jira-credential"
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-app-text">Credential</span>
+        <DropdownSelect
+          label="Credential"
           value={credentialName}
-          onChange={(event) => onCredentialNameChange(event.target.value)}
-        >
-          {hasCredentials ? (
-            credentials.map((credential) => (
-              <option key={credential.displayName} value={credential.displayName}>
-                {credential.displayName} - {credential.userEmail}
-              </option>
-            ))
-          ) : (
-            <option value="">
-              {credentialsLoading ? "Loading credentials..." : "No credentials"}
-            </option>
-          )}
-        </Select>
-      </Field>
+          options={
+            hasCredentials
+              ? credentials.map((credential) => ({
+                  value: credential.displayName,
+                  label: `${credential.displayName} - ${credential.userEmail}`,
+                }))
+              : [
+                  {
+                    value: "",
+                    label: credentialsLoading ? "Loading credentials..." : "No credentials",
+                  },
+                ]
+          }
+          onChange={onCredentialNameChange}
+          disabled={isBusy || !hasCredentials}
+        />
+      </div>
       <p className="text-xs text-app-text-subtle">
         Jira account emails are stored with each credential. Manage them under Settings, Access
         Tokens, Jira.

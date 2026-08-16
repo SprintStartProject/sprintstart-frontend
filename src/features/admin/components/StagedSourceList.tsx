@@ -70,15 +70,33 @@ function sourceTitle(source: DraftSource): string {
 }
 
 /**
- * Secondary line shown when the source is not in a failed state: the credential
- * for connectors, or the staged file count for an upload.
+ * Secondary line shown when the source is not in a failed state: the instance
+ * URL for Jira, the staged file count for an upload, or the credential for a
+ * GitHub repository.
  */
 function sourceDetail(source: DraftSource): string {
   if (source.type === "UPLOAD") {
     return source.files.length === 1 ? "1 file" : `${source.files.length} files`;
   }
 
+  if (source.type === "JIRA") {
+    return source.url;
+  }
+
   return source.tokenName;
+}
+
+/**
+ * The status line under the title. A staged GitHub repository that is already
+ * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
+ * misdescribe it — it says so instead.
+ */
+function statusDescription(source: DraftSource): string {
+  if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
+    return "Already ingested — will be linked";
+  }
+
+  return `${statusLabels[source.status]} · ${sourceDetail(source)}`;
 }
 
 /**
@@ -125,7 +143,7 @@ export function StagedSourceList({
               >
                 {source.status === "failed" && source.errorMessage
                   ? source.errorMessage
-                  : `${statusLabels[source.status]} · ${sourceDetail(source)}`}
+                  : statusDescription(source)}
               </p>
             </div>
           </div>

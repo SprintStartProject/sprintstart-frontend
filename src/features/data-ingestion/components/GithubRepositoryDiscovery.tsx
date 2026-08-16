@@ -12,9 +12,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { DropdownSelect } from "../../../components/ui/DropdownSelect";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
-import { Select } from "../../../components/ui/Select";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
   discoverRepositories,
@@ -351,26 +351,19 @@ export function GithubRepositoryDiscovery({
         </div>
 
         <div>
-          <label htmlFor="discovery-token" className="text-sm font-medium text-app-text">
-            Access token
-          </label>
-          <Select
-            id="discovery-token"
+          <span className="text-sm font-medium text-app-text">Access token</span>
+          <DropdownSelect
+            label="Access token"
             value={tokenName}
-            onChange={(event) => onTokenNameChange(event.target.value)}
+            options={
+              hasTokens
+                ? tokenNames.map((name) => ({ value: name, label: name }))
+                : [{ value: "", label: "No saved tokens" }]
+            }
+            onChange={onTokenNameChange}
             disabled={isBusy || !hasTokens}
-            className="mt-2"
-          >
-            {hasTokens ? (
-              tokenNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))
-            ) : (
-              <option value="">No saved tokens</option>
-            )}
-          </Select>
+            className="mt-2 sm:w-52"
+          />
         </div>
 
         <Button

@@ -28,7 +28,7 @@ import type { AdminUser } from "../types";
 import { WizardDetailsStep } from "./wizard/steps/WizardDetailsStep";
 import { WizardMembersStep } from "./wizard/steps/WizardMembersStep";
 import { WizardSourcesStep } from "./wizard/steps/WizardSourcesStep";
-import { WizardReviewStep } from "./wizard/steps/WizardReviewStep";
+import { WizardReviewStep, type ReviewPerson } from "./wizard/steps/WizardReviewStep";
 import { WizardProvisioning } from "./wizard/steps/WizardProvisioning";
 import { AddSourceFlow, type AddSourceStep } from "./wizard/sources/AddSourceFlow";
 
@@ -88,7 +88,9 @@ export function CreateProjectWizard({
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
 
   const [managerCandidates, setManagerCandidates] = useState<ProjectManager[]>([]);
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  // Starts true so the manager picker reads "Loading candidates..." on first
+  // paint instead of flashing "No candidates available" before the fetch begins.
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(true);
   const [candidatesError, setCandidatesError] = useState("");
 
   const [sources, setSources] = useState<DraftSource[]>([]);
@@ -244,22 +246,38 @@ export function CreateProjectWizard({
     onClose();
   };
 
-  const managerName = useMemo(() => {
+  // The manager for Review, resolved from the user directory when possible so
+  // the avatar matches the one shown elsewhere; the manager-candidate list has
+  // no profile icon, so a candidate-only manager falls back to a name-seeded one.
+  const reviewManager = useMemo<ReviewPerson | null>(() => {
     if (!managerId) return null;
+
+    const fromDirectory = users.find((user) => user.id === managerId);
+    if (fromDirectory) {
+      return {
+        id: fromDirectory.id,
+        name: getDisplayName(fromDirectory),
+        profileIcon: fromDirectory.profileIcon,
+      };
+    }
 
     const candidate = managerCandidates.find((current) => current.id === managerId);
     if (!candidate) return null;
 
     const fullName = `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim();
-    return fullName || candidate.username;
-  }, [managerCandidates, managerId]);
+    return { id: candidate.id, name: fullName || candidate.username };
+  }, [users, managerCandidates, managerId]);
 
   // Members shown on Review, excluding the manager (rendered separately there).
-  const memberNames = useMemo(
+  const reviewMembers = useMemo<ReviewPerson[]>(
     () =>
       users
         .filter((user) => selectedUserIds.has(user.id) && user.id !== managerId)
-        .map(getDisplayName),
+        .map((user) => ({
+          id: user.id,
+          name: getDisplayName(user),
+          profileIcon: user.profileIcon,
+        })),
     [users, selectedUserIds, managerId],
   );
 
@@ -671,8 +689,8 @@ export function CreateProjectWizard({
           <WizardReviewStep
             name={name}
             description={description}
-            managerName={managerName}
-            memberNames={memberNames}
+            manager={reviewManager}
+            members={reviewMembers}
             sources={sources}
             onEditDetails={() => setPhase("details")}
             onEditMembers={() => setPhase("members")}

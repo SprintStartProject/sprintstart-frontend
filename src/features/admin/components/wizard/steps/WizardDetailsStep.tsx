@@ -1,8 +1,8 @@
 import { useId } from "react";
 import { AlertCircle } from "lucide-react";
 import { Field } from "../../../../../components/ui/Field";
+import { DropdownSelect, type DropdownOption } from "../../../../../components/ui/DropdownSelect";
 import { Input } from "../../../../../components/ui/Input";
-import { Select } from "../../../../../components/ui/Select";
 import { Textarea } from "../../../../../components/ui/Textarea";
 import type { ProjectManager } from "../../../../../services/projectService";
 
@@ -45,7 +45,21 @@ export function WizardDetailsStep({
 }: WizardDetailsStepProps) {
   const nameInputId = useId();
   const descriptionInputId = useId();
-  const managerSelectId = useId();
+  const managerLabelId = useId();
+
+  const noManagerLabel = isLoadingCandidates
+    ? "Loading candidates..."
+    : managerCandidates.length === 0
+      ? "No candidates available"
+      : "No manager";
+
+  const managerOptions: DropdownOption<string>[] = [
+    { value: "", label: noManagerLabel },
+    ...managerCandidates.map((candidate) => ({
+      value: candidate.id,
+      label: managerLabel(candidate),
+    })),
+  ];
 
   return (
     <form
@@ -73,25 +87,18 @@ export function WizardDetailsStep({
         />
       </Field>
 
-      <Field label="Project manager" controlId={managerSelectId}>
-        <Select
+      <div className="flex flex-col gap-1.5">
+        <span id={managerLabelId} className="text-sm font-medium text-app-text">
+          Project manager
+        </span>
+
+        <DropdownSelect
+          label="Project manager"
           value={managerId}
-          onChange={(event) => onManagerChange(event.target.value)}
+          options={managerOptions}
+          onChange={onManagerChange}
           disabled={isLoadingCandidates || managerCandidates.length === 0}
-        >
-          <option value="">
-            {isLoadingCandidates
-              ? "Loading candidates..."
-              : managerCandidates.length === 0
-                ? "No candidates available"
-                : "No manager"}
-          </option>
-          {managerCandidates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {managerLabel(candidate)}
-            </option>
-          ))}
-        </Select>
+        />
 
         {candidatesError && (
           <p className="flex items-start gap-2 text-sm text-app-danger-text">
@@ -104,7 +111,7 @@ export function WizardDetailsStep({
           The manager becomes a member automatically, so they do not have to be ticked on the next
           step.
         </p>
-      </Field>
+      </div>
     </form>
   );
 }

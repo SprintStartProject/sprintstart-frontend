@@ -1,15 +1,23 @@
 import { GitBranch, Ticket, FileText } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
-import { Badge } from "../../../../../components/ui/Badge";
+import { UserAvatar } from "../../../../../components/common/UserAvatar";
+import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
 import type { DraftSource, DraftSourceType } from "../../../projectSourcesDraft";
+
+/** The minimum a review row needs to render a person with their avatar. */
+export type ReviewPerson = {
+  id: string;
+  name: string;
+  profileIcon?: string | null;
+};
 
 type WizardReviewStepProps = {
   name: string;
   description: string;
-  /** Resolved manager display name, or null when no manager was picked. */
-  managerName: string | null;
-  /** Display names of the picked members, excluding the manager. */
-  memberNames: string[];
+  /** The picked manager, or null when none was chosen. */
+  manager: ReviewPerson | null;
+  /** The picked members, excluding the manager (shown separately). */
+  members: ReviewPerson[];
   sources: DraftSource[];
   onEditDetails: () => void;
   onEditMembers: () => void;
@@ -30,6 +38,18 @@ const typeLabels: Record<DraftSourceType, string> = {
 
 function sourceTitle(source: DraftSource): string {
   return source.type === "GITHUB" ? `${source.owner}/${source.name}` : source.displayName;
+}
+
+function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface py-0.5 pr-3 pl-0.5 text-xs text-app-text">
+      <UserAvatar profileIcon={person.profileIcon} fallbackName={person.name} size={20} />
+      <span className="truncate">
+        {person.name}
+        {suffix && <span className="text-app-text-muted"> · {suffix}</span>}
+      </span>
+    </span>
+  );
 }
 
 function ReviewBlock({
@@ -71,14 +91,14 @@ function ReviewBlock({
 export function WizardReviewStep({
   name,
   description,
-  managerName,
-  memberNames,
+  manager,
+  members,
   sources,
   onEditDetails,
   onEditMembers,
   onEditSources,
 }: WizardReviewStepProps) {
-  const memberCount = memberNames.length + (managerName ? 1 : 0);
+  const memberCount = members.length + (manager ? 1 : 0);
 
   return (
     <div className="space-y-4">
@@ -103,10 +123,14 @@ export function WizardReviewStep({
               {description.trim() || <span className="text-app-text-muted">—</span>}
             </dd>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
             <dt className="w-24 shrink-0 text-app-text-muted">Manager</dt>
             <dd className="text-app-text">
-              {managerName ?? <span className="text-app-text-muted">None</span>}
+              {manager ? (
+                <PersonChip person={manager} />
+              ) : (
+                <span className="text-app-text-muted">None</span>
+              )}
             </dd>
           </div>
         </dl>
@@ -117,15 +141,9 @@ export function WizardReviewStep({
           <span className="text-app-text-muted">No members</span>
         ) : (
           <div className="flex flex-wrap gap-1.5">
-            {managerName && (
-              <Badge variant="brand" size="sm">
-                {managerName} · Manager
-              </Badge>
-            )}
-            {memberNames.map((memberName) => (
-              <Badge key={memberName} variant="neutral" size="sm">
-                {memberName}
-              </Badge>
+            {manager && <PersonChip person={manager} suffix="Manager" />}
+            {members.map((member) => (
+              <PersonChip key={member.id} person={member} />
             ))}
           </div>
         )}
@@ -145,9 +163,7 @@ export function WizardReviewStep({
                 <li key={source.id} className="flex items-center gap-2 text-app-text">
                   <Icon className="h-4 w-4 shrink-0 text-app-text-muted" />
                   <span className="truncate">{sourceTitle(source)}</span>
-                  <Badge variant="neutral" size="sm">
-                    {typeLabels[source.type]}
-                  </Badge>
+                  <SourceTypeBadge type={typeLabels[source.type]} size="sm" />
                 </li>
               );
             })}

@@ -205,8 +205,9 @@ describe("CreateProjectWizard", () => {
     await user.click(screen.getByRole("button", { name: /add source/i }));
     await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
 
-    // The stored credential is adopted automatically once it loads.
-    await screen.findByRole("option", { name: /Team token - me@example.com/i });
+    // The stored credential is adopted automatically once it loads; the
+    // FilterSelect combobox shows it as the selected label.
+    await screen.findByText(/Team token - me@example.com/i);
 
     await user.type(screen.getByLabelText("Display name"), "Team board");
     await user.type(screen.getByLabelText("Instance URL"), "https://acme.atlassian.net");
@@ -272,10 +273,12 @@ describe("CreateProjectWizard", () => {
     renderWizard();
     await settleModalFocus();
 
-    await waitFor(() =>
-      expect(screen.getByRole("option", { name: "Jane Doe" })).toBeInTheDocument(),
-    );
-    await user.selectOptions(screen.getByLabelText("Project manager"), "user-7");
+    // The manager picker is the animated FilterSelect combobox: wait for the
+    // candidates to load (it enables), open it, then pick the option.
+    const managerSelect = screen.getByLabelText("Project manager");
+    await waitFor(() => expect(managerSelect).toBeEnabled());
+    await user.click(managerSelect);
+    await user.click(await screen.findByRole("option", { name: "Jane Doe" }));
 
     await user.type(screen.getByLabelText("Name"), "Apollo");
     await user.click(screen.getByRole("button", { name: /continue/i }));
@@ -506,8 +509,10 @@ describe("CreateProjectWizard", () => {
     await waitFor(() =>
       expect(vi.mocked(addGithubPat)).toHaveBeenCalledWith("fresh-pat", "ghp_secret123"),
     );
-    // The refreshed token is adopted and shown selected in the discovery picker.
-    await waitFor(() => expect(screen.getByLabelText("Access token")).toHaveValue("fresh-pat"));
+    // The refreshed token is adopted and shown as the FilterSelect's label.
+    await waitFor(() =>
+      expect(screen.getByLabelText("Access token")).toHaveTextContent("fresh-pat"),
+    );
   });
 
   it("adds a Jira credential inline and selects the new one", async () => {
@@ -534,13 +539,9 @@ describe("CreateProjectWizard", () => {
         authToken: "jira-token",
       }),
     );
-    // The refreshed credential is adopted in the connect form.
-    await waitFor(() =>
-      expect(
-        screen.getByRole("option", { name: /Fresh cred - new@example.com/i }),
-      ).toBeInTheDocument(),
-    );
-    expect(screen.getByLabelText("Credential")).toHaveValue("Fresh cred");
+    // The refreshed credential is adopted and shown as the FilterSelect's label.
+    await screen.findByText(/Fresh cred - new@example.com/i);
+    expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
   });
 
   it("does not create the project when cancelled on the first step", async () => {
