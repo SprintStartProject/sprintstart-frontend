@@ -1,4 +1,5 @@
-import { FileText, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { FileText, KeyRound, X } from "lucide-react";
 import { Button } from "../../../../../components/ui/Button";
 import {
   GithubRepositoryDiscovery,
@@ -7,6 +8,8 @@ import {
 import { JiraConnectStep } from "../../../../data-ingestion/components/JiraConnectStep";
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
 import { FileUploadZone } from "../../../../knowledge-base/components/FileUploadZone";
+import { TokenAddForm } from "../../../../settings/components/TokenAddForm";
+import { JiraCredentialAddForm } from "../../../../settings/components/jira/JiraCredentialAddForm";
 import type { SourceSystem } from "../../../../data-ingestion/types";
 import type { JiraCredentialsDto } from "../../../../../services/sources/jiraService";
 
@@ -20,6 +23,8 @@ type GithubDetailProps = {
   onTokenNameChange: (name: string) => void;
   /** Must be stable (a state setter) — the picker only re-reports on change. */
   onSelectionChange: (selection: DiscoverySelection[]) => void;
+  /** Refetches the token list and selects the newly added one. */
+  onTokenSaved: () => Promise<void>;
 };
 
 /** Jira detail — a staged form; nothing connects until provisioning. */
@@ -31,11 +36,15 @@ type JiraDetailProps = {
   credentialsLoaded: boolean;
   credentialsLoading: boolean;
   credentialsError: string | null;
+  /** Prefill for the inline "add credential" form's account-email field. */
+  defaultUserEmail: string | null;
   onDisplayNameChange: (value: string) => void;
   onUrlChange: (value: string) => void;
   onCredentialNameChange: (value: string) => void;
   /** Enter in a field stages the source (guarded), matching "Add to list". */
   onSubmit: () => void;
+  /** Refetches credentials and selects the newly added one. */
+  onCredentialSaved: () => Promise<void>;
 };
 
 /** Upload detail — files are staged in memory and uploaded during provisioning. */
@@ -61,6 +70,95 @@ type AddSourceFlowProps = {
   jira: JiraDetailProps;
   upload: UploadDetailProps;
 };
+
+/**
+ * A "＋ Add credential" toggle that reveals an inline credential form in place,
+ * so a user with no stored token/credential can create one without leaving the
+ * wizard. Collapsed by default; the form itself owns save + cancel.
+ */
+function CredentialDisclosure({
+  open,
+  buttonLabel,
+  onOpen,
+  children,
+}: {
+  open: boolean;
+  buttonLabel: string;
+  onOpen: () => void;
+  children: ReactNode;
+}) {
+  if (open) return <>{children}</>;
+
+  return (
+    <Button variant="secondary" size="sm" onClick={onOpen} icon={<KeyRound className="h-4 w-4" />}>
+      {buttonLabel}
+    </Button>
+  );
+}
+
+/** GitHub detail with an inline "add token" disclosure above the picker. */
+function GithubDetail({ isBusy, github }: { isBusy: boolean; github: GithubDetailProps }) {
+  const [showTokenForm, setShowTokenForm] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <CredentialDisclosure
+        open={showTokenForm}
+        buttonLabel="Add GitHub token"
+        onOpen={() => setShowTokenForm(true)}
+      >
+        <TokenAddForm onClose={() => setShowTokenForm(false)} onSaved={github.onTokenSaved} />
+      </CredentialDisclosure>
+
+      <GithubRepositoryDiscovery
+        tokenNames={github.tokenNames}
+        projectId={null}
+        tokenName={github.tokenName}
+        onTokenNameChange={github.onTokenNameChange}
+        onSelectionChange={github.onSelectionChange}
+        isConnecting={isBusy}
+      />
+    </div>
+  );
+}
+
+/** Jira detail with an inline "add credential" disclosure above the form. */
+function JiraDetail({ isBusy, jira }: { isBusy: boolean; jira: JiraDetailProps }) {
+  const [showCredentialForm, setShowCredentialForm] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <CredentialDisclosure
+        open={showCredentialForm}
+        buttonLabel="Add Jira credential"
+        onOpen={() => setShowCredentialForm(true)}
+      >
+        <JiraCredentialAddForm
+          defaultUserEmail={jira.defaultUserEmail}
+          onClose={() => setShowCredentialForm(false)}
+          onSaved={jira.onCredentialSaved}
+        />
+      </CredentialDisclosure>
+
+      <JiraConnectStep
+        displayName={jira.displayName}
+        url={jira.url}
+        credentialName={jira.credentialName}
+        credentials={jira.credentials}
+        credentialsLoaded={jira.credentialsLoaded}
+        credentialsLoading={jira.credentialsLoading}
+        credentialsError={jira.credentialsError}
+        isBusy={isBusy}
+        canIngest
+        errorMessage={null}
+        onDisplayNameChange={jira.onDisplayNameChange}
+        onUrlChange={jira.onUrlChange}
+        onCredentialNameChange={jira.onCredentialNameChange}
+        onSubmit={jira.onSubmit}
+      />
+    </div>
+  );
+}
 
 /** The staged-files detail screen for an upload source. */
 function UploadDetail({ files, onAddFiles, onRemoveFile }: UploadDetailProps) {
@@ -107,9 +205,9 @@ function UploadDetail({ files, onAddFiles, onRemoveFile }: UploadDetailProps) {
  * than connecting one — the detail screens capture what is needed and the wizard
  * turns it into a draft when the user commits from the footer.
  *
- * The sub-flow is presentational: the wizard owns which screen is shown and the
- * captured detail state, so its single Modal footer can drive Back / Add to list
- * without this component reaching into it.
+ * The sub-flow is presentational (the wizard owns which screen is shown and the
+ * captured detail state); the only local state it owns is the collapsed/open
+ * state of each inline credential form.
  */
 export function AddSourceFlow({
   step,
@@ -134,24 +232,7 @@ export function AddSourceFlow({
   }
 
   if (selectedType === "JIRA") {
-    return (
-      <JiraConnectStep
-        displayName={jira.displayName}
-        url={jira.url}
-        credentialName={jira.credentialName}
-        credentials={jira.credentials}
-        credentialsLoaded={jira.credentialsLoaded}
-        credentialsLoading={jira.credentialsLoading}
-        credentialsError={jira.credentialsError}
-        isBusy={isBusy}
-        canIngest
-        errorMessage={null}
-        onDisplayNameChange={jira.onDisplayNameChange}
-        onUrlChange={jira.onUrlChange}
-        onCredentialNameChange={jira.onCredentialNameChange}
-        onSubmit={jira.onSubmit}
-      />
-    );
+    return <JiraDetail isBusy={isBusy} jira={jira} />;
   }
 
   if (selectedType === "UPLOAD") {
@@ -164,15 +245,5 @@ export function AddSourceFlow({
     );
   }
 
-  // GitHub detail.
-  return (
-    <GithubRepositoryDiscovery
-      tokenNames={github.tokenNames}
-      projectId={null}
-      tokenName={github.tokenName}
-      onTokenNameChange={github.onTokenNameChange}
-      onSelectionChange={github.onSelectionChange}
-      isConnecting={isBusy}
-    />
-  );
+  return <GithubDetail isBusy={isBusy} github={github} />;
 }

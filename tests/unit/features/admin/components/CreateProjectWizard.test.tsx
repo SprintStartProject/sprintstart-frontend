@@ -20,6 +20,8 @@ vi.mock("../../../../../src/services/sources/githubService", () => ({
   discoverRepositories: vi.fn(),
   connectGithubRepository: vi.fn(),
   addRepositoryToProject: vi.fn(),
+  getGithubPatNames: vi.fn(),
+  addGithubPat: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/ingestionService", () => ({
@@ -29,6 +31,7 @@ vi.mock("../../../../../src/services/ingestionService", () => ({
 vi.mock("../../../../../src/services/sources/jiraService", () => ({
   connectJiraInstance: vi.fn(),
   getMyJiraCredentials: vi.fn(),
+  addJiraCredential: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/knowledgeService", () => ({
@@ -37,11 +40,14 @@ vi.mock("../../../../../src/services/knowledgeService", () => ({
 
 import { projectService } from "../../../../../src/services/projectService";
 import {
+  addGithubPat,
   addRepositoryToProject,
   connectGithubRepository,
   discoverRepositories,
+  getGithubPatNames,
 } from "../../../../../src/services/sources/githubService";
 import {
+  addJiraCredential,
   connectJiraInstance,
   getMyJiraCredentials,
 } from "../../../../../src/services/sources/jiraService";
@@ -181,6 +187,9 @@ describe("CreateProjectWizard", () => {
       resolvedOwnerType: "org",
     });
     vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
+    vi.mocked(getGithubPatNames).mockResolvedValue(["team-pat"]);
+    vi.mocked(addGithubPat).mockResolvedValue(undefined);
+    vi.mocked(addJiraCredential).mockResolvedValue(undefined);
     vi.mocked(projectService.assignUsersToProject).mockResolvedValue([]);
     vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
     vi.mocked(getMyJiraCredentials).mockResolvedValue([
@@ -476,6 +485,62 @@ describe("CreateProjectWizard", () => {
     );
     // Uploads run only after the project exists.
     expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds a GitHub token inline and selects the new one", async () => {
+    vi.mocked(getGithubPatNames)
+      .mockResolvedValueOnce([]) // initial load: no tokens yet
+      .mockResolvedValue(["fresh-pat"]); // after the inline add
+    const user = userEvent.setup();
+    renderWizard({ tokenNames: [] });
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes repositories/i }));
+
+    await user.click(screen.getByRole("button", { name: /add github token/i }));
+    await user.type(screen.getByTestId("settings-add-token-name"), "fresh-pat");
+    await user.type(screen.getByTestId("settings-add-token-value"), "ghp_secret123");
+    await user.click(screen.getByTestId("settings-add-token-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addGithubPat)).toHaveBeenCalledWith("fresh-pat", "ghp_secret123"),
+    );
+    // The refreshed token is adopted and shown selected in the discovery picker.
+    await waitFor(() => expect(screen.getByLabelText("Access token")).toHaveValue("fresh-pat"));
+  });
+
+  it("adds a Jira credential inline and selects the new one", async () => {
+    vi.mocked(getMyJiraCredentials)
+      .mockResolvedValueOnce([]) // initial load: none stored
+      .mockResolvedValue([{ userEmail: "new@example.com", displayName: "Fresh cred" }]);
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
+
+    await user.click(screen.getByRole("button", { name: /add jira credential/i }));
+    await user.type(screen.getByTestId("settings-jira-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-jira-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-jira-add-token"), "jira-token");
+    await user.click(screen.getByTestId("settings-jira-add-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addJiraCredential)).toHaveBeenCalledWith({
+        userEmail: "new@example.com",
+        tokenName: "Fresh cred",
+        authToken: "jira-token",
+      }),
+    );
+    // The refreshed credential is adopted in the connect form.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", { name: /Fresh cred - new@example.com/i }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText("Credential")).toHaveValue("Fresh cred");
   });
 
   it("does not create the project when cancelled on the first step", async () => {

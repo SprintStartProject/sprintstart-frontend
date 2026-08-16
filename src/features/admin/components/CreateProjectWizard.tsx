@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
@@ -22,6 +22,7 @@ import {
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
 import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
+import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
 import { WizardDetailsStep } from "./wizard/steps/WizardDetailsStep";
@@ -101,6 +102,14 @@ export function CreateProjectWizard({
   const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
   const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
 
+  // The token list is owned here so an inline "add token" can refresh it and
+  // auto-select the new token. It falls back to the prop until it has loaded so
+  // discovery still works on the first open without waiting for the refetch.
+  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames } = useGithubTokens();
+  const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
+  const prevTokenNamesRef = useRef<string[]>([]);
+  const [awaitingNewToken, setAwaitingNewToken] = useState(false);
+
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
@@ -122,19 +131,32 @@ export function CreateProjectWizard({
     loaded: jiraCredentialsLoaded,
     error: jiraCredentialsError,
     isRefreshing: jiraCredentialsLoading,
+    reload: reloadJiraCredentials,
   } = useJiraCredentials(isOpen && isJiraDetail);
+  const prevCredentialNamesRef = useRef<string[]>([]);
+  const [awaitingNewCredential, setAwaitingNewCredential] = useState(false);
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
   useEffect(() => {
-    if (tokenNames.length === 0) return;
+    if (effectiveTokenNames.length === 0) return;
 
     void Promise.resolve().then(() => {
       setGithubTokenName((current) =>
-        current && tokenNames.includes(current) ? current : tokenNames[0],
+        current && effectiveTokenNames.includes(current) ? current : effectiveTokenNames[0],
       );
     });
-  }, [tokenNames]);
+  }, [effectiveTokenNames]);
+
+  // After an inline "add token" refetch, select the one that is new so the user
+  // does not have to pick it out of the list themselves.
+  useEffect(() => {
+    if (!awaitingNewToken) return;
+
+    const added = effectiveTokenNames.find((name) => !prevTokenNamesRef.current.includes(name));
+    if (added) setGithubTokenName(added);
+    setAwaitingNewToken(false);
+  }, [effectiveTokenNames, awaitingNewToken]);
 
   // Same adoption pattern for the Jira credential picker: select the first
   // stored credential once the list arrives, keeping a still-valid choice.
@@ -150,6 +172,19 @@ export function CreateProjectWizard({
       });
     });
   }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
+
+  // Counterpart to the token effect: after an inline "add credential" refetch,
+  // select the new credential. Runs after the adopt-first effect above so it
+  // wins when both fire on the same credentials change.
+  useEffect(() => {
+    if (!awaitingNewCredential) return;
+
+    const added = jiraCredentials.find(
+      (credential) => !prevCredentialNamesRef.current.includes(credential.displayName),
+    );
+    if (added) setJiraCredentialName(added.displayName);
+    setAwaitingNewCredential(false);
+  }, [jiraCredentials, awaitingNewCredential]);
 
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
@@ -256,6 +291,20 @@ export function CreateProjectWizard({
   const backToTypeGrid = () => {
     setAddStep("type");
     resetSourceDraftFields();
+  };
+
+  // Inline credential creation: snapshot the current names, refetch, and let the
+  // paired effect select whichever name is new.
+  const handleTokenSaved = async () => {
+    prevTokenNamesRef.current = effectiveTokenNames;
+    setAwaitingNewToken(true);
+    await loadTokenNames();
+  };
+
+  const handleCredentialSaved = async () => {
+    prevCredentialNamesRef.current = jiraCredentials.map((credential) => credential.displayName);
+    setAwaitingNewCredential(true);
+    await reloadJiraCredentials();
   };
 
   const selectedJiraCredential = jiraCredentials.find(
@@ -401,6 +450,28 @@ export function CreateProjectWizard({
   const isProvisioning = phase === "provisioning";
   const stepIndex = isProvisioning ? STEP_INDEX.review : STEP_INDEX[phase];
 
+  // Announced to screen readers on every screen change, and used as the target
+  // for focus so keyboard users land at the top of the new content rather than
+  // keeping focus on the footer button they just pressed.
+  const screenAnnouncement = isProvisioning
+    ? "Creating project"
+    : isAddingSource
+      ? addStep === "type"
+        ? "Add a source: choose a type"
+        : "Add a source: enter the details"
+      : `Step ${stepIndex + 1} of ${STEP_LABELS.length}: ${STEP_LABELS[stepIndex]}`;
+
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const hasRenderedRef = useRef(false);
+  useEffect(() => {
+    // Skip the initial mount so this does not fight the Modal's own autofocus.
+    if (!hasRenderedRef.current) {
+      hasRenderedRef.current = true;
+      return;
+    }
+    bodyRef.current?.focus();
+  }, [phase, isAddingSource, addStep]);
+
   const goBack = () => {
     if (phase === "members") setPhase("details");
     else if (phase === "sources") setPhase("members");
@@ -523,93 +594,102 @@ export function CreateProjectWizard({
       closeLabel="Close new project wizard"
       footer={footer}
     >
-      {phase === "details" && (
-        <WizardDetailsStep
-          name={name}
-          description={description}
-          managerId={managerId}
-          managerCandidates={managerCandidates}
-          isLoadingCandidates={isLoadingCandidates}
-          candidatesError={candidatesError}
-          onNameChange={setName}
-          onDescriptionChange={setDescription}
-          onManagerChange={setManagerId}
-          onSubmit={goForward}
-        />
-      )}
+      <p className="sr-only" aria-live="polite">
+        {screenAnnouncement}
+      </p>
 
-      {phase === "members" && (
-        <WizardMembersStep
-          users={users}
-          selectedUserIds={selectedUserIds}
-          onChange={setSelectedUserIds}
-        />
-      )}
-
-      {phase === "sources" &&
-        (isAddingSource ? (
-          <AddSourceFlow
-            key={addFlowKey}
-            step={addStep}
-            selectedType={addType}
-            availableTypes={AVAILABLE_SOURCE_TYPES}
-            onSelectType={handleSelectAddType}
-            github={{
-              tokenNames,
-              tokenName: githubTokenName,
-              onTokenNameChange: setGithubTokenName,
-              onSelectionChange: setGithubSelection,
-            }}
-            jira={{
-              displayName: jiraDisplayName,
-              url: jiraUrl,
-              credentialName: jiraCredentialName,
-              credentials: jiraCredentials,
-              credentialsLoaded: jiraCredentialsLoaded,
-              credentialsLoading: jiraCredentialsLoading,
-              credentialsError: jiraCredentialsError,
-              onDisplayNameChange: setJiraDisplayName,
-              onUrlChange: setJiraUrl,
-              onCredentialNameChange: setJiraCredentialName,
-              onSubmit: commitAddSource,
-            }}
-            upload={{
-              files: uploadFiles,
-              onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
-              onRemoveFile: (index) =>
-                setUploadFiles((current) => current.filter((_, position) => position !== index)),
-            }}
+      <div ref={bodyRef} tabIndex={-1} className="focus:outline-none">
+        {phase === "details" && (
+          <WizardDetailsStep
+            name={name}
+            description={description}
+            managerId={managerId}
+            managerCandidates={managerCandidates}
+            isLoadingCandidates={isLoadingCandidates}
+            candidatesError={candidatesError}
+            onNameChange={setName}
+            onDescriptionChange={setDescription}
+            onManagerChange={setManagerId}
+            onSubmit={goForward}
           />
-        ) : (
-          <WizardSourcesStep
+        )}
+
+        {phase === "members" && (
+          <WizardMembersStep
+            users={users}
+            selectedUserIds={selectedUserIds}
+            onChange={setSelectedUserIds}
+          />
+        )}
+
+        {phase === "sources" &&
+          (isAddingSource ? (
+            <AddSourceFlow
+              key={addFlowKey}
+              step={addStep}
+              selectedType={addType}
+              availableTypes={AVAILABLE_SOURCE_TYPES}
+              onSelectType={handleSelectAddType}
+              github={{
+                tokenNames: effectiveTokenNames,
+                tokenName: githubTokenName,
+                onTokenNameChange: setGithubTokenName,
+                onSelectionChange: setGithubSelection,
+                onTokenSaved: handleTokenSaved,
+              }}
+              jira={{
+                displayName: jiraDisplayName,
+                url: jiraUrl,
+                credentialName: jiraCredentialName,
+                credentials: jiraCredentials,
+                credentialsLoaded: jiraCredentialsLoaded,
+                credentialsLoading: jiraCredentialsLoading,
+                credentialsError: jiraCredentialsError,
+                defaultUserEmail: null,
+                onDisplayNameChange: setJiraDisplayName,
+                onUrlChange: setJiraUrl,
+                onCredentialNameChange: setJiraCredentialName,
+                onSubmit: commitAddSource,
+                onCredentialSaved: handleCredentialSaved,
+              }}
+              upload={{
+                files: uploadFiles,
+                onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
+                onRemoveFile: (index) =>
+                  setUploadFiles((current) => current.filter((_, position) => position !== index)),
+              }}
+            />
+          ) : (
+            <WizardSourcesStep
+              sources={sources}
+              onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
+              onAddSource={openAddSource}
+            />
+          ))}
+
+        {phase === "review" && (
+          <WizardReviewStep
+            name={name}
+            description={description}
+            managerName={managerName}
+            memberNames={memberNames}
             sources={sources}
-            onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
-            onAddSource={openAddSource}
+            onEditDetails={() => setPhase("details")}
+            onEditMembers={() => setPhase("members")}
+            onEditSources={() => setPhase("sources")}
           />
-        ))}
+        )}
 
-      {phase === "review" && (
-        <WizardReviewStep
-          name={name}
-          description={description}
-          managerName={managerName}
-          memberNames={memberNames}
-          sources={sources}
-          onEditDetails={() => setPhase("details")}
-          onEditMembers={() => setPhase("members")}
-          onEditSources={() => setPhase("sources")}
-        />
-      )}
-
-      {phase === "provisioning" && (
-        <WizardProvisioning
-          projectName={trimmedName}
-          memberCount={memberCount}
-          sources={sources}
-          disabled={isSubmitting}
-          onRetry={(sourceId) => void retrySource(sourceId)}
-        />
-      )}
+        {phase === "provisioning" && (
+          <WizardProvisioning
+            projectName={trimmedName}
+            memberCount={memberCount}
+            sources={sources}
+            disabled={isSubmitting}
+            onRetry={(sourceId) => void retrySource(sourceId)}
+          />
+        )}
+      </div>
     </Modal>
   );
 }
