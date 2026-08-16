@@ -77,13 +77,45 @@ describe("KnowledgeGapsPage", () => {
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state on error", () => {
+  // The four no-gaps-to-show outcomes below used to render one shared message.
+  // "A scan found nothing" and "no scan has run" are opposite answers, and
+  // conflating them made a clean result read as a scan that never happened.
+  it("reports a failed load as an error rather than an empty result", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ data: null, loading: false, revalidating: false, error: true, refresh: () => {} });
     renderPage();
-    expect(
-      screen.getByText("No knowledge gaps yet. Trigger a scan to detect them."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/could not load knowledge gaps/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no scan has run yet/i)).not.toBeInTheDocument();
+  });
+
+  it("says no scan has run when there is no result yet", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: { gaps: [] },
+      loading: false, revalidating: false, error: false, refresh: () => {},
+    });
+    renderPage();
+    expect(screen.getByText(/no scan has run yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /rescan/i })).toBeInTheDocument();
+  });
+
+  it("reports a completed scan that found nothing as a clean result", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: { gaps: [], refreshedAt: new Date().toISOString() },
+      loading: false, revalidating: false, error: false, refresh: () => {},
+    });
+    renderPage();
+    expect(screen.getByText(/no documentation gaps found/i)).toBeInTheDocument();
+    expect(screen.getByText(/last analyzed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no scan has run yet/i)).not.toBeInTheDocument();
+  });
+
+  it("says a rescan is running instead of reporting an empty result", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: { gaps: [], refreshing: true, refreshedAt: new Date().toISOString() },
+      loading: false, revalidating: false, error: false, refresh: () => {},
+    });
+    renderPage();
+    expect(screen.getByText(/scanning the newly ingested documentation/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no documentation gaps found/i)).not.toBeInTheDocument();
   });
 
   // The controls are no longer behind a disclosure -- they are always on the

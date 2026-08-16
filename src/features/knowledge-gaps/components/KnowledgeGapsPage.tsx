@@ -7,13 +7,14 @@ import type { KnowledgeGapSeverity } from "../types";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
+import { describeEmptyState } from "../emptyState";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { Button } from "../../../components/ui/Button";
 
 import {
   ShieldAlert,
-  AlertCircle,
   Clock,
   ArrowLeft,
   Filter,
@@ -103,16 +104,19 @@ export function KnowledgeGapsPage() {
   }
 
   if (error || !overview || overview.gaps.length === 0) {
+    const empty = describeEmptyState(overview, error);
+
     return (
       <div className="flex flex-col items-center gap-3 py-20">
-        {rescanning ? <Spinner size="lg" label="Scanning for knowledge gaps" /> : (
-          <AlertCircle className="h-5 w-5 text-app-text-muted" />
+        <EmptyStateIcon state={empty.state} />
+        <p className="max-w-md text-center text-app-text-muted">{empty.message}</p>
+        {/* Only meaningful once a scan has actually produced a result; before
+            that there is no reading whose age a PM could judge. */}
+        {empty.scannedAt && (
+          <p className="text-xs text-app-text-muted">
+            Last analyzed {formatRelativeDate(empty.scannedAt)}
+          </p>
         )}
-        <p className="text-app-text-muted">
-          {rescanning
-            ? "Scanning the newly ingested documentation…"
-            : "No knowledge gaps yet. Trigger a scan to detect them."}
-        </p>
         {refreshButton}
         {refreshError && (
           <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>

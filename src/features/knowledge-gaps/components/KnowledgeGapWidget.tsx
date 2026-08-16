@@ -10,13 +10,15 @@ import { useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
+import { describeEmptyState } from "../emptyState";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Button } from "../../../components/ui/Button";
 import { useProjectContext } from "../../projects/useProjectContext";
 
-import { ShieldAlert, ArrowRight, AlertCircle, Clock, RefreshCw } from "lucide-react";
+import { ShieldAlert, ArrowRight, Clock, RefreshCw } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: KnowledgeGapWidget
@@ -71,16 +73,12 @@ export function KnowledgeGapWidget() {
   // ── ERROR / EMPTY ──────────────────────────────────────
 
   if (error || !overview || overview.gaps.length === 0) {
+    const empty = describeEmptyState(overview, error);
+
     return (
       <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
-        {rescanning ? <Spinner size="lg" label="Scanning for knowledge gaps" /> : (
-          <AlertCircle className="h-5 w-5 text-app-text-muted" />
-        )}
-        <p className="text-sm text-app-text-muted">
-          {rescanning
-            ? "Scanning the newly ingested documentation…"
-            : "No knowledge gaps yet. Trigger a scan to detect them."}
-        </p>
+        <EmptyStateIcon state={empty.state} />
+        <p className="text-sm text-app-text-muted">{empty.message}</p>
         <div className="flex items-center gap-2">
           <Button
             variant="primary"

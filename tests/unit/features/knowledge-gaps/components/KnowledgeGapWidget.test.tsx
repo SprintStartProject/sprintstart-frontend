@@ -75,21 +75,29 @@ describe("KnowledgeGapWidget", () => {
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state on error", () => {
+  it("reports a failed load as an error rather than an empty result", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ data: null, loading: false, revalidating: false, error: true, refresh: () => {} });
     renderWidget();
-    expect(
-      screen.getByText("No knowledge gaps yet. Trigger a scan to detect them."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/could not load knowledge gaps/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /rescan/i })).toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state when there are no gaps", () => {
+  it("says no scan has run when there is no result yet", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ data: { gaps: [] }, loading: false, revalidating: false, error: false, refresh: () => {} });
     renderWidget();
-    expect(
-      screen.getByText("No knowledge gaps yet. Trigger a scan to detect them."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/no scan has run yet/i)).toBeInTheDocument();
+  });
+
+  // The widget sits on the PM dashboard, so it is the surface most likely to be
+  // read as "the scan never ran" when it actually came back clean.
+  it("reports a completed scan that found nothing as a clean result", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: { gaps: [], refreshedAt: new Date().toISOString() },
+      loading: false, revalidating: false, error: false, refresh: () => {},
+    });
+    renderWidget();
+    expect(screen.getByText(/no documentation gaps found/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no scan has run yet/i)).not.toBeInTheDocument();
   });
 });
 
