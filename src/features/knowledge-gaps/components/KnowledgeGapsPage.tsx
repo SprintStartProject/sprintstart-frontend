@@ -14,16 +14,7 @@ import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { Button } from "../../../components/ui/Button";
 
-import {
-  ShieldAlert,
-  Clock,
-  ArrowLeft,
-  Filter,
-  X,
-  RefreshCw,
-  FileText,
-  User,
-} from "lucide-react";
+import { ShieldAlert, Clock, ArrowLeft, Filter, X, RefreshCw, FileText, User } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";

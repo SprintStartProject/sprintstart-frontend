@@ -152,7 +152,9 @@ export function KnowledgeGapWidget() {
             aria-label="Rescan now"
             title="Rescan now"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing || rescanning ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${refreshing || rescanning ? "animate-spin" : ""}`}
+            />
           </Button>
           <Button
             variant="ghost"

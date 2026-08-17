@@ -101,9 +101,7 @@ export function FaqDetailPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {detail.trend && (
-              <TrendBadge trend={detail.trend} recentCount={detail.recentCount} />
-            )}
+            {detail.trend && <TrendBadge trend={detail.trend} recentCount={detail.recentCount} />}
             {detail.lastAskedAt && (
               <span className="text-xs text-app-text-muted">
                 Last asked {formatAskedAt(detail.lastAskedAt)}

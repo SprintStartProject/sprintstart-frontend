@@ -11,7 +11,10 @@ import type { FAQTrend } from "../types";
  * emphasis. "Fading" is deliberately neutral rather than a warning: a question
  * going quiet is usually a question that got answered, not a problem.
  */
-const trendDisplay: Record<FAQTrend, { label: string; variant: "warning" | "neutral"; icon: typeof Minus }> = {
+const trendDisplay: Record<
+  FAQTrend,
+  { label: string; variant: "warning" | "neutral"; icon: typeof Minus }
+> = {
   RISING: { label: "Rising", variant: "warning", icon: TrendingUp },
   STEADY: { label: "Steady", variant: "neutral", icon: Minus },
   FADING: { label: "Quiet", variant: "neutral", icon: TrendingDown },

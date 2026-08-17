@@ -33,10 +33,7 @@ describe("describeEmptyState", () => {
 
   // A running rescan describes the panel better than the result it is replacing.
   it("prefers a running rescan over the previous result", () => {
-    const info = describeEmptyState(
-      { gaps: [], refreshing: true, refreshedAt: SCANNED_AT },
-      false,
-    );
+    const info = describeEmptyState({ gaps: [], refreshing: true, refreshedAt: SCANNED_AT }, false);
 
     expect(info.state).toBe("scanning");
     expect(info.scannedAt).toBeNull();
