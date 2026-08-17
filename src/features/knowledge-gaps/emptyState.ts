@@ -48,7 +48,10 @@ export function describeEmptyState(
   if (overview.refreshedAt) {
     return {
       state: "clean",
-      message: "No documentation gaps found — every component has the expected documentation.",
+      // Deliberately not "no gaps found": components without gaps are listed
+      // now, as "covered". An empty result therefore means the scan found no
+      // components at all — nothing has been ingested for this project yet.
+      message: "The last scan found no ingested repositories to report on.",
       scannedAt: overview.refreshedAt,
     };
   }

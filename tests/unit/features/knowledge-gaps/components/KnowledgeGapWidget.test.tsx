@@ -120,7 +120,7 @@ describe("KnowledgeGapWidget", () => {
 
   // The widget sits on the PM dashboard, so it is the surface most likely to be
   // read as "the scan never ran" when it actually came back clean.
-  it("reports a completed scan that found nothing as a clean result", () => {
+  it("says a completed scan found nothing to report on", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({
       data: { gaps: [], refreshedAt: new Date().toISOString() },
       loading: false,
@@ -129,7 +129,7 @@ describe("KnowledgeGapWidget", () => {
       refresh: () => {},
     });
     renderWidget();
-    expect(screen.getByText(/no documentation gaps found/i)).toBeInTheDocument();
+    expect(screen.getByText(/found no ingested repositories/i)).toBeInTheDocument();
     expect(screen.queryByText(/no scan has run yet/i)).not.toBeInTheDocument();
   });
 });

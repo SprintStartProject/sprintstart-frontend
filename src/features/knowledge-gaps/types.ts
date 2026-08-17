@@ -7,7 +7,12 @@ export interface KnowledgeGapOwner {
   role?: string;
 }
 
-export type KnowledgeGapSeverity = "high" | "medium" | "low";
+/**
+ * `covered` is not a gap: the component was scanned and found to be missing
+ * nothing. Those are reported too, so the panel is the project's full component
+ * roster and an absence means "not ingested" rather than "nothing to report".
+ */
+export type KnowledgeGapSeverity = "high" | "medium" | "low" | "covered";
 
 export interface KnowledgeGap {
   id: string;

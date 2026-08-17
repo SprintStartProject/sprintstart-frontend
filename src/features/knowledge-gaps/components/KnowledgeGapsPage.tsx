@@ -9,7 +9,7 @@ import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
 import { describeEmptyState } from "../emptyState";
-import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { Button } from "../../../components/ui/Button";
@@ -35,11 +35,7 @@ const SORT_OPTIONS: FilterSelectOption<GapSortOption>[] = [
 
 export function KnowledgeGapsPage() {
   const { selectedProjectId } = useProjectContext();
-  const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([
-    "high",
-    "medium",
-    "low",
-  ]);
+  const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([...SEVERITIES]);
   const [sortBy, setSortBy] = useState<GapSortOption>("severity");
 
   const navigate = useNavigate();
@@ -215,7 +211,7 @@ export function KnowledgeGapsPage() {
           >
             <Filter aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
 
-            {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map((severity) => {
+            {SEVERITIES.map((severity) => {
               const isSelected = severityFilter.includes(severity);
               const { badge, label } = SEVERITY_STYLES[severity];
 
@@ -246,12 +242,12 @@ export function KnowledgeGapsPage() {
           </span>
 
           <div className="ml-auto flex items-center gap-2">
-            {(severityFilter.length < 3 || sortBy !== "severity") && (
+            {(severityFilter.length < SEVERITIES.length || sortBy !== "severity") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setSeverityFilter(["high", "medium", "low"]);
+                  setSeverityFilter([...SEVERITIES]);
                   setSortBy("severity");
                 }}
                 icon={<X className="h-3.5 w-3.5" />}
@@ -319,14 +315,21 @@ export function KnowledgeGapsPage() {
                       </span>
                     </div>
 
-                    {/* Missing document types for this component */}
+                    {/* Missing document types, or what a covered component has
+                        instead — "Missing documentation (0)" over an empty row
+                        would say nothing about a component that is fine. */}
                     <div className="mb-3">
                       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
                         <FileText className="h-3.5 w-3.5" />
-                        Missing documentation ({gap.missingTypes.length})
+                        {gap.missingTypes.length === 0
+                          ? `All expected documentation present (${gap.presentTypes?.length ?? 0})`
+                          : `Missing documentation (${gap.missingTypes.length})`}
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {gap.missingTypes.map((type) => (
+                        {(gap.missingTypes.length === 0
+                          ? (gap.presentTypes ?? [])
+                          : gap.missingTypes
+                        ).map((type) => (
                           <span
                             key={type}
                             className="rounded border border-app-border bg-app-surface-muted px-2 py-1 text-xs"

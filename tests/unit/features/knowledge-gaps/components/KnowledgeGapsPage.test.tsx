@@ -83,6 +83,38 @@ describe("KnowledgeGapsPage", () => {
     expect(screen.getByText("Database")).toBeInTheDocument();
   });
 
+  // A component in good shape is a finding of its own — leaving it out made it
+  // indistinguishable from one that was never ingested.
+  it("lists a component with no gaps and says what it has instead", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: {
+        gaps: [
+          {
+            id: "gap4",
+            component: "Docs Wiki",
+            missingTypes: [],
+            presentTypes: ["readme", "setup"],
+            lastIngested: new Date().toISOString(),
+            refreshedAt: new Date().toISOString(),
+            owners: [],
+            severity: "covered",
+          },
+        ],
+      },
+      loading: false,
+      revalidating: false,
+      error: false,
+      refresh: () => {},
+    });
+    renderPage();
+
+    // Scoped to the card: "Covered" is also the label of its filter toggle.
+    const card = within(screen.getByRole("button", { name: /Docs Wiki/ }));
+    expect(card.getByText("Covered")).toBeInTheDocument();
+    // "Missing documentation (0)" over an empty row would say nothing at all.
+    expect(card.getByText(/all expected documentation present \(2\)/i)).toBeInTheDocument();
+  });
+
   it("shows loading state", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({
       data: null,
@@ -124,7 +156,7 @@ describe("KnowledgeGapsPage", () => {
     expect(screen.getByRole("button", { name: /rescan/i })).toBeInTheDocument();
   });
 
-  it("reports a completed scan that found nothing as a clean result", () => {
+  it("says a completed scan found nothing to report on", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({
       data: { gaps: [], refreshedAt: new Date().toISOString() },
       loading: false,
@@ -133,7 +165,7 @@ describe("KnowledgeGapsPage", () => {
       refresh: () => {},
     });
     renderPage();
-    expect(screen.getByText(/no documentation gaps found/i)).toBeInTheDocument();
+    expect(screen.getByText(/found no ingested repositories/i)).toBeInTheDocument();
     expect(screen.getByText(/last analyzed/i)).toBeInTheDocument();
     expect(screen.queryByText(/no scan has run yet/i)).not.toBeInTheDocument();
   });
@@ -148,7 +180,7 @@ describe("KnowledgeGapsPage", () => {
     });
     renderPage();
     expect(screen.getByText(/scanning the newly ingested documentation/i)).toBeInTheDocument();
-    expect(screen.queryByText(/no documentation gaps found/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/found no ingested repositories/i)).not.toBeInTheDocument();
   });
 
   // The controls are no longer behind a disclosure -- they are always on the

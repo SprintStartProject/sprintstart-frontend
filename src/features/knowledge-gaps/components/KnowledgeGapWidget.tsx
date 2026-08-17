@@ -114,10 +114,14 @@ export function KnowledgeGapWidget() {
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
   );
 
-  // Show top in widget
+  // Show top in widget. Covered components sort last, so a dashboard glance
+  // still leads with whatever actually needs attention.
   const preview = sorted.slice(0, 4);
 
-  const gapCount = sorted.length;
+  // Components with something missing, not rows: the list now also carries the
+  // ones that are fine, and "See all (12)" would overstate the work if it
+  // counted those.
+  const gapCount = sorted.filter((gap) => gap.severity !== "covered").length;
 
   // ── RENDER ─────────────────────────────────────────────
 
