@@ -90,11 +90,13 @@ describe("FaqWidget", () => {
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
-  it("explains that questions appear on their own when there is an error", () => {
+  // On a dashboard the two states are one glance apart, so a failed load must
+  // not pose as "nobody has asked anything yet".
+  it("reports a failed load as an error rather than an empty FAQ", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, error: true });
     renderWidget();
-    expect(screen.getByText(/No recurring questions yet/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /open faq page/i })).toBeInTheDocument();
+    expect(screen.getByText(/could not load the recurring questions/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No recurring questions yet/)).not.toBeInTheDocument();
   });
 
   it("shows the empty state when overview has no groups", () => {

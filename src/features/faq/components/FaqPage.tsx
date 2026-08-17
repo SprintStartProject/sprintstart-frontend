@@ -140,7 +140,21 @@ export function FaqPage() {
     );
   }
 
-  if (error || !overview || overview.groups.length === 0) {
+  if (error || !overview) {
+    // Separate from the empty list below: a FAQ nobody has filled yet and a FAQ
+    // that could not be loaded look identical on screen but mean opposite
+    // things, and only one of them is worth waiting for.
+    return (
+      <div className="flex flex-col items-center gap-3 py-20">
+        <AlertCircle className="h-5 w-5 text-app-danger-text" />
+        <p className="max-w-md text-center text-app-text-muted">
+          Could not load the recurring questions. Is the backend reachable?
+        </p>
+      </div>
+    );
+  }
+
+  if (overview.groups.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-20">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />

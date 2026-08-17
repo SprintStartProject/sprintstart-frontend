@@ -5,43 +5,33 @@ import type {
   FAQRebuildScope,
   FAQRebuildPreview,
 } from "../features/faq/types";
-import faqMock from "../mocks/faqMock.json";
-import faqDetailMock from "../mocks/faqDetailMock.json";
-
 /**
  * FAQ insights are project-scoped: the groups are built from the questions asked in
  * one project's chats, so every call has to say which project it means.
+ *
+ * Nothing here falls back to mock data. A fixture returned on failure is
+ * indistinguishable from a real answer, so an unreachable backend rendered as a
+ * FAQ that simply had different entries in it — and the error states the pages
+ * already carry could never be reached. Failures propagate; the caller decides
+ * what to show.
  */
 export const insightsService = {
   /**
    * Fetches all recurring question groups sorted by frequency.
    */
   async fetchFAQGroups(projectId: string): Promise<FAQOverview> {
-    try {
-      return await apiClient.fetch<FAQOverview>(
-        `/api/v1/insights/faq?projectId=${encodeURIComponent(projectId)}`,
-      );
-    } catch (_error) {
-      // Asserted rather than inferred: a JSON import widens the trend literals
-      // to `string`, which no longer matches the union.
-      return faqMock as FAQOverview;
-    }
+    return await apiClient.fetch<FAQOverview>(
+      `/api/v1/insights/faq?projectId=${encodeURIComponent(projectId)}`,
+    );
   },
 
   /**
    * Fetches detailed information about a specific FAQ group.
    */
   async fetchFAQGroup(projectId: string, groupId: string): Promise<FAQDetail> {
-    try {
-      return await apiClient.fetch<FAQDetail>(
-        `/api/v1/insights/faq/${groupId}?projectId=${encodeURIComponent(projectId)}`,
-      );
-    } catch (error) {
-      console.error(`Error fetching FAQ group with ID ${groupId}:`, error);
-      // Asserted rather than inferred: a JSON import widens the trend literal
-      // to `string`, which no longer matches the union.
-      return faqDetailMock as FAQDetail;
-    }
+    return await apiClient.fetch<FAQDetail>(
+      `/api/v1/insights/faq/${groupId}?projectId=${encodeURIComponent(projectId)}`,
+    );
   },
 
   /**

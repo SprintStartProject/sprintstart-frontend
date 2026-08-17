@@ -244,11 +244,15 @@ describe("FaqPage", () => {
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
-  it("explains that questions appear on their own when there are none", () => {
+  // A FAQ nobody has filled yet and one that could not be loaded look the same
+  // on screen but mean opposite things — only one is worth waiting for.
+  it("reports a failed load as an error rather than an empty FAQ", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, error: true });
     renderPage();
-    expect(screen.getByText(/No recurring questions yet/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /rebuild/i })).toBeInTheDocument();
+    expect(screen.getByText(/could not load the recurring questions/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No recurring questions yet/)).not.toBeInTheDocument();
+    // Nothing to rebuild from when the current state is unknown.
+    expect(screen.queryByRole("button", { name: /rebuild/i })).not.toBeInTheDocument();
   });
 
   it("shows the empty state when there are no groups", () => {

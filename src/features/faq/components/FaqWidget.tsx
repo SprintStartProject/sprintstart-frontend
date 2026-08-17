@@ -45,9 +45,25 @@ export function FaqWidget() {
     );
   }
 
+  // ── ERROR ────────────────────────────────────────────────
+
+  // Kept apart from the empty state: on a dashboard the two are one glance
+  // apart, and "nobody has asked anything yet" is a very different thing to
+  // report than "this panel could not be loaded".
+  if (error || !overview) {
+    return (
+      <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
+        <AlertCircle className="h-5 w-5 text-app-danger-text" />
+        <p className="text-sm text-app-text-muted">
+          Could not load the recurring questions. Is the backend reachable?
+        </p>
+      </div>
+    );
+  }
+
   // ── EMPTY ────────────────────────────────────────────────
 
-  if (error || !overview || overview.groups.length === 0) {
+  if (overview.groups.length === 0) {
     return (
       <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
