@@ -100,6 +100,11 @@ export function FilterSelect<TValue extends string>({
 
   const close = () => {
     setIsOpen(false);
+    // Dropped rather than kept for the next open: the trigger may have moved in
+    // the meantime, and the menu renders once from state before the effect
+    // re-measures — with a stale position that first frame lands in the wrong
+    // place. Null holds it back until it has been measured.
+    setMenuPosition(null);
   };
 
   const commit = (index: number) => {
@@ -245,8 +250,7 @@ export function FilterSelect<TValue extends string>({
 
   // AnimatePresence goes inside the portal rather than around it, so the exit
   // animation still has a motion child to run on.
-  const hostMenu = (node: ReactNode) =>
-    menuInPortal ? createPortal(node, document.body) : node;
+  const hostMenu = (node: ReactNode) => (menuInPortal ? createPortal(node, document.body) : node);
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -278,96 +282,96 @@ export function FilterSelect<TValue extends string>({
       {hostMenu(
         <AnimatePresence>
           {isOpen && (!menuInPortal || menuPosition) && (
-          <motion.ul
-            ref={menuRef}
-            id={listboxId}
-            role="listbox"
-            aria-label={label}
-            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-            style={
-              menuInPortal && menuPosition
-                ? {
-                    position: "fixed",
-                    top: menuPosition.top,
-                    left: menuPosition.left,
-                    minWidth: menuPosition.width,
-                  }
-                : undefined
-            }
-            // `p-1.5` is not cosmetic: the list clips its own overflow, so this
-            // padding is the only room a magnified option has to grow into.
-            //
-            // The horizontal axis is pinned shut rather than left to itself:
-            // `overflow-y: auto` alone makes the other axis compute to `auto`
-            // too, and the magnified option is 3% wider than the list — beyond
-            // roughly 200px of width that exceeds the padding it grows into and
-            // raises a horizontal scrollbar for the 6px it overshoots by.
-            className={`max-h-64 overflow-x-hidden overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl ${
-              menuInPortal
-                ? // Above the modal overlay's own z-50, since a body portal is
-                  // only a sibling of it rather than a descendant.
-                  "z-[60]"
-                : "absolute top-[calc(100%+6px)] left-0 z-50 min-w-full"
-            }`}
-          >
-            {options.map((option, index) => {
-              const isSelected = option.value === value;
-              const isActive = index === activeIndex;
+            <motion.ul
+              ref={menuRef}
+              id={listboxId}
+              role="listbox"
+              aria-label={label}
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+              style={
+                menuInPortal && menuPosition
+                  ? {
+                      position: "fixed",
+                      top: menuPosition.top,
+                      left: menuPosition.left,
+                      minWidth: menuPosition.width,
+                    }
+                  : undefined
+              }
+              // `p-1.5` is not cosmetic: the list clips its own overflow, so this
+              // padding is the only room a magnified option has to grow into.
+              //
+              // The horizontal axis is pinned shut rather than left to itself:
+              // `overflow-y: auto` alone makes the other axis compute to `auto`
+              // too, and the magnified option is 3% wider than the list — beyond
+              // roughly 200px of width that exceeds the padding it grows into and
+              // raises a horizontal scrollbar for the 6px it overshoots by.
+              className={`max-h-64 overflow-x-hidden overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl ${
+                menuInPortal
+                  ? // Above the modal overlay's own z-50, since a body portal is
+                    // only a sibling of it rather than a descendant.
+                    "z-[60]"
+                  : "absolute top-[calc(100%+6px)] left-0 z-50 min-w-full"
+              }`}
+            >
+              {options.map((option, index) => {
+                const isSelected = option.value === value;
+                const isActive = index === activeIndex;
 
-              return (
-                // No keyboard handler by design: in the
-                // select-only combobox pattern the options are
-                // never focused. Keyboard users drive the list
-                // from the trigger via `aria-activedescendant`,
-                // which is handled in `handleKeyDown` above.
-                <motion.li
-                  key={option.value}
-                  id={`${optionIdPrefix}-${index}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => commit(index)}
-                  animate={{
-                    scale: isActive && !prefersReducedMotion ? OPTION_HOVER_SCALE : 1,
-                  }}
-                  transition={dockMagnifySpringToken}
-                  // Anchored left so the label does not drift
-                  // sideways as the row grows.
-                  style={{ transformOrigin: "left center" }}
-                  className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                    isSelected ? "font-semibold text-app-brand-text" : "text-app-text"
-                  }`}
-                >
-                  {isActive && (
-                    // One shared element rather than a
-                    // background per row, so the highlight
-                    // glides down the list instead of
-                    // blinking from row to row.
-                    <motion.span
-                      aria-hidden="true"
-                      layoutId={`${optionIdPrefix}-highlight`}
-                      transition={
-                        prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
-                      }
-                      className="absolute inset-0 rounded-xl bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
-                    />
-                  )}
-
-                  <Check
-                    aria-hidden="true"
-                    className={`relative z-10 h-3.5 w-3.5 shrink-0 ${
-                      isSelected ? "opacity-100" : "opacity-0"
+                return (
+                  // No keyboard handler by design: in the
+                  // select-only combobox pattern the options are
+                  // never focused. Keyboard users drive the list
+                  // from the trigger via `aria-activedescendant`,
+                  // which is handled in `handleKeyDown` above.
+                  <motion.li
+                    key={option.value}
+                    id={`${optionIdPrefix}-${index}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => commit(index)}
+                    animate={{
+                      scale: isActive && !prefersReducedMotion ? OPTION_HOVER_SCALE : 1,
+                    }}
+                    transition={dockMagnifySpringToken}
+                    // Anchored left so the label does not drift
+                    // sideways as the row grows.
+                    style={{ transformOrigin: "left center" }}
+                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                      isSelected ? "font-semibold text-app-brand-text" : "text-app-text"
                     }`}
-                  />
+                  >
+                    {isActive && (
+                      // One shared element rather than a
+                      // background per row, so the highlight
+                      // glides down the list instead of
+                      // blinking from row to row.
+                      <motion.span
+                        aria-hidden="true"
+                        layoutId={`${optionIdPrefix}-highlight`}
+                        transition={
+                          prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
+                        }
+                        className="absolute inset-0 rounded-xl bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
+                      />
+                    )}
 
-                  <span className="relative z-10">{option.label}</span>
-                </motion.li>
-              );
-            })}
-          </motion.ul>
+                    <Check
+                      aria-hidden="true"
+                      className={`relative z-10 h-3.5 w-3.5 shrink-0 ${
+                        isSelected ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+
+                    <span className="relative z-10">{option.label}</span>
+                  </motion.li>
+                );
+              })}
+            </motion.ul>
           )}
         </AnimatePresence>,
       )}
