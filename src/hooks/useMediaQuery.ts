@@ -1,31 +1,32 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * Tracks whether a CSS media query currently matches, re-rendering when it
  * flips. Used to branch behaviour that CSS alone cannot express — e.g. mounting
  * a component in a side drawer on desktop but inline on a phone.
  *
- * Reads the initial value synchronously so the first render is already correct
- * (no flash), then subscribes for changes.
+ * Built on `useSyncExternalStore` so the matched state is read straight from the
+ * `MediaQueryList` during render — no `useEffect` catch-up frame and no tearing
+ * during concurrent renders — with a server snapshot of `false`.
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(query).matches
-      : false,
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+        return () => {};
+      }
+
+      const mediaQueryList = window.matchMedia(query);
+      mediaQueryList.addEventListener("change", onStoreChange);
+      return () => mediaQueryList.removeEventListener("change", onStoreChange);
+    },
+    [query],
   );
 
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+  const getSnapshot = () =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(query).matches
+      : false;
 
-    const mediaQueryList = window.matchMedia(query);
-    const handleChange = () => setMatches(mediaQueryList.matches);
-
-    handleChange();
-    mediaQueryList.addEventListener("change", handleChange);
-
-    return () => mediaQueryList.removeEventListener("change", handleChange);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

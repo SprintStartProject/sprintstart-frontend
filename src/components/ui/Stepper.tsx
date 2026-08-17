@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { Check } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { centralSpringToken } from "../../styles/tokens";
@@ -120,7 +119,14 @@ export function Stepper({ steps, current, onStepSelect }: StepperProps) {
         );
 
         return (
-          <Fragment key={label}>
+          // The connector track lives inside the <li> (not as a sibling of it),
+          // so the <ol> only ever has <li> children — the sole valid child of a
+          // list, which screen readers rely on to count list items.
+          <li
+            key={label}
+            className="flex items-center"
+            aria-current={isCurrent ? "step" : undefined}
+          >
             {index > 0 && (
               <span
                 aria-hidden="true"
@@ -135,21 +141,19 @@ export function Stepper({ steps, current, onStepSelect }: StepperProps) {
               </span>
             )}
 
-            <li aria-current={isCurrent ? "step" : undefined}>
-              {isNavigable ? (
-                <button
-                  type="button"
-                  onClick={() => onStepSelect?.(index)}
-                  aria-label={`Go to ${label}`}
-                  className="-mx-1 flex items-center gap-1.5 rounded-full px-1 py-0.5 transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-brand focus-visible:outline-none"
-                >
-                  {stepBody}
-                </button>
-              ) : (
-                <span className="flex items-center gap-1.5">{stepBody}</span>
-              )}
-            </li>
-          </Fragment>
+            {isNavigable ? (
+              <button
+                type="button"
+                onClick={() => onStepSelect?.(index)}
+                aria-label={`Go to ${label}`}
+                className="-mx-1 flex items-center gap-1.5 rounded-full px-1 py-0.5 transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-brand focus-visible:outline-none"
+              >
+                {stepBody}
+              </button>
+            ) : (
+              <span className="flex items-center gap-1.5">{stepBody}</span>
+            )}
+          </li>
         );
       })}
     </ol>

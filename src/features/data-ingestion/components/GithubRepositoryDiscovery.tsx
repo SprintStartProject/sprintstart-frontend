@@ -208,8 +208,11 @@ export function GithubRepositoryDiscovery({
         setDiscoverState("loaded");
 
         if (!loadingMore) {
-          // A pasted "owner/name" pre-filters to that repository; a bare owner
-          // clears any leftover filter from a previous search.
+          // A fresh discovery starts with a clean slate: clear selections so a
+          // repository sharing a name with one picked under a previous owner is
+          // not silently re-selected. A pasted "owner/name" pre-filters to that
+          // repository; a bare owner clears any leftover filter.
+          setSelected(new Set());
           setFilter(repoReference ? repoReference.name : "");
           await loadConnectedRepositories();
         }

@@ -91,15 +91,16 @@ export function DropdownSelect<TValue extends string>({
   const optionIdPrefix = useId();
   const prefersReducedMotion = useReducedMotion();
 
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  );
-  const selectedLabel = options[selectedIndex]?.label ?? "";
+  // -1 when `value` matches no option (e.g. the empty initial state with no
+  // placeholder option): the trigger then shows a blank label rather than
+  // falsely rendering the first option as if it were selected.
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  const selectedLabel = selectedIndex === -1 ? "" : (options[selectedIndex]?.label ?? "");
 
   const open = () => {
     if (disabled) return;
-    setActiveIndex(selectedIndex);
+    // Nothing selected yet: start the keyboard highlight at the top.
+    setActiveIndex(selectedIndex === -1 ? 0 : selectedIndex);
     setIsOpen(true);
   };
 
@@ -125,12 +126,16 @@ export function DropdownSelect<TValue extends string>({
     const rect = trigger.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUp = spaceBelow < MENU_MAX_HEIGHT + MENU_GAP && rect.top > spaceBelow;
+    // Keep the menu on-screen horizontally: it is at least as wide as the trigger
+    // (`minWidth`), and `min-width` overrides `max-width` in CSS, so a trigger
+    // near the right edge would push the menu off-screen. Shift `left` back in.
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8));
 
     setMenuStyle({
       position: "fixed",
-      left: rect.left,
+      left,
       minWidth: rect.width,
-      maxWidth: `calc(100vw - ${rect.left + 8}px)`,
+      maxWidth: `calc(100vw - ${left + 8}px)`,
       maxHeight: MENU_MAX_HEIGHT,
       ...(openUp
         ? { bottom: window.innerHeight - rect.top + MENU_GAP }

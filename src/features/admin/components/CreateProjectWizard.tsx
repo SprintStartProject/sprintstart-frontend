@@ -468,14 +468,16 @@ export function CreateProjectWizard({
       });
     }
 
-    if (managerId) {
-      await projectService.setProjectManager(project.id, managerId);
-    }
+    // Setting the manager returns the full, backend-authoritative details
+    // (manager plus the complete member list), so prefer that response. Without
+    // a manager, the created-project response predates the member assignment, so
+    // the members are folded back in before the page adds it to its list.
+    const finalProject = managerId
+      ? await projectService.setProjectManager(project.id, managerId)
+      : { ...project, users: members };
 
     setCreatedProjectId(project.id);
-    // The created-project response predates both calls above, so the members are
-    // folded back in before the page adds the project to its list.
-    onProjectCreated({ ...project, users: members });
+    onProjectCreated(finalProject);
 
     return project.id;
   };
