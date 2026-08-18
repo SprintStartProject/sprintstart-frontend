@@ -58,7 +58,7 @@ export function KnowledgeBaseWidget() {
   }, [projectId]);
 
   return (
-    <div className="group relative flex min-h-56 flex-col overflow-hidden rounded-2xl p-6">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"

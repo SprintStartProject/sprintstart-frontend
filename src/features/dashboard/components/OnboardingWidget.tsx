@@ -1,4 +1,5 @@
 import { useMyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
+import type { DashboardWidgetSize } from "../layout/types";
 import { NextStepWidget } from "./NextStepWidget";
 
 /**
@@ -9,8 +10,8 @@ import { NextStepWidget } from "./NextStepWidget";
  * and the catalog stops offering this widget at the same moment, so a finished onboarding
  * leaves the board rather than leaving a blank.
  */
-export function OnboardingWidget() {
+export function OnboardingWidget({ size }: { size: DashboardWidgetSize }) {
   const status = useMyOnboardingStatus();
 
-  return <NextStepWidget status={status} />;
+  return <NextStepWidget status={status} compact={size === "small"} />;
 }

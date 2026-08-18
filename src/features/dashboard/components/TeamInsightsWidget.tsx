@@ -6,10 +6,11 @@ import { useFetch } from "../../../hooks/useFetch";
 import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import type { FAQGroup } from "../../faq/types";
-import type { KnowledgeGapSeverity } from "../../knowledge-gaps/types";
-import { SEVERITIES, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
+import type { KnowledgeGap, KnowledgeGapSeverity } from "../../knowledge-gaps/types";
+import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { summarizeGaps, topQuestions, type GapSummary } from "../teamInsights";
+import type { DashboardWidgetSize } from "../layout/types";
 
 const RING_SIZE = 92;
 const RING_STROKE = 9;
@@ -25,8 +26,13 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
  */
 const SEGMENT_GAP = RING_STROKE + 2.5;
 
-/** Questions listed before the column would start competing with the ring for height. */
-const VISIBLE_QUESTION_COUNT = 3;
+/**
+ * Questions listed in the medium form.
+ *
+ * The cell is a fixed height, so a fourth row does not find more space — it finds the bottom
+ * edge.
+ */
+const VISIBLE_ROW_COUNT = 3;
 
 /**
  * The ring draws straight from the CSS variables rather than the `bg-app-*-solid` classes
@@ -139,8 +145,8 @@ function GapRing({ summary }: { summary: GapSummary }) {
  * also answer something a list cannot — whether one question dominates, or the project asks
  * five different things equally often. Every bar carries its count in figures beside it.
  */
-function QuestionBars({ groups }: { groups: readonly FAQGroup[] }) {
-  const visible = topQuestions(groups, VISIBLE_QUESTION_COUNT);
+function QuestionBars({ groups, limit }: { groups: readonly FAQGroup[]; limit: number }) {
+  const visible = topQuestions(groups, limit);
   const highestCount = visible[0]?.count ?? 0;
 
   return (
@@ -165,6 +171,45 @@ function QuestionBars({ groups }: { groups: readonly FAQGroup[] }) {
                 transition: "width 900ms ease-out",
               }}
             />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The components carrying a gap, worst first, with what each is missing.
+ *
+ * Only shown at full width, and it is the reason full width is worth choosing: the ring says
+ * *how much* is undocumented and this says *what*, which is the difference between a figure
+ * to worry about and a list to work through. It sits beside the ring rather than in a column
+ * of its own, because it is the same analysis read a second way.
+ */
+function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
+  const worstFirst = [...gaps]
+    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+    .slice(0, VISIBLE_ROW_COUNT);
+
+  return (
+    <ul className="space-y-2">
+      {worstFirst.map((gap) => (
+        <li key={gap.id} className="flex items-start gap-2">
+          <span
+            aria-hidden="true"
+            className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${
+              SEVERITY_STYLES[gap.severity].bar
+            }`}
+          />
+
+          <div className="min-w-0">
+            <p className="truncate text-sm text-app-text">{gap.component}</p>
+            <p className="truncate text-xs text-app-text-muted">
+              {/* The severity is already in the dot; the words say what would fix it. */}
+              {gap.missingTypes.length > 0
+                ? `missing ${gap.missingTypes.join(", ")}`
+                : SEVERITY_STYLES[gap.severity].longLabel.toLowerCase()}
+            </p>
           </div>
         </li>
       ))}
@@ -204,7 +249,7 @@ function ColumnHeading({ label, total }: { label: string; total: string }) {
  *
  * Which user sees this at all is the dashboard's decision; see {@link canSeeTeamInsights}.
  */
-export function TeamInsightsWidget() {
+export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
   const navigate = useNavigate();
   const { selectedProjectId } = useProjectContext();
 
@@ -220,21 +265,24 @@ export function TeamInsightsWidget() {
 
   if (faqLoading || gapsLoading) {
     return (
-      <div className="flex min-h-56 items-center justify-center rounded-2xl p-6">
+      <div className="flex h-full items-center justify-center rounded-2xl p-6">
         <Spinner size="lg" label="Loading" />
       </div>
     );
   }
 
   const groups = faq?.groups ?? [];
-  const summary = summarizeGaps(knowledgeGaps?.gaps ?? []);
+  const gaps = knowledgeGaps?.gaps ?? [];
+  const summary = summarizeGaps(gaps);
   const askedCount = groups.reduce((total, group) => total + group.count, 0);
+
+  const isWide = size === "wide";
 
   return (
     <ClickableCard
       onClick={() => void navigate("/pm-dashboard")}
       aria-label="Open the PM Dashboard for the full team insights"
-      className="group relative flex min-h-56 cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       <div
         aria-hidden="true"
@@ -258,35 +306,53 @@ export function TeamInsightsWidget() {
         </span>
       </div>
 
-      <div className="relative grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+      <div
+        className={`relative grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 ${
+          isWide ? "lg:grid-cols-2" : ""
+        }`}
+      >
         <section aria-label="Knowledge gaps">
           <ColumnHeading
             label="Knowledge gaps"
             total={summary.total === 1 ? "1 gap" : `${summary.total} gaps`}
           />
 
-          <div className="flex flex-col items-center gap-3">
-            <GapRing summary={summary} />
+          {/* At full width the ring and the component list sit side by side and close
+              together: they are two views of the same analysis, and giving each an equal
+              third of the card left the ring stranded in the middle of its own column. */}
+          <div className={`flex ${isWide ? "items-center gap-5" : "flex-col items-center gap-3"}`}>
+            <div className="flex shrink-0 flex-col items-center gap-2">
+              <GapRing summary={summary} />
+
+              {summary.total > 0 && (
+                <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                  {SEVERITIES.filter((severity) => summary.counts[severity] > 0).map((severity) => (
+                    <li
+                      key={severity}
+                      className="flex items-center gap-1.5 text-xs text-app-text-muted"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block h-2 w-2 rounded-full ${SEVERITY_STYLES[severity].bar}`}
+                      />
+                      {summary.counts[severity]} {SEVERITY_STYLES[severity].label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
             {summary.total === 0 ? (
               <p className="text-center text-xs text-app-text-muted">
                 Nothing needs documenting right now.
               </p>
             ) : (
-              <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-                {SEVERITIES.filter((severity) => summary.counts[severity] > 0).map((severity) => (
-                  <li
-                    key={severity}
-                    className="flex items-center gap-1.5 text-xs text-app-text-muted"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`inline-block h-2 w-2 rounded-full ${SEVERITY_STYLES[severity].bar}`}
-                    />
-                    {summary.counts[severity]} {SEVERITY_STYLES[severity].label}
-                  </li>
-                ))}
-              </ul>
+              isWide && (
+                <div className="min-w-0 flex-1">
+                  <p className="mb-2 text-xs font-medium text-app-text-muted">Needs documenting</p>
+                  <GapList gaps={gaps} />
+                </div>
+              )
             )}
           </div>
         </section>
@@ -303,7 +369,7 @@ export function TeamInsightsWidget() {
           {groups.length === 0 ? (
             <p className="text-xs text-app-text-muted">No recurring questions yet.</p>
           ) : (
-            <QuestionBars groups={groups} />
+            <QuestionBars groups={groups} limit={VISIBLE_ROW_COUNT} />
           )}
         </section>
       </div>

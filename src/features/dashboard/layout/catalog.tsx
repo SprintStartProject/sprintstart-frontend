@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { PermissionGroup } from "../../../services/types";
-import { IngestionStatusWidget } from "../../data-ingestion/components/IngestionStatusWidget";
+import { IngestionWidget } from "../components/IngestionWidget";
 import { GreetingWidget } from "../components/GreetingWidget";
 import { KnowledgeBaseWidget } from "../components/KnowledgeBaseWidget";
 import { OnboardingWidget } from "../components/OnboardingWidget";
@@ -62,10 +62,10 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     description: "Your name, the date and a running clock.",
     icon: Clock,
     tier: "user",
-    sizes: ["wide"],
+    sizes: ["small", "medium", "wide"],
     defaultSize: "wide",
     isAvailable: always,
-    render: () => <GreetingWidget />,
+    render: (size) => <GreetingWidget size={size} />,
   },
   {
     id: "onboarding",
@@ -77,7 +77,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     defaultSize: "medium",
     // Offered exactly while the journey is live — see `useMyOnboardingStatus`.
     isAvailable: ({ hasLiveOnboarding }) => hasLiveOnboarding,
-    render: () => <OnboardingWidget />,
+    render: (size) => <OnboardingWidget size={size} />,
   },
   {
     id: "recent-chats",
@@ -110,7 +110,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     sizes: ["medium", "wide"],
     defaultSize: "wide",
     isAvailable: always,
-    render: () => <QuickChatWidget />,
+    render: (size) => <QuickChatWidget size={size} />,
   },
   {
     id: "skills",
@@ -118,10 +118,10 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     description: "Your project roles and the levels you were assessed at.",
     icon: GraduationCap,
     tier: "user",
-    sizes: ["wide"],
+    sizes: ["small", "medium", "wide"],
     defaultSize: "wide",
     isAvailable: always,
-    render: () => <SkillsStrip />,
+    render: (size) => <SkillsStrip size={size} />,
   },
   {
     id: "team-insights",
@@ -131,8 +131,9 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     tier: "manager",
     sizes: ["medium", "wide"],
     defaultSize: "medium",
+    isTallWhenWide: true,
     isAvailable: managesSelectedProject,
-    render: () => <TeamInsightsWidget />,
+    render: (size) => <TeamInsightsWidget size={size} />,
   },
   {
     id: "team-overview",
@@ -143,7 +144,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     sizes: ["small", "medium"],
     defaultSize: "medium",
     isAvailable: managesSelectedProject,
-    render: () => <TeamOverviewWidget />,
+    render: (size) => <TeamOverviewWidget size={size} />,
   },
   {
     id: "data-ingestion",
@@ -151,10 +152,11 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     description: "Whether the project's connected sources are in sync.",
     icon: Database,
     tier: "manager",
-    sizes: ["wide"],
+    sizes: ["small", "medium", "wide"],
     defaultSize: "wide",
+    isTallWhenWide: true,
     isAvailable: canIngest,
-    render: () => <IngestionStatusWidget />,
+    render: (size) => <IngestionWidget size={size} />,
   },
   {
     id: "project-overview",
@@ -167,18 +169,18 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     // The figures are summed from the ADMIN-only project listing; see the widget for why
     // HR, who reaches the same page, must not be offered it.
     isAvailable: ({ profile }) => profile?.permissionGroup === PermissionGroup.ADMIN,
-    render: () => <ProjectOverviewWidget />,
+    render: (size) => <ProjectOverviewWidget size={size} />,
   },
   {
     id: "user-overview",
-    title: "People",
-    description: "Everybody with an account, and who still cannot sign in.",
+    title: "User accounts",
+    description: "Who has an account, what they may do, and who is not in a project.",
     icon: UserRound,
     tier: "admin",
     sizes: ["small", "medium"],
     defaultSize: "medium",
     isAvailable: ({ profile }) => canAccessRoute(profile, "/admin"),
-    render: () => <UserOverviewWidget />,
+    render: (size) => <UserOverviewWidget size={size} />,
   },
 ];
 

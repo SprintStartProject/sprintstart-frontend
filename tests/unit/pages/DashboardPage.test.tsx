@@ -329,9 +329,8 @@ describe("DashboardPage", () => {
 
       expect(screen.getByRole("option", { name: "Small" })).toBeInTheDocument();
       expect(screen.getByRole("option", { name: "Medium" })).toBeInTheDocument();
-      // A card that only works across the full width has nothing to choose between.
+      // The knowledge base has no full-width form, so that step is never on offer.
       expect(screen.queryByRole("option", { name: "Wide" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("combobox", { name: "Size of Greeting" })).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("option", { name: "Small" }));
 
@@ -377,7 +376,7 @@ describe("DashboardPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
 
       const picker = screen.getByTestId("add-widget-modal");
-      expect(within(picker).getByRole("button", { name: "Add People" })).toBeInTheDocument();
+      expect(within(picker).getByRole("button", { name: "Add User accounts" })).toBeInTheDocument();
       expect(within(picker).getByRole("button", { name: "Add Projects" })).toBeInTheDocument();
     });
 
@@ -401,7 +400,9 @@ describe("DashboardPage", () => {
 
       const picker = screen.getByTestId("add-widget-modal");
       expect(within(picker).getByRole("button", { name: "Add Team overview" })).toBeInTheDocument();
-      expect(within(picker).queryByRole("button", { name: "Add People" })).not.toBeInTheDocument();
+      expect(
+        within(picker).queryByRole("button", { name: "Add User accounts" }),
+      ).not.toBeInTheDocument();
       expect(
         within(picker).queryByRole("button", { name: "Add Projects" }),
       ).not.toBeInTheDocument();

@@ -76,6 +76,14 @@ export type DashboardWidgetDefinition = {
   sizes: readonly DashboardWidgetSize[];
   defaultSize: DashboardWidgetSize;
   /**
+   * Whether the `wide` form needs both rows rather than the single-row strip.
+   *
+   * Set it only for a widget whose wide form is a real card — a header with its own action,
+   * and columns beneath it. Everything else reads better as a band across the row, and a
+   * board of full-width rectangles stops looking like a dashboard.
+   */
+  isTallWhenWide?: boolean;
+  /**
    * Whether this user may place the widget at all.
    *
    * Asked for the picker, for the default layout, and again when a stored layout is read —
@@ -83,5 +91,12 @@ export type DashboardWidgetDefinition = {
    * rendering a card that can only 403.
    */
   isAvailable: (context: DashboardWidgetContext) => boolean;
-  render: () => ReactNode;
+  /**
+   * Renders the widget at the size it was given.
+   *
+   * Handed the size rather than reading it, because a card is a different card at a quarter
+   * of a row than at a whole one — a wide card that only stretched its medium layout wastes
+   * the space it asked for, and a small one that shrank it becomes unreadable.
+   */
+  render: (size: DashboardWidgetSize) => ReactNode;
 };

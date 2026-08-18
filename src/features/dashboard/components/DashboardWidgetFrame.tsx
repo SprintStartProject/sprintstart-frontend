@@ -5,7 +5,7 @@ import { Button } from "../../../components/ui/Button";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
-import { DASHBOARD_SIZE_CLASSES, DASHBOARD_SIZE_LABELS } from "../layout/sizes";
+import { DASHBOARD_SIZE_LABELS, dashboardCellClass } from "../layout/sizes";
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetId,
@@ -17,7 +17,7 @@ import type {
  *
  * Under a degree, and every card starts at a different point in the cycle, so the board
  * shimmers rather than pulsing in lockstep. It stops the moment the pointer is over a card:
- * a moving target is hard to aim a 32px button at, and the card is already saying it can be
+ * a moving target is hard to aim a 36px button at, and the card is already saying it can be
  * moved by the time you have reached it.
  */
 const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
@@ -45,13 +45,17 @@ export type DashboardWidgetFrameProps = {
  * One cell of the dashboard: the widget, plus everything the edit mode adds around it.
  *
  * The widget itself never learns it is being edited — it renders exactly as it does on a
- * finished dashboard, with pointer events switched off so a card that is normally a link
- * does not navigate when it is being dragged. Everything editable lives in this frame, which
- * is what keeps the eleven widgets from each needing an edit mode of their own.
+ * finished dashboard, with pointer events switched off so a card that is normally a link does
+ * not navigate when it is being dragged. Everything editable lives in this frame, which is
+ * what keeps the eleven widgets from each needing an edit mode of their own.
  *
- * Dragging is Framer Motion's, not hand-rolled: the card follows the pointer, lifts, and
- * snaps back into whatever slot it has been reordered into, which is the part that has to
- * feel right and is very hard to get right by hand.
+ * **Two nested motion elements, deliberately.** The outer one is the grid cell: it does
+ * `layout` and `drag`, and Framer measures it. The inner one carries the decoration — the
+ * wiggle's rotation and the lift while dragging. They were on the same element until a card
+ * kept coming back about 3% larger from every drag: `whileDrag`'s scale and the wiggle's
+ * rotation both change an element's measured box, and a layout projection measured against a
+ * scaled or rotated box stays wrong until the element is remounted. Decoration on a child
+ * Framer does not measure cannot poison the measurement.
  */
 export function DashboardWidgetFrame({
   definition,
@@ -75,39 +79,18 @@ export function DashboardWidgetFrame({
   // The controls appear on approach and stay for the keyboard: they are always mounted, so
   // Tab can reach them, and focusing one is what reveals it.
   const showControls = isPointerOver || isFocusWithin;
-
   const isWiggling = isEditing && !reduceMotion && !isPointerOver && !isDragging;
-
-  // The layout spring is the shared one; only the wiggle brings its own timing, because a
-  // spring cannot express "rock back and forth forever".
-  const transition = isWiggling
-    ? {
-        ...centralSpringToken,
-        rotate: {
-          duration: 0.6,
-          repeat: Infinity,
-          ease: "easeInOut" as const,
-          // Offsets each card in the cycle so the board shimmers instead of pulsing.
-          delay: (index % 5) * 0.08,
-        },
-      }
-    : centralSpringToken;
 
   return (
     <motion.div
-      // `position` and not the full `layout`: the cell's width and height come from the grid,
-      // and letting Framer animate them too means it animates a *scale*, which stretches the
-      // card's contents mid-move and leaves the projection stale until the page is reloaded.
       layout="position"
       ref={(element) => registerElement(definition.id, element)}
-      transition={transition}
-      animate={isWiggling ? WIGGLE : { rotate: 0 }}
+      transition={centralSpringToken}
       drag={isEditing}
       dragSnapToOrigin
       // No elasticity: the card should sit under the pointer, not lag behind it on a spring.
       dragElastic={0}
       dragMomentum={false}
-      whileDrag={{ scale: 1.03, zIndex: 40 }}
       onDragStart={() => onDragStart(definition.id)}
       onDrag={() => onDrag(definition.id)}
       onDragEnd={onDragEnd}
@@ -117,19 +100,31 @@ export function DashboardWidgetFrame({
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false);
       }}
-      className={`${DASHBOARD_SIZE_CLASSES[size]} relative ${isDragging ? "z-40" : ""}`}
+      className={`${dashboardCellClass(size, definition.isTallWhenWide === true)} relative ${
+        isDragging ? "z-40" : ""
+      }`}
       style={isEditing ? { touchAction: "none" } : undefined}
     >
-      <SpotlightCard
-        roundedClassName="rounded-3xl"
-        className={`h-full ${isEditing ? "ring-2 ring-app-border-muted" : ""} ${
-          isDragging ? "cursor-grabbing shadow-2xl" : isEditing ? "cursor-grab" : ""
-        }`}
+      <motion.div
+        animate={isWiggling ? WIGGLE : { rotate: 0 }}
+        transition={
+          isWiggling
+            ? { duration: 0.6, repeat: Infinity, ease: "easeInOut", delay: (index % 5) * 0.08 }
+            : centralSpringToken
+        }
+        className="h-full"
       >
-        <div className={`h-full ${isEditing ? "pointer-events-none select-none" : ""}`}>
-          {definition.render()}
-        </div>
-      </SpotlightCard>
+        <SpotlightCard
+          roundedClassName="rounded-3xl"
+          className={`h-full ${isEditing ? "ring-2 ring-app-border-muted" : ""} ${
+            isDragging ? "cursor-grabbing shadow-2xl" : isEditing ? "cursor-grab" : ""
+          }`}
+        >
+          <div className={`h-full ${isEditing ? "pointer-events-none select-none" : ""}`}>
+            {definition.render(size)}
+          </div>
+        </SpotlightCard>
+      </motion.div>
 
       {isEditing && (
         <div

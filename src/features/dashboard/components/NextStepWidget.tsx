@@ -6,7 +6,9 @@ import { ClickableCard } from "../../../components/common/ClickableCard";
 import type { MyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
 import type { OnboardingNextAction } from "../../onboarding/nextAction";
 
+/** The ring at a card's full width, and the one that still fits a quarter-row card. */
 const RING_SIZE = 104;
+const COMPACT_RING_SIZE = 76;
 const RING_STROKE = 9;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -18,14 +20,16 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
  * harness only mocks `motion` for a fixed list of HTML tags, so `motion.circle`
  * resolves to undefined there.
  */
-function ProgressRing({ percentage }: { percentage: number }) {
+function ProgressRing({ percentage, compact }: { percentage: number; compact: boolean }) {
   const offset = RING_CIRCUMFERENCE * (1 - percentage / 100);
-
+  const size = compact ? COMPACT_RING_SIZE : RING_SIZE;
+  // The geometry is authored at `RING_SIZE`; the viewBox scales the whole drawing, so the
+  // stroke thins with it instead of turning a small ring into a thick doughnut.
   return (
-    <div className="relative shrink-0" style={{ width: RING_SIZE, height: RING_SIZE }}>
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg
-        width={RING_SIZE}
-        height={RING_SIZE}
+        width={size}
+        height={size}
         viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
         aria-hidden="true"
         className="-rotate-90"
@@ -63,7 +67,11 @@ function ProgressRing({ percentage }: { percentage: number }) {
       </svg>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-app-text tabular-nums">{percentage}%</span>
+        <span
+          className={`font-bold text-app-text tabular-nums ${compact ? "text-lg" : "text-2xl"}`}
+        >
+          {percentage}%
+        </span>
         <span className="text-[10px] font-medium tracking-wide text-app-text-muted uppercase">
           done
         </span>
@@ -136,7 +144,7 @@ function describeNextAction(action: Exclude<OnboardingNextAction, { kind: "done"
 }
 
 const CARD_CLASS_NAME =
-  "group relative flex min-h-56 flex-col overflow-hidden rounded-2xl p-6 transition-all";
+  "group relative flex h-full flex-col overflow-hidden rounded-2xl p-6 transition-all";
 
 /**
  * The signed-in user's own position in their onboarding: overall progress and the one
@@ -148,12 +156,18 @@ const CARD_CLASS_NAME =
  * path itself, not from the team overview's `currentStep`: that field ignores phase locks
  * and would send someone with an unpassed knowledge check straight into the next phase.
  */
-export function NextStepWidget({ status }: { status: MyOnboardingStatus }) {
+export function NextStepWidget({
+  status,
+  compact = false,
+}: {
+  status: MyOnboardingStatus;
+  compact?: boolean;
+}) {
   const navigate = useNavigate();
 
   if (status.state === "loading") {
     return (
-      <div className="flex min-h-56 items-center justify-center rounded-2xl p-6">
+      <div className="flex h-full items-center justify-center rounded-2xl p-6">
         <Spinner size="lg" label="Loading" />
       </div>
     );
@@ -161,7 +175,7 @@ export function NextStepWidget({ status }: { status: MyOnboardingStatus }) {
 
   if (status.state === "error") {
     return (
-      <div className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-2xl p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-2xl p-6 text-center">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-sm text-app-text-muted">Could not load your onboarding progress.</p>
       </div>
@@ -205,17 +219,33 @@ export function NextStepWidget({ status }: { status: MyOnboardingStatus }) {
         </span>
       </div>
 
-      <div className="relative flex flex-1 items-center gap-5">
-        <ProgressRing percentage={status.progress.percentage} />
+      {/* Stacked and centred when the card is a quarter of a row: at that width a ring with
+          text beside it leaves neither enough room, and the cell's fixed height gives the
+          stack somewhere to sit. */}
+      <div
+        className={`relative flex flex-1 ${
+          compact ? "flex-col items-center justify-center gap-3 text-center" : "items-center gap-5"
+        }`}
+      >
+        <ProgressRing percentage={status.progress.percentage} compact={compact} />
 
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
-            {content.eyebrow}
-          </p>
-          <p className="mt-1 line-clamp-2 text-lg leading-snug font-semibold text-app-text">
+        <div className={compact ? "max-w-full min-w-0" : "min-w-0 flex-1"}>
+          {/* The eyebrow names the kind of action; at this size the title says it anyway. */}
+          {!compact && (
+            <p className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              {content.eyebrow}
+            </p>
+          )}
+          <p
+            className={`line-clamp-2 leading-snug font-semibold text-app-text ${
+              compact ? "text-base" : "mt-1 text-lg"
+            }`}
+          >
             {content.title}
           </p>
-          {content.subtitle && (
+          {/* The subtitle is the first thing to go when the card is a quarter of a row: it
+              explains the next action, which the title has already named. */}
+          {content.subtitle && !compact && (
             <p className="mt-1 line-clamp-2 text-sm text-app-text-muted">{content.subtitle}</p>
           )}
         </div>
