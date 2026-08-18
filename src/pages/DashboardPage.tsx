@@ -16,19 +16,32 @@ import { RecentChatsWidget } from "../features/dashboard/components/RecentChatsW
 import { KnowledgeBaseWidget } from "../features/dashboard/components/KnowledgeBaseWidget";
 import { QuickChatWidget } from "../features/dashboard/components/QuickChatWidget";
 import { SkillsStrip } from "../features/dashboard/components/SkillsStrip";
+import { TeamInsightsWidget } from "../features/dashboard/components/TeamInsightsWidget";
+import { canSeeTeamInsights } from "../features/dashboard/teamInsights";
 import { useMyOnboardingStatus } from "../features/onboarding/hooks/useMyOnboardingStatus";
+import { useProjectContext } from "../features/projects/useProjectContext";
 import { SpotlightCard } from "../components/ui/SpotlightCard";
 
 /**
  * Central hub displayed after login.
  * Shows high-level project status and provides quick actions for the user.
+ *
+ * The card beside the knowledge base is a single flexible slot rather than three stacked
+ * ones: whichever of onboarding, team insights and conversations is the most useful thing
+ * for this user right now occupies it (#288). Nobody gets two, and nobody gets an empty
+ * one — the layout is identical for every role, only its occupant differs.
  */
 export function DashboardPage() {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // The insights widget reads the globally selected project, and a PM only qualifies for a
+  // project they actually manage — being a member of it is not enough.
+  const { canManageSelected } = useProjectContext();
+  const showsTeamInsights = canSeeTeamInsights(profile, canManageSelected);
+
   // Read here rather than inside the card, because the answer decides what occupies the
-  // slot: an onboarding to continue, or the conversations card for everyone who has none.
+  // slot: an onboarding to continue, or one of the cards for everyone who has none.
   const onboarding = useMyOnboardingStatus();
 
   // 2048 easter egg: Ctrl+Shift+2 opens the game in a modal.
@@ -98,10 +111,13 @@ export function DashboardPage() {
             icon={ChartColumn}
             title="Dashboard"
             subtitle={
-              // Promises onboarding progress only to someone who has an onboarding.
+              // Names whatever the flexible slot below actually holds, so the header never
+              // promises an onboarding to someone who has none.
               showsOnboarding
                 ? "Your central workspace for project status, onboarding progress and next actions."
-                : "Your central workspace for project status, recent conversations and next actions."
+                : showsTeamInsights
+                  ? "Your central workspace for project status, team insights and next actions."
+                  : "Your central workspace for project status, recent conversations and next actions."
             }
           />
         </div>
@@ -135,7 +151,25 @@ export function DashboardPage() {
           className="grid grid-cols-1 gap-5 lg:grid-cols-2"
         >
           <SpotlightCard roundedClassName="rounded-3xl">
-            {showsOnboarding ? <NextStepWidget status={onboarding} /> : <RecentChatsWidget />}
+            {/*
+              The slot's order of precedence, and why it is this one:
+
+              1. An onboarding still running. It is the user's own, it is finite, and #282
+                 established that the card exists exactly while the journey does — a newly
+                 hired PM should not lose their next step to a management widget.
+              2. Team insights, for a manager past their onboarding. This is the steady
+                 state for PM/HR/Admin, and the one thing they would otherwise open a
+                 second page for.
+              3. Recent conversations, for everybody else — the questions they were already
+                 asking, which is the closest thing to "where you left off".
+            */}
+            {showsOnboarding ? (
+              <NextStepWidget status={onboarding} />
+            ) : showsTeamInsights ? (
+              <TeamInsightsWidget />
+            ) : (
+              <RecentChatsWidget />
+            )}
           </SpotlightCard>
           <SpotlightCard roundedClassName="rounded-3xl">
             <KnowledgeBaseWidget />
