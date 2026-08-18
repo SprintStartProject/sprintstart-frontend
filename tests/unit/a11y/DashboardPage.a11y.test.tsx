@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
@@ -82,6 +83,20 @@ describe("DashboardPage Accessibility", () => {
         <DashboardPage />
       </MemoryRouter>,
     );
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  // Edit mode is the one state that adds controls of its own: a size select and three icon
+  // buttons per card, floating over a widget whose own controls are switched off.
+  it("should not have any a11y violations while the dashboard is being edited", async () => {
+    const { baseElement } = render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit dashboard" }));
+
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

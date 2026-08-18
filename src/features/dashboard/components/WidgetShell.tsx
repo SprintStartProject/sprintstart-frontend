@@ -1,0 +1,84 @@
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ClickableCard } from "../../../components/common/ClickableCard";
+import { Spinner } from "../../../components/ui/Spinner";
+
+export type WidgetShellProps = {
+  icon: LucideIcon;
+  title: string;
+  /** What the card promises when clicked, e.g. "Open team management". */
+  actionLabel: string;
+  /** Where clicking the card leads — the page that can act on what it shows. */
+  to: string;
+  isLoading?: boolean;
+  /** Shown instead of the body when the figures could not be read. */
+  errorMessage?: string | null;
+  children: ReactNode;
+};
+
+/**
+ * The frame the summary widgets share: header, click-through, loading and failure.
+ *
+ * Exists because a dashboard the user assembles themselves is only calm if the cards agree
+ * on where the title sits and what clicking does. Each widget then supplies its figures and
+ * nothing else.
+ *
+ * Deliberately has no nested links: the whole card is the control, and a link inside an
+ * interactive card is the nested-interactive problem `ClickableCard` documents.
+ */
+export function WidgetShell({
+  icon: Icon,
+  title,
+  actionLabel,
+  to,
+  isLoading = false,
+  errorMessage = null,
+  children,
+}: WidgetShellProps) {
+  const navigate = useNavigate();
+
+  return (
+    <ClickableCard
+      onClick={() => void navigate(to)}
+      aria-label={actionLabel}
+      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
+      />
+
+      <div className="relative mb-5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+          <span className="text-sm font-semibold text-app-text">{title}</span>
+        </div>
+
+        <span
+          aria-hidden="true"
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
+        >
+          {actionLabel}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="relative flex flex-1 items-center justify-center">
+          <Spinner size="lg" label="Loading" />
+        </div>
+      ) : errorMessage ? (
+        <div className="relative flex flex-1 flex-col items-center justify-center gap-2 text-center">
+          <AlertTriangle aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
+          <p className="text-sm text-app-text-muted">{errorMessage}</p>
+        </div>
+      ) : (
+        <div className="relative flex flex-1 flex-col">{children}</div>
+      )}
+    </ClickableCard>
+  );
+}

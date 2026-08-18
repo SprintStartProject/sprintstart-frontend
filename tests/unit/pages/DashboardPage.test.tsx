@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "../../../src/pages/DashboardPage";
@@ -57,7 +58,10 @@ vi.mock("../../../src/services/knowledgeGapService", () => ({
   knowledgeGapService: { fetchKnowledgeGaps: mocks.fetchKnowledgeGaps },
 }));
 
-const createProfile = (permissionGroup: PermissionGroup): UserProfile => ({
+const createProfile = (
+  permissionGroup: PermissionGroup,
+  overrides: Partial<UserProfile> = {},
+): UserProfile => ({
   id: "user1",
   authId: "auth-user1",
   username: "Test",
@@ -70,7 +74,14 @@ const createProfile = (permissionGroup: PermissionGroup): UserProfile => ({
   enabled: true,
   profileIcon: null,
   hasCompletedOnboarding: false,
+  ...overrides,
 });
+
+/** A member whose onboarding is still running — the case the catalog offers that widget for. */
+const ONBOARDING_IN_PROGRESS: Partial<UserProfile> = {
+  projectRoles: [{ id: "role1", name: "Developer" }],
+  hasCompletedOnboarding: false,
+};
 
 const manager = {
   id: "manager1",
@@ -113,6 +124,9 @@ function renderPage() {
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The arrangement is stored per user; a layout left behind by one test is another test's
+    // starting state.
+    window.localStorage.clear();
 
     const project = createSelectableProject({ id: "1", name: "Test Project", manager });
     mocks.profile = createProfile(PermissionGroup.USER);
@@ -137,7 +151,9 @@ describe("DashboardPage", () => {
 
   it("renders the dashboard with widgets", () => {
     renderPage();
-    expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.getByText("Your conversations")).toBeInTheDocument();
   });
 
   describe("the flexible slot", () => {
@@ -174,6 +190,7 @@ describe("DashboardPage", () => {
 
     it("keeps a running onboarding ahead of the team insights", () => {
       signInAsManagingPm();
+      mocks.profile = createProfile(PermissionGroup.PM, ONBOARDING_IN_PROGRESS);
       mocks.onboarding = { state: "loading" };
 
       renderPage();
@@ -233,6 +250,138 @@ describe("DashboardPage", () => {
       expect(
         await screen.findByRole("button", { name: /Open the PM Dashboard/ }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("edit mode", () => {
+    /** The widgets on the board, in the order they are rendered. */
+    function placedWidgets(): string[] {
+      return screen
+        .getAllByRole("button", { name: /^Remove / })
+        .map((button) => button.getAttribute("aria-label")?.replace("Remove ", "") ?? "");
+    }
+
+    async function startEditing() {
+      await userEvent.click(screen.getByRole("button", { name: "Edit dashboard" }));
+    }
+
+    it("keeps the editing controls out of the way until asked for", async () => {
+      renderPage();
+
+      expect(screen.queryByRole("button", { name: /^Remove / })).not.toBeInTheDocument();
+
+      await startEditing();
+
+      expect(placedWidgets()).toEqual([
+        "Greeting",
+        "Your conversations",
+        "Knowledge base",
+        "Ask the assistant",
+        "Role and skills",
+      ]);
+    });
+
+    it("takes a widget off the board and keeps it off across a remount", async () => {
+      const { unmount } = render(
+        <MemoryRouter>
+          <DashboardPage />
+        </MemoryRouter>,
+      );
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Remove Your conversations" }));
+
+      expect(screen.queryByText("Your conversations")).not.toBeInTheDocument();
+
+      unmount();
+      renderPage();
+
+      expect(screen.queryByText("Your conversations")).not.toBeInTheDocument();
+    });
+
+    it("offers a removed widget back in the picker", async () => {
+      renderPage();
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Remove Knowledge base" }));
+      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+
+      const picker = screen.getByTestId("add-widget-modal");
+      // Only what is missing is offered — a widget already placed would be a no-op.
+      expect(
+        within(picker).getByRole("button", { name: "Add Knowledge base" }),
+      ).toBeInTheDocument();
+      expect(
+        within(picker).queryByRole("button", { name: "Add Greeting" }),
+      ).not.toBeInTheDocument();
+
+      await userEvent.click(within(picker).getByRole("button", { name: "Add Knowledge base" }));
+
+      expect(screen.queryByTestId("add-widget-modal")).not.toBeInTheDocument();
+      expect(placedWidgets()).toContain("Knowledge base");
+    });
+
+    it("moves a widget with the keyboard, for anyone who cannot drag one", async () => {
+      renderPage();
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Move Greeting later" }));
+
+      expect(placedWidgets().slice(0, 2)).toEqual(["Your conversations", "Greeting"]);
+    });
+
+    it("puts the default layout back when the arrangement is reset", async () => {
+      renderPage();
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Remove Greeting" }));
+      expect(placedWidgets()).not.toContain("Greeting");
+
+      await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+      const confirmation = screen.getByRole("alertdialog");
+      await userEvent.click(within(confirmation).getByRole("button", { name: "Reset" }));
+
+      expect(placedWidgets()).toContain("Greeting");
+    });
+
+    it("offers only what this user may have — an admin gets the organization widgets", async () => {
+      mocks.profile = createProfile(PermissionGroup.ADMIN);
+
+      renderPage();
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+
+      const picker = screen.getByTestId("add-widget-modal");
+      expect(within(picker).getByRole("button", { name: "Add People" })).toBeInTheDocument();
+      expect(within(picker).getByRole("button", { name: "Add Projects" })).toBeInTheDocument();
+    });
+
+    it("has nothing left to offer a plain user, whose widgets are all placed by default", async () => {
+      renderPage();
+
+      await startEditing();
+
+      // The default layout already holds every widget a plain user may have, so the picker
+      // would open on an empty list.
+      expect(screen.getByRole("button", { name: "Add widget" })).toBeDisabled();
+    });
+
+    it("offers a manager their team widgets, and never the organization ones", async () => {
+      signInAsManagingPm();
+
+      renderPage();
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+
+      const picker = screen.getByTestId("add-widget-modal");
+      expect(within(picker).getByRole("button", { name: "Add Team overview" })).toBeInTheDocument();
+      expect(within(picker).queryByRole("button", { name: "Add People" })).not.toBeInTheDocument();
+      expect(
+        within(picker).queryByRole("button", { name: "Add Projects" }),
+      ).not.toBeInTheDocument();
     });
   });
 });
