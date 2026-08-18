@@ -68,7 +68,11 @@ function createArtifact(overrides: Partial<Artifact> = {}): Artifact {
 
 function renderDrawer(
   artifact: Artifact | null = createArtifact(),
-  overrides: { canDelete?: boolean; onDelete?: (id: string) => void } = {},
+  overrides: {
+    canDelete?: boolean;
+    onDelete?: (id: string) => void;
+    highlightLines?: number[];
+  } = {},
 ) {
   const onDelete = overrides.onDelete ?? vi.fn();
   return {
@@ -79,6 +83,7 @@ function renderDrawer(
         artifact={artifact}
         onClose={() => {}}
         projectId="proj-1"
+        highlightLines={overrides.highlightLines}
         canDelete={overrides.canDelete ?? false}
         onDelete={onDelete}
       />,
@@ -243,6 +248,48 @@ describe("ArtifactViewerDrawer", () => {
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
     });
 
+    it("renders Pull Request and Issue artifacts as markdown", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## PR Description\n- Added new feature\n- Fixed bugs",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "PR #42: Add feature",
+          artifactType: "PULL_REQUEST",
+          sourceUrl: "https://github.com/org/repo/pull/42",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("PR Description")).toBeInTheDocument();
+    });
+
+    it("renders Jira / GitHub issues as markdown even if artifactType is FILE", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Bug Report\nSteps to reproduce: ...",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Issue #101: Crash on startup",
+          artifactType: "FILE",
+          sourceUrl: "https://github.com/org/repo/issues/101",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Bug Report")).toBeInTheDocument();
+    });
+
     it("gracefully handles KaTeX math parse errors without breaking the drawer", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
@@ -256,6 +303,54 @@ describe("ArtifactViewerDrawer", () => {
       const rawContent = await screen.findByTestId("raw-content");
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
       expect(await screen.findByText(/Inline math/)).toBeInTheDocument();
+    });
+
+    it("highlights markdown elements and shows cited-chunk banner when highlightLines are provided", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "# Heading 1\n\nThis is paragraph one.\n\nThis is paragraph two cited.",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      // Highlight line 5 (paragraph two)
+      renderDrawer(createArtifact({ title: "docs.md" }), { highlightLines: [5] });
+
+      const banner = await screen.findByTestId("cited-chunk-banner");
+      expect(banner).toBeInTheDocument();
+      expect(screen.getByText(/Showing cited chunk \(Line 5\)/)).toBeInTheDocument();
+
+      const highlightedParagraph = screen.getByText("This is paragraph two cited.");
+      expect(highlightedParagraph).toHaveAttribute("data-highlighted", "true");
+      expect(highlightedParagraph).toHaveAttribute("id", "line-5");
+    });
+
+    it("allows switching between Formatted preview and Source view for markdown files", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "# Title\nSome content.",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "readme.md" }));
+
+      const previewBtn = await screen.findByTestId("view-rendered-btn");
+      const sourceBtn = await screen.findByTestId("view-source-btn");
+
+      expect(previewBtn).toBeInTheDocument();
+      expect(sourceBtn).toBeInTheDocument();
+
+      // Click Source
+      await userEvent.click(sourceBtn);
+
+      const rawContent = await screen.findByTestId("raw-content");
+      // Syntax highlighter creates line number spans
+      expect(rawContent.querySelector(".react-syntax-highlighter-line-number")).toBeInTheDocument();
+
+      // Switch back to Formatted
+      await userEvent.click(previewBtn);
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
     });
 
     describe("preprocessMarkdown", () => {
