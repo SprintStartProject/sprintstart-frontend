@@ -29,7 +29,8 @@ export function RecentChatsWidget() {
   // `chatsProjectId` is null until the list arrives — but also forever when no project is
   // selected, because the provider never fetches then. Without the second half of this the
   // card would spin for good on an account with no project.
-  const isLoading = chat != null && chat.chatsProjectId === null && chat.selectedProjectId !== "";
+  const isLoading =
+    chat !== undefined && chat.chatsProjectId === null && chat.selectedProjectId !== "";
   const recentChats = (chat?.sortedChats ?? []).slice(0, PREVIEW_COUNT);
 
   return (
