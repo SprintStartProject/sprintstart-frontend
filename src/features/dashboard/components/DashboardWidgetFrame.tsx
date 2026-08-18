@@ -1,8 +1,8 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, GripVertical, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { Select } from "../../../components/ui/Select";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
 import { DASHBOARD_SIZE_CLASSES, DASHBOARD_SIZE_LABELS } from "../layout/sizes";
@@ -16,8 +16,9 @@ import type {
  * The tilt that says "this can be moved".
  *
  * Under a degree, and every card starts at a different point in the cycle, so the board
- * shimmers rather than pulsing in lockstep. Skipped entirely under reduced motion, where the
- * dashed outline and the controls carry the same message without anything moving.
+ * shimmers rather than pulsing in lockstep. It stops the moment the pointer is over a card:
+ * a moving target is hard to aim a 32px button at, and the card is already saying it can be
+ * moved by the time you have reached it.
  */
 const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
 
@@ -32,7 +33,10 @@ export type DashboardWidgetFrameProps = {
   onRemove: (id: DashboardWidgetId) => void;
   onResize: (id: DashboardWidgetId, size: DashboardWidgetSize) => void;
   onMoveBy: (id: DashboardWidgetId, offset: number) => void;
-  onDragStart: (id: DashboardWidgetId, event: ReactPointerEvent<HTMLDivElement>) => void;
+  onDragStart: (id: DashboardWidgetId) => void;
+  /** Reports that the card has moved, so the grid can decide what it is being dropped on. */
+  onDrag: (id: DashboardWidgetId) => void;
+  onDragEnd: () => void;
   /** Lets the grid measure this cell while a drag is looking for what is under the pointer. */
   registerElement: (id: DashboardWidgetId, element: HTMLDivElement | null) => void;
 };
@@ -44,6 +48,10 @@ export type DashboardWidgetFrameProps = {
  * finished dashboard, with pointer events switched off so a card that is normally a link
  * does not navigate when it is being dragged. Everything editable lives in this frame, which
  * is what keeps the eleven widgets from each needing an edit mode of their own.
+ *
+ * Dragging is Framer Motion's, not hand-rolled: the card follows the pointer, lifts, and
+ * snaps back into whatever slot it has been reordered into, which is the part that has to
+ * feel right and is very hard to get right by hand.
  */
 export function DashboardWidgetFrame({
   definition,
@@ -56,11 +64,19 @@ export function DashboardWidgetFrame({
   onResize,
   onMoveBy,
   onDragStart,
+  onDrag,
+  onDragEnd,
   registerElement,
 }: DashboardWidgetFrameProps) {
   const reduceMotion = useReducedMotion();
+  const [isPointerOver, setPointerOver] = useState(false);
+  const [isFocusWithin, setFocusWithin] = useState(false);
 
-  const isWiggling = isEditing && !reduceMotion;
+  // The controls appear on approach and stay for the keyboard: they are always mounted, so
+  // Tab can reach them, and focusing one is what reveals it.
+  const showControls = isPointerOver || isFocusWithin;
+
+  const isWiggling = isEditing && !reduceMotion && !isPointerOver && !isDragging;
 
   // The layout spring is the shared one; only the wiggle brings its own timing, because a
   // spring cannot express "rock back and forth forever".
@@ -79,19 +95,36 @@ export function DashboardWidgetFrame({
 
   return (
     <motion.div
-      layout
+      // `position` and not the full `layout`: the cell's width and height come from the grid,
+      // and letting Framer animate them too means it animates a *scale*, which stretches the
+      // card's contents mid-move and leaves the projection stale until the page is reloaded.
+      layout="position"
       ref={(element) => registerElement(definition.id, element)}
       transition={transition}
       animate={isWiggling ? WIGGLE : { rotate: 0 }}
-      className={`${DASHBOARD_SIZE_CLASSES[size]} relative ${isDragging ? "z-20 opacity-80" : ""}`}
+      drag={isEditing}
+      dragSnapToOrigin
+      // No elasticity: the card should sit under the pointer, not lag behind it on a spring.
+      dragElastic={0}
+      dragMomentum={false}
+      whileDrag={{ scale: 1.03, zIndex: 40 }}
+      onDragStart={() => onDragStart(definition.id)}
+      onDrag={() => onDrag(definition.id)}
+      onDragEnd={onDragEnd}
+      onPointerEnter={() => setPointerOver(true)}
+      onPointerLeave={() => setPointerOver(false)}
+      onFocusCapture={() => setFocusWithin(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false);
+      }}
+      className={`${DASHBOARD_SIZE_CLASSES[size]} relative ${isDragging ? "z-40" : ""}`}
       style={isEditing ? { touchAction: "none" } : undefined}
-      onPointerDown={isEditing ? (event) => onDragStart(definition.id, event) : undefined}
     >
       <SpotlightCard
         roundedClassName="rounded-3xl"
-        className={`h-full ${
-          isEditing ? "cursor-grab ring-2 ring-app-border-muted ring-offset-0" : ""
-        } ${isDragging ? "cursor-grabbing" : ""}`}
+        className={`h-full ${isEditing ? "ring-2 ring-app-border-muted" : ""} ${
+          isDragging ? "cursor-grabbing shadow-2xl" : isEditing ? "cursor-grab" : ""
+        }`}
       >
         <div className={`h-full ${isEditing ? "pointer-events-none select-none" : ""}`}>
           {definition.render()}
@@ -101,54 +134,59 @@ export function DashboardWidgetFrame({
       {isEditing && (
         <div
           data-widget-controls
-          // Stops a click on the controls from also starting a drag of the card beneath.
-          onPointerDown={(event) => event.stopPropagation()}
-          className="absolute -top-3 right-3 z-10 flex items-center gap-1 rounded-full border border-app-border bg-app-surface px-1.5 py-1 shadow-lg"
+          // Keeps a press on the controls from also grabbing the card underneath.
+          onPointerDownCapture={(event) => event.stopPropagation()}
+          className={`absolute -top-4 right-4 z-50 flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface-muted p-1.5 shadow-lg transition-opacity duration-150 ${
+            showControls ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
         >
-          <GripVertical aria-hidden="true" className="h-4 w-4 text-app-text-subtle" />
+          <GripVertical aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
 
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             iconOnly
             aria-label={`Move ${definition.title} earlier`}
             disabled={index === 0}
             onClick={() => onMoveBy(definition.id, -1)}
-            icon={<ChevronLeft className="h-4 w-4" />}
-          />
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
 
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             iconOnly
             aria-label={`Move ${definition.title} later`}
             disabled={index === total - 1}
             onClick={() => onMoveBy(definition.id, 1)}
-            icon={<ChevronRight className="h-4 w-4" />}
-          />
-
-          <Select
-            size="sm"
-            aria-label={`Size of ${definition.title}`}
-            value={size}
-            onChange={(event) => onResize(definition.id, event.target.value as DashboardWidgetSize)}
-            className="w-28"
           >
-            {definition.sizes.map((option) => (
-              <option key={option} value={option}>
-                {DASHBOARD_SIZE_LABELS[option]}
-              </option>
-            ))}
-          </Select>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          {/* A widget with one sensible shape has nothing to choose between. */}
+          {definition.sizes.length > 1 && (
+            <FilterSelect
+              label={`Size of ${definition.title}`}
+              value={size}
+              options={definition.sizes.map((option) => ({
+                value: option,
+                label: DASHBOARD_SIZE_LABELS[option],
+              }))}
+              onChange={(next) => onResize(definition.id, next)}
+              className="w-32"
+            />
+          )}
 
           <Button
-            variant="dangerGhost"
+            variant="dangerSoft"
             size="sm"
             iconOnly
             aria-label={`Remove ${definition.title}`}
             onClick={() => onRemove(definition.id)}
-            icon={<X className="h-4 w-4" />}
-          />
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       )}
     </motion.div>

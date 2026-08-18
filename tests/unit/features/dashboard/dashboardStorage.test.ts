@@ -14,7 +14,7 @@ const KEY = "sprintstart:dashboard-layout:user-1";
 
 const LAYOUT: DashboardLayout = [
   { id: "greeting", size: "wide" },
-  { id: "skills", size: "full" },
+  { id: "skills", size: "small" },
 ];
 
 describe("dashboard layout storage", () => {
@@ -39,7 +39,9 @@ describe("dashboard layout storage", () => {
   });
 
   it("ignores a layout written by an older version of the format", () => {
-    window.localStorage.setItem(KEY, JSON.stringify({ version: 0, items: LAYOUT }));
+    // v1 allowed sizes v2 has no grid for, so the whole arrangement is dropped rather than
+    // losing those cards one at a time.
+    window.localStorage.setItem(KEY, JSON.stringify({ version: 1, items: LAYOUT }));
 
     expect(readStoredLayout("user-1", KNOWN_IDS)).toBeNull();
   });
@@ -48,7 +50,7 @@ describe("dashboard layout storage", () => {
     window.localStorage.setItem(KEY, "not json at all");
     expect(readStoredLayout("user-1", KNOWN_IDS)).toBeNull();
 
-    window.localStorage.setItem(KEY, JSON.stringify({ version: 1, items: "nope" }));
+    window.localStorage.setItem(KEY, JSON.stringify({ version: 2, items: "nope" }));
     expect(readStoredLayout("user-1", KNOWN_IDS)).toBeNull();
   });
 
@@ -56,7 +58,7 @@ describe("dashboard layout storage", () => {
     window.localStorage.setItem(
       KEY,
       JSON.stringify({
-        version: 1,
+        version: 2,
         items: [
           { id: "greeting", size: "wide" },
           { id: "a-widget-that-was-deleted", size: "medium" },

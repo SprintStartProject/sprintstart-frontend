@@ -71,7 +71,7 @@ describe("reconcileLayout", () => {
   it("keeps only the first of a duplicated widget", () => {
     const layout: DashboardLayout = [
       { id: "greeting", size: "wide" },
-      { id: "greeting", size: "full" },
+      { id: "greeting", size: "medium" },
     ];
 
     expect(reconcileLayout(layout, ["greeting"])).toEqual([{ id: "greeting", size: "wide" }]);
@@ -106,9 +106,9 @@ describe("removeWidget and resizeWidget", () => {
   });
 
   it("resizes just the one widget", () => {
-    expect(resizeWidget(layout, "skills", "full")).toEqual([
+    expect(resizeWidget(layout, "skills", "small")).toEqual([
       { id: "greeting", size: "wide" },
-      { id: "skills", size: "full" },
+      { id: "skills", size: "small" },
     ]);
   });
 });

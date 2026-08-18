@@ -1,55 +1,62 @@
 import { useCallback, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
-import { EmptyState } from "../../../components/ui/EmptyState";
 import { LayoutGrid } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { getDashboardWidget } from "../layout/catalog";
 import { DASHBOARD_GRID_CLASS } from "../layout/sizes";
-import type { DashboardLayoutController } from "../layout/useDashboardLayout";
 import type { DashboardWidgetId } from "../layout/types";
+import type { DashboardLayoutController } from "../layout/useDashboardLayout";
 import { DashboardWidgetFrame } from "./DashboardWidgetFrame";
 
 /**
- * How far inside a card the pointer has to be before it counts as "over" it.
+ * How long the grid ignores further reordering after a swap.
  *
- * Reordering on the first pixel of overlap makes two cards trade places repeatedly while the
- * pointer sits on the seam between them, because each swap moves the seam back under the
- * pointer. Requiring the middle of the card gives the layout somewhere to settle.
+ * A drag reports on every frame, but the re-flow it triggers takes a moment to land — and
+ * measuring the new positions before they exist makes the next frame swap again. That is
+ * how a single drag downwards used to travel two rows instead of one. Roughly the length of
+ * the layout animation, so the next decision is made against where things actually are.
  */
-const DROP_TARGET_INSET = 0.2;
+const SWAP_COOLDOWN_MS = 160;
 
-function isPointerOver(element: HTMLElement, x: number, y: number): boolean {
+/**
+ * Where a dragged card counts as being: its own middle.
+ *
+ * Deliberately not the pointer. The pointer can sit anywhere on a card the user grabbed by
+ * the corner, and reordering on it means the board rearranges before the card looks like it
+ * has arrived. The card's centre is what the eye is following.
+ */
+function centerOf(element: HTMLElement): { x: number; y: number } {
   const rect = element.getBoundingClientRect();
-  const insetX = rect.width * DROP_TARGET_INSET;
-  const insetY = rect.height * DROP_TARGET_INSET;
 
-  return (
-    x >= rect.left + insetX &&
-    x <= rect.right - insetX &&
-    y >= rect.top + insetY &&
-    y <= rect.bottom - insetY
-  );
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function contains(element: HTMLElement, x: number, y: number): boolean {
+  const rect = element.getBoundingClientRect();
+
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
 /**
  * The dashboard itself: the user's widgets, on an invisible four-column grid.
  *
  * Widgets are placed in layout order and left to wrap, so there are no coordinates to store
- * and no holes to fall into — a card's size only decides how many columns and rows it eats.
- * That is also what makes dragging a single operation: find the card under the pointer, put
- * the dragged one in its place, and let the grid re-flow.
- *
- * The reflow is animated by Framer Motion's `layout`, which is why the dragged card does not
- * follow the cursor as a free-floating copy — it moves to where it would land, and the rest
- * part around it, the way a home screen does.
+ * and no holes to fall into — a card's size only decides how many columns it eats. That is
+ * also what makes dragging a single operation: find the card the dragged one now covers, put
+ * it in that place, and let the grid re-flow around it.
  */
 export function DashboardGrid({
   controller,
   isEditing,
+  onAddWidget,
 }: {
   controller: DashboardLayoutController;
   isEditing: boolean;
+  /** Offered from the empty state, which is the one place with nothing else to click. */
+  onAddWidget: () => void;
 }) {
   const elements = useRef(new Map<DashboardWidgetId, HTMLDivElement>());
+  const lastSwapAt = useRef(0);
   const [draggingId, setDraggingId] = useState<DashboardWidgetId | null>(null);
 
   const registerElement = useCallback((id: DashboardWidgetId, element: HTMLDivElement | null) => {
@@ -60,50 +67,46 @@ export function DashboardGrid({
     }
   }, []);
 
-  const handleDragStart = useCallback(
-    (id: DashboardWidgetId, event: ReactPointerEvent<HTMLDivElement>) => {
-      // The controls sit on top of the card; pressing one must not also grab it.
-      if ((event.target as HTMLElement).closest("[data-widget-controls]")) return;
+  const handleDrag = useCallback(
+    (id: DashboardWidgetId) => {
+      const dragged = elements.current.get(id);
+      if (!dragged) return;
 
-      // Optional because jsdom has no pointer capture: without it every test that renders
-      // the edit mode would crash on the first pointer down.
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      setDraggingId(id);
-    },
-    [],
-  );
+      const now = performance.now();
+      if (now - lastSwapAt.current < SWAP_COOLDOWN_MS) return;
 
-  const handlePointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!draggingId) return;
+      const { x, y } = centerOf(dragged);
 
-      for (const [id, element] of elements.current) {
-        if (id !== draggingId && isPointerOver(element, event.clientX, event.clientY)) {
-          controller.moveWidgetTo(draggingId, id);
+      for (const [candidateId, element] of elements.current) {
+        if (candidateId !== id && contains(element, x, y)) {
+          controller.moveWidgetTo(id, candidateId);
+          lastSwapAt.current = now;
           return;
         }
       }
     },
-    [controller, draggingId],
+    [controller],
   );
 
-  const endDrag = useCallback(() => setDraggingId(null), []);
+  const handleDragStart = useCallback((id: DashboardWidgetId) => {
+    lastSwapAt.current = 0;
+    setDraggingId(id);
+  }, []);
 
   if (controller.layout.length === 0) {
     return (
-      <EmptyState icon={<LayoutGrid className="h-6 w-6" />} title="Your dashboard is empty">
-        Add a widget to start putting it back together.
+      <EmptyState
+        icon={<LayoutGrid className="h-6 w-6" />}
+        title="Your dashboard is empty"
+        action={<Button onClick={onAddWidget}>Add a widget</Button>}
+      >
+        Pick the cards you want and arrange them however you work.
       </EmptyState>
     );
   }
 
   return (
-    <div
-      className={DASHBOARD_GRID_CLASS}
-      onPointerMove={isEditing ? handlePointerMove : undefined}
-      onPointerUp={isEditing ? endDrag : undefined}
-      onPointerCancel={isEditing ? endDrag : undefined}
-    >
+    <div className={DASHBOARD_GRID_CLASS}>
       {controller.layout.map((item, index) => {
         const definition = getDashboardWidget(item.id);
         if (!definition) return null;
@@ -121,6 +124,8 @@ export function DashboardGrid({
             onResize={controller.resizeWidget}
             onMoveBy={controller.moveWidgetBy}
             onDragStart={handleDragStart}
+            onDrag={handleDrag}
+            onDragEnd={() => setDraggingId(null)}
             registerElement={registerElement}
           />
         );

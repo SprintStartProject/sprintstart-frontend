@@ -321,11 +321,34 @@ describe("DashboardPage", () => {
       expect(placedWidgets()).toContain("Knowledge base");
     });
 
+    it("offers a widget only the sizes it looks right at", async () => {
+      renderPage();
+
+      await startEditing();
+      await userEvent.click(screen.getByRole("combobox", { name: "Size of Knowledge base" }));
+
+      expect(screen.getByRole("option", { name: "Small" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Medium" })).toBeInTheDocument();
+      // A card that only works across the full width has nothing to choose between.
+      expect(screen.queryByRole("option", { name: "Wide" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("combobox", { name: "Size of Greeting" })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("option", { name: "Small" }));
+
+      expect(screen.getByRole("combobox", { name: "Size of Knowledge base" })).toHaveTextContent(
+        "Small",
+      );
+    });
+
     it("moves a widget with the keyboard, for anyone who cannot drag one", async () => {
       renderPage();
 
       await startEditing();
-      await userEvent.click(screen.getByRole("button", { name: "Move Greeting later" }));
+
+      // Focused rather than clicked: the controls only surface on hover, and focus is what
+      // reveals them for someone who never touches a pointer.
+      screen.getByRole("button", { name: "Move Greeting later" }).focus();
+      await userEvent.keyboard("{Enter}");
 
       expect(placedWidgets().slice(0, 2)).toEqual(["Your conversations", "Greeting"]);
     });

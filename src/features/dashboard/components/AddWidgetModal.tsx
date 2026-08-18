@@ -47,6 +47,9 @@ export function AddWidgetModal({ isOpen, widgets, onAdd, onClose }: AddWidgetMod
       title="Add a widget"
       description="Everything available to you. Widgets already on your dashboard are not listed."
       size="lg"
+      // With an emptied dashboard every widget is on offer, and eleven cards in three
+      // sections is taller than the viewport. Scrolling the list keeps the dialog a dialog.
+      bodyClassName="max-h-[60vh] overflow-y-auto px-7 py-6"
       testId="add-widget-modal"
     >
       {groups.length === 0 ? (
@@ -54,10 +57,10 @@ export function AddWidgetModal({ isOpen, widgets, onAdd, onClose }: AddWidgetMod
           Every widget available to you is already on your dashboard.
         </p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {groups.map((group) => (
             <section key={group.tier} aria-label={group.label}>
-              <div className="mb-3">
+              <div className="mb-2">
                 <h3 className="text-sm font-semibold text-app-text">{group.label}</h3>
                 <p className="text-xs text-app-text-muted">{group.hint}</p>
               </div>
@@ -69,7 +72,7 @@ export function AddWidgetModal({ isOpen, widgets, onAdd, onClose }: AddWidgetMod
                   return (
                     <li
                       key={widget.id}
-                      className="flex items-start gap-3 rounded-xl border border-app-border-muted bg-app-surface-muted p-4"
+                      className="flex items-center gap-3 rounded-xl border border-app-border-muted bg-app-surface-muted p-3"
                     >
                       <span
                         aria-hidden="true"
@@ -80,8 +83,10 @@ export function AddWidgetModal({ isOpen, widgets, onAdd, onClose }: AddWidgetMod
 
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-app-text">{widget.title}</p>
-                        <p className="mt-0.5 text-xs text-app-text-muted">{widget.description}</p>
-                        <p className="mt-1 text-xs text-app-text-subtle">
+                        <p className="mt-0.5 line-clamp-2 text-xs text-app-text-muted">
+                          {widget.description}
+                        </p>
+                        <p className="mt-0.5 text-xs text-app-text-subtle">
                           Added as {DASHBOARD_SIZE_LABELS[widget.defaultSize].toLowerCase()}
                         </p>
                       </div>

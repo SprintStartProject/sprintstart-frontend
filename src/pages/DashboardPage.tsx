@@ -107,7 +107,15 @@ export function DashboardPage() {
       </header>
 
       <main className="app-page-frame py-6 pb-24 lg:py-8">
-        <DashboardGrid controller={controller} isEditing={isEditing} />
+        <DashboardGrid
+          controller={controller}
+          isEditing={isEditing}
+          onAddWidget={() => {
+            // The empty board has nothing else to click, so its button also turns editing on.
+            setIsEditing(true);
+            setPickerOpen(true);
+          }}
+        />
       </main>
 
       <AddWidgetModal

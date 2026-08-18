@@ -10,11 +10,15 @@ import type { DashboardLayout, DashboardWidgetId } from "./types";
 /**
  * Bumped whenever a stored layout could no longer be read the way it was written.
  *
+ * v2 cut the size vocabulary to three, so a v1 layout holding a `large` or a `full` would
+ * lose those cards one by one — throwing the whole arrangement away and rebuilding the
+ * default is the kinder failure.
+ *
  * A mismatch throws the arrangement away and falls back to the default, which is the right
  * trade for a preference: rebuilding a dashboard costs a minute, and a half-migrated one
  * would be a puzzle.
  */
-const LAYOUT_VERSION = 1;
+const LAYOUT_VERSION = 2;
 
 /**
  * Keyed per user, because two people share a browser more often than a dashboard.

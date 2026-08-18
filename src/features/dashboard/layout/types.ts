@@ -30,13 +30,13 @@ export type DashboardWidgetId =
   | "user-overview";
 
 /**
- * The sizes a widget can be given, in columns × rows of the underlying grid.
+ * The sizes a widget can be given: a quarter row, a half row, or a whole one.
  *
- * Deliberately a short list of named steps rather than free resizing: a handful of shapes
- * that always tile cleanly is what keeps a rearranged dashboard from looking broken, and it
- * is the whole reason the grid can stay invisible.
+ * Three and not more, because 1 + 2 + 4 is what lets any combination fill a four-column row
+ * exactly — that is what keeps a rearranged dashboard from developing gaps, and the whole
+ * reason the grid can stay invisible.
  */
-export type DashboardWidgetSize = "small" | "medium" | "large" | "wide" | "full";
+export type DashboardWidgetSize = "small" | "medium" | "wide";
 
 /** One placed widget. Order in the layout is the reading order on screen. */
 export type DashboardLayoutItem = {
