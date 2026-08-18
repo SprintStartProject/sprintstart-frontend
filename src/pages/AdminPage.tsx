@@ -645,6 +645,7 @@ export function AdminPage() {
         isOpen={isCreateWizardOpen}
         tokenNames={tokenNames}
         users={users}
+        existingProjectNames={projects.map((project) => project.name)}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
       />

@@ -103,12 +103,9 @@ describe("AddSourceModal", () => {
 
     expect(screen.getByTestId("jira-display-name")).toBeInTheDocument();
     expect(screen.getByTestId("jira-instance-url")).toBeInTheDocument();
+    // The credential FilterSelect adopts the first credential as its label.
     await waitFor(() =>
-      expect(
-        within(screen.getByTestId("jira-credential")).getByRole("option", {
-          name: "default - me@corp.com",
-        }),
-      ).toBeInTheDocument(),
+      expect(screen.getByLabelText("Credential")).toHaveTextContent("default - me@corp.com"),
     );
   });
 
@@ -132,7 +129,7 @@ describe("AddSourceModal", () => {
     await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
 
     // Wait for the credential to load and default-select.
-    await waitFor(() => expect(screen.getByTestId("jira-credential")).toHaveValue("default"));
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
 
     await user.click(screen.getByRole("button", { name: /connect jira instance/i }));
 
@@ -163,7 +160,7 @@ describe("AddSourceModal", () => {
 
     await user.type(screen.getByTestId("jira-display-name"), "Team board");
     await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
-    await waitFor(() => expect(screen.getByTestId("jira-credential")).toHaveValue("default"));
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
 
     await user.click(screen.getByRole("button", { name: /connect jira instance/i }));
 
@@ -238,8 +235,6 @@ describe("AddSourceModal", () => {
       expect(within(connectedRow).getByRole("checkbox")).toBeEnabled();
     });
     await user.click(within(connectedRow).getByRole("checkbox"));
-
-    expect(await screen.findByText(/already ingested and will be linked/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /connect 1 selected/i }));
 

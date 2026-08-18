@@ -12,9 +12,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { DropdownSelect } from "../../../components/ui/DropdownSelect";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
-import { Select } from "../../../components/ui/Select";
 import { ApiError } from "../../../services/apiClient.ts";
 import {
   discoverRepositories,
@@ -74,6 +74,12 @@ type GithubRepositoryDiscoveryProps = {
   isConnecting?: boolean;
   /** Connect error from the parent, shown below any discovery error. */
   connectError?: string | null;
+  /**
+   * Hides the built-in "no stored token" banner. Set when the parent shows its
+   * own missing-token hint (e.g. the wizard's compact notice next to its inline
+   * "Add token" button) so the message is not duplicated.
+   */
+  suppressMissingTokenNotice?: boolean;
 };
 
 const PAGE_SIZE = 20;
@@ -90,12 +96,12 @@ const PAGE_SIZE = 20;
 export function GithubRepositoryDiscovery({
   tokenNames,
   projectId,
-  projectName,
   tokenName,
   onTokenNameChange,
   onSelectionChange,
   isConnecting = false,
   connectError,
+  suppressMissingTokenNotice = false,
 }: GithubRepositoryDiscoveryProps) {
   const hasTokens = tokenNames.length > 0;
 
@@ -202,8 +208,11 @@ export function GithubRepositoryDiscovery({
         setDiscoverState("loaded");
 
         if (!loadingMore) {
-          // A pasted "owner/name" pre-filters to that repository; a bare owner
-          // clears any leftover filter from a previous search.
+          // A fresh discovery starts with a clean slate: clear selections so a
+          // repository sharing a name with one picked under a previous owner is
+          // not silently re-selected. A pasted "owner/name" pre-filters to that
+          // repository; a bare owner clears any leftover filter.
+          setSelected(new Set());
           setFilter(repoReference ? repoReference.name : "");
           await loadConnectedRepositories();
         }
@@ -316,13 +325,10 @@ export function GithubRepositoryDiscovery({
   }, [onSelectionChange, selection]);
 
   const selectedCount = selection.length;
-  const selectedLinkCount = selection.filter(
-    (repository) => repository.linkState === "linkable",
-  ).length;
 
   return (
     <div className="space-y-5">
-      {!hasTokens && (
+      {!hasTokens && !suppressMissingTokenNotice && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           Add a GitHub personal access token in Settings first, then come back to discover
           repositories.
@@ -351,26 +357,19 @@ export function GithubRepositoryDiscovery({
         </div>
 
         <div>
-          <label htmlFor="discovery-token" className="text-sm font-medium text-app-text">
-            Access token
-          </label>
-          <Select
-            id="discovery-token"
+          <span className="text-sm font-medium text-app-text">Access token</span>
+          <DropdownSelect
+            label="Access token"
             value={tokenName}
-            onChange={(event) => onTokenNameChange(event.target.value)}
+            options={
+              hasTokens
+                ? tokenNames.map((name) => ({ value: name, label: name }))
+                : [{ value: "", label: "No saved tokens" }]
+            }
+            onChange={onTokenNameChange}
             disabled={isBusy || !hasTokens}
-            className="mt-2"
-          >
-            {hasTokens ? (
-              tokenNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))
-            ) : (
-              <option value="">No saved tokens</option>
-            )}
-          </Select>
+            className="mt-2 sm:w-52"
+          />
         </div>
 
         <Button
@@ -438,16 +437,6 @@ export function GithubRepositoryDiscovery({
               </button>
             </div>
           </div>
-
-          {selectedLinkCount > 0 && (
-            <p className="rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-2.5 text-xs text-app-brand-text">
-              {selectedLinkCount} of the selected{" "}
-              {selectedLinkCount === 1 ? "repository is" : "repositories are"} already ingested and
-              will be linked to
-              {projectName ? ` ${projectName}` : " this project"} without fetching or ingesting
-              again.
-            </p>
-          )}
 
           <ul className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
             {filteredRepositories.map((repository) => {
@@ -524,7 +513,7 @@ export function GithubRepositoryDiscovery({
                         variant="brand"
                         size="sm"
                         className="gap-1"
-                        title="Already ingested — adding it here reuses its artifacts instead of ingesting again."
+                        title="Already ingested. Adding it here reuses its artifacts instead of ingesting again."
                       >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                         Already ingested

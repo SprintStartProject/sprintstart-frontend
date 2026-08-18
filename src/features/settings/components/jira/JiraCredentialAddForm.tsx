@@ -12,6 +12,12 @@ type JiraCredentialAddFormProps = {
   defaultUserEmail: string | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /**
+   * When the form is already inside a titled container (the wizard's desktop
+   * companion), drop its own card chrome and header so the inputs sit directly
+   * in that panel instead of a card-within-a-card.
+   */
+  embedded?: boolean;
 };
 
 const ADD_FALLBACK = "Failed to add Jira credential.";
@@ -25,6 +31,7 @@ export function JiraCredentialAddForm({
   defaultUserEmail,
   onClose,
   onSaved,
+  embedded = false,
 }: JiraCredentialAddFormProps) {
   const [userEmail, setUserEmail] = useState(defaultUserEmail ?? "");
   const [name, setName] = useState("");
@@ -85,21 +92,27 @@ export function JiraCredentialAddForm({
     <form
       onSubmit={(e) => void handleSubmit(e)}
       aria-label="Add Jira credential"
-      className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      className={
+        embedded
+          ? ""
+          : "overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      }
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <span className="text-sm font-semibold text-app-text">New Jira credential</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={handleClose}
-          disabled={isSaving}
-          aria-label="Cancel add credential"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+      {!embedded && (
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <span className="text-sm font-semibold text-app-text">New Jira credential</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={handleClose}
+            disabled={isSaving}
+            aria-label="Cancel add credential"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Field label="Jira account email" controlId="settings-jira-add-email" disabled={isSaving}>
