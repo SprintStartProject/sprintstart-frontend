@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertCircle, Check, Edit, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { useToast } from "../../../context/useToast";
 import { adminUserService } from "../../../services/adminUserService";
 import { projectService } from "../../../services/projectService";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
@@ -80,7 +81,10 @@ export function UserDetailsDrawer({
 }: UserDetailsDrawerProps) {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  // `saveError` now only carries the inline field validation (email / group
+  // required); the save request's own failure is surfaced as a toast.
   const [saveError, setSaveError] = useState<SaveErrorState | null>(null);
+  const toast = useToast();
   const [draftUserState, setDraftUserState] = useState<DraftUserState>(() => ({
     userId: user.id,
     draftUser: getUserEditFormState(user),
@@ -256,11 +260,9 @@ export function UserDetailsDrawer({
         draftUser: getUserEditFormState(updatedUser),
       });
       setEditingUserId(null);
+      toast.success("User saved");
     } catch (error) {
-      setSaveError({
-        userId: user.id,
-        message: error instanceof Error ? error.message : "User changes could not be saved.",
-      });
+      toast.error(error instanceof Error ? error.message : "Couldn't save the user changes.");
     } finally {
       setSavingUserId((currentSavingUserId) =>
         currentSavingUserId === user.id ? null : currentSavingUserId,

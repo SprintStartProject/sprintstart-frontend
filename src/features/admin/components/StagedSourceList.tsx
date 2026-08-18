@@ -1,4 +1,13 @@
-import { AlertCircle, Check, GitBranch, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  FileText,
+  GitBranch,
+  Loader2,
+  RefreshCw,
+  Trash2,
+  Ticket,
+} from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { DraftSource, DraftSourceStatus } from "../projectSourcesDraft";
 
@@ -6,7 +15,11 @@ type StagedSourceListProps = {
   sources: DraftSource[];
   /** Blocks the row actions while the parent runs a connect batch. */
   disabled?: boolean;
-  onRemove: (sourceId: string) => void;
+  /**
+   * Removes a staged source. Omitted on the provisioning screen, where the
+   * project already exists and dropping a row from the list would do nothing.
+   */
+  onRemove?: (sourceId: string) => void;
   /** Omitted where retrying makes no sense, e.g. before anything ran. */
   onRetry?: (sourceId: string) => void;
   /** Shown in place of the list when there are no staged sources. */
@@ -20,20 +33,70 @@ const statusLabels: Record<DraftSourceStatus, string> = {
   failed: "Failed",
 };
 
-function StatusIcon({ status }: { status: DraftSourceStatus }) {
-  if (status === "connecting") {
-    return <Loader2 className="h-4 w-4 animate-spin text-app-brand" />;
+/** The resting icon shown before a run, chosen by source type. */
+function TypeIcon({ source }: { source: DraftSource }) {
+  if (source.type === "JIRA") {
+    return <Ticket className="h-4 w-4 text-app-text-muted" />;
   }
 
-  if (status === "connected") {
-    return <Check className="h-4 w-4 text-app-success-text" />;
-  }
-
-  if (status === "failed") {
-    return <AlertCircle className="h-4 w-4 text-app-danger-text" />;
+  if (source.type === "UPLOAD") {
+    return <FileText className="h-4 w-4 text-app-text-muted" />;
   }
 
   return <GitBranch className="h-4 w-4 text-app-text-muted" />;
+}
+
+function StatusIcon({ source }: { source: DraftSource }) {
+  if (source.status === "connecting") {
+    return <Loader2 className="h-4 w-4 animate-spin text-app-brand" />;
+  }
+
+  if (source.status === "connected") {
+    return <Check className="h-4 w-4 text-app-success-text" />;
+  }
+
+  if (source.status === "failed") {
+    return <AlertCircle className="h-4 w-4 text-app-danger-text" />;
+  }
+
+  return <TypeIcon source={source} />;
+}
+
+/** Primary line: the human name of the source, by type. */
+function sourceTitle(source: DraftSource): string {
+  if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
+
+  return source.displayName;
+}
+
+/**
+ * Secondary line shown when the source is not in a failed state: the instance
+ * URL for Jira, the staged file count for an upload, or the credential for a
+ * GitHub repository.
+ */
+function sourceDetail(source: DraftSource): string {
+  if (source.type === "UPLOAD") {
+    return source.files.length === 1 ? "1 file" : `${source.files.length} files`;
+  }
+
+  if (source.type === "JIRA") {
+    return source.url;
+  }
+
+  return source.tokenName;
+}
+
+/**
+ * The status line under the title. A staged GitHub repository that is already
+ * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
+ * misdescribe it — it says so instead.
+ */
+function statusDescription(source: DraftSource): string {
+  if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
+    return "Already ingested, will be linked";
+  }
+
+  return `${statusLabels[source.status]} · ${sourceDetail(source)}`;
 }
 
 /**
@@ -68,13 +131,11 @@ export function StagedSourceList({
         >
           <div className="flex min-w-0 items-start gap-3">
             <span className="mt-0.5 shrink-0">
-              <StatusIcon status={source.status} />
+              <StatusIcon source={source} />
             </span>
 
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-app-text">
-                {source.owner}/{source.name}
-              </p>
+              <p className="truncate text-sm font-medium text-app-text">{sourceTitle(source)}</p>
               <p
                 className={`mt-0.5 text-xs ${
                   source.status === "failed" ? "text-app-danger-text" : "text-app-text-muted"
@@ -82,7 +143,7 @@ export function StagedSourceList({
               >
                 {source.status === "failed" && source.errorMessage
                   ? source.errorMessage
-                  : `${statusLabels[source.status]} · ${source.tokenName}`}
+                  : statusDescription(source)}
               </p>
             </div>
           </div>
@@ -100,14 +161,14 @@ export function StagedSourceList({
               </Button>
             )}
 
-            {source.status !== "connected" && (
+            {source.status !== "connected" && onRemove && (
               <Button
                 variant="secondary"
                 size="sm"
                 iconOnly
                 onClick={() => onRemove(source.id)}
                 disabled={disabled}
-                aria-label={`Remove ${source.owner}/${source.name}`}
+                aria-label={`Remove ${sourceTitle(source)}`}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

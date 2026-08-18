@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { Field } from "../../../../components/ui/Field";
 import { Input } from "../../../../components/ui/Input";
+import { useToast } from "../../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
 import { addJiraCredential } from "../../../../services/sources/jiraService";
 
@@ -11,6 +12,12 @@ type JiraCredentialAddFormProps = {
   defaultUserEmail: string | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /**
+   * When the form is already inside a titled container (the wizard's desktop
+   * companion), drop its own card chrome and header so the inputs sit directly
+   * in that panel instead of a card-within-a-card.
+   */
+  embedded?: boolean;
 };
 
 const ADD_FALLBACK = "Failed to add Jira credential.";
@@ -24,13 +31,14 @@ export function JiraCredentialAddForm({
   defaultUserEmail,
   onClose,
   onSaved,
+  embedded = false,
 }: JiraCredentialAddFormProps) {
   const [userEmail, setUserEmail] = useState(defaultUserEmail ?? "");
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
-  const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const toast = useToast();
 
   const emailInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +61,6 @@ export function JiraCredentialAddForm({
 
     savingRef.current = true;
     setIsSaving(true);
-    setError("");
     try {
       try {
         await addJiraCredential({
@@ -62,15 +69,18 @@ export function JiraCredentialAddForm({
           authToken: token.trim(),
         });
       } catch (mutationError) {
-        setError(parseApiError(mutationError, ADD_FALLBACK));
+        // Keep the form open so the user can correct the input.
+        toast.error(parseApiError(mutationError, ADD_FALLBACK));
         return;
       }
       try {
         await onSaved();
       } catch (refreshError) {
-        setError(describeRefreshFailure(refreshError));
+        toast.warning(describeRefreshFailure(refreshError));
+        onClose();
         return;
       }
+      toast.success("Jira credential added");
       onClose();
     } finally {
       savingRef.current = false;
@@ -82,21 +92,27 @@ export function JiraCredentialAddForm({
     <form
       onSubmit={(e) => void handleSubmit(e)}
       aria-label="Add Jira credential"
-      className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      className={
+        embedded
+          ? ""
+          : "overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      }
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <span className="text-sm font-semibold text-app-text">New Jira credential</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={handleClose}
-          disabled={isSaving}
-          aria-label="Cancel add credential"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+      {!embedded && (
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <span className="text-sm font-semibold text-app-text">New Jira credential</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={handleClose}
+            disabled={isSaving}
+            aria-label="Cancel add credential"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Field label="Jira account email" controlId="settings-jira-add-email" disabled={isSaving}>
@@ -140,12 +156,6 @@ export function JiraCredentialAddForm({
             autoComplete="off"
           />
         </Field>
-
-        {error && (
-          <p role="alert" className="text-sm text-app-danger-text">
-            {error}
-          </p>
-        )}
 
         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={handleClose} disabled={isSaving}>

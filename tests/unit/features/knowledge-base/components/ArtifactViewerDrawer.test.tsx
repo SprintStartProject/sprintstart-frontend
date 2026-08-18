@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { ArtifactViewerDrawer } from "../../../../../src/features/knowledge-base/components/ArtifactViewerDrawer";
 import { preprocessMarkdown } from "../../../../../src/features/knowledge-base/markdown";
 import { ApiError } from "../../../../../src/services/apiClient";
@@ -72,7 +73,8 @@ function renderDrawer(
   const onDelete = overrides.onDelete ?? vi.fn();
   return {
     onDelete,
-    ...render(
+    // Delete outcomes are toasts now, so the drawer needs a ToastProvider.
+    ...rtlRender(
       <ArtifactViewerDrawer
         artifact={artifact}
         onClose={() => {}}
@@ -80,6 +82,7 @@ function renderDrawer(
         canDelete={overrides.canDelete ?? false}
         onDelete={onDelete}
       />,
+      { wrapper: ToastProvider },
     ),
   };
 }
@@ -316,12 +319,12 @@ describe("ArtifactViewerDrawer", () => {
       const confirmBtn = await screen.findByTestId("confirm-delete-btn");
       await userEvent.click(confirmBtn);
 
-      expect(await screen.findByTestId("delete-error-banner")).toHaveTextContent(
-        "Cannot resolve the uploaded artifact id for deletion.",
-      );
+      expect(
+        await screen.findByText(/Couldn't resolve the uploaded artifact id for deletion/),
+      ).toBeInTheDocument();
     });
 
-    it("surfaces the error in the confirm dialog when deletion fails", async () => {
+    it("surfaces the error as a toast when deletion fails", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.deleteUpload).mockRejectedValueOnce(new Error("Network failure"));
 
@@ -333,7 +336,7 @@ describe("ArtifactViewerDrawer", () => {
       const confirmBtn = await screen.findByTestId("confirm-delete-btn");
       await userEvent.click(confirmBtn);
 
-      expect(await screen.findByTestId("delete-error-banner")).toHaveTextContent("Network failure");
+      expect(await screen.findByText("Network failure")).toBeInTheDocument();
     });
   });
 });

@@ -7,6 +7,7 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
+import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
 import { getProjectEditFormState, getProjectSourcesCount, getProjectUsersCount } from "../data";
 import {
@@ -73,10 +74,12 @@ export function ProjectDetailsDrawer({
   const [projectDetails, setProjectDetails] = useState<AdminProjectDetails | null>(null);
   const [detailsError, setDetailsError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  // `saveErrorMessage` now only carries the inline "name required" validation;
+  // the save request's own failure is surfaced as a toast.
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+  const toast = useToast();
 
   const [draftProject, setDraftProject] = useState<ProjectEditFormState>(() =>
     getProjectEditFormState(project),
@@ -189,10 +192,9 @@ export function ProjectDetailsDrawer({
       const updatedProject = await projectService.getProjectById(project.id);
       applyProjectUpdate(updatedProject);
       resetDrafts(updatedProject);
+      toast.success("Project saved");
     } catch (error) {
-      setSaveErrorMessage(
-        error instanceof Error ? error.message : "Project changes could not be saved.",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't save the project changes.");
     } finally {
       setIsSaving(false);
     }
@@ -200,17 +202,15 @@ export function ProjectDetailsDrawer({
 
   const confirmDeleteProject = async () => {
     setIsDeleting(true);
-    setDeleteErrorMessage("");
 
     try {
       await projectService.deleteProject(project.id);
       setIsDeleteDialogOpen(false);
       onProjectDeleted?.(project.id);
       onClose();
+      toast.success("Project deleted");
     } catch (error) {
-      setDeleteErrorMessage(
-        error instanceof Error ? error.message : "Project could not be deleted.",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't delete the project.");
     } finally {
       setIsDeleting(false);
     }
@@ -356,10 +356,7 @@ export function ProjectDetailsDrawer({
 
                   <Button
                     variant="dangerSoft"
-                    onClick={() => {
-                      setDeleteErrorMessage("");
-                      setIsDeleteDialogOpen(true);
-                    }}
+                    onClick={() => setIsDeleteDialogOpen(true)}
                     disabled={isSaving}
                     icon={<Trash2 className="h-4 w-4" />}
                     className="mt-4"
@@ -388,7 +385,6 @@ export function ProjectDetailsDrawer({
         variant="danger"
         isLoading={isDeleting}
         loadingLabel="Deleting..."
-        errorMessage={deleteErrorMessage}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={() => void confirmDeleteProject()}
       />

@@ -11,18 +11,15 @@ describe("parseApiError", () => {
     expect(parseApiError(new Error("something broke"), "fallback")).toBe("something broke");
   });
 
-  it("extracts the message field from a JSON ApiError body", () => {
-    const error = new ApiError(400, '{"message":"email is required"}');
-    expect(parseApiError(error, "fallback")).toBe("email is required");
+  it("returns the ApiError message (apiClient has already unwrapped the body)", () => {
+    const error = new ApiError(400, "Github user pat with name default already exists.");
+    expect(parseApiError(error, "fallback")).toBe(
+      "Github user pat with name default already exists.",
+    );
   });
 
-  it("returns fallback when ApiError body is not valid JSON", () => {
-    const error = new ApiError(500, "Internal Server Error");
-    expect(parseApiError(error, "fallback")).toBe("fallback");
-  });
-
-  it("returns fallback when ApiError JSON body has no message field", () => {
-    const error = new ApiError(400, '{"code":"E001"}');
+  it("returns fallback when the ApiError message is empty", () => {
+    const error = new ApiError(500, "   ");
     expect(parseApiError(error, "fallback")).toBe("fallback");
   });
 });

@@ -24,6 +24,11 @@ type ModalProps = {
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
   isDismissDisabled?: boolean;
+  /**
+   * Extra right padding (px) on the centering area, which slides the centered
+   * dialog left. Used to make room for a companion panel opening to its right.
+   */
+  contentInsetRight?: number;
   titleId?: string;
   descriptionId?: string;
   /**
@@ -78,6 +83,7 @@ export function Modal({
   closeOnBackdrop = true,
   closeOnEscape = true,
   isDismissDisabled = false,
+  contentInsetRight = 0,
   titleId = "modal-title",
   descriptionId = "modal-description",
   testId,
@@ -173,7 +179,8 @@ export function Modal({
           initial="hidden"
           animate="visible"
           exit="exit"
-          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
+          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md transition-[padding] duration-300 ease-out`}
+          style={contentInsetRight ? { paddingRight: contentInsetRight } : undefined}
         >
           {closeOnBackdrop && (
             <button

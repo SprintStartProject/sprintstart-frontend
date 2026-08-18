@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { useToast } from "../../../context/useToast";
 import type { ProjectSummary } from "../types";
 
 export type ProjectAccessPanelProps = {
@@ -45,7 +46,7 @@ export function ProjectAccessPanel({
     isOpen: false,
   }));
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const toast = useToast();
 
   const activeProjectPickerState =
     projectPickerState.sourceKey === assignedProjectKey
@@ -106,15 +107,13 @@ export function ProjectAccessPanel({
     if (hasPendingProjectChange) return;
 
     setPendingProjectId(projectId);
-    setErrorMessage("");
 
     try {
       await onAssignProject(projectId);
       closeProjectPicker();
+      toast.success("Project assigned");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Project assignment could not be saved.",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't save the project assignment.");
     } finally {
       setPendingProjectId(null);
     }
@@ -124,13 +123,13 @@ export function ProjectAccessPanel({
     if (hasPendingProjectChange) return;
 
     setPendingProjectId(projectId);
-    setErrorMessage("");
 
     try {
       await onRemoveProject(projectId);
+      toast.success("Project removed");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Project assignment could not be removed.",
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't remove the project assignment.",
       );
     } finally {
       setPendingProjectId(null);
@@ -202,13 +201,6 @@ export function ProjectAccessPanel({
           )}
         </div>
       </div>
-
-      {errorMessage && (
-        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       <div className="grid gap-3 lg:grid-cols-2">
         {assignedProjects.length > 0 ? (

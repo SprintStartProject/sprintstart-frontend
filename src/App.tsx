@@ -3,6 +3,7 @@ import { SideBar } from "./components/layout/SideBar";
 import { AuthProvider } from "./context/AuthProvider";
 import { ChatProvider } from "./context/ChatProvider";
 import { ThemeProvider } from "./context/ThemeProvider";
+import { ToastProvider } from "./context/ToastProvider";
 import { ProjectProvider } from "./features/projects/ProjectProvider";
 import { MomentsProvider, RocketPet, useMoments } from "./features/moments";
 import { useAuth } from "./context/useAuth";
@@ -40,17 +41,22 @@ function App() {
   // depends on the authenticated user's permission group.
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <ProjectProvider>
-          <ChatProvider>
-            {/* Inside AuthProvider: the launch sequence is triggered
+      {/* Outermost app-level provider (just inside theme, so cards pick up
+          light/dark): toasts must be reachable from every page, signed in or
+          not, and must outlive route changes. */}
+      <ToastProvider>
+        <AuthProvider>
+          <ProjectProvider>
+            <ChatProvider>
+              {/* Inside AuthProvider: the launch sequence is triggered
                               by the user becoming authenticated. */}
-            <MomentsProvider>
-              <AppContent />
-            </MomentsProvider>
-          </ChatProvider>
-        </ProjectProvider>
-      </AuthProvider>
+              <MomentsProvider>
+                <AppContent />
+              </MomentsProvider>
+            </ChatProvider>
+          </ProjectProvider>
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

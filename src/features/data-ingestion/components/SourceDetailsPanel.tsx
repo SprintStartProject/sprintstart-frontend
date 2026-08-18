@@ -11,6 +11,7 @@ import {
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
+import { useToast } from "../../../context/useToast";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
@@ -91,9 +92,7 @@ export function SourceDetailsPanel({
   const [enabledState, setEnabledState] = useState<LoadingState>("idle");
   const [unlinkState, setUnlinkState] = useState<LoadingState>("idle");
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
-  const [unlinkError, setUnlinkError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
   const Icon = SOURCE_META[source.sourceSystem].icon;
   const repository = source.githubRepository;
   const jira = source.jiraInstance ?? null;
@@ -153,23 +152,19 @@ export function SourceDetailsPanel({
       if (!repository || !onSetSourceEnabled) return;
 
       setEnabledState("loading");
-      setMessage(null);
-      setErrorMessage(null);
 
       try {
         await onSetSourceEnabled(repository, enabled);
         setEnabledState("success");
-        setMessage(
-          enabled
-            ? "Source enabled. It is included in ingestion again."
-            : "Source disabled. It is excluded from ingestion.",
-        );
+        toast.success(enabled ? "Source enabled" : "Source disabled", {
+          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+        });
       } catch (error) {
         setEnabledState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Failed to update the source.");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
       }
     },
-    [onSetSourceEnabled, repository],
+    [onSetSourceEnabled, repository, toast],
   );
 
   const handleToggleJiraEnabled = useCallback(
@@ -177,23 +172,19 @@ export function SourceDetailsPanel({
       if (!jira || !onSetJiraSourceEnabled) return;
 
       setEnabledState("loading");
-      setMessage(null);
-      setErrorMessage(null);
 
       try {
         await onSetJiraSourceEnabled(jira.instanceUrl, enabled);
         setEnabledState("success");
-        setMessage(
-          enabled
-            ? "Source enabled. It is included in ingestion again."
-            : "Source disabled. It is excluded from ingestion.",
-        );
+        toast.success(enabled ? "Source enabled" : "Source disabled", {
+          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+        });
       } catch (error) {
         setEnabledState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Failed to update the source.");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
       }
     },
-    [jira, onSetJiraSourceEnabled],
+    [jira, onSetJiraSourceEnabled, toast],
   );
 
   const loadRepositoryConfig = useCallback(async () => {
@@ -219,55 +210,51 @@ export function SourceDetailsPanel({
     if (!canUpdate || !onUpdateSource) return;
 
     setUpdateState("loading");
-    setMessage(null);
-    setErrorMessage(null);
 
     try {
       await onUpdateSource(source);
       setUpdateState("success");
-      setMessage("Update started. Details will refresh while ingestion runs.");
+      toast.success("Update started", {
+        description: "Details refresh while ingestion runs.",
+      });
     } catch (error) {
       setUpdateState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Failed to start the update");
+      toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
     }
-  }, [canUpdate, onUpdateSource, source]);
+  }, [canUpdate, onUpdateSource, source, toast]);
 
   const handleConfirmUnlink = useCallback(async () => {
     if (!onUnlinkSource) return;
 
     setUnlinkState("loading");
-    setUnlinkError(null);
 
     try {
       await onUnlinkSource(source);
       // The parent closes this drawer on success, so there is nothing to reset
-      // here — the component unmounts.
+      // here — the component unmounts; the confirming toast lives at the root.
+      toast.success("Removed from project");
     } catch (error) {
       setUnlinkState("error");
-      setUnlinkError(
-        error instanceof Error ? error.message : "Failed to remove the source from the project.",
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't remove the source from the project.",
       );
     }
-  }, [onUnlinkSource, source]);
+  }, [onUnlinkSource, source, toast]);
 
   const handleRefreshDetails = useCallback(async () => {
     if (!onRefreshDetails) return;
 
     setRefreshState("loading");
-    setMessage(null);
-    setErrorMessage(null);
 
     try {
       await onRefreshDetails();
       setRefreshState("success");
-      setMessage("Repository details refreshed.");
+      toast.success("Repository details refreshed");
     } catch (error) {
       setRefreshState("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to refresh repository details",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't refresh repository details.");
     }
-  }, [onRefreshDetails]);
+  }, [onRefreshDetails, toast]);
 
   const details = useMemo(() => {
     const artifactCount = source.totalArtifactCount ?? source.artifacts;
@@ -344,10 +331,6 @@ export function SourceDetailsPanel({
         </div>
       }
     >
-      {message && <Message tone="success">{message}</Message>}
-
-      {errorMessage && <Message tone="warning">{errorMessage}</Message>}
-
       <Section title="Ingestion">
         {source.statusView.state === "syncing" && (
           <div className="mb-3 rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-3">
@@ -538,11 +521,9 @@ export function SourceDetailsPanel({
         loadingLabel="Removing…"
         variant="danger"
         isLoading={isUnlinking}
-        errorMessage={unlinkError ?? undefined}
         onClose={() => {
           if (isUnlinking) return;
           setIsUnlinkDialogOpen(false);
-          setUnlinkError(null);
         }}
         onConfirm={() => {
           void handleConfirmUnlink();
@@ -640,13 +621,4 @@ function formatEnabled(value?: boolean | null) {
   if (value === true) return "Enabled";
   if (value === false) return "Disabled";
   return "Not available";
-}
-
-function Message({ tone, children }: { tone: "success" | "warning"; children: ReactNode }) {
-  const className =
-    tone === "success"
-      ? "border-app-success-border bg-app-success-bg text-app-success-text"
-      : "border-app-warning-border bg-app-warning-bg text-app-warning-text";
-
-  return <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${className}`}>{children}</div>;
 }

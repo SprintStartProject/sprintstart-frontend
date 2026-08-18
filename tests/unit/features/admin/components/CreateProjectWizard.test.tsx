@@ -20,6 +20,8 @@ vi.mock("../../../../../src/services/sources/githubService", () => ({
   discoverRepositories: vi.fn(),
   connectGithubRepository: vi.fn(),
   addRepositoryToProject: vi.fn(),
+  getGithubPatNames: vi.fn(),
+  addGithubPat: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/ingestionService", () => ({
@@ -29,18 +31,27 @@ vi.mock("../../../../../src/services/ingestionService", () => ({
 vi.mock("../../../../../src/services/sources/jiraService", () => ({
   connectJiraInstance: vi.fn(),
   getMyJiraCredentials: vi.fn(),
+  addJiraCredential: vi.fn(),
+}));
+
+vi.mock("../../../../../src/services/knowledgeService", () => ({
+  knowledgeService: { uploadDocuments: vi.fn() },
 }));
 
 import { projectService } from "../../../../../src/services/projectService";
 import {
+  addGithubPat,
   addRepositoryToProject,
   connectGithubRepository,
   discoverRepositories,
+  getGithubPatNames,
 } from "../../../../../src/services/sources/githubService";
 import {
+  addJiraCredential,
   connectJiraInstance,
   getMyJiraCredentials,
 } from "../../../../../src/services/sources/jiraService";
+import { knowledgeService } from "../../../../../src/services/knowledgeService";
 import { getIngestionSourceStatuses } from "../../../../../src/services/ingestionService";
 
 const createdProject: AdminProjectDetails = {
@@ -122,28 +133,42 @@ async function settleModalFocus() {
   });
 }
 
-/** Fills in the name on step 1 and moves to the people step. */
-async function goToPeopleStep(user: ReturnType<typeof userEvent.setup>) {
+/** Fills in the name on the details step. */
+async function fillName(user: ReturnType<typeof userEvent.setup>) {
   await settleModalFocus();
-  await user.type(screen.getByLabelText("Name"), "Apollo");
+  await user.type(screen.getByLabelText(/^Name/), "Apollo");
+}
+
+/** Details → members. */
+async function goToMembers(user: ReturnType<typeof userEvent.setup>) {
+  await fillName(user);
   await user.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-/** Walks past details and people to the source-type step. */
-async function goToSourcesStep(user: ReturnType<typeof userEvent.setup>) {
-  await goToPeopleStep(user);
+/** Details → members → sources. */
+async function goToSources(user: ReturnType<typeof userEvent.setup>) {
+  await goToMembers(user);
   await user.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-/** From the source-type step, advance into the GitHub discovery detail. */
-async function goToGithubDetail(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /continue/i }));
+/** From the sources step, open the add-source flow and pick the GitHub type. */
+async function openGithubDetail(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /add source/i }));
+  await user.click(screen.getByRole("button", { name: /indexes repositories/i }));
 }
 
 /** Runs GitHub discovery for an owner and waits for the results to render. */
 async function discover(user: ReturnType<typeof userEvent.setup>, owner = "acme") {
   await user.type(screen.getByLabelText("Organization, user, or URL"), owner);
   await user.click(screen.getByRole("button", { name: /discover/i }));
+}
+
+/** Stages `widgets` as a GitHub source and returns to the sources list. */
+async function stageWidgets(user: ReturnType<typeof userEvent.setup>) {
+  await openGithubDetail(user);
+  await discover(user);
+  await user.click(await screen.findByRole("checkbox", { name: /widgets/i }));
+  await user.click(screen.getByRole("button", { name: /add to list/i }));
 }
 
 describe("CreateProjectWizard", () => {
@@ -162,31 +187,136 @@ describe("CreateProjectWizard", () => {
       resolvedOwnerType: "org",
     });
     vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
+    vi.mocked(getGithubPatNames).mockResolvedValue(["team-pat"]);
+    vi.mocked(addGithubPat).mockResolvedValue(undefined);
+    vi.mocked(addJiraCredential).mockResolvedValue(undefined);
     vi.mocked(projectService.assignUsersToProject).mockResolvedValue([]);
     vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
     vi.mocked(getMyJiraCredentials).mockResolvedValue([
       { userEmail: "me@example.com", displayName: "Team token" },
     ]);
+    vi.mocked(knowledgeService.uploadDocuments).mockResolvedValue([
+      { filename: "spec.md", status: "success" },
+    ]);
   });
 
-  it("blocks the step-1 continue button until a name is entered", async () => {
+  /** From the sources step, stage a Jira board through the add-source sub-flow. */
+  async function stageJiraBoard(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
+
+    // The stored credential is adopted automatically once it loads; the
+    // FilterSelect combobox shows it as the selected label.
+    await screen.findByText(/Team token - me@example.com/i);
+
+    await user.type(screen.getByLabelText("Display name"), "Team board");
+    await user.type(screen.getByLabelText("Instance URL"), "https://acme.atlassian.net");
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+  }
+
+  it("keeps details on a blank name and explains why instead of a dead button", async () => {
     const user = userEvent.setup();
     renderWizard();
     await settleModalFocus();
 
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+    // Continue stays enabled so the click can surface the reason rather than
+    // sitting there disabled with no explanation.
+    await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    await user.type(screen.getByLabelText("Name"), "Apollo");
+    expect(await screen.findByText("Name is required.")).toBeInTheDocument();
+    // Still on the Details step — the manager picker is a details-only control.
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    // A valid name advances to the members step.
+    expect(await screen.findByLabelText("Add members")).toBeInTheDocument();
   });
 
-  it("creates the project without sources when the source step is skipped", async () => {
+  it("flags a duplicate name before the commit and keeps the user on details", async () => {
+    const user = userEvent.setup();
+    renderWizard({ existingProjectNames: ["Apollo"] });
+    await settleModalFocus();
+
+    // Case-insensitive clash with an existing project.
+    await user.type(screen.getByLabelText(/^Name/), "apollo");
+
+    expect(await screen.findByText("A project with this name already exists.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Blocked on details; nothing was sent to the backend.
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
+    expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
+  });
+
+  it("asks before discarding a dirty wizard and only closes on confirm", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderWizard();
+    await fillName(user);
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    // The confirmation intercepts; the wizard is still open.
+    expect(await screen.findByText("Discard this project?")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /keep editing/i }));
+    await waitFor(() =>
+      expect(screen.queryByText("Discard this project?")).not.toBeInTheDocument(),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Cancelling again and confirming the discard closes the wizard.
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    await user.click(screen.getByRole("button", { name: /discard/i }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("closes a pristine wizard without a discard prompt", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderWizard();
+    await settleModalFocus();
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(screen.queryByText("Discard this project?")).not.toBeInTheDocument();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("jumps back to a completed step from the stepper", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+
+    // Completed steps are buttons; the current/future ones are not.
+    await user.click(screen.getByRole("button", { name: "Go to Details" }));
+
+    expect(await screen.findByLabelText(/^Name/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
+  });
+
+  it("keeps the manager on the details step and members on their own step", async () => {
+    const user = userEvent.setup();
+    renderWizard({ users: [adminUser("u1", "Max")] });
+    await settleModalFocus();
+
+    // Manager lives with the details, members do not.
+    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Add members")).not.toBeInTheDocument();
+
+    await goToMembers(user);
+
+    expect(screen.getByLabelText("Add members")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Project manager")).not.toBeInTheDocument();
+  });
+
+  it("creates the project without sources and closes immediately", async () => {
     const user = userEvent.setup();
     const { onClose, onProjectCreated } = renderWizard();
 
-    await goToSourcesStep(user);
-    await goToGithubDetail(user);
+    await goToSources(user);
     await user.click(screen.getByRole("button", { name: /create without sources/i }));
 
     await waitFor(() =>
@@ -200,25 +330,7 @@ describe("CreateProjectWizard", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('creates the project without sources via "Skip for now" on the source-type step', async () => {
-    const user = userEvent.setup();
-    const { onClose, onProjectCreated } = renderWizard();
-
-    await goToSourcesStep(user);
-    await user.click(screen.getByRole("button", { name: /skip for now/i }));
-
-    await waitFor(() =>
-      expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
-        name: "Apollo",
-        description: undefined,
-      }),
-    );
-    expect(vi.mocked(connectGithubRepository)).not.toHaveBeenCalled();
-    expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("assigns the chosen manager after creating the project", async () => {
+  it("assigns the chosen manager, picked on the details step", async () => {
     vi.mocked(projectService.getManagerCandidates).mockResolvedValue([
       {
         id: "user-7",
@@ -230,17 +342,18 @@ describe("CreateProjectWizard", () => {
     ]);
     const user = userEvent.setup();
     renderWizard();
+    await settleModalFocus();
 
-    // The manager picker lives on the people step, not next to the name.
-    await goToPeopleStep(user);
+    // The manager picker is the animated FilterSelect combobox: wait for the
+    // candidates to load (it enables), open it, then pick the option.
+    const managerSelect = screen.getByLabelText("Project manager");
+    await waitFor(() => expect(managerSelect).toBeEnabled());
+    await user.click(managerSelect);
+    await user.click(await screen.findByRole("option", { name: "Jane Doe" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("option", { name: "Jane Doe" })).toBeInTheDocument(),
-    );
-
-    await user.selectOptions(screen.getByLabelText("Project manager"), "user-7");
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
     await user.click(screen.getByRole("button", { name: /continue/i }));
-    await goToGithubDetail(user);
+    await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /create without sources/i }));
 
     await waitFor(() =>
@@ -251,18 +364,56 @@ describe("CreateProjectWizard", () => {
     );
   });
 
-  it("connects the repositories selected in discovery against the new project id", async () => {
+  it("assigns every picked member to the new project in one request", async () => {
+    const user = userEvent.setup();
+    renderWizard({ users: [adminUser("u1", "Max"), adminUser("u2", "Lena")] });
+
+    await goToMembers(user);
+    await user.click(screen.getByRole("checkbox", { name: "Add Max Mustermann to the project" }));
+    await user.click(screen.getByRole("checkbox", { name: "Add Lena Mustermann to the project" }));
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create without sources/i }));
+
+    await waitFor(() =>
+      expect(projectService.assignUsersToProject).toHaveBeenCalledWith("proj-new", {
+        userIds: ["u1", "u2"],
+      }),
+    );
+    expect(projectService.assignUsersToProject).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not assign anyone when no member was picked", async () => {
+    const user = userEvent.setup();
+    renderWizard({ users: [adminUser("u1", "Max")] });
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /create without sources/i }));
+
+    await waitFor(() => expect(projectService.createProject).toHaveBeenCalled());
+    expect(projectService.assignUsersToProject).not.toHaveBeenCalled();
+  });
+
+  it("stages repositories then connects them against the new project on Create", async () => {
     const user = userEvent.setup();
     renderWizard();
 
-    await goToSourcesStep(user);
-    await goToGithubDetail(user);
-    await discover(user);
+    await goToSources(user);
 
+    // Stage two repositories through the add-source sub-flow.
+    await openGithubDetail(user);
+    await discover(user);
     await user.click(await screen.findByRole("checkbox", { name: /widgets/i }));
     await user.click(screen.getByRole("checkbox", { name: /gadgets/i }));
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
 
-    await user.click(screen.getByRole("button", { name: /create and connect 2 repositories/i }));
+    // Back on the sources list, both are staged.
+    expect(screen.getByText("acme/widgets")).toBeInTheDocument();
+    expect(screen.getByText("acme/gadgets")).toBeInTheDocument();
+
+    // Continue → Review → Create project drives provisioning.
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
 
     await waitFor(() => expect(vi.mocked(connectGithubRepository)).toHaveBeenCalledTimes(2));
     expect(vi.mocked(connectGithubRepository)).toHaveBeenCalledWith({
@@ -271,6 +422,24 @@ describe("CreateProjectWizard", () => {
       tokenName: "team-pat",
       projectId: "proj-new",
     });
+  });
+
+  it("connects staged sources without a review via Create, skip review", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageWidgets(user);
+
+    await user.click(screen.getByRole("button", { name: /create, skip review/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(connectGithubRepository)).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "widgets", projectId: "proj-new" }),
+      ),
+    );
+    // The provisioning screen is now shown, with a Done button to close.
+    expect(await screen.findByRole("button", { name: /done/i })).toBeInTheDocument();
   });
 
   it("links an already-ingested repository instead of re-ingesting it", async () => {
@@ -283,12 +452,14 @@ describe("CreateProjectWizard", () => {
     const user = userEvent.setup();
     renderWizard();
 
-    await goToSourcesStep(user);
-    await goToGithubDetail(user);
+    await goToSources(user);
+    await openGithubDetail(user);
     await discover(user);
-
     await user.click(await screen.findByRole("checkbox", { name: /linked/i }));
-    await user.click(screen.getByRole("button", { name: /create and connect 1 repository/i }));
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
 
     await waitFor(() =>
       expect(vi.mocked(addRepositoryToProject)).toHaveBeenCalledWith("repo-42", "proj-new"),
@@ -301,16 +472,15 @@ describe("CreateProjectWizard", () => {
     const user = userEvent.setup();
     const { onClose, onProjectCreated } = renderWizard();
 
-    await goToSourcesStep(user);
-    await goToGithubDetail(user);
-    await discover(user);
+    await goToSources(user);
+    await stageWidgets(user);
 
-    await user.click(await screen.findByRole("checkbox", { name: /widgets/i }));
-    await user.click(screen.getByRole("button", { name: /create and connect 1 repository/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
 
     await waitFor(() => expect(screen.getByText("token expired")).toBeInTheDocument());
-    // The project itself succeeded, so it is reported and the wizard stays
-    // open instead of discarding the staged list.
+    // The project itself succeeded, so it is reported and the wizard stays on the
+    // provisioning screen instead of discarding the staged list.
     expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
     expect(onClose).not.toHaveBeenCalled();
 
@@ -321,134 +491,148 @@ describe("CreateProjectWizard", () => {
     expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
   });
 
-  it("creates the project and connects a Jira instance against the new project id", async () => {
+  it("stages a Jira board and connects it against the new project on Create", async () => {
     const user = userEvent.setup();
-    const { onClose } = renderWizard();
+    renderWizard();
 
-    await goToSourcesStep(user);
-    await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
-    await goToGithubDetail(user);
+    await goToSources(user);
+    await stageJiraBoard(user);
 
-    // The stored credential is adopted automatically once it loads.
-    await screen.findByRole("option", { name: /Team token - me@example.com/i });
+    // Back on the sources list, the board is staged under its display name.
+    expect(screen.getByText("Team board")).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Display name"), "Team board");
-    await user.type(screen.getByLabelText("Instance URL"), "https://acme.atlassian.net");
-
-    await user.click(screen.getByRole("button", { name: /create and connect jira instance/i }));
-
-    await waitFor(() =>
-      expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
-        name: "Apollo",
-        description: undefined,
-      }),
-    );
-    expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith({
-      displayName: "Team board",
-      url: "https://acme.atlassian.net",
-      userEmail: "me@example.com",
-      tokenName: "Team token",
-      projectId: "proj-new",
-    });
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("creates the project first so files can be uploaded to it", async () => {
-    const user = userEvent.setup();
-    const { onProjectCreated } = renderWizard();
-
-    await goToSourcesStep(user);
-    await user.click(screen.getByRole("button", { name: /indexes manually uploaded/i }));
-    await goToGithubDetail(user);
-
-    // Before the project exists the drop zone is withheld behind an explicit
-    // "Create project" action, since uploads need a live project id.
-    expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
-
+    await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /create project/i }));
 
     await waitFor(() =>
-      expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
-        name: "Apollo",
-        description: undefined,
+      expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith({
+        displayName: "Team board",
+        url: "https://acme.atlassian.net",
+        userEmail: "me@example.com",
+        tokenName: "Team token",
+        projectId: "proj-new",
       }),
     );
-    expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
-    // The upload drop zone is now revealed against the created project.
-    expect(await screen.findByText(/drag and drop .* files/i)).toBeInTheDocument();
   });
 
-  it("does not create the project when the wizard is cancelled on the source step", async () => {
+  it("connects a mixed batch of a GitHub repo and a Jira board", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageWidgets(user);
+    await stageJiraBoard(user);
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(connectGithubRepository)).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "widgets", projectId: "proj-new" }),
+    );
+    expect(vi.mocked(connectJiraInstance)).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://acme.atlassian.net", projectId: "proj-new" }),
+    );
+  });
+
+  it("stages uploaded files and uploads them against the new project on Create", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes manually uploaded/i }));
+
+    const file = new File(["hello"], "spec.md", { type: "text/markdown" });
+    await user.upload(screen.getByTestId("file-input"), file);
+
+    // The staged file is listed before anything is uploaded.
+    expect(screen.getByText("spec.md")).toBeInTheDocument();
+    expect(vi.mocked(knowledgeService.uploadDocuments)).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(knowledgeService.uploadDocuments)).toHaveBeenCalledWith("proj-new", [file]),
+    );
+    // Uploads run only after the project exists.
+    expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds a GitHub token inline and selects the new one", async () => {
+    vi.mocked(getGithubPatNames)
+      .mockResolvedValueOnce([]) // initial load: no tokens yet
+      .mockResolvedValue(["fresh-pat"]); // after the inline add
+    const user = userEvent.setup();
+    renderWizard({ tokenNames: [] });
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes repositories/i }));
+
+    await user.click(screen.getByRole("button", { name: /add github token/i }));
+    await user.type(screen.getByTestId("settings-add-token-name"), "fresh-pat");
+    await user.type(screen.getByTestId("settings-add-token-value"), "ghp_secret123");
+    await user.click(screen.getByTestId("settings-add-token-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addGithubPat)).toHaveBeenCalledWith("fresh-pat", "ghp_secret123"),
+    );
+    // The refreshed token is adopted and shown as the FilterSelect's label.
+    await waitFor(() =>
+      expect(screen.getByLabelText("Access token")).toHaveTextContent("fresh-pat"),
+    );
+  });
+
+  it("adds a Jira credential inline and selects the new one", async () => {
+    vi.mocked(getMyJiraCredentials)
+      .mockResolvedValueOnce([]) // initial load: none stored
+      .mockResolvedValue([{ userEmail: "new@example.com", displayName: "Fresh cred" }]);
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
+
+    await user.click(screen.getByRole("button", { name: /add jira credential/i }));
+    await user.type(screen.getByTestId("settings-jira-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-jira-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-jira-add-token"), "jira-token");
+    await user.click(screen.getByTestId("settings-jira-add-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addJiraCredential)).toHaveBeenCalledWith({
+        userEmail: "new@example.com",
+        tokenName: "Fresh cred",
+        authToken: "jira-token",
+      }),
+    );
+    // The refreshed credential is adopted and shown as the FilterSelect's label.
+    await screen.findByText(/Fresh cred - new@example.com/i);
+    expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
+  });
+
+  it("does not create the project when cancelled on the first step", async () => {
     const user = userEvent.setup();
     const { onClose } = renderWizard();
+    await settleModalFocus();
 
-    await goToSourcesStep(user);
-    // Two steps back: the wizard runs details → people → source type, and the
-    // secondary button only reads "Cancel" once it is back on the first step.
-    await user.click(screen.getByRole("button", { name: /back/i }));
-    await user.click(screen.getByRole("button", { name: /back/i }));
     await user.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("keeps the member picker off the first step", async () => {
-    const user = userEvent.setup();
-    renderWizard({ users: [adminUser("u1", "Max")] });
-    await settleModalFocus();
-
-    expect(screen.getByLabelText("Name")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Members")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Project manager")).not.toBeInTheDocument();
-
-    await goToPeopleStep(user);
-
-    expect(screen.getByLabelText("Members")).toBeInTheDocument();
-    expect(screen.getByLabelText("Project manager")).toBeInTheDocument();
-  });
-
-  it("assigns every picked member to the new project in one request", async () => {
-    const user = userEvent.setup();
-    renderWizard({ users: [adminUser("u1", "Max"), adminUser("u2", "Lena")] });
-
-    await goToPeopleStep(user);
-    await user.click(screen.getByRole("checkbox", { name: "Add Max Mustermann to the project" }));
-    await user.click(screen.getByRole("checkbox", { name: "Add Lena Mustermann to the project" }));
-
-    await user.click(screen.getByRole("button", { name: /continue/i }));
-    await user.click(screen.getByRole("button", { name: /continue/i }));
-    await user.click(screen.getByRole("button", { name: /create without sources/i }));
-
-    await waitFor(() => {
-      expect(projectService.assignUsersToProject).toHaveBeenCalledWith("proj-new", {
-        userIds: ["u1", "u2"],
-      });
-    });
-    expect(projectService.assignUsersToProject).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not assign anyone when no member was picked", async () => {
-    const user = userEvent.setup();
-    renderWizard({ users: [adminUser("u1", "Max")] });
-
-    await goToSourcesStep(user);
-    await goToGithubDetail(user);
-    await user.click(screen.getByRole("button", { name: /create without sources/i }));
-
-    await waitFor(() => {
-      expect(projectService.createProject).toHaveBeenCalled();
-    });
-    expect(projectService.assignUsersToProject).not.toHaveBeenCalled();
-  });
-
   it("filters the member list without losing what is already picked", async () => {
     const user = userEvent.setup();
     renderWizard({ users: [adminUser("u1", "Max"), adminUser("u2", "Lena")] });
 
-    await goToPeopleStep(user);
+    await goToMembers(user);
     await user.click(screen.getByRole("checkbox", { name: "Add Max Mustermann to the project" }));
-    await user.type(screen.getByLabelText("Members"), "lena");
+    await user.type(screen.getByLabelText("Add members"), "lena");
 
     expect(
       screen.queryByRole("checkbox", { name: "Add Max Mustermann to the project" }),

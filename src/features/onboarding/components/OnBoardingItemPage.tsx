@@ -13,6 +13,7 @@ import type {
   StepStatus,
 } from "../types";
 import { onboardingService } from "../../../services/onboardingService";
+import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
 import { Textarea } from "../../../components/ui/Textarea";
 import { StepOriginBadge } from "./StepOriginBadge";
@@ -96,6 +97,7 @@ export function OnBoardingItemPage() {
   const [loadingState, setLoadingState] = useState<LoadingState>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [skipReason, setSkipReason] = useState<string>("");
+  const toast = useToast();
   const [skipLoading, setSkipLoading] = useState<boolean>(false);
 
   // Ticks every 60s so the "time on step" display stays current while a step is open.
@@ -188,6 +190,7 @@ export function OnBoardingItemPage() {
       if (nextAction.isFirstStart) flyby();
     } catch (err) {
       console.error("Failed to start next onboarding step:", err);
+      toast.error(err instanceof Error ? err.message : "Couldn't start the step.");
     } finally {
       setNextLoading(false);
     }
@@ -201,6 +204,7 @@ export function OnBoardingItemPage() {
       setStepDetail((prev) => (prev ? { ...prev, status: newStatus } : prev));
     } catch (err) {
       console.error("Error updating step:", err);
+      toast.error(err instanceof Error ? err.message : "Couldn't update the step.");
     }
   };
 
@@ -221,6 +225,7 @@ export function OnBoardingItemPage() {
       });
     } catch (err) {
       console.error("Error updating task:", err);
+      toast.error(err instanceof Error ? err.message : "Couldn't update the task.");
     }
   };
 
@@ -292,8 +297,10 @@ export function OnBoardingItemPage() {
             }
           : prev,
       );
+      toast.success("Skip request submitted");
     } catch (err) {
       console.error("Error skipping step:", err);
+      toast.error(err instanceof Error ? err.message : "Couldn't submit the skip request.");
     } finally {
       setSkipLoading(false);
     }
@@ -305,8 +312,10 @@ export function OnBoardingItemPage() {
     try {
       await onboardingService.submitFeedback(stepDetail.id, feedbackHelpful, feedbackComment);
       setFeedbackSubmitted(true);
+      toast.success("Feedback submitted");
     } catch (err) {
       console.error("Error submitting feedback:", err);
+      toast.error(err instanceof Error ? err.message : "Couldn't submit your feedback.");
     } finally {
       setFeedbackLoading(false);
     }

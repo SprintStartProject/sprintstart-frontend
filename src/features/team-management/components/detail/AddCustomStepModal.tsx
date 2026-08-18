@@ -19,7 +19,6 @@ type AddCustomStepModalProps = {
   estimatedMinutes: string;
   tasks: CustomStepTaskDraft[];
   addingStep: boolean;
-  errorMessage: string;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onExpectedOutcomeChange: (value: string) => void;
@@ -37,7 +36,6 @@ export function AddCustomStepModal({
   estimatedMinutes,
   tasks,
   addingStep,
-  errorMessage,
   onTitleChange,
   onDescriptionChange,
   onExpectedOutcomeChange,
@@ -320,12 +318,6 @@ export function AddCustomStepModal({
             </div>
           )}
         </div>
-
-        {errorMessage && (
-          <div className="rounded-xl border border-app-danger-border bg-app-danger-bg p-3">
-            <p className="text-xs font-medium text-app-danger-text">{errorMessage}</p>
-          </div>
-        )}
       </div>
     </Modal>
   );

@@ -4,6 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { AccessConnectorGroup } from "../../../../src/features/access/components/AccessConnectorGroup";
 import { githubConnector } from "../../../../src/features/access/registry";
 
@@ -53,7 +54,9 @@ function renderGroup() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <GroupHarness />
+        <ToastProvider>
+          <GroupHarness />
+        </ToastProvider>
       </ThemeProvider>
     </MemoryRouter>,
   );
@@ -130,10 +133,12 @@ describe("AccessConnectorGroup — GitHub", () => {
     expect(addGithubPat).not.toHaveBeenCalled();
   });
 
-  it("surfaces a mutation error from the server", async () => {
+  it("surfaces a server-side name clash as a toast, not an inline format error", async () => {
     const user = userEvent.setup();
+    // apiClient has already unwrapped the backend's { message } body, so the
+    // ApiError carries the plain message string (not raw JSON).
     vi.mocked(addGithubPat).mockRejectedValue(
-      new ApiError(409, '{"message":"Name already exists"}'),
+      new ApiError(400, "Github user pat with name default already exists."),
     );
 
     renderGroup();
@@ -144,7 +149,14 @@ describe("AccessConnectorGroup — GitHub", () => {
     await user.type(screen.getByTestId("settings-add-token-value"), "ghp_abc123");
     await user.click(screen.getByTestId("settings-add-token-submit"));
 
-    await waitFor(() => expect(screen.getByText("Name already exists")).toBeInTheDocument());
+    // The real backend message shows in a toast...
+    await waitFor(() =>
+      expect(
+        screen.getByText("Github user pat with name default already exists."),
+      ).toBeInTheDocument(),
+    );
+    // ...and the misleading format hint is NOT shown inline.
+    expect(screen.queryByText(/Invalid token format/)).not.toBeInTheDocument();
   });
 
   it("deletes a token after confirmation and refreshes the list", async () => {
