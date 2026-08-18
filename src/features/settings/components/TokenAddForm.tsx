@@ -11,6 +11,12 @@ import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from "../utils/patValidation"
 type TokenAddFormProps = {
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /**
+   * When the form is already inside a titled container (the wizard's desktop
+   * companion), drop its own card chrome and header so the inputs sit directly
+   * in that panel instead of a card-within-a-card.
+   */
+  embedded?: boolean;
 };
 
 /**
@@ -18,7 +24,7 @@ type TokenAddFormProps = {
  * submitting. A ref guard prevents double-submit even if Enter fires before
  * the disabled state re-renders.
  */
-export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
+export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFormProps) {
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
   // `error` holds the inline messages shown next to the inputs: the client-side
@@ -80,21 +86,27 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
     <form
       onSubmit={(e) => void handleSubmit(e)}
       aria-label="Add GitHub PAT"
-      className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      className={
+        embedded
+          ? ""
+          : "overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      }
     >
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={handleClose}
-          disabled={isSaving}
-          aria-label="Cancel add token"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </Button>
-      </div>
+      {!embedded && (
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={handleClose}
+            disabled={isSaving}
+            aria-label="Cancel add token"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Field label="Token name" controlId="settings-add-token-name" disabled={isSaving}>

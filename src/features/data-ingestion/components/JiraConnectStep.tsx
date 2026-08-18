@@ -1,8 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 
+import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
-import { Select } from "../../../components/ui/Select.tsx";
 import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
 
 /**
@@ -28,6 +28,7 @@ export function JiraConnectStep({
   onUrlChange,
   onCredentialNameChange,
   onSubmit,
+  suppressMissingCredentialNotice = false,
 }: {
   displayName: string;
   url: string;
@@ -44,9 +45,16 @@ export function JiraConnectStep({
   onUrlChange: (value: string) => void;
   onCredentialNameChange: (value: string) => void;
   onSubmit: () => void;
+  /**
+   * Hides the built-in "no stored credential" banner. Set when the parent shows
+   * its own missing-credential hint (e.g. the wizard's compact notice next to
+   * its inline "Add credential" button) so the message is not duplicated.
+   */
+  suppressMissingCredentialNotice?: boolean;
 }) {
   const hasCredentials = credentials.length > 0;
-  const showNoCredentials = credentialsLoaded && !credentialsLoading && !hasCredentials;
+  const showNoCredentials =
+    credentialsLoaded && !credentialsLoading && !hasCredentials && !suppressMissingCredentialNotice;
 
   return (
     <form
@@ -87,25 +95,28 @@ export function JiraConnectStep({
         />
       </Field>
 
-      <Field label="Credential" controlId="jira-credential" disabled={isBusy || !hasCredentials}>
-        <Select
-          data-testid="jira-credential"
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-app-text">Credential</span>
+        <DropdownSelect
+          label="Credential"
           value={credentialName}
-          onChange={(event) => onCredentialNameChange(event.target.value)}
-        >
-          {hasCredentials ? (
-            credentials.map((credential) => (
-              <option key={credential.displayName} value={credential.displayName}>
-                {credential.displayName} - {credential.userEmail}
-              </option>
-            ))
-          ) : (
-            <option value="">
-              {credentialsLoading ? "Loading credentials..." : "No credentials"}
-            </option>
-          )}
-        </Select>
-      </Field>
+          options={
+            hasCredentials
+              ? credentials.map((credential) => ({
+                  value: credential.displayName,
+                  label: `${credential.displayName} - ${credential.userEmail}`,
+                }))
+              : [
+                  {
+                    value: "",
+                    label: credentialsLoading ? "Loading credentials..." : "No credentials",
+                  },
+                ]
+          }
+          onChange={onCredentialNameChange}
+          disabled={isBusy || !hasCredentials}
+        />
+      </div>
       <p className="text-xs text-app-text-subtle">
         Jira account emails are stored with each credential. Manage them under Settings, Access
         Tokens, Jira.
