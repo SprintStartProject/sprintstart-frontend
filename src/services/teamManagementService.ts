@@ -137,23 +137,29 @@ export async function getTeamMember(userId: string): Promise<TeamOverviewUser | 
   return users.find((user) => user.userId === userId);
 }
 
+/**
+ * The signed-in user's own row of the team overview: their roles, skills and position in
+ * their onboarding.
+ *
+ * Failures propagate. This used to answer with the first mock user instead, which is
+ * indistinguishable from a real reply — so a user with no onboarding path (404) or a role
+ * that may not read the overview at all (403) was handed somebody else's journey, and the
+ * dashboard reported an onboarding that did not exist. Callers decide what an absent
+ * overview means for them; a fixture cannot make that decision for them.
+ */
 export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
-  try {
-    const user = await apiClient.fetch<BackendTeamOverviewUser>(
-      "/api/v1/onboarding/me/team-overview",
-    );
-    return {
-      ...user,
-      projects: toTeamOverviewProjects(user),
-      roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
-        ...role,
-        id: role.id || role.roleId || "",
-      })),
-    };
-  } catch {
-    // Fallback to finding the first user in mock for development
-    return mockUsers[0];
-  }
+  const user = await apiClient.fetch<BackendTeamOverviewUser>(
+    "/api/v1/onboarding/me/team-overview",
+  );
+
+  return {
+    ...user,
+    projects: toTeamOverviewProjects(user),
+    roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
+      ...role,
+      id: role.id || role.roleId || "",
+    })),
+  };
 }
 
 export async function getProjectRoles(): Promise<ProjectRole[]> {

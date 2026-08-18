@@ -128,9 +128,16 @@ export function OnBoardingPage() {
   const focusCheckPhaseId = (location.state as { focusCheckPhaseId?: string } | null)
     ?.focusCheckPhaseId;
 
+  // Set by the dashboard card when the review pool is all that is left of the journey. The
+  // pool has no place on the page to scroll to — it lives in a modal — so the navigation
+  // opens it directly, rather than dropping the user next to a button they already clicked.
+  const shouldOpenReviewCheck =
+    (location.state as { openReviewCheck?: boolean } | null)?.openReviewCheck === true;
+
   // The phase's knowledge check card, which sits at the end of a potentially long step list.
   const checkCardRef = useRef<HTMLDivElement>(null);
   const hasFocusedCheckRef = useRef(false);
+  const hasOpenedReviewRef = useRef(false);
 
   /**
    * Brings the knowledge check into view when the user was sent here because of it.
@@ -144,6 +151,19 @@ export function OnBoardingPage() {
     hasFocusedCheckRef.current = true;
     checkCardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
   }, [loadingState, focusCheckPhaseId]);
+
+  /**
+   * Opens the review pool when the user came here to work through it.
+   *
+   * Waits for the count, which arrives after the path: opening an empty pool would show a
+   * modal with nothing in it. Fires once per visit, so closing the modal does not reopen it.
+   */
+  useEffect(() => {
+    if (loadingState !== "success" || !shouldOpenReviewCheck || hasOpenedReviewRef.current) return;
+    if (openReviewCount <= 0) return;
+    hasOpenedReviewRef.current = true;
+    setReviewCheckOpen(true);
+  }, [loadingState, shouldOpenReviewCheck, openReviewCount]);
 
   // Silently re-fetches the path, e.g. after a check attempt changed lock states.
   const refreshPath = async () => {

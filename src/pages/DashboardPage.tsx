@@ -12,9 +12,11 @@ import { SpaceInvadersModal } from "../features/space-invaders/components/SpaceI
 import { useSpaceInvadersShortcut } from "../features/space-invaders/hooks/useSpaceInvadersShortcut";
 import { DashboardHero } from "../features/dashboard/components/DashboardHero";
 import { NextStepWidget } from "../features/dashboard/components/NextStepWidget";
+import { RecentChatsWidget } from "../features/dashboard/components/RecentChatsWidget";
 import { KnowledgeBaseWidget } from "../features/dashboard/components/KnowledgeBaseWidget";
 import { QuickChatWidget } from "../features/dashboard/components/QuickChatWidget";
 import { SkillsStrip } from "../features/dashboard/components/SkillsStrip";
+import { useMyOnboardingStatus } from "../features/onboarding/hooks/useMyOnboardingStatus";
 import { SpotlightCard } from "../components/ui/SpotlightCard";
 
 /**
@@ -24,6 +26,10 @@ import { SpotlightCard } from "../components/ui/SpotlightCard";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Read here rather than inside the card, because the answer decides what occupies the
+  // slot: an onboarding to continue, or the conversations card for everyone who has none.
+  const onboarding = useMyOnboardingStatus();
 
   // 2048 easter egg: Ctrl+Shift+2 opens the game in a modal.
   const [game2048Open, setGame2048Open] = useState(false);
@@ -71,6 +77,19 @@ export function DashboardPage() {
   else if (hour < 12) greeting = "Good morning";
   else if (hour < 17) greeting = "Good afternoon";
 
+  /**
+   * Whether the onboarding card has anything to say.
+   *
+   * The journey has to be live for it: not yet built means the card would announce an
+   * onboarding nobody has, and finished means it is gone for good — the same rule the
+   * sidebar entry follows. `loading` and `error` keep the slot, so the card can report
+   * its own state instead of the layout silently swapping underneath the user.
+   */
+  const showsOnboarding =
+    onboarding.state === "loading" ||
+    onboarding.state === "error" ||
+    (onboarding.state === "ready" && onboarding.nextAction.kind !== "done");
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
@@ -78,7 +97,12 @@ export function DashboardPage() {
           <PageHeader
             icon={ChartColumn}
             title="Dashboard"
-            subtitle="Your central workspace for project status, onboarding progress and next actions."
+            subtitle={
+              // Promises onboarding progress only to someone who has an onboarding.
+              showsOnboarding
+                ? "Your central workspace for project status, onboarding progress and next actions."
+                : "Your central workspace for project status, recent conversations and next actions."
+            }
           />
         </div>
       </header>
@@ -111,7 +135,7 @@ export function DashboardPage() {
           className="grid grid-cols-1 gap-5 lg:grid-cols-2"
         >
           <SpotlightCard roundedClassName="rounded-3xl">
-            <NextStepWidget />
+            {showsOnboarding ? <NextStepWidget status={onboarding} /> : <RecentChatsWidget />}
           </SpotlightCard>
           <SpotlightCard roundedClassName="rounded-3xl">
             <KnowledgeBaseWidget />

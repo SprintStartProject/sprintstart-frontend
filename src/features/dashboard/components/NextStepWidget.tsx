@@ -1,13 +1,10 @@
-import { useEffect, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, Check, Rocket } from "lucide-react";
-import { Badge } from "../../../components/ui/Badge";
+import { AlertCircle, ArrowRight, Brain, ClipboardCheck, Rocket } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
-import { useAuth } from "../../../context/useAuth";
-import { isOnboardingAccessible } from "../../../auth/accessPolicy";
-import { getMyTeamOverview } from "../../../services/teamManagementService";
-import type { TeamOverviewUser } from "../../team-management/types";
+import type { MyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
+import type { OnboardingNextAction } from "../../onboarding/nextAction";
 
 const RING_SIZE = 104;
 const RING_STROKE = 9;
@@ -75,49 +72,86 @@ function ProgressRing({ percentage }: { percentage: number }) {
   );
 }
 
+/** Everything the card renders about one next action, and where clicking it leads. */
+type CardContent = {
+  icon: LucideIcon;
+  eyebrow: string;
+  title: string;
+  subtitle: string | null;
+  cta: string;
+  ariaLabel: string;
+  to: string;
+  /**
+   * Handed to the onboarding page through the router, which uses it to put the thing the
+   * user came for in front of them instead of dropping them at the top of the page.
+   */
+  navigationState?: { focusCheckPhaseId?: string; openReviewCheck?: boolean };
+};
+
+function pluralize(count: number, singular: string): string {
+  return `${count} ${count === 1 ? singular : `${singular}s`}`;
+}
+
+function describeNextAction(action: Exclude<OnboardingNextAction, { kind: "done" }>): CardContent {
+  switch (action.kind) {
+    case "step":
+      return {
+        icon: Rocket,
+        eyebrow: "Next up",
+        title: action.step.title,
+        subtitle: action.phase.title,
+        // A step that was never opened is started, not continued — and starting one is
+        // what the onboarding page celebrates, so the wording has to match.
+        cta: action.step.status === "WAITING" ? "Start" : "Continue",
+        ariaLabel: `Continue onboarding: ${action.step.title}`,
+        to: `/onboarding/${action.step.id}`,
+      };
+
+    case "check":
+      return {
+        icon: ClipboardCheck,
+        eyebrow: "Knowledge check",
+        title: `${action.phase.title} check`,
+        subtitle: action.isFinalPhase
+          ? "Every step done — pass it to finish your onboarding"
+          : "Every step done — pass it to unlock the next phase",
+        cta: "Open check",
+        ariaLabel: `Open the knowledge check for ${action.phase.title}`,
+        to: "/onboarding",
+        navigationState: { focusCheckPhaseId: action.phase.id },
+      };
+
+    case "review":
+      return {
+        icon: Brain,
+        eyebrow: "Review questions",
+        title: `${pluralize(action.openCount, "question")} to answer again`,
+        subtitle: "Answer them correctly once to finish your onboarding",
+        cta: "Test your knowledge",
+        ariaLabel: "Answer your open review questions",
+        to: "/onboarding",
+        navigationState: { openReviewCheck: true },
+      };
+  }
+}
+
+const CARD_CLASS_NAME =
+  "group relative flex min-h-56 flex-col overflow-hidden rounded-2xl p-6 transition-all";
+
 /**
- * Shows the signed-in user's own onboarding position: the step they are
- * currently on, the phase it belongs to, overall progress and the project
- * roles assigned to them.
+ * The signed-in user's own position in their onboarding: overall progress and the one
+ * thing waiting for them, which is what clicking the card opens.
  *
- * Reads `/api/v1/onboarding/me/team-overview`, which is open to the USER
- * role — unlike the PM-facing team overview used on the PM dashboard.
+ * Renders nothing when there is no live journey to report — that decision belongs to the
+ * dashboard, which has another card for the slot, so the states are handed in rather than
+ * fetched here (see {@link useMyOnboardingStatus}). The next action is resolved from the
+ * path itself, not from the team overview's `currentStep`: that field ignores phase locks
+ * and would send someone with an unpassed knowledge check straight into the next phase.
  */
-export function NextStepWidget() {
+export function NextStepWidget({ status }: { status: MyOnboardingStatus }) {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const [user, setUser] = useState<TeamOverviewUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    let isCurrentRequest = true;
-
-    async function loadOverview() {
-      try {
-        const data = await getMyTeamOverview();
-        if (!isCurrentRequest) return;
-
-        setUser(data);
-      } catch {
-        if (!isCurrentRequest) return;
-
-        setError(true);
-      } finally {
-        if (isCurrentRequest) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadOverview();
-
-    return () => {
-      isCurrentRequest = false;
-    };
-  }, []);
-
-  if (loading) {
+  if (status.state === "loading") {
     return (
       <div className="flex min-h-56 items-center justify-center rounded-2xl p-6">
         <Spinner size="lg" label="Loading" />
@@ -125,7 +159,7 @@ export function NextStepWidget() {
     );
   }
 
-  if (error || !user) {
+  if (status.state === "error") {
     return (
       <div className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-2xl p-6 text-center">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
@@ -134,23 +168,21 @@ export function NextStepWidget() {
     );
   }
 
-  const progressPercentage = Math.round(user.progressPercentage * 100);
-  const isComplete = progressPercentage >= 100;
+  // `absent`, and a journey with nothing left, are the dashboard's cue to show something
+  // else in this slot. Guarded here too so the component is safe to render on its own.
+  if (status.state !== "ready" || status.nextAction.kind === "done") {
+    return null;
+  }
 
-  // Completed users are bounced off /onboarding by the auth guard, so the
-  // card must not advertise a destination they cannot reach.
-  const canOpenOnboarding = isOnboardingAccessible(profile);
-  const stepId = user.currentStep?.id;
-  const target = stepId ? `/onboarding/${stepId}` : "/onboarding";
+  const content = describeNextAction(status.nextAction);
+  const Icon = content.icon;
 
-  const cardClassName = `group relative flex min-h-56 flex-col overflow-hidden rounded-2xl p-6 transition-all ${
-    canOpenOnboarding
-      ? "cursor-pointer hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus"
-      : ""
-  }`;
-
-  const body = (
-    <>
+  return (
+    <ClickableCard
+      onClick={() => void navigate(content.to, { state: content.navigationState })}
+      aria-label={content.ariaLabel}
+      className={`${CARD_CLASS_NAME} cursor-pointer hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+    >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
@@ -159,71 +191,35 @@ export function NextStepWidget() {
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <Rocket className="h-3.5 w-3.5" />
+            <Icon className="h-3.5 w-3.5" />
           </span>
           <span className="text-sm font-semibold text-app-text">Your onboarding</span>
         </div>
 
-        {canOpenOnboarding && (
-          <span
-            aria-hidden="true"
-            className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
-          >
-            {stepId ? "Continue" : "Open"}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        )}
+        <span
+          aria-hidden="true"
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
+        >
+          {content.cta}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
       </div>
 
       <div className="relative flex flex-1 items-center gap-5">
-        <ProgressRing percentage={progressPercentage} />
+        <ProgressRing percentage={status.progress.percentage} />
 
         <div className="min-w-0 flex-1">
-          {isComplete ? (
-            <>
-              <Badge variant="success" className="gap-1.5">
-                <Check className="h-3.5 w-3.5" />
-                All steps done
-              </Badge>
-              <p className="mt-2 text-sm text-app-text-muted">
-                Nice work — your onboarding is complete.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
-                Next up
-              </p>
-              <p className="mt-1 line-clamp-2 text-lg leading-snug font-semibold text-app-text">
-                {user.currentStep?.title ?? "No current step"}
-              </p>
-              {user.currentPhase?.title && (
-                <p className="mt-1 truncate text-sm text-app-text-muted">
-                  {user.currentPhase.title}
-                </p>
-              )}
-            </>
+          <p className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+            {content.eyebrow}
+          </p>
+          <p className="mt-1 line-clamp-2 text-lg leading-snug font-semibold text-app-text">
+            {content.title}
+          </p>
+          {content.subtitle && (
+            <p className="mt-1 line-clamp-2 text-sm text-app-text-muted">{content.subtitle}</p>
           )}
         </div>
       </div>
-    </>
-  );
-
-  if (!canOpenOnboarding) {
-    return <div className={cardClassName}>{body}</div>;
-  }
-
-  return (
-    <ClickableCard
-      onClick={() => void navigate(target)}
-      aria-label={
-        stepId
-          ? `Continue onboarding: ${user.currentStep?.title ?? "current step"}`
-          : "Open onboarding"
-      }
-      className={cardClassName}
-    >
-      {body}
     </ClickableCard>
   );
 }
