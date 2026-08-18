@@ -191,6 +191,24 @@ describe("FaqPage", () => {
     expect(screen.getByText(/dropped from the FAQ/)).toBeInTheDocument();
   });
 
+  // A rebuild is destructive and the dialog is the only place its reach is
+  // stated, so silently reoffering the last narrow window is the wrong thing
+  // for it to remember.
+  it("reopens the rebuild dialog on the default scope", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+    await chooseScope(user, "Asked in the last 30 days");
+    expect(await screen.findByRole("button", { name: "Rebuild 11 questions" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    await user.click(screen.getByRole("button", { name: /rebuild grouping/i }));
+
+    expect(await screen.findByRole("button", { name: "Rebuild 15 questions" })).toBeInTheDocument();
+    expect(screen.queryByText(/dropped from the FAQ/)).not.toBeInTheDocument();
+  });
+
   it("rebuilds over everything by default", async () => {
     const user = userEvent.setup();
     vi.mocked(insightsService.refreshFAQGroups).mockResolvedValue({ groupCount: 2 });

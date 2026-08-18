@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  SEVERITY_FILL,
   SEVERITY_ORDER,
   SEVERITIES,
   SEVERITY_STYLES,
@@ -19,6 +20,28 @@ describe("knowledge-gaps severity", () => {
   describe("SEVERITIES", () => {
     it("lists severities in display order high → medium → low → covered", () => {
       expect(SEVERITIES).toEqual(["high", "medium", "low", "covered"]);
+    });
+  });
+
+  describe("SEVERITY_FILL", () => {
+    it("gives every step a width", () => {
+      // Regression: the detail page used a ternary chain with no branch for a
+      // fourth step, so `covered` silently inherited the `low` width and drew
+      // a 30%-full bar for a component with nothing missing.
+      for (const severity of SEVERITIES) {
+        expect(SEVERITY_FILL[severity]).toBeTruthy();
+      }
+    });
+
+    it("fills further the worse the gap is, and fills covered completely", () => {
+      const percent = (severity: (typeof SEVERITIES)[number]) =>
+        Number.parseInt(SEVERITY_FILL[severity], 10);
+
+      expect(percent("high")).toBeGreaterThan(percent("medium"));
+      expect(percent("medium")).toBeGreaterThan(percent("low"));
+      // A near-empty bar would read as a component barely holding on; the
+      // colour is what says which of the two full bars is the good one.
+      expect(percent("covered")).toBe(100);
     });
   });
 

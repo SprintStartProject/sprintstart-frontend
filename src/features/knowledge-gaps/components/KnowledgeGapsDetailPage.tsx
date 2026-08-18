@@ -12,7 +12,7 @@ import { getTeamOverview } from "../../../services/teamManagementService";
 import { useToast } from "../../../context/useToast";
 import { useFetch } from "../../../hooks/useFetch";
 import { formatDateTime, formatRelativeDate, daysSince } from "../format";
-import { SEVERITY_STYLES } from "../severity";
+import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 import {
@@ -51,7 +51,9 @@ export function KnowledgeGapsDetailPage() {
     error,
   } = useFetch(
     () => knowledgeGapService.fetchKnowledgeGap(selectedProjectId, gapId ?? ""),
-    [gapId, refreshKey],
+    // The project is part of what is being fetched, so switching it has to
+    // refetch -- otherwise the page keeps showing the previous project's gap.
+    [selectedProjectId, gapId, refreshKey],
   );
 
   const { data: teamUsers } = useFetch(() => getTeamOverview(), []);
@@ -165,7 +167,7 @@ export function KnowledgeGapsDetailPage() {
             <div
               className={`h-full rounded-full ${bar}`}
               style={{
-                width: gap.severity === "high" ? "100%" : gap.severity === "medium" ? "60%" : "30%",
+                width: SEVERITY_FILL[gap.severity],
               }}
             />
           </div>

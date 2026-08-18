@@ -15,6 +15,25 @@ export const SEVERITY_ORDER: Record<KnowledgeGapSeverity, number> = {
 /** Severities in display order (high → medium → low → covered). */
 export const SEVERITIES: KnowledgeGapSeverity[] = ["high", "medium", "low", "covered"];
 
+/**
+ * Width of the detail page's hero bar per step.
+ *
+ * The bar's colour says *which* state the component is in; its length says how
+ * much of that state there is. So a gap fills further the worse it is, and
+ * `covered` fills completely — a full green bar reads as "fully covered",
+ * where a near-empty one would read as a component barely holding on.
+ *
+ * A lookup rather than a ternary chain: the chain that used to live in the
+ * detail page had no branch for a fourth step, so `covered` silently inherited
+ * the `low` width.
+ */
+export const SEVERITY_FILL: Record<KnowledgeGapSeverity, string> = {
+  high: "100%",
+  medium: "60%",
+  low: "30%",
+  covered: "100%",
+};
+
 export interface SeverityStyle {
   /** Solid fill for the severity bar, legend dots and stacked-bar segments. */
   bar: string;

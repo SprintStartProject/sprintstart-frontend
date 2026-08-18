@@ -38,7 +38,12 @@ export function FaqDetailPage() {
     data: detail,
     loading,
     error,
-  } = useFetch(() => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""), [groupId]);
+  } = useFetch(
+    () => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
+    // The project is part of what is being fetched, so switching it has to
+    // refetch -- otherwise the page keeps showing the previous project's entry.
+    [selectedProjectId, groupId],
+  );
 
   // ── LOADING ──────────────────────────────────────────────
 

@@ -159,6 +159,16 @@ export function FilterSelect<TValue extends string>({
     };
   }, [isOpen, menuInPortal]);
 
+  // Focus never leaves the trigger in the select-only combobox pattern, so the
+  // browser does not scroll the list for us the way it would if the options
+  // themselves were focused. Past the visible window, arrow keys and typeahead
+  // would otherwise move a highlight nobody can see.
+  useEffect(() => {
+    if (!isOpen) return;
+    const option = document.getElementById(`${optionIdPrefix}-${activeIndex}`);
+    option?.scrollIntoView({ block: "nearest" });
+  }, [isOpen, activeIndex, optionIdPrefix]);
+
   useEffect(() => {
     const typeahead = typeaheadRef.current;
     return () => {

@@ -78,6 +78,12 @@ export function RebuildFaqDialog({ isOpen, projectId, onClose, onConfirm }: Rebu
       await Promise.resolve();
       if (!active) return;
 
+      // Reopening starts from the default scope again: a rebuild is
+      // destructive and this dialog is the only place its reach is stated, so
+      // silently reoffering the last narrow window is the wrong thing to
+      // remember. Set here rather than in the effect body for the same reason
+      // the rest is -- a setState in the effect's own frame cascades.
+      setScope(ALL_SCOPE_KEY);
       setLoadingPreview(true);
       setPreview(null);
       try {

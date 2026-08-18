@@ -130,6 +130,26 @@ describe("FilterSelect", () => {
 
   // The portalled mode exists for modals, whose panel clips its overflow and
   // whose footer would otherwise be painted over the open list.
+  // Focus stays on the trigger in this pattern, so the browser never scrolls
+  // the list on its own the way it would if the options were focused.
+  it("scrolls the highlighted option into view as the keyboard moves it", async () => {
+    const user = userEvent.setup();
+    // vitest.setup stubs this on HTMLElement.prototype (jsdom has no layout),
+    // so the spy has to replace it there rather than on Element.
+    const scrollIntoView = vi
+      .spyOn(window.HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+
+    const { trigger } = renderSelect();
+    await user.click(trigger);
+    scrollIntoView.mockClear();
+
+    await user.keyboard("{ArrowDown}");
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    scrollIntoView.mockRestore();
+  });
+
   describe("in a portal", () => {
     it("renders the menu outside the control but still picks from it", async () => {
       const user = userEvent.setup();
