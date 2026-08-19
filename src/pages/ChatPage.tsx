@@ -87,6 +87,7 @@ export function ChatPage() {
     lastUserPrompt,
     handleSubmit,
     stopStreaming,
+    deleteChat,
     isThinking,
     isStreaming,
     thinkingState,
@@ -328,7 +329,7 @@ export function ChatPage() {
             <X size={24} />
           </button>
         </div>
-        <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
+        <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} onDeleteChat={deleteChat} />
       </aside>
 
       {/* Mobile toggle button — top-right so it doesn't overlap the mobile header burger */}
@@ -362,7 +363,7 @@ export function ChatPage() {
           </button>
         </div>
         <div className="flex flex-1 flex-col overflow-hidden">
-          <ChatSidebar chats={chats} setSidebarOpen={() => {}} />
+          <ChatSidebar chats={chats} setSidebarOpen={() => {}} onDeleteChat={deleteChat} />
         </div>
       </aside>
 

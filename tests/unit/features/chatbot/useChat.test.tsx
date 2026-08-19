@@ -394,4 +394,52 @@ describe("useChat", () => {
       expect(result.current.isStreaming).toBe(false);
     });
   });
+
+  it("deletes a chat and redirects if deleting active chat", async () => {
+    let deleteCalled = false;
+    server.use(
+      http.get("/api/v1/chats/me", () =>
+        HttpResponse.json({
+          chats: [
+            { id: "chat1", userId: "user1" },
+            { id: "chat2", userId: "user1" },
+          ],
+        }),
+      ),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.delete("/api/v1/chats/me/chat1", () => {
+        deleteCalled = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.deleteChat("chat1");
+    });
+
+    expect(deleteCalled).toBe(true);
+    expect(mockNavigate).toHaveBeenCalledWith("/chat", { replace: true, state: { newChat: true } });
+    expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
+  });
 });

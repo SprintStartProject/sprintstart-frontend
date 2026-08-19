@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import type { NavigateFunction } from "react-router-dom";
-import { createChat, getMyChats, getMessages, streamMessage } from "../services/chatService";
+import {
+  createChat,
+  deleteChat as apiDeleteChat,
+  getMyChats,
+  getMessages,
+  streamMessage,
+} from "../services/chatService";
 import { useAuth } from "./useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
@@ -623,6 +629,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     void refreshChats().catch((e) => console.error("Failed to refresh chats", e));
   }, [cancelDraft, flushDraft, clearStreamTimeout, refreshChats]);
 
+  /**
+   * Deletes a chat conversation and all of its messages for the authenticated user,
+   * cleaning up associated state and drafts.
+   */
+  const deleteChat = useCallback(
+    async (chatId: string) => {
+      // If the deleted chat is actively streaming, abort it cleanly first
+      if (streamingChatId === chatId) {
+        stopStreaming();
+      }
+
+      await apiDeleteChat(chatId);
+
+      // Remove from chats list
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+
+      // Evict cached messages
+      setMessagesByChat((prev) => {
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
+
+      // Evict persisted draft from localStorage
+      localStorage.removeItem(`chatDraft.${chatId}`);
+    },
+    [streamingChatId, stopStreaming],
+  );
+
   const value: ChatContextValue = {
     chats,
     sortedChats,
@@ -652,6 +687,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     sendMessage,
     stopStreaming,
     refreshChats,
+    deleteChat,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

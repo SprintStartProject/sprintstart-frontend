@@ -73,6 +73,7 @@ export function useChat() {
     clearFilters,
     sendMessage,
     stopStreaming,
+    deleteChat: ctxDeleteChat,
   } = ctx;
 
   /**
@@ -296,6 +297,16 @@ export function useChat() {
     [newRequest, addMessage, setNewRequest, chatId],
   );
 
+  const deleteChat = useCallback(
+    async (targetChatId: string) => {
+      await ctxDeleteChat(targetChatId);
+      if (targetChatId === chatId) {
+        void navigate("/chat", { replace: true, state: { newChat: true } });
+      }
+    },
+    [ctxDeleteChat, chatId, navigate],
+  );
+
   return {
     chats: sortedChats,
     chatId,
@@ -312,6 +323,7 @@ export function useChat() {
     handleSubmit,
     addMessage,
     stopStreaming: stopActiveStream,
+    deleteChat,
 
     newRequest,
     setNewRequest,

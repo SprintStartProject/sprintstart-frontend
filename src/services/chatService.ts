@@ -36,6 +36,17 @@ export async function createChat(projectId: string) {
 }
 
 /**
+ * Deletes an existing chat and all of its messages for the authenticated user.
+ *
+ * @param chatId The unique identifier of the chat to delete.
+ */
+export async function deleteChat(chatId: string): Promise<void> {
+  await apiClient.fetch<void>(`/api/v1/chats/me/${chatId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
  * Retrieves all messages from a specific chat owned by the authenticated user.
  *
  * @param chatId The chat the messages belong to.
