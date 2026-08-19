@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
+import { SaveButton } from "../../../components/ui/SaveButton";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { UserAvatar } from "../../../components/common/UserAvatar";
@@ -698,20 +699,14 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                         Reset
                       </button>
 
-                      <Button
-                        variant="primary"
+                      <SaveButton
+                        dirty={hasAssignChanges}
+                        saving={savingAssignment}
                         onClick={() => void handleSaveAssignment()}
-                        disabled={!hasAssignChanges}
-                        loading={savingAssignment}
-                      >
-                        {savingAssignment
-                          ? "Saving..."
-                          : hasAssignChanges
-                            ? `Save ${assignChangeCount} ${
-                                assignChangeCount === 1 ? "change" : "changes"
-                              }`
-                            : "Save changes"}
-                      </Button>
+                        label={`Save ${assignChangeCount} ${
+                          assignChangeCount === 1 ? "change" : "changes"
+                        }`}
+                      />
                     </div>
                   </div>
 
