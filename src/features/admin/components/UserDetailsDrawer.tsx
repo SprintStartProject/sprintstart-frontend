@@ -277,12 +277,24 @@ export function UserDetailsDrawer({
       title={visibleTitle}
       leading={
         <div className="flex shrink-0 items-center justify-center">
-          <UserAvatar
-            profileIcon={user.profileIcon}
-            fallbackName={`${user.firstName} ${user.lastName}`.trim()}
-            seed={user.id}
-            size={64}
-          />
+          {/* Smaller on mobile; original size from sm up. Same seed → identical
+              avatar, just rendered at two sizes. */}
+          <span className="sm:hidden">
+            <UserAvatar
+              profileIcon={user.profileIcon}
+              fallbackName={`${user.firstName} ${user.lastName}`.trim()}
+              seed={user.id}
+              size={48}
+            />
+          </span>
+          <span className="hidden sm:inline-flex">
+            <UserAvatar
+              profileIcon={user.profileIcon}
+              fallbackName={`${user.firstName} ${user.lastName}`.trim()}
+              seed={user.id}
+              size={64}
+            />
+          </span>
         </div>
       }
       badge={

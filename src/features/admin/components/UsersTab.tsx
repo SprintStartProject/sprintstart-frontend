@@ -169,7 +169,7 @@ export function UsersTab({
               />
             </div>
 
-            <div className="pointer-events-none relative z-10 col-start-2 row-start-1 min-w-0 text-left sm:col-auto">
+            <div className="pointer-events-none relative z-10 col-start-2 row-start-1 min-w-0 text-left sm:col-auto sm:row-auto">
               <div className="flex items-center gap-2.5">
                 <div className="flex shrink-0 items-center justify-center">
                   <UserAvatar
