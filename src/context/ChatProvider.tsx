@@ -129,6 +129,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // chat the user has since navigated to.
   const latestLoadRef = useRef<string | null>(null);
 
+  // Set of deleted chat IDs to prevent any in-flight or subsequent message loading.
+  const deletedChatIdsRef = useRef<Set<string>>(new Set());
+
   // rAF-batched draft of the in-flight assistant message (see StreamingDraft).
   const draftRef = useRef<StreamingDraft | null>(null);
 
@@ -254,14 +257,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [selectedProjectId]);
 
   const loadMessages = useCallback(async (chatId: string) => {
+    if (deletedChatIdsRef.current.has(chatId)) return;
+
     // Mark this chat as the latest requested so a slow earlier response
     // can be ignored after the user switches chats.
     latestLoadRef.current = chatId;
     try {
       const data = await getMessages(chatId);
 
-      // Ignore the response if the user has since navigated to a different chat.
-      if (latestLoadRef.current !== chatId) return;
+      // Ignore the response if the user has since navigated to a different chat or deleted it.
+      if (latestLoadRef.current !== chatId || deletedChatIdsRef.current.has(chatId)) return;
 
       setMessagesByChat((prev) => {
         // Don't overwrite if messages were added while we were fetching
@@ -273,7 +278,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return { ...prev, [chatId]: data.messages };
       });
     } catch (e) {
-      if (latestLoadRef.current !== chatId) return;
+      if (latestLoadRef.current !== chatId || deletedChatIdsRef.current.has(chatId)) return;
       console.error("Failed to load messages for chat " + chatId, e);
     }
   }, []);
@@ -636,6 +641,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
    */
   const deleteChat = useCallback(
     async (chatId: string) => {
+      deletedChatIdsRef.current.add(chatId);
+
       // If the deleted chat is actively streaming, abort it cleanly first
       if (streamingChatId === chatId) {
         stopStreaming();

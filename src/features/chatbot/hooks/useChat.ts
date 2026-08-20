@@ -130,6 +130,8 @@ export function useChat() {
     stopStreaming();
   }, [isActiveChatStreaming, stopStreaming]);
 
+  const deletingChatIdsRef = useRef<Set<string>>(new Set());
+
   /**
    * Loads messages from the backend when a chat is opened for the first time
    * (not yet cached in `messagesByChat`). If the user navigates away and
@@ -137,9 +139,11 @@ export function useChat() {
    */
   useEffect(() => {
     if (!chatId) return;
+    if (deletingChatIdsRef.current.has(chatId)) return;
+    if (chatsProjectId === selectedProjectId && !chats.some((chat) => chat.id === chatId)) return;
     if (messagesByChat[chatId]) return;
     void loadMessages(chatId);
-  }, [chatId, messagesByChat, loadMessages]);
+  }, [chatId, chats, chatsProjectId, selectedProjectId, messagesByChat, loadMessages]);
 
   // A5: Instead of reading scrollHeight/scrollTop on every token (which
   // forces a synchronous layout), an IntersectionObserver watches the bottom
@@ -299,6 +303,7 @@ export function useChat() {
 
   const deleteChat = useCallback(
     async (targetChatId: string) => {
+      deletingChatIdsRef.current.add(targetChatId);
       if (targetChatId === chatId) {
         void navigate("/chat", { replace: true, state: { newChat: true } });
       }

@@ -438,12 +438,14 @@ describe("useChat", () => {
       expect(result.current.chats).toHaveLength(2);
     });
 
+    const callsBeforeDelete = getMessagesCalls;
+
     await act(async () => {
       await result.current.deleteChat("chat1");
     });
 
     expect(deleteCalled).toBe(true);
-    expect(getMessagesCalls).toBe(1);
+    expect(getMessagesCalls).toBe(callsBeforeDelete);
     expect(mockNavigate).toHaveBeenCalledWith("/chat", { replace: true, state: { newChat: true } });
     expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
   });
