@@ -140,7 +140,7 @@ export function ProjectAccessPanel({
     <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:p-4">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="items-center align-middle">
-          <p className="text-xl font-semibold text-app-text sm:text-2xl">Projects</p>
+          <p className="text-base font-semibold text-app-text sm:text-2xl">Projects</p>
           <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
         </div>
 
