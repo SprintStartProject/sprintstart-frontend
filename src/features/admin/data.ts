@@ -208,6 +208,16 @@ export function getPaginatedUsers(
   return users.slice(startIndex, startIndex + pageSize);
 }
 
+export function getPaginatedProjects(
+  projects: ProjectOverview[],
+  page: number,
+  pageSize = PAGE_SIZE,
+): ProjectOverview[] {
+  const startIndex = (page - 1) * pageSize;
+
+  return projects.slice(startIndex, startIndex + pageSize);
+}
+
 export function areAllVisibleUsersSelected(users: AdminUser[], selectedUserIds: Set<string>) {
   return users.length > 0 && users.every((user) => selectedUserIds.has(user.id));
 }

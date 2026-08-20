@@ -12,6 +12,7 @@ import {
   filterAdminUsers,
   getAvailableProjects,
   getDisplayName,
+  getPaginatedProjects,
   getPaginatedUsers,
   getSafePage,
   getTotalPages,
@@ -66,6 +67,7 @@ export function AdminPage() {
   );
 
   const [page, setPage] = useState(1);
+  const [projectPage, setProjectPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
@@ -126,6 +128,13 @@ export function AdminPage() {
   const paginatedUsers = useMemo(() => {
     return getPaginatedUsers(filteredUsers, safePage);
   }, [filteredUsers, safePage]);
+
+  const projectTotalPages = getTotalPages(filteredProjects.length);
+  const safeProjectPage = getSafePage(projectPage, projectTotalPages);
+
+  const paginatedProjects = useMemo(() => {
+    return getPaginatedProjects(filteredProjects, safeProjectPage);
+  }, [filteredProjects, safeProjectPage]);
 
   const allVisibleUsersSelected = areAllVisibleUsersSelected(paginatedUsers, selectedUserIds);
 
@@ -306,6 +315,7 @@ export function AdminPage() {
     setOpenUserMenuId(null);
     setActiveTab("projects");
     setProjectSearchValue("");
+    setProjectPage(1);
     setSelectedUser(null);
     setSelectedProject(project);
     setIsDrawerOpen(true);
@@ -433,7 +443,11 @@ export function AdminPage() {
       // dialog's scroll lock has to be told where to look — see
       // `SCROLL_CONTAINER_ATTRIBUTE`.
       {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
-      className="h-dvh overflow-y-scroll overscroll-contain"
+      // Below lg the app shell offsets the page by the 64px fixed mobile
+      // header (App's main has pt-[64px] lg:pt-0). A plain h-dvh would then run
+      // 64px past the viewport, hiding the last row of content (e.g. the
+      // pagination) below the fold, so subtract the header there.
+      className="h-[calc(100dvh-64px)] overflow-y-scroll overscroll-contain lg:h-dvh"
     >
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">
@@ -539,15 +553,24 @@ export function AdminPage() {
                   <AdminProjectsToolbar
                     projectCount={filteredProjects.length}
                     projectSearchValue={projectSearchValue}
-                    onProjectSearchChange={setProjectSearchValue}
+                    onProjectSearchChange={(value) => {
+                      setProjectSearchValue(value);
+                      setProjectPage(1);
+                    }}
                     onCreateProject={openCreateWizard}
                   />
 
                   <ProjectsTab
-                    filteredProjects={filteredProjects}
+                    filteredProjects={paginatedProjects}
                     hasSearchQuery={projectSearchValue.trim().length > 0}
                     totalCount={projects.length}
                     onOpenProjectDetails={openProjectDetails}
+                  />
+
+                  <AdminPagination
+                    safePage={safeProjectPage}
+                    totalPages={projectTotalPages}
+                    onPageChange={setProjectPage}
                   />
                 </>
               ) : (
