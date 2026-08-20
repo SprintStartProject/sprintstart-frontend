@@ -60,6 +60,73 @@ export const slidingIndicatorSpringToken: Transition = {
 };
 
 /**
+ * Spring for the sidebar's active pill, which travels much further than any
+ * other indicator in the app.
+ *
+ * Split off from {@link slidingIndicatorSpringToken} because a spring settles
+ * in the same time regardless of how far it has to go, which means the same
+ * numbers do not feel the same over different distances. A segmented tab hops
+ * about 100px; the sidebar pill runs the length of the nav, roughly 350px from
+ * Dashboard to Access Management. On the shared token that journey peaks near
+ * 7500px/s, and the pill reads as teleporting with a short blur rather than as
+ * something that moved. Here it peaks around 5300px/s and settles in ~310ms
+ * instead of ~200ms, which over that distance is the same *sensation* the
+ * shared token gives a tab -- which is the point of a token, rather than the
+ * same four numbers everywhere.
+ *
+ * Damped to zeta ~0.86, a little looser than the shared token's ~0.93. The
+ * resulting overshoot is about half a percent: a couple of pixels on the long
+ * journey, a fifth of a pixel between neighbouring rows. Not enough to see as
+ * a bounce, just enough that the pill arrives with weight instead of stopping
+ * dead on the mark.
+ *
+ * Do not reach for this on small indicators. Over a 100px hop it is simply
+ * slow, and the shared token is right there.
+ */
+export const sidebarIndicatorSpringToken: Transition = {
+  type: "spring",
+  stiffness: 230,
+  damping: 26,
+  mass: 1,
+};
+
+/**
+ * How long the sidebar's colours take to hand over while the pill above is in
+ * flight, in milliseconds.
+ *
+ * One duration, used by the leaving row and the arriving row alike, and with
+ * no delay on either. That symmetry is the whole specification, because it is
+ * what makes the handover a crossfade instead of a cut: if both rows run the
+ * same curve over the same window, the one fading out is at `1 - c(t)` exactly
+ * when the one fading in is at `c(t)`, so the amount of "selected" on screen is
+ * 1 at every instant. It holds for any easing, which is why the curve is left
+ * to Tailwind's default and only the duration lives here.
+ *
+ * Two earlier versions each broke that sum in their own direction, and both
+ * are worth knowing about before touching this again:
+ *
+ * - Originally there was no shared timing at all. The link text ran 200ms, the
+ *   icon ran Tailwind's bare 150ms default, and the dot on the active row had
+ *   no transition whatsoever and simply teleported between entries. Four
+ *   elements, four timelines, one of them instant.
+ *
+ * - Then the two directions were split apart deliberately: the leaving row
+ *   dropped its colour at once and the arriving row waited out a 110ms delay,
+ *   on the theory that a row should not light up before the pill covers it.
+ *   The theory was fine and the result was worse. The departure finished
+ *   before the arrival began, so the total fell to 0.04 for about 60ms -- a
+ *   window in which no entry in the sidebar was white, the dot had left one
+ *   row without reaching the next, and the selection simply blinked from one
+ *   place to the other. Sequencing two halves of one gesture reads as two
+ *   events, not as a transition.
+ *
+ * 220ms sits comfortably inside the pill's ~310ms settle, so the colours are
+ * resolved while the pill is still easing the last few pixels into place, and
+ * the row is finished before the motion is.
+ */
+export const SIDEBAR_INDICATOR_COLOR_MS = 220;
+
+/**
  * How long a `SidePanel` takes to slide in or out, in milliseconds.
  *
  * Single source of truth: the panel animation, how long `PanelPresence` keeps
