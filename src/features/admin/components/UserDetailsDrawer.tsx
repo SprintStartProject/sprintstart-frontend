@@ -326,7 +326,7 @@ export function UserDetailsDrawer({
       }
       footer={
         isEditing ? (
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:justify-end">
             <Button variant="secondary" onClick={cancelEditing} disabled={isSaving}>
               Cancel
             </Button>

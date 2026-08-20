@@ -249,7 +249,7 @@ export function ProjectDetailsDrawer({
                 {pendingChangeCount === 1 ? "" : "s"}
               </p>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-end">
                 <Button variant="secondary" onClick={discardChanges} disabled={isSaving}>
                   Discard
                 </Button>
