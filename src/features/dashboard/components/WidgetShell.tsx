@@ -8,10 +8,21 @@ import { Spinner } from "../../../components/ui/Spinner";
 export type WidgetShellProps = {
   icon: LucideIcon;
   title: string;
-  /** What the card promises when clicked, e.g. "Open team management". */
-  actionLabel: string;
-  /** Where clicking the card leads — the page that can act on what it shows. */
-  to: string;
+  /**
+   * What the card promises when clicked, e.g. "Open team management".
+   *
+   * Omitted together with {@link WidgetShellProps.to} for a card with nowhere to go.
+   */
+  actionLabel?: string;
+  /**
+   * Where clicking the card leads — the page that can act on what it shows.
+   *
+   * Optional, because not every widget has one: a card whose subject lives behind a route
+   * this user may not enter is still worth showing, and sending them to a redirect would be
+   * worse than not offering the click at all. Left out, the card renders as plain content
+   * with the same frame — no pointer, no hover lift, nothing to focus.
+   */
+  to?: string;
   isLoading?: boolean;
   /** Shown instead of the body when the figures could not be read. */
   errorMessage?: string | null;
@@ -39,12 +50,8 @@ export function WidgetShell({
 }: WidgetShellProps) {
   const navigate = useNavigate();
 
-  return (
-    <ClickableCard
-      onClick={() => void navigate(to)}
-      aria-label={actionLabel}
-      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-    >
+  const contents = (
+    <>
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
@@ -58,13 +65,15 @@ export function WidgetShell({
           <span className="text-sm font-semibold text-app-text">{title}</span>
         </div>
 
-        <span
-          aria-hidden="true"
-          className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
-        >
-          {actionLabel}
-          <ArrowRight className="h-3.5 w-3.5" />
-        </span>
+        {to !== undefined && (
+          <span
+            aria-hidden="true"
+            className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
+          >
+            {actionLabel}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        )}
       </div>
 
       {isLoading ? (
@@ -79,6 +88,26 @@ export function WidgetShell({
       ) : (
         <div className="relative flex flex-1 flex-col">{children}</div>
       )}
+    </>
+  );
+
+  if (to === undefined) {
+    return (
+      // No surface of its own: the card's border, background and shadow come from the
+      // `SpotlightCard` the dashboard frame wraps every widget in.
+      <article className="relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
+        {contents}
+      </article>
+    );
+  }
+
+  return (
+    <ClickableCard
+      onClick={() => void navigate(to)}
+      aria-label={actionLabel}
+      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+    >
+      {contents}
     </ClickableCard>
   );
 }

@@ -127,4 +127,40 @@ describe("FilterSelect", () => {
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
+
+  /**
+   * The menu has to escape the caller's stacking context.
+   *
+   * An ancestor with `backdrop-filter` / `transform` / `opacity` creates one,
+   * and a menu rendered inside it is painted under whatever follows the caller
+   * in the DOM however high its `z-index` is — which is how the knowledge-gap
+   * owner dropdown ended up under the card beneath it, unclickable.
+   */
+  it("renders its menu into the body, out of any ancestor stacking context", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <div className="backdrop-blur-md">
+        <FilterSelect
+          label="Filter runs by status"
+          value="ALL"
+          options={OPTIONS}
+          onChange={onChange}
+        />
+      </div>,
+    );
+
+    const trigger = screen.getByLabelText("Filter runs by status");
+    await user.click(trigger);
+
+    const listbox = screen.getByRole("listbox");
+    expect(listbox.parentElement).toBe(document.body);
+    expect(listbox.closest(".backdrop-blur-md")).toBeNull();
+
+    // And it is still a working menu from out there — the outside-click
+    // dismissal must not treat the portaled options as "outside".
+    await user.click(screen.getByRole("option", { name: "Failed" }));
+    expect(onChange).toHaveBeenCalledWith("FAILED");
+  });
 });

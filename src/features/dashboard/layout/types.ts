@@ -23,6 +23,7 @@ export type DashboardWidgetId =
   | "knowledge-base"
   | "ask-chat"
   | "skills"
+  | "my-knowledge-gaps"
   | "team-insights"
   | "team-overview"
   | "data-ingestion"

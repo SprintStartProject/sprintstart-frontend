@@ -10,6 +10,7 @@ import {
   Bot,
   Clock,
   Database,
+  FileWarning,
   FolderKanban,
   GraduationCap,
   MessagesSquare,
@@ -23,6 +24,7 @@ import { PermissionGroup } from "../../../services/types";
 import { IngestionWidget } from "../components/IngestionWidget";
 import { GreetingWidget } from "../components/GreetingWidget";
 import { KnowledgeBaseWidget } from "../components/KnowledgeBaseWidget";
+import { MyKnowledgeGapsWidget } from "../components/MyKnowledgeGapsWidget";
 import { OnboardingWidget } from "../components/OnboardingWidget";
 import { ProjectOverviewWidget } from "../components/ProjectOverviewWidget";
 import { QuickChatWidget } from "../components/QuickChatWidget";
@@ -122,6 +124,20 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     defaultSize: "wide",
     isAvailable: always,
     render: (size) => <SkillsStrip size={size} />,
+  },
+  {
+    id: "my-knowledge-gaps",
+    title: "Your knowledge gaps",
+    description: "The components you own that are missing documentation.",
+    icon: FileWarning,
+    tier: "user",
+    sizes: ["small", "medium", "wide"],
+    defaultSize: "medium",
+    isTallWhenWide: true,
+    // Everyone: the endpoint behind it is filtered by component ownership, not by role, so a
+    // user who owns nothing simply gets the empty card rather than a 403.
+    isAvailable: always,
+    render: (size) => <MyKnowledgeGapsWidget size={size} />,
   },
   {
     id: "team-insights",

@@ -19,12 +19,14 @@ const { mocks } = vi.hoisted(() => {
     onboarding: MyOnboardingStatus;
     fetchFAQGroups: ReturnType<typeof vi.fn>;
     fetchKnowledgeGaps: ReturnType<typeof vi.fn>;
+    fetchMyKnowledgeGaps: ReturnType<typeof vi.fn>;
   } = {
     profile: null,
     projectContext: null,
     onboarding: { state: "absent" },
     fetchFAQGroups: vi.fn(),
     fetchKnowledgeGaps: vi.fn(),
+    fetchMyKnowledgeGaps: vi.fn(),
   };
 
   return { mocks };
@@ -55,7 +57,10 @@ vi.mock("../../../src/services/faqService", () => ({
 }));
 
 vi.mock("../../../src/services/knowledgeGapService", () => ({
-  knowledgeGapService: { fetchKnowledgeGaps: mocks.fetchKnowledgeGaps },
+  knowledgeGapService: {
+    fetchKnowledgeGaps: mocks.fetchKnowledgeGaps,
+    fetchMyKnowledgeGaps: mocks.fetchMyKnowledgeGaps,
+  },
 }));
 
 const createProfile = (
@@ -380,14 +385,21 @@ describe("DashboardPage", () => {
       expect(within(picker).getByRole("button", { name: "Add Projects" })).toBeInTheDocument();
     });
 
-    it("has nothing left to offer a plain user, whose widgets are all placed by default", async () => {
+    it("offers a plain user the widgets the default layout leaves out", async () => {
       renderPage();
 
       await startEditing();
+      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
 
-      // The default layout already holds every widget a plain user may have, so the picker
-      // would open on an empty list.
-      expect(screen.getByRole("button", { name: "Add widget" })).toBeDisabled();
+      // Everything else a plain user may have is already on the default board; the knowledge
+      // gaps assigned to them are opt-in, because most people own no component at all.
+      const picker = screen.getByTestId("add-widget-modal");
+      expect(
+        within(picker).getByRole("button", { name: "Add Your knowledge gaps" }),
+      ).toBeInTheDocument();
+      expect(
+        within(picker).queryByRole("button", { name: "Add User accounts" }),
+      ).not.toBeInTheDocument();
     });
 
     it("offers a manager their team widgets, and never the organization ones", async () => {
