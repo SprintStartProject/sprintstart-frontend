@@ -345,7 +345,31 @@ export function SidebarNavLink({
             layoutId={indicatorLayoutId}
             transition={indicatorTransition}
             className="absolute inset-0 rounded-[10px] bg-app-brand shadow-[0_6px_20px_-8px_var(--color-app-brand)]"
-          />
+          >
+            {/* The selected row's share of the hover tint.
+                It exists because this row was otherwise a hole in the
+                falloff. Every other entry hands its tint to its
+                neighbour so the two always sum to one row's worth, but
+                this one rendered the pill *instead of* a tint: it
+                contributed nothing and took its neighbour's half down
+                with it. Sweeping past the current page therefore had
+                the highlight dissolve on approach and reappear out of
+                nothing on the far side.
+                It runs `tintOpacity` -- the very same value every other
+                row fades its fill in on -- so the partition is exact
+                again; only the paint differs, because the muted surface
+                colour the others use would just be mud over brand blue.
+                `brand-border-strong` is the step the rest of the app
+                already moves brand to on hover, so the pill lightens
+                into a colour the palette has rather than an ad-hoc
+                wash, and the entry stays unmistakably the selected one
+                while still answering the pointer. */}
+            <motion.span
+              aria-hidden="true"
+              style={{ opacity: tintOpacity }}
+              className="absolute inset-0 rounded-[10px] bg-app-brand-border-strong"
+            />
+          </motion.span>
         ) : prefersReducedMotion ? (
           <span
             key="hover-tint-static"
