@@ -273,6 +273,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return { ...prev, [chatId]: data.messages };
       });
     } catch (e) {
+      if (latestLoadRef.current !== chatId) return;
       console.error("Failed to load messages for chat " + chatId, e);
     }
   }, []);
@@ -638,6 +639,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // If the deleted chat is actively streaming, abort it cleanly first
       if (streamingChatId === chatId) {
         stopStreaming();
+      }
+
+      if (latestLoadRef.current === chatId) {
+        latestLoadRef.current = null;
       }
 
       await apiDeleteChat(chatId);

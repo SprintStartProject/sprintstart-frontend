@@ -299,10 +299,10 @@ export function useChat() {
 
   const deleteChat = useCallback(
     async (targetChatId: string) => {
-      await ctxDeleteChat(targetChatId);
       if (targetChatId === chatId) {
         void navigate("/chat", { replace: true, state: { newChat: true } });
       }
+      await ctxDeleteChat(targetChatId);
     },
     [ctxDeleteChat, chatId, navigate],
   );

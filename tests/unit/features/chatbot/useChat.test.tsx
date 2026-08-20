@@ -397,6 +397,7 @@ describe("useChat", () => {
 
   it("deletes a chat and redirects if deleting active chat", async () => {
     let deleteCalled = false;
+    let getMessagesCalls = 0;
     server.use(
       http.get("/api/v1/chats/me", () =>
         HttpResponse.json({
@@ -406,7 +407,10 @@ describe("useChat", () => {
           ],
         }),
       ),
-      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.get("/api/v1/chats/me/chat1", () => {
+        getMessagesCalls++;
+        return HttpResponse.json({ messages: [] });
+      }),
       http.delete("/api/v1/chats/me/chat1", () => {
         deleteCalled = true;
         return new HttpResponse(null, { status: 204 });
@@ -439,6 +443,7 @@ describe("useChat", () => {
     });
 
     expect(deleteCalled).toBe(true);
+    expect(getMessagesCalls).toBe(1);
     expect(mockNavigate).toHaveBeenCalledWith("/chat", { replace: true, state: { newChat: true } });
     expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
   });
