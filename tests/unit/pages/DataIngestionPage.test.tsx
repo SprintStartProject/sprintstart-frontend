@@ -436,6 +436,62 @@ describe("DataIngestionPage", () => {
     });
   });
 
+  /*
+    The knowledge-gap detail page's "Update data source" button links here from a gap, and a gap
+    knows itself by component — `owner/repo` — not by the project-source id these cards select
+    by. Accepting both spellings is what opens the repository instead of dropping the reader on
+    the list to find it again.
+  */
+  it("opens a source addressed by its component rather than its card id", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "GITHUB",
+        sourceId: "octocat/hello-world",
+        repositoryId: "repo-uuid",
+        owner: "octocat",
+        name: "hello-world",
+        sourceUrl: "https://github.com/octocat/hello-world",
+        status: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 12,
+        updatedCount: 7,
+        deletedCount: 1,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 340,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      },
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={["/data-ingestion?sourceId=octocat/hello-world"]}>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    // The card's own id is the project-source id ("src1"), so this only resolves through the
+    // repository's full name.
+    const panel = await screen.findByRole("dialog");
+    expect(within(panel).getByText("Ingestion")).toBeInTheDocument();
+  });
+
+  it("opens nothing for a component that is not connected", async () => {
+    render(
+      <MemoryRouter initialEntries={["/data-ingestion?sourceId=someone/absent-repo"]}>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /filter sections/i })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("applies a projectId deep link once and then releases the project switcher", async () => {
     const setSelectedProjectId = vi.fn();
     const project = createSelectableProject({ id: "proj1", isManaged: true });

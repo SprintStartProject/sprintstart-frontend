@@ -368,6 +368,29 @@ function hasSourceId(sources: DataSource[], sourceId: string) {
   return sources.some((source) => source.sourceId === sourceId);
 }
 
+/**
+ * Turns a `?sourceId=` value into the id this page actually selects by.
+ *
+ * A card's id is its project-source id, but callers do not always have one. The knowledge-gap
+ * detail page links here from a gap, and a gap identifies itself by component — `owner/repo`,
+ * which is the GitHub repository's full name. Accepting that spelling too is what lets its
+ * "Update data source" button open the repository rather than dropping the reader on the page
+ * and leaving them to find it.
+ *
+ * Case-insensitive on the component, matching {@link matchSourceInstance}: GitHub treats owner
+ * and repository names that way, and the component string reaches us from the AI service.
+ */
+function resolveRequestedSourceId(sources: DataSource[], requested: string): string | null {
+  if (requested.length === 0) return null;
+  if (hasSourceId(sources, requested)) return requested;
+
+  const byComponent = sources.find(
+    (source) => source.githubRepository?.fullName.toLowerCase() === requested.toLowerCase(),
+  );
+
+  return byComponent?.sourceId ?? null;
+}
+
 const STATUS_BADGE_TONE = {
   success: "border-app-success-border bg-app-success-bg text-app-success-text",
   brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
@@ -738,16 +761,15 @@ export function DataIngestionPage() {
     void Promise.resolve().then(() => {
       if (!isMounted) return;
 
-      const requestedSourceExists =
-        requestedSourceId.length > 0 && hasSourceId(sources, requestedSourceId);
+      const resolvedSourceId = resolveRequestedSourceId(sources, requestedSourceId);
 
-      if (requestedSourceExists) {
+      if (resolvedSourceId) {
         setActiveSection("sources");
       }
 
       setSelectedSourceId((currentSourceId) => {
-        if (requestedSourceExists) {
-          return requestedSourceId;
+        if (resolvedSourceId) {
+          return resolvedSourceId;
         }
 
         // Keep the current selection while the list is transiently empty (an

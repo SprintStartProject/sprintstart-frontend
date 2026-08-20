@@ -303,9 +303,14 @@ export function KnowledgeGapsDetailPage() {
                 Last analyzed {formatDateTime(gap.refreshedAt)}
               </div>
             </div>
+            {/* Straight to this component's repository, not just to the page. Data Ingestion
+                accepts the component (`owner/repo`) as a `sourceId` and opens that card's
+                details — otherwise the reader lands on the list and has to find it again. */}
             <Button
               variant="primary"
-              onClick={() => void navigate("/data-ingestion")}
+              onClick={() =>
+                void navigate(`/data-ingestion?sourceId=${encodeURIComponent(gap.component)}`)
+              }
               icon={<Database className="h-4 w-4" />}
               className="shrink-0"
             >

@@ -55,8 +55,8 @@ export function ProjectOverviewWidget({ size }: { size: DashboardWidgetSize }) {
     <WidgetShell
       icon={FolderKanban}
       title="Projects"
-      actionLabel="Open access management"
-      to="/admin"
+      actionLabel="Open projects"
+      to="/admin?tab=projects"
       isLoading={isLoading}
       errorMessage={errorMessage ? "Could not load the project overview." : null}
     >

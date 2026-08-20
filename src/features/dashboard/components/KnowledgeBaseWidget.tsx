@@ -95,8 +95,10 @@ export function KnowledgeBaseWidget() {
         <ul className="relative flex-1 space-y-1">
           {artifacts.map((artifact) => (
             <li key={artifact.id}>
+              {/* Straight to the document, not just to the page it lives on. The Knowledge
+                  Base reads `?artifact` once on arrival and opens its viewer on that id. */}
               <Link
-                to="/knowledge-base"
+                to={`/knowledge-base?artifact=${encodeURIComponent(artifact.id)}`}
                 className="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover"
               >
                 <FileText className="h-3.5 w-3.5 shrink-0 text-app-text-muted" />

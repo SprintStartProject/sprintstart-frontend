@@ -122,6 +122,9 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     tier: "user",
     sizes: ["small", "medium", "wide"],
     defaultSize: "wide",
+    // One line of pills at full width, so it takes the short band. It is on the default
+    // dashboard, and the empty half of a full band was what put a scrollbar on it.
+    isShortWhenWide: true,
     isAvailable: always,
     render: (size) => <SkillsStrip size={size} />,
   },

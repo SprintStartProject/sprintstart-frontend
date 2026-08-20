@@ -52,6 +52,10 @@ function SkillPill({ skill, large }: { skill: UserSkillLevel; large: boolean }) 
  * width wraps into a ragged three-line paragraph, so the narrow form gives the roles and the
  * skills a row each instead.
  *
+ * Being one line is also why its wide cell is the short band rather than the full one — see
+ * `isShortWhenWide` in the catalog. It sits on the default dashboard, and the empty half of a
+ * full band was the difference between that board fitting on screen and scrolling.
+ *
  * The narrow forms also set their pills a size larger. This card carries the least of any on
  * the board, and at pill sizes tuned for a one-line strip it read as a few crumbs adrift in
  * a fixed-height cell.
@@ -93,10 +97,13 @@ export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
 
   return (
     <div
-      className={`flex h-full gap-x-4 gap-y-3 rounded-2xl px-5 py-4 ${
+      className={`flex h-full rounded-2xl px-5 ${
         isWide
-          ? "flex-wrap items-center justify-center"
-          : "flex-col items-center justify-center text-center"
+          ? // Tighter than the narrow forms because the wide cell is now the short band (84px):
+            // one line sits centred with room to spare, and the padding and row gap are set so
+            // that a wrap to two lines at a narrower viewport still fits rather than clipping.
+            "flex-wrap items-center justify-center gap-x-4 gap-y-2 py-2"
+          : "flex-col items-center justify-center gap-x-4 gap-y-3 py-4 text-center"
       }`}
     >
       <div className="flex items-center gap-2">

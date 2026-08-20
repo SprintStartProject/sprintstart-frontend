@@ -100,9 +100,11 @@ export function DashboardWidgetFrame({
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false);
       }}
-      className={`${dashboardCellClass(size, definition.isTallWhenWide === true)} relative ${
-        isDragging ? "z-40" : ""
-      }`}
+      className={`${dashboardCellClass(
+        size,
+        definition.isTallWhenWide === true,
+        definition.isShortWhenWide === true,
+      )} relative ${isDragging ? "z-40" : ""}`}
       style={isEditing ? { touchAction: "none" } : undefined}
     >
       <motion.div

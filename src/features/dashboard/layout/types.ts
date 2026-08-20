@@ -85,6 +85,15 @@ export type DashboardWidgetDefinition = {
    */
   isTallWhenWide?: boolean;
   /**
+   * Whether the `wide` form is a single line rather than a full band.
+   *
+   * The opposite trade to {@link DashboardWidgetDefinition.isTallWhenWide}, and set for the
+   * same kind of reason: a card whose full-width form is one row of pills leaves most of the
+   * band empty, and that emptiness is what the whole board scrolls for. Mutually exclusive
+   * with `isTallWhenWide`; see `dashboardCellClass` for which wins.
+   */
+  isShortWhenWide?: boolean;
+  /**
    * Whether this user may place the widget at all.
    *
    * Asked for the picker, for the default layout, and again when a stored layout is read —

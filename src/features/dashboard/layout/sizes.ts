@@ -16,18 +16,27 @@ import type { DashboardWidgetSize } from "./types";
  * there are three sizes and not five: with a `large` in the mix, a row could only be filled
  * some of the time, and the leftover gaps are what made the grid look broken.
  *
- * **Rows are a hard `8.5rem`.** Letting them grow with their content was the cause of a
- * lopsided board: a card's height depended on which neighbours happened to share its row, so
- * moving anything resized things that had not moved. `small` and `medium` are always two
- * rows, which is what keeps a row of mixed sizes level. `wide` is a single row by default —
- * a band across the dashboard rather than one more rectangle — and two where the widget's
- * wide form is a real card with a header and columns of its own.
+ * **Heights are fixed, never content-driven.** Letting them grow with their content was the
+ * cause of a lopsided board: a card's height depended on which neighbours happened to share
+ * its row, so moving anything resized things that had not moved.
+ *
+ * The track is `2rem` and the sizes span several of them. That is arithmetic, not a design
+ * with 2rem cards: a span of `n` covers `n * 2rem` plus the `n - 1` gaps between them, so with
+ * the `1.25rem` gap the three heights the board actually uses come out as
+ * `6 → 292px`, `3 → 136px` and `2 → 84px`. The first two are exactly what a `8.5rem` track
+ * gave before; the fine track only adds the third, which no whole number of `8.5rem` rows
+ * could express.
+ *
+ * `small` and `medium` are always the full 292px, which is what keeps a row of mixed sizes
+ * level. `wide` is 136px by default — a band across the dashboard rather than one more
+ * rectangle — 292px where the widget's wide form is a real card with a header and columns of
+ * its own, and 84px where its wide form is a single line and the band left it mostly empty.
  *
  * The cost is that a compact widget now has room it did not ask for. That is paid back in
  * the widgets themselves, which centre their content rather than hanging it from the top.
  */
 export const DASHBOARD_GRID_CLASS =
-  "grid grid-cols-1 gap-5 auto-rows-[8.5rem] sm:grid-cols-2 lg:grid-cols-4";
+  "grid grid-cols-1 gap-5 auto-rows-[2rem] sm:grid-cols-2 lg:grid-cols-4";
 
 /**
  * Column and row spans per size.
@@ -38,22 +47,43 @@ export const DASHBOARD_GRID_CLASS =
  * reads top to bottom on a small screen.
  */
 const SIZE_CLASSES: Record<DashboardWidgetSize, string> = {
-  small: "col-span-1 row-span-2",
-  medium: "col-span-1 row-span-2 sm:col-span-2",
-  wide: "col-span-1 row-span-1 sm:col-span-2 lg:col-span-4",
+  small: "col-span-1 row-span-6",
+  medium: "col-span-1 row-span-6 sm:col-span-2",
+  wide: "col-span-1 row-span-3 sm:col-span-2 lg:col-span-4",
 };
 
 /**
- * A wide card that needs both rows.
+ * A wide card with as much height as a `medium`.
  *
  * Only `wide` gets the choice, and only because it owns its row outright: nothing sits
  * beside it to be pushed around, so its height cannot make the board lopsided.
  */
-const TALL_WIDE_CLASS = "col-span-1 row-span-2 sm:col-span-2 lg:col-span-4";
+const TALL_WIDE_CLASS = "col-span-1 row-span-6 sm:col-span-2 lg:col-span-4";
 
-/** The grid-placement classes for one placed widget. */
-export function dashboardCellClass(size: DashboardWidgetSize, isTallWhenWide: boolean): string {
-  return size === "wide" && isTallWhenWide ? TALL_WIDE_CLASS : SIZE_CLASSES[size];
+/**
+ * A wide card whose content is a single line.
+ *
+ * The default band is right for a card that fills it. `skills` does not: at full width it is
+ * one row of pills, so more than half the band was empty and the default dashboard paid for
+ * that emptiness with a scrollbar.
+ */
+const SHORT_WIDE_CLASS = "col-span-1 row-span-2 sm:col-span-2 lg:col-span-4";
+
+/**
+ * The grid-placement classes for one placed widget.
+ *
+ * `isTallWhenWide` wins if a widget somehow claims both — a card asking for extra height and
+ * for less of it is a mistake in the catalog, and the roomier reading of it cannot clip.
+ */
+export function dashboardCellClass(
+  size: DashboardWidgetSize,
+  isTallWhenWide: boolean,
+  isShortWhenWide = false,
+): string {
+  if (size !== "wide") return SIZE_CLASSES[size];
+  if (isTallWhenWide) return TALL_WIDE_CLASS;
+
+  return isShortWhenWide ? SHORT_WIDE_CLASS : SIZE_CLASSES.wide;
 }
 
 /** Names shown on the size control, in the order the sizes grow. */
