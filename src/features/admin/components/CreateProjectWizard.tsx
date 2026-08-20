@@ -292,18 +292,6 @@ export function CreateProjectWizard({
   const closeWizard = () => {
     if (isSubmitting) return;
 
-    if (isProvisioning) {
-      if (hasFailedSources(sources)) {
-        toast.warning("Project created", {
-          description: "Some sources couldn't be connected.",
-        });
-      } else {
-        toast.success("Project created", {
-          description: "Initial ingestion is running in the background.",
-        });
-      }
-    }
-
     resetWizard();
     onClose();
   };
