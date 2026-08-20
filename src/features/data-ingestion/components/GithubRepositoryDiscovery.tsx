@@ -336,13 +336,13 @@ export function GithubRepositoryDiscovery({
       )}
 
       <form
-        className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end"
+        className="grid grid-cols-[1fr_auto] items-end gap-3 sm:grid-cols-[1fr_auto_auto]"
         onSubmit={(event) => {
           event.preventDefault();
           void runDiscovery(0);
         }}
       >
-        <div>
+        <div className="col-span-2 sm:col-span-1">
           <label htmlFor="discovery-owner" className="text-sm font-medium text-app-text">
             Organization, user, or URL
           </label>
@@ -475,62 +475,68 @@ export function GithubRepositoryDiscovery({
                       </span>
                     </span>
 
-                    {repository.alreadyConnected && (
-                      <span
-                        role="img"
-                        aria-label={repository.isEnabled === false ? "Disabled" : "Enabled"}
-                        title={repository.isEnabled === false ? "Disabled" : "Enabled"}
-                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                          repository.isEnabled === false
-                            ? "bg-app-text-disabled"
-                            : "bg-app-success-solid"
-                        }`}
-                      />
-                    )}
+                    {/* Name and badges share one wrapping row: on a narrow row
+                        the badges drop to the next line instead of squeezing the
+                        name to a couple of characters. Stays single-line and
+                        right-aligned from sm up (name grows via sm:flex-1). */}
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 sm:flex-nowrap">
+                      {repository.alreadyConnected && (
+                        <span
+                          role="img"
+                          aria-label={repository.isEnabled === false ? "Disabled" : "Enabled"}
+                          title={repository.isEnabled === false ? "Disabled" : "Enabled"}
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                            repository.isEnabled === false
+                              ? "bg-app-text-disabled"
+                              : "bg-app-success-solid"
+                          }`}
+                        />
+                      )}
 
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-app-text">
-                      {repository.name}
-                    </span>
+                      <span className="min-w-0 max-w-full truncate text-sm font-medium text-app-text sm:flex-1">
+                        {repository.name}
+                      </span>
 
-                    <Badge
-                      variant={repository.isPrivate ? "orange" : "success"}
-                      size="sm"
-                      className="gap-1"
-                    >
-                      {repository.isPrivate && <Lock className="h-3 w-3" aria-hidden="true" />}
-                      {repository.isPrivate ? "Private" : "Public"}
-                    </Badge>
-
-                    {linkState === "in-project" && (
-                      <Badge variant="neutral" size="sm" className="gap-1">
-                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                        In this project
-                      </Badge>
-                    )}
-
-                    {linkState === "linkable" && (
                       <Badge
-                        variant="brand"
+                        variant={repository.isPrivate ? "orange" : "success"}
                         size="sm"
                         className="gap-1"
-                        title="Already ingested. Adding it here reuses its artifacts instead of ingesting again."
                       >
-                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                        Already ingested
+                        {repository.isPrivate && <Lock className="h-3 w-3" aria-hidden="true" />}
+                        {repository.isPrivate ? "Private" : "Public"}
                       </Badge>
-                    )}
 
-                    {linkState === "unresolved" && (
-                      <Badge
-                        variant="neutral"
-                        size="sm"
-                        className="gap-1"
-                        title="Connected to another project, but its repository id could not be resolved."
-                      >
-                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                        Connected
-                      </Badge>
-                    )}
+                      {linkState === "in-project" && (
+                        <Badge variant="neutral" size="sm" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                          In this project
+                        </Badge>
+                      )}
+
+                      {linkState === "linkable" && (
+                        <Badge
+                          variant="brand"
+                          size="sm"
+                          className="gap-1"
+                          title="Already ingested. Adding it here reuses its artifacts instead of ingesting again."
+                        >
+                          <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                          Already ingested
+                        </Badge>
+                      )}
+
+                      {linkState === "unresolved" && (
+                        <Badge
+                          variant="neutral"
+                          size="sm"
+                          className="gap-1"
+                          title="Connected to another project, but its repository id could not be resolved."
+                        >
+                          <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                          Connected
+                        </Badge>
+                      )}
+                    </div>
 
                     <a
                       href={repository.url}
@@ -538,7 +544,7 @@ export function GithubRepositoryDiscovery({
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
                       aria-label={`Open ${repository.name} on GitHub`}
-                      className="text-app-text-muted transition hover:text-app-brand"
+                      className="shrink-0 text-app-text-muted transition hover:text-app-brand"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </a>

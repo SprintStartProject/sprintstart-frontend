@@ -157,7 +157,7 @@ export function JiraCredentialAddForm({
           />
         </Field>
 
-        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
+        <div className="flex flex-row justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={handleClose} disabled={isSaving}>
             Cancel
           </Button>

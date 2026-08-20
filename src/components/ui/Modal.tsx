@@ -14,6 +14,12 @@ type ModalProps = {
   description?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
+  /**
+   * Overrides the footer's layout classes (flex direction, gap, alignment).
+   * Defaults to a mobile-stacked / desktop-row layout. The container's spacing
+   * (padding) is always kept; only the layout portion is replaced.
+   */
+  footerClassName?: string;
   /** Optional controls shown in the header, left of the close button. */
   headerActions?: ReactNode;
   size?: ModalSize;
@@ -74,6 +80,7 @@ export function Modal({
   description,
   children,
   footer,
+  footerClassName = "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end",
   headerActions,
   size = "md",
   zIndexClassName = "z-50",
@@ -249,7 +256,7 @@ export function Modal({
 
             {footer && (
               <div
-                className={`relative z-10 flex shrink-0 flex-col-reverse gap-3 px-5 pb-6 sm:flex-row sm:justify-end sm:px-7 sm:pb-7 ${
+                className={`relative z-10 shrink-0 px-5 pb-6 sm:px-7 sm:pb-7 ${footerClassName} ${
                   children ? "" : "pt-6"
                 }`}
               >
