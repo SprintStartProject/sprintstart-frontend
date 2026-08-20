@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
 import {
@@ -55,9 +55,15 @@ export function FilterSelect<TValue extends string>({
   className = "",
 }: FilterSelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false);
+  // Which trigger edge the menu is anchored to. The menu grows to fit its
+  // widest option, so a narrow trigger near the right edge would clip long
+  // labels; anchoring right lets the menu grow leftwards into the free space
+  // instead. Decided per open from the trigger's position (see `open`).
+  const [align, setAlign] = useState<"left" | "right">("left");
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
   const typeaheadRef = useRef<{ query: string; timeoutId: number | null }>({
     query: "",
     timeoutId: null,
@@ -74,6 +80,9 @@ export function FilterSelect<TValue extends string>({
 
   const open = () => {
     if (disabled) return;
+    // Start left-anchored; the layout effect below re-anchors to the right only
+    // if the menu would actually spill off the right edge.
+    setAlign("left");
     setActiveIndex(selectedIndex);
     setIsOpen(true);
   };
@@ -108,6 +117,22 @@ export function FilterSelect<TValue extends string>({
       document.removeEventListener("mousedown", handlePointerDown);
     };
   }, [isOpen]);
+
+  // Once the menu is laid out, flip it to right-anchored if the left-anchored
+  // box spills past the right edge (a narrow trigger near the edge with long
+  // options). Runs before paint, so there is no visible jump. Left-anchored
+  // menus that already fit are left untouched.
+  useLayoutEffect(() => {
+    if (!isOpen || align !== "left") return;
+
+    const menu = menuRef.current;
+    if (!menu) return;
+
+    const overflowsRight = menu.getBoundingClientRect().right > window.innerWidth - 8;
+    if (overflowsRight) {
+      setAlign("right");
+    }
+  }, [isOpen, align]);
 
   useEffect(() => {
     const typeahead = typeaheadRef.current;
@@ -228,6 +253,7 @@ export function FilterSelect<TValue extends string>({
       <AnimatePresence>
         {isOpen && (
           <motion.ul
+            ref={menuRef}
             id={listboxId}
             role="listbox"
             aria-label={label}
@@ -237,7 +263,12 @@ export function FilterSelect<TValue extends string>({
             transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
             // `p-1.5` is not cosmetic: the list clips its own overflow, so this
             // padding is the only room a magnified option has to grow into.
-            className="absolute top-[calc(100%+6px)] left-0 z-50 max-h-64 min-w-full overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+            // `w-max` lets the menu grow to its widest option (never narrower
+            // than the trigger via `min-w-full`), capped to the viewport; the
+            // anchored edge flips with `align` so it never opens off-screen.
+            className={`absolute top-[calc(100%+6px)] ${
+              align === "right" ? "right-0" : "left-0"
+            } z-50 max-h-64 w-max max-w-[calc(100vw-1rem)] min-w-full overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl`}
           >
             {options.map((option, index) => {
               const isSelected = option.value === value;
