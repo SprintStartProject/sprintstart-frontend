@@ -317,7 +317,7 @@ export const knowledgeService = {
     projectId: string,
     files: File[],
   ): Promise<{ filename: string; status: "success" | "error"; error?: string }[]> {
-    const results: { filename: string; status: "success" | "error"; error?: string }[] = [];
+    if (files.length === 0) return [];
 
     const profile = await userService.getProfile();
     if (!profile) {
@@ -325,44 +325,40 @@ export const knowledgeService = {
     }
 
     const uploaderId = profile.id;
-
+    const formData = new FormData();
     for (const file of files) {
-      const formData = new FormData();
       formData.append("files", file);
-
-      const requestPayload = {
-        projectId,
-        uploaderId,
-      };
-      formData.append(
-        "request",
-        new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
-      );
-
-      try {
-        const uploadResults = await apiClient.fetch<UploadResponseItem[]>(`/api/v1/uploads`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const mappedResults = uploadResults.map(
-          (res): { filename: string; status: "success" | "error"; error?: string } => ({
-            filename: String(res.filename),
-            status: res.status === "failed" ? "error" : "success",
-            error: res.error ? String(res.error) : undefined,
-          }),
-        );
-        results.push(...mappedResults);
-      } catch (error) {
-        console.error(`Failed to upload file ${file.name}:`, error);
-        results.push({
-          filename: file.name,
-          status: "error",
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
     }
 
-    return results;
+    const requestPayload = {
+      projectId,
+      uploaderId,
+    };
+    formData.append(
+      "request",
+      new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
+    );
+
+    try {
+      const uploadResults = await apiClient.fetch<UploadResponseItem[]>(`/api/v1/uploads`, {
+        method: "POST",
+        body: formData,
+      });
+
+      return uploadResults.map(
+        (res): { filename: string; status: "success" | "error"; error?: string } => ({
+          filename: String(res.filename),
+          status: res.status === "failed" ? "error" : "success",
+          error: res.error ? String(res.error) : undefined,
+        }),
+      );
+    } catch (error) {
+      console.error("Failed to upload file batch:", error);
+      return files.map((file) => ({
+        filename: file.name,
+        status: "error" as const,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }));
+    }
   },
 };

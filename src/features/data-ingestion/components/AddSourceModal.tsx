@@ -469,7 +469,12 @@ export function AddSourceModal({
         projectId ? (
           <UploadArtifactPanel
             projectId={projectId}
-            onUploadSuccess={onConnected}
+            onUploadSuccess={() => {
+              toast.success("Files uploaded", {
+                description: "Initial ingestion is running in the background.",
+              });
+              onConnected();
+            }}
             onFinished={onClose}
             onUploadingChange={setIsUploadingFiles}
           />
