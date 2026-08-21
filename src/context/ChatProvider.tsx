@@ -118,6 +118,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     chatsRef.current = chats;
   }, [chats]);
 
+  // Always-current snapshot of the (user, project) scope for the same reason:
+  // the chat-list fetch below reads these through the ref so a slow response
+  // can tell whether the user or the selected project changed while it was in
+  // flight — and drop itself instead of overwriting the newer scope's list.
+  const scopeRef = useRef({ userId, selectedProjectId });
+  useEffect(() => {
+    scopeRef.current = { userId, selectedProjectId };
+  }, [userId, selectedProjectId]);
+
   // Always-current snapshot of filter state for the same reason.
   const filtersRef = useRef({ sourceSystems, from, to });
   useEffect(() => {
@@ -231,10 +240,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       try {
         const data = await getMyChats(selectedProjectId);
+        // Drop the response if the user or the selected project changed while
+        // the fetch was in flight — otherwise a slow reply for the previous
+        // project can land after the new scope's list and overwrite it.
+        const { userId: currentUserId, selectedProjectId: currentProjectId } = scopeRef.current;
+        if (currentUserId !== userId || currentProjectId !== selectedProjectId) return;
         const filtered = (data?.chats ?? []).filter((c) => !deletedChatIdsRef.current.has(c.id));
         setChats(filtered);
         setChatsProjectId(selectedProjectId);
       } catch (e) {
+        if (
+          scopeRef.current.userId !== userId ||
+          scopeRef.current.selectedProjectId !== selectedProjectId
+        ) {
+          return;
+        }
         console.error("Failed to load chats", e);
         setChats([]);
         setChatsProjectId(selectedProjectId);

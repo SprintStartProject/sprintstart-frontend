@@ -12,7 +12,7 @@ const mockNavigate = vi.fn();
 
 // Mutable so one test can arrive the way the dashboard's quick-chat card does — no chatId and
 // `state.newChat` — while every other test keeps the original fixed chat.
-const { routerState } = vi.hoisted(() => {
+const { routerState, projectState } = vi.hoisted(() => {
   const routerState: {
     params: { id?: string };
     location: { pathname: string; state?: { newChat?: boolean } };
@@ -20,8 +20,11 @@ const { routerState } = vi.hoisted(() => {
     params: { id: "chat1" },
     location: { pathname: "/" },
   };
+  // Mutable so the project-switch race test can change the selected project
+  // between renders, the way the real header switcher does.
+  const projectState = { selectedProjectId: "proj1" };
 
-  return { routerState };
+  return { routerState, projectState };
 });
 
 vi.mock("react-router-dom", () => ({
@@ -43,13 +46,19 @@ vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
     await import("../../setup/projectContext");
   const project = createSelectableProject({ id: "proj1" });
+  const projectB = createSelectableProject({ id: "proj2" });
   return {
-    useProjectContext: () =>
-      createProjectContextValue({
-        projects: [project],
-        selectedProject: project,
-        selectedProjectId: "proj1",
-      }),
+    useProjectContext: () => {
+      const selected =
+        projectState.selectedProjectId === "proj2"
+          ? { project: projectB, projects: [project, projectB] }
+          : { project, projects: [project] };
+      return createProjectContextValue({
+        projects: selected.projects,
+        selectedProject: selected.project,
+        selectedProjectId: projectState.selectedProjectId,
+      });
+    },
   };
 });
 
@@ -98,6 +107,7 @@ describe("useChat", () => {
     localStorage.clear();
     routerState.params = { id: "chat1" };
     routerState.location = { pathname: "/" };
+    projectState.selectedProjectId = "proj1";
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
@@ -587,6 +597,55 @@ describe("useChat", () => {
     expect(result.current.chats.some((c) => c.id === "chat1")).toBe(true);
   });
 
+  it("does not redirect away when deleting the active chat fails", async () => {
+    server.use(
+      http.get("/api/v1/chats/me", () =>
+        HttpResponse.json({
+          chats: [
+            { id: "chat1", userId: "user1" },
+            { id: "chat2", userId: "user1" },
+          ],
+        }),
+      ),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.delete("/api/v1/chats/me/chat1", () => new HttpResponse(null, { status: 500 })),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toHaveLength(2);
+    });
+
+    await expect(
+      act(async () => {
+        await result.current.deleteChat("chat1");
+      }),
+    ).rejects.toThrow();
+
+    // The user stays in the chat that still exists; navigating to /chat before
+    // the backend confirmed the delete left them stranded in the empty state.
+    expect(mockNavigate).not.toHaveBeenCalledWith("/chat", {
+      replace: true,
+      state: { newChat: true },
+    });
+  });
+
   it("filters out deleted chats when refreshChats receives a stale list", async () => {
     server.use(
       http.get("/api/v1/chats/me", () =>
@@ -768,5 +827,57 @@ describe("useChat", () => {
     await waitFor(() => {
       expect(result.current.chats.some((c) => c.id === "chat1")).toBe(true);
     });
+  });
+
+  it("drops a slow chat-list response when the selected project changed mid-flight", async () => {
+    // proj1's list is delayed; by the time it lands, the user is on proj2.
+    let proj1Requested = false;
+    server.use(
+      http.get("/api/v1/chats/me", async ({ request }) => {
+        const projectId = new URL(request.url).searchParams.get("projectId");
+        if (projectId === "proj1") {
+          proj1Requested = true;
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          return HttpResponse.json({ chats: [{ id: "stale-chat", userId: "user1" }] });
+        }
+        return HttpResponse.json({ chats: [{ id: "fresh-chat", userId: "user1" }] });
+      }),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result, rerender } = renderHook(() => useChat(), { wrapper });
+
+    // Wait until proj1's fetch is in flight…
+    await waitFor(() => {
+      expect(proj1Requested).toBe(true);
+    });
+    // …and switch to proj2 while it is still pending.
+    projectState.selectedProjectId = "proj2";
+    rerender();
+
+    // proj2's fast list wins.
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([{ id: "fresh-chat", userId: "user1" }]);
+    });
+    // Give the delayed proj1 response its remaining time to land.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+    // The stale response must have been dropped, not written over proj2's list.
+    expect(result.current.chats).toEqual([{ id: "fresh-chat", userId: "user1" }]);
   });
 });

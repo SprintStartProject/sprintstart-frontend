@@ -233,6 +233,31 @@ describe("ArtifactViewerDrawer", () => {
     expect(capturedSignal?.aborted).toBe(true);
   });
 
+  it("stops silently when unmounted during a 503 backoff wait (no unhandled rejection)", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.streamArtifactSummary).mockRejectedValueOnce(
+      new ApiError(503, "Service Unavailable"),
+    );
+
+    const { unmount } = renderDrawer();
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    await userEvent.click(summariseBtn);
+
+    // Wait until the first 503 has been handled and the backoff sleep is armed.
+    expect(
+      await screen.findByText("Preparing summary...", {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+
+    // Unmount mid-backoff: the abortable sleep must resolve (not reject), so
+    // `handleSummarize` returns cleanly instead of escaping an AbortError into
+    // a fire-and-forget promise chain.
+    unmount();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // No retry may fire for the stale artifact after the abort.
+    expect(knowledgeService.streamArtifactSummary).toHaveBeenCalledTimes(1);
+  });
+
   describe("Markdown rendering", () => {
     it("renders .md files as markdown even with non-markdown mime types", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
@@ -412,6 +437,42 @@ describe("ArtifactViewerDrawer", () => {
       expect(liElement).not.toHaveAttribute("id");
       expect(liElement).toHaveAttribute("data-highlighted", "true");
       expect(liElement).toHaveAttribute("data-line-start", "1");
+    });
+
+    it("does not emit id attributes on blockquote elements to avoid duplicate IDs with nested paragraphs", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "> Quoted text",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "quotes.md" }), { highlightLines: [1] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const blockquote = rawContent.querySelector("blockquote");
+      expect(blockquote).toBeInTheDocument();
+      expect(blockquote).not.toHaveAttribute("id");
+      expect(blockquote).toHaveAttribute("data-highlighted", "true");
+      expect(blockquote).toHaveAttribute("data-line-start", "1");
+    });
+
+    it("does not emit id attributes on table rows to avoid duplicate IDs", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "| Col A | Col B |\n| ----- | ----- |\n| cell 1 | cell 2 |",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "table.md" }), { highlightLines: [3] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const row = rawContent.querySelector("tbody tr");
+      expect(row).toBeInTheDocument();
+      expect(row).not.toHaveAttribute("id");
+      expect(row).toHaveAttribute("data-highlighted", "true");
+      expect(row).toHaveAttribute("data-line-start", "3");
     });
 
     it("does not render the cited-chunk banner for PDF or image artifacts", async () => {

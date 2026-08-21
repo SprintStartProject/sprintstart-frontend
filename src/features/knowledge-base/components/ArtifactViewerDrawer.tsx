@@ -464,7 +464,6 @@ function createMarkdownComponents(highlightLines?: number[]) {
       const { isHighlighted, startLine, endLine } = isNodeHighlighted(node, highlightLines);
       return (
         <blockquote
-          id={startLine ? `line-${startLine}` : undefined}
           data-highlighted={isHighlighted || undefined}
           data-line-start={startLine}
           data-line-end={endLine}
@@ -511,7 +510,6 @@ function createMarkdownComponents(highlightLines?: number[]) {
       const { isHighlighted, startLine, endLine } = isNodeHighlighted(node, highlightLines);
       return (
         <tr
-          id={startLine ? `line-${startLine}` : undefined}
           data-highlighted={isHighlighted || undefined}
           data-line-start={startLine}
           data-line-end={endLine}
@@ -529,7 +527,7 @@ function createMarkdownComponents(highlightLines?: number[]) {
 }
 
 const getLanguage = (filename?: string | null) => {
-  if (!filename) return "typescript";
+  if (!filename) return "text";
   const ext = filename.split(".").pop()?.toLowerCase();
   if (filename.toLowerCase() === "dockerfile") return "docker";
   switch (ext) {
@@ -566,7 +564,10 @@ const getLanguage = (filename?: string | null) => {
     case "csv":
       return "csv";
     default:
-      return "typescript";
+      // Plain text beats guessing TypeScript: extension-less titles (LICENSE,
+      // Makefile, dotfiles) and unknown extensions rendered as TS produce
+      // nonsense highlighting; unstyled plain text stays honest.
+      return "text";
   }
 };
 
@@ -756,23 +757,24 @@ export function ArtifactViewerDrawer({
         dispatch({ type: "summarizeIndexing" });
         const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
         // Abortable sleep: if the controller aborts (unmount / artifact change /
-        // a newer summarize loop), reject immediately instead of waiting out the timer.
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(resolve, delay);
+        // a newer summarize loop), stop immediately instead of waiting out the
+        // timer. Resolves `true` rather than rejecting: `handleSummarize` runs
+        // fire-and-forget (`void handleSummarize()`), so a rejected sleep would
+        // escape as an unhandled promise rejection.
+        const aborted = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), delay);
           controller.signal.addEventListener(
             "abort",
             () => {
               clearTimeout(timer);
-              reject(new DOMException("Aborted", "AbortError"));
+              resolve(true);
             },
             { once: true },
           );
-        }).catch((sleepErr: unknown) => {
-          if (sleepErr instanceof Error && sleepErr.name === "AbortError") {
-            throw sleepErr;
-          }
-          return undefined;
         });
+        if (aborted) {
+          return;
+        }
         attempt++;
       }
     }

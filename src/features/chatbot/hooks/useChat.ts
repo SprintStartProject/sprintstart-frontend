@@ -315,10 +315,13 @@ export function useChat() {
     async (targetChatId: string) => {
       deletingChatIdsRef.current.add(targetChatId);
       try {
+        await ctxDeleteChat(targetChatId);
+        // Navigate only once the backend confirmed the delete. Firing first
+        // left the user on the empty /chat state looking at a chat that still
+        // existed whenever the DELETE failed and was rolled back.
         if (targetChatId === chatId) {
           void navigate("/chat", { replace: true, state: { newChat: true } });
         }
-        await ctxDeleteChat(targetChatId);
       } catch (err) {
         deletingChatIdsRef.current.delete(targetChatId);
         throw err;
