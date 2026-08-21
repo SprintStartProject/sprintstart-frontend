@@ -30,7 +30,11 @@ export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
       onChange={onChange}
       layoutId="admin-tab-pill"
       ariaLabel="Admin sections"
-      className="w-full sm:w-auto"
+      // Mobile: the bar grows to fill the row and its three pills stretch to
+      // equal width, so it no longer sits left-aligned with dead space beside
+      // the refresh button. Desktop keeps the compact, content-sized bar.
+      // `grow`/`grow-0` (not `flex-1`) leaves each pill's own `shrink-0` intact.
+      className="flex-1 sm:flex-none [&>button]:grow sm:[&>button]:grow-0"
     />
   );
 }

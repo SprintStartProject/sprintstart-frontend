@@ -142,7 +142,14 @@ export function UsersTab({
             // An inset brand edge rather than the cards' lift: these
             // rows share a grid with their neighbours, and a
             // transform would break the column alignment.
-            className="group relative grid cursor-pointer grid-cols-[36px_minmax(0,1fr)_44px] gap-x-3 gap-y-3 border-b border-app-border px-3 py-4 transition-colors last:border-b-0 hover:bg-app-surface-hover hover:shadow-[inset_3px_0_0_0_var(--color-app-brand)] sm:grid-cols-[44px_2.5fr_1.8fr_1.8fr_52px] sm:items-center sm:gap-x-0 sm:gap-y-0 sm:px-5"
+            //
+            // Mobile is a two-row grid: checkbox / identity / kebab on the
+            // top line (all vertically centred), and the permission and
+            // project badges combined on one wrapping line below. Desktop
+            // keeps its five aligned columns — the badge wrapper is
+            // `sm:contents`, so from `sm` up its two children flow straight
+            // back into the grid as the third and fourth columns.
+            className="group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-app-border px-3 py-3 transition-colors last:border-b-0 hover:bg-app-surface-hover hover:shadow-[inset_3px_0_0_0_var(--color-app-brand)] sm:grid-cols-[44px_2.5fr_1.8fr_1.8fr_52px] sm:items-center sm:gap-x-0 sm:gap-y-0 sm:px-5 sm:py-4"
           >
             <button
               type="button"
@@ -152,7 +159,7 @@ export function UsersTab({
             />
 
             <div
-              className="relative z-10 row-span-3 flex items-start pt-1 sm:row-auto sm:items-center sm:pt-0"
+              className="relative z-10 col-start-1 row-start-1 flex items-center sm:col-auto sm:row-auto"
               data-user-row-action="true"
             >
               <SelectionCheckbox
@@ -162,7 +169,7 @@ export function UsersTab({
               />
             </div>
 
-            <div className="pointer-events-none relative z-10 col-start-2 min-h-11 min-w-0 text-left sm:col-auto">
+            <div className="pointer-events-none relative z-10 col-start-2 row-start-1 min-w-0 text-left sm:col-auto sm:row-auto">
               <div className="flex items-center gap-2.5">
                 <div className="flex shrink-0 items-center justify-center">
                   <UserAvatar
@@ -183,12 +190,14 @@ export function UsersTab({
               </div>
             </div>
 
-            <div className="pointer-events-none relative z-10 col-start-2 min-w-0 sm:col-auto">
-              <PermissionGroupBadge permissionGroup={user.permissionGroup} />
-            </div>
+            <div className="pointer-events-none relative z-10 col-span-2 col-start-2 row-start-2 flex min-w-0 flex-wrap items-center gap-2 sm:contents">
+              <div className="relative z-10 min-w-0">
+                <PermissionGroupBadge permissionGroup={user.permissionGroup} />
+              </div>
 
-            <div className="pointer-events-none relative z-10 col-span-2 col-start-2 min-w-0 sm:col-auto sm:col-span-1">
-              <ProjectList projects={user.projects} />
+              <div className="relative z-10 min-w-0">
+                <ProjectList projects={user.projects} />
+              </div>
             </div>
 
             <div

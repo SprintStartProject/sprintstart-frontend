@@ -3,6 +3,7 @@ import {
   areAllVisibleUsersSelected,
   filterAdminProjects,
   filterAdminUsers,
+  getPaginatedProjects,
   getPaginatedUsers,
   getSafePage,
   getTotalPages,
@@ -79,6 +80,11 @@ describe("admin data helpers", () => {
     expect(getTotalPages(17, 8)).toBe(3);
     expect(getSafePage(4, 3)).toBe(3);
     expect(getPaginatedUsers(users, 2, 1)).toEqual([users[1]]);
+  });
+
+  it("paginates projects by slicing the requested page", () => {
+    expect(getPaginatedProjects(projects, 1, 1)).toEqual([projects[0]]);
+    expect(getPaginatedProjects(projects, 2, 1)).toEqual([]);
   });
 
   it("toggles individual and visible user selections", () => {
