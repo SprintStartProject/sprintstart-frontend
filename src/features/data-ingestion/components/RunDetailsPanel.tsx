@@ -21,6 +21,7 @@ import {
   getRunStatusTone,
   getSourceLabel,
   isRunInProgress,
+  SOURCE_META,
 } from "../data.ts";
 import type { AiSyncStatus, IngestionRun } from "../types.ts";
 
@@ -58,6 +59,9 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
   const duration = formatDuration(run.startedAt, run.finishedAt, run.status);
   const repoLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
   const originRow = buildOriginRow(run);
+  // Hero icon follows the run's source system (GitHub → GitBranch, Jira → Ticket,
+  // Upload → FileText) so a Jira run never shows the GitHub glyph.
+  const SourceIcon = SOURCE_META[run.sourceSystem].icon;
 
   return (
     <DetailsSideDrawer
@@ -69,7 +73,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
       showOverlay
       leading={
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <GitBranch className="h-6 w-6" />
+          <SourceIcon className="h-6 w-6" />
         </div>
       }
       badge={

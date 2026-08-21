@@ -5,6 +5,7 @@ import {
   Database,
   GitBranch,
   RefreshCw,
+  Ticket,
   Unlink,
   XCircle,
   type LucideIcon,
@@ -307,7 +308,7 @@ export function SourceDetailsPanel({
             }}
             disabled={!canUpdate || isRefreshing}
             loading={isUpdating}
-            icon={isJira ? <Database className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+            icon={isJira ? <Ticket className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
             title={
               canUpdate
                 ? undefined
