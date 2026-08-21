@@ -28,6 +28,32 @@ export const knowledgeGapService = {
     }
   },
 
+  /**
+   * Returns the gaps in a project whose component the signed-in user owns.
+   *
+   * Deliberately without the mock fallback the panel reads use. This answers "what is on
+   * *you*", and a fixture standing in for that would put another user's components on the
+   * dashboard and make the empty state — the normal case — unreachable. A failure stays a
+   * failure, and the widget says so.
+   *
+   * The failure is logged here and rethrown, because `useFetch` reduces it to a boolean and
+   * leaves the cause to the loader by contract. Without this line the widget can only say
+   * "could not load" and there is nothing anywhere saying whether that was a 403 (not a
+   * member of the project), a 404 (a backend without this endpoint) or a 400 (no project
+   * selected) — which is exactly the hole this went missing down the first time.
+   */
+  async fetchMyKnowledgeGaps(projectId: string): Promise<KnowledgeGapOverview> {
+    try {
+      return await apiClient.fetch<KnowledgeGapOverview>(
+        `/api/v1/insights/knowledge-gaps/mine?projectId=${encodeURIComponent(projectId)}`,
+      );
+    } catch (error) {
+      const status = error instanceof ApiError ? String(error.status) : "no response";
+      console.error(`Error fetching the knowledge gaps assigned to you (${status}):`, error);
+      throw error;
+    }
+  },
+
   async fetchKnowledgeGap(projectId: string, gapId: string): Promise<KnowledgeGap> {
     try {
       return await apiClient.fetch<KnowledgeGap>(

@@ -51,23 +51,30 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
       setCheckingSkillAssessment(true);
 
-      const teamMember = await getMyTeamOverview();
-      const completed = await hasCompletedSkillAssessment(teamMember.userId);
-      const promptState = getSkillAssessmentPromptState(teamMember.userId);
-      const allSkills = await getSkills();
+      // Nothing here may throw past this point: the guard renders a full-screen spinner
+      // while it runs, so an unhandled rejection leaves the whole app on that spinner.
+      // A user whose overview cannot be read (no onboarding path, or a role that may not
+      // read it) simply has no assessment to prompt for — that is not a reason to lock
+      // them out of the app.
+      try {
+        const teamMember = await getMyTeamOverview();
+        const completed = await hasCompletedSkillAssessment(teamMember.userId);
+        const promptState = getSkillAssessmentPromptState(teamMember.userId);
+        const allSkills = await getSkills();
 
-      const hasSkillsForRoles =
-        !!teamMember &&
-        teamMember.roles.some((role) =>
+        const hasSkillsForRoles = teamMember.roles.some((role) =>
           allSkills.some(
             (skill) => skill.status === "ACTIVE" && isSkillLinkedToRole(skill, role.id),
           ),
         );
 
-      setSkillAssessmentUserId(teamMember.userId);
-      setNeedsSkillAssessment(
-        !!teamMember && hasSkillsForRoles && !completed && promptState === null,
-      );
+        setSkillAssessmentUserId(teamMember.userId);
+        setNeedsSkillAssessment(hasSkillsForRoles && !completed && promptState === null);
+      } catch (error) {
+        console.warn("Skipping the skill assessment check", error);
+        setSkillAssessmentUserId(null);
+        setNeedsSkillAssessment(false);
+      }
 
       setCheckingSkillAssessment(false);
     }

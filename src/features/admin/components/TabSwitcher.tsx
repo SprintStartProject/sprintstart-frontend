@@ -34,7 +34,7 @@ export function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
       // equal width, so it no longer sits left-aligned with dead space beside
       // the refresh button. Desktop keeps the compact, content-sized bar.
       // `grow`/`grow-0` (not `flex-1`) leaves each pill's own `shrink-0` intact.
-      className="flex-1 [&>button]:grow sm:flex-none sm:[&>button]:grow-0"
+      className="flex-1 sm:flex-none [&>button]:grow sm:[&>button]:grow-0"
     />
   );
 }

@@ -76,7 +76,21 @@ describe("AccessManagementView Accessibility", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Filter access by source" }));
     expect(await screen.findByRole("option", { name: "Jira" })).toBeInTheDocument();
-    expect(await axe(baseElement)).toHaveNoViolations();
+    /*
+      `region` is switched off for this one assertion, and only while a dropdown is open.
+
+      `FilterSelect` portals its menu into `<body>` so it can escape the stacking context of
+      whichever card it was dropped into — without that, the menu paints under the card below
+      it and its options cannot be clicked. Being in `<body>` puts it outside every landmark,
+      which is what `region` reports.
+
+      It is a false positive for this pattern rather than something to fix: `region` is an axe
+      best-practice rule, not a WCAG criterion, and nobody reaches this menu by landmark. Focus
+      never leaves the combobox — the options are exposed through `aria-activedescendant`, and
+      `aria-owns` re-parents the listbox onto the combobox in the accessibility tree. Every
+      other assertion in this file, including the two below, keeps the rule on.
+    */
+    expect(await axe(baseElement, { rules: { region: { enabled: false } } })).toHaveNoViolations();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("access-add-open"));

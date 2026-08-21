@@ -186,7 +186,7 @@ export function Modal({
           initial="hidden"
           animate="visible"
           exit="exit"
-          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-start justify-center overflow-y-auto bg-app-overlay p-4 backdrop-blur-md transition-[padding] duration-300 ease-out sm:items-center`}
+          className={`fixed inset-0 ${zIndexClassName} flex items-start justify-center overflow-y-auto bg-app-overlay p-4 backdrop-blur-md transition-[padding] duration-300 ease-out sm:items-center`}
           style={contentInsetRight ? { paddingRight: contentInsetRight } : undefined}
         >
           {closeOnBackdrop && (

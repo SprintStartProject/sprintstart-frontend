@@ -71,7 +71,9 @@ export function DrawerCard({
               </span>
             )}
             {label && (
-              <p className={`text-xs font-semibold tracking-wide uppercase ${labelTone}`}>{label}</p>
+              <p className={`text-xs font-semibold tracking-wide uppercase ${labelTone}`}>
+                {label}
+              </p>
             )}
           </div>
           {headerAccessory}

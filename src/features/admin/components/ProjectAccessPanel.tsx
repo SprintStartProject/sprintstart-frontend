@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -97,6 +97,37 @@ export function ProjectAccessPanel({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [openProjectPicker]);
+
+  // While the picker is open, a click outside it or an Escape press should
+  // dismiss just the picker. The Escape listener runs in the capture phase and
+  // stops propagation so the surrounding drawer's own document-level Escape
+  // handler doesn't fire and close the whole drawer along with it.
+  useEffect(() => {
+    if (!openProjectPicker) return;
+
+    const dismiss = () =>
+      setProjectPickerState({ sourceKey: assignedProjectKey, search: "", isOpen: false });
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!pickerAnchorRef.current?.contains(event.target as Node)) {
+        dismiss();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        dismiss();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [openProjectPicker, assignedProjectKey]);
 
   const projectOptions = availableProjects.filter((project) => {
     const isAlreadyAssigned = assignedProjectIds.has(project.id);

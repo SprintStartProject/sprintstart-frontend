@@ -187,6 +187,37 @@ describe("AdminPage", () => {
     expect(screen.getByText("Jane Smith")).toBeInTheDocument();
   });
 
+  /*
+    The dashboard's Projects card links to `/admin?tab=projects`. Before this it linked to
+    `/admin` and dropped the reader on the user list — a card about projects opening a list of
+    people.
+  */
+  it("opens on the tab named in the URL", async () => {
+    render(
+      <MemoryRouter initialEntries={["/admin?tab=projects"]}>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("projects-tab")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("users-tab")).not.toBeInTheDocument();
+  });
+
+  it("ignores a tab in the URL that does not exist", async () => {
+    render(
+      <MemoryRouter initialEntries={["/admin?tab=nonsense"]}>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("users-tab")).toBeInTheDocument();
+    });
+  });
+
   it("switches to the projects tab when clicked", async () => {
     const user = userEvent.setup();
     render(
