@@ -145,13 +145,16 @@ export function ChatSidebar({ chats, setSidebarOpen, onDeleteChat }: ChatSidebar
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={centralSpringToken}
+                      className="group relative flex items-center"
                     >
                       <NavLink
                         to={`/chat/${chat.id}`}
                         onClick={() => setSidebarOpen(false)}
                         aria-label={chat.title || "Untitled chat"}
                         className={({ isActive }) =>
-                          `group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-all focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                          `flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg py-2 pr-3 pl-3 text-sm transition-all focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                            onDeleteChat ? "pr-9" : ""
+                          } ${
                             isActive
                               ? "bg-app-brand font-semibold text-white shadow-lg"
                               : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
@@ -164,22 +167,18 @@ export function ChatSidebar({ chats, setSidebarOpen, onDeleteChat }: ChatSidebar
                             {formatRelativeDate(chat.createdAt)}
                           </span>
                         </div>
-                        {onDeleteChat && (
-                          <button
-                            type="button"
-                            aria-label={`Delete conversation "${chat.title || "Untitled"}"`}
-                            data-testid={`chat-delete-button-${chat.id}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setChatToDelete(chat);
-                            }}
-                            className="flex size-7 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/15 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-app-focus focus-visible:outline-none dark:hover:bg-white/20"
-                          >
-                            <Trash2 size={16} className="shrink-0 opacity-80 hover:opacity-100" />
-                          </button>
-                        )}
                       </NavLink>
+                      {onDeleteChat && (
+                        <button
+                          type="button"
+                          aria-label={`Delete conversation "${chat.title || "Untitled"}"`}
+                          data-testid={`chat-delete-button-${chat.id}`}
+                          onClick={() => setChatToDelete(chat)}
+                          className="absolute right-1.5 flex size-7 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/15 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-app-focus focus-visible:outline-none max-md:opacity-100 dark:hover:bg-white/20"
+                        >
+                          <Trash2 size={16} className="shrink-0 opacity-80 hover:opacity-100" />
+                        </button>
+                      )}
                     </motion.div>
                   ))}
                 </AnimatePresence>

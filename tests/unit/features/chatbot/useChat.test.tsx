@@ -609,4 +609,79 @@ describe("useChat", () => {
       expect(assistantMsg?.error).toBe("Stopped before the assistant replied.");
     });
   });
+
+  it("restores the chat in state when deleteChat fails while streaming", async () => {
+    let getChatsCount = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"reasoning","reasoning":"Thinking deep..."}\n\n'),
+        );
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => {
+        getChatsCount++;
+        return HttpResponse.json({
+          chats: [
+            { id: "chat1", userId: "user1", title: "Active chat" },
+            { id: "chat2", userId: "user1", title: "Second chat" },
+          ],
+        });
+      }),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () =>
+          new HttpResponse(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+      ),
+      http.delete("/api/v1/chats/me/chat1", () => new HttpResponse(null, { status: 500 })),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toHaveLength(2);
+    });
+
+    // Start streaming on chat1
+    act(() => {
+      void result.current.addMessage("Explain algorithms");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isThinking || result.current.isStreaming).toBe(true);
+    });
+
+    // Attempt to delete chat1 while streaming, which fails with 500
+    await expect(
+      act(async () => {
+        await result.current.deleteChat("chat1");
+      }),
+    ).rejects.toThrow();
+
+    // The chat list must be restored after rollback
+    await waitFor(() => {
+      expect(result.current.chats.some((c) => c.id === "chat1")).toBe(true);
+    });
+  });
 });

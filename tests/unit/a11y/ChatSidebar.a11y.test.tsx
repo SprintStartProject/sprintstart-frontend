@@ -26,4 +26,33 @@ describe("ChatSidebar Accessibility", () => {
     );
     expect(await axe(baseElement)).toHaveNoViolations();
   });
+
+  it("should not have any a11y violations when onDeleteChat is provided and delete buttons are rendered", async () => {
+    const chats: Chat[] = [
+      {
+        id: "1",
+        title: "Test Chat",
+        userId: "user1",
+        projectId: "project-1",
+        createdAt: "2026-07-04T00:00:00.000Z",
+      },
+      {
+        id: "2",
+        title: "Another Conversation",
+        userId: "user1",
+        projectId: "project-1",
+        createdAt: "2026-07-03T00:00:00.000Z",
+      },
+    ];
+    const setSidebarOpen = vi.fn();
+    const onDeleteChat = vi.fn();
+    const { baseElement } = render(
+      <MemoryRouter>
+        <main>
+          <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} onDeleteChat={onDeleteChat} />
+        </main>
+      </MemoryRouter>,
+    );
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
 });

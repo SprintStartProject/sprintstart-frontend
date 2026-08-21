@@ -486,7 +486,6 @@ function createMarkdownComponents(highlightLines?: number[]) {
       const { isHighlighted, startLine, endLine } = isNodeHighlighted(node, highlightLines);
       return (
         <li
-          id={startLine ? `line-${startLine}` : undefined}
           data-highlighted={isHighlighted || undefined}
           data-line-start={startLine}
           data-line-end={endLine}
@@ -595,6 +594,7 @@ export function ArtifactViewerDrawer({
   // Bumped each time the user switches artifact or unmounts. Long-running
   // summarize loops read this to bail out before dispatching into a stale reducer.
   const summarizeGenerationRef = useRef(0);
+  const contentContainerRef = useRef<HTMLDivElement | null>(null);
 
   /**
    * Loads the raw artifact content from the backend whenever a new artifact is selected.
@@ -647,18 +647,21 @@ export function ArtifactViewerDrawer({
 
   const scrollToHighlightedChunk = useCallback(() => {
     if (!highlightLines || highlightLines.length === 0) return;
+    const container = contentContainerRef.current;
+    if (!container) return;
+
     const firstLine = Math.min(...highlightLines);
-    const directLineEl = document.getElementById(`line-${firstLine}`);
+    const directLineEl = container.querySelector<HTMLElement>(`#line-${firstLine}`);
     if (directLineEl) {
       directLineEl.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    const highlightedEl = document.querySelector<HTMLElement>("[data-highlighted='true']");
+    const highlightedEl = container.querySelector<HTMLElement>("[data-highlighted='true']");
     if (highlightedEl) {
       highlightedEl.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    const allLineElements = document.querySelectorAll<HTMLElement>("[data-line-start]");
+    const allLineElements = container.querySelectorAll<HTMLElement>("[data-line-start]");
     for (const el of allLineElements) {
       const start = Number(el.dataset.lineStart);
       const end = Number(el.dataset.lineEnd || start);
@@ -861,6 +864,10 @@ export function ArtifactViewerDrawer({
   const isMarkdownArtifact =
     artifact && content ? shouldRenderAsMarkdown(content, artifact) : false;
 
+  const isPdfOrImage =
+    content?.mimeType === "application/pdf" || (content?.mimeType.startsWith("image/") ?? false);
+  const canHighlight = highlightLines && highlightLines.length > 0 && !isPdfOrImage;
+
   const actionsContent = viewMode === "raw" && (
     <div className="flex items-center gap-2">
       {isMarkdownArtifact && content && (
@@ -933,7 +940,7 @@ export function ArtifactViewerDrawer({
           <p className="mt-1 text-sm">{error}</p>
         </div>
       ) : viewMode === "raw" ? (
-        <div data-testid="raw-content" aria-busy={isLoading}>
+        <div ref={contentContainerRef} data-testid="raw-content" aria-busy={isLoading}>
           {isLoading ? (
             <div className="animate-pulse space-y-4">
               <div className="h-4 w-3/4 rounded bg-app-border"></div>
@@ -943,7 +950,7 @@ export function ArtifactViewerDrawer({
             </div>
           ) : (
             <>
-              {highlightLines && highlightLines.length > 0 && (
+              {canHighlight && (
                 <div
                   data-testid="cited-chunk-banner"
                   className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-app-brand-border bg-app-brand-soft/90 px-3.5 py-2 text-xs font-medium text-app-brand-text shadow-xs dark:border-app-brand/40 dark:bg-app-brand/20"

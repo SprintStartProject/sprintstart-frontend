@@ -396,6 +396,40 @@ describe("ArtifactViewerDrawer", () => {
       expect(inlineCode).not.toHaveAttribute("id");
     });
 
+    it("does not emit id attributes on li elements to avoid duplicate IDs with nested paragraphs", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "* List item text",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "list.md" }), { highlightLines: [1] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const liElement = rawContent.querySelector("li");
+      expect(liElement).toBeInTheDocument();
+      expect(liElement).not.toHaveAttribute("id");
+      expect(liElement).toHaveAttribute("data-highlighted", "true");
+      expect(liElement).toHaveAttribute("data-line-start", "1");
+    });
+
+    it("does not render the cited-chunk banner for PDF or image artifacts", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "blob:http://localhost/pdf-data",
+        mimeType: "application/pdf",
+        isObjectUrl: true,
+      });
+
+      renderDrawer(createArtifact({ title: "document.pdf", mime: "application/pdf" }), {
+        highlightLines: [1, 2, 3],
+      });
+
+      await screen.findByTestId("raw-content");
+      expect(screen.queryByTestId("cited-chunk-banner")).not.toBeInTheDocument();
+    });
+
     describe("preprocessMarkdown", () => {
       it("injects a newline after a mid-line block-math close so it stays a valid `$$` fence", () => {
         expect(preprocessMarkdown("math $$E=mc^2$$ then text")).toBe("math $$E=mc^2$$\nthen text");

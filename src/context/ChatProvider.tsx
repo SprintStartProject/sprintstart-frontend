@@ -672,10 +672,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(`chatDraft.${chatId}`);
       } catch (err) {
         deletedChatIdsRef.current.delete(chatId);
+        void refreshChats().catch((e) =>
+          console.error("Failed to refresh chats after delete rollback", e),
+        );
         throw err;
       }
     },
-    [streamingChatId, stopStreaming],
+    [streamingChatId, stopStreaming, refreshChats],
   );
 
   const value: ChatContextValue = {

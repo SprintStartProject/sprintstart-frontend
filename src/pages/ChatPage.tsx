@@ -1,6 +1,6 @@
 import { MessageSquareText, Sparkles, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
@@ -126,6 +126,10 @@ export function ChatPage() {
   const projectId = activeChat?.projectId ?? selectedProjectId ?? profile?.projectIds?.[0] ?? null;
   const [viewingCitationArtifact, setViewingCitationArtifact] =
     useState<CitationArtifactOpen | null>(null);
+  const citationArtifact = useMemo(
+    () => (viewingCitationArtifact ? deriveArtifactFromCitation(viewingCitationArtifact) : null),
+    [viewingCitationArtifact],
+  );
 
   // Easter egg states
   const [isBarrelRolling, setIsBarrelRolling] = useState(false);
@@ -502,12 +506,12 @@ export function ChatPage() {
         />
       </div>
 
-      {viewingCitationArtifact && projectId && (
+      {citationArtifact && projectId && (
         <ArtifactViewerDrawer
-          artifact={deriveArtifactFromCitation(viewingCitationArtifact)}
+          artifact={citationArtifact}
           onClose={() => setViewingCitationArtifact(null)}
           projectId={projectId}
-          highlightLines={viewingCitationArtifact.lines}
+          highlightLines={viewingCitationArtifact?.lines}
           canDelete={false}
           onDelete={() => {}}
         />
