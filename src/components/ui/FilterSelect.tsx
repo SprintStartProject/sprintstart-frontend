@@ -53,6 +53,7 @@ type MenuPosition = {
   top?: number;
   bottom?: number;
   maxHeight: number;
+  maxWidth: number;
   isAbove: boolean;
 };
 
@@ -135,6 +136,14 @@ export function FilterSelect<TValue extends string>({
    * Downwards unless the space under the trigger has stopped being usable and
    * there is more of it above — a control near the bottom of the window would
    * otherwise open into a two-option sliver.
+   *
+   * Horizontally the menu is left-aligned with the trigger but never allowed
+   * past either edge of the window. It may be wider than the control it hangs
+   * from — options do not wrap, so a long label grows the list sideways — which
+   * for a trigger near the right edge, like the size picker in a dashboard
+   * widget's toolbar, would otherwise put the menu half off-screen. Its own
+   * width is only knowable once it is mounted, so this reads it back when there
+   * is one to read and falls back to the trigger's width on the first pass.
    */
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -146,12 +155,17 @@ export function FilterSelect<TValue extends string>({
     const isAbove = spaceBelow < MIN_USABLE_HEIGHT && spaceAbove > spaceBelow;
     const available = isAbove ? spaceAbove : spaceBelow;
 
+    const maxWidth = Math.max(window.innerWidth - VIEWPORT_MARGIN * 2, 0);
+    const menuWidth = Math.min(Math.max(listRef.current?.offsetWidth ?? 0, rect.width), maxWidth);
+    const furthestLeft = window.innerWidth - VIEWPORT_MARGIN - menuWidth;
+
     setPosition({
-      left: rect.left,
+      left: Math.max(VIEWPORT_MARGIN, Math.min(rect.left, furthestLeft)),
       width: rect.width,
       top: isAbove ? undefined : rect.bottom + MENU_OFFSET,
       bottom: isAbove ? window.innerHeight - rect.top + MENU_OFFSET : undefined,
       maxHeight: Math.min(MENU_MAX_HEIGHT, Math.max(available, 0)),
+      maxWidth,
       isAbove,
     });
   }, []);
@@ -177,6 +191,11 @@ export function FilterSelect<TValue extends string>({
 
     const handle = () => updatePosition();
 
+    // Once more now that the menu exists: the measurement taken on open could
+    // only guess its width from the trigger, and a menu wider than its control
+    // may need to sit further left. Before paint, so it never appears to jump.
+    handle();
+
     window.addEventListener("scroll", handle, { capture: true, passive: true });
     window.addEventListener("resize", handle, { passive: true });
 
@@ -195,9 +214,10 @@ export function FilterSelect<TValue extends string>({
     triggerRef.current?.focus();
   };
 
-  // Pointer interactions outside the control dismiss it. `mousedown` rather
+  // Pointer interactions outside the control dismiss it. `pointerdown` rather
   // than `click`, so the menu is gone before the click lands on whatever is
-  // underneath.
+  // underneath — and rather than `mousedown`, which on a touch device only
+  // arrives as an emulated event after the tap, or not at all.
   //
   // The menu has to be tested separately from the container: it is portaled
   // into `<body>`, so `containerRef` no longer contains it, and checking the
@@ -206,7 +226,7 @@ export function FilterSelect<TValue extends string>({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handlePointerDown = (event: MouseEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
 
       if (!containerRef.current?.contains(target) && !listRef.current?.contains(target)) {
@@ -214,9 +234,9 @@ export function FilterSelect<TValue extends string>({
       }
     };
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [isOpen]);
 
@@ -365,6 +385,7 @@ export function FilterSelect<TValue extends string>({
                 top: position.top,
                 bottom: position.bottom,
                 minWidth: position.width,
+                maxWidth: position.maxWidth,
                 maxHeight: position.maxHeight,
                 zIndex: MENU_Z_INDEX,
               }}

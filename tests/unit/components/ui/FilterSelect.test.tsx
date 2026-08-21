@@ -23,6 +23,19 @@ function renderSelect(overrides: Partial<Parameters<typeof FilterSelect>[0]> = {
   return { onChange, trigger: screen.getByLabelText("Filter runs by status") };
 }
 
+/** A trigger sitting close enough to the right edge that a wide menu would overflow it. */
+const nearRightEdge = {
+  left: 900,
+  right: 1020,
+  top: 100,
+  bottom: 130,
+  width: 120,
+  height: 30,
+  x: 900,
+  y: 100,
+  toJSON: () => ({}),
+} as DOMRect;
+
 /**
  * This control replaces a native `<select>`, so everything the browser used to
  * provide for free has to be proven here instead.
@@ -126,6 +139,46 @@ describe("FilterSelect", () => {
     await user.click(trigger);
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  /**
+   * The menu may be wider than the control it hangs from — options do not wrap
+   * — so left-aligning it with a trigger near the right edge pushes it off the
+   * window. The dashboard's size picker sits in a toolbar pinned to the right
+   * of its widget, which is where this shows up.
+   */
+  it("keeps a menu wider than its trigger inside the right edge of the window", async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderSelect();
+
+    // jsdom lays nothing out: the trigger is placed near the right edge by hand
+    // and the menu is given a width wider than it.
+    trigger.getBoundingClientRect = () => nearRightEdge;
+    const menuWidth = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(300);
+
+    await user.click(trigger);
+
+    const listbox = screen.getByRole("listbox");
+    const left = Number.parseFloat(listbox.style.left);
+
+    expect(left).toBeLessThan(nearRightEdge.left);
+    expect(left + 300).toBeLessThanOrEqual(window.innerWidth);
+
+    menuWidth.mockRestore();
+  });
+
+  it("leaves a menu with room to its right aligned with the trigger", async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderSelect();
+
+    trigger.getBoundingClientRect = () => ({ ...nearRightEdge, left: 100, right: 220 });
+    const menuWidth = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(300);
+
+    await user.click(trigger);
+
+    expect(screen.getByRole("listbox").style.left).toBe("100px");
+
+    menuWidth.mockRestore();
   });
 
   /**

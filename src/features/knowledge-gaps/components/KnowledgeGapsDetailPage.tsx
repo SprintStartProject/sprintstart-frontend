@@ -50,7 +50,10 @@ export function KnowledgeGapsDetailPage() {
     error,
   } = useFetch(
     () => knowledgeGapService.fetchKnowledgeGap(selectedProjectId, gapId ?? ""),
-    [gapId, refreshKey],
+    // The project belongs in here as much as the gap does: switching projects in the header
+    // while a gap is open otherwise leaves another project's gap on screen, and the owner
+    // control below would then write to whichever project the switcher now names.
+    [gapId, refreshKey, selectedProjectId],
   );
 
   const { data: teamUsers } = useFetch(() => getTeamOverview(), []);

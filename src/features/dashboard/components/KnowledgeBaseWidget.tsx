@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { useAuth } from "../../../context/useAuth";
+import { useProjectContext } from "../../projects/useProjectContext";
 import type { Artifact } from "../../knowledge-base/types";
 
 const PREVIEW_COUNT = 4;
@@ -28,7 +29,15 @@ function formatRelative(iso: string): string {
  */
 export function KnowledgeBaseWidget() {
   const { profile } = useAuth();
-  const projectId = profile?.projectIds?.[0] ?? null;
+  const { selectedProjectId } = useProjectContext();
+
+  /*
+    The switcher's selection first, exactly as the Knowledge Base page this card links to reads
+    it — a card showing one project beside a header naming another is worse than a slow one.
+    The profile only fills the gap before the project list has loaded, and for a manager whose
+    own membership does not include the project they are managing.
+  */
+  const projectId = selectedProjectId || (profile?.projectIds?.[0] ?? null);
 
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(true);
