@@ -32,17 +32,19 @@ export function FileUploadZone({ onUpload, isUploading }: FileUploadZoneProps) {
       "image/jpeg",
       "image/webp",
     ];
+    const allowedExtensions = new Set(["pdf", "md", "txt", "png", "jpg", "jpeg", "webp"]);
 
     const maxSize = 10 * 1024 * 1024;
     const validFiles: File[] = [];
     const newErrors: string[] = [];
 
     Array.from(files).forEach((file) => {
-      // Browsers often report an empty/`application/octet-stream` MIME for `.md`,
-      // so accept it by extension as a fallback to the type allowlist.
-      const isMd = file.name.toLowerCase().endsWith(".md");
+      // Browsers often report an empty or generic application/octet-stream MIME,
+      // so accept allowed formats by extension as a fallback to the type allowlist.
+      const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const isAllowedByExtension = allowedExtensions.has(extension);
 
-      if (!allowedTypes.includes(file.type) && !isMd) {
+      if (!allowedTypes.includes(file.type) && !isAllowedByExtension) {
         newErrors.push(
           `File type not supported: ${file.name}. Only PDF, MD, TXT, PNG, JPG, and WEBP are allowed.`,
         );

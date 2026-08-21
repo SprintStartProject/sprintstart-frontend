@@ -5,6 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { ChatContext } from "../../../context/ChatContext";
 import { centralSpringToken } from "../../../styles/tokens";
+import type { DashboardWidgetSize } from "../layout/types";
 
 const SUGGESTIONS = [
   "What should I work on next?",
@@ -25,7 +26,15 @@ const SUGGESTIONS = [
  * bound to the chat route's `:id` param and would redirect away from the
  * dashboard to the most recent conversation.
  */
-export function QuickChatWidget() {
+export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
+  // Only a whole row is wide enough to put the bot beside the composer. At half a row the
+  // two would fight for it, so the card stacks and everything below the composer centres
+  // under it — a left-aligned row of chips under a centred bot reads as a mistake.
+  const isWide = size === "wide";
+
+  // Two chips at half a row. The cell is a fixed height, and four of them wrap onto a second
+  // line that the card has no room for — which is what was clipping them at the bottom edge.
+  const suggestions = isWide ? SUGGESTIONS : SUGGESTIONS.slice(0, 2);
   const navigate = useNavigate();
   const chat = useContext(ChatContext);
   const [question, setQuestion] = useState("");
@@ -42,7 +51,9 @@ export function QuickChatWidget() {
   }
 
   return (
-    <div className="relative rounded-2xl p-6">
+    <div
+      className={`relative flex h-full flex-col justify-center rounded-2xl ${isWide ? "px-6 py-4" : "p-6"}`}
+    >
       {/* The clip lives on this layer rather than on the card itself, so
           the glow blobs stay inside the rounded edge while the content
           above is free to leave it — which is how the bot's Z's get to
@@ -58,12 +69,18 @@ export function QuickChatWidget() {
         <div className="absolute -top-20 -right-16 h-48 w-48 rounded-full bg-app-brand/12 blur-3xl" />
       </div>
 
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center">
+      <div
+        className={`relative flex flex-col gap-5 ${isWide ? "lg:flex-row lg:items-center" : ""}`}
+      >
         {/* Stacked and centred rather than a row: at this size the bot
             is the subject of the widget, not a bullet point in front of
             a label, and a 76px character with text beside it drags the
             baseline off-centre. */}
-        <div className="flex flex-col items-center text-center lg:w-56 lg:shrink-0">
+        <div
+          className={`flex flex-col items-center text-center ${
+            isWide ? "lg:w-56 lg:shrink-0" : ""
+          }`}
+        >
           {/* The same assistant as in the chat, idle timer and all —
               so the character is one creature that follows you around
               rather than a different mascot per screen.
@@ -77,12 +94,13 @@ export function QuickChatWidget() {
               state's bot, so the character sits the same distance
               from whatever it introduces everywhere it appears. */}
           <span className="-mb-2 text-app-brand-text">
-            <SleepyBot size={76} tracksPointer />
+            <SleepyBot size={isWide ? 56 : 76} tracksPointer />
           </span>
 
           <div className="min-w-0">
             <p className="font-semibold text-app-text">Ask the AI assistant</p>
-            <p className="text-xs text-app-text-muted">Continue in chat</p>
+            {/* A single grid row has no line to spare for a subtitle the arrow already implies. */}
+            {!isWide && <p className="text-xs text-app-text-muted">Continue in chat</p>}
           </div>
         </div>
 
@@ -120,8 +138,8 @@ export function QuickChatWidget() {
             </div>
           </form>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SUGGESTIONS.map((suggestion, index) => (
+          <div className={`mt-3 flex flex-wrap gap-2 ${isWide ? "" : "justify-center"}`}>
+            {suggestions.map((suggestion, index) => (
               <motion.button
                 key={suggestion}
                 type="button"

@@ -84,7 +84,11 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
       ))}
     </div>
   ),
-  ArtifactViewerDrawer: () => <div data-testid="artifact-viewer">Viewer</div>,
+  // Reports which artifact it was handed, so a test can tell "the viewer is mounted" apart
+  // from "the viewer is showing the right document".
+  ArtifactViewerDrawer: ({ artifact }: { artifact: { id: string } | null }) => (
+    <div data-testid="artifact-viewer">{artifact ? artifact.id : "none"}</div>
+  ),
   UploadArtifactModal: () => <div data-testid="upload-modal">Upload Modal</div>,
   CitationsList: () => <div data-testid="citations-list" />,
 }));
@@ -139,6 +143,41 @@ describe("KnowledgeBasePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("readme.md")).toBeInTheDocument();
+    });
+  });
+
+  /*
+    The dashboard's knowledge-base card links to a document, not just to this page. Every row
+    there used to land on the bare page and the reader had to find the document again.
+  */
+  it("opens the artifact named in the URL", async () => {
+    mockGetUnifiedArtifacts.mockResolvedValue([
+      makeArtifact({ id: "a1", title: "readme.md" }),
+      makeArtifact({ id: "a2", title: "runbook.md" }),
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={["/knowledge-base?artifact=a2"]}>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("artifact-viewer")).toHaveTextContent("a2");
+    });
+  });
+
+  it("opens no artifact without the parameter", async () => {
+    mockGetUnifiedArtifacts.mockResolvedValue([makeArtifact({ id: "a1", title: "readme.md" })]);
+
+    render(
+      <MemoryRouter>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("artifact-viewer")).toHaveTextContent("none");
     });
   });
 

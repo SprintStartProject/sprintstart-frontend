@@ -40,7 +40,7 @@ export function ChatPage() {
     chats,
     activeChat,
     hasProject,
-    lastUserPrompt,
+    promptHistory,
     handleSubmit,
     stopStreaming,
     isThinking,
@@ -207,12 +207,33 @@ export function ChatPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isThinking, gameActive, isUnlocked]);
 
+  /**
+   * Focuses the composer and puts the caret behind whatever is already in it.
+   *
+   * A textarea focused with a value in it starts the caret at position 0, so a question handed
+   * over from the dashboard had the user typing *in front of* it. Deferred to the next frame
+   * because the value arrives with React's commit — measuring or selecting against the previous
+   * one clamps the caret back to where the old text ended. Same idiom as the composer's own
+   * arrow-up recall.
+   */
+  const focusComposerAtEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    });
+  }, [textareaRef]);
+
   // Focus textarea when opening a new chat (empty state).
   useEffect(() => {
     if (!chatId) {
-      setTimeout(() => textareaRef.current?.focus(), 0);
+      focusComposerAtEnd();
     }
-  }, [chatId, textareaRef]);
+  }, [chatId, focusComposerAtEnd]);
 
   // Scroll the freshly-started game into view, even if the user was scrolled up.
   useEffect(() => {
@@ -242,14 +263,11 @@ export function ChatPage() {
   const fillSuggestion = useCallback(
     (text: string) => {
       setNewRequest(text);
-      const el = textareaRef.current;
-      if (el) {
-        el.focus();
-        el.style.height = "auto";
-        el.style.height = `${el.scrollHeight}px`;
-      }
+      // Same treatment as an arriving question: the chip fills the composer, and the caret
+      // belongs after the text so it can simply be added to.
+      focusComposerAtEnd();
     },
-    [setNewRequest, textareaRef],
+    [setNewRequest, focusComposerAtEnd],
   );
 
   // Stable callbacks for the memoized MessageRow — referential equality
@@ -438,7 +456,7 @@ export function ChatPage() {
           onStop={stopStreaming}
           isBusy={isThinking || isStreaming}
           hasProject={hasProject}
-          lastUserPrompt={lastUserPrompt}
+          promptHistory={promptHistory}
           availableSources={availableSources}
           sourcesLoading={sourcesLoading}
           textareaRef={textareaRef}
