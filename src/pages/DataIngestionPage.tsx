@@ -1279,12 +1279,13 @@ export function DataIngestionPage() {
                       </div>
 
                       {canManageGithubSyncSettings ? (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={handleOpenConnectorsModal}
                             icon={<Plug className="h-4 w-4" />}
+                            className="w-full sm:w-auto"
                           >
                             Manage connectors
                           </Button>
@@ -1298,6 +1299,7 @@ export function DataIngestionPage() {
                                 setIsSyncSettingsModalOpen(true);
                               }}
                               icon={<CalendarClock className="h-4 w-4" />}
+                              className="w-full sm:w-auto"
                             >
                               Manage sync settings
                             </Button>

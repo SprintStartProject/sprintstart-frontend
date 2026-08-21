@@ -61,14 +61,18 @@ export function RunHistoryFilters({
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter runs">
+    <div
+      className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+      role="group"
+      aria-label="Filter runs"
+    >
       <FilterSelect
         label="Filter runs by status"
         value={status}
         options={STATUS_OPTIONS}
         onChange={onStatusChange}
         disabled={disabled}
-        className="w-40"
+        className="w-full sm:w-40"
       />
 
       {sources.length > 1 && (
@@ -78,7 +82,7 @@ export function RunHistoryFilters({
           options={sourceOptions}
           onChange={onSourceChange}
           disabled={disabled}
-          className="w-52"
+          className="w-full sm:w-52"
         />
       )}
 
@@ -89,7 +93,7 @@ export function RunHistoryFilters({
           onClick={onReset}
           disabled={disabled}
           icon={<RotateCcw className="h-3.5 w-3.5" />}
-          className="text-app-brand-text"
+          className="self-start text-app-brand-text sm:self-auto"
         >
           Reset
         </Button>
