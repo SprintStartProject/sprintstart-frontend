@@ -231,7 +231,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       try {
         const data = await getMyChats(selectedProjectId);
-        setChats(data?.chats ?? []);
+        const filtered = (data?.chats ?? []).filter((c) => !deletedChatIdsRef.current.has(c.id));
+        setChats(filtered);
         setChatsProjectId(selectedProjectId);
       } catch (e) {
         console.error("Failed to load chats", e);
@@ -252,7 +253,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const refreshChats = useCallback(async () => {
     if (!selectedProjectId) return;
     const data = await getMyChats(selectedProjectId);
-    setChats(data?.chats ?? []);
+    const filtered = (data?.chats ?? []).filter((c) => !deletedChatIdsRef.current.has(c.id));
+    setChats(filtered);
     setChatsProjectId(selectedProjectId);
   }, [selectedProjectId]);
 
@@ -304,8 +306,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         flushDraft();
         draftRef.current = null;
         // Partial content stays visible, exactly like a manual stop. Only a
-        // bubble that never received a token needs an explanation.
-        if (!orphan.content && !orphan.reasoning) {
+        // bubble that never received a content token needs an explanation.
+        if (!orphan.content) {
           setMessagesByChat((prev) => ({
             ...prev,
             [orphan.chatId]: (prev[orphan.chatId] ?? []).map((m) =>
@@ -616,9 +618,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setThinkingState(null);
     setStreamingChatId(null);
 
-    // Stopping before the first token or reasoning would otherwise leave a bare empty
-    // bubble — the placeholder is only hidden while `isThinking` is true.
-    if (stopped && !stopped.content && !stopped.reasoning) {
+    // Stopping before the first token would otherwise leave a bare empty
+    // bubble (or reasoning without an answer/explanation) — the placeholder
+    // is only hidden while `isThinking` is true.
+    if (stopped && !stopped.content) {
       setMessagesByChat((prev) => ({
         ...prev,
         [stopped.chatId]: (prev[stopped.chatId] ?? []).map((m) =>
@@ -643,29 +646,34 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     async (chatId: string) => {
       deletedChatIdsRef.current.add(chatId);
 
-      // If the deleted chat is actively streaming, abort it cleanly first
-      if (streamingChatId === chatId) {
-        stopStreaming();
+      try {
+        // If the deleted chat is actively streaming, abort it cleanly first
+        if (streamingChatId === chatId) {
+          stopStreaming();
+        }
+
+        if (latestLoadRef.current === chatId) {
+          latestLoadRef.current = null;
+        }
+
+        await apiDeleteChat(chatId);
+
+        // Remove from chats list
+        setChats((prev) => prev.filter((c) => c.id !== chatId));
+
+        // Evict cached messages
+        setMessagesByChat((prev) => {
+          const next = { ...prev };
+          delete next[chatId];
+          return next;
+        });
+
+        // Evict persisted draft from localStorage
+        localStorage.removeItem(`chatDraft.${chatId}`);
+      } catch (err) {
+        deletedChatIdsRef.current.delete(chatId);
+        throw err;
       }
-
-      if (latestLoadRef.current === chatId) {
-        latestLoadRef.current = null;
-      }
-
-      await apiDeleteChat(chatId);
-
-      // Remove from chats list
-      setChats((prev) => prev.filter((c) => c.id !== chatId));
-
-      // Evict cached messages
-      setMessagesByChat((prev) => {
-        const next = { ...prev };
-        delete next[chatId];
-        return next;
-      });
-
-      // Evict persisted draft from localStorage
-      localStorage.removeItem(`chatDraft.${chatId}`);
     },
     [streamingChatId, stopStreaming],
   );

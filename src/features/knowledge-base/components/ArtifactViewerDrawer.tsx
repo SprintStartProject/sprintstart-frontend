@@ -146,8 +146,11 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
  * Determines whether an artifact should be rendered as Markdown.
  * Issues, Pull Requests, Jira items, and Markdown files (.md/.markdown) are always rendered as Markdown.
  */
-const shouldRenderAsMarkdown = (content: ArtifactContent, artifact: Artifact | null): boolean => {
-  if (!artifact && !content) return false;
+const shouldRenderAsMarkdown = (
+  content: ArtifactContent | null | undefined,
+  artifact: Artifact | null,
+): boolean => {
+  if (!content) return false;
   const title = artifact?.title?.toLowerCase() ?? "";
   const sourceUrl = artifact?.sourceUrl?.toLowerCase() ?? "";
 
@@ -258,10 +261,7 @@ function createMarkdownComponents(highlightLines?: number[]) {
       if (!match) {
         return (
           <code
-            id={startLine ? `line-${startLine}` : undefined}
             data-highlighted={isHighlighted || undefined}
-            data-line-start={startLine}
-            data-line-end={endLine}
             className={`${className || ""} ${
               isHighlighted
                 ? "rounded bg-app-brand-soft px-1 py-0.5 font-bold text-app-brand-text ring-1 ring-app-brand-border dark:bg-app-brand/30 dark:text-app-text"
@@ -1002,7 +1002,7 @@ export function ArtifactViewerDrawer({
               ) : (
                 <div className="overflow-hidden rounded-lg border border-app-border text-sm">
                   <SyntaxHighlighter
-                    language={getLanguage(artifact?.title)}
+                    language={isMarkdownArtifact ? "markdown" : getLanguage(artifact?.title)}
                     style={vscDarkPlus}
                     showLineNumbers={true}
                     wrapLines={true}

@@ -449,4 +449,164 @@ describe("useChat", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/chat", { replace: true, state: { newChat: true } });
     expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
   });
+
+  it("rolls back deletion tracking sets on error so the chat remains functional", async () => {
+    server.use(
+      http.get("/api/v1/chats/me", () =>
+        HttpResponse.json({
+          chats: [
+            { id: "chat1", userId: "user1" },
+            { id: "chat2", userId: "user1" },
+          ],
+        }),
+      ),
+      http.get("/api/v1/chats/me/chat1", () => {
+        return HttpResponse.json({
+          messages: [{ id: "m1", role: "USER", content: "hello", chat: null }],
+        });
+      }),
+      http.delete("/api/v1/chats/me/chat1", () => {
+        return new HttpResponse(null, { status: 500 });
+      }),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toHaveLength(2);
+    });
+
+    // deleteChat throws on 500
+    await expect(
+      act(async () => {
+        await result.current.deleteChat("chat1");
+      }),
+    ).rejects.toThrow();
+
+    // Chat is still present in state
+    expect(result.current.chats.some((c) => c.id === "chat1")).toBe(true);
+  });
+
+  it("filters out deleted chats when refreshChats receives a stale list", async () => {
+    server.use(
+      http.get("/api/v1/chats/me", () =>
+        HttpResponse.json({
+          chats: [
+            { id: "chat1", userId: "user1" },
+            { id: "chat2", userId: "user1" },
+          ],
+        }),
+      ),
+      http.delete("/api/v1/chats/me/chat1", () => new HttpResponse(null, { status: 204 })),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.deleteChat("chat1");
+    });
+
+    // Chat is removed
+    expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
+  });
+
+  it("attaches stopped error message when stopped during reasoning before first content token", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"reasoning","reasoning":"Thinking deep..."}\n\n'),
+        );
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () =>
+        HttpResponse.json({ chats: [{ id: "chat1", userId: "user1" }] }),
+      ),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () =>
+          new HttpResponse(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+      ),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toHaveLength(1);
+    });
+
+    act(() => {
+      void result.current.addMessage("Explain quantum computing");
+    });
+
+    await waitFor(() => {
+      const msgs = result.current.messages;
+      expect(msgs.some((m) => m.reasoning === "Thinking deep...")).toBe(true);
+    });
+
+    // Stop mid-reasoning
+    act(() => {
+      result.current.stopStreaming();
+    });
+
+    await waitFor(() => {
+      const assistantMsg = result.current.messages.find((m) => m.role === "ASSISTANT");
+      expect(assistantMsg?.reasoning).toBe("Thinking deep...");
+      expect(assistantMsg?.error).toBe("Stopped before the assistant replied.");
+    });
+  });
 });

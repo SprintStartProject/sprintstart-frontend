@@ -353,6 +353,49 @@ describe("ArtifactViewerDrawer", () => {
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
     });
 
+    it("uses markdown language when switching to source mode for PR and Issue artifacts", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## PR Description",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "PR #42: Add feature",
+          artifactType: "PULL_REQUEST",
+          sourceUrl: "https://github.com/org/repo/pull/42",
+        }),
+      );
+
+      const sourceBtn = await screen.findByTestId("view-source-btn");
+      await userEvent.click(sourceBtn);
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const codeElement = rawContent.querySelector("code[class*='language-markdown']");
+      expect(codeElement).toBeInTheDocument();
+    });
+
+    it("does not generate duplicate line id attributes on inline code elements", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "Here is `inline code` inside a paragraph.",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "doc.md" }), { highlightLines: [1] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const pElement = rawContent.querySelector("p");
+      expect(pElement).toHaveAttribute("id", "line-1");
+
+      const inlineCode = rawContent.querySelector("p code");
+      expect(inlineCode).toBeInTheDocument();
+      expect(inlineCode).not.toHaveAttribute("id");
+    });
+
     describe("preprocessMarkdown", () => {
       it("injects a newline after a mid-line block-math close so it stays a valid `$$` fence", () => {
         expect(preprocessMarkdown("math $$E=mc^2$$ then text")).toBe("math $$E=mc^2$$\nthen text");

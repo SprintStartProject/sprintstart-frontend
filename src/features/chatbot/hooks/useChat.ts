@@ -304,10 +304,15 @@ export function useChat() {
   const deleteChat = useCallback(
     async (targetChatId: string) => {
       deletingChatIdsRef.current.add(targetChatId);
-      if (targetChatId === chatId) {
-        void navigate("/chat", { replace: true, state: { newChat: true } });
+      try {
+        if (targetChatId === chatId) {
+          void navigate("/chat", { replace: true, state: { newChat: true } });
+        }
+        await ctxDeleteChat(targetChatId);
+      } catch (err) {
+        deletingChatIdsRef.current.delete(targetChatId);
+        throw err;
       }
-      await ctxDeleteChat(targetChatId);
     },
     [ctxDeleteChat, chatId, navigate],
   );
