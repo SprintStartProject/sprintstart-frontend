@@ -182,9 +182,7 @@ export function createJiraSourceFromInstance(
  * Maps an UPLOAD status row from `/api/v1/ingestion-sources/status` into the
  * full {@link DataSource} model rendered on the ingestion page.
  */
-export function createUploadSourceFromInstance(
-  status: SourceInstanceIngestionStatus,
-): DataSource {
+export function createUploadSourceFromInstance(status: SourceInstanceIngestionStatus): DataSource {
   const meta = SOURCE_META.UPLOAD;
   const backendStatus: BackendProjectSourceStatus =
     status.enabled === false ? "DISABLED" : status.connectionStatus;
