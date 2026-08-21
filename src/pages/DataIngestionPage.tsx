@@ -465,7 +465,6 @@ export function DataIngestionPage() {
   const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
   const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(null);
   const toast = useToast();
-  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
   // search param is still honoured so deep links from the admin view land on
@@ -935,9 +934,6 @@ export function DataIngestionPage() {
     [toast],
   );
 
-  const handleToggleConnectorSources = useCallback((connector: ConnectorListItem) => {
-    setSelectedConnectorId((current) => (current === connector.id ? null : connector.id));
-  }, []);
 
   const selectedSource = useMemo(() => {
     if (!selectedSourceId) return null;
@@ -1410,7 +1406,7 @@ export function DataIngestionPage() {
         isOpen={isConnectorsModalOpen}
         title="Connectors"
         description="Enable or disable a connector, and choose which sources are in scope for this project."
-        size="lg"
+        size="xl"
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
         onClose={() => setIsConnectorsModalOpen(false)}
       >
@@ -1426,12 +1422,10 @@ export function DataIngestionPage() {
           <ConnectorList
             connectors={connectors}
             togglingConnectorId={togglingConnectorId}
-            expandedConnectorId={selectedConnectorId}
             projectId={selectedProjectId}
             onToggleEnabled={(connector) => {
               void handleToggleConnectorEnabled(connector);
             }}
-            onToggleSources={handleToggleConnectorSources}
             onSourcesSaved={() => {
               void loadConnectors();
               void reloadSourceStatuses();
