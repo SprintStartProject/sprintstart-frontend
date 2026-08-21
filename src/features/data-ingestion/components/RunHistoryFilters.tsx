@@ -66,25 +66,30 @@ export function RunHistoryFilters({
       role="group"
       aria-label="Filter runs"
     >
-      <FilterSelect
-        label="Filter runs by status"
-        value={status}
-        options={STATUS_OPTIONS}
-        onChange={onStatusChange}
-        disabled={disabled}
-        className="w-full sm:w-40"
-      />
-
-      {sources.length > 1 && (
+      {/* On mobile the two dropdowns sit side by side (each half width); at sm+
+          the wrapper is display:contents so they flow into the toolbar row
+          exactly as before. */}
+      <div className="flex gap-2 sm:contents">
         <FilterSelect
-          label="Filter runs by source"
-          value={sourceValue}
-          options={sourceOptions}
-          onChange={onSourceChange}
+          label="Filter runs by status"
+          value={status}
+          options={STATUS_OPTIONS}
+          onChange={onStatusChange}
           disabled={disabled}
-          className="w-full sm:w-52"
+          className="w-full max-sm:min-w-0 max-sm:flex-1 sm:w-40"
         />
-      )}
+
+        {sources.length > 1 && (
+          <FilterSelect
+            label="Filter runs by source"
+            value={sourceValue}
+            options={sourceOptions}
+            onChange={onSourceChange}
+            disabled={disabled}
+            className="w-full max-sm:min-w-0 max-sm:flex-1 sm:w-52"
+          />
+        )}
+      </div>
 
       {hasActiveFilter && (
         <Button
