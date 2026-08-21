@@ -493,7 +493,7 @@ export function GithubRepositoryDiscovery({
                         />
                       )}
 
-                      <span className="min-w-0 max-w-full truncate text-sm font-medium text-app-text sm:flex-1">
+                      <span className="max-w-full min-w-0 truncate text-sm font-medium text-app-text sm:flex-1">
                         {repository.name}
                       </span>
 
