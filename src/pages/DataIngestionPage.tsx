@@ -1279,7 +1279,7 @@ export function DataIngestionPage() {
                       </div>
 
                       {canManageGithubSyncSettings ? (
-                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
                           <Button
                             variant="secondary"
                             size="sm"

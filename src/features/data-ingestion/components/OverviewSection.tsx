@@ -81,7 +81,7 @@ export function OverviewSection({
         <h2 className="text-lg font-semibold tracking-tight text-app-text">Overview</h2>
       </div>
 
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-3.5 xl:grid-cols-4">
         <Kpi
           label="Connected sources"
           value={formatNumber(sources.length)}
@@ -218,21 +218,23 @@ function Kpi({
 }) {
   const body = (
     <>
-      <div className="flex items-center justify-between">
-        <span className="text-[12.5px] text-app-text-muted">{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-[12.5px] text-app-text-muted">{label}</span>
         <Icon
           size={20}
           className={`shrink-0 ${TONE_TILE[tone]} ${iconSpin ? "animate-spin" : ""}`}
         />
       </div>
-      <p className="mt-2.5 text-3xl font-bold tracking-tight text-app-text tabular-nums">{value}</p>
+      <p className="mt-2.5 text-2xl font-bold tracking-tight text-app-text tabular-nums sm:text-3xl">
+        {value}
+      </p>
       <p
         className={`mt-1 flex items-center gap-1 text-xs ${
           onClick ? "font-medium text-app-brand-text" : "text-app-text-subtle"
         }`}
       >
-        {foot}
-        {onClick && <ArrowRight className="h-3 w-3" />}
+        <span className="min-w-0 truncate">{foot}</span>
+        {onClick && <ArrowRight className="h-3 w-3 shrink-0" />}
       </p>
     </>
   );

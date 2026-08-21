@@ -74,7 +74,7 @@ export function SourceList({
             // Same hover language as the dashboard widgets: a small lift, a
             // brand-coloured edge and a shadow, so "this is clickable" reads
             // identically wherever it appears in the app.
-            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-5 text-left transition duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 sm:p-6 ${
+            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border bg-app-surface p-4 text-left transition duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 sm:p-6 ${
               isSelected
                 ? "border-app-brand shadow-sm"
                 : "border-app-border hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg"
@@ -82,13 +82,13 @@ export function SourceList({
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft">
-                  <Icon size={24} className="text-app-text-muted" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft sm:h-14 sm:w-14">
+                  <Icon className="h-5 w-5 text-app-text-muted sm:h-6 sm:w-6" />
                 </div>
 
                 <div className="min-w-0">
                   <div>
-                    <h3 className="text-lg font-semibold break-words text-app-text">
+                    <h3 className="text-base font-semibold break-words text-app-text sm:text-lg">
                       {source.name}
                     </h3>
 
@@ -123,7 +123,7 @@ export function SourceList({
               />
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:mt-6">
               <InfoBlock
                 label="Artifacts Ingested"
                 value={formatNumber(source.totalArtifactCount)}
@@ -174,7 +174,7 @@ function InfoBlock({
       <p className="text-xs tracking-wide text-app-text-subtle uppercase">{label}</p>
 
       <p
-        className={`mt-2 text-lg font-semibold break-words ${
+        className={`mt-1 text-base font-semibold break-words sm:mt-2 sm:text-lg ${
           danger ? "text-app-danger-text" : "text-app-text"
         }`}
       >
