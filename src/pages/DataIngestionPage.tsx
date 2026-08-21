@@ -1287,7 +1287,7 @@ export function DataIngestionPage() {
                             icon={<Plug className="h-4 w-4" />}
                             className="w-full sm:w-auto"
                           >
-                            Manage connectors
+                            <span className="min-w-0 truncate">Manage connectors</span>
                           </Button>
 
                           {hasGithubSources || hasJiraSources ? (
@@ -1301,7 +1301,7 @@ export function DataIngestionPage() {
                               icon={<CalendarClock className="h-4 w-4" />}
                               className="w-full sm:w-auto"
                             >
-                              Manage sync settings
+                              <span className="min-w-0 truncate">Manage sync settings</span>
                             </Button>
                           ) : null}
                         </div>

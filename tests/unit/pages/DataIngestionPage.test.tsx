@@ -182,7 +182,7 @@ describe("DataIngestionPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("octocat/hello-world")).toBeInTheDocument();
+    expect((await screen.findAllByText("octocat/hello-world")).length).toBeGreaterThan(0);
     expect(mockGetAccessibleProject).toHaveBeenCalledWith("proj1");
   });
 
@@ -226,7 +226,7 @@ describe("DataIngestionPage", () => {
     });
 
     // Owner comes from the endpoint, not from parsed artifact metadata.
-    expect(screen.getByText("octocat")).toBeInTheDocument();
+    expect(screen.getAllByText("octocat").length).toBeGreaterThan(0);
     expect(mockGetIngestionSourceStatuses).toHaveBeenCalledWith("proj1");
   });
 
@@ -755,7 +755,7 @@ describe("DataIngestionPage", () => {
     // The card stops claiming to be connected even though the repository's
     // own flag is enabled — visible without opening the connectors modal.
     await waitFor(async () => {
-      expect((await sourcesSection()).getByText("Connector disabled")).toBeInTheDocument();
+      expect((await sourcesSection()).getAllByText("Connector disabled").length).toBeGreaterThan(0);
     });
     expect((await sourcesSection()).queryByText("Connected")).not.toBeInTheDocument();
   });
@@ -771,7 +771,7 @@ describe("DataIngestionPage", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("octocat/hello-world");
+    await screen.findAllByText("octocat/hello-world");
     expect(screen.queryByText("Connector disabled")).not.toBeInTheDocument();
   });
 

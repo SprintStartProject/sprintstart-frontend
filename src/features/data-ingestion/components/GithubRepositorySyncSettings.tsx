@@ -397,25 +397,29 @@ export function GithubRepositorySyncSettings({
         </label>
       )}
 
-      <div className="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-        {isDirty && !isBusy && (
-          <p className="text-xs font-medium text-app-text-muted sm:mr-1">
-            You have unsaved changes
-          </p>
-        )}
+      {/* Like the admin drawers: the save affordance only appears once the
+          form is actually dirty, so a settled schedule shows no stray button. */}
+      {(isDirty || saveState === "loading") && (
+        <div className="mt-4 flex flex-col items-stretch gap-2 border-t border-app-border pt-4 sm:flex-row sm:items-center sm:justify-end">
+          {!isBusy && (
+            <p className="text-xs font-medium text-app-text-muted sm:mr-1">
+              You have unsaved changes
+            </p>
+          )}
 
-        <SaveButton
-          dirty={isDirty}
-          saving={saveState === "loading"}
-          disabled={loadState === "loading"}
-          label={saveLabel}
-          cleanLabel={saveLabel}
-          onClick={() => {
-            void saveSettings();
-          }}
-          className="w-full sm:w-auto"
-        />
-      </div>
+          <SaveButton
+            dirty={isDirty}
+            saving={saveState === "loading"}
+            disabled={loadState === "loading"}
+            label={saveLabel}
+            cleanLabel={saveLabel}
+            onClick={() => {
+              void saveSettings();
+            }}
+            className="w-full sm:w-auto"
+          />
+        </div>
+      )}
     </div>
   );
 }
