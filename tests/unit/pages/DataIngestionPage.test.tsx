@@ -49,6 +49,7 @@ const {
   mockGetIngestionRunsPage,
   mockGetIngestionStatus,
   mockConnectGithubRepository,
+  mockDiscoverRepositories,
   mockGetGithubPatNames,
   mockUpdateAllGithubRepositories,
   mockUpdateGithubRepository,
@@ -61,6 +62,7 @@ const {
   mockGetIngestionRunsPage: vi.fn(),
   mockGetIngestionStatus: vi.fn(),
   mockConnectGithubRepository: vi.fn(),
+  mockDiscoverRepositories: vi.fn(),
   mockGetGithubPatNames: vi.fn(),
   mockUpdateAllGithubRepositories: vi.fn(),
   mockUpdateGithubRepository: vi.fn(),
@@ -87,6 +89,7 @@ vi.mock("../../../src/services/projectService", async (importOriginal) => {
 
 vi.mock("../../../src/services/sources/githubService", () => ({
   connectGithubRepository: mockConnectGithubRepository,
+  discoverRepositories: mockDiscoverRepositories,
   getGithubPatNames: mockGetGithubPatNames,
   updateAllGithubRepositories: mockUpdateAllGithubRepositories,
   updateGithubRepository: mockUpdateGithubRepository,
@@ -130,6 +133,11 @@ describe("DataIngestionPage", () => {
     mockGetIngestionStatus.mockResolvedValue([]);
     mockGetGithubPatNames.mockResolvedValue(["token1"]);
     mockConnectGithubRepository.mockResolvedValue({ transactionId: "tx1" });
+    mockDiscoverRepositories.mockResolvedValue({
+      repositories: [],
+      hasMore: false,
+      resolvedOwnerType: "user",
+    });
     mockUpdateAllGithubRepositories.mockResolvedValue({ transactionId: "tx2" });
     mockUpdateGithubRepository.mockResolvedValue({ transactionId: "tx3" });
     mockGetAccessibleProject.mockResolvedValue({
@@ -974,7 +982,7 @@ describe("DataIngestionPage", () => {
     expect(filter().getByRole("button", { name: /runs/i })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("opens the add-source wizard and reaches GitHub discovery via Continue", async () => {
+  it("opens the add-source modal and reaches GitHub discovery", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -988,19 +996,33 @@ describe("DataIngestionPage", () => {
 
     await user.click(screen.getAllByRole("button", { name: /Add sources/i })[0]);
 
-    // Step 1: the source-type chooser.
-    await waitFor(() => {
-      expect(screen.getByText("Add a data source")).toBeInTheDocument();
-    });
+    // The modal opens straight on the type grid. Scope queries to the dialog so
+    // GitHub-related controls on the page behind the portal don't collide.
+    const dialog = within(await screen.findByRole("dialog"));
 
-    // Step 2 (GitHub is the default type): discovery.
-    await user.click(screen.getByRole("button", { name: /continue/i }));
+    // Type grid -> GitHub -> discovery.
+    await user.click(await dialog.findByRole("button", { name: /github/i }));
+
     await waitFor(() => {
-      expect(screen.getByText("Discover GitHub repositories")).toBeInTheDocument();
+      expect(dialog.getByLabelText("Organization, user, or URL")).toBeInTheDocument();
     });
   });
 
-  it("parses owner/repo format and connects it from the wizard single-repo mode", async () => {
+  it("stages a discovered repository and connects it to the project", async () => {
+    mockDiscoverRepositories.mockResolvedValue({
+      repositories: [
+        {
+          name: "hello-world",
+          isPrivate: false,
+          url: "https://github.com/octocat/hello-world",
+          alreadyConnected: false,
+          isEnabled: null,
+        },
+      ],
+      hasMore: false,
+      resolvedOwnerType: "user",
+    });
+
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -1013,16 +1035,22 @@ describe("DataIngestionPage", () => {
     });
 
     await user.click(screen.getAllByRole("button", { name: /Add sources/i })[0]);
-    await user.click(await screen.findByRole("button", { name: /continue/i }));
-    await user.click(await screen.findByRole("button", { name: /add single repo/i }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Repository owner")).toBeInTheDocument();
-    });
+    // Scope queries to the dialog so GitHub-related controls on the page behind
+    // the portal don't collide with the modal's own.
+    const dialog = within(await screen.findByRole("dialog"));
 
-    await user.type(screen.getByLabelText("Repository owner"), "octocat/hello-world");
+    await user.click(await dialog.findByRole("button", { name: /github/i }));
 
-    await user.click(screen.getByRole("button", { name: /connect repository/i }));
+    await user.type(await dialog.findByLabelText("Organization, user, or URL"), "octocat");
+    await user.click(dialog.getByRole("button", { name: "Discover" }));
+
+    const repoRow = (await dialog.findByText("hello-world")).closest("label") as HTMLElement;
+    await user.click(within(repoRow).getByRole("checkbox"));
+    await user.click(dialog.getByRole("button", { name: /add to list/i }));
+
+    // Back on the list; the staged repo connects together with the others.
+    await user.click(await dialog.findByRole("button", { name: /connect 1 source/i }));
 
     await waitFor(() => {
       expect(mockConnectGithubRepository).toHaveBeenCalledWith(
@@ -1030,6 +1058,7 @@ describe("DataIngestionPage", () => {
           owner: "octocat",
           name: "hello-world",
           tokenName: "token1",
+          projectId: "proj1",
         }),
       );
     });
@@ -1049,23 +1078,18 @@ describe("DataIngestionPage", () => {
     });
 
     await user.click(screen.getAllByRole("button", { name: /Add sources/i })[0]);
-    await user.click(await screen.findByRole("button", { name: /continue/i }));
-    await user.click(await screen.findByRole("button", { name: /add single repo/i }));
+    const dialog = within(await screen.findByRole("dialog"));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Repository owner")).toBeInTheDocument();
-    });
-
-    await user.type(screen.getByLabelText("Repository owner"), "octocat/hello-world");
-
-    // The wizard states the reason up front and disables the action, rather
-    // than accepting the click and failing afterwards.
+    // The modal states the reason up front on the type grid; drilling into a
+    // detail screen keeps "Connect now" disabled rather than accepting a connect
+    // that fails.
     expect(
-      await screen.findByText(/only connect sources to projects you manage/i),
+      await dialog.findByText(/only connect sources to projects you manage/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /connect repository/i })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: /connect repository/i }));
+    await user.click(await dialog.findByRole("button", { name: /github/i }));
+    expect(dialog.getByRole("button", { name: /connect now/i })).toBeDisabled();
+
     expect(mockConnectGithubRepository).not.toHaveBeenCalled();
   });
 });
