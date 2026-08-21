@@ -2,6 +2,7 @@
 // dashboard widget, list page and detail page keep an identical severity scale.
 // (Presentational components live in components/SeverityIndicators.tsx.)
 
+import type { BadgeVariant } from "../../components/ui/Badge";
 import type { KnowledgeGapSeverity } from "./types";
 
 /** Sort weight so higher-impact gaps come first (high → medium → low). */
@@ -19,6 +20,14 @@ export interface SeverityStyle {
   bar: string;
   /** Chip background + text pairing. */
   badge: string;
+  /**
+   * The same pairing expressed as a `ui/Badge` variant.
+   *
+   * `badge` above is the hand-rolled version this feature grew before the primitive existed
+   * and is still what the pages use. New surfaces should reach for `ui/Badge` with this
+   * variant instead, so the pill carries the shared border, radius and sizing.
+   */
+  badgeVariant: BadgeVariant;
   /** Short label, e.g. "High". */
   label: string;
   /** Long label, e.g. "High severity". */
@@ -37,6 +46,7 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
   high: {
     bar: "bg-app-danger-solid",
     badge: "bg-app-danger-bg text-app-danger-text",
+    badgeVariant: "danger",
     label: "High",
     longLabel: "High severity",
     ring: "border-app-danger-border",
@@ -44,6 +54,7 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
   medium: {
     bar: "bg-app-warning-solid",
     badge: "bg-app-warning-bg text-app-warning-text",
+    badgeVariant: "warning",
     label: "Medium",
     longLabel: "Medium severity",
     ring: "border-app-warning-border",
@@ -51,6 +62,7 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
   low: {
     bar: "bg-app-success-solid",
     badge: "bg-app-success-bg text-app-success-text",
+    badgeVariant: "success",
     label: "Low",
     longLabel: "Low severity",
     ring: "border-app-success-border",

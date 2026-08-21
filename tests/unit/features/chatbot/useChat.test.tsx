@@ -1,17 +1,33 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { render, renderHook, act, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useContext, type ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useChat } from "../../../../src/features/chatbot/hooks/useChat";
 import { ChatProvider } from "../../../../src/context/ChatProvider";
+import { ChatContext } from "../../../../src/context/ChatContext";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
 const mockNavigate = vi.fn();
 
+// Mutable so one test can arrive the way the dashboard's quick-chat card does — no chatId and
+// `state.newChat` — while every other test keeps the original fixed chat.
+const { routerState } = vi.hoisted(() => {
+  const routerState: {
+    params: { id?: string };
+    location: { pathname: string; state?: { newChat?: boolean } };
+  } = {
+    params: { id: "chat1" },
+    location: { pathname: "/" },
+  };
+
+  return { routerState };
+});
+
 vi.mock("react-router-dom", () => ({
   useNavigate: () => mockNavigate,
-  useParams: () => ({ id: "chat1" }),
-  useLocation: () => ({ pathname: "/" }),
+  useParams: () => routerState.params,
+  useLocation: () => routerState.location,
 }));
 
 vi.mock("../../../../src/context/useAuth", () => ({
@@ -39,9 +55,49 @@ vi.mock("../../../../src/features/projects/useProjectContext", async () => {
 
 const wrapper = ({ children }: { children: ReactNode }) => <ChatProvider>{children}</ChatProvider>;
 
+const HANDOFF_QUESTION = "What should I work on next?";
+
+/** Puts text in the shared composer, standing in for the dashboard's quick-chat card. */
+function Seeder() {
+  const ctx = useContext(ChatContext);
+
+  return (
+    <button type="button" onClick={() => ctx?.setNewRequest(HANDOFF_QUESTION)}>
+      seed
+    </button>
+  );
+}
+
+/** Renders `newRequest` so a test can read what the chat page's composer holds. */
+function ComposerProbe() {
+  const { newRequest } = useChat();
+
+  return <span data-testid="composer">{newRequest}</span>;
+}
+
+/**
+ * Provider with the chat page mounted or not.
+ *
+ * The two phases are the point: the composer is filled while the chat page is *absent*, then
+ * the page mounts — which is the order the app produces, the dashboard seeding the text before
+ * routing here. Seeding after mount would pass even with the bug, since the draft restore only
+ * clobbers on its first run.
+ */
+function Harness({ chatMounted }: { chatMounted: boolean }) {
+  return (
+    <ChatProvider>
+      <Seeder />
+      {chatMounted ? <ComposerProbe /> : null}
+    </ChatProvider>
+  );
+}
+
 describe("useChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    routerState.params = { id: "chat1" };
+    routerState.location = { pathname: "/" };
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
@@ -75,6 +131,35 @@ describe("useChat", () => {
     await waitFor(() => {
       expect(result.current.chats).toEqual([{ id: "chat1", userId: "user1" }]);
     });
+  });
+
+  /*
+    The dashboard's quick-chat card seeds the composer and navigates here with `state.newChat`.
+    The per-chat draft restore used to run on mount and overwrite that with the stored draft —
+    which was empty — so the question never arrived, whether it was typed or picked from a
+    suggestion chip.
+  */
+  it("keeps a question handed over from another page", async () => {
+    routerState.params = {};
+    routerState.location = { pathname: "/chat", state: { newChat: true } };
+
+    const { rerender } = render(<Harness chatMounted={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "seed" }));
+
+    rerender(<Harness chatMounted />);
+
+    await waitFor(() => expect(screen.getByTestId("composer")).toHaveTextContent(HANDOFF_QUESTION));
+  });
+
+  it("still restores this chat's own draft on a plain visit", async () => {
+    localStorage.setItem("chatDraft.__new__", "half-written question");
+    routerState.params = {};
+    routerState.location = { pathname: "/chat" };
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    // No hand-off, so the stored draft wins — the behaviour the draft restore exists for.
+    await waitFor(() => expect(result.current.newRequest).toBe("half-written question"));
   });
 
   it("loads messages when chat is selected", async () => {

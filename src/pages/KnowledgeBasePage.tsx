@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
@@ -64,8 +65,33 @@ export function KnowledgeBasePage() {
 
   const isLoading = isProjectLoading || isArtifactsLoading;
 
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  /*
+    `?artifact=<id>` opens a document straight away, which is what the dashboard's knowledge-base
+    card links to — before this, every row on that card landed on the bare page and the reader
+    had to find the document again themselves.
+
+    It is a hand-off rather than a permanent part of the URL: the id seeds the state once and the
+    parameter is then stripped, so the drawer state stays local (as it already was) and coming
+    back to the page later does not reopen a document the user has since closed.
+  */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(() =>
+    searchParams.get("artifact"),
+  );
   const [prevProjectId, setPrevProjectId] = useState(projectId);
+
+  const artifactParamConsumed = useRef(false);
+
+  useEffect(() => {
+    if (artifactParamConsumed.current) return;
+    artifactParamConsumed.current = true;
+
+    if (!searchParams.has("artifact")) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("artifact");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Reset active drawer selection whenever the project scope changes.
   if (prevProjectId !== projectId) {
