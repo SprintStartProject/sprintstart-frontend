@@ -29,6 +29,7 @@ import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
   createJiraSourceFromInstance,
+  createUploadSourceFromInstance,
   deriveSourceStatus,
   formatDateTime,
   getBackendSourceStatusLabel,
@@ -239,12 +240,13 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira cards are built solely from the connector-neutral status rows (the
-    // `jiraSources` path on the page), which carry Jira's authoritative health
-    // and counters. The project source list now also exposes Jira instances
-    // (for the admin/project-scoped source lists), so emitting a card here too
-    // would double every connected Jira instance.
+    // Jira cards are built solely from the connector-neutral status rows.
     if (sourceSystem === "JIRA") return [];
+    // Skip UPLOAD only when an authoritative status row already exists so the card
+    // does not vanish when artifact count is 0 or when run status fallback is needed.
+    if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
+      return [];
+    }
 
     const meta = SOURCE_META[sourceSystem];
     const latestRun = latestRunBySource.get(sourceSystem);
@@ -724,7 +726,11 @@ export function DataIngestionPage() {
         ),
       );
 
-    return [...githubAndUpload, ...jiraSources];
+    const uploadSources = sourceInstances
+      .filter((status) => status.sourceSystem === "UPLOAD")
+      .map((status) => createUploadSourceFromInstance(status));
+
+    return [...githubAndUpload, ...jiraSources, ...uploadSources];
   }, [connectorEnabledById, jiraInstances, projectSources, runs, sourceInstances]);
 
   const totalArtifactCount = useMemo(

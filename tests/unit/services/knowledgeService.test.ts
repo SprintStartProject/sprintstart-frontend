@@ -45,15 +45,15 @@ describe("knowledgeService", () => {
       expect(results[0].error).toBeTruthy();
     });
 
-    it("uploads multiple files, aggregating success and failure results", async () => {
+    it("uploads multiple files in a single request, aggregating success and failure results", async () => {
       let callCount = 0;
       server.use(
         http.post("/api/v1/uploads", () => {
           callCount += 1;
-          if (callCount === 2) {
-            return HttpResponse.json({}, { status: 500 });
-          }
-          return HttpResponse.json([{ id: "ok1", filename: "good.txt", status: "ok" }]);
+          return HttpResponse.json([
+            { id: "ok1", filename: "good.txt", status: "ok" },
+            { id: "bad1", filename: "bad.txt", status: "failed", error: "File format rejected" },
+          ]);
         }),
       );
 
@@ -61,9 +61,14 @@ describe("knowledgeService", () => {
       const badFile = new File(["b"], "bad.txt");
       const results = await knowledgeService.uploadDocuments("p1", [goodFile, badFile]);
 
+      expect(callCount).toBe(1);
       expect(results).toHaveLength(2);
-      expect(results[0].status).toBe("success");
-      expect(results[1].status).toBe("error");
+      expect(results[0]).toEqual({ filename: "good.txt", status: "success" });
+      expect(results[1]).toEqual({
+        filename: "bad.txt",
+        status: "error",
+        error: "File format rejected",
+      });
     });
   });
 
