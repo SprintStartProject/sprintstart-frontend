@@ -61,7 +61,7 @@ describe("AccountForm", () => {
     await user.clear(firstNameInput);
     await user.type(firstNameInput, "Jane");
 
-    await user.click(screen.getByText("Save Changes"));
+    await user.click(screen.getByText("Save changes"));
 
     await waitFor(
       () => {
@@ -78,11 +78,18 @@ describe("AccountForm", () => {
 
     render(<AccountForm profile={mockUser} onUpdate={vi.fn()} />);
 
-    await user.click(screen.getByText("Save Changes"));
+    // Edit a field so the (otherwise disabled) Save button becomes enabled.
+    const firstNameInput = screen.getByDisplayValue("John");
+    await user.clear(firstNameInput);
+    await user.type(firstNameInput, "Jane");
 
+    await user.click(screen.getByText("Save changes"));
+
+    // The save failed, so the changes are still unsaved and the button stays
+    // enabled rather than falling back to the muted "Saved" state.
     await waitFor(
       () => {
-        expect(screen.getByText("Save Changes")).not.toBeDisabled();
+        expect(screen.getByText("Save changes")).not.toBeDisabled();
       },
       { timeout: 3000 },
     );
