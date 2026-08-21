@@ -214,16 +214,17 @@ export function useChat() {
   }, [chatId, messages, isAtBottom]);
 
   /**
-   * The most recent question the user asked in this chat, for the composer's history recall.
-   * Reads from the rendered messages rather than a separate store, so it survives a reload
-   * and always matches what is on screen.
+   * Every question the user has asked in this chat, oldest first — the composer's history.
+   *
+   * Reads from the rendered messages rather than a separate store, so it survives a reload and
+   * always matches what is on screen. Sending a message rebuilds it, which is also what ends
+   * an in-progress walk through it: see `ChatComposer`, where "am I browsing" is derived from
+   * the composer's own contents rather than remembered across a change like that.
    */
-  const lastUserPrompt = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "USER") return messages[i].content;
-    }
-    return "";
-  }, [messages]);
+  const promptHistory = useMemo(
+    () => messages.filter((message) => message.role === "USER").map((message) => message.content),
+    [messages],
+  );
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -259,9 +260,18 @@ export function useChat() {
     }
 
     draftChatIdRef.current = chatId;
+
+    // A composer filled from outside survives this first run. The dashboard's quick-chat card
+    // seeds `newRequest` and then navigates here with `state.newChat`, and loading the stored
+    // draft over it is what made the question — typed or picked from a suggestion — vanish on
+    // arrival. Deliberately narrow: it takes an explicit new-chat navigation *and* text already
+    // in the composer, so text merely left over from another chat is still replaced by this
+    // chat's own draft, which is the case the ref above exists for.
+    if (prevChatId === DRAFT_UNINITIALIZED && isNewChatRequest && newRequest) return;
+
     const saved = localStorage.getItem(DRAFT_KEY(chatId)) ?? "";
     setNewRequest(saved);
-  }, [chatId, newRequest, setNewRequest]);
+  }, [chatId, isNewChatRequest, newRequest, setNewRequest]);
 
   // Debounced save while the user types (no chat switch).
   useEffect(() => {
@@ -345,7 +355,7 @@ export function useChat() {
     // the prompt vanish.
     hasProject: selectedProjectId !== "",
 
-    lastUserPrompt,
+    promptHistory,
 
     isThinking: isThinking && isActiveChatStreaming,
     isStreaming: isStreaming && isActiveChatStreaming,

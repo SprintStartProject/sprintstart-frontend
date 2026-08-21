@@ -516,7 +516,9 @@ export function CreateProjectWizard({
           description: "Some sources couldn't be connected.",
         });
       } else {
-        toast.success("Project created");
+        toast.success("Project created", {
+          description: "Initial ingestion is running in the background.",
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Couldn't create the project.";

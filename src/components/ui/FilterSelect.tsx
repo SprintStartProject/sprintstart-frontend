@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
 import {
@@ -14,6 +15,47 @@ import {
  * list's padding.
  */
 const OPTION_HOVER_SCALE = 1.03;
+
+/** Distance between the trigger and the menu, whichever side it opens on. */
+const MENU_OFFSET = 6;
+
+/** How tall the menu may get before it scrolls. */
+const MENU_MAX_HEIGHT = 256;
+
+/** Breathing room kept between the menu and the edge of the viewport. */
+const VIEWPORT_MARGIN = 8;
+
+/**
+ * Below this, "there is room underneath" stops being true in any useful sense
+ * and the menu flips above the trigger instead.
+ */
+const MIN_USABLE_HEIGHT = 160;
+
+/**
+ * Above modals (`z-50` on `<body>`), below toasts (`z-[200]`).
+ *
+ * A dropdown opened from inside a dialog has to clear it, and a toast arriving
+ * while one is open has to clear the dropdown.
+ */
+const MENU_Z_INDEX = 100;
+
+/**
+ * Where the menu is painted, in viewport coordinates.
+ *
+ * Anchored by `top` when it opens downwards and by `bottom` when it flips, so
+ * the edge that touches the trigger is the one that stays put — pinning `top`
+ * for an upward menu would make it grow away from the control as options are
+ * filtered.
+ */
+type MenuPosition = {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+  maxWidth: number;
+  isAbove: boolean;
+};
 
 export type FilterSelectOption<TValue extends string> = {
   value: TValue;
@@ -45,6 +87,20 @@ const TYPEAHEAD_RESET_MS = 500;
  * there is no focus to trap or restore. Everything a native select gives away
  * for free is reimplemented deliberately: arrow keys, Home/End, Enter/Escape,
  * typeahead, click-outside, and closing on blur.
+ *
+ * **The menu is rendered into `<body>`, not next to the trigger.** It used to
+ * be an absolutely positioned sibling, which meant its `z-index` only counted
+ * inside whatever stacking context the caller happened to sit in — and any
+ * ancestor with `backdrop-filter`, `filter`, `transform` or `opacity` makes
+ * one. The knowledge-gap detail page is the case that surfaced it: every card
+ * there carries `backdrop-blur`, so the owner dropdown opened *underneath* the
+ * card below it and its options could not be clicked. No z-index on this
+ * component could have fixed that, because the whole control was already
+ * trapped. A portal is the only way out, and it takes care of an ancestor's
+ * `overflow: hidden` clipping the menu at the same time.
+ *
+ * The cost is that the menu no longer moves with the trigger for free, so its
+ * position is measured on open and re-measured on scroll and resize.
  */
 export function FilterSelect<TValue extends string>({
   label,
@@ -56,8 +112,10 @@ export function FilterSelect<TValue extends string>({
 }: FilterSelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [position, setPosition] = useState<MenuPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const typeaheadRef = useRef<{ query: string; timeoutId: number | null }>({
     query: "",
     timeoutId: null,
@@ -72,15 +130,80 @@ export function FilterSelect<TValue extends string>({
   );
   const selectedLabel = options[selectedIndex]?.label ?? "";
 
+  /**
+   * Measures the trigger and decides which side the menu opens on.
+   *
+   * Downwards unless the space under the trigger has stopped being usable and
+   * there is more of it above — a control near the bottom of the window would
+   * otherwise open into a two-option sliver.
+   *
+   * Horizontally the menu is left-aligned with the trigger but never allowed
+   * past either edge of the window. It may be wider than the control it hangs
+   * from — options do not wrap, so a long label grows the list sideways — which
+   * for a trigger near the right edge, like the size picker in a dashboard
+   * widget's toolbar, would otherwise put the menu half off-screen. Its own
+   * width is only knowable once it is mounted, so this reads it back when there
+   * is one to read and falls back to the trigger's width on the first pass.
+   */
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - MENU_OFFSET - VIEWPORT_MARGIN;
+    const spaceAbove = rect.top - MENU_OFFSET - VIEWPORT_MARGIN;
+    const isAbove = spaceBelow < MIN_USABLE_HEIGHT && spaceAbove > spaceBelow;
+    const available = isAbove ? spaceAbove : spaceBelow;
+
+    const maxWidth = Math.max(window.innerWidth - VIEWPORT_MARGIN * 2, 0);
+    const menuWidth = Math.min(Math.max(listRef.current?.offsetWidth ?? 0, rect.width), maxWidth);
+    const furthestLeft = window.innerWidth - VIEWPORT_MARGIN - menuWidth;
+
+    setPosition({
+      left: Math.max(VIEWPORT_MARGIN, Math.min(rect.left, furthestLeft)),
+      width: rect.width,
+      top: isAbove ? undefined : rect.bottom + MENU_OFFSET,
+      bottom: isAbove ? window.innerHeight - rect.top + MENU_OFFSET : undefined,
+      maxHeight: Math.min(MENU_MAX_HEIGHT, Math.max(available, 0)),
+      maxWidth,
+      isAbove,
+    });
+  }, []);
+
   const open = () => {
     if (disabled) return;
     setActiveIndex(selectedIndex);
+    // Measured before the menu is mounted, so it is never painted at 0,0 first.
+    updatePosition();
     setIsOpen(true);
   };
 
   const close = () => {
     setIsOpen(false);
   };
+
+  // Re-measured rather than closed on scroll: a filter bar inside a scrolling
+  // page is the normal case, and a menu that vanishes the moment the page moves
+  // under the pointer is worse than one that follows. Capture phase, because a
+  // scroll inside a nested container does not bubble to `window`.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const handle = () => updatePosition();
+
+    // Once more now that the menu exists: the measurement taken on open could
+    // only guess its width from the trigger, and a menu wider than its control
+    // may need to sit further left. Before paint, so it never appears to jump.
+    handle();
+
+    window.addEventListener("scroll", handle, { capture: true, passive: true });
+    window.addEventListener("resize", handle, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handle, { capture: true });
+      window.removeEventListener("resize", handle);
+    };
+  }, [isOpen, updatePosition]);
 
   const commit = (index: number) => {
     const option = options[index];
@@ -91,21 +214,29 @@ export function FilterSelect<TValue extends string>({
     triggerRef.current?.focus();
   };
 
-  // Pointer interactions outside the control dismiss it. `mousedown` rather
+  // Pointer interactions outside the control dismiss it. `pointerdown` rather
   // than `click`, so the menu is gone before the click lands on whatever is
-  // underneath.
+  // underneath — and rather than `mousedown`, which on a touch device only
+  // arrives as an emulated event after the tap, or not at all.
+  //
+  // The menu has to be tested separately from the container: it is portaled
+  // into `<body>`, so `containerRef` no longer contains it, and checking the
+  // container alone would treat a press on an option as an outside click —
+  // unmounting the option before the click that selects it could land.
   useEffect(() => {
     if (!isOpen) return;
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+
+      if (!containerRef.current?.contains(target) && !listRef.current?.contains(target)) {
         close();
       }
     };
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [isOpen]);
 
@@ -207,6 +338,12 @@ export function FilterSelect<TValue extends string>({
         aria-label={label}
         aria-expanded={isOpen}
         aria-controls={listboxId}
+        // Re-parents the menu onto the combobox in the accessibility tree.
+        // It is portaled into `<body>`, so DOM containment can no longer say
+        // that the listbox belongs to this control — `aria-owns` is the only
+        // thing left that does, and without it the menu reads as loose page
+        // content sitting outside every landmark.
+        aria-owns={isOpen ? listboxId : undefined}
         aria-haspopup="listbox"
         aria-activedescendant={isOpen ? `${optionIdPrefix}-${activeIndex}` : undefined}
         disabled={disabled}
@@ -225,77 +362,96 @@ export function FilterSelect<TValue extends string>({
         />
       </motion.button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.ul
-            id={listboxId}
-            role="listbox"
-            aria-label={label}
-            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-            // `p-1.5` is not cosmetic: the list clips its own overflow, so this
-            // padding is the only room a magnified option has to grow into.
-            className="absolute top-[calc(100%+6px)] left-0 z-50 max-h-64 min-w-full overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-          >
-            {options.map((option, index) => {
-              const isSelected = option.value === value;
-              const isActive = index === activeIndex;
+      {createPortal(
+        <AnimatePresence>
+          {isOpen && position && (
+            <motion.ul
+              ref={listRef}
+              id={listboxId}
+              role="listbox"
+              aria-label={label}
+              // The menu slides out of the trigger, so an upward one has to
+              // start below its resting place rather than above it.
+              initial={
+                prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: position.isAbove ? 6 : -6 }
+              }
+              animate={{ opacity: 1, y: 0 }}
+              exit={
+                prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: position.isAbove ? 6 : -6 }
+              }
+              transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+              style={{
+                left: position.left,
+                top: position.top,
+                bottom: position.bottom,
+                minWidth: position.width,
+                maxWidth: position.maxWidth,
+                maxHeight: position.maxHeight,
+                zIndex: MENU_Z_INDEX,
+              }}
+              // `p-1.5` is not cosmetic: the list clips its own overflow, so this
+              // padding is the only room a magnified option has to grow into.
+              className="fixed overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+            >
+              {options.map((option, index) => {
+                const isSelected = option.value === value;
+                const isActive = index === activeIndex;
 
-              return (
-                // No keyboard handler by design: in the
-                // select-only combobox pattern the options are
-                // never focused. Keyboard users drive the list
-                // from the trigger via `aria-activedescendant`,
-                // which is handled in `handleKeyDown` above.
-                <motion.li
-                  key={option.value}
-                  id={`${optionIdPrefix}-${index}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => commit(index)}
-                  animate={{
-                    scale: isActive && !prefersReducedMotion ? OPTION_HOVER_SCALE : 1,
-                  }}
-                  transition={dockMagnifySpringToken}
-                  // Anchored left so the label does not drift
-                  // sideways as the row grows.
-                  style={{ transformOrigin: "left center" }}
-                  className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                    isSelected ? "font-semibold text-app-brand-text" : "text-app-text"
-                  }`}
-                >
-                  {isActive && (
-                    // One shared element rather than a
-                    // background per row, so the highlight
-                    // glides down the list instead of
-                    // blinking from row to row.
-                    <motion.span
-                      aria-hidden="true"
-                      layoutId={`${optionIdPrefix}-highlight`}
-                      transition={
-                        prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
-                      }
-                      className="absolute inset-0 rounded-xl bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
-                    />
-                  )}
-
-                  <Check
-                    aria-hidden="true"
-                    className={`relative z-10 h-3.5 w-3.5 shrink-0 ${
-                      isSelected ? "opacity-100" : "opacity-0"
+                return (
+                  // No keyboard handler by design: in the
+                  // select-only combobox pattern the options are
+                  // never focused. Keyboard users drive the list
+                  // from the trigger via `aria-activedescendant`,
+                  // which is handled in `handleKeyDown` above.
+                  <motion.li
+                    key={option.value}
+                    id={`${optionIdPrefix}-${index}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => commit(index)}
+                    animate={{
+                      scale: isActive && !prefersReducedMotion ? OPTION_HOVER_SCALE : 1,
+                    }}
+                    transition={dockMagnifySpringToken}
+                    // Anchored left so the label does not drift
+                    // sideways as the row grows.
+                    style={{ transformOrigin: "left center" }}
+                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                      isSelected ? "font-semibold text-app-brand-text" : "text-app-text"
                     }`}
-                  />
+                  >
+                    {isActive && (
+                      // One shared element rather than a
+                      // background per row, so the highlight
+                      // glides down the list instead of
+                      // blinking from row to row.
+                      <motion.span
+                        aria-hidden="true"
+                        layoutId={`${optionIdPrefix}-highlight`}
+                        transition={
+                          prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
+                        }
+                        className="absolute inset-0 rounded-xl bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
+                      />
+                    )}
 
-                  <span className="relative z-10">{option.label}</span>
-                </motion.li>
-              );
-            })}
-          </motion.ul>
-        )}
-      </AnimatePresence>
+                    <Check
+                      aria-hidden="true"
+                      className={`relative z-10 h-3.5 w-3.5 shrink-0 ${
+                        isSelected ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+
+                    <span className="relative z-10">{option.label}</span>
+                  </motion.li>
+                );
+              })}
+            </motion.ul>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }

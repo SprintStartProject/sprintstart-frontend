@@ -1,4 +1,5 @@
 import { Check, Filter, Send, Square, X } from "lucide-react";
+import { useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { SOURCE_META } from "../../data-ingestion/data";
 import type { SourceSystem } from "../types";
@@ -20,10 +21,10 @@ type ChatComposerProps = {
    */
   hasProject: boolean;
   /**
-   * The last question asked in this chat. Arrow-up in an empty composer recalls it, the way
-   * a shell recalls the previous command.
+   * Every question asked in this chat, oldest first. Arrow-up walks back through it and
+   * arrow-down forward again, the way a shell walks its command history.
    */
-  lastUserPrompt: string;
+  promptHistory: string[];
   /**
    * The source systems that can actually be filtered on. Offering the full hardcoded set
    * meant a connector that was never configured was still selectable, and the prompt then
@@ -61,7 +62,7 @@ export function ChatComposer({
   onStop,
   isBusy,
   hasProject,
-  lastUserPrompt,
+  promptHistory,
   availableSources,
   sourcesLoading,
   textareaRef,
@@ -78,6 +79,36 @@ export function ChatComposer({
 }: ChatComposerProps) {
   // E7: surface a hint when the date range is inverted.
   const rangeInvalid = !!from && !!to && from > to;
+
+  /*
+    Where the arrow keys currently sit in `promptHistory`.
+
+    Only half the answer, though: whether the composer is *still* on that entry is derived
+    below from its own contents rather than tracked. Typing over a recalled prompt, sending it,
+    or switching to a chat with a different history all end the walk on their own that way —
+    each of which would otherwise need its own reset, and a missed one would leave arrow-up
+    stepping from a stale position.
+  */
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+
+  const browsingIndex =
+    historyIndex !== null && promptHistory[historyIndex] === value ? historyIndex : null;
+
+  /** Puts `text` in the composer, resized, with the caret behind it. */
+  const applyRecalled = (element: HTMLTextAreaElement, text: string) => {
+    onChange(text);
+    element.style.height = "auto";
+
+    requestAnimationFrame(() => {
+      element.style.height = `${element.scrollHeight}px`;
+      element.setSelectionRange(element.value.length, element.value.length);
+    });
+  };
+
+  const recall = (element: HTMLTextAreaElement, index: number) => {
+    setHistoryIndex(index);
+    applyRecalled(element, promptHistory[index]);
+  };
   const blocked = rangeInvalid || !hasProject;
 
   return (
@@ -272,17 +303,44 @@ export function ChatComposer({
               return;
             }
 
-            // Only from an empty composer: with text present, arrow-up has to keep
-            // moving the caret, or editing a multi-line draft becomes impossible.
-            if (e.key === "ArrowUp" && !value && lastUserPrompt) {
+            if (e.key === "ArrowUp") {
+              // From a composer the user has written in, arrow-up has to keep moving the
+              // caret or editing a multi-line draft becomes impossible. Mid-walk it keeps
+              // walking, which is the only way to reach anything but the newest entry.
+              if (browsingIndex === null && value) return;
+              if (promptHistory.length === 0) return;
+
               e.preventDefault();
-              onChange(lastUserPrompt);
-              const el = e.currentTarget;
-              el.style.height = "auto";
-              requestAnimationFrame(() => {
-                el.style.height = `${el.scrollHeight}px`;
-                el.setSelectionRange(el.value.length, el.value.length);
-              });
+
+              if (browsingIndex === null) {
+                recall(e.currentTarget, promptHistory.length - 1);
+                return;
+              }
+
+              // Already at the oldest: stay there rather than wrapping around, so holding
+              // the key does not silently cycle back to the newest.
+              recall(e.currentTarget, Math.max(browsingIndex - 1, 0));
+              return;
+            }
+
+            if (e.key === "ArrowDown") {
+              // Only meaningful mid-walk; otherwise the caret moves as usual.
+              if (browsingIndex === null) return;
+
+              e.preventDefault();
+
+              const next = browsingIndex + 1;
+
+              if (next >= promptHistory.length) {
+                // Past the newest is a blank composer again, to write something of your own.
+                // Nothing to restore: a walk can only start from an empty composer, because
+                // arrow-up with text in it has to go on moving the caret.
+                setHistoryIndex(null);
+                applyRecalled(e.currentTarget, "");
+                return;
+              }
+
+              recall(e.currentTarget, next);
             }
           }}
         />

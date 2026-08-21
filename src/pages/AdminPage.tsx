@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
@@ -51,7 +51,33 @@ export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { reloadProjects } = useProjectContext();
-  const [activeTab, setActiveTab] = useState<AdminTab>("users");
+  /*
+    `?tab=projects` opens the page on that section. The dashboard's Projects card links here,
+    and without this it always landed on Users — a card about projects dropping the reader on
+    a list of people.
+
+    A hand-off, not a permanent part of the URL: it seeds the tab once and is then stripped, so
+    the tab bar keeps behaving exactly as before and the back button does not turn into a
+    step-through of sections.
+  */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    const requested = searchParams.get("tab");
+    return ADMIN_TAB_ORDER.find((tab) => tab === requested) ?? "users";
+  });
+
+  const tabParamConsumed = useRef(false);
+
+  useEffect(() => {
+    if (tabParamConsumed.current) return;
+    tabParamConsumed.current = true;
+
+    if (!searchParams.has("tab")) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
