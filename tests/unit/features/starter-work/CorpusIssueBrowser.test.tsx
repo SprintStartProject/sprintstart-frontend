@@ -26,6 +26,12 @@ async function openRow(user: ReturnType<typeof userEvent.setup>, title: string) 
   await user.click(await screen.findByRole("button", { name: new RegExp(`open ${title}`, "i") }));
 }
 
+/** Pick a pool-state filter option (the list defaults to "New"). */
+async function selectPoolFilter(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole("combobox", { name: /filter issues by pool state/i }));
+  await user.click(await screen.findByRole("option", { name: label }));
+}
+
 describe("CorpusIssueBrowser", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -121,11 +127,14 @@ describe("CorpusIssueBrowser", () => {
     const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
-    // Marked on the compact row already.
-    expect(await screen.findByText(/in the pool/i)).toBeInTheDocument();
+    // The list defaults to "New", so switch to see the pooled issue at all.
+    await screen.findByTestId("corpus-issue-empty");
+    await selectPoolFilter(user, "All issues");
 
-    // And opening it offers no way to add it again.
+    // It shows on the list, and opening it offers no way to add it again — the footer marks it
+    // pooled instead ("Already in the pool" is unique to the drawer footer).
     await openRow(user, "Fix the login redirect");
+    expect(await screen.findByText(/already in the pool/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
   });
 
@@ -139,6 +148,10 @@ describe("CorpusIssueBrowser", () => {
     ]);
     const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
+
+    // The list defaults to "New"; removed issues live behind the filter.
+    await screen.findByTestId("corpus-issue-empty");
+    await selectPoolFilter(user, "All issues");
 
     await openRow(user, "Fix the login redirect");
 
@@ -273,12 +286,11 @@ describe("CorpusIssueBrowser", () => {
     const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
+    // Defaults to "New": the available issue shows, the pooled one is filtered out.
     await screen.findByText("Fix the login redirect");
-    // Both show under the default "All issues".
-    expect(screen.getByText("Add the pooled one")).toBeInTheDocument();
+    expect(screen.queryByText("Add the pooled one")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("combobox", { name: /filter issues by pool state/i }));
-    await user.click(await screen.findByRole("option", { name: "In the pool" }));
+    await selectPoolFilter(user, "In the pool");
 
     expect(screen.getByText("Add the pooled one")).toBeInTheDocument();
     expect(screen.queryByText("Fix the login redirect")).not.toBeInTheDocument();

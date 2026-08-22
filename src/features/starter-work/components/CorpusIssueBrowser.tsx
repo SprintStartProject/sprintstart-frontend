@@ -76,7 +76,9 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
   } = useCorpusIssueBrowser(projectId, onPromoted);
 
   const [page, setPage] = useState(1);
-  const [poolFilter, setPoolFilter] = useState<PoolFilter>("all");
+  // Defaults to the new, not-yet-pooled issues — the ones a PM is here to act on. Pooled and
+  // removed issues stay one filter step away rather than padding the default list.
+  const [poolFilter, setPoolFilter] = useState<PoolFilter>("available");
   const [openSourceId, setOpenSourceId] = useState<string | null>(null);
 
   // The pool-state filter sits on top of the hook's own search/assigned filtering.

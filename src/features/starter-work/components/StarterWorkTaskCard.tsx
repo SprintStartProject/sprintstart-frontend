@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import type { StarterWorkTask } from "../types";
 
@@ -161,6 +161,11 @@ export function StarterWorkTaskCard({
             </motion.button>
           </motion.div>
         )}
+
+        <ChevronRight
+          className="h-4 w-4 shrink-0 self-center text-app-text-disabled"
+          aria-hidden="true"
+        />
       </div>
     </div>
   );
