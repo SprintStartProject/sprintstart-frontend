@@ -166,6 +166,10 @@ describe("StarterWorkPage", () => {
     const user = userEvent.setup();
     render(<StarterWorkPage />);
 
+    // The row is compact and opens a drawer; the add action lives in that drawer's footer.
+    await user.click(
+      await screen.findByRole("button", { name: /open tidy the onboarding readme/i }),
+    );
     await user.click(await screen.findByTestId("promote-issue-github:acme/repo:ISSUE:7"));
 
     const confirmation = await screen.findByTestId("created-task-confirmation");

@@ -63,39 +63,51 @@ export function TaskOrientationManager() {
 
   return (
     <section data-testid="task-orientation-manager" className="p-5 sm:p-6">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-app-text-muted" aria-hidden="true" />
-          <h2 className="text-sm font-semibold text-app-text">Task orientation</h2>
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
+          <BookOpen className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-app-text">Task orientation</h2>
+            {tasks.length > 0 && (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-app-surface-muted px-1.5 py-0.5 text-[11px] font-bold text-app-text-subtle tabular-nums">
+                {tasks.length}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-sm text-app-text-muted">
+            Write the guide for an approved task yourself, or hand it back to the AI. Orientation is
+            per project, so pick one first. What you write is served to hires exactly as-is.
+          </p>
         </div>
       </div>
-      <p className="mb-4 text-xs text-app-text-muted">
-        Write the guide for an approved task yourself, or hand it back to the AI. Orientation is per
-        project, so pick one first. What you write is served to hires exactly as-is.
-      </p>
 
       {tasksError && (
-        <p className="mb-3 rounded-lg bg-app-danger-bg p-2.5 text-xs font-medium text-app-danger-text">
+        <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
           {tasksError}
         </p>
       )}
 
       {tasksLoading ? (
-        <div className="flex justify-center py-8 text-app-text-muted">
-          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <div className="flex items-center justify-center py-16 text-app-text-muted">
+          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
         </div>
       ) : tasks.length === 0 ? (
-        <p className="py-6 text-center text-xs text-app-text-muted">
-          No approved tasks yet. Approve a starter task above to author its orientation.
-        </p>
+        <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
+          <BookOpen className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
+          <p className="mx-auto max-w-md text-sm text-app-text-muted">
+            No approved tasks yet. Approve a starter task above to author its orientation.
+          </p>
+        </div>
       ) : (
-        <ul className="space-y-2" data-testid="approved-task-list">
+        <ul className="space-y-3" data-testid="approved-task-list">
           {tasks.map((task) => (
             <li
               key={task.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-app-border px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-app-border bg-app-bg px-4 py-3 transition-colors hover:border-app-border-strong"
             >
-              <span className="min-w-0 truncate text-sm font-medium text-app-text">
+              <span className="min-w-0 truncate text-sm font-semibold text-app-text">
                 {task.title}
               </span>
               <button
@@ -103,7 +115,7 @@ export function TaskOrientationManager() {
                 data-testid={`edit-orientation-${task.id}`}
                 disabled={!selectedProjectId || openingId !== null}
                 onClick={() => void openEditor(task)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {openingId === task.id ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
