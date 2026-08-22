@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Link2,
@@ -14,16 +14,19 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { SpotlightCard } from "../components/ui/SpotlightCard";
 import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { PanelPresence } from "../components/ui/PanelPresence";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import { PermissionGroup } from "../services/types";
 import { StarterWorkTaskCard } from "../features/starter-work/components/StarterWorkTaskCard";
+import { StarterWorkTaskDetails } from "../features/starter-work/components/StarterWorkTaskDetails";
 import { NewStarterTaskModal } from "../features/starter-work/components/NewStarterTaskModal";
 import { CorpusIssueBrowser } from "../features/starter-work/components/CorpusIssueBrowser";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TaskOrientationManager } from "../features/orientation/components/TaskOrientationManager";
 import { useStarterWorkReview } from "../features/starter-work/hooks/useStarterWorkReview";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
-import type { CreateStarterWorkTaskInput } from "../features/starter-work/types";
+import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../features/starter-work/types";
 
 /**
  * The workflows this page holds, and the order they sit in the section filter.
@@ -55,6 +58,7 @@ const SECTION_LABELS: Record<StarterWorkSection, string> = {
  */
 export function StarterWorkPage() {
   const { profile } = useAuth();
+  const toast = useToast();
   const canAct = profile?.permissionGroup !== PermissionGroup.HR;
   // Loaded here rather than inside the modal so opening the form never waits on a fetch. An
   // empty list degrades to "Any role" only, which is a usable form rather than a broken one.
@@ -78,6 +82,44 @@ export function StarterWorkPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [activeSection, setActiveSection] = useState<StarterWorkSection>("overview");
+  // The task whose detail drawer is open, or null. Held as the object so the
+  // drawer can animate itself out after the task has left the queue.
+  const [selectedTask, setSelectedTask] = useState<StarterWorkTask | null>(null);
+
+  // Clicking a task toggles its drawer: the open one closes, any other opens.
+  const toggleSelectedTask = useCallback(
+    (task: StarterWorkTask) =>
+      setSelectedTask((current) => (current?.id === task.id ? null : task)),
+    [],
+  );
+
+  // Every decision reports its outcome as a toast, and re-throws on failure so the
+  // card or drawer that triggered it can settle back (and the drawer stays open).
+  const handleApprove = useCallback(
+    async (id: string) => {
+      try {
+        await approve(id);
+        toast.success("Marked as reviewed");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't save that decision.");
+        throw err;
+      }
+    },
+    [approve, toast],
+  );
+
+  const handleReject = useCallback(
+    async (id: string, reason?: string) => {
+      try {
+        await reject(id, reason);
+        toast.success("Removed from the pool");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't remove that task.");
+        throw err;
+      }
+    },
+    [reject, toast],
+  );
 
   // The orientation workflow is PM/ADMIN only, so the tab list — and the order the
   // swipe/slide directions read from — depends on the role.
@@ -105,7 +147,8 @@ export function StarterWorkPage() {
   const showOverview = activeSection === "overview";
   const showReview = activeSection === "overview" || activeSection === "review";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
-  const showOrientation = canAct && (activeSection === "overview" || activeSection === "orientation");
+  const showOrientation =
+    canAct && (activeSection === "overview" || activeSection === "orientation");
 
   // At-a-glance summary of the queue, derived from the same tasks the review
   // section renders so it can never drift from the list below it.
@@ -259,8 +302,8 @@ export function StarterWorkPage() {
                   <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" />
                   <p className="mx-auto max-w-md text-sm text-app-text-muted">
                     Nothing here needs a look. Tasks are mined from the corpus whenever a crawl
-                    finishes — this is where the ones nobody has vouched for yet show up, not a queue
-                    blocking anybody.
+                    finishes — this is where the ones nobody has vouched for yet show up, not a
+                    queue blocking anybody.
                   </p>
                 </div>
               ) : (
@@ -270,8 +313,10 @@ export function StarterWorkPage() {
                       key={task.id}
                       task={task}
                       canAct={canAct}
-                      onApprove={approve}
-                      onReject={reject}
+                      isOpen={selectedTask?.id === task.id}
+                      onSelect={toggleSelectedTask}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
                     />
                   ))}
                 </div>
@@ -301,6 +346,18 @@ export function StarterWorkPage() {
           )}
         </SlidingTabPanel>
       </main>
+
+      <PanelPresence value={selectedTask}>
+        {(task) => (
+          <StarterWorkTaskDetails
+            task={task}
+            canAct={canAct}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onClose={() => setSelectedTask(null)}
+          />
+        )}
+      </PanelPresence>
 
       {isCreateOpen && (
         <NewStarterTaskModal

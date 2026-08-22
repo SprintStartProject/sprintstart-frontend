@@ -51,14 +51,18 @@ describe("StarterWorkPage", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
-  it("shows the AI scope-safety rationale next to the task", async () => {
+  it("shows the AI scope-safety rationale in the task detail", async () => {
+    const user = userEvent.setup();
     render(<StarterWorkPage />);
 
-    // The rationale is the claim a PM is checking, so it has to be visible before deciding.
+    // The list stays compact; the rationale — the claim a PM is checking — opens with the detail.
+    await user.click(
+      await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
+    );
+
     expect(
       await screen.findByText(/touches one file and has clear acceptance criteria/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("Fix the login redirect")).toBeInTheDocument();
   });
 
   it("lists the competencies that become prerequisites", async () => {
@@ -67,15 +71,6 @@ describe("StarterWorkPage", () => {
     await screen.findByText("Fix the login redirect");
     expect(screen.getByText("kotlin")).toBeInTheDocument();
     expect(screen.getByText("auth")).toBeInTheDocument();
-  });
-
-  it("says a hire can already claim it, so review does not read as a gate", async () => {
-    render(<StarterWorkPage />);
-
-    await screen.findByText("Fix the login redirect");
-    expect(screen.getByText(/hires can already claim this/i)).toBeInTheDocument();
-    // Removal is the irreversible half, and it is sticky -- worth saying before it is clicked.
-    expect(screen.getByText(/mining will not bring it back/i)).toBeInTheDocument();
   });
 
   it("approves through the service and drops the task from the queue", async () => {

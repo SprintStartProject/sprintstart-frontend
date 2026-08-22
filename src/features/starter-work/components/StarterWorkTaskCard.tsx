@@ -1,128 +1,167 @@
 import { useState } from "react";
-import { Check, ExternalLink, Loader2, X } from "lucide-react";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { Check, Loader2, X } from "lucide-react";
+import { Badge } from "../../../components/ui/Badge";
 import type { StarterWorkTask } from "../types";
 
 type StarterWorkTaskCardProps = {
   task: StarterWorkTask;
   /** HR can read the queue but not decide on it. */
   canAct: boolean;
+  /** Whether this task's detail drawer is the one currently open. */
+  isOpen: boolean;
+  /** Toggle this task's detail drawer (open it, or close it if it is already the open one). */
+  onSelect: (task: StarterWorkTask) => void;
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string, reason?: string) => Promise<void>;
 };
 
+/** The action cluster slides its buttons in with a short stagger; reduced motion just fades them. */
+const CLUSTER_VARIANTS: Variants = {
+  rest: { transition: { staggerChildren: 0.05, staggerDirection: -1 } },
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.03 } },
+};
+
+const BUTTON_SPRING = { type: "spring", stiffness: 520, damping: 30, mass: 0.6 } as const;
+
 /**
- * One mined starter task awaiting a PM's decision.
+ * One mined starter task in the review list, kept compact.
  *
- * Shows the AI's scope-safety rationale next to the task itself, because that judgement is the
- * whole reason a PM is being asked rather than told: "this issue is small and self-contained" is
- * a claim they are checking, not a fact.
+ * The whole row toggles the detail drawer, where the AI's scope-safety rationale lives. The two
+ * quick decisions sit here too, sliding in while the pointer is over this row or focus is within it,
+ * so a PM can clear an obvious one without opening it. On touch, where there is no hover, they stay
+ * out of the way and the drawer is the way in. The outcome of a decision is surfaced by a toast.
  */
 export function StarterWorkTaskCard({
   task,
   canAct,
+  isOpen,
+  onSelect,
   onApprove,
   onReject,
 }: StarterWorkTaskCardProps) {
   const [isDeciding, setIsDeciding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocusWithin, setIsFocusWithin] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  const showActions = canAct && (isHovered || isFocusWithin);
+
+  const buttonVariants: Variants = prefersReducedMotion
+    ? { rest: { opacity: 0 }, show: { opacity: 1 } }
+    : {
+        rest: { opacity: 0, x: 14, scale: 0.85 },
+        show: { opacity: 1, x: 0, scale: 1, transition: BUTTON_SPRING },
+      };
 
   const decide = async (action: () => Promise<void>) => {
     setIsDeciding(true);
-    setError(null);
     try {
       await action();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save that decision.");
+      // On success the task leaves the queue and this card unmounts, so there is
+      // nothing to reset; the toast owns the feedback.
+    } catch {
+      // The page's handler already raised a toast for the failure — just let the
+      // row settle back so it can be tried again.
       setIsDeciding(false);
     }
   };
 
   return (
-    <article className="rounded-2xl border border-app-border bg-app-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div
+      data-task-card
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
+      onFocusCapture={() => setIsFocusWithin(true)}
+      onBlurCapture={() => setIsFocusWithin(false)}
+      className="relative rounded-2xl border border-app-border bg-app-bg transition-colors hover:border-app-border-strong"
+    >
+      {/* A stretched button rather than an interactive wrapper: it sits behind
+          the content as a sibling of the quick actions, so nothing interactive
+          is nested inside anything interactive. Everything on top is
+          pointer-transparent except the actions, so a click anywhere else
+          falls through to this and toggles the drawer. */}
+      <button
+        type="button"
+        onClick={(event) => {
+          onSelect(task);
+          // A mouse open leaves this trigger focused, and the drawer returns focus
+          // here on close — showing a focus ring the pointer user never asked for.
+          // Blur so focus falls back to the body. Keyboard activation (detail 0)
+          // keeps the ring, which is where it belongs.
+          if (event.detail !== 0) {
+            event.currentTarget.blur();
+          }
+        }}
+        aria-label={isOpen ? `Close details for ${task.title}` : `Open details for ${task.title}`}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      />
+
+      <div className="pointer-events-none relative z-10 flex items-start gap-3 p-4">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-app-text">{task.title}</h3>
-          {task.summary && <p className="mt-1 text-sm text-app-text-muted">{task.summary}</p>}
+          <h3 className="truncate text-sm font-semibold text-app-text">{task.title}</h3>
+          {task.summary && (
+            <p className="mt-0.5 line-clamp-1 text-sm text-app-text-muted">{task.summary}</p>
+          )}
+          {task.competencyKeys.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {task.competencyKeys.map((key) => (
+                <li key={key}>
+                  <Badge variant="purple" size="md">
+                    {key}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        {task.sourceUrl && (
-          <a
-            href={task.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
+
+        {canAct && (
+          <motion.div
+            initial={false}
+            animate={showActions ? "show" : "rest"}
+            variants={CLUSTER_VARIANTS}
+            className="pointer-events-auto flex shrink-0 items-center gap-2 self-center"
           >
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            Source issue
-          </a>
+            <motion.button
+              type="button"
+              variants={buttonVariants}
+              whileHover={
+                prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+              }
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+              data-testid={`approve-task-${task.id}`}
+              disabled={isDeciding}
+              onClick={() => void decide(() => onApprove(task.id))}
+              aria-label="Looks good"
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-5 text-xs font-semibold whitespace-nowrap text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isDeciding ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Check className="h-4 w-4" aria-hidden="true" />
+              )}
+              Looks good
+            </motion.button>
+            <motion.button
+              type="button"
+              variants={buttonVariants}
+              whileHover={
+                prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+              }
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+              data-testid={`reject-task-${task.id}`}
+              disabled={isDeciding}
+              onClick={() => void decide(() => onReject(task.id))}
+              aria-label="Take it out of the pool"
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-5 text-xs font-semibold whitespace-nowrap text-app-danger-text transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Take it out
+            </motion.button>
+          </motion.div>
         )}
       </div>
-
-      {task.rationale && (
-        <p className="mt-3 rounded-lg bg-app-surface-muted p-2.5 text-xs text-app-text-muted">
-          <span className="font-medium text-app-text">Why this is a safe first task: </span>
-          {task.rationale}
-        </p>
-      )}
-
-      {task.competencyKeys.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-1.5 text-xs font-medium text-app-text-subtle">
-            Skills it exercises — each becomes a prerequisite
-          </p>
-          <ul className="flex flex-wrap gap-1.5">
-            {task.competencyKeys.map((key) => (
-              <li
-                key={key}
-                className="rounded-md bg-app-surface-muted px-2 py-0.5 text-xs text-app-text-muted"
-              >
-                {key}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {error && (
-        <p className="mt-3 rounded-lg bg-app-danger-bg p-2.5 text-xs font-medium text-app-danger-text">
-          {error}
-        </p>
-      )}
-
-      {canAct && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            data-testid={`approve-task-${task.id}`}
-            disabled={isDeciding}
-            onClick={() => void decide(() => onApprove(task.id))}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isDeciding ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            ) : (
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            )}
-            Looks good
-          </button>
-          <button
-            type="button"
-            data-testid={`reject-task-${task.id}`}
-            disabled={isDeciding}
-            onClick={() => void decide(() => onReject(task.id))}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-app-border px-4 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-            Take it out of the pool
-          </button>
-          {/* Review is not admission any more, so the copy must not imply a hire is
-                        waiting on it. What it changes is rank, and what removal changes is
-                        permanent -- both are worth saying plainly. */}
-          <p className="w-full text-xs text-app-text-subtle">
-            Hires can already claim this. Vouching for it moves it up their suggestions; taking it
-            out is permanent, and mining will not bring it back.
-          </p>
-        </div>
-      )}
-    </article>
+    </div>
   );
 }
