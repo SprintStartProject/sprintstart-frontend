@@ -17,6 +17,7 @@ import {
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
+  StarterWorkIcon,
   type SidebarIcon,
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
@@ -76,6 +77,11 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Data Ingestion",
     path: "/data-ingestion",
     icon: DataIngestionIcon,
+  },
+  {
+    label: "Starter Work",
+    path: "/starter-work",
+    icon: StarterWorkIcon,
   },
 ];
 
