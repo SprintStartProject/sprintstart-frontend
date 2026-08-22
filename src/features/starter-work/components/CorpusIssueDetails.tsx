@@ -64,6 +64,16 @@ export function CorpusIssueDetails({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [onClose]);
 
+  // The pool state used to fill the footer; for a pooled or removed issue it now reads as one line
+  // in the Information card up top, so the footer holds only the action (or the reason there is none).
+  const poolStatus = isAvailable ? null : candidate.poolState === "IN_POOL" ? (
+    <Badge variant="success" size="sm">
+      Already in the pool
+    </Badge>
+  ) : (
+    <span className="text-app-text-muted">Taken out of the pool — it cannot go back.</span>
+  );
+
   const footerAction = isAvailable ? (
     canAct ? (
       <button
@@ -85,17 +95,9 @@ export function CorpusIssueDetails({
         Only a project manager can add work to the pool.
       </p>
     )
-  ) : candidate.poolState === "IN_POOL" ? (
-    <div className="flex items-center justify-center">
-      <Badge variant="success" size="md">
-        Already in the pool
-      </Badge>
-    </div>
-  ) : (
-    <p className="text-center text-sm text-app-text-muted">
-      Taken out of the pool — it cannot go back.
-    </p>
-  );
+  ) : null;
+
+  const hasInfo = Boolean(parsed.owner || parsed.repo || parsed.repoLabel || updated || poolStatus);
 
   return (
     <DetailsSideDrawer
@@ -133,28 +135,54 @@ export function CorpusIssueDetails({
         ) : undefined
       }
       footer={
-        <div className="w-full space-y-3">
-          {error && (
-            <p className="rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
-              {error}
-            </p>
-          )}
-          {footerAction}
-        </div>
+        footerAction || error ? (
+          <div className="w-full space-y-3">
+            {error && (
+              <p className="rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
+                {error}
+              </p>
+            )}
+            {footerAction}
+          </div>
+        ) : undefined
       }
     >
       <div className="space-y-4 sm:space-y-5">
-        {(parsed.repoLabel || updated) && (
-          <DrawerCard
-            bare
-            index={0}
-            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-muted"
-          >
-            {parsed.repoLabel && (
-              <span className="font-medium text-app-text">{parsed.repoLabel}</span>
-            )}
-            {parsed.repoLabel && updated && <span aria-hidden="true">·</span>}
-            {updated && <span>Updated {updated}</span>}
+        {hasInfo && (
+          <DrawerCard label="Information" icon={Info} index={0}>
+            <dl className="space-y-2 text-sm">
+              {parsed.owner && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-app-text-subtle">Owner</dt>
+                  <dd className="text-right font-medium text-app-text">{parsed.owner}</dd>
+                </div>
+              )}
+              {parsed.repo ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-app-text-subtle">Repository</dt>
+                  <dd className="text-right font-medium text-app-text">{parsed.repo}</dd>
+                </div>
+              ) : (
+                parsed.repoLabel && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-app-text-subtle">Repository</dt>
+                    <dd className="text-right font-medium text-app-text">{parsed.repoLabel}</dd>
+                  </div>
+                )
+              )}
+              {updated && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-app-text-subtle">Updated</dt>
+                  <dd className="text-right text-app-text-muted">{updated}</dd>
+                </div>
+              )}
+              {poolStatus && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-app-text-subtle">Pool status</dt>
+                  <dd className="text-right">{poolStatus}</dd>
+                </div>
+              )}
+            </dl>
           </DrawerCard>
         )}
 

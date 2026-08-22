@@ -2,11 +2,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleSlash,
-  Database,
   FileText,
   GitBranch,
   History,
   Loader2,
+  Ticket,
 } from "lucide-react";
 import type {
   AiSyncStatus,
@@ -34,7 +34,7 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
   JIRA: {
     name: "Jira Project Board",
     type: "Jira",
-    icon: Database,
+    icon: Ticket,
     description: "Indexes Jira issues, tasks, epics, comments and project-related metadata.",
   },
   UPLOAD: {
