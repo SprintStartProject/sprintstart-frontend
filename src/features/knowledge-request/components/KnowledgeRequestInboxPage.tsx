@@ -93,7 +93,11 @@ export function KnowledgeRequestInboxPage() {
   const answeredCount = orderedAnswers.length;
 
   return (
-    <div className="min-h-screen bg-app-bg">
+    // No root background: the app-wide aurora and cursor-glow canvas sit behind
+    // every route, and painting `bg-app-bg` here would hide them — the same
+    // choice the dashboard and PM dashboard make. Only the header band and the
+    // cards carry their own surfaces.
+    <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader

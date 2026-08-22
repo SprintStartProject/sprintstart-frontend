@@ -934,7 +934,6 @@ export function DataIngestionPage() {
     [toast],
   );
 
-
   const selectedSource = useMemo(() => {
     if (!selectedSourceId) return null;
 

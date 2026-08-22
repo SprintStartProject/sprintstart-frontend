@@ -152,6 +152,36 @@ describe("SideBar", () => {
     expect(screen.getAllByText("Access Management").length).toBeGreaterThan(0);
   });
 
+  it("hides the escalation inbox from a regular user", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
+  });
+
+  it("shows the escalation inbox to a PM managing the selected project", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: { ...mockProfile, permissionGroup: PermissionGroup.PM },
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    // The project context is mocked with `canManageSelected: true`, so the
+    // manager-assignment gate passes and the entry renders.
+    expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
+  });
+
   /**
    * The sliding pill animates by measuring where the previous one sat, which
    * only holds while the entry list does. It does not: the Project Manager

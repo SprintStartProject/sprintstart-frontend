@@ -14,6 +14,7 @@ import {
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
+  InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
@@ -77,6 +78,15 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/data-ingestion",
     icon: DataIngestionIcon,
   },
+  // The escalation inbox, surfaced as its own entry while it is being evaluated
+  // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
+  // already hides it from hires: the route is PM/HR/ADMIN-only, and for a PM it
+  // additionally requires managing the selected project.
+  {
+    label: "Escalation Inbox",
+    path: "/insights/knowledge-requests",
+    icon: InboxIcon,
+  },
 ];
 
 const adminNavItems: SidebarNavItem[] = [
@@ -135,7 +145,8 @@ function SidebarContent({
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
     location.pathname.startsWith("/insights/faq") ||
-    location.pathname.startsWith("/insights/knowledge-gaps");
+    location.pathname.startsWith("/insights/knowledge-gaps") ||
+    location.pathname.startsWith("/insights/knowledge-requests");
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },
