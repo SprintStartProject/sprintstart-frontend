@@ -1,8 +1,9 @@
-import { CalendarClock } from "lucide-react";
+import { AlertTriangle, CalendarClock, RefreshCw } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
-import { Select } from "../../../components/ui/Select.tsx";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs.tsx";
 import { useToast } from "../../../context/useToast.ts";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
@@ -37,12 +38,12 @@ type GithubRepositorySyncSettingsProps = {
   saveLabel?: string;
 };
 
-const SCHEDULE_TYPES: { value: ScheduleType; label: string }[] = [
+const SCHEDULE_TYPES: SegmentedTabOption<ScheduleType>[] = [
   { value: "INTERVAL", label: "Interval" },
   { value: "DAILY", label: "Daily" },
   { value: "WEEKLY", label: "Weekly" },
   { value: "MONTHLY", label: "Monthly" },
-  { value: "CUSTOM", label: "Custom cron" },
+  { value: "CUSTOM", label: "Custom" },
 ];
 
 const DAYS_OF_WEEK: GithubScheduleDayOfWeek[] = [
@@ -72,11 +73,14 @@ export function GithubRepositorySyncSettings({
   toggleAriaLabel = "Toggle repository auto update",
   saveLabel = "Save",
 }: GithubRepositorySyncSettingsProps) {
-  const scheduleTypeId = useId();
   const intervalInputId = useId();
   const timeInputId = useId();
   const dayOfMonthInputId = useId();
   const cronInputId = useId();
+  // Unique per mount: framer-motion matches `layoutId` globally, so the modal
+  // and the details-panel copy of this form must not share the cadence pill.
+  const cadenceLayoutId = useId();
+  const prefersReducedMotion = useReducedMotion();
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [scheduleType, setScheduleType] = useState<ScheduleType>("INTERVAL");
   const [everyMinutes, setEveryMinutes] = useState("60");
@@ -224,7 +228,6 @@ export function GithubRepositorySyncSettings({
   };
 
   const isBusy = loadState === "loading" || saveState === "loading";
-  const usesTimeInput = ["DAILY", "WEEKLY", "MONTHLY"].includes(scheduleType);
 
   const currentSnapshot = useMemo(
     () =>
@@ -241,36 +244,56 @@ export function GithubRepositorySyncSettings({
   );
   const isDirty = currentSnapshot !== baseline;
 
+  // A quiet opacity crossfade between cadence field sets — deliberately not a
+  // height/unfold reveal, which replayed an "expand" every time the schedule
+  // type changed. Instant swap under reduced-motion.
+  const fieldTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.15, ease: "easeOut" as const };
+
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
+    // No own surface: this control renders both on the modal's `bg-app-bg` and
+    // inside a Source Details `DrawerCard` (`bg-app-surface`); letting the parent
+    // own the surface avoids a card-in-a-card look on either background.
+    <div className="space-y-4">
       {errorMessage && (
-        <div className="mb-4 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-2 text-sm text-app-warning-text">
-          {errorMessage}
+        <div className="flex items-start gap-2 rounded-2xl border border-yellow-400 bg-yellow-200 px-4 py-3 text-sm font-medium text-app-warning-text dark:border-yellow-400/50 dark:bg-yellow-400/15">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{errorMessage}</span>
         </div>
       )}
 
       {disclaimer && (
-        <div className="mb-4 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-2 text-sm text-app-warning-text">
-          {disclaimer}
+        <div className="flex items-start gap-2 rounded-2xl border border-yellow-400 bg-yellow-200 px-4 py-3 text-sm font-medium text-app-warning-text dark:border-yellow-400/50 dark:bg-yellow-400/15">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{disclaimer}</span>
         </div>
       )}
 
       {showNextSync && (
-        <div className="mb-4 flex flex-col gap-2 border-b border-app-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-app-text">Next sync</p>
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-app-text">
-            <CalendarClock className="h-4 w-4 text-app-text-muted" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-bg-soft px-3 py-1.5 text-xs font-semibold text-app-text">
+            <CalendarClock className="h-3.5 w-3.5 text-app-text-muted" />
             {nextSyncAt ? formatDateTime(nextSyncAt) : "Not available"}
-          </p>
+          </span>
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
-        <div>
-          <p className="text-sm font-semibold text-app-text">Auto update</p>
-          <p className="mt-1 text-xs text-app-text-muted">
-            {autoUpdate ? autoUpdateOnText : autoUpdateOffText}
-          </p>
+      {/* Auto-update as a distinct switch card, set apart from the schedule
+          fields below it. */}
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-app-border bg-app-surface-muted p-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface text-app-text-muted">
+            <RefreshCw className="h-4.5 w-4.5" />
+          </span>
+
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-app-text">Auto update</p>
+            <p className="mt-1 text-xs text-app-text-muted">
+              {autoUpdate ? autoUpdateOnText : autoUpdateOffText}
+            </p>
+          </div>
         </div>
 
         <AccountEnabledToggle
@@ -281,141 +304,182 @@ export function GithubRepositorySyncSettings({
         />
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor={scheduleTypeId} className="text-sm font-medium text-app-text">
-            Schedule
-          </label>
-          <Select
-            id={scheduleTypeId}
+      <div>
+        <p className="mb-2 text-sm font-medium text-app-text">Schedule</p>
+        {/* SegmentedTabs has no disabled state; while busy we soft-disable the
+            whole bar so the cadence can't change mid load/save. */}
+        <div
+          className={isBusy ? "pointer-events-none opacity-60" : undefined}
+          aria-disabled={isBusy || undefined}
+        >
+          <SegmentedTabs
             value={scheduleType}
-            disabled={isBusy}
-            onChange={(event) => setScheduleType(event.target.value as ScheduleType)}
-            className="mt-2"
-          >
-            {SCHEDULE_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {scheduleType === "INTERVAL" && (
-          <div>
-            <label htmlFor={intervalInputId} className="text-sm font-medium text-app-text">
-              Minutes
-            </label>
-            <div className="mt-2 flex min-h-10 items-center rounded-xl border border-app-border bg-app-surface focus-within:border-app-brand focus-within:ring-2 focus-within:ring-app-focus">
-              <span className="pl-3 text-sm text-app-text-muted">Every</span>
-              <input
-                id={intervalInputId}
-                type="number"
-                min="1"
-                value={everyMinutes}
-                disabled={isBusy}
-                onChange={(event) => setEveryMinutes(event.target.value)}
-                className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm font-semibold text-app-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              />
-              <span className="pr-3 text-sm text-app-text-muted">minutes</span>
-            </div>
-          </div>
-        )}
-
-        {usesTimeInput && (
-          <label htmlFor={timeInputId} className="block">
-            <span className="text-sm font-medium text-app-text">Time</span>
-            <Input
-              id={timeInputId}
-              type="time"
-              step="1"
-              value={time}
-              disabled={isBusy}
-              onChange={(event) => setTime(event.target.value)}
-              className="mt-2"
-            />
-          </label>
-        )}
-
-        {scheduleType === "CUSTOM" && (
-          <label htmlFor={cronInputId} className="block">
-            <span className="text-sm font-medium text-app-text">Cron</span>
-            <Input
-              id={cronInputId}
-              type="text"
-              value={cron}
-              disabled={isBusy}
-              onChange={(event) => setCron(event.target.value)}
-              className="mt-2 font-mono"
-            />
-          </label>
-        )}
-      </div>
-
-      {scheduleType === "WEEKLY" && (
-        <fieldset className="mt-4">
-          <legend className="text-sm font-medium text-app-text">Days</legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {DAYS_OF_WEEK.map((day) => {
-              const isSelected = daysOfWeek.includes(day);
-
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  aria-pressed={isSelected}
-                  disabled={isBusy}
-                  onClick={() => setDaysOfWeek((current) => toggleDay(current, day))}
-                  className={[
-                    "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-                    isSelected
-                      ? "border-app-brand-border-strong bg-app-brand text-white"
-                      : "border-app-border bg-app-surface text-app-text-muted hover:text-app-text",
-                  ].join(" ")}
-                >
-                  {formatDayLabel(day)}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-      )}
-
-      {scheduleType === "MONTHLY" && (
-        <label htmlFor={dayOfMonthInputId} className="mt-4 block max-w-48">
-          <span className="text-sm font-medium text-app-text">Day of month</span>
-          <Input
-            id={dayOfMonthInputId}
-            type="number"
-            min="1"
-            max="31"
-            value={dayOfMonth}
-            disabled={isBusy}
-            onChange={(event) => setDayOfMonth(event.target.value)}
-            className="mt-2"
+            options={SCHEDULE_TYPES}
+            onChange={setScheduleType}
+            layoutId={cadenceLayoutId}
+            ariaLabel="Sync schedule cadence"
           />
-        </label>
-      )}
-
-      <div className="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-        {isDirty && !isBusy && (
-          <p className="text-xs font-medium text-app-text-muted sm:mr-1">
-            You have unsaved changes
-          </p>
-        )}
-
-        <SaveButton
-          dirty={isDirty}
-          saving={saveState === "loading"}
-          disabled={loadState === "loading"}
-          label={saveLabel}
-          cleanLabel={saveLabel}
-          onClick={() => {
-            void saveSettings();
-          }}
-          className="w-full sm:w-auto"
-        />
+        </div>
       </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={scheduleType}
+          initial={prefersReducedMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={fieldTransition}
+        >
+          {scheduleType === "INTERVAL" && (
+            <div className="max-w-xs">
+              <label htmlFor={intervalInputId} className="text-sm font-medium text-app-text">
+                Minutes
+              </label>
+              <div className="mt-2 flex min-h-10 items-center rounded-xl border border-app-border bg-app-surface focus-within:border-app-brand focus-within:ring-2 focus-within:ring-app-focus">
+                <span className="pl-3 text-sm text-app-text-muted">Every</span>
+                <input
+                  id={intervalInputId}
+                  type="number"
+                  min="1"
+                  value={everyMinutes}
+                  disabled={isBusy}
+                  onChange={(event) => setEveryMinutes(event.target.value)}
+                  className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm font-semibold text-app-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <span className="pr-3 text-sm text-app-text-muted">minutes</span>
+              </div>
+            </div>
+          )}
+
+          {scheduleType === "DAILY" && (
+            <label htmlFor={timeInputId} className="block max-w-xs">
+              <span className="text-sm font-medium text-app-text">Time</span>
+              <Input
+                id={timeInputId}
+                type="time"
+                step="1"
+                value={time}
+                disabled={isBusy}
+                onChange={(event) => setTime(event.target.value)}
+                className="mt-2"
+              />
+            </label>
+          )}
+
+          {scheduleType === "WEEKLY" && (
+            <div className="space-y-4">
+              <label htmlFor={timeInputId} className="block max-w-xs">
+                <span className="text-sm font-medium text-app-text">Time</span>
+                <Input
+                  id={timeInputId}
+                  type="time"
+                  step="1"
+                  value={time}
+                  disabled={isBusy}
+                  onChange={(event) => setTime(event.target.value)}
+                  className="mt-2"
+                />
+              </label>
+
+              <fieldset>
+                <legend className="text-sm font-medium text-app-text">Days</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => {
+                    const isSelected = daysOfWeek.includes(day);
+
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        aria-pressed={isSelected}
+                        disabled={isBusy}
+                        onClick={() => setDaysOfWeek((current) => toggleDay(current, day))}
+                        className={[
+                          "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                          isSelected
+                            ? "border-app-brand-border-strong bg-app-brand text-white"
+                            : "border-app-border bg-app-surface text-app-text-muted hover:text-app-text",
+                        ].join(" ")}
+                      >
+                        {formatDayLabel(day)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            </div>
+          )}
+
+          {scheduleType === "MONTHLY" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label htmlFor={timeInputId} className="block">
+                <span className="text-sm font-medium text-app-text">Time</span>
+                <Input
+                  id={timeInputId}
+                  type="time"
+                  step="1"
+                  value={time}
+                  disabled={isBusy}
+                  onChange={(event) => setTime(event.target.value)}
+                  className="mt-2"
+                />
+              </label>
+
+              <label htmlFor={dayOfMonthInputId} className="block">
+                <span className="text-sm font-medium text-app-text">Day of month</span>
+                <Input
+                  id={dayOfMonthInputId}
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={dayOfMonth}
+                  disabled={isBusy}
+                  onChange={(event) => setDayOfMonth(event.target.value)}
+                  className="mt-2"
+                />
+              </label>
+            </div>
+          )}
+
+          {scheduleType === "CUSTOM" && (
+            <label htmlFor={cronInputId} className="block">
+              <span className="text-sm font-medium text-app-text">Cron</span>
+              <Input
+                id={cronInputId}
+                type="text"
+                value={cron}
+                disabled={isBusy}
+                onChange={(event) => setCron(event.target.value)}
+                className="mt-2 font-mono"
+              />
+            </label>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Like the admin drawers: the save affordance only appears once the
+          form is actually dirty, so a settled schedule shows no stray button. */}
+      {(isDirty || saveState === "loading") && (
+        <div className="flex flex-col items-stretch gap-2 border-t border-app-border pt-4 sm:flex-row sm:items-center sm:justify-end">
+          {!isBusy && (
+            <p className="text-xs font-medium text-app-text-muted sm:mr-1">
+              You have unsaved changes
+            </p>
+          )}
+
+          <SaveButton
+            dirty={isDirty}
+            saving={saveState === "loading"}
+            disabled={loadState === "loading"}
+            label={saveLabel}
+            cleanLabel={saveLabel}
+            onClick={() => {
+              void saveSettings();
+            }}
+            className="w-full sm:w-auto"
+          />
+        </div>
+      )}
     </div>
   );
 }
