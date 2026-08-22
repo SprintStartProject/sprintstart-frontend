@@ -91,7 +91,7 @@ export function ProjectsTab({
             // 1px border from the pre-scale bitmap, and on a row this wide that
             // reads as the outline thinning out and partly vanishing. A
             // translation moves the same crisp pixels.
-            className="group flex w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow motion-reduce:hover:translate-y-0 sm:flex-row sm:items-start sm:justify-between sm:p-5"
+            className="group flex w-full cursor-pointer flex-row items-start gap-3 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow motion-reduce:hover:translate-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:p-5"
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
@@ -149,7 +149,7 @@ export function ProjectsTab({
               </div>
             </div>
 
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-xl text-app-text-muted transition-colors group-hover:text-app-text sm:self-center">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-xl text-app-text-muted transition-colors group-hover:text-app-text">
               <ChevronRight className="h-4 w-4" />
             </div>
           </button>

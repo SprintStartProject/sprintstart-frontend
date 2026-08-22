@@ -189,38 +189,42 @@ export function SidePanel({
       >
         {(title || description || leading || badge || actions) && (
           <div className={`${headerDividerClassName} ${headerClassName}`}>
-            <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
-              <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-                {leading}
+            {/* Mobile: the leading media (avatar/icon) and the action/close
+                cluster share the top row; the title, description and badge drop
+                to their own full-width row below (`order-last` + `w-full`), so
+                the name gets the whole row. From `sm` up it collapses to the
+                original inline row — avatar and title on the left, actions and
+                close on the right. */}
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3 sm:gap-4">
+              {leading}
 
-                <div className="min-w-0">
-                  {title && (
-                    <h2
-                      id={titleId}
-                      className="text-xl leading-tight font-bold break-words text-app-text"
-                    >
-                      {title}
-                    </h2>
-                  )}
+              <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
+                {title && (
+                  <h2
+                    id={titleId}
+                    className="text-xl leading-tight font-bold break-words text-app-text"
+                  >
+                    {title}
+                  </h2>
+                )}
 
-                  {description && (
-                    <div
-                      id={descriptionId}
-                      className="mt-1 text-sm leading-relaxed text-app-text-muted"
-                    >
-                      {description}
-                    </div>
-                  )}
+                {description && (
+                  <div
+                    id={descriptionId}
+                    className="mt-1 text-sm leading-relaxed text-app-text-muted"
+                  >
+                    {description}
+                  </div>
+                )}
 
-                  {badge && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-app-text-muted">
-                      {badge}
-                    </div>
-                  )}
-                </div>
+                {badge && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-app-text-muted">
+                    {badge}
+                  </div>
+                )}
               </div>
 
-              <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 {actions}
 
                 <button

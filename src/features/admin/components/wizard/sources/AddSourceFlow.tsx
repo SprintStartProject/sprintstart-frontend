@@ -45,6 +45,13 @@ type GithubDetailProps = {
   onSelectionChange: (selection: DiscoverySelection[]) => void;
   /** Refetches the token list and selects the newly added one. */
   onTokenSaved: () => Promise<void>;
+  /**
+   * Scopes discovery to an existing project so repositories already connected to
+   * it are flagged and cannot be staged twice. `null`/omitted (the create-project
+   * wizard, where no project exists yet) discovers without that scope.
+   */
+  projectId?: string | null;
+  projectName?: string;
 };
 
 /** Jira detail — a staged form; nothing connects until provisioning. */
@@ -351,7 +358,8 @@ function GithubDetail({
 
       <GithubRepositoryDiscovery
         tokenNames={github.tokenNames}
-        projectId={null}
+        projectId={github.projectId ?? null}
+        projectName={github.projectName}
         tokenName={github.tokenName}
         onTokenNameChange={github.onTokenNameChange}
         onSelectionChange={github.onSelectionChange}

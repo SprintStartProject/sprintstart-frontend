@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Search, Shield, ShieldCheck, UserMinus, UserPlus, Undo2 } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Search, Shield, ShieldCheck, UserMinus, UserPlus, Undo2, Users } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -94,6 +95,7 @@ export function ProjectPeopleSection({
   onDraftChange,
 }: ProjectPeopleSectionProps) {
   const [search, setSearch] = useState("");
+  const prefersReducedMotion = useReducedMotion();
 
   const activeDraft = resolvePeopleDraft(draft, snapshotKey);
 
@@ -214,36 +216,44 @@ export function ProjectPeopleSection({
 
   return (
     <div>
-      <div className="mb-4">
-        <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">People</p>
-        <p className="mt-1 text-sm text-app-text-muted">
-          {peopleCount} {peopleCount === 1 ? "person" : "people"}
-          {managerCount > 0 ? " · 1 manager" : " · no manager"}
-        </p>
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
+          <Users className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+            People
+          </p>
+          <p className="mt-0.5 text-sm text-app-text-muted">
+            {peopleCount} {peopleCount === 1 ? "person" : "people"}
+            {managerCount > 0 ? " · 1 manager" : " · no manager"}
+          </p>
+        </div>
       </div>
 
-      <Input
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search or add people..."
-        aria-label="Search or add people"
-        disabled={disabled}
-        icon={<Search className="h-4 w-4" />}
-        className="mb-4"
-      />
+      <div className="mb-4">
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search or add people..."
+          aria-label="Search or add people"
+          disabled={disabled}
+          icon={<Search className="h-4 w-4" />}
+        />
+      </div>
 
-      {visibleRows.length > 0 ? (
+      {visibleRows.length > 0 && (
         <ul className="space-y-2">
           {visibleRows.map((row) => (
             <li
               key={row.id}
               className={[
-                "flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors",
+                "flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all",
                 row.isPendingRemove
                   ? "border-app-danger-border bg-app-danger-bg opacity-75"
                   : row.isPendingAdd
                     ? "border-app-brand-border-strong bg-app-brand-soft"
-                    : "border-app-border bg-app-surface",
+                    : "border-app-border bg-app-surface hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0",
               ].join(" ")}
             >
               <UserAvatar
@@ -345,10 +355,15 @@ export function ProjectPeopleSection({
             </li>
           ))}
         </ul>
-      ) : (
+      )}
+
+      {/* The empty-state box speaks for the whole list, so it only stands in
+          when nothing matches at all — never above a valid "Add to project"
+          result that the search just surfaced. */}
+      {visibleRows.length === 0 && addableUsers.length === 0 && (
         <p className="rounded-2xl border border-dashed border-app-border px-4 py-6 text-center text-sm text-app-text-muted">
           {search.trim()
-            ? "No assigned people match your search."
+            ? `No people match "${search.trim()}".`
             : "Nobody is assigned to this project yet."}
         </p>
       )}
@@ -360,8 +375,17 @@ export function ProjectPeopleSection({
           </p>
 
           <ul className="space-y-1">
-            {addableUsers.map((user) => (
-              <li key={user.id}>
+            {addableUsers.map((user, addableIndex) => (
+              <motion.li
+                key={user.id}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0 }
+                    : { duration: 0.2, delay: addableIndex * 0.04, ease: "easeOut" }
+                }
+              >
                 <button
                   type="button"
                   onClick={() => addUser(user.id)}
@@ -384,7 +408,7 @@ export function ProjectPeopleSection({
                   </span>
                   <UserPlus className="h-4 w-4 shrink-0 text-app-text-muted" />
                 </button>
-              </li>
+              </motion.li>
             ))}
           </ul>
         </div>

@@ -150,7 +150,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               aria-label={`Rename credential ${displayName}`}
               className="flex-1 sm:flex-none"
             >
-              Rename
+              <span className="hidden sm:inline">Rename</span>
             </Button>
             <Button
               variant="secondary"
@@ -161,7 +161,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               aria-label={`Rotate token ${displayName}`}
               className="flex-1 sm:flex-none"
             >
-              Rotate
+              <span className="hidden sm:inline">Rotate</span>
             </Button>
             <Button
               variant="dangerSoft"
@@ -172,7 +172,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               aria-label={`Delete credential ${displayName}`}
               className="flex-1 sm:flex-none"
             >
-              Delete
+              <span className="hidden sm:inline">Delete</span>
             </Button>
           </div>
         )}

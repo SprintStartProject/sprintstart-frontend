@@ -19,8 +19,8 @@ export function AdminProjectsToolbar({
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-sm font-semibold text-app-text">{projectCount} projects</span>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="w-full sm:w-64">
+      <div className="flex flex-row items-center gap-2 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1 sm:w-64 sm:min-w-[auto] sm:flex-initial">
           <Input
             value={projectSearchValue}
             onChange={(event) => onProjectSearchChange(event.target.value)}
@@ -34,7 +34,7 @@ export function AdminProjectsToolbar({
           variant="primary"
           onClick={onCreateProject}
           icon={<Plus className="h-4 w-4" />}
-          className="w-full sm:w-auto"
+          className="w-auto shrink-0 sm:w-auto sm:shrink"
         >
           New Project
         </Button>
