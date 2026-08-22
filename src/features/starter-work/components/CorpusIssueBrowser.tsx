@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Ban, Check, ChevronRight, Inbox, Loader2, Search, UserCheck } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { Ban, Check, ChevronRight, Inbox, Loader2, Plus, Search, UserCheck } from "lucide-react";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -25,6 +26,9 @@ type CorpusIssueBrowserProps = {
 const PAGE_SIZE = 8;
 /** Labels shown inline on a row before the rest collapse into a "+N" badge. */
 const ROW_LABEL_CAP = 3;
+
+/** The same spring the review quick-actions ride in on, so the two read as one motion. */
+const BUTTON_SPRING = { type: "spring", stiffness: 520, damping: 30, mass: 0.6 } as const;
 
 /** The pool-state filter beside the search box. */
 type PoolFilter = "all" | "available" | "in-pool" | "removed";
@@ -208,7 +212,11 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
                   <CandidateRow
                     key={candidate.sourceId}
                     candidate={candidate}
+                    canAct={canAct}
+                    isPromoting={promotingSourceId === candidate.sourceId}
+                    isBusy={promotingSourceId !== null}
                     onOpen={setOpenSourceId}
+                    onPromote={promote}
                   />
                 ))}
               </ul>
@@ -223,19 +231,26 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
         </>
       )}
 
+      {/* Portaled to <body> so the drawer clears the sliding tab panel's transform. The extra
+          AnimatePresence resets the `initial={false}` that SlidingTabPanel's own AnimatePresence
+          pushes down the React tree (context crosses the portal) — without it the drawer inherits
+          "no enter animation" and pops in instead of sliding. Its child, PanelPresence, is always
+          present, so this AnimatePresence only resets the context; it never manages the exit. */}
       {createPortal(
-        <PanelPresence value={openCandidate}>
-          {(candidate) => (
-            <CorpusIssueDetails
-              candidate={candidate}
-              canAct={canAct}
-              isPromoting={promotingSourceId === candidate.sourceId}
-              error={error}
-              onPromote={promote}
-              onClose={() => setOpenSourceId(null)}
-            />
-          )}
-        </PanelPresence>,
+        <AnimatePresence>
+          <PanelPresence value={openCandidate}>
+            {(candidate) => (
+              <CorpusIssueDetails
+                candidate={candidate}
+                canAct={canAct}
+                isPromoting={promotingSourceId === candidate.sourceId}
+                error={error}
+                onPromote={promote}
+                onClose={() => setOpenSourceId(null)}
+              />
+            )}
+          </PanelPresence>
+        </AnimatePresence>,
         document.body,
       )}
     </section>
@@ -244,7 +259,14 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
 
 type CandidateRowProps = {
   candidate: StarterWorkCandidate;
+  /** HR reads the list; only PM/ADMIN get the quick-add action. */
+  canAct: boolean;
+  /** This row's own add is in flight. */
+  isPromoting: boolean;
+  /** Any row's add is in flight, so every add is held until it settles. */
+  isBusy: boolean;
   onOpen: (sourceId: string) => void;
+  onPromote: (sourceId: string) => Promise<boolean>;
 };
 
 /**
@@ -278,25 +300,70 @@ function poolStateBadge(poolState: CandidatePoolState) {
 /**
  * One browsable issue, kept to a name and a number.
  *
- * The whole row opens the detail drawer, where the body and the add action live. A pooled or
- * removed issue is still shown and still opens — the marking is what tells a reader why it is not on
- * offer, and leaving it out would send them hunting for an issue they know exists.
+ * A stretched button behind the content opens the detail drawer, so a click anywhere on the row
+ * falls through to it — nothing interactive is nested inside anything interactive. On a pointer the
+ * quick "Add to the pool" surfaces on hover (and on keyboard focus) so a PM can pool an obvious one
+ * without opening it; on touch, where there is no hover, it stays out of the way and the drawer is
+ * the way in. Only an available issue offers it: a pooled or removed one is shown marked instead.
  */
-function CandidateRow({ candidate, onOpen }: CandidateRowProps) {
+function CandidateRow({
+  candidate,
+  canAct,
+  isPromoting,
+  isBusy,
+  onOpen,
+  onPromote,
+}: CandidateRowProps) {
   const parsed = parseCandidateSource(candidate.sourceId);
   const tracker = trackerLabel(candidate.tracker);
   const shownLabels = candidate.labels.slice(0, ROW_LABEL_CAP);
   const extraLabels = candidate.labels.length - shownLabels.length;
   const isRemoved = candidate.poolState === "REMOVED";
   const status = poolStateBadge(candidate.poolState);
+  const canAdd = canAct && candidate.poolState === "AVAILABLE";
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocusWithin, setIsFocusWithin] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  // Revealed on hover or focus, matching the review card. Reduced motion just fades it in; otherwise
+  // it slides and scales in on the same spring the review quick-actions use.
+  const showAdd = canAdd && (isHovered || isFocusWithin);
+  const addVariants: Variants = prefersReducedMotion
+    ? { rest: { opacity: 0 }, show: { opacity: 1 } }
+    : {
+        rest: { opacity: 0, x: 14, scale: 0.85 },
+        show: { opacity: 1, x: 0, scale: 1, transition: BUTTON_SPRING },
+      };
 
   return (
-    <li data-testid={`corpus-issue-${candidate.sourceId}`} data-corpus-row>
+    <li
+      className="group relative"
+      data-testid={`corpus-issue-${candidate.sourceId}`}
+      data-corpus-row
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
+      onFocusCapture={() => setIsFocusWithin(true)}
+      onBlurCapture={() => setIsFocusWithin(false)}
+    >
+      {/* A stretched button rather than an interactive wrapper: it sits behind the content, so a
+          click anywhere but the add action falls through to it and opens the drawer. */}
       <button
         type="button"
-        onClick={() => onOpen(candidate.sourceId)}
+        onClick={(event) => {
+          onOpen(candidate.sourceId);
+          // A mouse open leaves this trigger focused; blur so it does not linger a focus ring or
+          // keep the quick-add revealed. Keyboard activation (detail 0) keeps the ring.
+          if (event.detail !== 0) {
+            event.currentTarget.blur();
+          }
+        }}
         aria-label={`Open ${candidate.title}`}
-        className={`flex w-full items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      />
+
+      <div
+        className={`pointer-events-none relative z-10 flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong ${
           isRemoved ? "opacity-70" : ""
         }`}
       >
@@ -321,10 +388,6 @@ function CandidateRow({ candidate, onOpen }: CandidateRowProps) {
                 {status}
               </div>
             )}
-            <ChevronRight
-              className="mt-1.5 h-4 w-4 shrink-0 text-app-text-disabled"
-              aria-hidden="true"
-            />
           </div>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -354,7 +417,34 @@ function CandidateRow({ candidate, onOpen }: CandidateRowProps) {
             </div>
           )}
         </div>
-      </button>
+
+        <div className="flex shrink-0 items-center gap-2 self-center">
+          {canAdd && (
+            <motion.button
+              type="button"
+              initial={false}
+              animate={showAdd ? "show" : "rest"}
+              variants={addVariants}
+              whileHover={
+                prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+              }
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+              data-testid={`quick-promote-issue-${candidate.sourceId}`}
+              disabled={isBusy}
+              onClick={() => void onPromote(candidate.sourceId)}
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+            >
+              {isPromoting ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              )}
+              Add to the pool
+            </motion.button>
+          )}
+          <ChevronRight className="h-4 w-4 shrink-0 text-app-text-disabled" aria-hidden="true" />
+        </div>
+      </div>
     </li>
   );
 }

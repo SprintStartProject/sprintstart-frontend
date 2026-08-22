@@ -145,16 +145,20 @@ export function CorpusIssueDetails({
     >
       <div className="space-y-4 sm:space-y-5">
         {(parsed.repoLabel || updated) && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-muted">
+          <DrawerCard
+            bare
+            index={0}
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-muted"
+          >
             {parsed.repoLabel && (
               <span className="font-medium text-app-text">{parsed.repoLabel}</span>
             )}
             {parsed.repoLabel && updated && <span aria-hidden="true">·</span>}
             {updated && <span>Updated {updated}</span>}
-          </div>
+          </DrawerCard>
         )}
 
-        <DrawerCard label="Issue" icon={AlignLeft} index={0}>
+        <DrawerCard label="Issue" icon={AlignLeft} index={1}>
           {candidate.excerpt ? (
             <div className="text-sm leading-relaxed text-app-text-muted">
               <BuddyMarkdown content={candidate.excerpt} />
@@ -172,7 +176,7 @@ export function CorpusIssueDetails({
         </DrawerCard>
 
         {candidate.labels.length > 0 && (
-          <DrawerCard label="Labels" icon={Tag} index={1}>
+          <DrawerCard label="Labels" icon={Tag} index={2}>
             <ul className="flex flex-wrap gap-1.5">
               {candidate.labels.map((label) => (
                 <li key={label}>
@@ -186,7 +190,7 @@ export function CorpusIssueDetails({
         )}
 
         {candidate.hasAssignee === true && (
-          <DrawerCard label="Status" icon={Info} index={2}>
+          <DrawerCard label="Status" icon={Info} index={3}>
             <p className="text-sm leading-relaxed text-app-text-muted">
               Someone is already on this issue. It is still yours to add — the pool is a suggestion,
               not a claim.

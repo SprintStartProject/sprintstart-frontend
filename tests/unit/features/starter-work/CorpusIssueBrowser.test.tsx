@@ -192,6 +192,47 @@ describe("CorpusIssueBrowser", () => {
     expect(starterWorkService.fetchCandidates).toHaveBeenCalledTimes(1);
   });
 
+  it("adds an issue straight from its row, without opening the drawer", async () => {
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
+    const promote = vi.spyOn(starterWorkService, "promoteCandidate").mockResolvedValue({
+      id: "task-1",
+      sourceId: "github:acme/repo:ISSUE:1",
+      title: "Fix the login redirect",
+      summary: null,
+      rationale: null,
+      sourceUrl: "https://github.com/acme/repo/issues/1",
+      competencyKeys: [],
+      status: "LIVE",
+      reviewed: true,
+    });
+    const onPromoted = vi.fn();
+    const user = userEvent.setup();
+    render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={onPromoted} />);
+
+    await user.click(await screen.findByTestId("quick-promote-issue-github:acme/repo:ISSUE:1"));
+
+    await waitFor(() =>
+      expect(promote).toHaveBeenCalledWith({ sourceId: "github:acme/repo:ISSUE:1" }),
+    );
+    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }));
+    // The row flips to pooled, so it no longer offers the quick add.
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("quick-promote-issue-github:acme/repo:ISSUE:1"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("does not offer the quick add on the row to HR", async () => {
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
+    render(<CorpusIssueBrowser projectId="p1" canAct={false} onPromoted={vi.fn()} />);
+
+    await screen.findByText("Fix the login redirect");
+    expect(
+      screen.queryByTestId("quick-promote-issue-github:acme/repo:ISSUE:1"),
+    ).not.toBeInTheDocument();
+  });
+
   it("surfaces a refused promotion instead of pretending it landed", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
     vi.spyOn(starterWorkService, "promoteCandidate").mockRejectedValue(
