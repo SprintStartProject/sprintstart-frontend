@@ -10,12 +10,18 @@ export type AppRoute =
   | "/chat"
   | "/knowledge-base"
   | "/onboarding"
+  | "/buddy"
+  | "/board"
   | "/data-ingestion"
+  | "/arrival-steps"
+  | "/starter-work"
   | "/admin"
   | "/pm-dashboard"
   | "/team-management"
   | "/insights/faq"
   | "/insights/knowledge-gaps"
+  | "/insights/knowledge-requests"
+  | "/insights/onboarding"
   | "/settings"
   | "/profile";
 
@@ -31,12 +37,26 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
   "/chat": ALL_GROUPS,
   "/knowledge-base": ALL_GROUPS,
   "/onboarding": ALL_GROUPS,
+  "/buddy": ALL_GROUPS,
+  // The hire's own board. Same audience as the buddy: it is the durable half of the same
+  // surface, and everybody onboards onto a project at some point.
+  "/board": ALL_GROUPS,
   "/data-ingestion": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  // HR reads the arrival list; PM/ADMIN author it (enforced server-side too -- this only decides
+  // who sees the page). Worth revisiting: paperwork and accounts are arguably HR's to own.
+  "/arrival-steps": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  // HR reads the queue; approving is what mints a goal node, so only PM/ADMIN act (enforced
+  // server-side too -- this only decides who sees the page).
+  "/starter-work": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/admin": [PermissionGroup.HR, PermissionGroup.ADMIN],
   "/pm-dashboard": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/team-management": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/insights/faq": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/insights/knowledge-gaps": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  // HR reads the escalation queue; answering (minting durable knowledge) is PM/ADMIN, enforced
+  // server-side too -- this only decides who sees the page.
+  "/insights/knowledge-requests": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  "/insights/onboarding": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/settings": ALL_GROUPS,
   "/profile": ALL_GROUPS,
 };

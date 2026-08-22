@@ -38,5 +38,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./tests/unit/setup/vitest.setup.ts",
+    // An axe scan of a full page takes seconds, and the a11y suite runs many of them in
+    // parallel. The default 5s bounds machine load rather than the code under test, so a
+    // busy runner fails whichever file happens to be scheduled last.
+    testTimeout: 30000,
   },
 });
