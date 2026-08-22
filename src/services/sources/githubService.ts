@@ -383,7 +383,7 @@ export async function updateGithubRepository(
 export async function configureAllGithubRepositories(
   request: ConfigureGithubRepositoryRequest,
 ): Promise<void> {
-  await apiClient.fetch<void>("/api/v1/github/config/global", {
+  await apiClient.fetch<void>("/api/v1/github/config", {
     method: "PUT",
     body: JSON.stringify(request),
   });

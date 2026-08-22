@@ -227,9 +227,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         )
       ) : (
         <>
-          {loading ? spinner : icon}
+          {/* Icons keep their size in a tight/`w-full` button: without `shrink-0`
+              a long label squeezes the SVG smaller as the button narrows. */}
+          {loading ? (
+            <span className="flex shrink-0 items-center">{spinner}</span>
+          ) : icon ? (
+            <span className="flex shrink-0 items-center">{icon}</span>
+          ) : null}
           {children}
-          {trailingIcon}
+          {trailingIcon ? (
+            <span className="flex shrink-0 items-center">{trailingIcon}</span>
+          ) : null}
         </>
       )}
     </motion.button>

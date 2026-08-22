@@ -88,7 +88,7 @@ describe("githubService config endpoints", () => {
     expect.assertions(1);
 
     server.use(
-      http.put("/api/v1/github/config/global", async ({ request }) => {
+      http.put("/api/v1/github/config", async ({ request }) => {
         const body = await request.json();
 
         expect(body).toEqual({
