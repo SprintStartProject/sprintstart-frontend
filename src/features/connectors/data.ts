@@ -41,23 +41,6 @@ export function toConnectorListItems(connectors: ConnectorDto[]): ConnectorListI
   }));
 }
 
-export function formatConfiguredAt(value: string | null): string {
-  if (!value) {
-    return "Never configured";
-  }
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "Never configured";
-  }
-
-  return parsed.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
 export function buildSourceKey(sources: { id: string; enabled: boolean }[]): string {
   return sources
     .map((source) => `${source.id}:${source.enabled}`)
