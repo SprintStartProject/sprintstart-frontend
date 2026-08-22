@@ -1,6 +1,19 @@
-import { useState } from "react";
-import { CheckCircle2, Loader2, Plus, Sparkles, Target, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  Link2,
+  ListChecks,
+  Loader2,
+  Plus,
+  Sparkles,
+  Target,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
+import { SpotlightCard } from "../components/ui/SpotlightCard";
+import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { StarterWorkTaskCard } from "../features/starter-work/components/StarterWorkTaskCard";
@@ -9,7 +22,24 @@ import { CorpusIssueBrowser } from "../features/starter-work/components/CorpusIs
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TaskOrientationManager } from "../features/orientation/components/TaskOrientationManager";
 import { useStarterWorkReview } from "../features/starter-work/hooks/useStarterWorkReview";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import type { CreateStarterWorkTaskInput } from "../features/starter-work/types";
+
+/**
+ * The workflows this page holds, and the order they sit in the section filter.
+ *
+ * `overview` is the dashboard: it shows every section at once. The others narrow
+ * to one, mirroring the Data Ingestion page. `orientation` only exists for a PM
+ * or admin, so the tab list is built from `canAct` rather than this constant.
+ */
+type StarterWorkSection = "overview" | "review" | "browse" | "orientation";
+
+const SECTION_LABELS: Record<StarterWorkSection, string> = {
+  overview: "Overview",
+  review: "To review",
+  browse: "Browse issues",
+  orientation: "Orientation",
+};
 
 /**
  * Where a PM looks over the starter tasks the corpus produced.
@@ -47,6 +77,43 @@ export function StarterWorkPage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [activeSection, setActiveSection] = useState<StarterWorkSection>("overview");
+
+  // The orientation workflow is PM/ADMIN only, so the tab list — and the order the
+  // swipe/slide directions read from — depends on the role.
+  const sectionOrder = useMemo<StarterWorkSection[]>(
+    () =>
+      canAct ? ["overview", "review", "browse", "orientation"] : ["overview", "review", "browse"],
+    [canAct],
+  );
+
+  // Two-finger swipe between the sections, matching the Data Ingestion page.
+  const swipeRef = useSwipeableTabs<StarterWorkSection, HTMLElement>({
+    order: sectionOrder,
+    value: activeSection,
+    onChange: setActiveSection,
+  });
+
+  const tabOptions: SegmentedTabOption<StarterWorkSection>[] = sectionOrder.map((key) => ({
+    value: key,
+    label: SECTION_LABELS[key],
+    // Only the review queue has a page-level count; the other sections own their
+    // own data, so their tabs stay countless rather than showing a wrong number.
+    count: key === "review" ? tasks.length : undefined,
+  }));
+
+  const showOverview = activeSection === "overview";
+  const showReview = activeSection === "overview" || activeSection === "review";
+  const showBrowse = activeSection === "overview" || activeSection === "browse";
+  const showOrientation = canAct && (activeSection === "overview" || activeSection === "orientation");
+
+  // At-a-glance summary of the queue, derived from the same tasks the review
+  // section renders so it can never drift from the list below it.
+  const overview = useMemo(() => {
+    const skills = new Set(tasks.flatMap((task) => task.competencyKeys));
+    const linked = tasks.filter((task) => task.sourceUrl).length;
+    return { awaiting: tasks.length, skills: skills.size, linked };
+  }, [tasks]);
 
   const handleCreate = async (input: CreateStarterWorkTaskInput): Promise<boolean> => {
     setIsCreating(true);
@@ -56,8 +123,8 @@ export function StarterWorkPage() {
   };
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <header className="border-b border-app-border bg-app-bg">
+    <div className="min-h-screen">
+      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-frame py-6">
           <PageHeader
             icon={Target}
@@ -81,7 +148,7 @@ export function StarterWorkPage() {
                   data-testid="generate-starter-work"
                   onClick={() => void generate()}
                   disabled={isGenerating}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isGenerating ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -96,7 +163,7 @@ export function StarterWorkPage() {
         </div>
       </header>
 
-      <main className="app-page-frame space-y-5 py-6 lg:py-8">
+      <main ref={swipeRef} className="app-page-frame space-y-5 py-6 lg:py-8">
         {createdTask && (
           <div
             data-testid="created-task-confirmation"
@@ -140,45 +207,99 @@ export function StarterWorkPage() {
           </div>
         )}
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-app-text-muted">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="rounded-3xl border border-app-border bg-app-bg p-10 text-center">
-            <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" />
-            <p className="text-sm text-app-text-muted">
-              Nothing here needs a look. Tasks are mined from the corpus whenever a crawl finishes —
-              this is where the ones nobody has vouched for yet show up, not a queue blocking
-              anybody.
-            </p>
-          </div>
-        ) : (
-          <section className="space-y-3" data-testid="starter-work-unreviewed">
-            {tasks.map((task) => (
-              <StarterWorkTaskCard
-                key={task.id}
-                task={task}
-                canAct={canAct}
-                onApprove={approve}
-                onReject={reject}
-              />
-            ))}
-          </section>
-        )}
-
-        {/* The picker beside the blank form: the same action with a better input than an
-                    empty box. HR reads it, matching the rest of the page. It is a second way to
-                    add work, never a filter in front of mining — the pool above stays live. */}
-        <CorpusIssueBrowser
-          projectId={selectedProjectId}
-          canAct={canAct}
-          onPromoted={notePromoted}
+        <SegmentedTabs
+          value={activeSection}
+          options={tabOptions}
+          onChange={setActiveSection}
+          layoutId="starter-work-section-pill"
+          ariaLabel="Filter sections"
         />
 
-        {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split —
-                    HR looks over the pool but does not write hire-facing content. */}
-        {canAct && <TaskOrientationManager />}
+        <SlidingTabPanel
+          activeKey={activeSection}
+          index={sectionOrder.indexOf(activeSection)}
+          className="space-y-5"
+        >
+          {showOverview && (
+            <section aria-label="Overview" className="grid gap-3.5 sm:grid-cols-3">
+              <Kpi
+                label="Awaiting review"
+                value={overview.awaiting}
+                foot={overview.awaiting > 0 ? "Vouch or remove each one" : "All caught up"}
+                icon={ListChecks}
+              />
+              <Kpi
+                label="Skills exercised"
+                value={overview.skills}
+                foot="Distinct competencies in the queue"
+                icon={Sparkles}
+              />
+              <Kpi
+                label="Linked to a source"
+                value={overview.linked}
+                foot="Traceable to a tracker issue"
+                icon={Link2}
+              />
+            </section>
+          )}
+
+          {showReview && (
+            <SectionCard
+              icon={ListChecks}
+              title="Awaiting your review"
+              description="Mined tasks nobody has vouched for yet. Vouching lifts their rank; removal is permanent."
+              count={tasks.length}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16 text-app-text-muted">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : tasks.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
+                  <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" />
+                  <p className="mx-auto max-w-md text-sm text-app-text-muted">
+                    Nothing here needs a look. Tasks are mined from the corpus whenever a crawl
+                    finishes — this is where the ones nobody has vouched for yet show up, not a queue
+                    blocking anybody.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3" data-testid="starter-work-unreviewed">
+                  {tasks.map((task) => (
+                    <StarterWorkTaskCard
+                      key={task.id}
+                      task={task}
+                      canAct={canAct}
+                      onApprove={approve}
+                      onReject={reject}
+                    />
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* The picker beside the blank form: the same action with a better input than an
+              empty box. HR reads it, matching the rest of the page. It is a second way to
+              add work, never a filter in front of mining — the pool above stays live. */}
+          {showBrowse && (
+            <SpotlightCard roundedClassName="rounded-3xl">
+              <CorpusIssueBrowser
+                projectId={selectedProjectId}
+                canAct={canAct}
+                onPromoted={notePromoted}
+              />
+            </SpotlightCard>
+          )}
+
+          {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split —
+              HR looks over the pool but does not write hire-facing content. */}
+          {showOrientation && (
+            <SpotlightCard roundedClassName="rounded-3xl">
+              <TaskOrientationManager />
+            </SpotlightCard>
+          )}
+        </SlidingTabPanel>
       </main>
 
       {isCreateOpen && (
@@ -189,6 +310,72 @@ export function StarterWorkPage() {
           onClose={() => setIsCreateOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * A page-owned section shell: a spotlight card with a consistent header (icon
+ * chip, title, one-line description and an optional count) above its content.
+ */
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  count,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <SpotlightCard roundedClassName="rounded-3xl">
+      <section className="p-5 sm:p-6">
+        <div className="mb-4 flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
+            <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold text-app-text">{title}</h2>
+              {typeof count === "number" && count > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-app-surface-muted px-1.5 py-0.5 text-[11px] font-bold text-app-text-subtle tabular-nums">
+                  {count}
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-sm text-app-text-muted">{description}</p>
+          </div>
+        </div>
+        {children}
+      </section>
+    </SpotlightCard>
+  );
+}
+
+/** One at-a-glance overview tile, matching the Data Ingestion overview band. */
+function Kpi({
+  label,
+  value,
+  foot,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  foot: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <div className="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">
+      <div className="flex items-center justify-between">
+        <span className="text-[12.5px] text-app-text-muted">{label}</span>
+        <Icon size={20} className="shrink-0 text-app-brand-text" aria-hidden="true" />
+      </div>
+      <p className="mt-2.5 text-3xl font-bold tracking-tight text-app-text tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-app-text-subtle">{foot}</p>
     </div>
   );
 }

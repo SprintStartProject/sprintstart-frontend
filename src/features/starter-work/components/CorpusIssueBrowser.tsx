@@ -37,10 +37,7 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
   } = useCorpusIssueBrowser(projectId, onPromoted);
 
   return (
-    <section
-      data-testid="corpus-issue-browser"
-      className="rounded-3xl border border-app-border bg-app-bg p-5"
-    >
+    <section data-testid="corpus-issue-browser" className="p-5 sm:p-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Inbox className="h-4 w-4 text-app-text-muted" aria-hidden="true" />
         <h2 className="text-sm font-semibold text-app-text">Issues in this project</h2>

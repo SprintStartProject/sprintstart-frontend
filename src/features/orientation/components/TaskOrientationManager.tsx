@@ -62,10 +62,7 @@ export function TaskOrientationManager() {
   };
 
   return (
-    <section
-      data-testid="task-orientation-manager"
-      className="rounded-3xl border border-app-border bg-app-bg p-5"
-    >
+    <section data-testid="task-orientation-manager" className="p-5 sm:p-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-app-text-muted" aria-hidden="true" />
