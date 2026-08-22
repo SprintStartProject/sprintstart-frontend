@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CorpusIssueBrowser } from "../../../../src/features/starter-work/components/CorpusIssueBrowser";
@@ -142,7 +142,7 @@ describe("CorpusIssueBrowser", () => {
    * Rejection is sticky, so a removed issue cannot go back. Leaving it out of the list would read
    * as a bug and send somebody hunting for an issue they know exists.
    */
-  it("shows a removed issue as removed, and says it cannot go back", async () => {
+  it("shows a removed issue as taken out of the pool", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([
       candidate({ poolState: "REMOVED" }),
     ]);
@@ -155,7 +155,10 @@ describe("CorpusIssueBrowser", () => {
 
     await openRow(user, "Fix the login redirect");
 
-    expect(await screen.findByText(/it cannot go back/i)).toBeInTheDocument();
+    // Both the list row and the drawer's Pool status now carry a "Taken out" badge, so scope
+    // the assertion to the drawer to prove it is the detail view that marks the removed state.
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText(/taken out/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
   });
 

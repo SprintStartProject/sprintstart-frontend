@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { AlignLeft, CircleDot, ExternalLink, Info, Loader2, Plus, Tag } from "lucide-react";
+import { AlignLeft, CircleDot, ExternalLink, Info, Loader2, Plus } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { DrawerCard } from "../../admin/components/DrawerCard";
 import { Badge } from "../../../components/ui/Badge";
@@ -67,11 +67,13 @@ export function CorpusIssueDetails({
   // The pool state used to fill the footer; for a pooled or removed issue it now reads as one line
   // in the Information card up top, so the footer holds only the action (or the reason there is none).
   const poolStatus = isAvailable ? null : candidate.poolState === "IN_POOL" ? (
-    <Badge variant="success" size="sm">
+    <Badge variant="success" size="md">
       Already in the pool
     </Badge>
   ) : (
-    <span className="text-app-text-muted">Taken out of the pool — it cannot go back.</span>
+    <Badge variant="neutral" size="md">
+      Taken out
+    </Badge>
   );
 
   const footerAction = isAvailable ? (
@@ -97,7 +99,14 @@ export function CorpusIssueDetails({
     )
   ) : null;
 
-  const hasInfo = Boolean(parsed.owner || parsed.repo || parsed.repoLabel || updated || poolStatus);
+  const hasInfo = Boolean(
+    parsed.owner ||
+    parsed.repo ||
+    parsed.repoLabel ||
+    updated ||
+    poolStatus ||
+    candidate.labels.length > 0,
+  );
 
   return (
     <DetailsSideDrawer
@@ -150,36 +159,34 @@ export function CorpusIssueDetails({
       <div className="space-y-4 sm:space-y-5">
         {hasInfo && (
           <DrawerCard label="Information" icon={Info} index={0}>
-            <dl className="space-y-2 text-sm">
-              {parsed.owner && (
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-app-text-subtle">Owner</dt>
-                  <dd className="text-right font-medium text-app-text">{parsed.owner}</dd>
-                </div>
-              )}
+            <dl className="-my-1">
+              {parsed.owner && <InfoRow label="Owner" value={parsed.owner} />}
               {parsed.repo ? (
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-app-text-subtle">Repository</dt>
-                  <dd className="text-right font-medium text-app-text">{parsed.repo}</dd>
-                </div>
+                <InfoRow label="Repository" value={parsed.repo} />
               ) : (
-                parsed.repoLabel && (
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-app-text-subtle">Repository</dt>
-                    <dd className="text-right font-medium text-app-text">{parsed.repoLabel}</dd>
-                  </div>
-                )
+                parsed.repoLabel && <InfoRow label="Repository" value={parsed.repoLabel} />
               )}
-              {updated && (
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-app-text-subtle">Updated</dt>
-                  <dd className="text-right text-app-text-muted">{updated}</dd>
+              {updated && <InfoRow label="Updated" value={updated} />}
+              {poolStatus && (
+                <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
+                  <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Pool status</dt>
+                  <dd className="min-w-0 text-[13px]">{poolStatus}</dd>
                 </div>
               )}
-              {poolStatus && (
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-app-text-subtle">Pool status</dt>
-                  <dd className="text-right">{poolStatus}</dd>
+              {candidate.labels.length > 0 && (
+                <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
+                  <dt className="w-24 shrink-0 pt-0.5 text-[12.5px] text-app-text-muted">Labels</dt>
+                  <dd className="min-w-0">
+                    <ul className="flex flex-wrap gap-1.5">
+                      {candidate.labels.map((label) => (
+                        <li key={label}>
+                          <Badge variant="neutral" size="md">
+                            {label}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  </dd>
                 </div>
               )}
             </dl>
@@ -203,22 +210,8 @@ export function CorpusIssueDetails({
           )}
         </DrawerCard>
 
-        {candidate.labels.length > 0 && (
-          <DrawerCard label="Labels" icon={Tag} index={2}>
-            <ul className="flex flex-wrap gap-1.5">
-              {candidate.labels.map((label) => (
-                <li key={label}>
-                  <Badge variant="neutral" size="md">
-                    {label}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </DrawerCard>
-        )}
-
         {candidate.hasAssignee === true && (
-          <DrawerCard label="Status" icon={Info} index={3}>
+          <DrawerCard label="Status" icon={Info} index={2}>
             <p className="text-sm leading-relaxed text-app-text-muted">
               Someone is already on this issue. It is still yours to add — the pool is a suggestion,
               not a claim.
@@ -227,5 +220,15 @@ export function CorpusIssueDetails({
         )}
       </div>
     </DetailsSideDrawer>
+  );
+}
+
+/** One label/value line in the Information card, matching the data-ingestion detail rows. */
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
+      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
+      <dd className="min-w-0 text-[13px] font-semibold wrap-break-word text-app-text">{value}</dd>
+    </div>
   );
 }
