@@ -110,26 +110,23 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
   );
 
   return (
-    <section data-testid="corpus-issue-browser" className="p-5 sm:p-6">
-      <div className="mb-4 flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
-          <Inbox className="h-[18px] w-[18px]" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-app-text">Issues in this project</h2>
-            {projectId && totalCount > 0 && (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-app-surface-muted px-1.5 py-0.5 text-[11px] font-bold text-app-text-subtle tabular-nums">
-                {totalCount}
-              </span>
-            )}
-          </div>
-          <p className="mt-0.5 text-sm text-app-text-muted">
-            Every open issue the project has ingested. Adding one puts it in the pool straight away
-            — the same as writing a task by hand, because you looked at it. Mining keeps filling the
-            pool on its own; this is a second way in, not a gate in front of it.
-          </p>
+    <section data-testid="corpus-issue-browser" aria-label="Issues in this project">
+      <div className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-tight text-app-text">
+            Issues in this project
+          </h2>
+          {projectId && totalCount > 0 && (
+            <Badge variant="neutral" size="sm" className="tabular-nums">
+              {totalCount}
+            </Badge>
+          )}
         </div>
+        <p className="mt-1 text-sm text-app-text-muted">
+          Every open issue the project has ingested. Adding one puts it in the pool straight away —
+          the same as writing a task by hand, because you looked at it. Mining keeps filling the
+          pool on its own; this is a second way in, not a gate in front of it.
+        </p>
       </div>
 
       {!projectId ? (
@@ -299,7 +296,7 @@ function CandidateRow({ candidate, onOpen }: CandidateRowProps) {
         type="button"
         onClick={() => onOpen(candidate.sourceId)}
         aria-label={`Open ${candidate.title}`}
-        className={`flex w-full items-start gap-3 rounded-2xl border border-app-border bg-app-bg p-4 text-left transition-colors hover:border-app-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        className={`flex w-full items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
           isRemoved ? "opacity-70" : ""
         }`}
       >

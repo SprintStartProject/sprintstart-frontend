@@ -74,7 +74,7 @@ export function StarterWorkTaskCard({
       onPointerLeave={() => setIsHovered(false)}
       onFocusCapture={() => setIsFocusWithin(true)}
       onBlurCapture={() => setIsFocusWithin(false)}
-      className="relative rounded-2xl border border-app-border bg-app-bg transition-colors hover:border-app-border-strong"
+      className="relative rounded-2xl border border-app-border bg-app-surface transition-colors hover:border-app-border-strong"
     >
       {/* A stretched button rather than an interactive wrapper: it sits behind
           the content as a sibling of the quick actions, so nothing interactive

@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
-import { SpotlightCard } from "../components/ui/SpotlightCard";
+import { Badge } from "../components/ui/Badge";
 import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { PanelPresence } from "../components/ui/PanelPresence";
@@ -261,7 +261,7 @@ export function StarterWorkPage() {
         <SlidingTabPanel
           activeKey={activeSection}
           index={sectionOrder.indexOf(activeSection)}
-          className="space-y-5"
+          className="space-y-8"
         >
           {showOverview && (
             <section aria-label="Overview" className="grid gap-3.5 sm:grid-cols-3">
@@ -287,12 +287,12 @@ export function StarterWorkPage() {
           )}
 
           {showReview && (
-            <SectionCard
-              icon={ListChecks}
-              title="Awaiting your review"
-              description="Mined tasks nobody has vouched for yet. Vouching lifts their rank; removal is permanent."
-              count={tasks.length}
-            >
+            <section aria-label="Awaiting your review">
+              <SectionHeading
+                title="Awaiting your review"
+                description="Mined tasks nobody has vouched for yet. Vouching lifts their rank; removal is permanent."
+                count={tasks.length}
+              />
               {isLoading ? (
                 <div className="flex items-center justify-center py-16 text-app-text-muted">
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -321,29 +321,23 @@ export function StarterWorkPage() {
                   ))}
                 </div>
               )}
-            </SectionCard>
+            </section>
           )}
 
           {/* The picker beside the blank form: the same action with a better input than an
               empty box. HR reads it, matching the rest of the page. It is a second way to
               add work, never a filter in front of mining — the pool above stays live. */}
           {showBrowse && (
-            <SpotlightCard roundedClassName="rounded-3xl">
-              <CorpusIssueBrowser
-                projectId={selectedProjectId}
-                canAct={canAct}
-                onPromoted={notePromoted}
-              />
-            </SpotlightCard>
+            <CorpusIssueBrowser
+              projectId={selectedProjectId}
+              canAct={canAct}
+              onPromoted={notePromoted}
+            />
           )}
 
           {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split —
               HR looks over the pool but does not write hire-facing content. */}
-          {showOrientation && (
-            <SpotlightCard roundedClassName="rounded-3xl">
-              <TaskOrientationManager />
-            </SpotlightCard>
-          )}
+          {showOrientation && <TaskOrientationManager />}
         </SlidingTabPanel>
       </main>
 
@@ -372,44 +366,32 @@ export function StarterWorkPage() {
 }
 
 /**
- * A page-owned section shell: a spotlight card with a consistent header (icon
- * chip, title, one-line description and an optional count) above its content.
+ * A flat section header — title, an optional count badge and a one-line
+ * description — matching the Data Ingestion page. No card, no icon chip: the
+ * content below sits straight on the page so the sections read as one surface
+ * rather than a stack of boxes.
  */
-function SectionCard({
-  icon: Icon,
+function SectionHeading({
   title,
   description,
   count,
-  children,
 }: {
-  icon: LucideIcon;
   title: string;
   description: string;
   count?: number;
-  children: React.ReactNode;
 }) {
   return (
-    <SpotlightCard roundedClassName="rounded-3xl">
-      <section className="p-5 sm:p-6">
-        <div className="mb-4 flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
-            <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-app-text">{title}</h2>
-              {typeof count === "number" && count > 0 && (
-                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-app-surface-muted px-1.5 py-0.5 text-[11px] font-bold text-app-text-subtle tabular-nums">
-                  {count}
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-sm text-app-text-muted">{description}</p>
-          </div>
-        </div>
-        {children}
-      </section>
-    </SpotlightCard>
+    <div className="mb-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-semibold tracking-tight text-app-text">{title}</h2>
+        {typeof count === "number" && count > 0 && (
+          <Badge variant="neutral" size="sm" className="tabular-nums">
+            {count}
+          </Badge>
+        )}
+      </div>
+      <p className="mt-1 text-sm text-app-text-muted">{description}</p>
+    </div>
   );
 }
 
