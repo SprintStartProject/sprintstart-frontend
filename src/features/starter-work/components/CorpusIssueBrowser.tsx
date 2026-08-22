@@ -6,6 +6,7 @@ import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
@@ -127,12 +128,11 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
               {totalCount}
             </Badge>
           )}
+          <InfoHint
+            label="About issues in this project"
+            text="Every open issue the project has ingested. Adding one puts it in the pool straight away, the same as writing a task by hand, because you looked at it. Mining keeps filling the pool on its own; this is a second way in, not a gate in front of it."
+          />
         </div>
-        <p className="mt-1 text-sm text-app-text-muted">
-          Every open issue the project has ingested. Adding one puts it in the pool straight away —
-          the same as writing a task by hand, because you looked at it. Mining keeps filling the
-          pool on its own; this is a second way in, not a gate in front of it.
-        </p>
       </div>
 
       {!projectId ? (

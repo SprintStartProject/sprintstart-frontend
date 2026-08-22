@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, Loader2, PencilLine } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
+import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { OrientationEditor } from "./OrientationEditor";
@@ -87,11 +88,11 @@ export function TaskOrientationManager() {
               {tasks.length}
             </Badge>
           )}
+          <InfoHint
+            label="About task orientation"
+            text="Write the guide for an approved task yourself, or hand it back to the AI. Orientation is per project, so pick one first. What you write is served to hires exactly as-is."
+          />
         </div>
-        <p className="mt-1 text-sm text-app-text-muted">
-          Write the guide for an approved task yourself, or hand it back to the AI. Orientation is
-          per project, so pick one first. What you write is served to hires exactly as-is.
-        </p>
       </div>
 
       {tasksError && (

@@ -13,6 +13,7 @@ import {
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
+import { InfoHint } from "../components/ui/InfoHint";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { useAuth } from "../context/useAuth";
@@ -389,8 +390,8 @@ function SectionHeading({
             {count}
           </Badge>
         )}
+        <InfoHint text={description} label={`About ${title}`} />
       </div>
-      <p className="mt-1 text-sm text-app-text-muted">{description}</p>
     </div>
   );
 }
