@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence } from "framer-motion";
-import { ChevronDown, PencilLine, Plus, Save, Undo2, X } from "lucide-react";
+import { ChevronDown, ExternalLink, PencilLine, Plus, Save, Undo2, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { DrawerCard } from "../../admin/components/DrawerCard";
@@ -12,10 +12,7 @@ import type { AuthorOrientationInput, OrientationPacket, OrientationStep } from 
 type OrientationEditorProps = {
   /** The task the orientation belongs to; its title heads the editor. */
   taskTitle: string;
-  /**
-   * The task's link. Accepted for a stable caller contract (and future use), but the editor no
-   * longer renders a live preview, so it is not read here.
-   */
+  /** The task's link (e.g. the GitHub issue). Shown as an "Open issue" action when present. */
   taskUrl: string | null;
   /** The packet being edited, or null to author from blank. */
   initial: OrientationPacket | null;
@@ -38,6 +35,7 @@ const inputClasses =
  */
 export function OrientationEditor({
   taskTitle,
+  taskUrl,
   initial,
   onSave,
   onRevert,
@@ -93,6 +91,20 @@ export function OrientationEditor({
         onClose={onClose}
         title="Write this orientation yourself"
         closeAriaLabel="Close orientation editor"
+        showOverlay
+        actions={
+          taskUrl ? (
+            <a
+              href={taskUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-app-border px-3 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover"
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              Open issue
+            </a>
+          ) : undefined
+        }
         leading={
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
             <PencilLine className="h-5 w-5" aria-hidden="true" />
