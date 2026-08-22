@@ -16,8 +16,8 @@ function renderModal(overrides: Partial<Parameters<typeof AddSourceModal>[0]> = 
     onConnected: vi.fn(),
     ...overrides,
   };
-  // The connect request's own failures/successes are toasts now, so the modal
-  // needs a ToastProvider around it for those to mount.
+  // The connect run reports its outcome via toasts, so the modal needs a
+  // ToastProvider around it for those to mount.
   render(<AddSourceModal {...props} />, { wrapper: ToastProvider });
   return props;
 }
@@ -70,46 +70,61 @@ function sourceStatusHandler({ inThisProject = [] as string[] } = {}) {
   });
 }
 
-/** Advances the wizard from the source-type step into the detail step. */
-async function gotoGithubStep(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /continue/i }));
-}
-
 function jiraCredentialsHandler(names: string[], email = "me@corp.com") {
   return http.get("/api/v1/jira/credentials", () =>
     HttpResponse.json(names.map((displayName) => ({ userEmail: email, displayName }))),
   );
 }
 
+/** Drills into the GitHub detail from the type grid the modal opens on. */
+async function gotoGithubStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /github/i }));
+}
+
+/** Discovers `acme` and stages `repo-a` via "Add to list", landing on the list. */
+async function stageRepoA(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("Organization, user, or URL"), "acme");
+  await user.click(screen.getByRole("button", { name: "Discover" }));
+  await screen.findByText("repo-a");
+
+  const repoRow = screen.getByText("repo-a").closest("label") as HTMLElement;
+  await user.click(within(repoRow).getByRole("checkbox"));
+  await user.click(screen.getByRole("button", { name: /add to list/i }));
+}
+
 describe("AddSourceModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The modal re-fetches stored PAT names for the inline "add token" flow; keep
+    // the discovery token picker populated so the GitHub step stays usable.
+    server.use(http.get("/api/v1/github/pat", () => HttpResponse.json(["default"])));
   });
 
-  it("starts on the source-type step with GitHub, Jira and Upload choices", () => {
+  it("opens directly on the source-type chooser", () => {
     renderModal();
+
     expect(screen.getByRole("button", { name: /github/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /jira/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /upload/i })).toBeInTheDocument();
   });
 
-  it("shows the Jira connect form on the Jira step", async () => {
+  it("offers both 'Add to list' and 'Connect now' on a detail screen", async () => {
     server.use(jiraCredentialsHandler(["default"]));
     const user = userEvent.setup();
     renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
-    await gotoGithubStep(user);
 
     expect(screen.getByTestId("jira-display-name")).toBeInTheDocument();
-    expect(screen.getByTestId("jira-instance-url")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add to list/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /connect now/i })).toBeInTheDocument();
     // The credential FilterSelect adopts the first credential as its label.
     await waitFor(() =>
       expect(screen.getByLabelText("Credential")).toHaveTextContent("default - me@corp.com"),
     );
   });
 
-  it("connects a Jira instance with the right body and reports success", async () => {
+  it("stages a Jira instance and connects the list", async () => {
     let capturedBody: unknown = null;
     server.use(
       jiraCredentialsHandler(["default"]),
@@ -123,15 +138,16 @@ describe("AddSourceModal", () => {
     const props = renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
-    await gotoGithubStep(user);
-
     await user.type(screen.getByTestId("jira-display-name"), "Team board");
     await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
-
-    // Wait for the credential to load and default-select.
     await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
 
-    await user.click(screen.getByRole("button", { name: /connect jira instance/i }));
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    // Back on the list, the staged instance shows and connecting is enabled.
+    expect(await screen.findByText("Team board")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /connect 1 source/i }));
 
     await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
     expect(props.onClose).toHaveBeenCalled();
@@ -144,7 +160,37 @@ describe("AddSourceModal", () => {
     });
   });
 
-  it("surfaces a 502 as an unreachable-server message", async () => {
+  it("connects a source immediately with 'Connect now'", async () => {
+    let capturedBody: unknown = null;
+    server.use(
+      jiraCredentialsHandler(["default"]),
+      http.post("/api/v1/jira/connect", async ({ request }) => {
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 202 });
+      }),
+    );
+
+    const user = userEvent.setup();
+    const props = renderModal();
+
+    await user.click(screen.getByRole("button", { name: /jira/i }));
+    await user.type(screen.getByTestId("jira-display-name"), "Team board");
+    await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
+
+    // Skips the staged-list step entirely.
+    await user.click(screen.getByRole("button", { name: /connect now/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+    expect(props.onClose).toHaveBeenCalled();
+    expect(capturedBody).toMatchObject({
+      displayName: "Team board",
+      url: "https://acme.atlassian.net",
+      projectId: "project-1",
+    });
+  });
+
+  it("surfaces a failed connect on the connecting screen with a retry", async () => {
     server.use(
       jiraCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", () =>
@@ -156,15 +202,14 @@ describe("AddSourceModal", () => {
     renderModal();
 
     await user.click(screen.getByRole("button", { name: /jira/i }));
-    await gotoGithubStep(user);
-
     await user.type(screen.getByTestId("jira-display-name"), "Team board");
     await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
     await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
+    await user.click(screen.getByRole("button", { name: /connect now/i }));
 
-    await user.click(screen.getByRole("button", { name: /connect jira instance/i }));
-
-    expect(await screen.findByText(/Jira server could not be reached/i)).toBeInTheDocument();
+    // The failed row stays on the connecting screen with a retry action.
+    expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.getByText(/failed/i)).toBeInTheDocument();
   });
 
   it("lets an already-ingested repository be selected for linking", async () => {
@@ -204,7 +249,7 @@ describe("AddSourceModal", () => {
 
   it("links an already-ingested repository instead of re-ingesting it", async () => {
     let linkedPath: string | null = null;
-    let connectAllCalled = false;
+    let singleConnectCalled = false;
 
     server.use(
       discoveryHandler,
@@ -216,9 +261,9 @@ describe("AddSourceModal", () => {
           projectIds: ["project-1"],
         });
       }),
-      http.post("/api/v1/github/connect/all", () => {
-        connectAllCalled = true;
-        return HttpResponse.json({ transactionIdsByRepositoryId: {} });
+      http.post("/api/v1/github/connect", () => {
+        singleConnectCalled = true;
+        return HttpResponse.json({ transactionId: "txn" });
       }),
     );
 
@@ -235,96 +280,92 @@ describe("AddSourceModal", () => {
       expect(within(connectedRow).getByRole("checkbox")).toBeEnabled();
     });
     await user.click(within(connectedRow).getByRole("checkbox"));
-
-    await user.click(screen.getByRole("button", { name: /connect 1 selected/i }));
+    await user.click(screen.getByRole("button", { name: /connect now/i }));
 
     await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
     expect(linkedPath).toBe(
       `/api/v1/github/connections/${encodeURIComponent("id-acme/repo-connected")}/projects/project-1`,
     );
     // No fetch + ingestion for a repository that is already ingested.
-    expect(connectAllCalled).toBe(false);
+    expect(singleConnectCalled).toBe(false);
   });
 
-  it("filters the discovered list by name", async () => {
-    server.use(discoveryHandler);
-    const user = userEvent.setup();
-    renderModal();
-    await gotoGithubStep(user);
-
-    await user.type(screen.getByLabelText("Organization, user, or URL"), "acme");
-    await user.click(screen.getByRole("button", { name: "Discover" }));
-    await screen.findByText("repo-a");
-
-    await user.type(screen.getByLabelText("Filter repositories"), "connected");
-
-    expect(screen.queryByText("repo-a")).not.toBeInTheDocument();
-    expect(screen.getByText("repo-connected")).toBeInTheDocument();
-  });
-
-  it("pre-filters to a single repository when an owner/name is pasted", async () => {
-    server.use(discoveryHandler);
-    const user = userEvent.setup();
-    renderModal();
-    await gotoGithubStep(user);
-
-    // Pasting a full repository reference discovers the owner but isolates the
-    // one repository, so its sibling is filtered out of the results.
-    await user.type(screen.getByLabelText("Organization, user, or URL"), "acme/repo-connected");
-    await user.click(screen.getByRole("button", { name: "Discover" }));
-
-    expect(await screen.findByText("repo-connected")).toBeInTheDocument();
-    expect(screen.queryByText("repo-a")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Filter repositories")).toHaveValue("repo-connected");
-  });
-
-  it("batch-connects the selected repositories and reports success", async () => {
+  it("stages and connects a newly discovered repository with the right body", async () => {
     let capturedBody: unknown = null;
     server.use(
       discoveryHandler,
-      http.post("/api/v1/github/connect/all", async ({ request }) => {
+      http.post("/api/v1/github/connect", async ({ request }) => {
         capturedBody = await request.json();
-        return HttpResponse.json({
-          transactionIdsByRepositoryId: { "acme/repo-a": "txn-a" },
-        });
+        return HttpResponse.json({ transactionId: "txn-a" });
       }),
     );
 
     const user = userEvent.setup();
     const props = renderModal();
     await gotoGithubStep(user);
+    await stageRepoA(user);
 
-    await user.type(screen.getByLabelText("Organization, user, or URL"), "acme");
-    await user.click(screen.getByRole("button", { name: "Discover" }));
-    await screen.findByText("repo-a");
-
-    const repoRow = screen.getByText("repo-a").closest("label") as HTMLElement;
-    await user.click(within(repoRow).getByRole("checkbox"));
-    await user.click(screen.getByRole("button", { name: /connect 1 selected/i }));
+    // Staged on the list; the connect button reflects the count.
+    expect(screen.getByText("acme/repo-a")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /connect 1 source/i }));
 
     await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
     expect(props.onClose).toHaveBeenCalled();
     expect(capturedBody).toEqual({
-      repositories: [
-        {
-          owner: "acme",
-          name: "repo-a",
-          tokenName: "default",
-          projectId: "project-1",
-        },
-      ],
+      owner: "acme",
+      name: "repo-a",
+      tokenName: "default",
+      projectId: "project-1",
     });
   });
 
-  it("can go back from the GitHub step to the source-type step", async () => {
+  it("keeps building the list across source types before connecting", async () => {
+    server.use(discoveryHandler, jiraCredentialsHandler(["default"]));
+    const user = userEvent.setup();
+    renderModal();
+
+    // Stage a GitHub repo.
+    await gotoGithubStep(user);
+    await stageRepoA(user);
+    expect(screen.getByText("acme/repo-a")).toBeInTheDocument();
+
+    // Add another source of a different type from the list.
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    await user.click(screen.getByRole("button", { name: /jira/i }));
+    await user.type(screen.getByTestId("jira-display-name"), "Team board");
+    await user.type(screen.getByTestId("jira-instance-url"), "https://acme.atlassian.net");
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    // Both types now sit in the same list, ready to connect together.
+    expect(screen.getByText("acme/repo-a")).toBeInTheDocument();
+    expect(screen.getByText("Team board")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /connect 2 sources/i })).toBeEnabled();
+  });
+
+  it("removes a staged source from the list", async () => {
+    server.use(discoveryHandler);
+    const user = userEvent.setup();
+    renderModal();
+
+    await gotoGithubStep(user);
+    await stageRepoA(user);
+    expect(screen.getByText("acme/repo-a")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /remove acme\/repo-a/i }));
+
+    // The list is empty again, so it falls back to the type grid for the next add.
+    expect(screen.queryByText("acme/repo-a")).not.toBeInTheDocument();
+  });
+
+  it("can go back from the GitHub detail screen to the type grid", async () => {
     const user = userEvent.setup();
     renderModal();
     await gotoGithubStep(user);
     expect(screen.getByLabelText("Organization, user, or URL")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /back/i }));
-    // Back on the source-type step: the type cards are shown and the GitHub
-    // discovery input is gone.
+    await user.click(screen.getByRole("button", { name: /back to source types/i }));
+    // Back on the type grid: the type cards are shown and the discovery input is gone.
     expect(screen.getByRole("button", { name: /jira/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("Organization, user, or URL")).not.toBeInTheDocument();
   });
@@ -332,7 +373,12 @@ describe("AddSourceModal", () => {
   it("blocks connecting when the user may not ingest into the project", async () => {
     const user = userEvent.setup();
     renderModal({ canIngest: false, ingestBlockedReason: "Not your project." });
-    await gotoGithubStep(user);
+
+    // The reason is stated up front on the type grid.
     expect(screen.getByText("Not your project.")).toBeInTheDocument();
+
+    // On a detail screen, "Connect now" stays disabled.
+    await user.click(screen.getByRole("button", { name: /jira/i }));
+    expect(screen.getByRole("button", { name: /connect now/i })).toBeDisabled();
   });
 });

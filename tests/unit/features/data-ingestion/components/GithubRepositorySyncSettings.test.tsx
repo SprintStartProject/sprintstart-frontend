@@ -41,10 +41,10 @@ describe("GithubRepositorySyncSettings", () => {
       />,
     );
 
-    const scheduleSelect = await screen.findByLabelText("Schedule");
+    const weeklyTab = await screen.findByRole("button", { name: "Weekly" });
     expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
 
-    await user.selectOptions(scheduleSelect, "WEEKLY");
+    await user.click(weeklyTab);
     expect(screen.getByText(UNSAVED)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -78,11 +78,11 @@ describe("GithubRepositorySyncSettings", () => {
       />,
     );
 
-    const scheduleSelect = await screen.findByLabelText("Schedule");
+    await screen.findByRole("button", { name: "Interval" });
 
     // Round-trip through INTERVAL (which rewrites the interval field) and back.
-    await user.selectOptions(scheduleSelect, "INTERVAL");
-    await user.selectOptions(scheduleSelect, "WEEKLY");
+    await user.click(screen.getByRole("button", { name: "Interval" }));
+    await user.click(screen.getByRole("button", { name: "Weekly" }));
 
     // Back at the saved weekly schedule, so nothing would change on save.
     await waitFor(() => {

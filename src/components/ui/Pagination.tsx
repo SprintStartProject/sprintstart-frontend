@@ -51,37 +51,46 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      {pages[0] > 1 && (
-        <>
-          <Button variant="ghost" size="sm" onClick={() => onPageChange(1)}>
-            1
-          </Button>
-          {pages[0] > 2 && <span className="px-2 text-app-text-muted">...</span>}
-        </>
-      )}
+      {/* Below sm the numbered buttons would overflow a narrow row, so they
+          collapse to a plain "page X of Y" counter; the prev/next controls
+          stay usable. From sm up the full numbered set returns unchanged. */}
+      <span className="px-2 text-sm font-medium text-app-text-muted tabular-nums sm:hidden">
+        Page {currentPage} of {totalPages}
+      </span>
 
-      {pages.map((page) => (
-        <Button
-          key={page}
-          variant={currentPage === page ? "primary" : "ghost"}
-          size="sm"
-          onClick={() => onPageChange(page)}
-          aria-current={currentPage === page ? "page" : undefined}
-        >
-          {page}
-        </Button>
-      ))}
+      <div className="hidden items-center space-x-1 sm:flex">
+        {pages[0] > 1 && (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => onPageChange(1)}>
+              1
+            </Button>
+            {pages[0] > 2 && <span className="px-2 text-app-text-muted">...</span>}
+          </>
+        )}
 
-      {pages[pages.length - 1] < totalPages && (
-        <>
-          {pages[pages.length - 1] < totalPages - 1 && (
-            <span className="px-2 text-app-text-muted">...</span>
-          )}
-          <Button variant="ghost" size="sm" onClick={() => onPageChange(totalPages)}>
-            {totalPages}
+        {pages.map((page) => (
+          <Button
+            key={page}
+            variant={currentPage === page ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => onPageChange(page)}
+            aria-current={currentPage === page ? "page" : undefined}
+          >
+            {page}
           </Button>
-        </>
-      )}
+        ))}
+
+        {pages[pages.length - 1] < totalPages && (
+          <>
+            {pages[pages.length - 1] < totalPages - 1 && (
+              <span className="px-2 text-app-text-muted">...</span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => onPageChange(totalPages)}>
+              {totalPages}
+            </Button>
+          </>
+        )}
+      </div>
 
       <Button
         variant="secondary"
