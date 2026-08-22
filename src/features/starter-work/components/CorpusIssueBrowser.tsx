@@ -1,4 +1,5 @@
 import { ExternalLink, Inbox, Loader2, Plus, Search, UserCheck } from "lucide-react";
+import { Badge } from "../../../components/ui/Badge";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import type { StarterWorkCandidate, StarterWorkTask } from "../types";
 
@@ -38,23 +39,37 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
 
   return (
     <section data-testid="corpus-issue-browser" className="p-5 sm:p-6">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Inbox className="h-4 w-4 text-app-text-muted" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-app-text">Issues in this project</h2>
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
+          <Inbox className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-app-text">Issues in this project</h2>
+            {projectId && totalCount > 0 && (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-app-surface-muted px-1.5 py-0.5 text-[11px] font-bold text-app-text-subtle tabular-nums">
+                {totalCount}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-sm text-app-text-muted">
+            Every open issue the project has ingested. Adding one puts it in the pool straight away
+            — the same as writing a task by hand, because you looked at it. Mining keeps filling the
+            pool on its own; this is a second way in, not a gate in front of it.
+          </p>
+        </div>
       </div>
-      <p className="mb-4 text-xs text-app-text-muted">
-        Every open issue the project has ingested. Adding one puts it in the pool straight away —
-        the same as writing a task by hand, because you looked at it. Mining keeps filling the pool
-        on its own; this is a second way in, not a gate in front of it.
-      </p>
 
       {!projectId ? (
-        <p className="py-6 text-center text-xs text-app-text-muted">
-          Issues come from one project&apos;s corpus, so pick a project first.
-        </p>
+        <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
+          <Inbox className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
+          <p className="mx-auto max-w-md text-sm text-app-text-muted">
+            Issues come from one project&apos;s corpus, so pick a project first.
+          </p>
+        </div>
       ) : (
         <>
-          <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <label className="relative block min-w-0 flex-1">
               <span className="sr-only">Search issues</span>
               <Search
@@ -88,30 +103,33 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
           </div>
 
           {error && (
-            <p className="mb-3 rounded-lg bg-app-danger-bg p-2.5 text-xs font-medium text-app-danger-text">
+            <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
               {error}
             </p>
           )}
 
           {isLoading ? (
-            <div className="flex justify-center py-8 text-app-text-muted">
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            <div className="flex items-center justify-center py-16 text-app-text-muted">
+              <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
             </div>
           ) : candidates.length === 0 ? (
-            <p
+            <div
               data-testid="corpus-issue-empty"
-              className="rounded-2xl border border-dashed border-app-border p-6 text-center text-sm text-app-text-muted"
+              className="rounded-2xl border border-dashed border-app-border p-10 text-center"
             >
+              <Inbox className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
               {/* Three different silences, and they mean different things. "No good
                                 first work here" is the one thing none of them means. */}
-              {totalCount === 0
-                ? "No open issues have been ingested for this project yet. Connect a repository or tracker and crawl it, and they will show up here."
-                : query.trim().length > 0
-                  ? `Nothing matches “${query.trim()}”.`
-                  : "Every open issue here is one somebody is already on. Tick the box above to see them."}
-            </p>
+              <p className="mx-auto max-w-md text-sm text-app-text-muted">
+                {totalCount === 0
+                  ? "No open issues have been ingested for this project yet. Connect a repository or tracker and crawl it, and they will show up here."
+                  : query.trim().length > 0
+                    ? `Nothing matches “${query.trim()}”.`
+                    : "Every open issue here is one somebody is already on. Tick the box above to see them."}
+              </p>
+            </div>
           ) : (
-            <ul className="space-y-2" data-testid="corpus-issue-list">
+            <ul className="space-y-3" data-testid="corpus-issue-list">
               {candidates.map((candidate) => (
                 <CandidateRow
                   key={candidate.sourceId}
@@ -151,11 +169,11 @@ function CandidateRow({ candidate, canAct, isPromoting, isBusy, onPromote }: Can
   return (
     <li
       data-testid={`corpus-issue-${candidate.sourceId}`}
-      className="rounded-2xl border border-app-border bg-app-surface p-4"
+      className="rounded-2xl border border-app-border bg-app-bg p-4 transition-colors hover:border-app-border-strong"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-medium text-app-text">{candidate.title}</h3>
+          <h3 className="text-sm font-semibold text-app-text">{candidate.title}</h3>
           <p className="mt-0.5 text-xs text-app-text-subtle">
             {candidate.tracker} · {candidate.sourceId}
           </p>
@@ -174,7 +192,7 @@ function CandidateRow({ candidate, canAct, isPromoting, isBusy, onPromote }: Can
       </div>
 
       {candidate.excerpt && (
-        <p className="mt-2 text-xs text-app-text-muted">
+        <p className="mt-2 text-xs leading-relaxed text-app-text-muted">
           {candidate.excerpt}
           {/* Said next to the thing it limits: a partial body read as the whole story is
                         how somebody judges an issue on half of it. */}
@@ -185,13 +203,12 @@ function CandidateRow({ candidate, canAct, isPromoting, isBusy, onPromote }: Can
       )}
 
       {candidate.labels.length > 0 && (
-        <ul className="mt-2 flex flex-wrap gap-1.5">
+        <ul className="mt-2.5 flex flex-wrap gap-1.5">
           {candidate.labels.map((label) => (
-            <li
-              key={label}
-              className="rounded-md bg-app-surface-muted px-2 py-0.5 text-xs text-app-text-muted"
-            >
-              {label}
+            <li key={label}>
+              <Badge variant="neutral" size="sm">
+                {label}
+              </Badge>
             </li>
           ))}
         </ul>
@@ -202,20 +219,20 @@ function CandidateRow({ candidate, canAct, isPromoting, isBusy, onPromote }: Can
                     does not ingest GitHub assignees — and a badge on every GitHub issue saying so
                     would be noise on the whole list. */}
         {candidate.hasAssignee === true && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-app-warning-bg px-2 py-0.5 text-xs font-medium text-app-warning-text">
-            <UserCheck className="h-3 w-3" aria-hidden="true" />
+          <Badge variant="warning" size="sm">
+            <UserCheck className="mr-1 h-3 w-3" aria-hidden="true" />
             Someone is on this
-          </span>
+          </Badge>
         )}
         {candidate.poolState === "IN_POOL" && (
-          <span className="rounded-md bg-app-success-bg px-2 py-0.5 text-xs font-medium text-app-success-text">
+          <Badge variant="success" size="sm">
             Already in the pool
-          </span>
+          </Badge>
         )}
         {candidate.poolState === "REMOVED" && (
-          <span className="rounded-md bg-app-surface-muted px-2 py-0.5 text-xs font-medium text-app-text-muted">
+          <Badge variant="neutral" size="sm">
             Taken out of the pool — it cannot go back
-          </span>
+          </Badge>
         )}
         {canAct && !isPooled && (
           <button
