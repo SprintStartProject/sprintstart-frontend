@@ -14,3 +14,15 @@ export const STEP_LABELS: Record<OrientationStep, string> = {
   CHECK_LOCALLY: "Check it locally",
   OPEN_THE_PR: "Open the pull request",
 };
+
+/**
+ * The canonical order of the path to a pull request. The editor and the reader both walk it in this
+ * order, so it is the single source of truth for "the five steps" — never re-listed at a call site.
+ */
+export const STEP_ORDER: OrientationStep[] = [
+  "SET_UP",
+  "FIND_THE_CODE",
+  "MAKE_THE_CHANGE",
+  "CHECK_LOCALLY",
+  "OPEN_THE_PR",
+];
