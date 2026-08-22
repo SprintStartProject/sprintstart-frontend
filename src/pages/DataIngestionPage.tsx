@@ -29,6 +29,7 @@ import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
   createJiraSourceFromInstance,
+  createUploadSourceFromInstance,
   deriveSourceStatus,
   formatDateTime,
   getBackendSourceStatusLabel,
@@ -239,12 +240,13 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira cards are built solely from the connector-neutral status rows (the
-    // `jiraSources` path on the page), which carry Jira's authoritative health
-    // and counters. The project source list now also exposes Jira instances
-    // (for the admin/project-scoped source lists), so emitting a card here too
-    // would double every connected Jira instance.
+    // Jira cards are built solely from the connector-neutral status rows.
     if (sourceSystem === "JIRA") return [];
+    // Skip UPLOAD only when an authoritative status row already exists so the card
+    // does not vanish when artifact count is 0 or when run status fallback is needed.
+    if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
+      return [];
+    }
 
     const meta = SOURCE_META[sourceSystem];
     const latestRun = latestRunBySource.get(sourceSystem);
@@ -366,6 +368,29 @@ function buildProjectDataSources(
 }
 function hasSourceId(sources: DataSource[], sourceId: string) {
   return sources.some((source) => source.sourceId === sourceId);
+}
+
+/**
+ * Turns a `?sourceId=` value into the id this page actually selects by.
+ *
+ * A card's id is its project-source id, but callers do not always have one. The knowledge-gap
+ * detail page links here from a gap, and a gap identifies itself by component — `owner/repo`,
+ * which is the GitHub repository's full name. Accepting that spelling too is what lets its
+ * "Update data source" button open the repository rather than dropping the reader on the page
+ * and leaving them to find it.
+ *
+ * Case-insensitive on the component, matching {@link matchSourceInstance}: GitHub treats owner
+ * and repository names that way, and the component string reaches us from the AI service.
+ */
+function resolveRequestedSourceId(sources: DataSource[], requested: string): string | null {
+  if (requested.length === 0) return null;
+  if (hasSourceId(sources, requested)) return requested;
+
+  const byComponent = sources.find(
+    (source) => source.githubRepository?.fullName.toLowerCase() === requested.toLowerCase(),
+  );
+
+  return byComponent?.sourceId ?? null;
 }
 
 const STATUS_BADGE_TONE = {
@@ -724,7 +749,11 @@ export function DataIngestionPage() {
         ),
       );
 
-    return [...githubAndUpload, ...jiraSources];
+    const uploadSources = sourceInstances
+      .filter((status) => status.sourceSystem === "UPLOAD")
+      .map((status) => createUploadSourceFromInstance(status));
+
+    return [...githubAndUpload, ...jiraSources, ...uploadSources];
   }, [connectorEnabledById, jiraInstances, projectSources, runs, sourceInstances]);
 
   const totalArtifactCount = useMemo(
@@ -738,16 +767,15 @@ export function DataIngestionPage() {
     void Promise.resolve().then(() => {
       if (!isMounted) return;
 
-      const requestedSourceExists =
-        requestedSourceId.length > 0 && hasSourceId(sources, requestedSourceId);
+      const resolvedSourceId = resolveRequestedSourceId(sources, requestedSourceId);
 
-      if (requestedSourceExists) {
+      if (resolvedSourceId) {
         setActiveSection("sources");
       }
 
       setSelectedSourceId((currentSourceId) => {
-        if (requestedSourceExists) {
-          return requestedSourceId;
+        if (resolvedSourceId) {
+          return resolvedSourceId;
         }
 
         // Keep the current selection while the list is transiently empty (an

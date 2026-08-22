@@ -128,6 +128,12 @@ export function OnBoardingPage() {
   const focusCheckPhaseId = (location.state as { focusCheckPhaseId?: string } | null)
     ?.focusCheckPhaseId;
 
+  // Set by the dashboard card when the review pool is all that is left of the journey. The
+  // pool has no place on the page to scroll to — it lives in a modal — so the navigation
+  // opens it directly, rather than dropping the user next to a button they already clicked.
+  const shouldOpenReviewCheck =
+    (location.state as { openReviewCheck?: boolean } | null)?.openReviewCheck === true;
+
   // The phase's knowledge check card, which sits at the end of a potentially long step list.
   const checkCardRef = useRef<HTMLDivElement>(null);
   const hasFocusedCheckRef = useRef(false);
@@ -155,11 +161,23 @@ export function OnBoardingPage() {
     }
   };
 
-  // Silently re-reads how many questions are waiting in the review pool.
-  const refreshReviewCount = async () => {
+  /**
+   * Silently re-reads how many questions are waiting in the review pool.
+   *
+   * `openWhenPending` is passed by the initial load alone, and only when the dashboard sent
+   * the user here to work through the pool. Opening the modal from the read that produced
+   * the count — rather than from an effect watching it — is what keeps the pool from
+   * springing open much later, when a passed check happens to refill it.
+   */
+  const refreshReviewCount = async ({ openWhenPending = false } = {}) => {
     try {
       const pool = await onboardingService.fetchReviewCheck();
       setOpenReviewCount(pool.openCount);
+
+      // An empty pool would open a modal with nothing in it.
+      if (openWhenPending && pool.openCount > 0) {
+        setReviewCheckOpen(true);
+      }
     } catch (err) {
       console.error("Failed to refresh review check:", err);
     }
@@ -334,8 +352,10 @@ export function OnBoardingPage() {
           : -1;
         setSelectedPhaseIndex(requestedIndex >= 0 ? requestedIndex : findActivePhaseIndex(path));
         setLoadingState("success");
-        // Drives the review-check button; failing to read it must not break the page.
-        await refreshReviewCount();
+        // Drives the review-check button; failing to read it must not break the page. The
+        // pool has no place on the page to scroll to, so a user sent here for it gets the
+        // modal opened straight from this read.
+        await refreshReviewCount({ openWhenPending: shouldOpenReviewCheck });
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           // No path generated yet — kick off AI personalization instead of erroring out.
@@ -347,9 +367,10 @@ export function OnBoardingPage() {
       }
     };
     void loadOnBoardingPath();
-    // focusCheckPhaseId comes from the navigation that mounted this page, so it is fixed
-    // for the visit; listing it keeps the phase choice honest about what it reads.
-  }, [focusCheckPhaseId]);
+    // Both flags come from the navigation that mounted this page, so they are fixed for the
+    // visit; listing them keeps the effect honest about what it reads, and `hasLoadedRef`
+    // makes a re-run a no-op anyway.
+  }, [focusCheckPhaseId, shouldOpenReviewCheck]);
 
   const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 

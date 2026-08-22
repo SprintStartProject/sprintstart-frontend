@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
@@ -48,6 +49,16 @@ export function ProjectAccessPanel({
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
   const toast = useToast();
 
+  const prefersReducedMotion = useReducedMotion();
+
+  // Anchors the picker so it can be flipped above the button when the drawer
+  // leaves no room below it.
+  const pickerAnchorRef = useRef<HTMLDivElement>(null);
+  const [pickerPlacement, setPickerPlacement] = useState<{
+    dropUp: boolean;
+    maxHeight: number;
+  }>({ dropUp: false, maxHeight: 384 });
+
   const activeProjectPickerState =
     projectPickerState.sourceKey === assignedProjectKey
       ? projectPickerState
@@ -60,6 +71,63 @@ export function ProjectAccessPanel({
   const projectSearch = activeProjectPickerState.search;
   const openProjectPicker = activeProjectPickerState.isOpen;
   const hasPendingProjectChange = pendingProjectId !== null;
+
+  // On open, decide whether the picker drops down or flips up, and how tall it
+  // may grow, from the room left around the button inside the drawer's viewport
+  // — so it never spills below the fold and forces an extra scroll to reach it.
+  useLayoutEffect(() => {
+    if (!openProjectPicker) return;
+
+    const measure = () => {
+      const anchor = pickerAnchorRef.current?.getBoundingClientRect();
+      if (!anchor) return;
+
+      const margin = 16;
+      const spaceBelow = window.innerHeight - anchor.bottom - margin;
+      const spaceAbove = anchor.top - margin;
+      const dropUp = spaceBelow < 260 && spaceAbove > spaceBelow;
+
+      setPickerPlacement({
+        dropUp,
+        maxHeight: Math.max(200, Math.min(384, dropUp ? spaceAbove : spaceBelow)),
+      });
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [openProjectPicker]);
+
+  // While the picker is open, a click outside it or an Escape press should
+  // dismiss just the picker. The Escape listener runs in the capture phase and
+  // stops propagation so the surrounding drawer's own document-level Escape
+  // handler doesn't fire and close the whole drawer along with it.
+  useEffect(() => {
+    if (!openProjectPicker) return;
+
+    const dismiss = () =>
+      setProjectPickerState({ sourceKey: assignedProjectKey, search: "", isOpen: false });
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!pickerAnchorRef.current?.contains(event.target as Node)) {
+        dismiss();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        dismiss();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [openProjectPicker, assignedProjectKey]);
 
   const projectOptions = availableProjects.filter((project) => {
     const isAlreadyAssigned = assignedProjectIds.has(project.id);
@@ -137,14 +205,16 @@ export function ProjectAccessPanel({
   };
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface-muted p-3 sm:p-4">
+    <div className="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="items-center align-middle">
-          <p className="text-xl font-semibold text-app-text sm:text-2xl">Projects</p>
+        <div>
+          <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+            Projects
+          </p>
           <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
         </div>
 
-        <div className="relative">
+        <div className="relative" ref={pickerAnchorRef}>
           <Button
             variant="secondary"
             onClick={toggleProjectPicker}
@@ -156,19 +226,40 @@ export function ProjectAccessPanel({
           </Button>
 
           {openProjectPicker && (
-            <div className="absolute right-0 z-30 mt-2 w-[min(calc(100vw-2rem),20rem)] rounded-2xl border border-app-border bg-app-surface p-2 shadow-lg">
-              <Input
-                size="sm"
-                value={projectSearch}
-                onChange={(event) => updateProjectSearch(event.target.value)}
-                placeholder="Search projects..."
-                aria-label="Search projects"
-                disabled={hasPendingProjectChange}
-                icon={<Search className="h-3.5 w-3.5" />}
-                className="mb-2"
-              />
+            <motion.div
+              initial={
+                prefersReducedMotion
+                  ? false
+                  : { opacity: 0, y: pickerPlacement.dropUp ? 6 : -6, scale: 0.98 }
+              }
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={
+                prefersReducedMotion ? { duration: 0 } : { duration: 0.16, ease: "easeOut" }
+              }
+              style={{ maxHeight: pickerPlacement.maxHeight }}
+              className={`absolute right-0 z-30 flex w-[min(calc(100vw-2rem),22rem)] flex-col rounded-2xl border border-app-border bg-app-surface p-2.5 shadow-app-brand-lift ${
+                pickerPlacement.dropUp
+                  ? "bottom-full mb-2 origin-bottom-right"
+                  : "mt-2 origin-top-right"
+              }`}
+            >
+              <p className="mb-2 shrink-0 px-1 text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+                Add to project
+              </p>
 
-              <div className="max-h-64 space-y-1 overflow-auto">
+              <div className="mb-2 shrink-0">
+                <Input
+                  size="sm"
+                  value={projectSearch}
+                  onChange={(event) => updateProjectSearch(event.target.value)}
+                  placeholder="Search projects..."
+                  aria-label="Search projects"
+                  disabled={hasPendingProjectChange}
+                  icon={<Search className="h-3.5 w-3.5" />}
+                />
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-1 overflow-auto">
                 {projectOptions.length > 0 ? (
                   projectOptions.map((project) => (
                     <button
@@ -176,9 +267,13 @@ export function ProjectAccessPanel({
                       type="button"
                       onClick={() => void addProject(project.id)}
                       disabled={hasPendingProjectChange}
-                      className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                      className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-app-brand-border-strong hover:bg-app-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <span className="min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface-muted text-app-text-muted transition-colors group-hover:bg-app-surface group-hover:text-app-brand">
+                        <Folder className="h-4 w-4" />
+                      </span>
+
+                      <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-app-text">
                           {project.name}
                         </span>
@@ -186,18 +281,22 @@ export function ProjectAccessPanel({
                           {project.id}
                         </span>
                       </span>
-                      {pendingProjectId === project.id && (
+
+                      {pendingProjectId === project.id ? (
                         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-app-text-muted" />
+                      ) : (
+                        <Plus className="h-4 w-4 shrink-0 text-app-brand opacity-0 transition-opacity group-hover:opacity-100" />
                       )}
                     </button>
                   ))
                 ) : (
-                  <p className="px-3 py-3 text-sm text-app-text-muted">
-                    No unassigned projects available.
-                  </p>
+                  <div className="flex flex-col items-center gap-1.5 px-3 py-6 text-center">
+                    <Folder className="h-5 w-5 text-app-text-disabled" />
+                    <p className="text-sm text-app-text-muted">No unassigned projects available.</p>
+                  </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
@@ -207,17 +306,20 @@ export function ProjectAccessPanel({
           assignedProjects.map((project) => (
             <div
               key={project.id}
-              className="rounded-2xl border border-app-border bg-app-surface px-3 py-4 sm:px-4"
+              className="rounded-2xl border border-app-border bg-app-surface-muted px-3 py-4 transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0 sm:px-4"
             >
               <div className="flex items-start justify-between gap-3 sm:gap-4">
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-surface-muted text-app-text-muted">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-surface text-app-text-muted">
                     <Folder className="h-4 w-4" />
                   </div>
 
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-app-text">{project.name}</p>
-                    <p className="mt-1 font-mono text-xs break-all text-app-text-muted">
+                    <p
+                      className="mt-0.5 truncate font-mono text-xs text-app-text-muted"
+                      title={project.id}
+                    >
                       {project.id}
                     </p>
                   </div>
@@ -253,7 +355,7 @@ export function ProjectAccessPanel({
             </div>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-app-border bg-app-surface px-4 py-8 text-center lg:col-span-2">
+          <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-8 text-center lg:col-span-2">
             <p className="text-sm font-medium text-app-text">No projects assigned</p>
             <p className="mt-1 text-sm text-app-text-muted">
               Add a project to assign this user to a project.

@@ -152,7 +152,6 @@ export function RebuildFaqDialog({ isOpen, projectId, onClose, onConfirm }: Rebu
               value={scope}
               options={SCOPE_OPTIONS}
               onChange={setScope}
-              menuInPortal
               className="w-full"
             />
           </div>

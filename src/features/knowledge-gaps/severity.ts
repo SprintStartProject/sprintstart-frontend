@@ -37,7 +37,17 @@ export const SEVERITY_FILL: Record<KnowledgeGapSeverity, string> = {
 export interface SeverityStyle {
   /** Solid fill for the severity bar, legend dots and stacked-bar segments. */
   bar: string;
-  /** Chip background + text pairing. */
+  /**
+   * Chip background + text pairing, for the pills on the pages, the widgets and
+   * the dashboard.
+   *
+   * Deliberately not a `ui/Badge` variant. The primitive's variants are the
+   * app's status ladder plus two named accents, and this ramp is neither — it
+   * is four ordered steps on its own scale (see `SEVERITY_STYLES` below), so
+   * there is no variant that carries the right colour. Mapping the steps onto
+   * the nearest status roles would put a pill and the bar beside it in two
+   * different reds for one and the same datum.
+   */
   badge: string;
   /** Short label, e.g. "High". */
   label: string;

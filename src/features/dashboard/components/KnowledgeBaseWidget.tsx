@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { useAuth } from "../../../context/useAuth";
+import { useProjectContext } from "../../projects/useProjectContext";
 import type { Artifact } from "../../knowledge-base/types";
 
 const PREVIEW_COUNT = 4;
@@ -28,7 +29,15 @@ function formatRelative(iso: string): string {
  */
 export function KnowledgeBaseWidget() {
   const { profile } = useAuth();
-  const projectId = profile?.projectIds?.[0] ?? null;
+  const { selectedProjectId } = useProjectContext();
+
+  /*
+    The switcher's selection first, exactly as the Knowledge Base page this card links to reads
+    it — a card showing one project beside a header naming another is worse than a slow one.
+    The profile only fills the gap before the project list has loaded, and for a manager whose
+    own membership does not include the project they are managing.
+  */
+  const projectId = selectedProjectId || (profile?.projectIds?.[0] ?? null);
 
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +67,7 @@ export function KnowledgeBaseWidget() {
   }, [projectId]);
 
   return (
-    <div className="group relative flex min-h-56 flex-col overflow-hidden rounded-2xl p-6">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
@@ -95,8 +104,10 @@ export function KnowledgeBaseWidget() {
         <ul className="relative flex-1 space-y-1">
           {artifacts.map((artifact) => (
             <li key={artifact.id}>
+              {/* Straight to the document, not just to the page it lives on. The Knowledge
+                  Base reads `?artifact` once on arrival and opens its viewer on that id. */}
               <Link
-                to="/knowledge-base"
+                to={`/knowledge-base?artifact=${encodeURIComponent(artifact.id)}`}
                 className="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover"
               >
                 <FileText className="h-3.5 w-3.5 shrink-0 text-app-text-muted" />

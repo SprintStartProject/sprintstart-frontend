@@ -516,7 +516,9 @@ export function CreateProjectWizard({
           description: "Some sources couldn't be connected.",
         });
       } else {
-        toast.success("Project created");
+        toast.success("Project created", {
+          description: "Initial ingestion is running in the background.",
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Couldn't create the project.";
@@ -725,6 +727,10 @@ export function CreateProjectWizard({
         onClose={requestClose}
         closeLabel="Close new project wizard"
         footer={footer}
+        // Keep the footer buttons side by side (up to three) instead of stacking
+        // them on narrow screens; desktop keeps its natural-width, right-aligned
+        // row via the sm: resets.
+        footerClassName="flex flex-row flex-wrap gap-3 [&>button]:flex-1 sm:flex-nowrap sm:justify-end sm:[&>button]:flex-initial"
       >
         <p className="sr-only" aria-live="polite">
           {screenAnnouncement}

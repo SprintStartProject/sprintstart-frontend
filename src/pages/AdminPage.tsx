@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
@@ -12,6 +12,7 @@ import {
   filterAdminUsers,
   getAvailableProjects,
   getDisplayName,
+  getPaginatedProjects,
   getPaginatedUsers,
   getSafePage,
   getTotalPages,
@@ -51,7 +52,33 @@ export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { reloadProjects } = useProjectContext();
-  const [activeTab, setActiveTab] = useState<AdminTab>("users");
+  /*
+    `?tab=projects` opens the page on that section. The dashboard's Projects card links here,
+    and without this it always landed on Users — a card about projects dropping the reader on
+    a list of people.
+
+    A hand-off, not a permanent part of the URL: it seeds the tab once and is then stripped, so
+    the tab bar keeps behaving exactly as before and the back button does not turn into a
+    step-through of sections.
+  */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    const requested = searchParams.get("tab");
+    return ADMIN_TAB_ORDER.find((tab) => tab === requested) ?? "users";
+  });
+
+  const tabParamConsumed = useRef(false);
+
+  useEffect(() => {
+    if (tabParamConsumed.current) return;
+    tabParamConsumed.current = true;
+
+    if (!searchParams.has("tab")) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -66,6 +93,7 @@ export function AdminPage() {
   );
 
   const [page, setPage] = useState(1);
+  const [projectPage, setProjectPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
@@ -126,6 +154,13 @@ export function AdminPage() {
   const paginatedUsers = useMemo(() => {
     return getPaginatedUsers(filteredUsers, safePage);
   }, [filteredUsers, safePage]);
+
+  const projectTotalPages = getTotalPages(filteredProjects.length);
+  const safeProjectPage = getSafePage(projectPage, projectTotalPages);
+
+  const paginatedProjects = useMemo(() => {
+    return getPaginatedProjects(filteredProjects, safeProjectPage);
+  }, [filteredProjects, safeProjectPage]);
 
   const allVisibleUsersSelected = areAllVisibleUsersSelected(paginatedUsers, selectedUserIds);
 
@@ -306,6 +341,7 @@ export function AdminPage() {
     setOpenUserMenuId(null);
     setActiveTab("projects");
     setProjectSearchValue("");
+    setProjectPage(1);
     setSelectedUser(null);
     setSelectedProject(project);
     setIsDrawerOpen(true);
@@ -433,7 +469,11 @@ export function AdminPage() {
       // dialog's scroll lock has to be told where to look — see
       // `SCROLL_CONTAINER_ATTRIBUTE`.
       {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
-      className="h-dvh overflow-y-scroll overscroll-contain"
+      // Below lg the app shell offsets the page by the 64px fixed mobile
+      // header (App's main has pt-[64px] lg:pt-0). A plain h-dvh would then run
+      // 64px past the viewport, hiding the last row of content (e.g. the
+      // pagination) below the fold, so subtract the header there.
+      className="h-[calc(100dvh-64px)] overflow-y-scroll overscroll-contain lg:h-dvh"
     >
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">
@@ -450,14 +490,14 @@ export function AdminPage() {
         {/* No card around the sections, matching the other tabbed pages: the
             box drew a second frame inside the page frame and made the tab bar
             look like it belonged to a widget rather than to the page. */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex items-center gap-3 sm:justify-between">
           <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
 
           <button
             type="button"
             onClick={() => void refreshAdminData()}
             disabled={isRefreshing}
-            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:w-11"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Refresh admin data"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
@@ -539,15 +579,24 @@ export function AdminPage() {
                   <AdminProjectsToolbar
                     projectCount={filteredProjects.length}
                     projectSearchValue={projectSearchValue}
-                    onProjectSearchChange={setProjectSearchValue}
+                    onProjectSearchChange={(value) => {
+                      setProjectSearchValue(value);
+                      setProjectPage(1);
+                    }}
                     onCreateProject={openCreateWizard}
                   />
 
                   <ProjectsTab
-                    filteredProjects={filteredProjects}
+                    filteredProjects={paginatedProjects}
                     hasSearchQuery={projectSearchValue.trim().length > 0}
                     totalCount={projects.length}
                     onOpenProjectDetails={openProjectDetails}
+                  />
+
+                  <AdminPagination
+                    safePage={safeProjectPage}
+                    totalPages={projectTotalPages}
+                    onPageChange={setProjectPage}
                   />
                 </>
               ) : (

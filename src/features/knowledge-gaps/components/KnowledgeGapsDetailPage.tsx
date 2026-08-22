@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
-import { Select } from "../../../components/ui/Select";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { getTeamOverview } from "../../../services/teamManagementService";
@@ -22,7 +22,6 @@ import {
   Clock,
   User,
   UserPlus,
-  X,
   FileCheck,
   ShieldAlert,
   Wrench,
@@ -51,9 +50,10 @@ export function KnowledgeGapsDetailPage() {
     error,
   } = useFetch(
     () => knowledgeGapService.fetchKnowledgeGap(selectedProjectId, gapId ?? ""),
-    // The project is part of what is being fetched, so switching it has to
-    // refetch -- otherwise the page keeps showing the previous project's gap.
-    [selectedProjectId, gapId, refreshKey],
+    // The project belongs in here as much as the gap does: switching projects in the header
+    // while a gap is open otherwise leaves another project's gap on screen, and the owner
+    // control below would then write to whichever project the switcher now names.
+    [gapId, refreshKey, selectedProjectId],
   );
 
   const { data: teamUsers } = useFetch(() => getTeamOverview(), []);
@@ -94,7 +94,26 @@ export function KnowledgeGapsDetailPage() {
 
   // A component has a single owner; assigning replaces any previous one.
   const currentOwner = gap.owners[0] ?? null;
-  const assignableUsers = (teamUsers ?? []).filter((u) => u.userId !== currentOwner?.id);
+
+  /*
+    One control for one property: the dropdown names the current owner and "Unassigned" is how
+    it is cleared. The owner therefore has to be among the options even though the list is the
+    project's team — an owner who has since left it would otherwise leave the trigger blank —
+    so they are prepended when the team overview no longer carries them.
+  */
+  const teamOptions = [...(teamUsers ?? [])]
+    .sort((a, b) => `${a.lastname} ${a.firstname}`.localeCompare(`${b.lastname} ${b.firstname}`))
+    .map((u) => ({ value: u.userId, label: `${u.firstname} ${u.lastname}` }));
+
+  const ownerIsOnTeam = teamOptions.some((option) => option.value === currentOwner?.id);
+
+  const ownerOptions = [
+    { value: "", label: "Unassigned" },
+    ...(currentOwner && !ownerIsOnTeam
+      ? [{ value: currentOwner.id, label: `${currentOwner.firstname} ${currentOwner.lastname}` }]
+      : []),
+    ...teamOptions,
+  ];
 
   const saveOwners = async (userIds: string[]) => {
     setSavingOwners(true);
@@ -110,10 +129,7 @@ export function KnowledgeGapsDetailPage() {
     }
   };
 
-  const setOwner = (userId: string) => {
-    if (userId) void saveOwners([userId]);
-  };
-  const clearOwner = () => void saveOwners([]);
+  const setOwner = (userId: string) => void saveOwners(userId ? [userId] : []);
 
   const firstIngested = gap.firstIngested ?? gap.lastIngested;
   const daysSinceIngest = daysSince(gap.lastIngested);
@@ -256,38 +272,21 @@ export function KnowledgeGapsDetailPage() {
                     {currentOwner.role ? ` · ${currentOwner.role}` : ""}
                   </div>
                 </div>
-                <button
-                  onClick={clearOwner}
-                  disabled={savingOwners}
-                  title="Remove owner"
-                  className="shrink-0 text-app-text-muted transition-colors hover:text-app-danger-solid disabled:opacity-60"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
             )}
           </div>
 
           {/* Assign / change owner */}
           <div className="mt-3 flex items-center gap-2">
-            <UserPlus className="h-4 w-4 shrink-0 text-app-text-muted" />
-            <Select
-              size="sm"
-              value=""
-              aria-label={currentOwner ? "Change owner" : "Assign owner"}
-              disabled={savingOwners || assignableUsers.length === 0}
-              onChange={(e) => setOwner(e.target.value)}
+            <UserPlus aria-hidden="true" className="h-4 w-4 shrink-0 text-app-text-muted" />
+            <FilterSelect
+              label={currentOwner ? "Change the owner of this component" : "Assign an owner"}
+              value={currentOwner?.id ?? ""}
+              options={ownerOptions}
+              onChange={setOwner}
+              disabled={savingOwners}
               className="flex-1"
-            >
-              <option value="" disabled>
-                {currentOwner ? "Change owner…" : "Assign owner…"}
-              </option>
-              {assignableUsers.map((u) => (
-                <option key={u.userId} value={u.userId}>
-                  {u.firstname} {u.lastname}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
         </div>
 
@@ -313,6 +312,9 @@ export function KnowledgeGapsDetailPage() {
                 Last analyzed {formatDateTime(gap.refreshedAt)}
               </div>
             </div>
+            {/* Straight to this component's repository, not just to the page. Data Ingestion
+                accepts the component (`owner/repo`) as a `sourceId` and opens that card's
+                details — otherwise the reader lands on the list and has to find it again. */}
             <Button
               variant="primary"
               onClick={() => void navigate(dataIngestionLink)}

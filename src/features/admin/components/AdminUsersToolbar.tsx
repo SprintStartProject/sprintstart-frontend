@@ -45,8 +45,8 @@ export function AdminUsersToolbar({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="w-full sm:w-64">
+      <div className="flex flex-row items-center gap-2 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1 sm:w-64 sm:min-w-[auto] sm:flex-initial">
           <Input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
@@ -61,7 +61,7 @@ export function AdminUsersToolbar({
           value={userFilter}
           options={USER_FILTER_OPTIONS}
           onChange={onFilterChange}
-          className="w-full sm:w-52"
+          className="w-36 sm:w-52"
         />
       </div>
     </div>
