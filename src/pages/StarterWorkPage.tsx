@@ -29,27 +29,28 @@ import type {
   PoolFlightRect,
 } from "../features/starter-work/components/poolFlight";
 import { useProjectContext } from "../features/projects/useProjectContext";
-import { TaskOrientationManager } from "../features/orientation/components/TaskOrientationManager";
 import { useStarterWorkReview } from "../features/starter-work/hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../features/starter-work/hooks/useStarterWorkPool";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../features/starter-work/types";
 
 /**
- * The workflows this page holds, and the order they sit in the section filter.
+ * The sections this page holds, and the order they sit in the section filter.
  *
- * `overview` is the dashboard: it shows every section at once. The others narrow
- * to one, mirroring the Data Ingestion page. `orientation` only exists for a PM
- * or admin, so the tab list is built from `canAct` rather than this constant.
+ * `overview` is the dashboard: it shows every section at once. The others narrow to one of the
+ * sections the overview stacks up, mirroring the Data Ingestion page. There is no orientation
+ * section any more: a task's orientation is authored inline from its pool card.
  */
-type StarterWorkSection = "overview" | "review" | "browse" | "orientation";
+type StarterWorkSection = "overview" | "review" | "pool" | "browse";
 
 const SECTION_LABELS: Record<StarterWorkSection, string> = {
   overview: "Overview",
-  review: "To review",
-  browse: "Browse issues",
-  orientation: "Orientation",
+  review: "Review",
+  pool: "Pool",
+  browse: "Issues",
 };
+
+const SECTION_ORDER: StarterWorkSection[] = ["overview", "review", "pool", "browse"];
 
 function compactToastDetail(value: string, maxLength: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -214,27 +215,20 @@ export function StarterWorkPage() {
     [reject, reloadPool, toast],
   );
 
-  // The orientation workflow is PM/ADMIN only, so the tab list — and the order the
-  // swipe/slide directions read from — depends on the role.
-  const sectionOrder = useMemo<StarterWorkSection[]>(
-    () =>
-      canAct ? ["overview", "review", "browse", "orientation"] : ["overview", "review", "browse"],
-    [canAct],
-  );
-
-  // Two-finger swipe between the sections, matching the Data Ingestion page.
+  // Two-finger swipe between the sections, matching the Data Ingestion page. Every section is
+  // readable by every role now, so the order is fixed rather than built from the role.
   const swipeRef = useSwipeableTabs<StarterWorkSection, HTMLElement>({
-    order: sectionOrder,
+    order: SECTION_ORDER,
     value: activeSection,
     onChange: setActiveSection,
   });
 
-  const tabOptions: SegmentedTabOption<StarterWorkSection>[] = sectionOrder.map((key) => ({
+  const tabOptions: SegmentedTabOption<StarterWorkSection>[] = SECTION_ORDER.map((key) => ({
     value: key,
     label: SECTION_LABELS[key],
-    // Only the review queue has a page-level count; the other sections own their
-    // own data, so their tabs stay countless rather than showing a wrong number.
-    count: key === "review" ? tasks.length : undefined,
+    // The review queue and the pool each carry a page-level count; the other sections own their own
+    // data, so their tabs stay countless rather than showing a wrong number.
+    count: key === "review" ? tasks.length : key === "pool" ? pooledTasks.length : undefined,
   }));
 
   const showOverview = activeSection === "overview";
@@ -246,8 +240,8 @@ export function StarterWorkPage() {
   // the column on their own, so no placeholder shows.
   const reviewFillerCount = hasOpenReviews && tasks.length <= 2 ? 3 - tasks.length : 0;
   const showReviewTab = activeSection === "review";
+  const showPoolTab = activeSection === "pool";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
-  const showOrientation = canAct && activeSection === "orientation";
 
   // At-a-glance workflow snapshot: how much work is live, and how much of it has
   // already been vouched for. Both values come from the same pool rendered below.
@@ -335,7 +329,7 @@ export function StarterWorkPage() {
 
         <SlidingTabPanel
           activeKey={activeSection}
-          index={sectionOrder.indexOf(activeSection)}
+          index={SECTION_ORDER.indexOf(activeSection)}
           className="space-y-8"
         >
           {showOverview && (
@@ -437,9 +431,16 @@ export function StarterWorkPage() {
             />
           )}
 
-          {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split —
-              HR looks over the pool but does not write hire-facing content. */}
-          {showOrientation && <TaskOrientationManager />}
+          {/* The pool on its own, the same surface the overview shows on the right. PM/ADMIN edit a
+              task's orientation inline from its card here; HR reads it. */}
+          {showPoolTab && (
+            <StarterWorkPoolCloud
+              tasks={pooledTasks}
+              isLoading={isPoolLoading}
+              error={poolError}
+              canAct={canAct}
+            />
+          )}
         </SlidingTabPanel>
       </main>
 

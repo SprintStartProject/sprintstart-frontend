@@ -1,4 +1,4 @@
-import { render as testingRender, screen, waitFor } from "@testing-library/react";
+import { render as testingRender, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -48,8 +48,8 @@ describe("StarterWorkPage", () => {
     vi.restoreAllMocks();
     permissionGroup.current = "PM";
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [task] });
-    // The PM page also renders the task-orientation manager, which loads the approved pool and
-    // the caller's projects. Stub both so these tests stay about the review queue.
+    // The page loads the live pool for the overview alongside the review queue. Stub it (and the
+    // caller's projects) so these tests stay about the review queue.
     vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([]);
     vi.spyOn(userService, "getMyProjects").mockResolvedValue([]);
     // The page also renders the corpus issue browser, which reads the selected project's
@@ -115,6 +115,25 @@ describe("StarterWorkPage", () => {
     await waitFor(() => expect(approve).toHaveBeenCalledWith("task-1"));
     await waitFor(() =>
       expect(screen.queryByTestId("approve-task-task-1")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("offers the overview, review, pool and issues sections and no orientation tab", async () => {
+    const user = userEvent.setup();
+    render(<StarterWorkPage />);
+
+    const tabs = await screen.findByRole("group", { name: "Filter sections" });
+    expect(within(tabs).getByText("Overview")).toBeInTheDocument();
+    expect(within(tabs).getByText("Review")).toBeInTheDocument();
+    expect(within(tabs).getByText("Pool")).toBeInTheDocument();
+    expect(within(tabs).getByText("Issues")).toBeInTheDocument();
+    expect(within(tabs).queryByText("Orientation")).not.toBeInTheDocument();
+
+    // The pool section stands on its own under the Pool tab, without the issue browser beside it.
+    await user.click(within(tabs).getByText("Pool"));
+    expect(await screen.findByTestId("starter-work-pool")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId("corpus-issue-browser")).not.toBeInTheDocument(),
     );
   });
 
