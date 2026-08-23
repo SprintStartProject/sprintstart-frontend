@@ -59,6 +59,35 @@ describe("StarterWorkPoolCloud density", () => {
     expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
   });
 
+  it("lays the full-width list out as a 2×3 grid of up to six rows per page", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={Array.from({ length: 7 }, (_, index) => task(index + 1))}
+        isLoading={false}
+        error={null}
+        canAct
+        fullWidth
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "List view" }));
+
+    const list = screen.getByTestId("pool-task-list");
+    expect(list).toHaveClass("grid", "@min-[38rem]:grid-cols-2");
+    const rows = screen.getAllByTestId(/^pool-list-task-/);
+    expect(rows).toHaveLength(6);
+    // Each row and its card stretch to the grid cell so side-by-side cards match the taller one.
+    expect(rows[0]).toHaveClass("h-full");
+    expect(rows[0].querySelector("div")).toHaveClass("h-full");
+    expect(screen.queryByText("Starter task 7")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+
+    expect(await screen.findByText("Starter task 7")).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
+  });
+
   it("does not render competency badges in either pool view", async () => {
     const user = userEvent.setup();
     renderWithProviders(

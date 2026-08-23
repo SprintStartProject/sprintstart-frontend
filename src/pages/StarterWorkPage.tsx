@@ -402,6 +402,7 @@ export function StarterWorkPage() {
                     isLoading={isPoolLoading}
                     error={poolError}
                     canAct={canAct}
+                    fullWidth={poolUsesFullWidth}
                   />
                 </div>
               </div>
@@ -439,6 +440,7 @@ export function StarterWorkPage() {
               isLoading={isPoolLoading}
               error={poolError}
               canAct={canAct}
+              fullWidth
             />
           )}
         </SlidingTabPanel>

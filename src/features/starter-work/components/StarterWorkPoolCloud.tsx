@@ -26,6 +26,8 @@ import type { StarterWorkTask } from "../types";
 /** Cloud cards need more breathing room than the compact issue-style list rows. */
 const CLOUD_PAGE_SIZE = 5;
 const LIST_PAGE_SIZE = 3;
+/** Full width, the list lays its rows out two-up, so one page holds a 2×3 grid instead of three. */
+const LIST_PAGE_SIZE_WIDE = 6;
 
 type PoolView = "cloud" | "list";
 
@@ -95,6 +97,12 @@ type StarterWorkPoolCloudProps = {
   error: string | null;
   /** HR reads the pool; only PM/ADMIN can open the orientation editor. */
   canAct: boolean;
+  /**
+   * Whether the pool spans the full content width (its own tab, or the overview with no open
+   * reviews). When it does, the list view lays its rows out in a two-column grid rather than a
+   * single stacked column, and pages six at a time to fill a 2×3 grid.
+   */
+  fullWidth?: boolean;
 };
 
 type PoolTaskProps = {
@@ -194,7 +202,7 @@ function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps
   const description = task.summary?.trim();
 
   return (
-    <li className="group relative" data-testid={`pool-list-task-${task.id}`}>
+    <li className="group relative h-full" data-testid={`pool-list-task-${task.id}`}>
       {canOpen && (
         <button
           type="button"
@@ -205,7 +213,9 @@ function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps
         />
       )}
 
-      <div className="pointer-events-none relative z-10 flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong">
+      {/* h-full so that side by side in the full-width grid, the row's two cards match the taller
+          one's height; in the single stacked column it is a no-op. */}
+      <div className="pointer-events-none relative z-10 flex h-full items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold text-app-text" title={task.title}>
             {task.title}
@@ -247,6 +257,7 @@ export function StarterWorkPoolCloud({
   isLoading,
   error,
   canAct,
+  fullWidth = false,
 }: StarterWorkPoolCloudProps) {
   const { selectedProjectId } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
@@ -261,7 +272,8 @@ export function StarterWorkPoolCloud({
   } | null>(null);
   const [page, setPage] = useState(1);
 
-  const pageSize = view === "cloud" ? CLOUD_PAGE_SIZE : LIST_PAGE_SIZE;
+  const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
+  const pageSize = view === "cloud" ? CLOUD_PAGE_SIZE : listPageSize;
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
@@ -415,7 +427,13 @@ export function StarterWorkPoolCloud({
               </ul>
             </div>
           ) : (
-            <ul className="space-y-2.5" data-testid="pool-task-list" data-pool-flight-target>
+            <ul
+              className={
+                fullWidth ? "grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2" : "space-y-2.5"
+              }
+              data-testid="pool-task-list"
+              data-pool-flight-target
+            >
               {pageItems.map((task) => (
                 <PoolListRow
                   key={task.id}
