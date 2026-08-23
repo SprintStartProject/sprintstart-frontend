@@ -79,6 +79,7 @@ const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
   "/team-management",
   "/insights/faq",
   "/insights/knowledge-gaps",
+  "/insights/knowledge-requests",
 ];
 
 const routePrefixes: Partial<Record<AppRoute, readonly string[]>> = {

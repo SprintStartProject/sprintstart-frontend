@@ -7,6 +7,13 @@ import * as useAuthHook from "../../../../src/context/useAuth";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { PermissionGroup } from "../../../../src/services/types";
 
+// Mutable so individual tests can flip it mid-suite. Module-level mock
+// factories cannot close over `let`, hence the `vi.hoisted` shared object
+// (same pattern as `useChat.test.tsx`). Reset in `beforeEach`.
+const { projectState } = vi.hoisted(() => ({
+  projectState: { canManageSelected: true },
+}));
+
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
     await import("../../setup/projectContext");
@@ -17,7 +24,7 @@ vi.mock("../../../../src/features/projects/useProjectContext", async () => {
         projects: [project],
         selectedProject: project,
         selectedProjectId: "proj1",
-        canManageSelected: true,
+        canManageSelected: projectState.canManageSelected,
       }),
   };
 });
@@ -54,6 +61,7 @@ describe("SideBar", () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     document.documentElement.className = "";
+    projectState.canManageSelected = true;
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       // Framer Motion's `useReducedMotion` (used by the sidebar nav items)
@@ -180,6 +188,67 @@ describe("SideBar", () => {
     // The project context is mocked with `canManageSelected: true`, so the
     // manager-assignment gate passes and the entry renders.
     expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
+  });
+
+  it("hides the escalation inbox from a PM who only has member access to the selected project", () => {
+    projectState.canManageSelected = false;
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: { ...mockProfile, permissionGroup: PermissionGroup.PM },
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    // The route is manager-scoped: a member-only PM would land on an inbox
+    // whose API requests fail with 403, so the entry stays hidden.
+    expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
+  });
+
+  it("activates only the Escalation Inbox entry on its own route", () => {
+    const pmProfile = {
+      ...mockProfile,
+      permissionGroup: PermissionGroup.PM,
+    };
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: pmProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    // The framer-motion test mock surfaces `layoutId` as `data-layout-id`,
+    // rendered once per active entry. Two active entries here (the Escalation
+    // Inbox via NavLink match plus a force-active PM Dashboard) would each
+    // mount one pill sharing the same id. `initialEntries` (instead of the
+    // helper's default `/` location) is what puts the route in the inbox.
+    render(
+      <MemoryRouter initialEntries={["/insights/knowledge-requests"]}>
+        <ThemeProvider>
+          <SideBar />
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
+
+    // The sidebar mounts twice (desktop + mobile drawer), so there are two
+    // pills in total -- but each instance must carry exactly ONE. A second
+    // active entry in one instance would mean two shared-layout elements
+    // fighting over the same id within it.
+    const desktopNav = screen.getByRole("navigation", { name: "Desktop Navigation" });
+    expect(desktopNav.querySelectorAll("[data-layout-id]")).toHaveLength(1);
+
+    // The desktop instance is the one under assertion; `getAllByText` because
+    // the mobile drawer renders the same labels a second time.
+    const pmDashboardEntry = screen
+      .getAllByText("PM Dashboard")
+      .map((label) => label.closest("a"))
+      .find((link) => desktopNav.contains(link));
+    expect(pmDashboardEntry?.className).not.toContain("text-white");
   });
 
   /**

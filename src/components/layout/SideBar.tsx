@@ -142,11 +142,13 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
+  // `/insights/knowledge-requests` is deliberately absent: it has its own
+  // sidebar entry, so listing it here would leave two entries active at once
+  // -- including two active pills sharing one Framer Motion `layoutId`.
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
     location.pathname.startsWith("/insights/faq") ||
-    location.pathname.startsWith("/insights/knowledge-gaps") ||
-    location.pathname.startsWith("/insights/knowledge-requests");
+    location.pathname.startsWith("/insights/knowledge-gaps");
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },
