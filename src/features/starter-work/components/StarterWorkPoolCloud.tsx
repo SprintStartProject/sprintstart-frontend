@@ -1,0 +1,476 @@
+import { useMemo, useState, type CSSProperties } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  ChevronRight,
+  Cloud,
+  List as ListIcon,
+  Loader2,
+  PackageOpen,
+  PencilLine,
+} from "lucide-react";
+import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { InfoHint } from "../../../components/ui/InfoHint";
+import { Pagination } from "../../../components/ui/Pagination";
+import { SpotlightCard } from "../../../components/ui/SpotlightCard";
+import { orientationService } from "../../../services/orientationService";
+import { centralSpringToken } from "../../../styles/tokens";
+import { OrientationEditor } from "../../orientation/components/OrientationEditor";
+import type { MyOrientation } from "../../orientation/types";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { parseCandidateSource, trackerLabel } from "../sourceId";
+import type { StarterWorkTask } from "../types";
+
+/** Cloud cards need more breathing room than the compact issue-style list rows. */
+const CLOUD_PAGE_SIZE = 5;
+const LIST_PAGE_SIZE = 3;
+
+type PoolView = "cloud" | "list";
+
+type CloudSlot = {
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+};
+
+/**
+ * Five collision-free compositions for one five-card cloud page.
+ *
+ * A page change picks a different composition at random. The positions themselves stay fixed while
+ * that page is visible, so normal renders never make cards jump. Below `xl` the custom properties
+ * are ignored and the same cards fall back to a regular responsive grid.
+ */
+const CLOUD_LAYOUTS: CloudSlot[][] = [
+  [
+    { left: "0%", top: "0%", width: "29%", height: "8.5rem" },
+    { left: "35%", top: "5%", width: "29%", height: "8.5rem" },
+    { left: "70%", top: "2%", width: "30%", height: "8.5rem" },
+    { left: "7%", top: "57%", width: "32%", height: "8.5rem" },
+    { left: "51%", top: "54%", width: "33%", height: "8.5rem" },
+  ],
+  [
+    { left: "2%", top: "7%", width: "30%", height: "8.5rem" },
+    { left: "36%", top: "0%", width: "30%", height: "8.5rem" },
+    { left: "70%", top: "8%", width: "30%", height: "8.5rem" },
+    { left: "15%", top: "54%", width: "31%", height: "8.5rem" },
+    { left: "55%", top: "57%", width: "32%", height: "8.5rem" },
+  ],
+  [
+    { left: "0%", top: "0%", width: "30%", height: "8.5rem" },
+    { left: "34%", top: "9%", width: "30%", height: "8.5rem" },
+    { left: "69%", top: "3%", width: "31%", height: "8.5rem" },
+    { left: "5%", top: "57%", width: "33%", height: "8.5rem" },
+    { left: "48%", top: "54%", width: "33%", height: "8.5rem" },
+  ],
+  [
+    { left: "4%", top: "5%", width: "30%", height: "8.5rem" },
+    { left: "38%", top: "0%", width: "30%", height: "8.5rem" },
+    { left: "72%", top: "8%", width: "28%", height: "8.5rem" },
+    { left: "0%", top: "55%", width: "32%", height: "8.5rem" },
+    { left: "42%", top: "57%", width: "34%", height: "8.5rem" },
+  ],
+  [
+    { left: "0%", top: "8%", width: "29%", height: "8.5rem" },
+    { left: "35%", top: "0%", width: "31%", height: "8.5rem" },
+    { left: "71%", top: "4%", width: "29%", height: "8.5rem" },
+    { left: "12%", top: "54%", width: "33%", height: "8.5rem" },
+    { left: "56%", top: "57%", width: "32%", height: "8.5rem" },
+  ],
+];
+
+type CloudSlotStyle = CSSProperties & {
+  "--cloud-left": string;
+  "--cloud-top": string;
+  "--cloud-width": string;
+  "--cloud-height": string;
+};
+
+type StarterWorkPoolCloudProps = {
+  /** Reviewed tasks shown in the pool; the page removes the still-unreviewed queue first. */
+  tasks: StarterWorkTask[];
+  isLoading: boolean;
+  error: string | null;
+  /** HR reads the pool; only PM/ADMIN can open the orientation editor. */
+  canAct: boolean;
+};
+
+type PoolTaskProps = {
+  task: StarterWorkTask;
+  canOpen: boolean;
+  isOpening: boolean;
+  isBusy: boolean;
+  onOpen: (task: StarterWorkTask) => void;
+};
+
+/** Pick any of the other four layouts, so every page change is visibly different. */
+function nextCloudLayout(current: number): number {
+  const offset = 1 + Math.floor(Math.random() * (CLOUD_LAYOUTS.length - 1));
+  return (current + offset) % CLOUD_LAYOUTS.length;
+}
+
+/** Shared source metadata used by both representations of a pool task. */
+function PoolTaskMeta({ task }: { task: StarterWorkTask }) {
+  const parsed = parseCandidateSource(task.sourceId);
+  const trackerCode = task.sourceId.split(":")[0] ?? "";
+  const hasKnownTracker =
+    trackerCode.toUpperCase() === "GITHUB" || trackerCode.toUpperCase() === "JIRA";
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {hasKnownTracker && (
+        <Badge variant="brand" size="sm">
+          {trackerLabel(trackerCode)}
+        </Badge>
+      )}
+      {parsed.numberLabel && (
+        <Badge variant="neutral" size="sm">
+          {parsed.numberLabel}
+        </Badge>
+      )}
+      {parsed.repo && (
+        <span className="min-w-0 truncate text-xs text-app-text-subtle" title={parsed.repo}>
+          {parsed.repo}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A cloud card whose stretched button makes the entire surface open the orientation drawer. */
+function PoolCloudCard({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+  const description = task.summary?.trim();
+
+  return (
+    <SpotlightCard
+      roundedClassName="rounded-2xl"
+      className="h-full focus-within:ring-2 focus-within:ring-app-focus"
+    >
+      {canOpen && (
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onOpen(task)}
+          aria-label={`Edit orientation for ${task.title}`}
+          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+        />
+      )}
+
+      <article className="pointer-events-none relative z-10 flex h-full flex-col gap-2 p-4">
+        <div className="flex items-start gap-2">
+          <h3
+            className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-semibold text-app-text"
+            title={task.title}
+          >
+            {task.title}
+          </h3>
+          {canOpen && (
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted">
+              {isOpening ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <PencilLine className="h-4 w-4" aria-hidden="true" />
+              )}
+            </span>
+          )}
+        </div>
+
+        {description && (
+          <p className="truncate text-xs leading-relaxed text-app-text-muted" title={description}>
+            {description}
+          </p>
+        )}
+
+        <div className="mt-auto pt-1">
+          <PoolTaskMeta task={task} />
+        </div>
+      </article>
+    </SpotlightCard>
+  );
+}
+
+/** Pool task in the same compact row language as the issue browser directly below it. */
+function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+  const description = task.summary?.trim();
+
+  return (
+    <li className="group relative" data-testid={`pool-list-task-${task.id}`}>
+      {canOpen && (
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onOpen(task)}
+          aria-label={`Edit orientation for ${task.title}`}
+          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+        />
+      )}
+
+      <div className="pointer-events-none relative z-10 flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-app-text" title={task.title}>
+            {task.title}
+          </h3>
+          {description && (
+            <p className="mt-1 truncate text-xs text-app-text-muted" title={description}>
+              {description}
+            </p>
+          )}
+          <div className="mt-1.5">
+            <PoolTaskMeta task={task} />
+          </div>
+        </div>
+
+        {canOpen && (
+          <span className="flex shrink-0 items-center gap-2 self-center text-app-text-muted">
+            {isOpening ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <PencilLine className="h-4 w-4" aria-hidden="true" />
+            )}
+            <ChevronRight className="h-4 w-4 text-app-text-disabled" aria-hidden="true" />
+          </span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * The reviewed starter-work pool with interchangeable cloud and list views.
+ *
+ * Cloud cards use one of five compositions and list rows deliberately mirror the issue browser.
+ * Both representations make the whole task surface the orientation trigger, while HR keeps a
+ * non-interactive read-only view matching the backend's authoring permissions.
+ */
+export function StarterWorkPoolCloud({
+  tasks,
+  isLoading,
+  error,
+  canAct,
+}: StarterWorkPoolCloudProps) {
+  const { selectedProjectId } = useProjectContext();
+  const prefersReducedMotion = useReducedMotion();
+
+  const [view, setView] = useState<PoolView>("cloud");
+  const [layoutIndex, setLayoutIndex] = useState(0);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{
+    task: StarterWorkTask;
+    orientation: MyOrientation;
+  } | null>(null);
+  const [page, setPage] = useState(1);
+
+  const pageSize = view === "cloud" ? CLOUD_PAGE_SIZE : LIST_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(
+    () => tasks.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [tasks, safePage, pageSize],
+  );
+
+  const openEditor = async (task: StarterWorkTask) => {
+    if (!selectedProjectId) return;
+    setOpeningId(task.id);
+    setOpenError(null);
+    try {
+      const orientation = await orientationService.fetchTaskOrientation(task.id, selectedProjectId);
+      setEditing({ task, orientation });
+    } catch (err) {
+      setOpenError(err instanceof Error ? err.message : "Could not open this orientation.");
+    } finally {
+      setOpeningId(null);
+    }
+  };
+
+  const changeView = (nextView: PoolView) => {
+    setView(nextView);
+    setPage(1);
+  };
+
+  const changePage = (nextPage: number) => {
+    if (nextPage === safePage) return;
+    setPage(nextPage);
+    if (view === "cloud") setLayoutIndex((current) => nextCloudLayout(current));
+  };
+
+  const canOpenTask = canAct && Boolean(selectedProjectId);
+
+  return (
+    <section className="@container" data-testid="starter-work-pool" aria-label="Tasks in the pool">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-semibold tracking-tight text-app-text">In the pool</h2>
+        {tasks.length > 0 && (
+          <Badge variant="neutral" size="sm" className="tabular-nums">
+            {tasks.length}
+          </Badge>
+        )}
+        <InfoHint
+          label="About the pool"
+          text="Tasks somebody has vouched for by reviewing them. Every task stays claimable; review improves its rank. Edit its orientation to write the hire-facing guide."
+        />
+
+        <div
+          className="ml-auto flex items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1"
+          role="group"
+          aria-label="Pool view"
+        >
+          <Button
+            variant={view === "cloud" ? "secondary" : "ghost"}
+            size="sm"
+            iconOnly
+            aria-label="Cloud view"
+            aria-pressed={view === "cloud"}
+            title="Cloud view"
+            onClick={() => changeView("cloud")}
+          >
+            <Cloud className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Button
+            variant={view === "list" ? "secondary" : "ghost"}
+            size="sm"
+            iconOnly
+            aria-label="List view"
+            aria-pressed={view === "list"}
+            title="List view"
+            onClick={() => changeView("list")}
+          >
+            <ListIcon className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+
+      {openError && (
+        <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
+          {openError}
+        </p>
+      )}
+      {error && (
+        <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
+          {error}
+        </p>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-app-text-muted">
+          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+        </div>
+      ) : tasks.length === 0 ? (
+        <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
+          Nothing has been vouched for yet. Review a task on the left and it lands here.
+        </EmptyState>
+      ) : (
+        <>
+          {view === "cloud" ? (
+            <div
+              data-pool-flight-target
+              className="relative overflow-hidden rounded-2xl @min-[38rem]:min-h-[22rem]"
+            >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-4 hidden opacity-40 @min-[38rem]:block"
+                style={{
+                  backgroundImage: "radial-gradient(var(--border-strong) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                  maskImage: "linear-gradient(to bottom, black, transparent 92%)",
+                }}
+              />
+
+              <ul
+                className="relative z-10 grid grid-cols-1 gap-3 sm:grid-cols-2 @min-[38rem]:m-4 @min-[38rem]:block @min-[38rem]:min-h-80"
+                data-testid="pool-task-cloud"
+                data-cloud-layout={layoutIndex}
+              >
+                <AnimatePresence initial={false} mode="popLayout">
+                  {pageItems.map((task, index) => {
+                    const slot = CLOUD_LAYOUTS[layoutIndex][index];
+                    const slotStyle: CloudSlotStyle = {
+                      "--cloud-left": slot.left,
+                      "--cloud-top": slot.top,
+                      "--cloud-width": slot.width,
+                      "--cloud-height": slot.height,
+                    };
+
+                    return (
+                      <motion.li
+                        key={task.id}
+                        layout={!prefersReducedMotion}
+                        initial={
+                          prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }
+                        }
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
+                        transition={centralSpringToken}
+                        style={slotStyle}
+                        data-testid={`pool-task-${task.id}`}
+                        data-cloud-slot={index}
+                        className="min-h-32 @min-[38rem]:absolute @min-[38rem]:top-[var(--cloud-top)] @min-[38rem]:left-[var(--cloud-left)] @min-[38rem]:h-[var(--cloud-height)] @min-[38rem]:w-[var(--cloud-width)] @min-[38rem]:min-w-40"
+                      >
+                        <PoolCloudCard
+                          task={task}
+                          canOpen={canOpenTask}
+                          isOpening={openingId === task.id}
+                          isBusy={openingId !== null}
+                          onOpen={(selected) => void openEditor(selected)}
+                        />
+                      </motion.li>
+                    );
+                  })}
+                </AnimatePresence>
+              </ul>
+            </div>
+          ) : (
+            <ul className="space-y-2.5" data-testid="pool-task-list" data-pool-flight-target>
+              {pageItems.map((task) => (
+                <PoolListRow
+                  key={task.id}
+                  task={task}
+                  canOpen={canOpenTask}
+                  isOpening={openingId === task.id}
+                  isBusy={openingId !== null}
+                  onOpen={(selected) => void openEditor(selected)}
+                />
+              ))}
+            </ul>
+          )}
+
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            onPageChange={changePage}
+            className="mt-5"
+          />
+        </>
+      )}
+
+      {editing && selectedProjectId && (
+        <OrientationEditor
+          taskTitle={editing.task.title}
+          taskUrl={editing.task.sourceUrl}
+          initial={editing.orientation.packet}
+          onSave={async (input) => {
+            await orientationService.authorTaskOrientation(
+              editing.task.id,
+              selectedProjectId,
+              input,
+            );
+            return true;
+          }}
+          onRevert={
+            editing.orientation.packet
+              ? async () => {
+                  await orientationService.revertTaskOrientation(
+                    editing.task.id,
+                    selectedProjectId,
+                  );
+                  return true;
+                }
+              : undefined
+          }
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </section>
+  );
+}

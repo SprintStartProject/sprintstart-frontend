@@ -31,13 +31,16 @@ describe("NewStarterTaskModal", () => {
     await user.type(screen.getByLabelText("Title"), "Add dark mode");
     await user.click(screen.getByTestId("create-starter-task"));
 
-    expect(onCreate).toHaveBeenCalledWith({
-      title: "Add dark mode",
-      summary: undefined,
-      sourceUrl: undefined,
-      competencyKeys: undefined,
-      // "Any role" is the default, and it is sent as absent rather than as a sentinel.
-    });
+    expect(onCreate).toHaveBeenCalledWith(
+      {
+        title: "Add dark mode",
+        summary: undefined,
+        sourceUrl: undefined,
+        competencyKeys: undefined,
+        // "Any role" is the default, and it is sent as absent rather than as a sentinel.
+      },
+      { top: 0, left: 0, width: 0, height: 0 },
+    );
   });
 
   it("parses comma- or space-separated competency keys into a list", async () => {
@@ -50,6 +53,7 @@ describe("NewStarterTaskModal", () => {
 
     expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({ competencyKeys: ["react", "typescript", "css"] }),
+      { top: 0, left: 0, width: 0, height: 0 },
     );
   });
 

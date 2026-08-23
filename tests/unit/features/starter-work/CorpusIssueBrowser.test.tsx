@@ -202,7 +202,12 @@ describe("CorpusIssueBrowser", () => {
     await waitFor(() =>
       expect(promote).toHaveBeenCalledWith({ sourceId: "github:acme/repo:ISSUE:1" }),
     );
-    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }));
+    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }), {
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+    });
     // The row badge and the drawer footer both say it now, so match either.
     expect((await screen.findAllByText(/already in the pool/i)).length).toBeGreaterThan(0);
     expect(starterWorkService.fetchCandidates).toHaveBeenCalledTimes(1);
@@ -230,7 +235,12 @@ describe("CorpusIssueBrowser", () => {
     await waitFor(() =>
       expect(promote).toHaveBeenCalledWith({ sourceId: "github:acme/repo:ISSUE:1" }),
     );
-    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }));
+    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }), {
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+    });
     // The row flips to pooled, so it no longer offers the quick add.
     await waitFor(() =>
       expect(

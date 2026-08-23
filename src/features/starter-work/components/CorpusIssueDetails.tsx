@@ -6,6 +6,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { BuddyMarkdown } from "../../buddy/components/BuddyMarkdown";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { StarterWorkCandidate } from "../types";
+import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type CorpusIssueDetailsProps = {
   candidate: StarterWorkCandidate;
@@ -14,7 +15,7 @@ type CorpusIssueDetailsProps = {
   isPromoting: boolean;
   /** The last promote error, surfaced next to the button that raised it. */
   error: string | null;
-  onPromote: (sourceId: string) => Promise<boolean>;
+  onPromote: (sourceId: string, origin?: PoolFlightRect) => Promise<boolean>;
   onClose: () => void;
 };
 
@@ -28,7 +29,7 @@ function formatUpdated(iso: string | null): string | null {
 /**
  * The full view of one browsable corpus issue, opened from the list.
  *
- * The row is deliberately compact — it carries a name and a number, no more — so the whole issue
+ * The row is deliberately compact â€” it carries a name and a number, no more â€” so the whole issue
  * body lives here, rendered as the Markdown it is written in. Adding it to the pool is the one
  * decision, and it fills the footer; the source link sits in the header beside the close button so
  * the reader can jump to the real issue without hunting.
@@ -50,7 +51,7 @@ export function CorpusIssueDetails({
   const isAvailable = candidate.poolState === "AVAILABLE";
 
   // Close on a pointer-down in empty space, but leave clicks inside the drawer and clicks on a
-  // list row alone — so clicking another issue switches to it and clicking the open one closes it,
+  // list row alone â€” so clicking another issue switches to it and clicking the open one closes it,
   // without this handler racing the row and reopening it. Mirrors the review drawer.
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -82,7 +83,10 @@ export function CorpusIssueDetails({
         type="button"
         data-testid={`promote-issue-${candidate.sourceId}`}
         disabled={isPromoting}
-        onClick={() => void onPromote(candidate.sourceId)}
+        onClick={(event) => {
+          const origin = capturePoolFlightRect(event.currentTarget);
+          void onPromote(candidate.sourceId, origin);
+        }}
         className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPromoting ? (
@@ -213,8 +217,8 @@ export function CorpusIssueDetails({
         {candidate.hasAssignee === true && (
           <DrawerCard label="Status" icon={Info} index={2}>
             <p className="text-sm leading-relaxed text-app-text-muted">
-              Someone is already on this issue. It is still yours to add — the pool is a suggestion,
-              not a claim.
+              Someone is already on this issue. It is still yours to add â€” the pool is a
+              suggestion, not a claim.
             </p>
           </DrawerCard>
         )}

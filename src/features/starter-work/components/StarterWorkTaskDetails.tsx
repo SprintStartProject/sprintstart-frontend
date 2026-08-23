@@ -13,12 +13,13 @@ import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer"
 import { DrawerCard } from "../../admin/components/DrawerCard";
 import { Badge } from "../../../components/ui/Badge";
 import type { StarterWorkTask } from "../types";
+import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type StarterWorkTaskDetailsProps = {
   task: StarterWorkTask;
   /** HR reads the detail but does not decide, so the footer is theirs to hide. */
   canAct: boolean;
-  onApprove: (id: string) => Promise<void>;
+  onApprove: (id: string, origin?: PoolFlightRect) => Promise<void>;
   onReject: (id: string, reason?: string) => Promise<void>;
   onClose: () => void;
 };
@@ -26,7 +27,7 @@ type StarterWorkTaskDetailsProps = {
 /**
  * The full view of one mined starter task, opened from the review list.
  *
- * The body is split into the same kind of labelled sections the admin user drawer uses — summary,
+ * The body is split into the same kind of labelled sections the admin user drawer uses â€” summary,
  * the AI's scope-safety rationale (the claim a PM is being asked to check) and the skills the task
  * exercises. The two decisions fill the footer; a successful one closes the drawer, since the task
  * then leaves the queue behind it.
@@ -54,7 +55,7 @@ export function StarterWorkTaskDetails({
 
   // Close when the pointer goes down on empty space. The drawer has no overlay on
   // purpose, so the list behind it stays live. Clicks inside the drawer are left
-  // alone, and clicks on a task card are left to that card's own toggle — so
+  // alone, and clicks on a task card are left to that card's own toggle â€” so
   // clicking a different task switches to it and clicking the open one closes it,
   // without this handler racing the card and reopening it.
   useEffect(() => {
@@ -99,7 +100,10 @@ export function StarterWorkTaskDetails({
             <button
               type="button"
               disabled={isDeciding}
-              onClick={() => void decide(() => onApprove(task.id))}
+              onClick={(event) => {
+                const origin = capturePoolFlightRect(event.currentTarget);
+                void decide(() => onApprove(task.id, origin));
+              }}
               className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-2.5 text-sm font-semibold text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isDeciding ? (

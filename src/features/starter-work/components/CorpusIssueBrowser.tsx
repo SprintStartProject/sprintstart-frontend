@@ -14,13 +14,14 @@ import { CorpusIssueDetails } from "./CorpusIssueDetails";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { CandidatePoolState, StarterWorkCandidate, StarterWorkTask } from "../types";
+import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type CorpusIssueBrowserProps = {
   /** The project whose corpus to browse. Empty when nothing is selected yet. */
   projectId: string;
   /** HR reads the browser; only PM/ADMIN put work in the pool. */
   canAct: boolean;
-  onPromoted: (task: StarterWorkTask) => void;
+  onPromoted: (task: StarterWorkTask, origin?: PoolFlightRect) => Promise<void> | void;
 };
 
 /** How many issue rows sit on one page before the list paginates. */
@@ -52,13 +53,13 @@ const POOL_FILTER_STATE: Record<Exclude<PoolFilter, "all">, CandidatePoolState> 
  *
  * This is a second way to add work, not a filter in front of mining. Mining keeps landing
  * tasks live and a hire can claim them without anybody looking, so nothing here may read as
- * "choose the tasks hires are allowed to have" — that is the gate S3b deleted. What it adds is the
+ * "choose the tasks hires are allowed to have" â€” that is the gate S3b deleted. What it adds is the
  * picker hand-authoring never had: the blank form beside it is untouched and equally reachable.
  *
  * Nothing is ranked and no issue carries a score. The judgement is the reader's, and a number would
  * be the mining filter wearing a different hat.
  *
- * Each row is compact — a name and a number — and opens a drawer with the whole issue body and the
+ * Each row is compact â€” a name and a number â€” and opens a drawer with the whole issue body and the
  * add action, so the list scans quickly and the reading happens where there is room for it.
  */
 export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssueBrowserProps) {
@@ -77,7 +78,7 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
   } = useCorpusIssueBrowser(projectId, onPromoted);
 
   const [page, setPage] = useState(1);
-  // Defaults to the new, not-yet-pooled issues — the ones a PM is here to act on. Pooled and
+  // Defaults to the new, not-yet-pooled issues â€” the ones a PM is here to act on. Pooled and
   // removed issues stay one filter step away rather than padding the default list.
   const [poolFilter, setPoolFilter] = useState<PoolFilter>("available");
   const [openSourceId, setOpenSourceId] = useState<string | null>(null);
@@ -197,14 +198,14 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
                 {totalCount === 0
                   ? "No open issues have been ingested for this project yet. Connect a repository or tracker and crawl it, and they will show up here."
                   : query.trim().length > 0
-                    ? `Nothing matches “${query.trim()}”.`
+                    ? `Nothing matches â€œ${query.trim()}â€.`
                     : "Every open issue here is one somebody is already on. Tick the box above to see them."}
               </EmptyState>
             </div>
           ) : shown.length === 0 ? (
             <div data-testid="corpus-issue-empty">
               <EmptyState icon={<Inbox className="h-8 w-8" aria-hidden="true" />}>
-                No issues match this filter. Switch it back to “All issues” to see the rest.
+                No issues match this filter. Switch it back to â€œAll issuesâ€ to see the rest.
               </EmptyState>
             </div>
           ) : (
@@ -235,7 +236,7 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
 
       {/* Portaled to <body> so the drawer clears the sliding tab panel's transform. The extra
           AnimatePresence resets the `initial={false}` that SlidingTabPanel's own AnimatePresence
-          pushes down the React tree (context crosses the portal) — without it the drawer inherits
+          pushes down the React tree (context crosses the portal) â€” without it the drawer inherits
           "no enter animation" and pops in instead of sliding. Its child, PanelPresence, is always
           present, so this AnimatePresence only resets the context; it never manages the exit. */}
       {createPortal(
@@ -268,14 +269,14 @@ type CandidateRowProps = {
   /** Any row's add is in flight, so every add is held until it settles. */
   isBusy: boolean;
   onOpen: (sourceId: string) => void;
-  onPromote: (sourceId: string) => Promise<boolean>;
+  onPromote: (sourceId: string, origin?: PoolFlightRect) => Promise<boolean>;
 };
 
 /**
  * The pool state of an issue, as a badge that reads apart from its labels.
  *
  * Labels all share the one neutral colour (the tracker never tells us their real colours), so pool
- * state has to earn its own place: it sits up in the title row, carries an icon, and is coloured —
+ * state has to earn its own place: it sits up in the title row, carries an icon, and is coloured â€”
  * "in the pool" in success green, "taken out" muted with a struck-through mark, so a terminal state
  * never reads like just another tag.
  */
@@ -303,7 +304,7 @@ function poolStateBadge(poolState: CandidatePoolState) {
  * One browsable issue, kept to a name and a number.
  *
  * A stretched button behind the content opens the detail drawer, so a click anywhere on the row
- * falls through to it — nothing interactive is nested inside anything interactive. On a pointer the
+ * falls through to it â€” nothing interactive is nested inside anything interactive. On a pointer the
  * quick "Add to the pool" surfaces on hover (and on keyboard focus) so a PM can pool an obvious one
  * without opening it; on touch, where there is no hover, it stays out of the way and the drawer is
  * the way in. Only an available issue offers it: a pooled or removed one is shown marked instead.
@@ -433,7 +434,10 @@ function CandidateRow({
               whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
               data-testid={`quick-promote-issue-${candidate.sourceId}`}
               disabled={isBusy}
-              onClick={() => void onPromote(candidate.sourceId)}
+              onClick={(event) => {
+                const origin = capturePoolFlightRect(event.currentTarget);
+                void onPromote(candidate.sourceId, origin);
+              }}
               className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
             >
               {isPromoting ? (

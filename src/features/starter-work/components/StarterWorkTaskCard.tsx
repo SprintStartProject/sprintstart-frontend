@@ -3,6 +3,7 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import type { StarterWorkTask } from "../types";
+import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type StarterWorkTaskCardProps = {
   task: StarterWorkTask;
@@ -12,7 +13,7 @@ type StarterWorkTaskCardProps = {
   isOpen: boolean;
   /** Toggle this task's detail drawer (open it, or close it if it is already the open one). */
   onSelect: (task: StarterWorkTask) => void;
-  onApprove: (id: string) => Promise<void>;
+  onApprove: (id: string, origin?: PoolFlightRect) => Promise<void>;
   onReject: (id: string, reason?: string) => Promise<void>;
 };
 
@@ -61,7 +62,7 @@ export function StarterWorkTaskCard({
       // On success the task leaves the queue and this card unmounts, so there is
       // nothing to reset; the toast owns the feedback.
     } catch {
-      // The page's handler already raised a toast for the failure — just let the
+      // The page's handler already raised a toast for the failure â€” just let the
       // row settle back so it can be tried again.
       setIsDeciding(false);
     }
@@ -86,7 +87,7 @@ export function StarterWorkTaskCard({
         onClick={(event) => {
           onSelect(task);
           // A mouse open leaves this trigger focused, and the drawer returns focus
-          // here on close — showing a focus ring the pointer user never asked for.
+          // here on close â€” showing a focus ring the pointer user never asked for.
           // Blur so focus falls back to the body. Keyboard activation (detail 0)
           // keeps the ring, which is where it belongs.
           if (event.detail !== 0) {
@@ -132,7 +133,10 @@ export function StarterWorkTaskCard({
               whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
               data-testid={`approve-task-${task.id}`}
               disabled={isDeciding}
-              onClick={() => void decide(() => onApprove(task.id))}
+              onClick={(event) => {
+                const origin = capturePoolFlightRect(event.currentTarget);
+                void decide(() => onApprove(task.id, origin));
+              }}
               aria-label="Looks good"
               className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-5 text-xs font-semibold whitespace-nowrap text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Link2,
@@ -23,9 +23,16 @@ import { StarterWorkTaskCard } from "../features/starter-work/components/Starter
 import { StarterWorkTaskDetails } from "../features/starter-work/components/StarterWorkTaskDetails";
 import { NewStarterTaskModal } from "../features/starter-work/components/NewStarterTaskModal";
 import { CorpusIssueBrowser } from "../features/starter-work/components/CorpusIssueBrowser";
+import { StarterWorkPoolGrid } from "../features/starter-work/components/StarterWorkPoolGrid";
+import { PoolTaskFlight } from "../features/starter-work/components/PoolTaskFlight";
+import type {
+  PoolFlightItem,
+  PoolFlightRect,
+} from "../features/starter-work/components/poolFlight";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TaskOrientationManager } from "../features/orientation/components/TaskOrientationManager";
 import { useStarterWorkReview } from "../features/starter-work/hooks/useStarterWorkReview";
+import { useStarterWorkPool } from "../features/starter-work/hooks/useStarterWorkPool";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../features/starter-work/types";
 
@@ -49,7 +56,7 @@ const SECTION_LABELS: Record<StarterWorkSection, string> = {
  * Where a PM looks over the starter tasks the corpus produced.
  *
  * A mined task is live and claimable the moment it lands; this lists the ones nobody has vouched
- * for yet. Vouching lifts the demotion fit-ranking applies — it does not admit anything, and
+ * for yet. Vouching lifts the demotion fit-ranking applies â€” it does not admit anything, and
  * nothing here holds a task back from a hire.
  *
  * Removal is the one irreversible action, and it is sticky: mining never brings back a task
@@ -80,12 +87,48 @@ export function StarterWorkPage() {
     reject,
   } = useStarterWorkReview();
 
+  // The pool shown on the right of the overview. Reloaded after every decision so it stays in step
+  // with the queue on the left.
+  const {
+    pool,
+    isLoading: isPoolLoading,
+    error: poolError,
+    reload: reloadPool,
+  } = useStarterWorkPool();
+  // The right column is the pool minus whatever is still awaiting review on the left. The backend
+  // pool response carries no per-task "reviewed" flag, so the split is computed by id against the
+  // unreviewed queue rather than read off the task â€” and reviewing one drops it from the queue,
+  // which is exactly what moves it across to the right.
+  const queueIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
+  const pooledTasks = useMemo(
+    () => pool.filter((task) => !queueIds.has(task.id)),
+    [pool, queueIds],
+  );
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [activeSection, setActiveSection] = useState<StarterWorkSection>("overview");
   // The task whose detail drawer is open, or null. Held as the object so the
   // drawer can animate itself out after the task has left the queue.
   const [selectedTask, setSelectedTask] = useState<StarterWorkTask | null>(null);
+  const flightSequence = useRef(0);
+  const [poolFlight, setPoolFlight] = useState<PoolFlightItem | null>(null);
+
+  const launchPoolFlight = useCallback(
+    (task: { title: string; summary?: string | null }, origin?: PoolFlightRect) => {
+      if (!origin) return;
+      flightSequence.current += 1;
+      setActiveSection("overview");
+      setPoolFlight({
+        id: flightSequence.current,
+        title: task.title,
+        summary: task.summary,
+        origin,
+      });
+    },
+    [],
+  );
+  const clearPoolFlight = useCallback(() => setPoolFlight(null), []);
 
   // Clicking a task toggles its drawer: the open one closes, any other opens.
   const toggleSelectedTask = useCallback(
@@ -97,33 +140,37 @@ export function StarterWorkPage() {
   // Every decision reports its outcome as a toast, and re-throws on failure so the
   // card or drawer that triggered it can settle back (and the drawer stays open).
   const handleApprove = useCallback(
-    async (id: string) => {
+    async (id: string, origin?: PoolFlightRect) => {
+      const approvedTask = tasks.find((task) => task.id === id);
       try {
         await approve(id);
+        if (approvedTask) launchPoolFlight(approvedTask, origin);
+        void reloadPool({ preserveContent: true });
         toast.success("Marked as reviewed");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Couldn't save that decision.");
         throw err;
       }
     },
-    [approve, toast],
+    [approve, launchPoolFlight, reloadPool, tasks, toast],
   );
 
   const handleReject = useCallback(
     async (id: string, reason?: string) => {
       try {
         await reject(id, reason);
+        void reloadPool();
         toast.success("Removed from the pool");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Couldn't remove that task.");
         throw err;
       }
     },
-    [reject, toast],
+    [reject, reloadPool, toast],
   );
 
-  // The orientation workflow is PM/ADMIN only, so the tab list — and the order the
-  // swipe/slide directions read from — depends on the role.
+  // The orientation workflow is PM/ADMIN only, so the tab list â€” and the order the
+  // swipe/slide directions read from â€” depends on the role.
   const sectionOrder = useMemo<StarterWorkSection[]>(
     () =>
       canAct ? ["overview", "review", "browse", "orientation"] : ["overview", "review", "browse"],
@@ -146,10 +193,9 @@ export function StarterWorkPage() {
   }));
 
   const showOverview = activeSection === "overview";
-  const showReview = activeSection === "overview" || activeSection === "review";
+  const showReviewTab = activeSection === "review";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
-  const showOrientation =
-    canAct && (activeSection === "overview" || activeSection === "orientation");
+  const showOrientation = canAct && activeSection === "orientation";
 
   // At-a-glance summary of the queue, derived from the same tasks the review
   // section renders so it can never drift from the list below it.
@@ -159,12 +205,28 @@ export function StarterWorkPage() {
     return { awaiting: tasks.length, skills: skills.size, linked };
   }, [tasks]);
 
-  const handleCreate = async (input: CreateStarterWorkTaskInput): Promise<boolean> => {
+  const handleCreate = async (
+    input: CreateStarterWorkTaskInput,
+    origin?: PoolFlightRect,
+  ): Promise<boolean> => {
     setIsCreating(true);
     const ok = await create(input);
     setIsCreating(false);
+    if (ok) {
+      await reloadPool({ preserveContent: true });
+      launchPoolFlight(input, origin);
+    }
     return ok;
   };
+
+  const handlePromoted = useCallback(
+    async (task: StarterWorkTask, origin?: PoolFlightRect) => {
+      notePromoted(task);
+      await reloadPool({ preserveContent: true });
+      launchPoolFlight(task, origin);
+    },
+    [launchPoolFlight, notePromoted, reloadPool],
+  );
 
   return (
     <div className="min-h-screen">
@@ -173,7 +235,7 @@ export function StarterWorkPage() {
           <PageHeader
             icon={Target}
             title="Starter Work"
-            subtitle="Well-scoped first tasks mined from the ingested corpus. Approving one turns it into a goal a hire can work toward — their path becomes the route to shipping it."
+            subtitle="Well-scoped first tasks mined from the ingested corpus. Approving one turns it into a goal a hire can work toward â€” their path becomes the route to shipping it."
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 {canAct && (
@@ -215,7 +277,7 @@ export function StarterWorkPage() {
           >
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p className="flex-1">
-              <strong>“{createdTask.title}”</strong> is in the pool —{" "}
+              <strong>â€œ{createdTask.title}â€</strong> is in the pool â€”{" "}
               {createdVia === "picked" ? "you picked it" : "you wrote it"}, so it counts as reviewed
               and won&apos;t appear below. Hires can aim at it straight away.
             </p>
@@ -265,78 +327,72 @@ export function StarterWorkPage() {
           className="space-y-8"
         >
           {showOverview && (
-            <section aria-label="Overview" className="grid gap-3.5 sm:grid-cols-3">
-              <Kpi
-                label="Awaiting review"
-                value={overview.awaiting}
-                foot={overview.awaiting > 0 ? "Vouch or remove each one" : "All caught up"}
-                icon={ListChecks}
-              />
-              <Kpi
-                label="Skills exercised"
-                value={overview.skills}
-                foot="Distinct competencies in the queue"
-                icon={Sparkles}
-              />
-              <Kpi
-                label="Linked to a source"
-                value={overview.linked}
-                foot="Traceable to a tracker issue"
-                icon={Link2}
-              />
-            </section>
+            <>
+              <section aria-label="Overview" className="grid gap-3.5 sm:grid-cols-3">
+                <Kpi
+                  label="Awaiting review"
+                  value={overview.awaiting}
+                  foot={overview.awaiting > 0 ? "Vouch or remove each one" : "All caught up"}
+                  icon={ListChecks}
+                />
+                <Kpi
+                  label="Skills exercised"
+                  value={overview.skills}
+                  foot="Distinct competencies in the queue"
+                  icon={Sparkles}
+                />
+                <Kpi
+                  label="Linked to a source"
+                  value={overview.linked}
+                  foot="Traceable to a tracker issue"
+                  icon={Link2}
+                />
+              </section>
+
+              <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
+                <ReviewQueue
+                  tasks={tasks}
+                  isLoading={isLoading}
+                  canAct={canAct}
+                  selectedTaskId={selectedTask?.id ?? null}
+                  onToggle={toggleSelectedTask}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                />
+                <StarterWorkPoolGrid
+                  tasks={pooledTasks}
+                  isLoading={isPoolLoading}
+                  error={poolError}
+                  canAct={canAct}
+                />
+              </div>
+            </>
           )}
 
-          {showReview && (
-            <section aria-label="Awaiting your review">
-              <SectionHeading
-                title="Awaiting your review"
-                description="Mined tasks nobody has vouched for yet. Vouching lifts their rank; removal is permanent."
-                count={tasks.length}
-              />
-              {isLoading ? (
-                <div className="flex items-center justify-center py-16 text-app-text-muted">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : tasks.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
-                  <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" />
-                  <p className="mx-auto max-w-md text-sm text-app-text-muted">
-                    Nothing here needs a look. Tasks are mined from the corpus whenever a crawl
-                    finishes — this is where the ones nobody has vouched for yet show up, not a
-                    queue blocking anybody.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3" data-testid="starter-work-unreviewed">
-                  {tasks.map((task) => (
-                    <StarterWorkTaskCard
-                      key={task.id}
-                      task={task}
-                      canAct={canAct}
-                      isOpen={selectedTask?.id === task.id}
-                      onSelect={toggleSelectedTask}
-                      onApprove={handleApprove}
-                      onReject={handleReject}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+          {showReviewTab && (
+            <ReviewQueue
+              tasks={tasks}
+              isLoading={isLoading}
+              canAct={canAct}
+              selectedTaskId={selectedTask?.id ?? null}
+              onToggle={toggleSelectedTask}
+              onApprove={handleApprove}
+              onReject={handleReject}
+            />
           )}
 
           {/* The picker beside the blank form: the same action with a better input than an
               empty box. HR reads it, matching the rest of the page. It is a second way to
-              add work, never a filter in front of mining — the pool above stays live. */}
+              add work, never a filter in front of mining â€” the pool above stays live. */}
           {showBrowse && (
             <CorpusIssueBrowser
               projectId={selectedProjectId}
               canAct={canAct}
-              onPromoted={notePromoted}
+              onPromoted={handlePromoted}
             />
           )}
 
-          {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split —
+          {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split â€”
               HR looks over the pool but does not write hire-facing content. */}
           {showOrientation && <TaskOrientationManager />}
         </SlidingTabPanel>
@@ -362,13 +418,73 @@ export function StarterWorkPage() {
           onClose={() => setIsCreateOpen(false)}
         />
       )}
+
+      {poolFlight && (
+        <PoolTaskFlight key={poolFlight.id} flight={poolFlight} onComplete={clearPoolFlight} />
+      )}
     </div>
   );
 }
 
+/** The review queue shared by the overview column and its full-width tab. */
+function ReviewQueue({
+  tasks,
+  isLoading,
+  canAct,
+  selectedTaskId,
+  onToggle,
+  onApprove,
+  onReject,
+}: {
+  tasks: StarterWorkTask[];
+  isLoading: boolean;
+  canAct: boolean;
+  selectedTaskId: string | null;
+  onToggle: (task: StarterWorkTask) => void;
+  onApprove: (id: string, origin?: PoolFlightRect) => Promise<void>;
+  onReject: (id: string, reason?: string) => Promise<void>;
+}) {
+  return (
+    <section aria-label="Awaiting your review">
+      <SectionHeading
+        title="Awaiting your review"
+        description="Mined tasks nobody has vouched for yet. Vouching lifts their rank; removal is permanent."
+        count={tasks.length}
+      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-app-text-muted">
+          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
+          <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
+          <p className="mx-auto max-w-md text-sm text-app-text-muted">
+            Nothing here needs a look. Tasks are mined from the corpus whenever a crawl finishes â€”
+            this is where the ones nobody has vouched for yet show up, not a queue blocking anybody.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3" data-testid="starter-work-unreviewed">
+          {tasks.map((task) => (
+            <StarterWorkTaskCard
+              key={task.id}
+              task={task}
+              canAct={canAct}
+              isOpen={selectedTaskId === task.id}
+              onSelect={onToggle}
+              onApprove={onApprove}
+              onReject={onReject}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /**
- * A flat section header — title, an optional count badge and a one-line
- * description — matching the Data Ingestion page. No card, no icon chip: the
+ * A flat section header â€” title, an optional count badge and a one-line
+ * description â€” matching the Data Ingestion page. No card, no icon chip: the
  * content below sits straight on the page so the sections read as one surface
  * rather than a stack of boxes.
  */

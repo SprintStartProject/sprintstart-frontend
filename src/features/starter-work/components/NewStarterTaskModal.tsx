@@ -3,11 +3,12 @@ import { Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import type { CreateStarterWorkTaskInput } from "../types";
+import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type NewStarterTaskModalProps = {
   isSaving: boolean;
   error: string | null;
-  onCreate: (input: CreateStarterWorkTaskInput) => Promise<boolean>;
+  onCreate: (input: CreateStarterWorkTaskInput, origin?: PoolFlightRect) => Promise<boolean>;
   onClose: () => void;
 };
 
@@ -18,7 +19,7 @@ const inputClasses =
  * A PM hand-authoring a starter task, with no AI mining.
  *
  * The origination counterpart to the review queue: mining fills the pool from ingested issues, this
- * adds one the corpus never surfaced. It is born approved — a PM authoring a task is the review —
+ * adds one the corpus never surfaced. It is born approved â€” a PM authoring a task is the review â€”
  * so it lands in the graph as a goal at once rather than joining the queue below.
  *
  * The competency keys are typed as a free list (comma- or space-separated) rather than a picker:
@@ -41,16 +42,21 @@ export function NewStarterTaskModal({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!canSave) return;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const origin = submitter instanceof HTMLElement ? capturePoolFlightRect(submitter) : undefined;
     const competencyKeys = competencyKeysRaw
       .split(/[\s,]+/)
       .map((key) => key.trim())
       .filter((key) => key.length > 0);
-    const created = await onCreate({
-      title: title.trim(),
-      summary: summary.trim() || undefined,
-      sourceUrl: sourceUrl.trim() || undefined,
-      competencyKeys: competencyKeys.length > 0 ? competencyKeys : undefined,
-    });
+    const created = await onCreate(
+      {
+        title: title.trim(),
+        summary: summary.trim() || undefined,
+        sourceUrl: sourceUrl.trim() || undefined,
+        competencyKeys: competencyKeys.length > 0 ? competencyKeys : undefined,
+      },
+      origin,
+    );
     if (created) onClose();
   };
 
@@ -58,7 +64,7 @@ export function NewStarterTaskModal({
     <Modal
       isOpen
       title="Add a starter task"
-      description="Author a first task by hand. The AI is optional — this becomes a goal a hire can aim at right away, no mining needed."
+      description="Author a first task by hand. The AI is optional â€” this becomes a goal a hire can aim at right away, no mining needed."
       size="lg"
       testId="new-starter-task-modal"
       isDismissDisabled={isSaving}
