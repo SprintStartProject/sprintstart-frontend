@@ -16,7 +16,7 @@ const task: StarterWorkTask = {
 };
 
 describe("StarterWorkTaskCard", () => {
-  it("keeps labels and review actions in one fixed row", () => {
+  it("keeps the source line and review actions stable while the actions reveal", () => {
     const { container } = render(
       <StarterWorkTaskCard
         task={task}
@@ -38,7 +38,10 @@ describe("StarterWorkTaskCard", () => {
     expect(card).not.toHaveClass("h-36");
     expect(title).toHaveClass("line-clamp-2");
     expect(summary).toHaveClass("truncate");
-    expect(metaRow).toContainElement(screen.getByText("auth"));
+    // Labels sit in their own row below the source line, so nothing clips when there are many.
+    const labelsRow = screen.getByTestId("review-labels-row-task-1");
+    expect(labelsRow).toContainElement(screen.getByText("auth"));
+    expect(metaRow).not.toContainElement(screen.getByText("auth"));
     expect(metaRow).toContainElement(actions);
     expect(actions).toHaveClass("pointer-events-none");
 
@@ -56,5 +59,25 @@ describe("StarterWorkTaskCard", () => {
     expect(title).toHaveClass("line-clamp-2");
     expect(summary).toHaveClass("truncate");
     expect(actions).toHaveClass("pointer-events-none");
+  });
+
+  it("keeps the meta row populated with source metadata when the task has no competencies", () => {
+    render(
+      <StarterWorkTaskCard
+        task={{ ...task, competencyKeys: [] }}
+        canAct
+        isOpen={false}
+        onSelect={vi.fn()}
+        onApprove={vi.fn().mockResolvedValue(undefined)}
+        onReject={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const metaRow = screen.getByTestId("review-meta-row-task-1");
+    expect(metaRow).toContainElement(screen.getByText("GitHub"));
+    expect(metaRow).toContainElement(screen.getByText("#42"));
+    expect(metaRow).toContainElement(screen.getByText("repo"));
+    // No competencies, so the labels row is left out rather than sitting empty.
+    expect(screen.queryByTestId("review-labels-row-task-1")).not.toBeInTheDocument();
   });
 });

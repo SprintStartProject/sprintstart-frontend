@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
+import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
@@ -47,6 +48,14 @@ export function StarterWorkTaskCard({
   const prefersReducedMotion = useReducedMotion();
 
   const showActions = canAct && (isHovered || isFocusWithin);
+
+  // Source metadata, shown the same way the pool cards show it, so the meta row always carries the
+  // tracker and issue number even when the AI attached no competencies. A hand-authored task with no
+  // recognised tracker reads as "Custom", with no number or repo to show.
+  const parsedSource = parseCandidateSource(task.sourceId);
+  const trackerCode = task.sourceId.split(":")[0] ?? "";
+  const hasKnownTracker =
+    trackerCode.toUpperCase() === "GITHUB" || trackerCode.toUpperCase() === "JIRA";
 
   const buttonVariants: Variants = prefersReducedMotion
     ? { rest: { opacity: 0 }, show: { opacity: 1 } }
@@ -113,14 +122,29 @@ export function StarterWorkTaskCard({
             data-testid={"review-meta-row-" + task.id}
             className="mt-2 flex min-w-0 items-center gap-3"
           >
-            <ul className="flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-hidden">
-              {task.competencyKeys.map((key) => (
-                <li key={key} className="shrink-0">
-                  <Badge variant="purple" size="md">
-                    {key}
+            {/* Source line: tracker, issue number and repo. Single line, so the repo truncates
+                first; the competency labels get their own wrapping row below so nothing clips. */}
+            <ul className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-hidden">
+              <li className="shrink-0">
+                <Badge variant="brand" size="md">
+                  {hasKnownTracker ? trackerLabel(trackerCode) : "Custom"}
+                </Badge>
+              </li>
+              {hasKnownTracker && parsedSource.numberLabel && (
+                <li className="shrink-0">
+                  <Badge variant="neutral" size="md">
+                    {parsedSource.numberLabel}
                   </Badge>
                 </li>
-              ))}
+              )}
+              {hasKnownTracker && parsedSource.repo && (
+                <li
+                  className="min-w-0 truncate text-xs text-app-text-subtle"
+                  title={parsedSource.repo}
+                >
+                  {parsedSource.repo}
+                </li>
+              )}
             </ul>
 
             {canAct && (
@@ -176,6 +200,21 @@ export function StarterWorkTaskCard({
               </motion.div>
             )}
           </div>
+
+          {task.competencyKeys.length > 0 && (
+            <ul
+              data-testid={"review-labels-row-" + task.id}
+              className="mt-2 flex flex-wrap gap-1.5"
+            >
+              {task.competencyKeys.map((key) => (
+                <li key={key}>
+                  <Badge variant="purple" size="md">
+                    {key}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <ChevronRight
