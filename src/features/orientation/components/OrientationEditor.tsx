@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import { ChevronDown, ExternalLink, PencilLine, Plus, Save, Undo2, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
+import { useToast } from "../../../context/useToast";
 import { DrawerCard } from "../../admin/components/DrawerCard";
 import { STEP_LABELS, STEP_ORDER } from "../steps";
 import { useOrientationDraft, type DraftStep } from "../hooks/useOrientationDraft";
@@ -42,8 +43,8 @@ export function OrientationEditor({
   onClose,
 }: OrientationEditorProps) {
   const draft = useOrientationDraft(initial);
+  const toast = useToast();
   const [busy, setBusy] = useState<"saving" | "reverting" | null>(null);
-  const [error, setError] = useState<string | null>(null);
   // Single-open accordion. Start on the first written step, or the first step when authoring blank,
   // so the editor never opens onto five collapsed rows with no obvious place to begin.
   const [openStep, setOpenStep] = useState<OrientationStep | null>(
@@ -53,13 +54,18 @@ export function OrientationEditor({
   const handleSave = async () => {
     if (!draft.isValid || busy) return;
     setBusy("saving");
-    setError(null);
     try {
       const ok = await onSave(draft.toInput());
-      if (ok) onClose();
-      else setError("Could not save this orientation. Please try again.");
+      if (ok) {
+        toast.success("Orientation saved");
+        onClose();
+      } else {
+        toast.error("Save failed", { description: "Please try again." });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save this orientation.");
+      toast.error("Save failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setBusy(null);
     }
@@ -68,13 +74,18 @@ export function OrientationEditor({
   const handleRevert = async () => {
     if (!onRevert || busy) return;
     setBusy("reverting");
-    setError(null);
     try {
       const ok = await onRevert();
-      if (ok) onClose();
-      else setError("Could not hand this back to the AI. Please try again.");
+      if (ok) {
+        toast.success("Handed back to AI");
+        onClose();
+      } else {
+        toast.error("AI handoff failed", { description: "Please try again." });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not hand this back to the AI.");
+      toast.error("AI handoff failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setBusy(null);
     }
@@ -176,15 +187,6 @@ export function OrientationEditor({
               onRemoveCitation={(citationKey) => draft.removeCitation(step.step, citationKey)}
             />
           ))}
-
-          {error && (
-            <p
-              data-testid="editor-error"
-              className="rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text"
-            >
-              {error}
-            </p>
-          )}
         </div>
       </DetailsSideDrawer>
     </AnimatePresence>,

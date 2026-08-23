@@ -7,13 +7,7 @@ function renderModal(overrides: Partial<Parameters<typeof NewStarterTaskModal>[0
   const onCreate = overrides.onCreate ?? vi.fn().mockResolvedValue(true);
   const onClose = overrides.onClose ?? vi.fn();
   render(
-    <NewStarterTaskModal
-      isSaving={false}
-      error={null}
-      onCreate={onCreate}
-      onClose={onClose}
-      {...overrides}
-    />,
+    <NewStarterTaskModal isSaving={false} onCreate={onCreate} onClose={onClose} {...overrides} />,
   );
   return { onCreate, onClose };
 }

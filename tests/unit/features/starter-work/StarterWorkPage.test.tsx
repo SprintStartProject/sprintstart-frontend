@@ -1,7 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render as testingRender, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StarterWorkPage } from "../../../../src/pages/StarterWorkPage";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { userService } from "../../../../src/services/userService";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
@@ -24,6 +26,10 @@ const permissionGroup = vi.hoisted(() => ({ current: "PM" }));
 vi.mock("../../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: "u1", permissionGroup: permissionGroup.current } }),
 }));
+
+function render(ui: ReactElement) {
+  return testingRender(<ToastProvider>{ui}</ToastProvider>);
+}
 
 const task: StarterWorkTask = {
   id: "task-1",
@@ -51,6 +57,24 @@ describe("StarterWorkPage", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
+  it("summarizes the live pool and its reviewed work", async () => {
+    vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([
+      task,
+      { ...task, id: "task-2", title: "Document the auth flow", reviewed: true },
+    ]);
+    render(<StarterWorkPage />);
+
+    const poolCard = (await screen.findByText("Available to new hires")).parentElement;
+    const reviewedCard = screen.getByText("Vouched for by your team").parentElement;
+
+    expect(poolCard).toHaveTextContent("In the pool");
+    expect(poolCard).toHaveTextContent("2");
+    expect(reviewedCard).toHaveTextContent("Reviewed");
+    expect(reviewedCard).toHaveTextContent("1");
+    expect(screen.queryByText("Skills exercised")).not.toBeInTheDocument();
+    expect(screen.queryByText("Linked to a source")).not.toBeInTheDocument();
+  });
+
   it("shows the AI scope-safety rationale in the task detail", async () => {
     const user = userEvent.setup();
     render(<StarterWorkPage />);
@@ -63,6 +87,12 @@ describe("StarterWorkPage", () => {
     expect(
       await screen.findByText(/touches one file and has clear acceptance criteria/i),
     ).toBeInTheDocument();
+
+    const dialog = screen.getByRole("dialog");
+    const overlay = screen
+      .getAllByRole("button", { name: "Close details" })
+      .find((button) => !dialog.contains(button));
+    expect(overlay).toHaveClass("bg-app-overlay", "opacity-100");
   });
 
   it("lists the competencies that become prerequisites", async () => {
@@ -84,7 +114,7 @@ describe("StarterWorkPage", () => {
 
     await waitFor(() => expect(approve).toHaveBeenCalledWith("task-1"));
     await waitFor(() =>
-      expect(screen.queryByText("Fix the login redirect")).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("approve-task-task-1")).not.toBeInTheDocument(),
     );
   });
 
@@ -97,12 +127,29 @@ describe("StarterWorkPage", () => {
     expect(screen.queryByTestId("reject-task-task-1")).not.toBeInTheDocument();
   });
 
-  it("explains an empty list as nothing to look at, not nothing done", async () => {
+  it("hides the overview review section and expands the pool when no reviews are open", async () => {
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [] });
     render(<StarterWorkPage />);
 
-    expect(await screen.findByText(/nothing here needs a look/i)).toBeInTheDocument();
-    expect(screen.getByText(/not a queue blocking anybody/i)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId("overview-review-column")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/nothing here needs a look/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("overview-pool-column")).toHaveClass("xl:col-span-2");
+  });
+
+  it("shows generated work as a success toast", async () => {
+    vi.spyOn(starterWorkService, "generate").mockResolvedValue({
+      status: "COMPLETED",
+      tasksProposed: 2,
+      notes: [],
+    });
+    const user = userEvent.setup();
+    render(<StarterWorkPage />);
+
+    await user.click(await screen.findByTestId("generate-starter-work"));
+
+    expect(await screen.findByText("2 tasks added")).toBeInTheDocument();
   });
 
   it("surfaces a failed load", async () => {
@@ -132,10 +179,8 @@ describe("StarterWorkPage", () => {
         expect.objectContaining({ title: "Add a dark-mode toggle" }),
       ),
     );
-    // Born approved, so it never joins the queue — the page says so rather than losing it.
-    expect(await screen.findByTestId("created-task-confirmation")).toHaveTextContent(
-      /add a dark-mode toggle/i,
-    );
+    expect(await screen.findByText("Added to pool")).toBeInTheDocument();
+    expect(screen.getAllByText("Add a dark-mode toggle").length).toBeGreaterThan(0);
   });
 
   /**
@@ -172,9 +217,8 @@ describe("StarterWorkPage", () => {
     );
     await user.click(await screen.findByTestId("promote-issue-github:acme/repo:ISSUE:7"));
 
-    const confirmation = await screen.findByTestId("created-task-confirmation");
-    expect(confirmation).toHaveTextContent(/tidy the onboarding readme/i);
-    expect(confirmation).toHaveTextContent(/you picked it/i);
+    expect(await screen.findByText("Added to pool")).toBeInTheDocument();
+    expect(screen.getAllByText("Tidy the onboarding README").length).toBeGreaterThan(0);
   });
 
   it("lets HR read the issue browser but not add from it", async () => {

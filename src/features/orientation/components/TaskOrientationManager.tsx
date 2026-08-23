@@ -3,6 +3,7 @@ import { BookOpen, ChevronRight, Loader2, PencilLine } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
+import { useToast } from "../../../context/useToast";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { OrientationEditor } from "./OrientationEditor";
 import { parseCandidateSource, trackerLabel } from "../../starter-work/sourceId";
@@ -26,10 +27,10 @@ const ROW_LABEL_CAP = 3;
  */
 export function TaskOrientationManager() {
   const { selectedProjectId } = useProjectContext();
+  const { error: showErrorToast } = useToast();
 
   const [tasks, setTasks] = useState<StarterWorkTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
-  const [tasksError, setTasksError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     task: StarterWorkTask;
@@ -45,7 +46,9 @@ export function TaskOrientationManager() {
         if (!cancelled) setTasks(approved);
       } catch (err) {
         if (!cancelled) {
-          setTasksError(err instanceof Error ? err.message : "Could not load approved tasks.");
+          showErrorToast("Tasks unavailable", {
+            description: err instanceof Error ? err.message : "Please try again.",
+          });
         }
       } finally {
         if (!cancelled) setTasksLoading(false);
@@ -54,17 +57,18 @@ export function TaskOrientationManager() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showErrorToast]);
 
   const openEditor = async (task: StarterWorkTask) => {
     if (!selectedProjectId) return;
     setOpeningId(task.id);
-    setTasksError(null);
     try {
       const orientation = await orientationService.fetchTaskOrientation(task.id, selectedProjectId);
       setEditing({ task, orientation });
     } catch (err) {
-      setTasksError(err instanceof Error ? err.message : "Could not open this orientation.");
+      showErrorToast("Orientation unavailable", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setOpeningId(null);
     }
@@ -94,12 +98,6 @@ export function TaskOrientationManager() {
           />
         </div>
       </div>
-
-      {tasksError && (
-        <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
-          {tasksError}
-        </p>
-      )}
 
       {tasksLoading ? (
         <div className="flex items-center justify-center py-16 text-app-text-muted">

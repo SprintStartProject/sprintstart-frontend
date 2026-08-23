@@ -1,9 +1,15 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render as testingRender, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CorpusIssueBrowser } from "../../../../src/features/starter-work/components/CorpusIssueBrowser";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import type { StarterWorkCandidate } from "../../../../src/features/starter-work/types";
+
+function render(ui: ReactElement) {
+  return testingRender(<ToastProvider>{ui}</ToastProvider>);
+}
 
 function candidate(overrides: Partial<StarterWorkCandidate> = {}): StarterWorkCandidate {
   return {
@@ -54,6 +60,12 @@ describe("CorpusIssueBrowser", () => {
     expect(
       await screen.findByText(/users land on the wrong page after signing in/i),
     ).toBeInTheDocument();
+
+    const dialog = screen.getByRole("dialog");
+    const overlay = screen
+      .getAllByRole("button", { name: "Close details" })
+      .find((button) => !dialog.contains(button));
+    expect(overlay).toHaveClass("bg-app-overlay", "opacity-100");
   });
 
   /**
@@ -270,7 +282,7 @@ describe("CorpusIssueBrowser", () => {
     await openRow(user, "Fix the login redirect");
     await user.click(await screen.findByTestId("promote-issue-github:acme/repo:ISSUE:1"));
 
-    // The failure is surfaced in the drawer footer (and mirrored in the list behind it).
+    // The action failure is surfaced once through the shared toast viewport.
     expect(
       (await screen.findAllByText(/already in the starter-work pool/i)).length,
     ).toBeGreaterThan(0);

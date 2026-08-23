@@ -1,11 +1,17 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render as testingRender, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { OrientationEditor } from "../../../../src/features/orientation/components/OrientationEditor";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import type {
   AuthorOrientationInput,
   OrientationPacket,
 } from "../../../../src/features/orientation/types";
+
+function render(ui: ReactElement) {
+  return testingRender(<ToastProvider>{ui}</ToastProvider>);
+}
 
 const packet: OrientationPacket = {
   taskId: "task-1",
@@ -60,6 +66,7 @@ describe("OrientationEditor", () => {
       sourceUrl: "https://example.test/README.md",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Orientation saved")).toBeInTheDocument();
   });
 
   it("lists the five fixed steps in order and needs none of them pre-added", () => {
@@ -130,6 +137,7 @@ describe("OrientationEditor", () => {
 
     await waitFor(() => expect(onRevert).toHaveBeenCalledTimes(1));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Handed back to AI")).toBeInTheDocument();
   });
 
   it("offers no revert when there is no packet to hand back", () => {

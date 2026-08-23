@@ -1,10 +1,16 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render as testingRender, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TaskOrientationManager } from "../../../../src/features/orientation/components/TaskOrientationManager";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { orientationService } from "../../../../src/services/orientationService";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+
+function render(ui: ReactElement) {
+  return testingRender(<ToastProvider>{ui}</ToastProvider>);
+}
 
 // The project is chosen globally in the sidebar switcher, so the component reads the
 // context rather than loading a listing of its own.
@@ -59,6 +65,15 @@ describe("TaskOrientationManager", () => {
 
     await waitFor(() => expect(fetchOrientation).toHaveBeenCalledWith("task-1", "p1"));
     expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
+  });
+
+  it("shows a failed pool load as a toast", async () => {
+    vi.spyOn(starterWorkService, "fetchPool").mockRejectedValue(new Error("pool unavailable"));
+
+    render(<TaskOrientationManager />);
+
+    expect(await screen.findByText("Tasks unavailable")).toBeInTheDocument();
+    expect(screen.getByText("pool unavailable")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no approved tasks", async () => {

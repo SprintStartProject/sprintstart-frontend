@@ -7,7 +7,6 @@ import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type NewStarterTaskModalProps = {
   isSaving: boolean;
-  error: string | null;
   onCreate: (input: CreateStarterWorkTaskInput, origin?: PoolFlightRect) => Promise<boolean>;
   onClose: () => void;
 };
@@ -26,12 +25,7 @@ const inputClasses =
  * they are optional enrichment, and a key that isn't a live competency is skipped server-side, so
  * an over-eager entry costs an edge, not the task.
  */
-export function NewStarterTaskModal({
-  isSaving,
-  error,
-  onCreate,
-  onClose,
-}: NewStarterTaskModalProps) {
+export function NewStarterTaskModal({ isSaving, onCreate, onClose }: NewStarterTaskModalProps) {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -157,15 +151,6 @@ export function NewStarterTaskModal({
             any that isn&apos;t in the graph is quietly skipped.
           </p>
         </div>
-
-        {error && (
-          <p
-            data-testid="new-task-error"
-            className="rounded-lg bg-app-danger-bg p-2.5 text-xs font-medium text-app-danger-text"
-          >
-            {error}
-          </p>
-        )}
       </form>
     </Modal>
   );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { Ban, Check, ChevronRight, Inbox, Loader2, Plus, Search, UserCheck } from "lucide-react";
@@ -10,6 +10,7 @@ import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
+import { useToast } from "../../../context/useToast";
 import { CorpusIssueDetails } from "./CorpusIssueDetails";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
@@ -76,6 +77,12 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
     promotingSourceId,
     promote,
   } = useCorpusIssueBrowser(projectId, onPromoted);
+  const { error: showErrorToast } = useToast();
+
+  useEffect(() => {
+    if (!error) return;
+    showErrorToast("Issue action failed", { description: error });
+  }, [error, showErrorToast]);
 
   const [page, setPage] = useState(1);
   // Defaults to the new, not-yet-pooled issues â€” the ones a PM is here to act on. Pooled and
@@ -180,12 +187,6 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
             />
           </div>
 
-          {error && (
-            <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
-              {error}
-            </p>
-          )}
-
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-app-text-muted">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
@@ -247,7 +248,6 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
                 candidate={candidate}
                 canAct={canAct}
                 isPromoting={promotingSourceId === candidate.sourceId}
-                error={error}
                 onPromote={promote}
                 onClose={() => setOpenSourceId(null)}
               />

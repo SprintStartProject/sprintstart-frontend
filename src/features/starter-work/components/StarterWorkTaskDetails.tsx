@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   AlignLeft,
   Check,
@@ -53,28 +53,11 @@ export function StarterWorkTaskDetails({
     }
   };
 
-  // Close when the pointer goes down on empty space. The drawer has no overlay on
-  // purpose, so the list behind it stays live. Clicks inside the drawer are left
-  // alone, and clicks on a task card are left to that card's own toggle â€” so
-  // clicking a different task switches to it and clicking the open one closes it,
-  // without this handler racing the card and reopening it.
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('[role="dialog"]') || target?.closest("[data-task-card]")) {
-        return;
-      }
-      onClose();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [onClose]);
-
   return (
     <DetailsSideDrawer
       isOpen
       onClose={onClose}
+      showOverlay
       title={task.title}
       leading={
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">

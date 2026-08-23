@@ -2,6 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 import { orientationService } from "../../../../src/services/orientationService";
 import { renderWithProviders } from "../../setup/test-utils";
@@ -36,6 +37,32 @@ describe("StarterWorkPoolCloud", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+  });
+
+  it("shows pool load failures as a toast", async () => {
+    renderWithProviders(
+      <ToastProvider>
+        <StarterWorkPoolCloud tasks={[]} isLoading={false} error="pool unavailable" canAct />
+      </ToastProvider>,
+    );
+
+    expect(await screen.findByText("Pool unavailable")).toBeInTheDocument();
+    expect(screen.getByText("pool unavailable")).toBeInTheDocument();
+  });
+
+  it("labels manually created tasks as Custom instead of exposing their source id", () => {
+    const sourceId = "c90aad2a-f7c5-4cd5-9b02-8c3ab5fb83ed";
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[{ ...task(1), sourceId, sourceUrl: null }]}
+        isLoading={false}
+        error={null}
+        canAct
+      />,
+    );
+
+    expect(screen.getByText("Custom")).toBeInTheDocument();
+    expect(screen.queryByText(sourceId)).not.toBeInTheDocument();
   });
 
   it("places one page of tasks in five deterministic, unique cloud slots", () => {

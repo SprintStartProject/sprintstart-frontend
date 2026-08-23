@@ -1,13 +1,12 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
-  Link2,
   ListChecks,
   Loader2,
+  PackageOpen,
   Plus,
   Sparkles,
   Target,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -52,6 +51,11 @@ const SECTION_LABELS: Record<StarterWorkSection, string> = {
   orientation: "Orientation",
 };
 
+function compactToastDetail(value: string, maxLength: number): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return compact.length <= maxLength ? compact : compact.slice(0, maxLength - 1).trimEnd() + "…";
+}
+
 /**
  * Where a PM looks over the starter tasks the corpus produced.
  *
@@ -78,11 +82,10 @@ export function StarterWorkPage() {
     error,
     generateResult,
     createdTask,
-    createdVia,
+
     generate,
     create,
     notePromoted,
-    dismissCreated,
     approve,
     reject,
   } = useStarterWorkReview();
@@ -113,6 +116,40 @@ export function StarterWorkPage() {
   const [selectedTask, setSelectedTask] = useState<StarterWorkTask | null>(null);
   const flightSequence = useRef(0);
   const [poolFlight, setPoolFlight] = useState<PoolFlightItem | null>(null);
+  const showErrorToast = toast.error;
+  const showInfoToast = toast.info;
+  const showSuccessToast = toast.success;
+  const showWarningToast = toast.warning;
+
+  useEffect(() => {
+    if (!error) return;
+    showErrorToast("Action failed", { description: error });
+  }, [error, showErrorToast]);
+
+  useEffect(() => {
+    if (!createdTask) return;
+    showSuccessToast("Added to pool", { description: compactToastDetail(createdTask.title, 80) });
+  }, [createdTask, showSuccessToast]);
+
+  useEffect(() => {
+    if (!generateResult) return;
+    const count = generateResult.tasksProposed;
+    const notes = generateResult.notes.join(" ");
+    const description = notes ? compactToastDetail(notes, 160) : undefined;
+
+    if (count === 0) {
+      if (description) {
+        showWarningToast("No tasks added", { description });
+      } else {
+        showInfoToast("No tasks found");
+      }
+      return;
+    }
+
+    const message = count === 1 ? "1 task added" : count + " tasks added";
+    if (description) showWarningToast(message, { description });
+    else showSuccessToast(message);
+  }, [generateResult, showInfoToast, showSuccessToast, showWarningToast]);
 
   const launchPoolFlight = useCallback(
     (task: { title: string; summary?: string | null }, origin?: PoolFlightRect) => {
@@ -146,9 +183,11 @@ export function StarterWorkPage() {
         await approve(id);
         if (approvedTask) launchPoolFlight(approvedTask, origin);
         void reloadPool({ preserveContent: true });
-        toast.success("Marked as reviewed");
+        toast.success("Review saved");
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't save that decision.");
+        toast.error("Review failed", {
+          description: err instanceof Error ? err.message : "Please try again.",
+        });
         throw err;
       }
     },
@@ -160,9 +199,11 @@ export function StarterWorkPage() {
       try {
         await reject(id, reason);
         void reloadPool();
-        toast.success("Removed from the pool");
+        toast.success("Removed from pool");
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't remove that task.");
+        toast.error("Remove failed", {
+          description: err instanceof Error ? err.message : "Please try again.",
+        });
         throw err;
       }
     },
@@ -193,17 +234,22 @@ export function StarterWorkPage() {
   }));
 
   const showOverview = activeSection === "overview";
+  const hasOpenReviews = tasks.length > 0;
+  const poolUsesFullWidth = !hasOpenReviews;
   const showReviewTab = activeSection === "review";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
   const showOrientation = canAct && activeSection === "orientation";
 
-  // At-a-glance summary of the queue, derived from the same tasks the review
-  // section renders so it can never drift from the list below it.
-  const overview = useMemo(() => {
-    const skills = new Set(tasks.flatMap((task) => task.competencyKeys));
-    const linked = tasks.filter((task) => task.sourceUrl).length;
-    return { awaiting: tasks.length, skills: skills.size, linked };
-  }, [tasks]);
+  // At-a-glance workflow snapshot: how much work is live, and how much of it has
+  // already been vouched for. Both values come from the same pool rendered below.
+  const overview = useMemo(
+    () => ({
+      awaiting: tasks.length,
+      total: pool.length,
+      reviewed: pooledTasks.length,
+    }),
+    [pool.length, pooledTasks.length, tasks.length],
+  );
 
   const handleCreate = async (
     input: CreateStarterWorkTaskInput,
@@ -270,49 +316,6 @@ export function StarterWorkPage() {
       </header>
 
       <main ref={swipeRef} className="app-page-frame space-y-5 py-6 lg:py-8">
-        {createdTask && (
-          <div
-            data-testid="created-task-confirmation"
-            className="flex items-start gap-3 rounded-2xl border border-app-success-border bg-app-success-bg p-4 text-sm text-app-success-text"
-          >
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <p className="flex-1">
-              <strong>â€œ{createdTask.title}â€</strong> is in the pool â€”{" "}
-              {createdVia === "picked" ? "you picked it" : "you wrote it"}, so it counts as reviewed
-              and won&apos;t appear below. Hires can aim at it straight away.
-            </p>
-            <button
-              type="button"
-              aria-label="Dismiss"
-              onClick={dismissCreated}
-              className="rounded-lg p-1 text-app-success-text transition-colors hover:bg-app-surface-hover"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {generateResult && (
-          <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft p-4 text-sm text-app-brand-text">
-            Added {generateResult.tasksProposed} task
-            {generateResult.tasksProposed === 1 ? "" : "s"} to the pool. Hires can claim them now;
-            they rank below tasks somebody has looked at.
-            {generateResult.notes.length > 0 && (
-              <ul className="mt-2 list-inside list-disc space-y-1">
-                {generateResult.notes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg p-4 text-sm text-app-danger-text">
-            {error}
-          </div>
-        )}
-
         <SegmentedTabs
           value={activeSection}
           options={tabOptions}
@@ -336,35 +339,44 @@ export function StarterWorkPage() {
                   icon={ListChecks}
                 />
                 <Kpi
-                  label="Skills exercised"
-                  value={overview.skills}
-                  foot="Distinct competencies in the queue"
-                  icon={Sparkles}
+                  label="In the pool"
+                  value={overview.total}
+                  foot="Available to new hires"
+                  icon={PackageOpen}
                 />
                 <Kpi
-                  label="Linked to a source"
-                  value={overview.linked}
-                  foot="Traceable to a tracker issue"
-                  icon={Link2}
+                  label="Reviewed"
+                  value={overview.reviewed}
+                  foot="Vouched for by your team"
+                  icon={CheckCircle2}
                 />
               </section>
 
               <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
-                <ReviewQueue
-                  tasks={tasks}
-                  isLoading={isLoading}
-                  canAct={canAct}
-                  selectedTaskId={selectedTask?.id ?? null}
-                  onToggle={toggleSelectedTask}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                />
-                <StarterWorkPoolGrid
-                  tasks={pooledTasks}
-                  isLoading={isPoolLoading}
-                  error={poolError}
-                  canAct={canAct}
-                />
+                {hasOpenReviews && (
+                  <div data-testid="overview-review-column">
+                    <ReviewQueue
+                      tasks={tasks}
+                      isLoading={isLoading}
+                      canAct={canAct}
+                      selectedTaskId={selectedTask?.id ?? null}
+                      onToggle={toggleSelectedTask}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                    />
+                  </div>
+                )}
+                <div
+                  data-testid="overview-pool-column"
+                  className={poolUsesFullWidth ? "xl:col-span-2" : undefined}
+                >
+                  <StarterWorkPoolGrid
+                    tasks={pooledTasks}
+                    isLoading={isPoolLoading}
+                    error={poolError}
+                    canAct={canAct}
+                  />
+                </div>
               </div>
             </>
           )}
@@ -413,7 +425,6 @@ export function StarterWorkPage() {
       {isCreateOpen && (
         <NewStarterTaskModal
           isSaving={isCreating}
-          error={error}
           onCreate={handleCreate}
           onClose={() => setIsCreateOpen(false)}
         />

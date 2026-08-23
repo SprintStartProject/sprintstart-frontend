@@ -75,7 +75,7 @@ export function StarterWorkTaskCard({
       onPointerLeave={() => setIsHovered(false)}
       onFocusCapture={() => setIsFocusWithin(true)}
       onBlurCapture={() => setIsFocusWithin(false)}
-      className="relative rounded-2xl border border-app-border bg-app-surface transition-colors hover:border-app-border-strong"
+      className="relative overflow-hidden rounded-2xl border border-app-border bg-app-surface transition-colors hover:border-app-border-strong"
     >
       {/* A stretched button rather than an interactive wrapper: it sits behind
           the content as a sibling of the quick actions, so nothing interactive
@@ -100,71 +100,83 @@ export function StarterWorkTaskCard({
 
       <div className="pointer-events-none relative z-10 flex items-start gap-3 p-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-app-text">{task.title}</h3>
+          <h3 title={task.title} className="line-clamp-2 text-sm font-semibold text-app-text">
+            {task.title}
+          </h3>
           {task.summary && (
-            <p className="mt-0.5 line-clamp-1 text-sm text-app-text-muted">{task.summary}</p>
+            <p title={task.summary} className="mt-0.5 truncate text-sm text-app-text-muted">
+              {task.summary}
+            </p>
           )}
-          {task.competencyKeys.length > 0 && (
-            <ul className="mt-2 flex flex-wrap gap-1.5">
+
+          <div
+            data-testid={"review-meta-row-" + task.id}
+            className="mt-2 flex min-w-0 items-center gap-3"
+          >
+            <ul className="flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-hidden">
               {task.competencyKeys.map((key) => (
-                <li key={key}>
+                <li key={key} className="shrink-0">
                   <Badge variant="purple" size="md">
                     {key}
                   </Badge>
                 </li>
               ))}
             </ul>
-          )}
-        </div>
 
-        {canAct && (
-          <motion.div
-            initial={false}
-            animate={showActions ? "show" : "rest"}
-            variants={CLUSTER_VARIANTS}
-            className="pointer-events-auto flex shrink-0 items-center gap-2 self-center"
-          >
-            <motion.button
-              type="button"
-              variants={buttonVariants}
-              whileHover={
-                prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
-              }
-              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-              data-testid={`approve-task-${task.id}`}
-              disabled={isDeciding}
-              onClick={(event) => {
-                const origin = capturePoolFlightRect(event.currentTarget);
-                void decide(() => onApprove(task.id, origin));
-              }}
-              aria-label="Looks good"
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-5 text-xs font-semibold whitespace-nowrap text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isDeciding ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Check className="h-4 w-4" aria-hidden="true" />
-              )}
-              Looks good
-            </motion.button>
-            <motion.button
-              type="button"
-              variants={buttonVariants}
-              whileHover={
-                prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
-              }
-              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-              data-testid={`reject-task-${task.id}`}
-              disabled={isDeciding}
-              onClick={() => void decide(() => onReject(task.id))}
-              aria-label="Take it out of the pool"
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-5 text-xs font-semibold whitespace-nowrap text-app-danger-text transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-              Take it out
-            </motion.button>
-          </motion.div>
-        )}
+            {canAct && (
+              <motion.div
+                initial={false}
+                animate={showActions ? "show" : "rest"}
+                variants={CLUSTER_VARIANTS}
+                data-testid={"task-actions-" + task.id}
+                className={
+                  "ml-auto flex shrink-0 items-center gap-2 " +
+                  (showActions ? "pointer-events-auto" : "pointer-events-none")
+                }
+              >
+                <motion.button
+                  type="button"
+                  variants={buttonVariants}
+                  whileHover={
+                    prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+                  }
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                  data-testid={"approve-task-" + task.id}
+                  disabled={isDeciding}
+                  onClick={(event) => {
+                    const origin = capturePoolFlightRect(event.currentTarget);
+                    void decide(() => onApprove(task.id, origin));
+                  }}
+                  aria-label="Looks good"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-3 text-xs font-semibold whitespace-nowrap text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeciding ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  Looks good
+                </motion.button>
+                <motion.button
+                  type="button"
+                  variants={buttonVariants}
+                  whileHover={
+                    prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+                  }
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                  data-testid={"reject-task-" + task.id}
+                  disabled={isDeciding}
+                  onClick={() => void decide(() => onReject(task.id))}
+                  aria-label="Take it out of the pool"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-xs font-semibold whitespace-nowrap text-app-danger-text transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  Take it out
+                </motion.button>
+              </motion.div>
+            )}
+          </div>
+        </div>
 
         <ChevronRight
           className="h-4 w-4 shrink-0 self-center text-app-text-disabled"

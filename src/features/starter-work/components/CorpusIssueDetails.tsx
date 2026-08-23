@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { AlignLeft, CircleDot, ExternalLink, Info, Loader2, Plus } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { DrawerCard } from "../../admin/components/DrawerCard";
@@ -13,8 +12,6 @@ type CorpusIssueDetailsProps = {
   /** HR reads the detail but does not decide, so the footer is theirs to hide. */
   canAct: boolean;
   isPromoting: boolean;
-  /** The last promote error, surfaced next to the button that raised it. */
-  error: string | null;
   onPromote: (sourceId: string, origin?: PoolFlightRect) => Promise<boolean>;
   onClose: () => void;
 };
@@ -41,7 +38,6 @@ export function CorpusIssueDetails({
   candidate,
   canAct,
   isPromoting,
-  error,
   onPromote,
   onClose,
 }: CorpusIssueDetailsProps) {
@@ -49,21 +45,6 @@ export function CorpusIssueDetails({
   const tracker = trackerLabel(candidate.tracker);
   const updated = formatUpdated(candidate.updatedAtSource);
   const isAvailable = candidate.poolState === "AVAILABLE";
-
-  // Close on a pointer-down in empty space, but leave clicks inside the drawer and clicks on a
-  // list row alone â€” so clicking another issue switches to it and clicking the open one closes it,
-  // without this handler racing the row and reopening it. Mirrors the review drawer.
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('[role="dialog"]') || target?.closest("[data-corpus-row]")) {
-        return;
-      }
-      onClose();
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [onClose]);
 
   // The pool state used to fill the footer; for a pooled or removed issue it now reads as one line
   // in the Information card up top, so the footer holds only the action (or the reason there is none).
@@ -116,6 +97,7 @@ export function CorpusIssueDetails({
     <DetailsSideDrawer
       isOpen
       onClose={onClose}
+      showOverlay
       title={candidate.title}
       leading={
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
@@ -147,18 +129,7 @@ export function CorpusIssueDetails({
           </a>
         ) : undefined
       }
-      footer={
-        footerAction || error ? (
-          <div className="w-full space-y-3">
-            {error && (
-              <p className="rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
-                {error}
-              </p>
-            )}
-            {footerAction}
-          </div>
-        ) : undefined
-      }
+      footer={footerAction ? <div className="w-full space-y-3">{footerAction}</div> : undefined}
     >
       <div className="space-y-4 sm:space-y-5">
         {hasInfo && (

@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ChevronRight,
@@ -14,6 +14,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
+import { useToast } from "../../../context/useToast";
 import { orientationService } from "../../../services/orientationService";
 import { centralSpringToken } from "../../../styles/tokens";
 import { OrientationEditor } from "../../orientation/components/OrientationEditor";
@@ -119,17 +120,15 @@ function PoolTaskMeta({ task }: { task: StarterWorkTask }) {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {hasKnownTracker && (
-        <Badge variant="brand" size="sm">
-          {trackerLabel(trackerCode)}
-        </Badge>
-      )}
-      {parsed.numberLabel && (
+      <Badge variant="brand" size="sm">
+        {hasKnownTracker ? trackerLabel(trackerCode) : "Custom"}
+      </Badge>
+      {hasKnownTracker && parsed.numberLabel && (
         <Badge variant="neutral" size="sm">
           {parsed.numberLabel}
         </Badge>
       )}
-      {parsed.repo && (
+      {hasKnownTracker && parsed.repo && (
         <span className="min-w-0 truncate text-xs text-app-text-subtle" title={parsed.repo}>
           {parsed.repo}
         </span>
@@ -251,11 +250,11 @@ export function StarterWorkPoolCloud({
 }: StarterWorkPoolCloudProps) {
   const { selectedProjectId } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
+  const { error: showErrorToast } = useToast();
 
   const [view, setView] = useState<PoolView>("cloud");
   const [layoutIndex, setLayoutIndex] = useState(0);
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [openError, setOpenError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     task: StarterWorkTask;
     orientation: MyOrientation;
@@ -270,15 +269,21 @@ export function StarterWorkPoolCloud({
     [tasks, safePage, pageSize],
   );
 
+  useEffect(() => {
+    if (!error) return;
+    showErrorToast("Pool unavailable", { description: error });
+  }, [error, showErrorToast]);
+
   const openEditor = async (task: StarterWorkTask) => {
     if (!selectedProjectId) return;
     setOpeningId(task.id);
-    setOpenError(null);
     try {
       const orientation = await orientationService.fetchTaskOrientation(task.id, selectedProjectId);
       setEditing({ task, orientation });
     } catch (err) {
-      setOpenError(err instanceof Error ? err.message : "Could not open this orientation.");
+      showErrorToast("Orientation unavailable", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setOpeningId(null);
     }
@@ -340,17 +345,6 @@ export function StarterWorkPoolCloud({
           </Button>
         </div>
       </div>
-
-      {openError && (
-        <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
-          {openError}
-        </p>
-      )}
-      {error && (
-        <p className="mb-3 rounded-xl border border-app-danger-border bg-app-danger-bg p-3 text-xs font-medium text-app-danger-text">
-          {error}
-        </p>
-      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-app-text-muted">
