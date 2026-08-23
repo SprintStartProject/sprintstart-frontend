@@ -239,7 +239,7 @@ export function OnboardingMetricsWidget() {
         ) : preview.length === 0 ? (
           <div className="flex items-center gap-2 rounded-xl bg-app-success-bg/40 px-3 py-2.5">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-app-success-solid" aria-hidden="true" />
-            <p className="text-sm text-app-text">Everyone&apos;s on track — nobody is waiting.</p>
+            <p className="text-sm text-app-text">Everyone&apos;s on track, nobody is waiting.</p>
           </div>
         ) : (
           <ul className="space-y-3">
