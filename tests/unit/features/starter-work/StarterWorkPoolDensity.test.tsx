@@ -88,7 +88,7 @@ describe("StarterWorkPoolCloud density", () => {
     expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
   });
 
-  it("shows the small cloud twice, up to ten cards per page, when full width", async () => {
+  it("shows the small cloud twice, up to ten cards per page, when full width", () => {
     renderWithProviders(
       <StarterWorkPoolCloud
         tasks={Array.from({ length: 11 }, (_, index) => task(index + 1))}
