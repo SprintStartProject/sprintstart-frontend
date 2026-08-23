@@ -243,7 +243,7 @@ export function OnboardingMetricsPage() {
             <PageHeader
               icon={Gauge}
               title="Onboarding metrics"
-              subtitle="Time to a first accepted piece of work, response latency, and who is stalled — the measures the onboarding redesign is judged on."
+              subtitle="Track each new hire's path from joining to their first accepted contribution, and where they get held up."
             />
             {refreshButton}
           </div>
