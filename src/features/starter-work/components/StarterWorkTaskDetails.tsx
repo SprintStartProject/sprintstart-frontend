@@ -27,7 +27,7 @@ type StarterWorkTaskDetailsProps = {
 /**
  * The full view of one mined starter task, opened from the review list.
  *
- * The body is split into the same kind of labelled sections the admin user drawer uses â€” summary,
+ * The body is split into the same kind of labelled sections the admin user drawer uses — summary,
  * the AI's scope-safety rationale (the claim a PM is being asked to check) and the skills the task
  * exercises. The two decisions fill the footer; a successful one closes the drawer, since the task
  * then leaves the queue behind it.

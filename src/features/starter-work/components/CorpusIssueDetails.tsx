@@ -26,7 +26,7 @@ function formatUpdated(iso: string | null): string | null {
 /**
  * The full view of one browsable corpus issue, opened from the list.
  *
- * The row is deliberately compact â€” it carries a name and a number, no more â€” so the whole issue
+ * The row is deliberately compact — it carries a name and a number, no more — so the whole issue
  * body lives here, rendered as the Markdown it is written in. Adding it to the pool is the one
  * decision, and it fills the footer; the source link sits in the header beside the close button so
  * the reader can jump to the real issue without hunting.
@@ -188,8 +188,8 @@ export function CorpusIssueDetails({
         {candidate.hasAssignee === true && (
           <DrawerCard label="Status" icon={Info} index={2}>
             <p className="text-sm leading-relaxed text-app-text-muted">
-              Someone is already on this issue. It is still yours to add â€” the pool is a
-              suggestion, not a claim.
+              Someone is already on this issue. It is still yours to add — the pool is a suggestion,
+              not a claim.
             </p>
           </DrawerCard>
         )}

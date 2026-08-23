@@ -11,7 +11,7 @@ function toMessage(error: unknown, fallback: string): string {
  * Does this issue match what somebody typed?
  *
  * Over the title, the labels and the source id, because those are the three things a PM knows an
- * issue by â€” its name, what the project calls it, and its number. Not the excerpt: matching body
+ * issue by — its name, what the project calls it, and its number. Not the excerpt: matching body
  * text would surface rows whose reason for matching is off-screen.
  */
 function matches(candidate: StarterWorkCandidate, query: string): boolean {
@@ -27,13 +27,13 @@ function matches(candidate: StarterWorkCandidate, query: string): boolean {
 /**
  * Owns the browsable list of a project's open corpus issues and putting one in the pool.
  *
- * Searching and the assigned filter are client-side over a list already in hand â€” the backend
+ * Searching and the assigned filter are client-side over a list already in hand — the backend
  * sends every open issue once, and a search that costs a round trip is one people stop using.
  *
  * The assigned filter defaults to off, and hides only a definite `true`. `hasAssignee` is
  * three-valued: null means SprintStart does not know (it does not ingest GitHub assignees), and
  * hiding those would empty the list for every GitHub project. Issues already pooled or removed are
- * never hidden at all â€” they are shown marked, because an issue missing from the list leaves a
+ * never hidden at all — they are shown marked, because an issue missing from the list leaves a
  * reader unable to tell "filtered" from "not ingested".
  *
  * @param projectId The project whose corpus to browse; nothing loads while it is empty.
@@ -66,7 +66,7 @@ export function useCorpusIssueBrowser(
         const items = await starterWorkService.fetchCandidates(projectId);
         if (!cancelled) setLoaded({ projectId, items });
       } catch (err) {
-        if (!cancelled) setError(toMessage(err, "Could not load the projectâ€™s issues."));
+        if (!cancelled) setError(toMessage(err, "Could not load the project’s issues."));
       } finally {
         if (!cancelled) setIsLoading(false);
       }

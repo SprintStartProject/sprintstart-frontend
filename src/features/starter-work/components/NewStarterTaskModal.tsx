@@ -18,7 +18,7 @@ const inputClasses =
  * A PM hand-authoring a starter task, with no AI mining.
  *
  * The origination counterpart to the review queue: mining fills the pool from ingested issues, this
- * adds one the corpus never surfaced. It is born approved â€” a PM authoring a task is the review â€”
+ * adds one the corpus never surfaced. It is born approved — a PM authoring a task is the review —
  * so it lands in the graph as a goal at once rather than joining the queue below.
  *
  * The competency keys are typed as a free list (comma- or space-separated) rather than a picker:
@@ -58,7 +58,7 @@ export function NewStarterTaskModal({ isSaving, onCreate, onClose }: NewStarterT
     <Modal
       isOpen
       title="Add a starter task"
-      description="Author a first task by hand. The AI is optional â€” this becomes a goal a hire can aim at right away, no mining needed."
+      description="Author a first task by hand. The AI is optional — this becomes a goal a hire can aim at right away, no mining needed."
       size="lg"
       testId="new-starter-task-modal"
       isDismissDisabled={isSaving}

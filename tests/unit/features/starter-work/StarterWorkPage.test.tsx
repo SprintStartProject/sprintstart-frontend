@@ -179,7 +179,7 @@ describe("StarterWorkPage", () => {
         expect.objectContaining({ title: "Add a dark-mode toggle" }),
       ),
     );
-    expect(await screen.findByText("Added to pool")).toBeInTheDocument();
+    expect(await screen.findByText("Task created")).toBeInTheDocument();
     expect(screen.getAllByText("Add a dark-mode toggle").length).toBeGreaterThan(0);
   });
 

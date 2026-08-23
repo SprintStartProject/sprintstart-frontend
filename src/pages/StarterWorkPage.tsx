@@ -22,7 +22,7 @@ import { StarterWorkTaskCard } from "../features/starter-work/components/Starter
 import { StarterWorkTaskDetails } from "../features/starter-work/components/StarterWorkTaskDetails";
 import { NewStarterTaskModal } from "../features/starter-work/components/NewStarterTaskModal";
 import { CorpusIssueBrowser } from "../features/starter-work/components/CorpusIssueBrowser";
-import { StarterWorkPoolGrid } from "../features/starter-work/components/StarterWorkPoolGrid";
+import { StarterWorkPoolCloud } from "../features/starter-work/components/StarterWorkPoolCloud";
 import { PoolTaskFlight } from "../features/starter-work/components/PoolTaskFlight";
 import type {
   PoolFlightItem,
@@ -60,7 +60,7 @@ function compactToastDetail(value: string, maxLength: number): string {
  * Where a PM looks over the starter tasks the corpus produced.
  *
  * A mined task is live and claimable the moment it lands; this lists the ones nobody has vouched
- * for yet. Vouching lifts the demotion fit-ranking applies â€” it does not admit anything, and
+ * for yet. Vouching lifts the demotion fit-ranking applies — it does not admit anything, and
  * nothing here holds a task back from a hire.
  *
  * Removal is the one irreversible action, and it is sticky: mining never brings back a task
@@ -82,6 +82,7 @@ export function StarterWorkPage() {
     error,
     generateResult,
     createdTask,
+    createdVia,
 
     generate,
     create,
@@ -100,7 +101,7 @@ export function StarterWorkPage() {
   } = useStarterWorkPool();
   // The right column is the pool minus whatever is still awaiting review on the left. The backend
   // pool response carries no per-task "reviewed" flag, so the split is computed by id against the
-  // unreviewed queue rather than read off the task â€” and reviewing one drops it from the queue,
+  // unreviewed queue rather than read off the task — and reviewing one drops it from the queue,
   // which is exactly what moves it across to the right.
   const queueIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
   const pooledTasks = useMemo(
@@ -128,8 +129,11 @@ export function StarterWorkPage() {
 
   useEffect(() => {
     if (!createdTask) return;
-    showSuccessToast("Added to pool", { description: compactToastDetail(createdTask.title, 80) });
-  }, [createdTask, showSuccessToast]);
+    // Both land reviewed in the same spot, but "you wrote it" and "you picked it out of the corpus"
+    // are different things to have just done, so the confirmation names the one that happened.
+    const title = createdVia === "picked" ? "Added to pool" : "Task created";
+    showSuccessToast(title, { description: compactToastDetail(createdTask.title, 80) });
+  }, [createdTask, createdVia, showSuccessToast]);
 
   useEffect(() => {
     if (!generateResult) return;
@@ -210,8 +214,8 @@ export function StarterWorkPage() {
     [reject, reloadPool, toast],
   );
 
-  // The orientation workflow is PM/ADMIN only, so the tab list â€” and the order the
-  // swipe/slide directions read from â€” depends on the role.
+  // The orientation workflow is PM/ADMIN only, so the tab list — and the order the
+  // swipe/slide directions read from — depends on the role.
   const sectionOrder = useMemo<StarterWorkSection[]>(
     () =>
       canAct ? ["overview", "review", "browse", "orientation"] : ["overview", "review", "browse"],
@@ -281,7 +285,7 @@ export function StarterWorkPage() {
           <PageHeader
             icon={Target}
             title="Starter Work"
-            subtitle="Well-scoped first tasks mined from the ingested corpus. Approving one turns it into a goal a hire can work toward â€” their path becomes the route to shipping it."
+            subtitle="Well-scoped first tasks mined from the ingested corpus. Approving one turns it into a goal a hire can work toward — their path becomes the route to shipping it."
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 {canAct && (
@@ -370,7 +374,7 @@ export function StarterWorkPage() {
                   data-testid="overview-pool-column"
                   className={poolUsesFullWidth ? "xl:col-span-2" : undefined}
                 >
-                  <StarterWorkPoolGrid
+                  <StarterWorkPoolCloud
                     tasks={pooledTasks}
                     isLoading={isPoolLoading}
                     error={poolError}
@@ -395,7 +399,7 @@ export function StarterWorkPage() {
 
           {/* The picker beside the blank form: the same action with a better input than an
               empty box. HR reads it, matching the rest of the page. It is a second way to
-              add work, never a filter in front of mining â€” the pool above stays live. */}
+              add work, never a filter in front of mining — the pool above stays live. */}
           {showBrowse && (
             <CorpusIssueBrowser
               projectId={selectedProjectId}
@@ -404,7 +408,7 @@ export function StarterWorkPage() {
             />
           )}
 
-          {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split â€”
+          {/* Authoring a task's orientation is PM/ADMIN only, matching the backend role split —
               HR looks over the pool but does not write hire-facing content. */}
           {showOrientation && <TaskOrientationManager />}
         </SlidingTabPanel>
@@ -470,7 +474,7 @@ function ReviewQueue({
         <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
           <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
           <p className="mx-auto max-w-md text-sm text-app-text-muted">
-            Nothing here needs a look. Tasks are mined from the corpus whenever a crawl finishes â€”
+            Nothing here needs a look. Tasks are mined from the corpus whenever a crawl finishes —
             this is where the ones nobody has vouched for yet show up, not a queue blocking anybody.
           </p>
         </div>
@@ -494,8 +498,8 @@ function ReviewQueue({
 }
 
 /**
- * A flat section header â€” title, an optional count badge and a one-line
- * description â€” matching the Data Ingestion page. No card, no icon chip: the
+ * A flat section header — title, an optional count badge and a one-line
+ * description — matching the Data Ingestion page. No card, no icon chip: the
  * content below sits straight on the page so the sections read as one surface
  * rather than a stack of boxes.
  */

@@ -62,7 +62,7 @@ export function StarterWorkTaskCard({
       // On success the task leaves the queue and this card unmounts, so there is
       // nothing to reset; the toast owns the feedback.
     } catch {
-      // The page's handler already raised a toast for the failure â€” just let the
+      // The page's handler already raised a toast for the failure — just let the
       // row settle back so it can be tried again.
       setIsDeciding(false);
     }
@@ -87,7 +87,7 @@ export function StarterWorkTaskCard({
         onClick={(event) => {
           onSelect(task);
           // A mouse open leaves this trigger focused, and the drawer returns focus
-          // here on close â€” showing a focus ring the pointer user never asked for.
+          // here on close — showing a focus ring the pointer user never asked for.
           // Blur so focus falls back to the body. Keyboard activation (detail 0)
           // keeps the ring, which is where it belongs.
           if (event.detail !== 0) {
