@@ -15,6 +15,7 @@ import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { useToast } from "../../../context/useToast";
+import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { orientationService } from "../../../services/orientationService";
 import { centralSpringToken } from "../../../styles/tokens";
 import { OrientationEditor } from "../../orientation/components/OrientationEditor";
@@ -302,9 +303,15 @@ export function StarterWorkPoolCloud({
   } | null>(null);
   const [page, setPage] = useState(1);
 
+  // The cloud only reads as a cloud once there is room to scatter its cards. Below `sm` there is
+  // not, so the pool falls back to the list regardless of the picked view, and the view toggle is
+  // hidden. `view` still holds the desktop choice, so widening the window restores the cloud.
+  const isSmUp = useIsSmUp();
+  const effectiveView: PoolView = isSmUp ? view : "list";
+
   const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
   const cloudPageSize = fullWidth ? CLOUD_PAGE_SIZE_WIDE : CLOUD_PAGE_SIZE;
-  const pageSize = view === "cloud" ? cloudPageSize : listPageSize;
+  const pageSize = effectiveView === "cloud" ? cloudPageSize : listPageSize;
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
@@ -340,7 +347,7 @@ export function StarterWorkPoolCloud({
   const changePage = (nextPage: number) => {
     if (nextPage === safePage) return;
     setPage(nextPage);
-    if (view === "cloud") setLayoutIndex((current) => nextCloudLayout(current));
+    if (effectiveView === "cloud") setLayoutIndex((current) => nextCloudLayout(current));
   };
 
   const canOpenTask = canAct && Boolean(selectedProjectId);
@@ -360,7 +367,7 @@ export function StarterWorkPoolCloud({
         />
 
         <div
-          className="ml-auto flex items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1"
+          className="ml-auto hidden items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1 sm:flex"
           role="group"
           aria-label="Pool view"
         >
@@ -399,7 +406,7 @@ export function StarterWorkPoolCloud({
         </EmptyState>
       ) : (
         <>
-          {view === "cloud" ? (
+          {effectiveView === "cloud" ? (
             <div
               data-pool-flight-target
               className="relative overflow-hidden rounded-2xl @min-[38rem]:min-h-[22rem]"

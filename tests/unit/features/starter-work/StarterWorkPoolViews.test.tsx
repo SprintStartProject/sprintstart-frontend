@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 import { orientationService } from "../../../../src/services/orientationService";
+import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
 
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
@@ -36,6 +37,8 @@ describe("StarterWorkPoolCloud views", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    // The pool offers its cloud view from `sm` up, so pin a desktop viewport for these view tests.
+    mockViewport();
   });
 
   it("chooses a different one of the five cloud layouts whenever the page changes", async () => {

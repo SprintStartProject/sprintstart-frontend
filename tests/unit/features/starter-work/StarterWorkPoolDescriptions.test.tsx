@@ -1,8 +1,9 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
 
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
@@ -32,6 +33,11 @@ function task(id: string, summary: string | null): StarterWorkTask {
 }
 
 describe("StarterWorkPoolCloud descriptions", () => {
+  beforeEach(() => {
+    // The cloud view only renders from `sm` up, so pin a desktop viewport to assert on cloud cards.
+    mockViewport();
+  });
+
   it("renders a real description as one truncated line and omits blank descriptions", async () => {
     const user = userEvent.setup();
     const description = "A meaningful description that previews what the task is about.";

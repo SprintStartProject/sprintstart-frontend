@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Ban, Check, ChevronRight, Inbox, Loader2, Plus, Search, UserCheck } from "lucide-react";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { Badge } from "../../../components/ui/Badge";
@@ -11,6 +11,8 @@ import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { useToast } from "../../../context/useToast";
+import { useIsSmUp } from "../../../hooks/useIsSmUp";
+import { getQuickActionRevealVariants, quickActionSpringToken } from "../../../styles/tokens";
 import { CorpusIssueDetails } from "./CorpusIssueDetails";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
@@ -29,9 +31,6 @@ type CorpusIssueBrowserProps = {
 const PAGE_SIZE = 8;
 /** Labels shown inline on a row before the rest collapse into a "+N" badge. */
 const ROW_LABEL_CAP = 3;
-
-/** The same spring the review quick-actions ride in on, so the two read as one motion. */
-const BUTTON_SPRING = { type: "spring", stiffness: 520, damping: 30, mass: 0.6 } as const;
 
 /** The pool-state filter beside the search box. */
 type PoolFilter = "all" | "available" | "in-pool" | "removed";
@@ -330,14 +329,11 @@ function CandidateRow({
   const prefersReducedMotion = useReducedMotion();
 
   // Revealed on hover or focus, matching the review card. Reduced motion just fades it in; otherwise
-  // it slides and scales in on the same spring the review quick-actions use.
-  const showAdd = canAdd && (isHovered || isFocusWithin);
-  const addVariants: Variants = prefersReducedMotion
-    ? { rest: { opacity: 0 }, show: { opacity: 1 } }
-    : {
-        rest: { opacity: 0, x: 14, scale: 0.85 },
-        show: { opacity: 1, x: 0, scale: 1, transition: BUTTON_SPRING },
-      };
+  // it slides and scales in on the same spring the review quick-actions use. On touch there is no
+  // hover, so below `sm` it is shown from the start instead.
+  const isSmUp = useIsSmUp();
+  const showAdd = canAdd && (!isSmUp || isHovered || isFocusWithin);
+  const addVariants = getQuickActionRevealVariants(Boolean(prefersReducedMotion));
 
   return (
     <li
@@ -429,7 +425,9 @@ function CandidateRow({
               animate={showAdd ? "show" : "rest"}
               variants={addVariants}
               whileHover={
-                prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+                prefersReducedMotion
+                  ? undefined
+                  : { scale: 1.06, transition: quickActionSpringToken }
               }
               whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
               data-testid={`quick-promote-issue-${candidate.sourceId}`}

@@ -90,7 +90,7 @@ describe("CorpusIssueBrowser", () => {
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
     expect(
-      await screen.findByText(/a second way in, not a gate in front of it/i),
+      await screen.findByText(/a second way in besides mining/i),
     ).toBeInTheDocument();
   });
 

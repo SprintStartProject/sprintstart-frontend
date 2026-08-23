@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkTaskCard } from "../../../../src/features/starter-work/components/StarterWorkTaskCard";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import { mockViewport } from "../../setup/matchMedia";
 
 const task: StarterWorkTask = {
   id: "task-1",
@@ -16,6 +17,12 @@ const task: StarterWorkTask = {
 };
 
 describe("StarterWorkTaskCard", () => {
+  beforeEach(() => {
+    // The quick actions reveal on hover from `sm` up; pin a desktop viewport so the reveal tests
+    // exercise that path rather than the touch fallback (which shows them from the start).
+    mockViewport();
+  });
+
   it("keeps the source line and review actions stable while the actions reveal", () => {
     const { container } = render(
       <StarterWorkTaskCard
@@ -79,5 +86,27 @@ describe("StarterWorkTaskCard", () => {
     expect(metaRow).toContainElement(screen.getByText("repo"));
     // No competencies, so the labels row is left out rather than sitting empty.
     expect(screen.queryByTestId("review-labels-row-task-1")).not.toBeInTheDocument();
+  });
+
+  it("shows the review actions from the start on mobile, where there is no hover", () => {
+    mockViewport(false);
+
+    render(
+      <StarterWorkTaskCard
+        task={task}
+        canAct
+        isOpen={false}
+        onSelect={vi.fn()}
+        onApprove={vi.fn().mockResolvedValue(undefined)}
+        onReject={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const actions = screen.getByTestId("task-actions-task-1");
+    // No pointer interaction: the cluster is already interactive and both decisions are reachable.
+    expect(actions).toHaveClass("pointer-events-auto");
+    expect(actions).not.toHaveClass("pointer-events-none");
+    expect(screen.getByTestId("approve-task-task-1")).toBeInTheDocument();
+    expect(screen.getByTestId("reject-task-task-1")).toBeInTheDocument();
   });
 });

@@ -36,6 +36,20 @@ export const hoverSpringToken: Transition = {
 };
 
 /**
+ * Spring for the quick-action buttons that reveal on a card's hover or focus
+ * (the Starter Work review decisions, and the issue browser's "Add to the pool").
+ * A touch stiffer and heavier than `hoverSpringToken` so the buttons snap in
+ * decisively as one cluster; shared so the review card and the issue row read as
+ * the same motion. Pair it with `getQuickActionRevealVariants`.
+ */
+export const quickActionSpringToken: Transition = {
+  type: "spring",
+  stiffness: 520,
+  damping: 30,
+  mass: 0.6,
+};
+
+/**
  * Spring for the macOS-dock style magnification of sidebar items.
  * Almost critically damped so items grow and shrink without wobbling
  * while the pointer sweeps across the navigation.
@@ -143,6 +157,26 @@ export const modalBackdropVariants: Variants = {
  * Exit is a short tween: dismissing must never feel like waiting, and a spring
  * always spends time easing out that the user reads as lag.
  */
+/**
+ * Enter/rest variants for a hover-revealed quick action. `rest` parks the button
+ * a little to the right, faded and shrunk; `show` slides it home on
+ * {@link quickActionSpringToken}. Reduced motion keeps only the fade. Shared by
+ * the Starter Work review card and the issue browser row so the two reveal
+ * identically; drive it with a `rest`/`show` `animate` value from the card's
+ * hover/focus state (or hold it on `show` outright on touch, where there is no
+ * hover).
+ */
+export function getQuickActionRevealVariants(prefersReducedMotion: boolean): Variants {
+  if (prefersReducedMotion) {
+    return { rest: { opacity: 0 }, show: { opacity: 1 } };
+  }
+
+  return {
+    rest: { opacity: 0, x: 14, scale: 0.85 },
+    show: { opacity: 1, x: 0, scale: 1, transition: quickActionSpringToken },
+  };
+}
+
 export function getModalDialogVariants(prefersReducedMotion: boolean): Variants {
   if (prefersReducedMotion) {
     return {

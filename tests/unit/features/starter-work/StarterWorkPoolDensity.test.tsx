@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
 
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
@@ -35,6 +36,8 @@ describe("StarterWorkPoolCloud density", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    // The cloud view (and its wide ten-card page) only exists from `sm` up, so pin a desktop viewport.
+    mockViewport();
   });
 
   it("shows at most three issue-style rows on each list page", async () => {

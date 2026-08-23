@@ -2,6 +2,8 @@ import { useState } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Check, ChevronRight, Loader2, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
+import { useIsSmUp } from "../../../hooks/useIsSmUp";
+import { getQuickActionRevealVariants, quickActionSpringToken } from "../../../styles/tokens";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
@@ -24,8 +26,6 @@ const CLUSTER_VARIANTS: Variants = {
   show: { transition: { staggerChildren: 0.07, delayChildren: 0.03 } },
 };
 
-const BUTTON_SPRING = { type: "spring", stiffness: 520, damping: 30, mass: 0.6 } as const;
-
 /**
  * One mined starter task in the review list, kept compact.
  *
@@ -47,7 +47,10 @@ export function StarterWorkTaskCard({
   const [isFocusWithin, setIsFocusWithin] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
-  const showActions = canAct && (isHovered || isFocusWithin);
+  // On a pointer the actions slide in on hover or focus; on touch, where neither happens, they are
+  // shown from the start so a mobile PM can still act without opening the drawer.
+  const isSmUp = useIsSmUp();
+  const showActions = canAct && (!isSmUp || isHovered || isFocusWithin);
 
   // Source metadata, shown the same way the pool cards show it, so the meta row always carries the
   // tracker and issue number even when the AI attached no competencies. A hand-authored task with no
@@ -57,12 +60,7 @@ export function StarterWorkTaskCard({
   const hasKnownTracker =
     trackerCode.toUpperCase() === "GITHUB" || trackerCode.toUpperCase() === "JIRA";
 
-  const buttonVariants: Variants = prefersReducedMotion
-    ? { rest: { opacity: 0 }, show: { opacity: 1 } }
-    : {
-        rest: { opacity: 0, x: 14, scale: 0.85 },
-        show: { opacity: 1, x: 0, scale: 1, transition: BUTTON_SPRING },
-      };
+  const buttonVariants = getQuickActionRevealVariants(Boolean(prefersReducedMotion));
 
   const decide = async (action: () => Promise<void>) => {
     setIsDeciding(true);
@@ -162,7 +160,9 @@ export function StarterWorkTaskCard({
                   type="button"
                   variants={buttonVariants}
                   whileHover={
-                    prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+                    prefersReducedMotion
+                      ? undefined
+                      : { scale: 1.06, transition: quickActionSpringToken }
                   }
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                   data-testid={"approve-task-" + task.id}
@@ -185,7 +185,9 @@ export function StarterWorkTaskCard({
                   type="button"
                   variants={buttonVariants}
                   whileHover={
-                    prefersReducedMotion ? undefined : { scale: 1.06, transition: BUTTON_SPRING }
+                    prefersReducedMotion
+                      ? undefined
+                      : { scale: 1.06, transition: quickActionSpringToken }
                   }
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                   data-testid={"reject-task-" + task.id}

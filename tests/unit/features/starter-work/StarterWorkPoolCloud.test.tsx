@@ -5,6 +5,7 @@ import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/comp
 import { ToastProvider } from "../../../../src/context/ToastProvider";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 import { orientationService } from "../../../../src/services/orientationService";
+import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
 
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
@@ -37,6 +38,8 @@ describe("StarterWorkPoolCloud", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    // The cloud view only renders from `sm` up, so pin a desktop viewport for these cloud tests.
+    mockViewport();
   });
 
   it("shows pool load failures as a toast", async () => {
