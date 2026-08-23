@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { useFetch } from "../../../hooks/useFetch";
 import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
@@ -20,6 +21,19 @@ import { PageAttentionSection } from "./PageAttentionSection";
 import { StatTile } from "./StatTile";
 import { formatDuration } from "../format";
 import type { HireTimeline } from "../types";
+
+/** Narrows the per-hire list to those a PM might act on, for a busy project. */
+type HireFilter = "all" | "attention";
+
+const HIRE_FILTER_OPTIONS: FilterSelectOption<HireFilter>[] = [
+  { value: "all", label: "All hires" },
+  { value: "attention", label: "Needs attention only" },
+];
+
+/** A hire worth a second look: stalled, or with work still waiting on somebody else. */
+function needsAttention(hire: HireTimeline): boolean {
+  return hire.stalled || hire.openContributionCount > 0;
+}
 
 /** Whether any hire has reached any tracked moment — distinguishes "no data" from "no hires". */
 function hasActivity(hires: HireTimeline[]): boolean {
@@ -56,6 +70,7 @@ export function OnboardingMetricsPage() {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [hireFilter, setHireFilter] = useState<HireFilter>("all");
   // Set when a manual refresh is in flight, so the completion effect can tell the
   // user what the refetch turned up without also firing on the first load.
   const pendingRefreshRef = useRef(false);
@@ -140,6 +155,11 @@ export function OnboardingMetricsPage() {
     return [...metrics.hires].sort((a, b) => Number(b.stalled) - Number(a.stalled));
   }, [metrics]);
 
+  const filteredHires = useMemo(
+    () => (hireFilter === "attention" ? orderedHires.filter(needsAttention) : orderedHires),
+    [orderedHires, hireFilter],
+  );
+
   const refreshButton = (
     <Button
       variant="primary"
@@ -214,39 +234,53 @@ export function OnboardingMetricsPage() {
             <PageAttentionSection projectId={selectedProjectId} />
 
             {/* Aggregates. Medians throughout so one outlier can't move the number. */}
-            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <StatTile
-                label="Median time to first accepted work"
-                value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
-                hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
-              />
-              <StatTile
-                label="Median first-review wait"
-                value={formatDuration(metrics.medianHoursToFirstResponse)}
-                hint="Opened → first response"
-              />
-              <StatTile
-                label="90th-percentile review wait"
-                value={formatDuration(metrics.p90HoursToFirstResponse)}
-                hint="The slow tail, where the barrier bites"
-              />
-              <StatTile
-                label="Waiting on a review"
-                value={metrics.waitingOnResponseCount}
-                hint={
-                  metrics.unattributableMemberCount > 0
-                    ? `${metrics.unattributableMemberCount} unattributable (no GitHub login)`
-                    : undefined
-                }
-              />
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-app-text">Overview</h2>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile
+                  label="Median time to first accepted work"
+                  value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
+                  hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
+                />
+                <StatTile
+                  label="Median first-review wait"
+                  value={formatDuration(metrics.medianHoursToFirstResponse)}
+                  hint="Opened → first response"
+                />
+                <StatTile
+                  label="90th-percentile review wait"
+                  value={formatDuration(metrics.p90HoursToFirstResponse)}
+                  hint="The slow tail, where the barrier bites"
+                />
+                <StatTile
+                  label="Waiting on a review"
+                  value={metrics.waitingOnResponseCount}
+                  hint={
+                    metrics.unattributableMemberCount > 0
+                      ? `${metrics.unattributableMemberCount} unattributable (no GitHub login)`
+                      : undefined
+                  }
+                />
+              </div>
             </section>
 
             {/* Per-hire timelines, stalled first. */}
             <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-app-text">Per-hire timelines</h2>
-              {orderedHires.map((hire) => (
-                <HireTimelineCard key={hire.userId} hire={hire} />
-              ))}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-app-text">Per-hire timelines</h2>
+                <FilterSelect
+                  label="Filter hires"
+                  value={hireFilter}
+                  options={HIRE_FILTER_OPTIONS}
+                  onChange={setHireFilter}
+                  className="w-52"
+                />
+              </div>
+              {filteredHires.length === 0 ? (
+                <EmptyState size="sm">No hires need attention right now.</EmptyState>
+              ) : (
+                filteredHires.map((hire) => <HireTimelineCard key={hire.userId} hire={hire} />)
+              )}
             </section>
           </>
         )}
