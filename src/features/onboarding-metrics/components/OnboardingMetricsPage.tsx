@@ -2,9 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowLeft,
-  CheckCircle2,
   FolderKanban,
   Gauge,
   Loader2,
@@ -18,6 +16,7 @@ import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
+import { PageAttentionSection } from "./PageAttentionSection";
 import { StatTile } from "./StatTile";
 import { formatDuration } from "../format";
 import type { HireTimeline } from "../types";
@@ -141,11 +140,6 @@ export function OnboardingMetricsPage() {
     return [...metrics.hires].sort((a, b) => Number(b.stalled) - Number(a.stalled));
   }, [metrics]);
 
-  const stalledHires = useMemo(
-    () => (metrics ? metrics.hires.filter((hire) => hire.stalled) : []),
-    [metrics],
-  );
-
   const refreshButton = (
     <Button
       variant="primary"
@@ -216,49 +210,8 @@ export function OnboardingMetricsPage() {
           </EmptyState>
         ) : (
           <>
-            {/* Stalls first: the primary call to action, never a footnote. */}
-            <section className="rounded-3xl border border-app-border bg-app-bg p-5 shadow-sm">
-              {stalledHires.length > 0 ? (
-                <>
-                  <div className="mb-3 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-app-warning-solid" aria-hidden="true" />
-                    <h2 className="text-lg font-semibold text-app-text">
-                      {stalledHires.length} hire
-                      {stalledHires.length === 1 ? "" : "s"} stalled
-                    </h2>
-                  </div>
-                  <p className="mb-4 text-sm text-app-text-muted">
-                    The thing to act on today. Where the wait is on a review, the fix is a
-                    conversation with the reviewer — not a nudge to the hire.
-                  </p>
-                  <ul className="space-y-2">
-                    {stalledHires.map((hire) => (
-                      <li
-                        key={hire.userId}
-                        className="flex items-start justify-between gap-3 rounded-xl border border-app-warning-border bg-app-warning-bg/40 p-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-app-text">{hire.displayName}</p>
-                          <p className="text-xs text-app-text-muted">
-                            {hire.stalledReason ?? "Stalled"}
-                          </p>
-                        </div>
-                        {hire.longestOpenWaitHours !== null && (
-                          <span className="shrink-0 text-xs font-medium text-app-warning-text">
-                            {formatDuration(hire.longestOpenWaitHours)}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-app-success-solid" aria-hidden="true" />
-                  <p className="text-sm text-app-text">Nobody is stalled right now.</p>
-                </div>
-              )}
-            </section>
+            {/* Who needs a human first: the primary call to action, never a footnote. */}
+            <PageAttentionSection projectId={selectedProjectId} />
 
             {/* Aggregates. Medians throughout so one outlier can't move the number. */}
             <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
