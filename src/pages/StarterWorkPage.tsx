@@ -240,6 +240,11 @@ export function StarterWorkPage() {
   const showOverview = activeSection === "overview";
   const hasOpenReviews = tasks.length > 0;
   const poolUsesFullWidth = !hasOpenReviews;
+  // A short queue beside a taller pool leaves a gap under the review column. It is filled with empty
+  // dashed card slots that read as "room for more" rather than dead space, topping the column up to
+  // three slots: two placeholders under a single review, one under two. Three or more reviews fill
+  // the column on their own, so no placeholder shows.
+  const reviewFillerCount = hasOpenReviews && tasks.length <= 2 ? 3 - tasks.length : 0;
   const showReviewTab = activeSection === "review";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
   const showOrientation = canAct && activeSection === "orientation";
@@ -368,6 +373,30 @@ export function StarterWorkPage() {
                       onApprove={handleApprove}
                       onReject={handleReject}
                     />
+                    {reviewFillerCount > 0 && (
+                      // Empty card-shaped slots that fill the gap left by a short queue, xl only,
+                      // where the side-by-side split creates it. Decorative, so hidden from a11y.
+                      <div
+                        aria-hidden="true"
+                        data-testid="overview-review-filler"
+                        className="mt-3 hidden space-y-3 xl:block"
+                      >
+                        {Array.from({ length: reviewFillerCount }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="flex min-h-28 items-center justify-center rounded-2xl border border-dashed border-app-border px-6 text-center"
+                          >
+                            {/* The line sits in the topmost slot only, so it stays right under the
+                                queue with one review and reads as the last row with two. */}
+                            {index === 0 && (
+                              <p className="text-xs text-app-text-subtle">
+                                New tasks land here for review.
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div

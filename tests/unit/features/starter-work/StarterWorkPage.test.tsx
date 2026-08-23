@@ -138,6 +138,42 @@ describe("StarterWorkPage", () => {
     expect(screen.getByTestId("overview-pool-column")).toHaveClass("xl:col-span-2");
   });
 
+  it("fills the gap under a single review with two dashed placeholder slots", async () => {
+    // Default mock is a single review, so the column tops up to three slots: one card, two dashes.
+    render(<StarterWorkPage />);
+
+    await screen.findByText("Fix the login redirect");
+    const filler = screen.getByTestId("overview-review-filler");
+    expect(filler.children).toHaveLength(2);
+    // The hint sits in the topmost slot only, so it appears exactly once.
+    expect(filler).toHaveTextContent("New tasks land here for review.");
+    expect(screen.getAllByText("New tasks land here for review.")).toHaveLength(1);
+  });
+
+  it("fills the gap under two reviews with one dashed placeholder slot", async () => {
+    vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({
+      tasks: [task, { ...task, id: "task-2", title: "Document the auth flow" }],
+    });
+    render(<StarterWorkPage />);
+
+    await screen.findByText("Document the auth flow");
+    expect(screen.getByTestId("overview-review-filler").children).toHaveLength(1);
+  });
+
+  it("drops the placeholder once the review queue is long enough to fill the column", async () => {
+    vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({
+      tasks: [
+        task,
+        { ...task, id: "task-2", title: "Document the auth flow" },
+        { ...task, id: "task-3", title: "Tidy the onboarding README" },
+      ],
+    });
+    render(<StarterWorkPage />);
+
+    await screen.findByText("Fix the login redirect");
+    expect(screen.queryByTestId("overview-review-filler")).not.toBeInTheDocument();
+  });
+
   it("shows generated work as a success toast", async () => {
     vi.spyOn(starterWorkService, "generate").mockResolvedValue({
       status: "COMPLETED",
