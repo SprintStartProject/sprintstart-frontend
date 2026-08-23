@@ -2,11 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Clock,
   Gauge,
+  Hourglass,
+  Loader2,
   RefreshCw,
+  TrendingDown,
+  type LucideIcon,
 } from "lucide-react";
 import { useFetch } from "../../../hooks/useFetch";
 import { useToast } from "../../../context/useToast";
@@ -14,39 +18,71 @@ import { onboardingMetricsService } from "../../../services/onboardingMetricsSer
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useAttention } from "../hooks/useAttention";
 import { ClickableCard } from "../../../components/common/ClickableCard";
+import { UserAvatar } from "../../../components/common/UserAvatar";
+import { Badge, type BadgeVariant } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
-import { formatDaysAgo } from "../format";
-import { formatDuration } from "../format";
-import type { AttentionItem } from "../types";
+import { StatTile } from "./StatTile";
+import { formatDaysAgo, formatDuration } from "../format";
+import type { AttentionItem, AttentionSeverity } from "../types";
 
 /** How many attention rows the compact widget previews before deferring to the page. */
-const PREVIEW_LIMIT = 3;
+const PREVIEW_LIMIT = 2;
 
-/** Severity chip: colour follows meaning — waiting on someone (warning) vs. drifting (danger). */
-function severityChip(item: AttentionItem) {
-  if (item.severity === "BLOCKED") {
-    return (
-      <span className="shrink-0 rounded-full bg-app-warning-bg px-2 py-0.5 text-xs font-medium text-app-warning-text">
-        Waiting
-      </span>
-    );
-  }
+/**
+ * How each severity reads: whose move it is, in a word, an icon and a colour.
+ * `BLOCKED` is waiting on somebody else (a review) — a warning, not the hire's
+ * fault. `DRIFTING` is the hire losing momentum on their own — the more pointed
+ * danger. The accent bar carries the same colour so a glance down the list sorts
+ * them without reading.
+ */
+const SEVERITY_META: Record<
+  AttentionSeverity,
+  { label: string; Icon: LucideIcon; variant: BadgeVariant; bar: string }
+> = {
+  BLOCKED: { label: "Waiting", Icon: Clock, variant: "orange", bar: "bg-app-orange-text" },
+  DRIFTING: { label: "Drifting", Icon: TrendingDown, variant: "danger", bar: "bg-app-danger-solid" },
+};
+
+/** One "needs attention" row: avatar, name + severity badge, reason, and how long it's been true. */
+function AttentionRow({ item }: { item: AttentionItem }) {
+  const meta = SEVERITY_META[item.severity];
   return (
-    <span className="shrink-0 rounded-full bg-app-danger-bg px-2 py-0.5 text-xs font-medium text-app-danger-text">
-      Drifting
-    </span>
+    <li className="flex items-center gap-3">
+      <span className={`w-1 shrink-0 self-stretch rounded-full ${meta.bar}`} aria-hidden="true" />
+      <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-app-surface-muted">
+        <UserAvatar size={32} fallbackName={item.hireName} seed={item.hireId} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-app-text">{item.hireName}</span>
+          <Badge variant={meta.variant} size="md" className="shrink-0 gap-1">
+            <meta.Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {meta.label}
+          </Badge>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-app-text-muted">{item.reason}</p>
+      </div>
+      <span
+        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2.5 py-1 text-xs font-semibold text-app-brand-text"
+        title={formatDaysAgo(item.days)}
+      >
+        <Hourglass className="h-3 w-3" aria-hidden="true" />
+        {item.days <= 0 ? "today" : `${item.days}d`}
+      </span>
+    </li>
   );
 }
 
 /**
- * Compact PM-dashboard summary of onboarding health, leading with the stall count
- * (the thing a PM should act on) and previewing who needs a human, then linking to
- * the full readout. Same widget → `/insights/*` page split as the other Insights
- * cards (`FaqWidget`, `KnowledgeGapWidget`).
+ * Compact PM-dashboard summary of onboarding health, a peer card to the other
+ * Insights widgets (`FaqWidget`, `KnowledgeGapWidget`). It deliberately carries
+ * only the two questions a PM answers at a glance — how many hires are stuck, and
+ * how fast onboarding reaches a first accepted piece of work — plus a short "who
+ * needs a human" preview; everything else lives on the full readout it links to.
  *
- * The metrics are derived on request, so "refresh" is a client-side refetch rather
- * than a pipeline trigger.
+ * The metrics are derived on request, so "refresh" is a client-side refetch
+ * rather than a pipeline trigger.
  */
 export function OnboardingMetricsWidget() {
   const { selectedProjectId } = useProjectContext();
@@ -68,7 +104,8 @@ export function OnboardingMetricsWidget() {
     [selectedProjectId, refreshKey],
   );
 
-  const { attention, reload: reloadAttention } = useAttention(selectedProjectId);
+  const { attention, isLoading: attentionLoading, reload: reloadAttention } =
+    useAttention(selectedProjectId);
 
   const openPage = () => void navigate("/insights/onboarding");
 
@@ -123,8 +160,9 @@ export function OnboardingMetricsWidget() {
     );
   }
 
-  const stalled = metrics.stalledCount;
+  const totalAttention = attention?.items.length ?? 0;
   const preview = attention?.items.slice(0, PREVIEW_LIMIT) ?? [];
+  const extra = totalAttention - preview.length;
 
   return (
     <ClickableCard
@@ -167,47 +205,57 @@ export function OnboardingMetricsWidget() {
         </div>
       </div>
 
-      {/* Stall summary — the headline a PM acts on. */}
-      {stalled > 0 ? (
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-app-warning-solid" aria-hidden="true" />
-          <p className="text-sm text-app-text">
-            <span className="font-semibold">{stalled}</span> hire{stalled === 1 ? "" : "s"} stalled
-            — worth acting on today.
-          </p>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-app-success-solid" aria-hidden="true" />
-          <p className="text-sm text-app-text-muted">Nobody is stalled right now.</p>
-        </div>
-      )}
+      {/* The two numbers that matter at a glance. */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatTile
+          label="Stalled hires"
+          value={metrics.stalledCount}
+          hint={metrics.stalledCount > 0 ? "Worth acting on today" : "Nobody stalled"}
+        />
+        <StatTile
+          label="Time to first accepted work"
+          value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
+          hint="Median, joined → accepted"
+        />
+      </div>
 
-      <p className="mt-3 text-xs text-app-text-muted">
-        Median time to first accepted work:{" "}
-        <span className="font-medium text-app-text">
-          {formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
-        </span>
-      </p>
+      {/* Needs attention — the call to action, top few. */}
+      <div className="mt-5">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+            Needs attention
+          </span>
+          {totalAttention > 0 && (
+            <Badge variant="neutral" size="sm">
+              {totalAttention}
+            </Badge>
+          )}
+        </div>
 
-      {/* Who needs a human, top few. */}
-      {preview.length > 0 && (
-        <ul className="mt-4 space-y-2 border-t border-app-border pt-4">
-          {preview.map((item) => (
-            <li key={item.hireId} className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-app-text">{item.hireName}</span>
-                  {severityChip(item)}
-                </div>
-                <p className="mt-0.5 truncate text-xs text-app-text-muted">
-                  {item.reason} · {formatDaysAgo(item.days)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+        {attentionLoading && !attention ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-app-brand" aria-hidden="true" />
+          </div>
+        ) : preview.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-xl bg-app-success-bg/40 px-3 py-2.5">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-app-success-solid" aria-hidden="true" />
+            <p className="text-sm text-app-text">Everyone&apos;s on track — nobody is waiting.</p>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {preview.map((item) => (
+              <AttentionRow key={item.hireId} item={item} />
+            ))}
+            {extra > 0 && (
+              <li>
+                <span className="text-xs font-medium text-app-brand-text">
+                  +{extra} more on the full readout
+                </span>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
     </ClickableCard>
   );
 }

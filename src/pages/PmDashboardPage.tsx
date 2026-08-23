@@ -56,12 +56,12 @@ export function PmDashboardPage() {
               </p>
             </div>
 
-            <div className="space-y-4">
+            {/* Two-up. Onboarding metrics sits on its own row at half width;
+                the empty half is reserved for the coming knowledge-requests widget. */}
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+              <FaqWidget />
+              <KnowledgeGapWidget />
               <OnboardingMetricsWidget />
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <FaqWidget />
-                <KnowledgeGapWidget />
-              </div>
             </div>
           </section>
         </SpotlightCard>
