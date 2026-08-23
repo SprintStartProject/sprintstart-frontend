@@ -135,7 +135,8 @@ function SidebarContent({
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
     location.pathname.startsWith("/insights/faq") ||
-    location.pathname.startsWith("/insights/knowledge-gaps");
+    location.pathname.startsWith("/insights/knowledge-gaps") ||
+    location.pathname.startsWith("/insights/onboarding");
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },
