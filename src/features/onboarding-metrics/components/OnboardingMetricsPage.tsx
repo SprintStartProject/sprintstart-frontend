@@ -3,21 +3,29 @@ import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
+  Clock,
   FolderKanban,
   Gauge,
+  Hourglass,
+  Inbox,
+  LayoutGrid,
   Loader2,
   RefreshCw,
+  Rocket,
+  Search,
+  Users,
 } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { Input } from "../../../components/ui/Input";
+import { Pagination } from "../../../components/ui/Pagination";
 import { useFetch } from "../../../hooks/useFetch";
 import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
-import { PageAttentionSection } from "./PageAttentionSection";
 import { StatTile } from "./StatTile";
 import { formatDuration } from "../format";
 import type { HireTimeline } from "../types";
@@ -25,14 +33,26 @@ import type { HireTimeline } from "../types";
 /** Narrows the per-hire list to those a PM might act on, for a busy project. */
 type HireFilter = "all" | "attention";
 
-const HIRE_FILTER_OPTIONS: FilterSelectOption<HireFilter>[] = [
-  { value: "all", label: "All hires" },
-  { value: "attention", label: "Needs attention only" },
-];
+/** How many hire timelines to show per page before the list paginates. */
+const HIRES_PER_PAGE = 8;
 
-/** A hire worth a second look: stalled, or with work still waiting on somebody else. */
+
+/**
+ * A hire worth a second look — the same two states the card flags on its face:
+ * stalled (the drifting highlight), or genuinely waiting on a first response (the
+ * "Waiting … on a response" badge).
+ *
+ * Deliberately NOT "has any open contribution": an active contributor almost
+ * always has work in flight, so that clause flagged healthy hires too and made
+ * the filter a no-op (everyone matched). Waiting means a contribution was opened
+ * and no response has come back yet.
+ */
 function needsAttention(hire: HireTimeline): boolean {
-  return hire.stalled || hire.openContributionCount > 0;
+  const awaitingFirstResponse =
+    hire.firstContributionOpenedAt !== null &&
+    hire.firstResponseAt === null &&
+    hire.openContributionCount > 0;
+  return hire.stalled || awaitingFirstResponse;
 }
 
 /** Whether any hire has reached any tracked moment — distinguishes "no data" from "no hires". */
@@ -49,8 +69,8 @@ function hasActivity(hires: HireTimeline[]): boolean {
 
 /**
  * The PM readout for the numbers the onboarding redesign is judged on:
- * time-to-first-accepted-work, response latency, and — first, as the call to action —
- * who is stalled.
+ * time-to-first-accepted-work, response latency, and who is stalled. The
+ * aggregates lead, and the per-hire timelines follow, stalled first.
  *
  * Deliberately a measurement readout, not another dashboard: no completion
  * percentages, because progress is what somebody has proven rather than how far
@@ -71,6 +91,8 @@ export function OnboardingMetricsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [hireFilter, setHireFilter] = useState<HireFilter>("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   // Set when a manual refresh is in flight, so the completion effect can tell the
   // user what the refetch turned up without also firing on the first load.
   const pendingRefreshRef = useRef(false);
@@ -155,9 +177,40 @@ export function OnboardingMetricsPage() {
     return [...metrics.hires].sort((a, b) => Number(b.stalled) - Number(a.stalled));
   }, [metrics]);
 
-  const filteredHires = useMemo(
-    () => (hireFilter === "attention" ? orderedHires.filter(needsAttention) : orderedHires),
-    [orderedHires, hireFilter],
+  const hireFilterOptions: FilterSelectOption<HireFilter>[] = [
+    { value: "all", label: "All hires" },
+    { value: "attention", label: "Needs attention only" },
+  ];
+
+  const filteredHires = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return orderedHires.filter((hire) => {
+      if (hireFilter === "attention" && !needsAttention(hire)) return false;
+      if (!query) return true;
+      return (
+        hire.displayName.toLowerCase().includes(query) ||
+        (hire.githubLogin?.toLowerCase().includes(query) ?? false)
+      );
+    });
+  }, [orderedHires, hireFilter, search]);
+
+  // A changed filter or search re-slices the list, so start back at the first
+  // page. Done in the change handlers (not an effect) to avoid a cascading render.
+  const handleFilterChange = (value: HireFilter) => {
+    setHireFilter(value);
+    setPage(1);
+  };
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(filteredHires.length / HIRES_PER_PAGE));
+  // Clamp in case the list shrank under the current page (e.g. after filtering).
+  const currentPage = Math.min(page, totalPages);
+  const pagedHires = filteredHires.slice(
+    (currentPage - 1) * HIRES_PER_PAGE,
+    currentPage * HIRES_PER_PAGE,
   );
 
   const refreshButton = (
@@ -230,29 +283,37 @@ export function OnboardingMetricsPage() {
           </EmptyState>
         ) : (
           <>
-            {/* Who needs a human first: the primary call to action, never a footnote. */}
-            <PageAttentionSection projectId={selectedProjectId} />
-
             {/* Aggregates. Medians throughout so one outlier can't move the number. */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-app-text">Overview</h2>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="h-4 w-4 text-app-brand" aria-hidden="true" />
+                <h2 className="text-lg font-semibold tracking-tight text-app-text">Overview</h2>
+              </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatTile
+                  icon={<Rocket size={18} />}
+                  accent="brand"
                   label="Median time to first accepted work"
                   value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
                   hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
                 />
                 <StatTile
+                  icon={<Clock size={18} />}
+                  accent="brand"
                   label="Median first-review wait"
                   value={formatDuration(metrics.medianHoursToFirstResponse)}
                   hint="Opened → first response"
                 />
                 <StatTile
+                  icon={<Hourglass size={18} />}
+                  accent="warning"
                   label="90th-percentile review wait"
                   value={formatDuration(metrics.p90HoursToFirstResponse)}
                   hint="The slow tail, where the barrier bites"
                 />
                 <StatTile
+                  icon={<Inbox size={18} />}
+                  accent={metrics.waitingOnResponseCount > 0 ? "warning" : "neutral"}
                   label="Waiting on a review"
                   value={metrics.waitingOnResponseCount}
                   hint={
@@ -265,21 +326,48 @@ export function OnboardingMetricsPage() {
             </section>
 
             {/* Per-hire timelines, stalled first. */}
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-app-text">Per-hire timelines</h2>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-app-brand" aria-hidden="true" />
+                <h2 className="text-lg font-semibold tracking-tight text-app-text">
+                  Per-hire timelines
+                </h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <Input
+                  size="sm"
+                  icon={<Search className="h-4 w-4" />}
+                  aria-label="Search hires by name"
+                  placeholder="Search hires…"
+                  value={search}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  className="min-w-0 flex-1"
+                />
                 <FilterSelect
                   label="Filter hires"
                   value={hireFilter}
-                  options={HIRE_FILTER_OPTIONS}
-                  onChange={setHireFilter}
-                  className="w-52"
+                  options={hireFilterOptions}
+                  onChange={handleFilterChange}
+                  className="w-56 shrink-0"
                 />
               </div>
               {filteredHires.length === 0 ? (
-                <EmptyState size="sm">No hires need attention right now.</EmptyState>
+                <EmptyState size="sm">
+                  {search.trim()
+                    ? "No hires match your search."
+                    : "No hires need attention right now."}
+                </EmptyState>
               ) : (
-                filteredHires.map((hire) => <HireTimelineCard key={hire.userId} hire={hire} />)
+                <>
+                  {pagedHires.map((hire) => (
+                    <HireTimelineCard key={hire.userId} hire={hire} />
+                  ))}
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
+                </>
               )}
             </section>
           </>
