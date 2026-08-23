@@ -58,7 +58,7 @@ export function NewStarterTaskModal({ isSaving, onCreate, onClose }: NewStarterT
     <Modal
       isOpen
       title="Add a starter task"
-      description="Author a first task by hand. The AI is optional — this becomes a goal a hire can aim at right away, no mining needed."
+      description="Write a first task by hand. It becomes a goal a hire can pick up right away."
       size="lg"
       testId="new-starter-task-modal"
       isDismissDisabled={isSaving}

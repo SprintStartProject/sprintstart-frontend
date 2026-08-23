@@ -284,7 +284,7 @@ export function StarterWorkPage() {
           <PageHeader
             icon={Target}
             title="Starter Work"
-            subtitle="Well-scoped first tasks mined from the ingested corpus. Approving one turns it into a goal a hire can work toward — their path becomes the route to shipping it."
+            subtitle="First tasks mined from your corpus. Approve one to turn it into a goal a new hire can pick up."
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 {canAct && (
@@ -495,7 +495,7 @@ function ReviewQueue({
     <section aria-label="Awaiting your review">
       <SectionHeading
         title="Awaiting your review"
-        description="Mined tasks nobody has vouched for yet. Vouching lifts their rank; removal is permanent."
+        description="Vouch to lift a task's rank. Removal is permanent."
         count={tasks.length}
       />
       {isLoading ? (
@@ -506,8 +506,7 @@ function ReviewQueue({
         <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
           <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
           <p className="mx-auto max-w-md text-sm text-app-text-muted">
-            Nothing here needs a look. Tasks are mined from the corpus whenever a crawl finishes —
-            this is where the ones nobody has vouched for yet show up, not a queue blocking anybody.
+            Nothing to review right now. Fresh tasks land here after each crawl.
           </p>
         </div>
       ) : (

@@ -138,7 +138,7 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
           )}
           <InfoHint
             label="About issues in this project"
-            text="Every open issue the project has ingested. Adding one puts it in the pool straight away, the same as writing a task by hand, because you looked at it. Mining keeps filling the pool on its own; this is a second way in, not a gate in front of it."
+            text="Add any ingested issue straight to the pool, a second way in besides mining."
           />
         </div>
       </div>
