@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AttentionWidget } from "../../../../src/features/onboarding-metrics/components/AttentionWidget";
+import { PageAttentionSection } from "../../../../src/features/onboarding-metrics/components/PageAttentionSection";
 import type { ProjectAttention } from "../../../../src/features/onboarding-metrics/types";
 
 vi.mock("../../../../src/services/onboardingMetricsService", () => ({
@@ -32,7 +32,7 @@ const attention: ProjectAttention = {
   ],
 };
 
-describe("AttentionWidget", () => {
+describe("PageAttentionSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -40,7 +40,7 @@ describe("AttentionWidget", () => {
   it("renders stalls and waiting PRs with whose move it is — and nothing else", async () => {
     vi.mocked(onboardingMetricsService.fetchAttention).mockResolvedValue(attention);
 
-    render(<AttentionWidget projectId="p1" />);
+    render(<PageAttentionSection projectId="p1" />);
 
     expect(await screen.findByText("Ada")).toBeInTheDocument();
     expect(screen.getByText("Grace")).toBeInTheDocument();
@@ -59,21 +59,21 @@ describe("AttentionWidget", () => {
   it("reads the attention list from the metrics endpoint", async () => {
     vi.mocked(onboardingMetricsService.fetchAttention).mockResolvedValue(attention);
 
-    render(<AttentionWidget projectId="p1" />);
+    render(<PageAttentionSection projectId="p1" />);
 
     await screen.findByText("Ada");
     expect(onboardingMetricsService.fetchAttention).toHaveBeenCalledWith("p1");
   });
 
-  it("says so when nobody is waiting or drifting", async () => {
+  it("says so when nobody needs a human", async () => {
     vi.mocked(onboardingMetricsService.fetchAttention).mockResolvedValue({
       projectId: "p1",
       memberCount: 2,
       items: [],
     });
 
-    render(<AttentionWidget projectId="p1" />);
+    render(<PageAttentionSection projectId="p1" />);
 
-    expect(await screen.findByText(/Nobody is waiting or drifting right now/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nobody needs a human right now/)).toBeInTheDocument();
   });
 });
