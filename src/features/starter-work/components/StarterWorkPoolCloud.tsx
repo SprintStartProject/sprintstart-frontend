@@ -356,7 +356,7 @@ export function StarterWorkPoolCloud({
         )}
         <InfoHint
           label="About the pool"
-          text="Reviewed tasks hires can claim. Edit a task's orientation to write its guide."
+          text="Every pooled task stays claimable. Review lifts its rank; edit orientation to write the guide."
         />
 
         <div

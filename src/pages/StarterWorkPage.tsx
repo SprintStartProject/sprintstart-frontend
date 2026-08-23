@@ -284,7 +284,7 @@ export function StarterWorkPage() {
           <PageHeader
             icon={Target}
             title="Starter Work"
-            subtitle="First tasks mined from your corpus. Approve one to turn it into a goal a new hire can pick up."
+            subtitle="First tasks mined from your corpus, ready for new hires to pick up. Reviewing one lifts it up the list."
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 {canAct && (
@@ -338,7 +338,7 @@ export function StarterWorkPage() {
                 <Kpi
                   label="Awaiting review"
                   value={overview.awaiting}
-                  foot={overview.awaiting > 0 ? "Vouch or remove each one" : "All caught up"}
+                  foot={overview.awaiting > 0 ? "Rank or remove, optional" : "All caught up"}
                   icon={ListChecks}
                 />
                 <Kpi
