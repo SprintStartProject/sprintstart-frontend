@@ -88,6 +88,22 @@ describe("StarterWorkPoolCloud density", () => {
     expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
   });
 
+  it("shows the small cloud twice, up to ten cards per page, when full width", async () => {
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={Array.from({ length: 11 }, (_, index) => task(index + 1))}
+        isLoading={false}
+        error={null}
+        canAct
+        fullWidth
+      />,
+    );
+
+    // Cloud view is the default; full width doubles the five-card page to ten.
+    expect(screen.getAllByTestId(/^pool-task-task-/)).toHaveLength(10);
+    expect(screen.queryByText("Starter task 11")).not.toBeInTheDocument();
+  });
+
   it("does not render competency badges in either pool view", async () => {
     const user = userEvent.setup();
     renderWithProviders(

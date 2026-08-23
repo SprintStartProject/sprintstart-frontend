@@ -83,6 +83,36 @@ const CLOUD_LAYOUTS: CloudSlot[][] = [
   ],
 ];
 
+/** Full width shows the small five-card composition twice, so a page holds ten. */
+const CLOUD_PAGE_SIZE_WIDE = 10;
+
+/**
+ * The full-width cloud is the small composition shown twice, side by side. Each slot's horizontal
+ * position and width are scaled into one half and the same set is offset into the other; the
+ * vertical placement is untouched, so it reads as two of the same cloud rather than a new shape.
+ *
+ * The scale is a touch under half (and the right half starts a touch past centre) so the two clouds
+ * leave a small gutter down the middle instead of meeting edge to edge.
+ */
+const CLOUD_HALF_SCALE = 0.48;
+const CLOUD_RIGHT_OFFSET = "52%";
+
+function widenCloudLayout(layout: CloudSlot[]): CloudSlot[] {
+  const left = layout.map((slot) => ({
+    ...slot,
+    left: `calc(${slot.left} * ${CLOUD_HALF_SCALE})`,
+    width: `calc(${slot.width} * ${CLOUD_HALF_SCALE})`,
+  }));
+  const right = layout.map((slot) => ({
+    ...slot,
+    left: `calc(${CLOUD_RIGHT_OFFSET} + ${slot.left} * ${CLOUD_HALF_SCALE})`,
+    width: `calc(${slot.width} * ${CLOUD_HALF_SCALE})`,
+  }));
+  return [...left, ...right];
+}
+
+const CLOUD_LAYOUTS_WIDE: CloudSlot[][] = CLOUD_LAYOUTS.map(widenCloudLayout);
+
 type CloudSlotStyle = CSSProperties & {
   "--cloud-left": string;
   "--cloud-top": string;
@@ -273,7 +303,8 @@ export function StarterWorkPoolCloud({
   const [page, setPage] = useState(1);
 
   const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
-  const pageSize = view === "cloud" ? CLOUD_PAGE_SIZE : listPageSize;
+  const cloudPageSize = fullWidth ? CLOUD_PAGE_SIZE_WIDE : CLOUD_PAGE_SIZE;
+  const pageSize = view === "cloud" ? cloudPageSize : listPageSize;
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
@@ -390,7 +421,10 @@ export function StarterWorkPoolCloud({
               >
                 <AnimatePresence initial={false} mode="popLayout">
                   {pageItems.map((task, index) => {
-                    const slot = CLOUD_LAYOUTS[layoutIndex][index];
+                    const layout = fullWidth
+                      ? CLOUD_LAYOUTS_WIDE[layoutIndex]
+                      : CLOUD_LAYOUTS[layoutIndex];
+                    const slot = layout[index];
                     const slotStyle: CloudSlotStyle = {
                       "--cloud-left": slot.left,
                       "--cloud-top": slot.top,
@@ -411,7 +445,9 @@ export function StarterWorkPoolCloud({
                         style={slotStyle}
                         data-testid={`pool-task-${task.id}`}
                         data-cloud-slot={index}
-                        className="min-h-32 @min-[38rem]:absolute @min-[38rem]:top-[var(--cloud-top)] @min-[38rem]:left-[var(--cloud-left)] @min-[38rem]:h-[var(--cloud-height)] @min-[38rem]:w-[var(--cloud-width)] @min-[38rem]:min-w-40"
+                        className={`min-h-32 @min-[38rem]:absolute @min-[38rem]:top-[var(--cloud-top)] @min-[38rem]:left-[var(--cloud-left)] @min-[38rem]:h-[var(--cloud-height)] @min-[38rem]:w-[var(--cloud-width)] ${
+                          fullWidth ? "@min-[38rem]:min-w-36" : "@min-[38rem]:min-w-40"
+                        }`}
                       >
                         <PoolCloudCard
                           task={task}
