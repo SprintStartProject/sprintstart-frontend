@@ -10,10 +10,12 @@ type BuddyComposerProps = {
   handleSubmit: (event: React.FormEvent) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
+  /** Drops the keyboard hint under the box, for the dock where the room is better spent. */
+  compact?: boolean;
 };
 
 /**
- * The buddy's message box: the bottom band of the conversation card.
+ * The box you answer the buddy in, shared by the dock and the full page.
  *
  * One rounded surface holds the field and the send button and takes the focus ring as a unit —
  * the composer shape the chat page already draws, so the two places you type at a model in this
@@ -21,14 +23,16 @@ type BuddyComposerProps = {
  * "every text field is `ui/Textarea`": the box is shared, so the field inside it is borderless
  * and borrows only the growing behaviour, via `useAutoResize`.
  *
- * The inner width matches the thread's above it, so the box lines up with the bubbles rather
- * than with the card's edges.
+ * It draws no band of its own — no border, no background, no page padding. Each surface frames
+ * it: the page's card gives it a bottom band, the dock hands it to `SidePanel`'s footer. Owning
+ * the frame here is what previously put two `border-t`s across the dock.
  */
 export function BuddyComposer({
   draft,
   setDraft,
   handleSubmit,
   placeholder = "Ask your buddy anything...",
+  compact = false,
 }: BuddyComposerProps) {
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,40 +55,40 @@ export function BuddyComposer({
   };
 
   return (
-    <div className="shrink-0 border-t border-app-border-muted bg-app-bg/40 px-4 py-3.5 sm:px-6 sm:py-4">
-      <div className="mx-auto w-full max-w-5xl">
-        <form
-          onSubmit={handleSubmit}
-          className="flex items-end gap-2 rounded-xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
+    <div className="min-w-0">
+      <form
+        onSubmit={handleSubmit}
+        className="flex items-end gap-2 rounded-xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
+      >
+        <textarea
+          ref={fieldRef}
+          aria-label="Message"
+          value={draft}
+          rows={1}
+          placeholder={placeholder}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={handleKeyDown}
+          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-2 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+        />
+
+        <Button
+          type="submit"
+          variant="primary"
+          iconOnly
+          aria-label="Send message"
+          disabled={!draft.trim()}
         >
-          <textarea
-            ref={fieldRef}
-            aria-label="Message"
-            value={draft}
-            rows={1}
-            placeholder={placeholder}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-2 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
-          />
+          <Send className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </form>
 
-          <Button
-            type="submit"
-            variant="primary"
-            iconOnly
-            aria-label="Send message"
-            disabled={!draft.trim()}
-          >
-            <Send className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </form>
-
+      {!compact && (
         <p className="mt-2 px-1 text-xs text-app-text-disabled">
           <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
           <kbd className="font-sans font-medium">Shift</kbd> +{" "}
           <kbd className="font-sans font-medium">Enter</kbd> for a new line
         </p>
-      </div>
+      )}
     </div>
   );
 }

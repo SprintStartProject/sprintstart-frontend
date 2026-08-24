@@ -112,14 +112,14 @@ describe("useHandedOffDraft", () => {
   });
 });
 
-describe("the panel’s hand-off control", () => {
+describe("the dock’s hand-off control", () => {
   it("is absent on the page it would open", async () => {
     // Guarded in BuddyWidget rather than here; this documents the intent that a control
     // offering the page you are already reading is not offered at all.
-    const { BuddyPanel } = await import("../../../../src/features/buddy/components/BuddyPanel");
+    const { BuddyDock } = await import("../../../../src/features/buddy/components/BuddyDock");
 
     render(
-      <BuddyPanel
+      <BuddyDock
         messages={[]}
         isThinking={false}
         draft=""
@@ -129,20 +129,21 @@ describe("the panel’s hand-off control", () => {
         dismissAction={vi.fn()}
         bottomRef={{ current: null }}
         suggestions={[]}
+        isOpen
         onClose={vi.fn()}
       />,
     );
 
-    expect(screen.queryByTitle("Open the full conversation")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Open the full buddy page")).not.toBeInTheDocument();
   });
 
   it("is offered when there is somewhere to go", async () => {
-    const { BuddyPanel } = await import("../../../../src/features/buddy/components/BuddyPanel");
+    const { BuddyDock } = await import("../../../../src/features/buddy/components/BuddyDock");
     const onOpenFull = vi.fn();
     const user = userEvent.setup();
 
     render(
-      <BuddyPanel
+      <BuddyDock
         messages={[]}
         isThinking={false}
         draft="half a question"
@@ -152,12 +153,13 @@ describe("the panel’s hand-off control", () => {
         dismissAction={vi.fn()}
         bottomRef={{ current: null }}
         suggestions={[]}
+        isOpen
         onClose={vi.fn()}
         onOpenFull={onOpenFull}
       />,
     );
 
-    await user.click(screen.getByTitle("Open the full conversation"));
+    await user.click(screen.getByLabelText("Open the full buddy page"));
 
     expect(onOpenFull).toHaveBeenCalled();
   });

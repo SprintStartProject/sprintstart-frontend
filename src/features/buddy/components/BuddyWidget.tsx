@@ -1,19 +1,28 @@
-import { motion } from "framer-motion";
+import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bot, X } from "lucide-react";
 import { useBuddy } from "../hooks/useBuddy";
-import { BuddyPanel } from "./BuddyPanel";
+import { BuddyDock } from "./BuddyDock";
+import { BuddyLauncher } from "./BuddyLauncher";
 
-/** Where the full conversation lives. The panel hands off to it rather than growing. */
+/** Where the full conversation lives. The dock hands off to it rather than growing. */
 const BUDDY_PAGE = "/buddy";
 
 /**
- * The always-on, repo-grounded onboarding companion. Mounted once at the app
- * root (see App.tsx) so it survives page navigation and keeps its open/closed
- * state for the lifetime of the session.
+ * The always-on, repo-grounded onboarding companion: the buddy in the corner of every page,
+ * and the dock it opens.
  *
- * The widget owns the hand-off because it owns the navigation: the panel stays a presentational
- * component that is handed a callback, which is also what keeps it testable without a router.
+ * Mounted once at the app root (see `App.tsx`) so it survives navigation and keeps one
+ * conversation for the lifetime of the session — which is the point of an always-on buddy, and
+ * the reason it is not a per-page component. `useBuddy` warms the visit on mount for the same
+ * reason: writing a greeting is the slow part of meeting the buddy, and doing it before the
+ * click turns the click into the replay path.
+ *
+ * Hidden on `/buddy` itself. The launcher is an affordance for reaching the buddy from
+ * somewhere else; on its own page it would offer what is already filling the screen, and the
+ * dock would put a second composer over the first one for the same thread.
+ *
+ * The widget owns the navigation, so the launcher and the dock stay presentational components
+ * handed callbacks — which is also what keeps them testable without a router.
  */
 export function BuddyWidget() {
   const navigate = useNavigate();
@@ -32,47 +41,36 @@ export function BuddyWidget() {
     suggestions,
   } = useBuddy();
 
-  // Nothing to hand off to when the page is already on screen -- the control would offer what
-  // the hire is looking at. The panel drops it entirely rather than disabling it.
-  const openFull =
-    pathname === BUDDY_PAGE
-      ? undefined
-      : () => {
-          void navigate(BUDDY_PAGE, { state: { draft } });
-          // Closed on the way out: leaving a floating copy of the conversation over the
-          // full-page one is two composers for the same thread.
-          toggleOpen();
-        };
+  const isOnBuddyPage = pathname === BUDDY_PAGE;
+
+  const openFull = useCallback(() => {
+    // The draft rides along in history state; `useHandedOffDraft` applies it once on the page.
+    void navigate(BUDDY_PAGE, { state: { draft } });
+    // Closed on the way out: leaving a floating copy of the conversation over the full-page
+    // one is two composers for the same thread.
+    if (isOpen) toggleOpen();
+  }, [draft, isOpen, navigate, toggleOpen]);
+
+  if (isOnBuddyPage) return null;
 
   return (
     <>
-      {isOpen && (
-        <BuddyPanel
-          messages={messages}
-          isThinking={isThinking}
-          draft={draft}
-          setDraft={setDraft}
-          handleSubmit={handleSubmit}
-          confirmAction={confirmAction}
-          dismissAction={dismissAction}
-          bottomRef={bottomRef}
-          suggestions={suggestions}
-          onClose={toggleOpen}
-          onOpenFull={openFull}
-        />
-      )}
+      <BuddyDock
+        messages={messages}
+        isThinking={isThinking}
+        draft={draft}
+        setDraft={setDraft}
+        handleSubmit={handleSubmit}
+        confirmAction={confirmAction}
+        dismissAction={dismissAction}
+        bottomRef={bottomRef}
+        suggestions={suggestions}
+        isOpen={isOpen}
+        onClose={toggleOpen}
+        onOpenFull={openFull}
+      />
 
-      <motion.button
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={toggleOpen}
-        className="fixed right-8 bottom-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-app-brand text-white shadow-lg shadow-app-brand/25 transition-colors hover:bg-app-brand-hover focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none"
-        aria-label={isOpen ? "Close buddy chat" : "Open buddy chat"}
-      >
-        {isOpen ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
-      </motion.button>
+      <BuddyLauncher isOpen={isOpen} onToggle={toggleOpen} onOpenFull={openFull} />
     </>
   );
 }
