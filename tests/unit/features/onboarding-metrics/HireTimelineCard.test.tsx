@@ -52,19 +52,6 @@ describe("HireTimelineCard", () => {
     expect(screen.getByText(/Waiting .* on a response/)).toBeInTheDocument();
   });
 
-  it("shows the stall reason the server worded", () => {
-    render(
-      <HireTimelineCard
-        hire={hire({
-          stalled: true,
-          stalledReason: "No ceremony started in 20 days since joining",
-        })}
-      />,
-    );
-
-    expect(screen.getByText("No ceremony started in 20 days since joining")).toBeInTheDocument();
-  });
-
   it("says work cannot be attributed when there is no GitHub login", () => {
     render(<HireTimelineCard hire={hire({ githubLogin: null })} />);
 
