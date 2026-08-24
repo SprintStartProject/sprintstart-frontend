@@ -17,6 +17,19 @@ export type AutoResizeTextareaProps = {
    * submit half an answer every time they pressed it.
    */
   submitOnEnter?: boolean;
+  /**
+   * Drops the field's own frame — border, background, radius and horizontal
+   * padding — leaving a bare growing textarea.
+   *
+   * For the one shape this component cannot express otherwise: a composer where
+   * the *row* is the control (field plus a send button inside one rounded
+   * surface that takes the focus ring together), which is what the chat page's
+   * composer already looks like. Without this the buddy's composer had to be a
+   * bordered box sitting next to a separate square button — two controls where
+   * the rest of the app draws one. Padding still comes from `className`, so the
+   * caller owns the inset that lines the text up with its own button.
+   */
+  unstyled?: boolean;
 };
 
 /**
@@ -33,6 +46,7 @@ export function AutoResizeTextarea({
   maxRows = 10,
   className = "",
   submitOnEnter = false,
+  unstyled = false,
 }: AutoResizeTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -94,7 +108,11 @@ export function AutoResizeTextarea({
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
       rows={minRows}
-      className={`w-full resize-none overflow-hidden rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand ${className}`.trim()}
+      className={`w-full resize-none overflow-hidden text-sm text-app-text outline-none placeholder:text-app-text-disabled ${
+        unstyled
+          ? "bg-transparent"
+          : "rounded-xl border border-app-border bg-app-bg px-3 py-2 focus:border-app-brand"
+      } ${className}`.trim()}
     />
   );
 }

@@ -1,11 +1,10 @@
-import { Bot, Send } from "lucide-react";
-import type { RefObject } from "react";
-import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
-import { UserAvatar } from "../../../components/common/UserAvatar";
+import type { ReactNode, RefObject } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
-import { BuddyActionProposals } from "./BuddyActionProposals";
-import { BuddyMarkdown } from "./BuddyMarkdown";
+import { BuddyComposer } from "./BuddyComposer";
+import { BuddyMessageBubble } from "./BuddyMessageBubble";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
@@ -22,12 +21,33 @@ type BuddyConversationProps = {
   bottomRef: RefObject<HTMLDivElement | null>;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
+  /**
+   * Rendered inside the scroller, above the thread — the record of what the hire asked a
+   * person. It scrolls with the conversation rather than sitting pinned between the header
+   * and the transcript, which is what used to push the thread halfway down the page.
+   */
+  topSlot?: ReactNode;
+  /**
+   * Shown in place of the thread until the hire has said something (see `BuddyWelcome`).
+   * Passed in rather than decided here so this component keeps one job: render a conversation.
+   */
+  welcome?: ReactNode;
+  /** The quiet row under the composer — the escalation trigger, once there is a question to flag. */
+  composerFooter?: ReactNode;
 };
 
 /**
- * The full-page buddy conversation used by the `/buddy` home. Shares the bubble styling of
- * the floating [BuddyPanel] so both surfaces feel like the same companion, but lays out for
- * a page and surfaces what the buddy is *doing* (a tool label) rather than a bare spinner.
+ * The full-page buddy conversation used by the `/buddy` home: the thread, and the box you
+ * answer it in.
+ *
+ * Bubble styling is shared with the chat page's message row rather than with the floating
+ * [BuddyPanel] alone, so the two model surfaces in this app read as one product. What stays
+ * particular to the buddy is what the buddy does: a tool label instead of a bare spinner, and
+ * proposals the hire confirms inline.
+ *
+ * It scrolls down, never sideways — `overflow-x-hidden` plus `min-w-0` down the column. This
+ * page is wide, so an overflowing reply reads as a slightly odd layout rather than an obvious
+ * bug, which is how such a regression survives review; see `BuddyPanel` for the full rule.
  */
 export function BuddyConversation({
   messages,
@@ -39,125 +59,97 @@ export function BuddyConversation({
   confirmAction,
   dismissAction,
   bottomRef,
-  placeholder = "Ask your buddy anything...",
+  placeholder,
+  topSlot,
+  welcome,
+  composerFooter,
 }: BuddyConversationProps) {
+  const prefersReducedMotion = useReducedMotion();
+
+  // The send loop appends an empty assistant message up front and streams into it, so the
+  // last turn is the one receiving tokens — that bot stays awake while every older one is
+  // free to doze off.
+  const streamingId = messages[messages.length - 1]?.id;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Same rule as the floating panel, and not merely defensive here: this page is wide,
-                so an overflowing reply reads as a slightly odd layout rather than an obvious bug —
-                which is how it would go unnoticed. See BuddyPanel for why min-w-0 is the fix. */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4 px-4 py-4">
-          {messages.map((message) => {
-            const isUser = message.role === "USER";
-            const hasText = message.content.trim().length > 0;
-            const hasActions = (message.actions?.length ?? 0) > 0;
+        {topSlot}
 
-            // The send loop appends an empty assistant message up front and streams
-            // into it. Until the first token (or an action proposal) arrives it has
-            // nothing to show, and the `isThinking` indicator below already stands in
-            // for it — so skip it, otherwise an empty second bubble appears while the
-            // buddy is thinking.
-            if (!isUser && !hasText && !hasActions) {
-              return null;
-            }
+        {welcome ?? (
+          <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-5 px-4 py-6">
+            {messages.map((message) => {
+              const isUser = message.role === "USER";
+              const hasText = message.content.trim().length > 0;
+              const hasActions = (message.actions?.length ?? 0) > 0;
 
-            return (
-              <div
-                key={message.id}
-                className={`flex w-full gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+              // Until the first token (or an action proposal) arrives the streaming
+              // placeholder has nothing to show, and the `isThinking` indicator below
+              // already stands in for it — so skip it, otherwise an empty second bubble
+              // appears while the buddy is thinking.
+              if (!isUser && !hasText && !hasActions) {
+                return null;
+              }
+
+              return (
+                <BuddyMessageBubble
+                  key={message.id}
+                  message={message}
+                  isStreaming={message.id === streamingId}
+                  onConfirm={confirmAction}
+                  onDismiss={dismissAction}
+                />
+              );
+            })}
+
+            {isThinking && (
+              <motion.div
+                {...(prefersReducedMotion
+                  ? {}
+                  : {
+                      initial: { opacity: 0, y: 10 },
+                      animate: { opacity: 1, y: 0 },
+                      transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const },
+                    })}
+                role="status"
+                className="flex w-full gap-3"
               >
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                    isUser ? "" : "bg-app-surface-muted"
-                  }`}
-                >
-                  {isUser ? (
-                    <UserAvatar fallbackName="You" size={32} />
-                  ) : (
-                    <Bot size={16} className="text-app-brand-text" />
-                  )}
+                <div className="flex size-8 shrink-0 items-center justify-center">
+                  <SleepyBot size={30} canSleep={false} className="text-app-brand-text" />
                 </div>
 
-                <div
-                  className={`flex max-w-[80%] min-w-0 flex-col ${isUser ? "items-end" : "items-start"}`}
-                >
-                  {hasText && (
-                    <div
-                      className={`max-w-full min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${
-                        isUser
-                          ? "rounded-tr-none bg-app-brand whitespace-pre-wrap text-white"
-                          : "rounded-tl-none bg-app-surface-muted text-app-text"
-                      }`}
-                    >
-                      {isUser ? message.content : <BuddyMarkdown content={message.content} />}
-                    </div>
-                  )}
-
-                  {!isUser && message.actions && message.actions.length > 0 && (
-                    <BuddyActionProposals
-                      messageId={message.id}
-                      actions={message.actions}
-                      onConfirm={confirmAction}
-                      onDismiss={dismissAction}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {isThinking && (
-            <div className="flex w-full gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
-                <Bot size={16} className="text-app-brand-text" />
-              </div>
-
-              <div className="flex max-w-[80%] flex-col items-start">
-                <div className="rounded-2xl rounded-tl-none bg-app-surface-muted px-4 py-2.5">
-                  {activeTool ? (
-                    <span className="text-sm text-app-text-muted">{toolLabel(activeTool)}</span>
-                  ) : (
-                    <div className="flex gap-1">
+                <div className="flex max-w-[85%] flex-col items-start">
+                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 shadow-sm">
+                    <span className="flex gap-1" aria-hidden="true">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
-                    </div>
-                  )}
+                    </span>
+                    {/* What it is *doing*, when the backend says — "Checking your
+                                        progress…" is an answer to "why is this taking a moment",
+                                        which three dots are not. */}
+                    {activeTool && (
+                      <span className="text-sm text-app-text-muted italic">
+                        {toolLabel(activeTool)}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          <div ref={bottomRef} />
-        </div>
+            <div ref={bottomRef} />
+          </div>
+        )}
       </div>
 
-      <div className="border-t border-app-border bg-app-bg">
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 py-4"
-        >
-          <AutoResizeTextarea
-            value={draft}
-            onChange={setDraft}
-            placeholder={placeholder}
-            minRows={1}
-            maxRows={6}
-            className="flex-1"
-            submitOnEnter
-          />
-
-          <button
-            type="submit"
-            aria-label="Send message"
-            disabled={!draft.trim()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Send size={18} />
-          </button>
-        </form>
-      </div>
+      <BuddyComposer
+        draft={draft}
+        setDraft={setDraft}
+        handleSubmit={handleSubmit}
+        placeholder={placeholder}
+        footer={composerFooter}
+      />
     </div>
   );
 }
