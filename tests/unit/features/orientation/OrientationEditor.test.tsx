@@ -1,11 +1,17 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render as testingRender, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { OrientationEditor } from "../../../../src/features/orientation/components/OrientationEditor";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import type {
   AuthorOrientationInput,
   OrientationPacket,
 } from "../../../../src/features/orientation/types";
+
+function render(ui: ReactElement) {
+  return testingRender(<ToastProvider>{ui}</ToastProvider>);
+}
 
 const packet: OrientationPacket = {
   taskId: "task-1",
@@ -60,9 +66,28 @@ describe("OrientationEditor", () => {
       sourceUrl: "https://example.test/README.md",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Orientation saved")).toBeInTheDocument();
   });
 
-  it("cannot save until a section has a title and a body", async () => {
+  it("lists the five fixed steps in order and needs none of them pre-added", () => {
+    render(
+      <OrientationEditor
+        taskTitle="A task"
+        taskUrl={null}
+        initial={null}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // The five steps are the scaffold, always present — there is no "add section".
+    expect(screen.getAllByTestId("editor-section")).toHaveLength(5);
+    expect(screen.getByText("Before you start")).toBeInTheDocument();
+    expect(screen.getByText("Open the pull request")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-section")).not.toBeInTheDocument();
+  });
+
+  it("cannot save until a step has both a title and a body", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(true);
 
@@ -76,42 +101,20 @@ describe("OrientationEditor", () => {
       />,
     );
 
-    // No sections yet → cannot save.
+    // Nothing written yet → cannot save. The first step is open by default.
     expect(screen.getByTestId("save-orientation")).toBeDisabled();
 
-    await user.click(screen.getByTestId("add-section"));
-    // A section with empty title/body is still not saveable.
+    // A title alone leaves the step half-written, which must not be saveable.
+    await user.type(screen.getByTestId("step-title-SET_UP"), "Set up");
     expect(screen.getByTestId("save-orientation")).toBeDisabled();
 
-    await user.type(screen.getByLabelText("Section title"), "Set up");
-    await user.type(screen.getByLabelText("Section body"), "Clone and run it.");
+    await user.type(screen.getByTestId("step-body-SET_UP"), "Clone and run it.");
     expect(screen.getByTestId("save-orientation")).toBeEnabled();
 
     await user.click(screen.getByTestId("save-orientation"));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0].sections).toHaveLength(1);
-  });
-
-  it("reuses the hire renderer so the preview cannot drift from what ships", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <OrientationEditor
-        taskTitle="A task"
-        taskUrl={null}
-        initial={null}
-        onSave={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByTestId("add-section"));
-    await user.type(screen.getByLabelText("Section title"), "Set up first");
-    await user.type(screen.getByLabelText("Section body"), "Clone the repo.");
-
-    // The preview column renders the author's words through the same panel a hire sees.
-    const preview = screen.getByText("What the hire will see").parentElement as HTMLElement;
-    expect(await within(preview).findByText("Set up first")).toBeInTheDocument();
+    expect(onSave.mock.calls[0][0].sections[0].step).toBe("SET_UP");
   });
 
   it("hands the task back to the AI when reverted", async () => {
@@ -134,6 +137,7 @@ describe("OrientationEditor", () => {
 
     await waitFor(() => expect(onRevert).toHaveBeenCalledTimes(1));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Handed back to AI")).toBeInTheDocument();
   });
 
   it("offers no revert when there is no packet to hand back", () => {

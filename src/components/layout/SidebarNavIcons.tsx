@@ -8,6 +8,7 @@ import {
   Inbox,
   MessageSquare,
   Rocket,
+  Target,
   Terminal,
 } from "lucide-react";
 
@@ -277,6 +278,53 @@ export function DataIngestionIcon({ isActive }: SidebarIconProps) {
         initial={hasPlayed ? { y: -6, opacity: 0 } : false}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...bounce, delay: 0.16 }}
+      />
+    </IconFrame>
+  );
+}
+
+/** Starter Work: the sight locks on — rings close in, then the bullseye lands. */
+export function StarterWorkIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <Target className={ICON_CLASS} />;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      {/* The two outer rings close inward with a short stagger, so the
+                target reads as a sight settling rather than three circles
+                fading in together. Scaled about the centre they share. */}
+      {[
+        { r: 10, delay: 0 },
+        { r: 6, delay: 0.07 },
+      ].map((ring) => (
+        <motion.circle
+          key={ring.r}
+          cx={12}
+          cy={12}
+          r={ring.r}
+          style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
+          initial={hasPlayed ? { scale: 1.35, opacity: 0 } : false}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ ...bounce, delay: ring.delay }}
+        />
+      ))}
+
+      {/* The bullseye lands last and overshoots, so the lock-on has a
+                beat of impact instead of merely appearing. Filled rather
+                than stroked: a 2px ring at r=2 is nearly a dot anyway. */}
+      <motion.circle
+        cx={12}
+        cy={12}
+        r={2}
+        fill="currentColor"
+        stroke="none"
+        style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scale: 0 } : false}
+        animate={hasPlayed ? { scale: [0, 1.5, 1] } : { scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.16, ease: "easeOut", times: [0, 0.6, 1] }}
       />
     </IconFrame>
   );

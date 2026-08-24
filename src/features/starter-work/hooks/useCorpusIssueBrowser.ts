@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { starterWorkService } from "../../../services/starterWorkService";
 import type { StarterWorkCandidate, StarterWorkTask } from "../types";
+import type { PoolFlightRect } from "../components/poolFlight";
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -40,7 +41,7 @@ function matches(candidate: StarterWorkCandidate, query: string): boolean {
  */
 export function useCorpusIssueBrowser(
   projectId: string,
-  onPromoted: (task: StarterWorkTask) => void,
+  onPromoted: (task: StarterWorkTask, origin?: PoolFlightRect) => Promise<void> | void,
 ) {
   // Held with the project they belong to, so switching project is a *derivation* rather than an
   // effect that clears state -- one less place for the list and the selection to disagree, and
@@ -98,8 +99,17 @@ export function useCorpusIssueBrowser(
     [candidates, showAssigned, query],
   );
 
+  // Resolves an id against the whole loaded list, not the filtered `visible` one, so an open detail
+  // drawer survives search-as-you-type: typing a character that no longer matches the open issue
+  // narrows the list without pulling the issue the reader is looking at out from under them. Its
+  // pool state still comes from the live list, so an add reflects the moment the drawer sees it.
+  const resolveCandidate = useCallback(
+    (sourceId: string) => candidates.find((candidate) => candidate.sourceId === sourceId) ?? null,
+    [candidates],
+  );
+
   const promote = useCallback(
-    async (sourceId: string): Promise<boolean> => {
+    async (sourceId: string, origin?: PoolFlightRect): Promise<boolean> => {
       setPromotingSourceId(sourceId);
       setError(null);
       try {
@@ -114,7 +124,7 @@ export function useCorpusIssueBrowser(
               : candidate,
           ),
         }));
-        onPromoted(task);
+        await onPromoted(task, origin);
         return true;
       } catch (err) {
         setError(toMessage(err, "Could not add this issue to the pool."));
@@ -128,6 +138,7 @@ export function useCorpusIssueBrowser(
 
   return {
     candidates: visible,
+    resolveCandidate,
     totalCount: candidates.length,
     assignedCount,
     isLoading,

@@ -1,9 +1,15 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render as testingRender, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CorpusIssueBrowser } from "../../../../src/features/starter-work/components/CorpusIssueBrowser";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import type { StarterWorkCandidate } from "../../../../src/features/starter-work/types";
+
+function render(ui: ReactElement) {
+  return testingRender(<ToastProvider>{ui}</ToastProvider>);
+}
 
 function candidate(overrides: Partial<StarterWorkCandidate> = {}): StarterWorkCandidate {
   return {
@@ -21,18 +27,58 @@ function candidate(overrides: Partial<StarterWorkCandidate> = {}): StarterWorkCa
   };
 }
 
+/** Open a compact issue row to reveal its detail drawer. */
+async function openRow(user: ReturnType<typeof userEvent.setup>, title: string) {
+  await user.click(await screen.findByRole("button", { name: new RegExp(`open ${title}`, "i") }));
+}
+
+/** Pick a pool-state filter option (the list defaults to "New"). */
+async function selectPoolFilter(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole("combobox", { name: /filter issues by pool state/i }));
+  await user.click(await screen.findByRole("option", { name: label }));
+}
+
 describe("CorpusIssueBrowser", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("lists the project’s open issues with enough text to judge one", async () => {
+  it("lists the project’s open issues and shows the body when a row is opened", async () => {
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
+    const user = userEvent.setup();
+    render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
+
+    // The row is compact: title and label are on it, the body is not.
+    expect(await screen.findByText("Fix the login redirect")).toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/users land on the wrong page after signing in/i),
+    ).not.toBeInTheDocument();
+
+    await openRow(user, "Fix the login redirect");
+
+    expect(
+      await screen.findByText(/users land on the wrong page after signing in/i),
+    ).toBeInTheDocument();
+
+    const dialog = screen.getByRole("dialog");
+    const overlay = screen
+      .getAllByRole("button", { name: "Close details" })
+      .find((button) => !dialog.contains(button));
+    expect(overlay).toHaveClass("bg-app-overlay", "opacity-100");
+  });
+
+  /**
+   * The raw source id is turned into readable pieces: the number as a badge, the repo as text.
+   */
+  it("renders the source id as a tracker badge, an issue number and a repo", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
-    expect(await screen.findByText("Fix the login redirect")).toBeInTheDocument();
-    expect(screen.getByText(/users land on the wrong page after signing in/i)).toBeInTheDocument();
-    expect(screen.getByText("bug")).toBeInTheDocument();
+    await screen.findByText("Fix the login redirect");
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.getByText("#1")).toBeInTheDocument();
+    expect(screen.getByText("acme/repo")).toBeInTheDocument();
   });
 
   /**
@@ -44,7 +90,7 @@ describe("CorpusIssueBrowser", () => {
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
     expect(
-      await screen.findByText(/a second way in, not a gate in front of it/i),
+      await screen.findByText(/a second way in besides mining/i),
     ).toBeInTheDocument();
   });
 
@@ -63,7 +109,7 @@ describe("CorpusIssueBrowser", () => {
     await screen.findByText("Fix the login redirect");
     expect(screen.queryByText("Write the release notes")).not.toBeInTheDocument();
     // The count is what stops the exclusion becoming an absence nobody can account for.
-    expect(screen.getByTestId("show-assigned-issues").closest("label")).toHaveTextContent("(1)");
+    expect(screen.getByText(/also show issues someone is already on \(1\)/i)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("show-assigned-issues"));
 
@@ -90,8 +136,16 @@ describe("CorpusIssueBrowser", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([
       candidate({ poolState: "IN_POOL" }),
     ]);
+    const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
+    // The list defaults to "New", so switch to see the pooled issue at all.
+    await screen.findByTestId("corpus-issue-empty");
+    await selectPoolFilter(user, "All issues");
+
+    // It shows on the list, and opening it offers no way to add it again — the footer marks it
+    // pooled instead ("Already in the pool" is unique to the drawer footer).
+    await openRow(user, "Fix the login redirect");
     expect(await screen.findByText(/already in the pool/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
   });
@@ -100,13 +154,23 @@ describe("CorpusIssueBrowser", () => {
    * Rejection is sticky, so a removed issue cannot go back. Leaving it out of the list would read
    * as a bug and send somebody hunting for an issue they know exists.
    */
-  it("shows a removed issue as removed, and says it cannot go back", async () => {
+  it("shows a removed issue as taken out of the pool", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([
       candidate({ poolState: "REMOVED" }),
     ]);
+    const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
-    expect(await screen.findByText(/it cannot go back/i)).toBeInTheDocument();
+    // The list defaults to "New"; removed issues live behind the filter.
+    await screen.findByTestId("corpus-issue-empty");
+    await selectPoolFilter(user, "All issues");
+
+    await openRow(user, "Fix the login redirect");
+
+    // Both the list row and the drawer's Pool status now carry a "Taken out" badge, so scope
+    // the assertion to the drawer to prove it is the detail view that marks the removed state.
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText(/taken out/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
   });
 
@@ -127,7 +191,7 @@ describe("CorpusIssueBrowser", () => {
     expect(starterWorkService.fetchCandidates).toHaveBeenCalledTimes(1);
   });
 
-  it("promotes an issue and flips its row to pooled without refetching", async () => {
+  it("promotes an issue from its drawer and flips it to pooled without refetching", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
     const promote = vi.spyOn(starterWorkService, "promoteCandidate").mockResolvedValue({
       id: "task-1",
@@ -144,14 +208,67 @@ describe("CorpusIssueBrowser", () => {
     const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={onPromoted} />);
 
+    await openRow(user, "Fix the login redirect");
     await user.click(await screen.findByTestId("promote-issue-github:acme/repo:ISSUE:1"));
 
     await waitFor(() =>
       expect(promote).toHaveBeenCalledWith({ sourceId: "github:acme/repo:ISSUE:1" }),
     );
-    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }));
-    expect(await screen.findByText(/already in the pool/i)).toBeInTheDocument();
+    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }), {
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+    });
+    // The row badge and the drawer footer both say it now, so match either.
+    expect((await screen.findAllByText(/already in the pool/i)).length).toBeGreaterThan(0);
     expect(starterWorkService.fetchCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds an issue straight from its row, without opening the drawer", async () => {
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
+    const promote = vi.spyOn(starterWorkService, "promoteCandidate").mockResolvedValue({
+      id: "task-1",
+      sourceId: "github:acme/repo:ISSUE:1",
+      title: "Fix the login redirect",
+      summary: null,
+      rationale: null,
+      sourceUrl: "https://github.com/acme/repo/issues/1",
+      competencyKeys: [],
+      status: "LIVE",
+      reviewed: true,
+    });
+    const onPromoted = vi.fn();
+    const user = userEvent.setup();
+    render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={onPromoted} />);
+
+    await user.click(await screen.findByTestId("quick-promote-issue-github:acme/repo:ISSUE:1"));
+
+    await waitFor(() =>
+      expect(promote).toHaveBeenCalledWith({ sourceId: "github:acme/repo:ISSUE:1" }),
+    );
+    expect(onPromoted).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }), {
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+    });
+    // The row flips to pooled, so it no longer offers the quick add.
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("quick-promote-issue-github:acme/repo:ISSUE:1"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("does not offer the quick add on the row to HR", async () => {
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
+    render(<CorpusIssueBrowser projectId="p1" canAct={false} onPromoted={vi.fn()} />);
+
+    await screen.findByText("Fix the login redirect");
+    expect(
+      screen.queryByTestId("quick-promote-issue-github:acme/repo:ISSUE:1"),
+    ).not.toBeInTheDocument();
   });
 
   it("surfaces a refused promotion instead of pretending it landed", async () => {
@@ -162,17 +279,68 @@ describe("CorpusIssueBrowser", () => {
     const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
+    await openRow(user, "Fix the login redirect");
     await user.click(await screen.findByTestId("promote-issue-github:acme/repo:ISSUE:1"));
 
-    expect(await screen.findByText(/already in the starter-work pool/i)).toBeInTheDocument();
+    // The action failure is surfaced once through the shared toast viewport.
+    expect(
+      (await screen.findAllByText(/already in the starter-work pool/i)).length,
+    ).toBeGreaterThan(0);
   });
 
-  it("lets HR read the list but not add to the pool", async () => {
+  it("lets HR read the list and the body but not add to the pool", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
+    const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct={false} onPromoted={vi.fn()} />);
 
-    expect(await screen.findByText("Fix the login redirect")).toBeInTheDocument();
+    await openRow(user, "Fix the login redirect");
+
+    expect(await screen.findByText(/only a project manager can add work/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
+  });
+
+  it("filters the list by pool state", async () => {
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([
+      candidate(),
+      candidate({
+        sourceId: "github:acme/repo:ISSUE:2",
+        title: "Add the pooled one",
+        poolState: "IN_POOL",
+      }),
+    ]);
+    const user = userEvent.setup();
+    render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
+
+    // Defaults to "New": the available issue shows, the pooled one is filtered out.
+    await screen.findByText("Fix the login redirect");
+    expect(screen.queryByText("Add the pooled one")).not.toBeInTheDocument();
+
+    await selectPoolFilter(user, "In the pool");
+
+    expect(screen.getByText("Add the pooled one")).toBeInTheDocument();
+    expect(screen.queryByText("Fix the login redirect")).not.toBeInTheDocument();
+  });
+
+  it("paginates a long list and reveals later rows on the next page", async () => {
+    const many = Array.from({ length: 11 }, (_, index) =>
+      candidate({
+        sourceId: `github:acme/repo:ISSUE:${index + 1}`,
+        title: `Issue number ${index + 1}`,
+      }),
+    );
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue(many);
+    const user = userEvent.setup();
+    render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
+
+    await screen.findByText("Issue number 1");
+    // The eighth row is the page cut-off, so the ninth is off the first page.
+    expect(screen.getByText("Issue number 8")).toBeInTheDocument();
+    expect(screen.queryByText("Issue number 9")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "2" }));
+
+    expect(screen.getByText("Issue number 9")).toBeInTheDocument();
+    expect(screen.queryByText("Issue number 1")).not.toBeInTheDocument();
   });
 
   /**

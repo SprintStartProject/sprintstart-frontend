@@ -94,8 +94,6 @@ export function useStarterWorkReview() {
     setCreatedVia("picked");
   }, []);
 
-  const dismissCreated = useCallback(() => setCreatedTask(null), []);
-
   const approve = useCallback(async (id: string) => {
     await starterWorkService.markReviewed(id);
     setTasks((prev) => prev.filter((task) => task.id !== id));
@@ -117,7 +115,6 @@ export function useStarterWorkReview() {
     generate,
     create,
     notePromoted,
-    dismissCreated,
     approve,
     reject,
   };

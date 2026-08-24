@@ -5,6 +5,21 @@
    Without this, Tailwind uses prefers-color-scheme by default. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* A side drawer slides shut by parking itself one full viewport to the right
+   (Framer animates the panel to translateX(100%)). While it sits there, and
+   (because the closing panel is retained for its exit) briefly after every close,
+   that off-screen panel widens the document, so the whole page ends up scrolled
+   to the right and the user has to scroll back left to see everything. Clipping
+   horizontal overflow at the viewport stops the off-screen panel from ever adding
+   scrollable width. `clip` rather than `hidden` on purpose: it does not turn the
+   root into a scroll container, so the sticky sidebar and the normal vertical
+   document scroll are left exactly as they were. Nothing on any page is meant to
+   scroll sideways at the page level, wide content carries its own scroller. */
+html,
+body {
+  overflow-x: clip;
+}
+
 :root {
   --app-page-gutter: 1.25rem;
   --app-page-block-gutter: 1.25rem;

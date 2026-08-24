@@ -4,15 +4,23 @@ type SelectionCheckboxProps = {
   checked: boolean;
   onChange: () => void;
   ariaLabel: string;
+  /** Optional test hook, so callers outside the admin surface can target the box. */
+  testId?: string;
 };
 
-export function SelectionCheckbox({ checked, onChange, ariaLabel }: SelectionCheckboxProps) {
+export function SelectionCheckbox({
+  checked,
+  onChange,
+  ariaLabel,
+  testId,
+}: SelectionCheckboxProps) {
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={checked}
       aria-label={ariaLabel}
+      data-testid={testId}
       onClick={onChange}
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-all ${
         checked
