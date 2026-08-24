@@ -39,6 +39,8 @@ const createGap = (component: string, severity: KnowledgeGapSeverity): Knowledge
 
 const createGroup = (groupId: string, question: string, count: number): FAQGroup => ({
   groupId,
+  // Entries carry a generated title alongside the representative question now.
+  title: question,
   question,
   count,
   topDocuments: [],
@@ -80,20 +82,35 @@ describe("summarizeGaps", () => {
 
     expect(summary.total).toBe(4);
     expect(summary.componentCount).toBe(3);
-    expect(summary.counts).toEqual({ high: 1, medium: 1, low: 2 });
+    expect(summary.counts).toEqual({ high: 1, medium: 1, low: 2, covered: 0 });
   });
 
-  it("always reports all three severities, so the ring has no missing keys", () => {
+  it("always reports every severity, so the ring has no missing keys", () => {
     const summary = summarizeGaps([createGap("auth", "high")]);
 
-    expect(summary.counts).toEqual({ high: 1, medium: 0, low: 0 });
+    expect(summary.counts).toEqual({ high: 1, medium: 0, low: 0, covered: 0 });
+  });
+
+  // The overview is the project's full component roster now, but the ring answers how much
+  // is outstanding -- a cleared component would inflate both the middle number and the
+  // proportions around it.
+  it("leaves covered components out of the ring and its middle number", () => {
+    const summary = summarizeGaps([
+      createGap("auth", "high"),
+      createGap("billing", "covered"),
+      createGap("search", "covered"),
+    ]);
+
+    expect(summary.total).toBe(1);
+    expect(summary.componentCount).toBe(1);
+    expect(summary.counts).toEqual({ high: 1, medium: 0, low: 0, covered: 0 });
   });
 
   it("summarizes an empty list to zeroes", () => {
     expect(summarizeGaps([])).toEqual({
       componentCount: 0,
       total: 0,
-      counts: { high: 0, medium: 0, low: 0 },
+      counts: { high: 0, medium: 0, low: 0, covered: 0 },
     });
   });
 });

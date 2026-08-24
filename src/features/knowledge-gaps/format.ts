@@ -1,20 +1,34 @@
 // Shared display formatters for the knowledge-gaps feature.
 
 /**
- * Formats an ISO timestamp as a short, approximate "time ago" string
- * (e.g. "Today", "Yesterday", "5d ago", "3mo ago") for list/overview UIs.
+ * Formats an ISO timestamp as an approximate "time ago" string
+ * (e.g. "just now", "12 minutes ago", "3 hours ago", "5 days ago").
+ *
+ * Everything reads as an age, including today. "Today" answered the wrong
+ * question after an ingestion run: a PM watching one finish wants to know
+ * whether it was minutes or hours ago, and "Today" says neither.
  */
 export function formatRelativeDate(iso: string): string {
-  // Compare calendar days (not elapsed 24h windows) so this agrees with the
-  // absolute date shown on the detail view.
+  const elapsedMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(elapsedMs / 60_000);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return plural(minutes, "minute");
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return plural(hours, "hour");
+
+  // Past a day, switch to calendar days so this agrees with the absolute date
+  // shown on the detail view rather than drifting by the time of day.
   const days = daysSince(iso);
+  if (days <= 1) return "yesterday";
+  if (days < 30) return plural(days, "day");
 
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days}d ago`;
+  return plural(Math.floor(days / 30), "month");
+}
 
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+function plural(value: number, unit: string): string {
+  return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
 }
 
 /**

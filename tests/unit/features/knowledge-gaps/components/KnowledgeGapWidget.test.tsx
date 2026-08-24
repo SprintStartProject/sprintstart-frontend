@@ -27,17 +27,23 @@ const mockOverview: KnowledgeGapOverview = {
   ],
 };
 
-vi.mock("../../../../../src/hooks/useFetch", () => ({
-  useFetch: vi.fn(),
+vi.mock("../../../../../src/hooks/useLiveFetch", () => ({
+  useLiveFetch: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/knowledgeGapService", () => ({
   knowledgeGapService: { fetchKnowledgeGaps: vi.fn() },
 }));
 
-import { useFetch } from "../../../../../src/hooks/useFetch";
+import { useLiveFetch } from "../../../../../src/hooks/useLiveFetch";
 
-vi.mocked(useFetch).mockReturnValue({ data: mockOverview, loading: false, error: false });
+vi.mocked(useLiveFetch).mockReturnValue({
+  data: mockOverview,
+  loading: false,
+  revalidating: false,
+  error: false,
+  refresh: () => {},
+});
 
 function renderWidget() {
   return render(
@@ -50,7 +56,13 @@ function renderWidget() {
 describe("KnowledgeGapWidget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useFetch).mockReturnValue({ data: mockOverview, loading: false, error: false });
+    vi.mocked(useLiveFetch).mockReturnValue({
+      data: mockOverview,
+      loading: false,
+      revalidating: false,
+      error: false,
+      refresh: () => {},
+    });
   });
 
   it('renders the widget header with "Knowledge gaps"', () => {
@@ -70,26 +82,55 @@ describe("KnowledgeGapWidget", () => {
   });
 
   it("shows loading state", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: null, loading: true, error: false });
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: null,
+      loading: true,
+      revalidating: false,
+      error: false,
+      refresh: () => {},
+    });
     const { container } = renderWidget();
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state on error", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: null, loading: false, error: true });
+  it("reports a failed load as an error rather than an empty result", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: null,
+      loading: false,
+      revalidating: false,
+      error: true,
+      refresh: () => {},
+    });
     renderWidget();
-    expect(
-      screen.getByText("No knowledge gaps yet. Trigger a refresh to detect them."),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /refresh/i })).toBeInTheDocument();
+    expect(screen.getByText(/could not load knowledge gaps/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /rescan/i })).toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state when there are no gaps", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: { gaps: [] }, loading: false, error: false });
+  it("says no scan has run when there is no result yet", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: { gaps: [] },
+      loading: false,
+      revalidating: false,
+      error: false,
+      refresh: () => {},
+    });
     renderWidget();
-    expect(
-      screen.getByText("No knowledge gaps yet. Trigger a refresh to detect them."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/no scan has run yet/i)).toBeInTheDocument();
+  });
+
+  // The widget sits on the PM dashboard, so it is the surface most likely to be
+  // read as "the scan never ran" when it actually came back clean.
+  it("says a completed scan found nothing to report on", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({
+      data: { gaps: [], refreshedAt: new Date().toISOString() },
+      loading: false,
+      revalidating: false,
+      error: false,
+      refresh: () => {},
+    });
+    renderWidget();
+    expect(screen.getByText(/found no ingested repositories/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no scan has run yet/i)).not.toBeInTheDocument();
   });
 });
 

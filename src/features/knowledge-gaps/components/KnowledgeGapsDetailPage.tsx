@@ -12,7 +12,7 @@ import { getTeamOverview } from "../../../services/teamManagementService";
 import { useToast } from "../../../context/useToast";
 import { useFetch } from "../../../hooks/useFetch";
 import { formatDateTime, formatRelativeDate, daysSince } from "../format";
-import { SEVERITY_STYLES } from "../severity";
+import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 import {
@@ -135,6 +135,12 @@ export function KnowledgeGapsDetailPage() {
   const daysSinceIngest = daysSince(gap.lastIngested);
   const isStale = daysSinceIngest > STALE_AFTER_DAYS;
 
+  // Opens the source's details panel straight away instead of dropping the PM
+  // on a list to find the repository again. A gap's component is `owner/repo`,
+  // which is exactly the `sourceId` the Data Ingestion page deep-links by; an
+  // unknown one simply leaves the panel closed.
+  const dataIngestionLink = `/data-ingestion?sourceId=${encodeURIComponent(gap.component)}`;
+
   // ── RENDER ─────────────────────────────────────────────
 
   return (
@@ -177,7 +183,7 @@ export function KnowledgeGapsDetailPage() {
             <div
               className={`h-full rounded-full ${bar}`}
               style={{
-                width: gap.severity === "high" ? "100%" : gap.severity === "medium" ? "60%" : "30%",
+                width: SEVERITY_FILL[gap.severity],
               }}
             />
           </div>
@@ -311,9 +317,7 @@ export function KnowledgeGapsDetailPage() {
                 details — otherwise the reader lands on the list and has to find it again. */}
             <Button
               variant="primary"
-              onClick={() =>
-                void navigate(`/data-ingestion?sourceId=${encodeURIComponent(gap.component)}`)
-              }
+              onClick={() => void navigate(dataIngestionLink)}
               icon={<Database className="h-4 w-4" />}
               className="shrink-0"
             >
