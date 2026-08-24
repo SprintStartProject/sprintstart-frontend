@@ -7,7 +7,12 @@ export interface KnowledgeGapOwner {
   role?: string;
 }
 
-export type KnowledgeGapSeverity = "high" | "medium" | "low";
+/**
+ * `covered` is not a gap: the component was scanned and found to be missing
+ * nothing. Those are reported too, so the panel is the project's full component
+ * roster and an absence means "not ingested" rather than "nothing to report".
+ */
+export type KnowledgeGapSeverity = "high" | "medium" | "low" | "covered";
 
 export interface KnowledgeGap {
   id: string;
@@ -28,4 +33,10 @@ export interface KnowledgeGap {
 
 export interface KnowledgeGapOverview {
   gaps: KnowledgeGap[];
+  // True while a rescan triggered by newly ingested documentation is still
+  // running. The gaps alongside it are the previous result, so the panel can
+  // say so instead of showing stale numbers with no explanation.
+  refreshing?: boolean;
+  // When the returned gaps were computed. Null before the first scan.
+  refreshedAt?: string | null;
 }

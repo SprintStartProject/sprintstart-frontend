@@ -4,20 +4,22 @@
 // On click navigiert zu /insights/knowledge-gaps/:gapId
 // ============================================================
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useToast } from "../../../context/useToast";
-import { useFetch } from "../../../hooks/useFetch";
+import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
+import { describeEmptyState } from "../emptyState";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Button } from "../../../components/ui/Button";
 import { useProjectContext } from "../../projects/useProjectContext";
 
-import { ShieldAlert, ArrowRight, AlertCircle, Clock, RefreshCw } from "lucide-react";
+import { ShieldAlert, ArrowRight, Clock, RefreshCw } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT: KnowledgeGapWidget
@@ -27,26 +29,37 @@ export function KnowledgeGapWidget() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
-  const pendingRefreshRef = useRef(false);
 
   const {
     data: overview,
     loading,
     error,
-  } = useFetch(
+    refresh,
+  } = useLiveFetch(
     () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [refreshKey, selectedProjectId],
+    [selectedProjectId],
   );
+
+  // The backend rescans on its own once new documentation is indexed; while it
+  // does, the gaps below are the previous result and the panel says so instead
+  // of showing numbers that quietly went stale.
+  const rescanning = overview?.refreshing ?? false;
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
-      pendingRefreshRef.current = true;
-      setRefreshKey((key) => key + 1);
+      const result = await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
+      refresh();
+      // Read off the refresh's own result rather than off the reloaded panel:
+      // useLiveFetch deliberately keeps the previous data on screen while it
+      // revalidates, so no render marks the moment the new result arrived.
+      if (result.gapCount === 0) {
+        toast.info("No knowledge gaps found", {
+          description: "Nothing needs attention for this project right now.",
+        });
+      }
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
       toast.error("Refresh failed. Is the AI service running?");
@@ -54,17 +67,6 @@ export function KnowledgeGapWidget() {
       setRefreshing(false);
     }
   };
-
-  // Tell the user when a refresh they triggered still detected no gaps.
-  useEffect(() => {
-    if (loading || !pendingRefreshRef.current) return;
-    pendingRefreshRef.current = false;
-    if (overview && overview.gaps.length === 0) {
-      toast.info("No knowledge gaps found", {
-        description: "Nothing needs attention for this project right now.",
-      });
-    }
-  }, [loading, overview, toast]);
 
   // ── LOADING ────────────────────────────────────────────
 
@@ -79,21 +81,21 @@ export function KnowledgeGapWidget() {
   // ── ERROR / EMPTY ──────────────────────────────────────
 
   if (error || !overview || overview.gaps.length === 0) {
+    const empty = describeEmptyState(overview, error);
+
     return (
       <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
-        <AlertCircle className="h-5 w-5 text-app-text-muted" />
-        <p className="text-sm text-app-text-muted">
-          No knowledge gaps yet. Trigger a refresh to detect them.
-        </p>
+        <EmptyStateIcon state={empty.state} />
+        <p className="text-sm text-app-text-muted">{empty.message}</p>
         <div className="flex items-center gap-2">
           <Button
             variant="primary"
             size="sm"
             onClick={() => void handleRefresh()}
-            loading={refreshing}
+            loading={refreshing || rescanning}
             icon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            {refreshing ? "Refreshing…" : "Refresh"}
+            {refreshing || rescanning ? "Scanning…" : "Rescan now"}
           </Button>
           <Button
             variant="secondary"
@@ -112,10 +114,14 @@ export function KnowledgeGapWidget() {
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
   );
 
-  // Show top in widget
+  // Show top in widget. Covered components sort last, so a dashboard glance
+  // still leads with whatever actually needs attention.
   const preview = sorted.slice(0, 4);
 
-  const gapCount = sorted.length;
+  // Components with something missing, not rows: the list now also carries the
+  // ones that are fine, and "See all (12)" would overstate the work if it
+  // counted those.
+  const gapCount = sorted.filter((gap) => gap.severity !== "covered").length;
 
   // ── RENDER ─────────────────────────────────────────────
 
@@ -130,6 +136,12 @@ export function KnowledgeGapWidget() {
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-app-brand" />
           <span className="text-sm font-semibold text-app-text">Knowledge gaps</span>
+          {rescanning && (
+            <span className="flex items-center gap-1.5 text-xs text-app-text-muted">
+              <Spinner size="sm" silent />
+              Rescanning
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -140,11 +152,13 @@ export function KnowledgeGapWidget() {
               event.stopPropagation();
               void handleRefresh();
             }}
-            disabled={refreshing}
-            aria-label="Refresh"
-            title="Refresh"
+            disabled={refreshing || rescanning}
+            aria-label="Rescan now"
+            title="Rescan now"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${refreshing || rescanning ? "animate-spin" : ""}`}
+            />
           </Button>
           <Button
             variant="ghost"

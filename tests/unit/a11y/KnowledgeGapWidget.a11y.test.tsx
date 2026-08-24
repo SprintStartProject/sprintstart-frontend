@@ -4,8 +4,8 @@ import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeGapWidget } from "../../../src/features/knowledge-gaps/components/KnowledgeGapWidget";
 
-vi.mock("../../../src/hooks/useFetch", () => ({
-  useFetch: () => ({
+vi.mock("../../../src/hooks/useLiveFetch", () => ({
+  useLiveFetch: () => ({
     data: {
       gaps: [
         {
@@ -29,7 +29,9 @@ vi.mock("../../../src/hooks/useFetch", () => ({
       ],
     },
     loading: false,
+    revalidating: false,
     error: false,
+    refresh: () => {},
   }),
 }));
 

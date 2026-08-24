@@ -99,6 +99,31 @@ describe("MyKnowledgeGapsWidget", () => {
     expect(screen.queryByText("Could not load your knowledge gaps.")).not.toBeInTheDocument();
   });
 
+  // The overview is the project's full component roster now. This card is a to-do list, so a
+  // component with nothing missing is not a short item on it.
+  it("leaves out the components the scan found nothing missing on", async () => {
+    mocks.fetchMyKnowledgeGaps.mockResolvedValue({
+      gaps: [createGap("auth-service", "high"), createGap("billing", "covered", [])],
+    });
+
+    renderWidget();
+    await settled();
+
+    expect(screen.getByText("auth-service")).toBeInTheDocument();
+    expect(screen.queryByText("billing")).not.toBeInTheDocument();
+  });
+
+  it("reads as nothing assigned when every component the caller owns is covered", async () => {
+    mocks.fetchMyKnowledgeGaps.mockResolvedValue({
+      gaps: [createGap("billing", "covered", [])],
+    });
+
+    renderWidget();
+
+    // Not "0 documents missing" on a card: the honest answer is the empty state.
+    expect(await screen.findByText("Nothing assigned to you.")).toBeInTheDocument();
+  });
+
   it("keeps a failed load apart from owning nothing", async () => {
     mocks.fetchMyKnowledgeGaps.mockRejectedValue(new Error("boom"));
 

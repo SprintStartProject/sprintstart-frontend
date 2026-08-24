@@ -185,7 +185,11 @@ export function TeamMemberDetailPage() {
       setUser(memberData);
       setAvailableRoles(rolesData);
       setSkillLevels(skills);
-      setKnowledgeGaps(knowledgeGapOverview.gaps);
+      // Covered components are dropped rather than shown: the overview is the
+      // project's full roster now, but this panel is headed "Knowledge gaps"
+      // and counting repositories that are missing nothing would overstate
+      // what the member has to answer for.
+      setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
       setFeedbackItems(feedback);
       setOnboardingPath(path);
       // Open on the phase the member is actually working on. Phase 1 is almost never

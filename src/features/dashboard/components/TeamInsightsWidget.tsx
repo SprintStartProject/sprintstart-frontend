@@ -40,9 +40,12 @@ const VISIBLE_ROW_COUNT = 3;
  * values, same theme switch — the variables are redefined in the dark block.
  */
 const severityStroke: Record<KnowledgeGapSeverity, string> = {
-  high: "var(--danger-solid)",
-  medium: "var(--warning-solid)",
-  low: "var(--success-solid)",
+  high: "var(--severity-high-solid)",
+  medium: "var(--severity-medium-solid)",
+  low: "var(--severity-low-solid)",
+  // Never drawn — `summarizeGaps` leaves covered components out of the ring — but the record
+  // is kept whole so a step cannot be missing if that ever changes.
+  covered: "var(--severity-covered-solid)",
 };
 
 /**

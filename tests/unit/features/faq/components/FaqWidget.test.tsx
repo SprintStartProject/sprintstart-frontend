@@ -9,35 +9,46 @@ const mockOverview: FAQOverview = {
     {
       groupId: "g1",
       count: 10,
+      title: "Deploying to production",
       question: "How to deploy?",
+      recentCount: 7,
+      trend: "RISING",
       topDocuments: [{ id: "d1", title: "Deploy Guide" }],
     },
     {
       groupId: "g2",
       count: 8,
+      title: "Configuring the service",
       question: "How to configure?",
       topDocuments: [{ id: "d2", title: "Config Doc" }],
     },
     {
       groupId: "g3",
       count: 5,
+      title: "Understanding what X is",
       question: "What is X?",
       topDocuments: [{ id: "d3", title: "X Doc" }],
     },
   ],
 };
 
-vi.mock("../../../../../src/hooks/useFetch", () => ({
-  useFetch: vi.fn(),
+vi.mock("../../../../../src/hooks/useLiveFetch", () => ({
+  useLiveFetch: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/faqService", () => ({
   insightsService: { fetchFAQGroups: vi.fn() },
 }));
 
-import { useFetch } from "../../../../../src/hooks/useFetch";
+import { useLiveFetch } from "../../../../../src/hooks/useLiveFetch";
 
-vi.mocked(useFetch).mockReturnValue({ data: mockOverview, loading: false, error: false });
+const loaded = {
+  data: mockOverview,
+  loading: false,
+  revalidating: false,
+  error: false,
+  refresh: vi.fn(),
+};
 
 function renderWidget() {
   return render(
@@ -50,18 +61,22 @@ function renderWidget() {
 describe("FaqWidget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useLiveFetch).mockReturnValue(loaded);
   });
 
-  it("renders the hero card with the most asked question", () => {
+  it("renders the hero card with the most asked entry", () => {
     renderWidget();
+    expect(screen.getByText("Deploying to production")).toBeInTheDocument();
     expect(screen.getByText("How to deploy?")).toBeInTheDocument();
     expect(screen.getByText("Most asked")).toBeInTheDocument();
   });
 
-  it("renders the grid of remaining groups", () => {
+  it("lists the remaining entries by title", () => {
     renderWidget();
-    expect(screen.getByText("How to configure?")).toBeInTheDocument();
-    expect(screen.getByText("What is X?")).toBeInTheDocument();
+    // Titles rather than verbatim questions: the tiles are small, and a
+    // sentence per tile is not something a PM can scan.
+    expect(screen.getByText("Configuring the service")).toBeInTheDocument();
+    expect(screen.getByText("Understanding what X is")).toBeInTheDocument();
   });
 
   it('shows the header with "Recurring questions"', () => {
@@ -70,26 +85,24 @@ describe("FaqWidget", () => {
   });
 
   it("shows loading state", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: null, loading: true, error: false });
+    vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, loading: true });
     const { container } = renderWidget();
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state when there is an error", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: null, loading: false, error: true });
+  // On a dashboard the two states are one glance apart, so a failed load must
+  // not pose as "nobody has asked anything yet".
+  it("reports a failed load as an error rather than an empty FAQ", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, error: true });
     renderWidget();
-    expect(
-      screen.getByText("No FAQ groups yet. Trigger a refresh to generate them."),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /refresh/i })).toBeInTheDocument();
+    expect(screen.getByText(/could not load the recurring questions/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No recurring questions yet/)).not.toBeInTheDocument();
   });
 
-  it("shows the empty/refresh state when overview has no groups", () => {
-    vi.mocked(useFetch).mockReturnValueOnce({ data: { groups: [] }, loading: false, error: false });
+  it("shows the empty state when overview has no groups", () => {
+    vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: { groups: [] } });
     renderWidget();
-    expect(
-      screen.getByText("No FAQ groups yet. Trigger a refresh to generate them."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No recurring questions yet/)).toBeInTheDocument();
   });
 });
 

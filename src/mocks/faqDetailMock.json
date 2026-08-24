@@ -1,10 +1,18 @@
 {
   "groupId": "vpn-access",
   "count": 14,
+  "title": "Getting VPN access",
+  "question": "How do I get VPN access?",
+  "recentCount": 9,
+  "trend": "RISING",
+  "firstAskedAt": "2026-06-02T10:00:00Z",
+  "lastAskedAt": "2026-08-13T09:12:00Z",
   "questions": [
     {
       "id": "q_001",
-      "text": "How do I get VPN access?"
+      "text": "How do I get VPN access?",
+      "askedAt": "2026-08-13T09:12:00Z",
+      "occurrences": 4
     },
     {
       "id": "q_002",
