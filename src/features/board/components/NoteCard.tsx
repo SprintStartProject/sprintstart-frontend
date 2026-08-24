@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Check, Pencil, X } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Textarea } from "../../../components/ui/Textarea";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { AuthoredCardRequest, BoardCard, NoteContent } from "../types";
 
@@ -58,14 +60,15 @@ export function NoteCard({
       canMoveDown={canMoveDown}
       action={
         onEdit && !editing ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={() => setEditing(true)}
             aria-label="Edit this note"
-            className="rounded-lg p-1 text-app-text-muted transition hover:bg-app-surface-hover hover:text-app-text"
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </Button>
         ) : undefined
       }
     >
@@ -74,31 +77,30 @@ export function NoteCard({
           <label className="sr-only" htmlFor={`note-${card.id}`}>
             Note text
           </label>
-          <textarea
+          <Textarea
             id={`note-${card.id}`}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            rows={4}
-            className="w-full rounded-xl border border-app-border bg-app-bg p-2 text-sm text-app-text outline-none focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+            minRows={4}
           />
           <div className="mt-2 flex gap-2">
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={save}
               disabled={draft.trim().length === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-app-brand px-3 py-1.5 text-sm font-medium text-white transition hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              icon={<Check className="h-3.5 w-3.5" aria-hidden="true" />}
             >
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
               Save
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={cancel}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-app-border px-3 py-1.5 text-sm text-app-text transition hover:bg-app-surface-hover"
+              icon={<X className="h-3.5 w-3.5" aria-hidden="true" />}
             >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

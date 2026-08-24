@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, SuggestedTasksContent } from "../types";
@@ -45,10 +46,10 @@ export function SuggestedTasksCard({
       canMoveDown={canMoveDown}
     >
       {content.tasks.length === 0 ? (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           No starter tasks are ready for you yet. Your PM approves the ones that fit your role — ask
           your buddy if you want something to get started on in the meantime.
-        </p>
+        </EmptyState>
       ) : (
         <ol className="space-y-3">
           {content.tasks.map((task) => (

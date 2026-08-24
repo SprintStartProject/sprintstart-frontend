@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, CurrentTaskContent } from "../types";
@@ -69,10 +70,10 @@ export function CurrentTaskCard({
           )}
         </div>
       ) : (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           Nothing claimed yet. Ask your buddy what would be a good one to pick up — they can suggest
           tasks that fit what you&apos;ve already shown.
-        </p>
+        </EmptyState>
       )}
 
       {/* "How do I start this" is what makes the mentor offer to assemble the orientation

@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { Input } from "../../../components/ui/Input";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
@@ -93,18 +96,18 @@ export function ChecklistCard({
       canMoveDown={canMoveDown}
     >
       {content.items.length === 0 ? (
-        <p className="text-sm text-app-text-muted">Nothing on it yet.</p>
+        <EmptyState size="sm">Nothing on it yet.</EmptyState>
       ) : (
         <ul className="space-y-1.5">
           {content.items.map((item) => (
-            <li key={item.id} className="flex items-start gap-2">
+            <li key={item.id} className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id={`item-${item.id}`}
                 checked={item.done}
                 disabled={!onEdit}
                 onChange={() => toggle(item.id)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-app-border accent-app-brand"
+                className="h-4 w-4 shrink-0 rounded border-app-border accent-app-brand"
               />
               <label
                 htmlFor={`item-${item.id}`}
@@ -115,14 +118,15 @@ export function ChecklistCard({
                 {item.text}
               </label>
               {onEdit && (
-                <button
-                  type="button"
+                <Button
+                  variant="dangerGhost"
+                  size="sm"
+                  iconOnly
                   onClick={() => remove(item.id)}
                   aria-label={`Remove "${item.text}"`}
-                  className="shrink-0 rounded p-0.5 text-app-text-muted transition hover:text-app-danger-text"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
+                </Button>
               )}
             </li>
           ))}
@@ -134,8 +138,9 @@ export function ChecklistCard({
           <label className="sr-only" htmlFor={`add-${card.id}`}>
             Add an item
           </label>
-          <input
+          <Input
             id={`add-${card.id}`}
+            size="sm"
             value={newItem}
             onChange={(event) => setNewItem(event.target.value)}
             onKeyDown={(event) => {
@@ -145,17 +150,18 @@ export function ChecklistCard({
               }
             }}
             placeholder="Add an item"
-            className="min-w-0 flex-1 rounded-lg border border-app-border bg-app-bg px-2 py-1.5 text-sm text-app-text outline-none focus:border-app-brand-border-strong focus:ring-2 focus:ring-app-brand-glow"
+            className="min-w-0 flex-1"
           />
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
+            iconOnly
             onClick={add}
             disabled={newItem.trim().length === 0}
             aria-label="Add this item"
-            className="shrink-0 rounded-lg border border-app-border px-2 text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       )}
     </BoardCardFrame>

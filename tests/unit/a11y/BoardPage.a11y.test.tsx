@@ -75,9 +75,7 @@ describe("BoardPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <BoardPage />
-        </main>
+        <BoardPage />
       </MemoryRouter>,
     );
 
@@ -90,9 +88,7 @@ describe("BoardPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <BoardPage />
-        </main>
+        <BoardPage />
       </MemoryRouter>,
     );
 

@@ -1,3 +1,4 @@
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, BoardCompetency, CompetencyProgressContent } from "../types";
@@ -59,10 +60,10 @@ export function CompetencyProgressCard({
       canMoveDown={canMoveDown}
     >
       {nothingYet ? (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           Nothing on your record yet. That&apos;s the normal shape of a first week — it fills in as
           work of yours is accepted.
-        </p>
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {held.length > 0 && (

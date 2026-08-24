@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { List, Network, RefreshCw } from "lucide-react";
 import { boardService } from "../../../services/boardService";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { type GraphShape } from "../../competency-graph/layout";
 import { DiagramCanvas, type DiagramCanvasEdge } from "../../graph-diagram/DiagramCanvas";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -127,20 +129,21 @@ export function DiagramCard({
       canMoveDown={canMoveDown}
       action={
         hasPicture ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={() => setAsList((shown) => !shown)}
             aria-pressed={asList}
             title={asList ? "Show the diagram" : "Read it as a list"}
             aria-label={asList ? "Show the diagram" : "Read it as a list"}
-            className="rounded-lg p-1 text-app-text-muted transition hover:bg-app-surface-hover hover:text-app-text"
           >
             {asList ? (
               <Network className="h-4 w-4" aria-hidden="true" />
             ) : (
               <List className="h-4 w-4" aria-hidden="true" />
             )}
-          </button>
+          </Button>
         ) : undefined
       }
     >
@@ -165,9 +168,9 @@ export function DiagramCard({
           </div>
         )
       ) : (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           {current.reason ?? "There is nothing in this project’s material to draw this from yet."}
-        </p>
+        </EmptyState>
       )}
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-app-text-muted">

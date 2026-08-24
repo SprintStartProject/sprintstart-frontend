@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Check, ExternalLink, Loader2 } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import { arrivalService } from "../../../services/arrivalService";
+import { Button } from "../../../components/ui/Button";
+import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { groupByScope } from "../../arrival/scopeGroups";
@@ -145,7 +147,7 @@ export function ArrivalStepsCard({
             */}
       {checking && (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-app-text-muted">
-          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+          <Spinner size="sm" silent />
           Checking what we can see for ourselves…
         </p>
       )}
@@ -225,21 +227,9 @@ function StepRow({
             // there, so offering one would be an affordance whose only outcome is an
             // error.
             step.selfConfirmable && (
-              <button
-                type="button"
-                onClick={onConfirm}
-                disabled={pending}
-                className="rounded-lg border border-app-border px-2 py-1 text-xs text-app-text transition hover:bg-app-surface-muted disabled:opacity-60"
-              >
-                {pending ? (
-                  <Loader2
-                    className="h-3.5 w-3.5 animate-spin"
-                    aria-label={`Saving "${step.title}"`}
-                  />
-                ) : (
-                  "I've done this"
-                )}
-              </button>
+              <Button variant="secondary" size="sm" onClick={onConfirm} loading={pending}>
+                I&apos;ve done this
+              </Button>
             )
           )}
         </div>

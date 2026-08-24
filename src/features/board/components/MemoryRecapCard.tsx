@@ -1,3 +1,4 @@
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, MemoryRecapContent } from "../types";
@@ -61,9 +62,9 @@ export function MemoryRecapCard({
           </p>
         </>
       ) : (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           Nothing yet — your buddy starts remembering after your first conversation.
-        </p>
+        </EmptyState>
       )}
 
       <AskTheBuddy
