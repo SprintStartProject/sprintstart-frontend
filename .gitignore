@@ -53,3 +53,6 @@ CLAUDE.md
 AGENTS.local.md
 GEMINI.local.md
 CLAUDE.local.md
+
+# Hermes agent working files (per-developer)
+.hermes/

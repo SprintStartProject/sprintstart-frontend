@@ -5,6 +5,7 @@ import {
   Briefcase,
   ChartColumn,
   Database,
+  Inbox,
   MessageSquare,
   Rocket,
   Target,
@@ -382,6 +383,41 @@ export function AdminIcon({ isActive }: SidebarIconProps) {
         animate={hasPlayed ? { scaleX: 1 } : { scaleX: 1 }}
         transition={{ duration: 0.35, delay: 0.5, ease: "easeOut" }}
       />
+    </IconFrame>
+  );
+}
+
+/**
+ * Escalation Inbox: a question drops into the tray and settles.
+ *
+ * The tray is drawn last in DOM order so it paints over the falling paper —
+ * the same trick the Data Ingestion stack uses for its platters. The paper
+ * starts above the tray's opening and lands just past the lip, which is what
+ * "something arrived here" looks like at 18px.
+ */
+export function InboxIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <Inbox className={ICON_CLASS} />;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      {/* The arriving question: a small sheet falling into the tray. */}
+      <motion.rect
+        x={10.4}
+        y={2}
+        width={3.2}
+        height={5}
+        rx={0.8}
+        initial={hasPlayed ? { y: -3, opacity: 0 } : false}
+        animate={{ y: 0, opacity: [0, 1, 1] }}
+        transition={{ ...bounce, delay: 0.08 }}
+      />
+      {/* The tray itself, with its front lip covering the landed sheet's foot. */}
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </IconFrame>
   );
 }

@@ -14,6 +14,7 @@ import {
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
+  InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
@@ -83,6 +84,15 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/starter-work",
     icon: StarterWorkIcon,
   },
+  // The escalation inbox, surfaced as its own entry while it is being evaluated
+  // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
+  // already hides it from hires: the route is PM/HR/ADMIN-only, and for a PM it
+  // additionally requires managing the selected project.
+  {
+    label: "Escalation Inbox",
+    path: "/insights/knowledge-requests",
+    icon: InboxIcon,
+  },
 ];
 
 const adminNavItems: SidebarNavItem[] = [
@@ -138,6 +148,9 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
+  // `/insights/knowledge-requests` is deliberately absent: it has its own
+  // sidebar entry, so listing it here would leave two entries active at once
+  // -- including two active pills sharing one Framer Motion `layoutId`.
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
     location.pathname.startsWith("/insights/faq") ||

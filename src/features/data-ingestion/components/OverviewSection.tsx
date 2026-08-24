@@ -295,9 +295,7 @@ function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: str
         >
           {label}
         </span>
-        <span className="text-[11.5px] text-app-text-subtle">
-          {formatDateTime(run.startedAt)}
-        </span>
+        <span className="text-[11.5px] text-app-text-subtle">{formatDateTime(run.startedAt)}</span>
       </div>
     </li>
   );
