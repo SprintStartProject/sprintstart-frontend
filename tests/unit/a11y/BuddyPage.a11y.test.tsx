@@ -3,9 +3,15 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
+  // An empty visit is the one case that still greets — see `ensureOpened`.
+  streamOpenBuddy: vi.fn((handlers: { onDone: () => void }) => {
+    handlers.onDone();
+    return Promise.resolve();
+  }),
   streamMessage: vi.fn(),
   performAction: vi.fn(),
   // The chips come from the backend now, gated on the tools mounted for this hire — the page
@@ -55,7 +61,9 @@ describe("BuddyPage Accessibility", () => {
     const { baseElement } = render(
       <MemoryRouter>
         <main>
-          <BuddyPage />
+          <BuddyProvider>
+            <BuddyPage />
+          </BuddyProvider>
         </main>
       </MemoryRouter>,
     );
@@ -71,7 +79,9 @@ describe("BuddyPage Accessibility", () => {
     const { baseElement } = render(
       <MemoryRouter>
         <main>
-          <BuddyPage />
+          <BuddyProvider>
+            <BuddyPage />
+          </BuddyProvider>
         </main>
       </MemoryRouter>,
     );

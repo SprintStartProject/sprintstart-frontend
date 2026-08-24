@@ -10,22 +10,15 @@ import type { BuddyMessageView, ProposedAction } from "../types";
 
 /**
  * The conversation core behind every buddy surface: the message list, the optimistic
- * send-and-stream loop, and the "which tool is it running" signal. Deliberately knows
- * nothing about *where* it is shown -- the floating widget ([useBuddy]) and the
- * full-page `/buddy` home both build on it, so a hire's one buddy session behaves the
- * same in either place.
+ * send-and-stream loop, and the "which tool is it running" signal.
  *
- * @param autoLoad When true, loads the current visit's messages on mount (the widget).
- *   Leave it false and call [loadHistory] on first open so an unopened surface makes no
- *   request.
- * @param open When true, *opens a visit* on mount instead: the buddy folds the previous
- *   visit into its memory and greets proactively (the `/buddy` home). No transcript is
- *   replayed — the greeting is the first message and continuity lives in the memory.
+ * Deliberately knows nothing about *where* it is shown. It is instantiated exactly once, by
+ * [BuddyProvider], and both surfaces read that one instance through `useBuddySession` — so a
+ * hire's one buddy session really is one, rather than two lists that happen to share a name.
+ *
+ * Nothing is requested until a surface calls [ensureOpened].
  */
-export function useBuddyConversation({
-  autoLoad = false,
-  open = false,
-}: { autoLoad?: boolean; open?: boolean } = {}) {
+export function useBuddyConversation() {
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -34,77 +27,95 @@ export function useBuddyConversation({
   const [activeTool, setActiveTool] = useState<string | null>(null);
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
-  // True while the visit is being opened, so the page can show a greeting-loading state.
-  const [isOpening, setIsOpening] = useState(open);
+  // True while a surface is opening the conversation, so it can show a loading state rather
+  // than an empty thread. Starts false: nothing is opening until somebody asks.
+  const [isOpening, setIsOpening] = useState(false);
   const [draft, setDraft] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef(false);
 
   /**
-   * Loads the conversation so far, at most once. Idempotent so both the widget's
-   * open handler and the page's mount effect can call it without double-fetching.
+   * Streams the buddy's opening greeting into the thread.
+   *
+   * Only reached for a visit with nothing in it — see [ensureOpened]. The greeting is a single
+   * growing message rather than one per token, so the hire watches it being written instead of
+   * watching messages pile up.
    */
-  const loadHistory = useCallback(async () => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    const history = await getMessages();
-    setMessages(history.map((message) => ({ ...message, id: crypto.randomUUID() })));
+  const greet = useCallback(async () => {
+    const id = crypto.randomUUID();
+    await streamOpenBuddy({
+      onToken: (token) => {
+        setMessages((prev) => {
+          const existing = prev.find((message) => message.id === id);
+          if (!existing) {
+            return [
+              {
+                id,
+                role: "ASSISTANT",
+                content: token,
+                createdAt: new Date().toISOString(),
+                citations: [],
+              },
+            ];
+          }
+          return prev.map((message) =>
+            message.id === id ? { ...message, content: message.content + token } : message,
+          );
+        });
+        // The surface stops waiting at the first word, not the last: everything after this is
+        // the hire reading along, and the composer is theirs from here.
+        setIsOpening(false);
+      },
+      onAction: setOpenerAction,
+      onDone: () => setIsOpening(false),
+      onError: (message) => console.error(message),
+    });
   }, []);
 
   /**
-   * Opens a visit: the buddy greets proactively, at most once. The greeting becomes the
-   * first (and only) message shown; the past transcript is deliberately not replayed.
+   * Brings the conversation on screen, once per session.
+   *
+   * **Reading comes before greeting, and that ordering is the whole fix.** The page used to
+   * call the open endpoint unconditionally. Opening is idempotent only while the hire has said
+   * nothing; once they have, a second open *rotates the visit* — the backend folds what was
+   * said into the buddy's memory and starts a new window. So a hire who asked something in the
+   * dock and then opened the full page destroyed their own context and was shown a greeting
+   * instead of their conversation. It was not a rendering problem; the messages were really
+   * gone.
+   *
+   * Now: fetch what the visit already holds. If there is anything there, that *is* the
+   * conversation — show it, and call no model at all. Only a genuinely empty visit gets a
+   * greeting, which is the case the greeting was written for.
+   *
+   * Idempotent by ref rather than by state, so the dock's open handler and the page's mount
+   * effect can both call it without either double-fetching or racing.
+   *
+   * What this cannot do is reach back past the current visit: `getMessages` returns the window
+   * since the buddy last updated its memory, and no hire-facing endpoint exposes anything
+   * older. Showing a hire every question they have ever asked needs a backend change, not a
+   * frontend one.
    */
-  const openVisit = useCallback(async () => {
+  const ensureOpened = useCallback(async () => {
     if (loadedRef.current) return;
     loadedRef.current = true;
-    const id = crypto.randomUUID();
+    setIsOpening(true);
+
     try {
-      await streamOpenBuddy({
-        onToken: (token) => {
-          // The greeting is a single growing message rather than one per token, so the
-          // hire watches it being written instead of watching messages pile up.
-          setMessages((prev) => {
-            const existing = prev.find((message) => message.id === id);
-            if (!existing) {
-              return [
-                {
-                  id,
-                  role: "ASSISTANT",
-                  content: token,
-                  createdAt: new Date().toISOString(),
-                  citations: [],
-                },
-              ];
-            }
-            return prev.map((message) =>
-              message.id === id ? { ...message, content: message.content + token } : message,
-            );
-          });
-          // The page stops waiting at the first word, not the last: everything after this
-          // is the hire reading along, and the composer is theirs from here.
-          setIsOpening(false);
-        },
-        onAction: setOpenerAction,
-        onDone: () => setIsOpening(false),
-        onError: (message) => console.error(message),
-      });
+      const history = await getMessages();
+
+      if (history.length > 0) {
+        setMessages(history.map((message) => ({ ...message, id: crypto.randomUUID() })));
+        return;
+      }
+
+      await greet();
     } catch (e) {
       console.error(e);
     } finally {
       setIsOpening(false);
     }
-  }, []);
-
-  useEffect(() => {
-    // Deferred to a microtask (the repo's React-19 pattern) so the first setState never runs
-    // synchronously in the effect body.
-    void (async () => {
-      if (open) await openVisit();
-      else if (autoLoad) await loadHistory();
-    })();
-  }, [open, autoLoad, openVisit, loadHistory]);
+  }, [greet]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -293,7 +304,7 @@ export function useBuddyConversation({
     confirmAction,
     dismissAction,
 
-    loadHistory,
+    ensureOpened,
     bottomRef,
   };
 }

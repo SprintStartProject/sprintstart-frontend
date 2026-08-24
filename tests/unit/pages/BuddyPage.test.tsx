@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 
 const projectState = { selectedProjectId: "p1" };
 
@@ -47,12 +48,17 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   };
 });
 
-import { streamOpenBuddy, streamMessage } from "../../../src/services/buddyService";
+import { getMessages, streamOpenBuddy, streamMessage } from "../../../src/services/buddyService";
 
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/buddy"]}>
-      <BuddyPage />
+      {/* The conversation belongs to the provider, not to the page — the page is one of two
+                views of it. Rendering the page without one is not a supported arrangement, and
+                `useBuddySession` says so rather than quietly making a second conversation. */}
+      <BuddyProvider>
+        <BuddyPage />
+      </BuddyProvider>
     </MemoryRouter>,
   );
 }
@@ -62,6 +68,9 @@ describe("BuddyPage", () => {
     vi.clearAllMocks();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     projectState.selectedProjectId = "p1";
+    // `clearAllMocks` drops the module mock's resolved values too, so the default — an empty
+    // visit, the case that greets — has to be restored per test.
+    vi.mocked(getMessages).mockResolvedValue([]);
   });
 
   it("shows the no-project state when the hire is not on a project yet", async () => {
@@ -71,6 +80,31 @@ describe("BuddyPage", () => {
 
     expect(await screen.findByText(/not on a project yet/)).toBeInTheDocument();
     // Nothing is opened for somebody with nowhere to onboard.
+    expect(streamOpenBuddy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The bug this replaced: the page opened a visit unconditionally. Opening is idempotent only
+   * while the hire has said nothing — once they have, a second open rotates the visit
+   * server-side, folding what was said into memory and starting a new window. So asking
+   * something in the dock and then opening the full page really did destroy the context, and
+   * the hire was shown a greeting where their conversation had been.
+   */
+  it("shows the conversation already in progress instead of opening a new visit", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+    expect(screen.getByText("With the setup guide.")).toBeInTheDocument();
+    // No greeting, and — the part that matters — no model call that would have rotated the visit.
     expect(streamOpenBuddy).not.toHaveBeenCalled();
   });
 
@@ -173,10 +207,12 @@ describe("BuddyPage", () => {
 
     render(
       <MemoryRouter initialEntries={["/buddy"]}>
-        <Routes>
-          <Route path="/buddy" element={<BuddyPage />} />
-          <Route path="/board" element={<p>the board</p>} />
-        </Routes>
+        <BuddyProvider>
+          <Routes>
+            <Route path="/buddy" element={<BuddyPage />} />
+            <Route path="/board" element={<p>the board</p>} />
+          </Routes>
+        </BuddyProvider>
       </MemoryRouter>,
     );
 

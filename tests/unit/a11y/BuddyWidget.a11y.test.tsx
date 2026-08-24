@@ -5,6 +5,7 @@ import { axe } from "vitest-axe";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { BuddyWidget } from "../../../src/features/buddy/components/BuddyWidget";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { server } from "../setup/vitest.setup";
 
 describe("BuddyWidget Accessibility", () => {
@@ -14,7 +15,9 @@ describe("BuddyWidget Accessibility", () => {
       // router here for the same reason it has one in App: it is mounted inside one.
       <MemoryRouter>
         <main>
-          <BuddyWidget />
+          <BuddyProvider>
+            <BuddyWidget />
+          </BuddyProvider>
         </main>
       </MemoryRouter>,
     );
@@ -38,7 +41,9 @@ describe("BuddyWidget Accessibility", () => {
       // router here for the same reason it has one in App: it is mounted inside one.
       <MemoryRouter>
         <main>
-          <BuddyWidget />
+          <BuddyProvider>
+            <BuddyWidget />
+          </BuddyProvider>
         </main>
       </MemoryRouter>,
     );

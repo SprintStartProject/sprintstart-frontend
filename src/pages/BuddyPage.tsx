@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { Sparkles, Users, X } from "lucide-react";
 import { SleepyBot } from "../features/chatbot/components/SleepyBot";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
-import { useBuddyConversation } from "../features/buddy/hooks/useBuddyConversation";
+import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
@@ -121,7 +121,14 @@ function BuddyMentorHome() {
     confirmAction,
     dismissAction,
     bottomRef,
-  } = useBuddyConversation({ open: true });
+    ensureOpened,
+  } = useBuddySession();
+
+  // The same conversation the dock shows, brought on screen the same way. It used to open a
+  // *new* visit here, which is what threw away whatever the hire had already asked.
+  useEffect(() => {
+    void ensureOpened();
+  }, [ensureOpened]);
 
   const suggestions = useBuddySuggestions();
 

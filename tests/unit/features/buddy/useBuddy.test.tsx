@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
+import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -19,7 +20,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     expect(result.current.isOpen).toBe(false);
     expect(requested).toBe(false);
@@ -35,7 +36,7 @@ describe("useBuddy", () => {
       ),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();
@@ -64,7 +65,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();
@@ -93,7 +94,7 @@ describe("useBuddy", () => {
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();
@@ -131,7 +132,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();

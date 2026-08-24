@@ -19,10 +19,18 @@ describe("warming the buddy visit", () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
-  /** A fresh module instance per test, so the remembered warm-up starts empty. */
-  async function freshUseBuddy() {
+  /**
+   * A fresh module instance per test, so the remembered warm-up starts empty.
+   *
+   * The provider has to come from the *same* fresh graph as the hook. `vi.resetModules()` gives
+   * each dynamic import a new module registry, and a statically imported provider would hold a
+   * different `BuddySessionContext` object — so the hook would look up a context nothing had
+   * provided and throw.
+   */
+  async function freshBuddy() {
     const { useBuddy } = await import("../../../../src/features/buddy/hooks/useBuddy");
-    return useBuddy;
+    const { BuddyProvider } = await import("../../../../src/features/buddy/BuddyProvider");
+    return { useBuddy, BuddyProvider };
   }
 
   function countOpens() {
@@ -46,9 +54,9 @@ describe("warming the buddy visit", () => {
    */
   it("opens the visit at mount, before the hire has clicked anything", async () => {
     const opens = countOpens();
-    const useBuddy = await freshUseBuddy();
+    const { useBuddy, BuddyProvider } = await freshBuddy();
 
-    renderHook(() => useBuddy());
+    renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     await waitFor(() => {
       expect(opens.count).toBe(1);
@@ -62,9 +70,9 @@ describe("warming the buddy visit", () => {
    */
   it("warms the visit once, not once per render", async () => {
     const opens = countOpens();
-    const useBuddy = await freshUseBuddy();
+    const { useBuddy, BuddyProvider } = await freshBuddy();
 
-    const { rerender } = renderHook(() => useBuddy());
+    const { rerender } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
     rerender();
     rerender();
 
