@@ -23,6 +23,7 @@ import {
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
 import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
+import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -126,10 +127,9 @@ export function CreateProjectWizard({
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token. It falls back to the prop until it has loaded so
   // discovery still works on the first open without waiting for the refetch.
-  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames } = useGithubTokens();
+  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
+    useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
-  const prevTokenNamesRef = useRef<string[]>([]);
-  const [awaitingNewToken, setAwaitingNewToken] = useState(false);
 
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
@@ -181,9 +181,8 @@ export function CreateProjectWizard({
     error: jiraCredentialsError,
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
+    addCredentialLocally,
   } = useJiraCredentials(isOpen && isJiraDetail);
-  const prevCredentialNamesRef = useRef<string[]>([]);
-  const [awaitingNewCredential, setAwaitingNewCredential] = useState(false);
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -196,16 +195,6 @@ export function CreateProjectWizard({
       );
     });
   }, [effectiveTokenNames]);
-
-  // After an inline "add token" refetch, select the one that is new so the user
-  // does not have to pick it out of the list themselves.
-  useEffect(() => {
-    if (!awaitingNewToken) return;
-
-    const added = effectiveTokenNames.find((name) => !prevTokenNamesRef.current.includes(name));
-    if (added) setGithubTokenName(added);
-    setAwaitingNewToken(false);
-  }, [effectiveTokenNames, awaitingNewToken]);
 
   // Same adoption pattern for the Jira credential picker: select the first
   // stored credential once the list arrives, keeping a still-valid choice.
@@ -221,19 +210,6 @@ export function CreateProjectWizard({
       });
     });
   }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
-
-  // Counterpart to the token effect: after an inline "add credential" refetch,
-  // select the new credential. Runs after the adopt-first effect above so it
-  // wins when both fire on the same credentials change.
-  useEffect(() => {
-    if (!awaitingNewCredential) return;
-
-    const added = jiraCredentials.find(
-      (credential) => !prevCredentialNamesRef.current.includes(credential.displayName),
-    );
-    if (added) setJiraCredentialName(added.displayName);
-    setAwaitingNewCredential(false);
-  }, [jiraCredentials, awaitingNewCredential]);
 
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
@@ -389,17 +365,18 @@ export function CreateProjectWizard({
     resetSourceDraftFields();
   };
 
-  // Inline credential creation: snapshot the current names, refetch, and let the
-  // paired effect select whichever name is new.
-  const handleTokenSaved = async () => {
-    prevTokenNamesRef.current = effectiveTokenNames;
-    setAwaitingNewToken(true);
+  // Inline credential creation: adopt the new token/credential locally and
+  // select it right away, so a successful add is reflected even if the reload
+  // fails or is aborted; the reload then reconciles with the server.
+  const handleTokenSaved = async (tokenName: string) => {
+    addTokenNameLocally(tokenName);
+    setGithubTokenName(tokenName);
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async () => {
-    prevCredentialNamesRef.current = jiraCredentials.map((credential) => credential.displayName);
-    setAwaitingNewCredential(true);
+  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+    addCredentialLocally(credential);
+    setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();
   };
 

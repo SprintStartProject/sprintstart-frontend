@@ -8,6 +8,12 @@ type UseGithubTokensResult = {
   isRefreshing: boolean;
   /** Reloads the token list from the server. Aborts any in-flight request first. */
   loadTokenNames: () => Promise<void>;
+  /**
+   * Adds a just-created token name to the local list without a round-trip, so a
+   * successful add is reflected immediately even if the follow-up reload fails
+   * or is aborted. A later `loadTokenNames` reconciles with the server.
+   */
+  addTokenNameLocally: (name: string) => void;
 };
 
 /**
@@ -70,6 +76,11 @@ export function useGithubTokens(): UseGithubTokensResult {
     }
   }, []);
 
+  const addTokenNameLocally = useCallback((name: string) => {
+    setTokenNames((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    setTokensLoaded(true);
+  }, []);
+
   // Initial load. Deferred to a microtask so the synchronous setState
   // inside `loadTokenNames` doesn't fire during the effect body (which
   // triggers the react-hooks/set-state-in-effect lint rule and can cause
@@ -78,5 +89,12 @@ export function useGithubTokens(): UseGithubTokensResult {
     void Promise.resolve().then(loadTokenNames);
   }, [loadTokenNames]);
 
-  return { tokenNames, tokensLoaded, tokensError, isRefreshing, loadTokenNames };
+  return {
+    tokenNames,
+    tokensLoaded,
+    tokensError,
+    isRefreshing,
+    loadTokenNames,
+    addTokenNameLocally,
+  };
 }

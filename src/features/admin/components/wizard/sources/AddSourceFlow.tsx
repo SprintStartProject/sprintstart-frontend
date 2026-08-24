@@ -43,8 +43,8 @@ type GithubDetailProps = {
   onTokenNameChange: (name: string) => void;
   /** Must be stable (a state setter) — the picker only re-reports on change. */
   onSelectionChange: (selection: DiscoverySelection[]) => void;
-  /** Refetches the token list and selects the newly added one. */
-  onTokenSaved: () => Promise<void>;
+  /** Adds the new token to the list, selects it, and reconciles with the server. */
+  onTokenSaved: (tokenName: string) => Promise<void>;
   /**
    * Scopes discovery to an existing project so repositories already connected to
    * it are flagged and cannot be staged twice. `null`/omitted (the create-project
@@ -70,8 +70,8 @@ type JiraDetailProps = {
   onCredentialNameChange: (value: string) => void;
   /** Enter in a field stages the source (guarded), matching "Add to list". */
   onSubmit: () => void;
-  /** Refetches credentials and selects the newly added one. */
-  onCredentialSaved: () => Promise<void>;
+  /** Adds the new credential to the list, selects it, and reconciles with the server. */
+  onCredentialSaved: (credential: JiraCredentialsDto) => Promise<void>;
 };
 
 /** Upload detail — files are staged in memory and uploaded during provisioning. */

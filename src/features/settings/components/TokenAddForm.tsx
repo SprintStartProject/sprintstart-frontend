@@ -10,7 +10,8 @@ import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from "../utils/patValidation"
 
 type TokenAddFormProps = {
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  /** Receives the name of the token just added, for an optimistic list update. */
+  onSaved: (tokenName: string) => Promise<void>;
   /**
    * When the form is already inside a titled container (the wizard's desktop
    * companion), drop its own card chrome and header so the inputs sit directly
@@ -69,7 +70,7 @@ export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFor
         return;
       }
       try {
-        await onSaved();
+        await onSaved(trimmedName);
       } catch (refreshError) {
         setError(describeRefreshFailure(refreshError));
         return;
