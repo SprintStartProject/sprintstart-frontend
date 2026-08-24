@@ -41,7 +41,12 @@ const SEVERITY_META: Record<
   { label: string; Icon: LucideIcon; variant: BadgeVariant; bar: string }
 > = {
   BLOCKED: { label: "Waiting", Icon: Clock, variant: "orange", bar: "bg-app-orange-text" },
-  DRIFTING: { label: "Drifting", Icon: TrendingDown, variant: "danger", bar: "bg-app-danger-solid" },
+  DRIFTING: {
+    label: "Drifting",
+    Icon: TrendingDown,
+    variant: "danger",
+    bar: "bg-app-danger-solid",
+  },
 };
 
 /** One "needs attention" row: avatar, name + severity badge, reason, and how long it's been true. */
@@ -104,8 +109,12 @@ export function OnboardingMetricsWidget() {
     [selectedProjectId, refreshKey],
   );
 
-  const { attention, isLoading: attentionLoading, reload: reloadAttention } =
-    useAttention(selectedProjectId);
+  const {
+    attention,
+    isLoading: attentionLoading,
+    error: attentionError,
+    reload: reloadAttention,
+  } = useAttention(selectedProjectId);
 
   const openPage = () => void navigate("/insights/onboarding");
 
@@ -235,6 +244,11 @@ export function OnboardingMetricsWidget() {
         {attentionLoading && !attention ? (
           <div className="flex justify-center py-4">
             <Loader2 className="h-4 w-4 animate-spin text-app-brand" aria-hidden="true" />
+          </div>
+        ) : attentionError && !attention ? (
+          <div className="flex items-center gap-2 rounded-xl bg-app-surface-muted px-3 py-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
+            <p className="text-sm text-app-text-muted">Couldn&apos;t load who needs attention.</p>
           </div>
         ) : preview.length === 0 ? (
           <div className="flex items-center gap-2 rounded-xl bg-app-success-bg/40 px-3 py-2.5">

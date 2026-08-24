@@ -28,6 +28,7 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
 import { StatTile } from "./StatTile";
 import { formatDuration } from "../format";
+import { isAwaitingFirstResponse } from "../hireStatus";
 import type { HireTimeline } from "../types";
 
 /** Narrows the per-hire list to those a PM might act on, for a busy project. */
@@ -35,7 +36,6 @@ type HireFilter = "all" | "attention";
 
 /** How many hire timelines to show per page before the list paginates. */
 const HIRES_PER_PAGE = 8;
-
 
 /**
  * A hire worth a second look — the same two states the card flags on its face:
@@ -48,18 +48,19 @@ const HIRES_PER_PAGE = 8;
  * and no response has come back yet.
  */
 function needsAttention(hire: HireTimeline): boolean {
-  const awaitingFirstResponse =
-    hire.firstContributionOpenedAt !== null &&
-    hire.firstResponseAt === null &&
-    hire.openContributionCount > 0;
-  return hire.stalled || awaitingFirstResponse;
+  return hire.stalled || isAwaitingFirstResponse(hire);
 }
 
-/** Whether any hire has reached any tracked moment — distinguishes "no data" from "no hires". */
+/**
+ * Whether any hire has actually done something — distinguishes "no data" from "no hires".
+ *
+ * Deliberately NOT `joinedAt`: a hire always has a join date the moment they exist,
+ * so counting it would make this always true and the "no data yet" state unreachable.
+ * "Activity" means claimed, opened, accepted, or open work — something happened.
+ */
 function hasActivity(hires: HireTimeline[]): boolean {
   return hires.some(
     (hire) =>
-      hire.joinedAt !== null ||
       hire.firstTaskClaimedAt !== null ||
       hire.firstContributionOpenedAt !== null ||
       hire.acceptedContributionCount > 0 ||
@@ -134,7 +135,8 @@ export function OnboardingMetricsPage() {
     if (!metrics || metrics.memberCount === 0) return;
     if (!hasActivity(metrics.hires)) {
       toast.info("No onboarding activity yet", {
-        description: "Nothing has happened on this project yet — that's different from nobody being here.",
+        description:
+          "Nothing has happened on this project yet — that's different from nobody being here.",
       });
     } else {
       toast.success("Metrics refreshed");
@@ -252,10 +254,7 @@ export function OnboardingMetricsPage() {
 
       <main className="app-page-content space-y-6 py-8">
         {!projectsLoading && projects.length === 0 ? (
-          <EmptyState
-            icon={<FolderKanban className="h-8 w-8" />}
-            title="No projects"
-          >
+          <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No projects">
             There are no projects to report on yet.
           </EmptyState>
         ) : loading ? (
@@ -270,10 +269,7 @@ export function OnboardingMetricsPage() {
             The onboarding metrics couldn&apos;t be loaded. Try again shortly.
           </EmptyState>
         ) : !metrics || metrics.memberCount === 0 ? (
-          <EmptyState
-            icon={<FolderKanban className="h-8 w-8" />}
-            title="No hires yet"
-          >
+          <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No hires yet">
             Once people join this project, their onboarding shows up here.
           </EmptyState>
         ) : !hasActivity(metrics.hires) ? (

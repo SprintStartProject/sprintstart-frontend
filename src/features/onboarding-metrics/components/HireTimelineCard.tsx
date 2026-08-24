@@ -13,6 +13,7 @@ import type { HireTimeline } from "../types";
 import { Badge } from "../../../components/ui/Badge";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { formatDuration, formatMoment } from "../format";
+import { isAwaitingFirstResponse } from "../hireStatus";
 
 type HireTimelineCardProps = {
   hire: HireTimeline;
@@ -63,14 +64,15 @@ export function HireTimelineCard({ hire }: HireTimelineCardProps) {
       icon: GitPullRequest,
     },
     { label: "First response", at: hire.firstResponseAt, icon: MessageSquare },
-    { label: capitalise(contributionVerbPast), at: hire.firstContributionAcceptedAt, icon: GitMerge },
+    {
+      label: capitalise(contributionVerbPast),
+      at: hire.firstContributionAcceptedAt,
+      icon: GitMerge,
+    },
   ];
 
   // Something is in flight, was started, but nobody has responded: the wait is on somebody else.
-  const awaitingReview =
-    hire.firstContributionOpenedAt !== null &&
-    hire.firstResponseAt === null &&
-    hire.openContributionCount > 0;
+  const awaitingReview = isAwaitingFirstResponse(hire);
 
   return (
     <div
@@ -105,55 +107,57 @@ export function HireTimelineCard({ hire }: HireTimelineCardProps) {
               unreached one is a dashed hollow node. The connector between two nodes
               fills brand only once the later moment is reached, and carries the gap. */}
           <ol className="mt-4 flex items-start overflow-x-auto pb-1">
-        {moments.map((moment, index) => {
-          const reached = moment.at !== null;
-          const nextReached = index < moments.length - 1 && moments[index + 1].at !== null;
-          const gap =
-            index < moments.length - 1 ? gapHours(moment.at, moments[index + 1].at) : null;
-          const StepIcon = moment.icon;
-          return (
-            <li key={moment.label} className="flex min-w-0 items-start">
-              <div className="flex w-20 shrink-0 flex-col items-center px-1 text-center">
-                <span
-                  className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
-                    reached
-                      ? "border-app-brand bg-app-brand text-white"
-                      : "border-dashed border-app-border bg-app-surface text-app-text-subtle"
-                  }`}
-                >
-                  <StepIcon className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span
-                  className={`mt-2 text-xs leading-tight font-medium ${
-                    reached ? "text-app-text" : "text-app-text-subtle"
-                  }`}
-                >
-                  {moment.label}
-                </span>
-                <span className="mt-0.5 flex items-center gap-0.5 text-[11px] text-app-text-muted">
-                  {reached && <Check className="h-3 w-3 text-app-success-solid" aria-hidden="true" />}
-                  {formatMoment(moment.at)}
-                </span>
-              </div>
-
-              {index < moments.length - 1 && (
-                <div className="flex min-w-[3rem] flex-1 flex-col items-center pt-4">
-                  <span
-                    className={`h-0.5 w-full rounded-full ${
-                      nextReached ? "bg-app-brand" : "bg-app-border"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  {gap !== null && (
-                    <span className="mt-1 text-[10px] font-medium text-app-text-muted">
-                      {formatDuration(gap)}
+            {moments.map((moment, index) => {
+              const reached = moment.at !== null;
+              const nextReached = index < moments.length - 1 && moments[index + 1].at !== null;
+              const gap =
+                index < moments.length - 1 ? gapHours(moment.at, moments[index + 1].at) : null;
+              const StepIcon = moment.icon;
+              return (
+                <li key={moment.label} className="flex min-w-0 items-start">
+                  <div className="flex w-20 shrink-0 flex-col items-center px-1 text-center">
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
+                        reached
+                          ? "border-app-brand bg-app-brand text-white"
+                          : "border-dashed border-app-border bg-app-surface text-app-text-subtle"
+                      }`}
+                    >
+                      <StepIcon className="h-4 w-4" aria-hidden="true" />
                     </span>
+                    <span
+                      className={`mt-2 text-xs leading-tight font-medium ${
+                        reached ? "text-app-text" : "text-app-text-subtle"
+                      }`}
+                    >
+                      {moment.label}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-0.5 text-[11px] text-app-text-muted">
+                      {reached && (
+                        <Check className="h-3 w-3 text-app-success-solid" aria-hidden="true" />
+                      )}
+                      {formatMoment(moment.at)}
+                    </span>
+                  </div>
+
+                  {index < moments.length - 1 && (
+                    <div className="flex min-w-[3rem] flex-1 flex-col items-center pt-4">
+                      <span
+                        className={`h-0.5 w-full rounded-full ${
+                          nextReached ? "bg-app-brand" : "bg-app-border"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      {gap !== null && (
+                        <span className="mt-1 text-[10px] font-medium text-app-text-muted">
+                          {formatDuration(gap)}
+                        </span>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-            </li>
-          );
-        })}
+                </li>
+              );
+            })}
           </ol>
         </div>
 
