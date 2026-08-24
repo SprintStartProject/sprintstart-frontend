@@ -18,6 +18,16 @@ export function trackerLabel(tracker: string): string {
   return TRACKER_LABELS[tracker.toUpperCase()] ?? tracker;
 }
 
+/**
+ * Whether a tracker code is one we render structured (GitHub/Jira) rather than a hand-authored
+ * source. A task from an unknown tracker has no reliable number or repo to show, so it reads as
+ * "Custom" instead. Kept here beside `trackerLabel` so the three cards that show source meta share
+ * one definition rather than each re-deriving it.
+ */
+export function isKnownTracker(tracker: string): boolean {
+  return tracker.toUpperCase() in TRACKER_LABELS;
+}
+
 export type ParsedSource = {
   /** `#103`, or a tracker key like `ONB-2`, or null when the id carries no trailing identifier. */
   numberLabel: string | null;
@@ -25,10 +35,15 @@ export type ParsedSource = {
   repo: string | null;
   /** `owner/repo` when both are present, for a single muted line. */
   repoLabel: string | null;
+  /** The tracker code from the id's first segment (`GITHUB`); `""` when the id is empty. */
+  trackerCode: string;
+  /** Whether `trackerCode` is one we recognise, so number and repo are safe to show as badges. */
+  hasKnownTracker: boolean;
 };
 
 export function parseCandidateSource(sourceId: string): ParsedSource {
   const parts = sourceId.split(":");
+  const trackerCode = parts[0] ?? "";
   const repoSegment = parts.find((part) => part.includes("/")) ?? null;
 
   let owner: string | null = null;
@@ -50,5 +65,7 @@ export function parseCandidateSource(sourceId: string): ParsedSource {
     owner,
     repo,
     repoLabel: owner && repo ? `${owner}/${repo}` : repoSegment,
+    trackerCode,
+    hasKnownTracker: isKnownTracker(trackerCode),
   };
 }

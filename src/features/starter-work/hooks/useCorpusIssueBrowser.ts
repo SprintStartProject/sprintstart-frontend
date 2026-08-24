@@ -99,6 +99,15 @@ export function useCorpusIssueBrowser(
     [candidates, showAssigned, query],
   );
 
+  // Resolves an id against the whole loaded list, not the filtered `visible` one, so an open detail
+  // drawer survives search-as-you-type: typing a character that no longer matches the open issue
+  // narrows the list without pulling the issue the reader is looking at out from under them. Its
+  // pool state still comes from the live list, so an add reflects the moment the drawer sees it.
+  const resolveCandidate = useCallback(
+    (sourceId: string) => candidates.find((candidate) => candidate.sourceId === sourceId) ?? null,
+    [candidates],
+  );
+
   const promote = useCallback(
     async (sourceId: string, origin?: PoolFlightRect): Promise<boolean> => {
       setPromotingSourceId(sourceId);
@@ -129,6 +138,7 @@ export function useCorpusIssueBrowser(
 
   return {
     candidates: visible,
+    resolveCandidate,
     totalCount: candidates.length,
     assignedCount,
     isLoading,

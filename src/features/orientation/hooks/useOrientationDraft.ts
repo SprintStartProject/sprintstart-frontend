@@ -151,7 +151,13 @@ function seedSteps(initial: OrientationPacket | null): DraftStep[] {
     }));
 
     if (slot.title || slot.body) {
-      slot.body = [slot.body, section.body].filter(Boolean).join("\n\n");
+      // A second section for the same step: fold its body in and keep its citations. Its title is
+      // not dropped — it becomes the step title if the first section carried none, otherwise it
+      // rides along as a heading above its own body so nothing the packet held is lost silently.
+      const bodyWithTitle =
+        section.title && slot.title ? `## ${section.title}\n\n${section.body}` : section.body;
+      slot.title = slot.title || section.title;
+      slot.body = [slot.body, bodyWithTitle].filter(Boolean).join("\n\n");
       slot.citations = [...slot.citations, ...seededCitations];
     } else {
       slot.title = section.title;

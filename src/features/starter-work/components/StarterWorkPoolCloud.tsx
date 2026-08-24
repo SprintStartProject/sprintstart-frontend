@@ -153,9 +153,7 @@ function nextCloudLayout(current: number): number {
 /** Shared source metadata used by both representations of a pool task. */
 function PoolTaskMeta({ task }: { task: StarterWorkTask }) {
   const parsed = parseCandidateSource(task.sourceId);
-  const trackerCode = task.sourceId.split(":")[0] ?? "";
-  const hasKnownTracker =
-    trackerCode.toUpperCase() === "GITHUB" || trackerCode.toUpperCase() === "JIRA";
+  const { trackerCode, hasKnownTracker } = parsed;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">

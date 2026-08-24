@@ -65,6 +65,7 @@ const POOL_FILTER_STATE: Record<Exclude<PoolFilter, "all">, CandidatePoolState> 
 export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssueBrowserProps) {
   const {
     candidates,
+    resolveCandidate,
     totalCount,
     assignedCount,
     isLoading,
@@ -116,12 +117,11 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
     [shown, safePage],
   );
 
-  // The open issue, resolved from the live list so its pool state stays current after an add. It
-  // drops to null (and the drawer closes) if a filter hides it while it is open.
-  const openCandidate = useMemo(
-    () => candidates.find((candidate) => candidate.sourceId === openSourceId) ?? null,
-    [candidates, openSourceId],
-  );
+  // The open issue, resolved from the whole loaded list rather than the filtered view, so searching
+  // or flipping a filter while it is open does not yank the drawer shut. Its pool state still comes
+  // from the live list, so an add reflects the moment the drawer sees it. It only drops to null once
+  // the issue leaves the project's corpus entirely (a project switch), which does close the drawer.
+  const openCandidate = openSourceId ? resolveCandidate(openSourceId) : null;
 
   return (
     <section data-testid="corpus-issue-browser" aria-label="Issues in this project">

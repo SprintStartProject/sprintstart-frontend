@@ -56,9 +56,7 @@ export function StarterWorkTaskCard({
   // tracker and issue number even when the AI attached no competencies. A hand-authored task with no
   // recognised tracker reads as "Custom", with no number or repo to show.
   const parsedSource = parseCandidateSource(task.sourceId);
-  const trackerCode = task.sourceId.split(":")[0] ?? "";
-  const hasKnownTracker =
-    trackerCode.toUpperCase() === "GITHUB" || trackerCode.toUpperCase() === "JIRA";
+  const { trackerCode, hasKnownTracker } = parsedSource;
 
   const buttonVariants = getQuickActionRevealVariants(Boolean(prefersReducedMotion));
 

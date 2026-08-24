@@ -8,6 +8,15 @@ type PoolTaskFlightProps = {
   onComplete: () => void;
 };
 
+/**
+ * How many frames to keep looking for the pool before giving up. The launch switches to Overview
+ * first, and `SlidingTabPanel` runs a ~180ms `mode="wait"` exit before the incoming panel (which
+ * holds the pool) mounts. A short budget would expire mid-transition and drop the arc whenever it
+ * was launched from another tab, so this covers the switch with room to spare while still bailing
+ * quickly when the pool genuinely is not there.
+ */
+const MAX_TARGET_FRAMES = 40;
+
 function findPoolTarget(): PoolFlightRect | null {
   const element =
     document.querySelector<HTMLElement>("[data-pool-flight-target]") ??
@@ -42,7 +51,7 @@ export function PoolTaskFlight({ flight, onComplete }: PoolTaskFlightProps) {
         return;
       }
       attempts += 1;
-      if (attempts < 6) frame = window.requestAnimationFrame(measure);
+      if (attempts < MAX_TARGET_FRAMES) frame = window.requestAnimationFrame(measure);
       else onComplete();
     };
     frame = window.requestAnimationFrame(measure);

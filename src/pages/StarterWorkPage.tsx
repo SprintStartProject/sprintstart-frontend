@@ -203,7 +203,9 @@ export function StarterWorkPage() {
     async (id: string, reason?: string) => {
       try {
         await reject(id, reason);
-        void reloadPool();
+        // Preserve content on reload so the pool holds its cards instead of flashing to a spinner,
+        // matching approve — both are single decisions that should not blank the whole column.
+        void reloadPool({ preserveContent: true });
         toast.success("Removed from pool");
       } catch (err) {
         toast.error("Remove failed", {

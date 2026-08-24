@@ -115,10 +115,7 @@ export function TaskOrientationManager() {
           <ul className="space-y-2.5" data-testid="approved-task-list">
             {pageItems.map((task) => {
               const parsed = parseCandidateSource(task.sourceId);
-              const trackerCode = task.sourceId.split(":")[0] ?? "";
-              const hasKnownTracker =
-                trackerCode.toUpperCase() === "GITHUB" || trackerCode.toUpperCase() === "JIRA";
-              const showMeta = Boolean(hasKnownTracker || parsed.numberLabel || parsed.repoLabel);
+              const { trackerCode, hasKnownTracker } = parsed;
               const shownKeys = task.competencyKeys.slice(0, ROW_LABEL_CAP);
               const extraKeys = task.competencyKeys.length - shownKeys.length;
 
@@ -142,25 +139,21 @@ export function TaskOrientationManager() {
                     <div className="min-w-0 flex-1">
                       <h3 className="truncate text-sm font-semibold text-app-text">{task.title}</h3>
 
-                      {showMeta && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {hasKnownTracker && (
-                            <Badge variant="brand" size="md">
-                              {trackerLabel(trackerCode)}
-                            </Badge>
-                          )}
-                          {parsed.numberLabel && (
-                            <Badge variant="neutral" size="md">
-                              {parsed.numberLabel}
-                            </Badge>
-                          )}
-                          {parsed.repoLabel && (
-                            <span className="truncate text-xs text-app-text-subtle">
-                              {parsed.repoLabel}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <Badge variant="brand" size="md">
+                          {hasKnownTracker ? trackerLabel(trackerCode) : "Custom"}
+                        </Badge>
+                        {hasKnownTracker && parsed.numberLabel && (
+                          <Badge variant="neutral" size="md">
+                            {parsed.numberLabel}
+                          </Badge>
+                        )}
+                        {hasKnownTracker && parsed.repoLabel && (
+                          <span className="truncate text-xs text-app-text-subtle">
+                            {parsed.repoLabel}
+                          </span>
+                        )}
+                      </div>
 
                       {shownKeys.length > 0 && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
