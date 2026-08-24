@@ -91,6 +91,50 @@ describe("useBuddy", () => {
     expect(result.current.draft).toBe("");
   });
 
+  /**
+   * The backend can emit `action_proposal` before it has written a word, which put an
+   * "Accept this task" button on screen above an empty bubble — the hire was asked to agree to
+   * something the buddy had not said yet. Proposals are held until the reply finishes, so the
+   * order is always: what it wants to do, then the button that does it.
+   */
+  it("holds a proposal back until the reply it belongs to has been written", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            // Proposal first, then the words — and the stream stays open, so nothing has
+            // finished yet.
+            controller.enqueue(
+              encoder.encode(
+                'data: {"type":"action_proposal","action":"claim_goal","label":"Accept this task","task_id":"t1"}\n\n',
+              ),
+            );
+            controller.enqueue(
+              encoder.encode('data: {"type":"token","content":"Here is a good first task."}\n\n'),
+            );
+          },
+        });
+        return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+
+    act(() => {
+      result.current.setDraft("what should I work on?");
+    });
+    act(() => {
+      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)?.content).toBe("Here is a good first task.");
+    });
+    expect(result.current.messages.at(-1)?.actions ?? []).toHaveLength(0);
+  });
+
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 

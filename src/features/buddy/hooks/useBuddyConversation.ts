@@ -145,6 +145,17 @@ export function useBuddyConversation() {
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setIsThinking(true);
+
+    /**
+     * Proposals held back until the reply is finished.
+     *
+     * The backend can emit `action_proposal` before it has written a word, which put an
+     * "Accept this task" button on screen above an empty bubble — the hire was asked to agree
+     * to something the buddy had not said yet. Buffering them costs nothing (a proposal is
+     * inert until confirmed) and guarantees the only sane order: what it wants to do, then the
+     * button that does it.
+     */
+    const proposed: ProposedAction[] = [];
     setActiveTool(null);
     // Once the hire says anything, the opener's one-click suggestion has served its purpose.
     setOpenerAction(null);
@@ -174,12 +185,12 @@ export function useBuddyConversation() {
         },
 
         onActionProposal: (proposal) => {
-          // The buddy is offering to do something — attach it to this reply as a pending
-          // action. Nothing has changed yet; the hire confirms it below. The confirm
-          // payloads ride along so the action runs against what the buddy proposed.
-          setIsThinking(false);
+          // The buddy is offering to do something. Nothing has changed yet and nothing will
+          // until the hire confirms — so this is only recorded here, and attached to the reply
+          // once the reply exists. The confirm payloads ride along so the action runs against
+          // what the buddy actually proposed.
           setActiveTool(null);
-          const action: ProposedAction = {
+          proposed.push({
             id: crypto.randomUUID(),
             action: proposal.action,
             label: proposal.label,
@@ -191,17 +202,23 @@ export function useBuddyConversation() {
             competencyKey: proposal.competencyKey,
             level: proposal.level,
             status: "idle",
-          };
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), action] } : m,
-            ),
-          );
+          });
         },
 
         onDone: () => {
           setIsStreaming(false);
+          // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
+          // emits a token, and the typing dots would sit under it forever.
+          setIsThinking(false);
           setActiveTool(null);
+
+          if (proposed.length > 0) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), ...proposed] } : m,
+              ),
+            );
+          }
         },
 
         onError: (err) => {
