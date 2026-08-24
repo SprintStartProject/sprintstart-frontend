@@ -15,9 +15,10 @@ export function SeverityBar({ severity }: { severity: KnowledgeGapSeverity }) {
 }
 
 /**
- * Stacked bar + legend summarizing how many gaps fall into each severity.
- * Renders nothing when there are no gaps. `className` lets the caller control
- * the surrounding margin.
+ * Stacked bar + legend summarizing how the project's components are spread
+ * across the severity ramp, including the covered ones. Renders nothing when
+ * there is nothing to summarize. `className` lets the caller control the
+ * surrounding margin.
  */
 export function SeveritySummaryBar({
   gaps,
@@ -29,11 +30,11 @@ export function SeveritySummaryBar({
   const total = gaps.length;
   if (total === 0) return null;
 
-  const counts: Record<KnowledgeGapSeverity, number> = {
-    high: gaps.filter((g) => g.severity === "high").length,
-    medium: gaps.filter((g) => g.severity === "medium").length,
-    low: gaps.filter((g) => g.severity === "low").length,
-  };
+  // Derived from SEVERITIES rather than spelled out, so a step added to the
+  // ramp cannot be silently left out of the summary.
+  const counts = Object.fromEntries(
+    SEVERITIES.map((s) => [s, gaps.filter((g) => g.severity === s).length]),
+  ) as Record<KnowledgeGapSeverity, number>;
 
   return (
     <div className={className}>

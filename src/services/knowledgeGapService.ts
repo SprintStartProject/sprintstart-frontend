@@ -1,31 +1,24 @@
-import { apiClient } from "./apiClient";
-import { ApiError } from "./apiClient";
+import { apiClient, ApiError } from "./apiClient";
 import type {
   KnowledgeGapOverview,
   KnowledgeGap,
   KnowledgeGapOwner,
 } from "../features/knowledge-gaps/types";
 
-import knowledgeGapMock from "../mocks/knowledgeGapsMock.json";
-import knowledgeGapDetailMock from "../mocks/knowledgeGapsDetailMock.json";
-
 /**
  * Knowledge gaps are detected and cached per project, so every call carries the
  * project it is asking about.
+ *
+ * Nothing here falls back to mock data. A fixture returned on failure is
+ * indistinguishable from a real answer, so an unreachable backend rendered as a
+ * project that simply had different gaps — and the panel's error state could
+ * never be reached. Failures propagate; the caller decides what to show.
  */
 export const knowledgeGapService = {
   async fetchKnowledgeGaps(projectId: string): Promise<KnowledgeGapOverview> {
-    try {
-      return await apiClient.fetch<KnowledgeGapOverview>(
-        `/api/v1/insights/knowledge-gaps?projectId=${encodeURIComponent(projectId)}`,
-      );
-    } catch (error) {
-      if (!(error instanceof ApiError && error.status === 404)) {
-        console.error("Error fetching knowledge gaps:", error);
-      }
-
-      return knowledgeGapMock as KnowledgeGapOverview;
-    }
+    return await apiClient.fetch<KnowledgeGapOverview>(
+      `/api/v1/insights/knowledge-gaps?projectId=${encodeURIComponent(projectId)}`,
+    );
   },
 
   /**
@@ -55,17 +48,9 @@ export const knowledgeGapService = {
   },
 
   async fetchKnowledgeGap(projectId: string, gapId: string): Promise<KnowledgeGap> {
-    try {
-      return await apiClient.fetch<KnowledgeGap>(
-        `/api/v1/insights/knowledge-gaps/${gapId}?projectId=${encodeURIComponent(projectId)}`,
-      );
-    } catch (error) {
-      if (!(error instanceof ApiError && error.status === 404)) {
-        console.error(`Error fetching knowledge gap with ID ${gapId}:`, error);
-      }
-
-      return knowledgeGapDetailMock as KnowledgeGap;
-    }
+    return await apiClient.fetch<KnowledgeGap>(
+      `/api/v1/insights/knowledge-gaps/${gapId}?projectId=${encodeURIComponent(projectId)}`,
+    );
   },
 
   /**

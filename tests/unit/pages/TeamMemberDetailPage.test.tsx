@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { TeamMemberDetailPage } from "../../../src/pages/TeamMemberDetailPage";
 import type { TeamOverviewUser, ProjectRole } from "../../../src/features/team-management/types";
 import type { KnowledgeGap } from "../../../src/features/knowledge-gaps/types";
+import { knowledgeGapService } from "../../../src/services/knowledgeGapService";
 
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: "pm1", firstName: "PM", lastName: "User" } }),
@@ -76,7 +77,13 @@ vi.mock("../../../src/features/team-management/components/detail/MemberOnboardin
 }));
 
 vi.mock("../../../src/features/team-management/components/detail/MemberGapsPanel", () => ({
-  MemberGapsPanel: () => <div data-testid="member-gaps-panel">Gaps</div>,
+  // Renders the components it was handed, so a test can assert which ones
+  // reached the panel rather than only that the panel exists.
+  MemberGapsPanel: ({ knowledgeGaps }: { knowledgeGaps: KnowledgeGap[] }) => (
+    <div data-testid="member-gaps-panel">
+      {knowledgeGaps.map((gap) => gap.component).join(",") || "Gaps"}
+    </div>
+  ),
 }));
 
 vi.mock("../../../src/features/team-management/components/detail/StepDetailsPanel", () => ({
@@ -266,6 +273,35 @@ describe("TeamMemberDetailPage", () => {
     await waitFor(() => {
       expect(mockDenyOnboardingSkipRequest).toHaveBeenCalledWith("skip1");
     });
+  });
+
+  // The knowledge-gaps overview is the project's full component roster now, but
+  // this panel is headed "Knowledge gaps" -- listing repositories that are
+  // missing nothing would overstate what the member has to answer for.
+  it("keeps covered components out of the member's gaps panel", async () => {
+    const gap = (component: string, severity: KnowledgeGap["severity"]): KnowledgeGap => ({
+      id: component,
+      component,
+      missingTypes: severity === "covered" ? [] : ["readme"],
+      lastIngested: new Date().toISOString(),
+      refreshedAt: new Date().toISOString(),
+      owners: [],
+      severity,
+    });
+    vi.mocked(knowledgeGapService.fetchKnowledgeGaps).mockResolvedValue({
+      gaps: [gap("auth-service", "high"), gap("docs-wiki", "covered")],
+    });
+
+    render(
+      <MemoryRouter>
+        <TeamMemberDetailPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("member-gaps-panel")).toHaveTextContent("auth-service");
+    });
+    expect(screen.getByTestId("member-gaps-panel")).not.toHaveTextContent("docs-wiki");
   });
 });
 

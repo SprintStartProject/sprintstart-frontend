@@ -23,7 +23,7 @@ describe("FaqWidget", () => {
         </AuthProvider>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/No FAQ groups yet/i)).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /refresh/i })).toBeInTheDocument();
+    expect(await screen.findByText(/No recurring questions yet/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /open faq page/i })).toBeInTheDocument();
   });
 });

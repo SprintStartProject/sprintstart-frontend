@@ -1,6 +1,5 @@
 import { Clock, FileWarning, FolderOpen, ShieldCheck } from "lucide-react";
 import { canAccessRoute } from "../../../auth/accessPolicy";
-import { Badge } from "../../../components/ui/Badge";
 import { useAuth } from "../../../context/useAuth";
 import { useFetch } from "../../../hooks/useFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -278,13 +277,20 @@ function MoreTile({ remaining }: { remaining: number }) {
   );
 }
 
+/*
+  The feature's own pill rather than `ui/Badge`: severity is a four-step ramp on its own
+  scale, not a point on the app's status ladder, so no Badge variant carries the right
+  colour. Mapping the steps onto the nearest status roles would have put this pill and the
+  `SeverityBar` beside it in two different reds for the same gap. Same markup as the pills
+  on the knowledge-gaps pages.
+*/
 function SeverityPill({ gap }: { gap: KnowledgeGap }) {
-  const { badgeVariant, label } = SEVERITY_STYLES[gap.severity];
+  const { badge, label } = SEVERITY_STYLES[gap.severity];
 
   return (
-    <Badge variant={badgeVariant} size="sm" className="shrink-0">
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>
       {label}
-    </Badge>
+    </span>
   );
 }
 
@@ -398,7 +404,16 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
 
   const canOpenPage = canAccessRoute(profile, "/insights/knowledge-gaps", canManageSelected);
 
-  const gaps = worstFirst(data?.gaps ?? []);
+  /*
+    The overview is the project's full component roster now, the covered ones included. This
+    card is a to-do list — its title, its counts and every chip on it say "missing" — so a
+    component with nothing missing is not a smaller item on it, it is not an item at all.
+
+    Filtering here is also what keeps the empty state reachable: left in, a member whose
+    components are all documented would get cards reading "0 documents missing" instead of
+    "Nothing assigned to you", and the summary bar would count them as work.
+  */
+  const gaps = worstFirst((data?.gaps ?? []).filter((gap) => gap.severity !== "covered"));
   const visible = gaps.slice(0, VISIBLE_COUNT[size]);
   const hidden = gaps.length - visible.length;
 

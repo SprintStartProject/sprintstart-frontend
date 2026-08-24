@@ -3,7 +3,11 @@
     {
       "groupId": "vpn-access",
       "count": 14,
+      "title": "Getting VPN access",
       "question": "How do I get VPN access?",
+      "recentCount": 9,
+      "trend": "RISING",
+      "lastAskedAt": "2026-08-13T09:12:00Z",
       "topDocuments": [
         {
           "id": "doc_001",
@@ -14,7 +18,11 @@
     {
       "groupId": "vacation-days",
       "count": 11,
+      "title": "Checking remaining vacation days",
       "question": "How many vacation days do I have left?",
+      "recentCount": 4,
+      "trend": "STEADY",
+      "lastAskedAt": "2026-08-11T14:40:00Z",
       "topDocuments": [
         {
           "id": "doc_002",
@@ -25,7 +33,11 @@
     {
       "groupId": "laptop-request",
       "count": 9,
+      "title": "Requesting a new laptop",
       "question": "How can I request a new laptop?",
+      "recentCount": 1,
+      "trend": "FADING",
+      "lastAskedAt": "2026-07-30T08:05:00Z",
       "topDocuments": [
         {
           "id": "doc_003",
@@ -36,7 +48,11 @@
     {
       "groupId": "expense-report",
       "count": 8,
+      "title": "Submitting a travel expense report",
       "question": "How do I submit a travel expense report?",
+      "recentCount": 5,
+      "trend": "RISING",
+      "lastAskedAt": "2026-08-12T16:20:00Z",
       "topDocuments": [
         {
           "id": "doc_004",
@@ -47,7 +63,11 @@
     {
       "groupId": "jira-access",
       "count": 6,
+      "title": "Getting access to Jira",
       "question": "How do I get access to Jira?",
+      "recentCount": 3,
+      "trend": "STEADY",
+      "lastAskedAt": "2026-08-10T11:00:00Z",
       "topDocuments": [
         {
           "id": "doc_005",
@@ -55,5 +75,8 @@
         }
       ]
     }
-  ]
+  ],
+  "lastAskedAt": "2026-08-13T09:12:00Z",
+  "questionCount": 48,
+  "rebuildQuestionLimit": 2000
 }

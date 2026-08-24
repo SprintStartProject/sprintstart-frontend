@@ -147,6 +147,26 @@ describe("FilterSelect", () => {
    * window. The dashboard's size picker sits in a toolbar pinned to the right
    * of its widget, which is where this shows up.
    */
+  // Focus stays on the trigger in this pattern, so the browser never scrolls
+  // the list on its own the way it would if the options were focused.
+  it("scrolls the highlighted option into view as the keyboard moves it", async () => {
+    const user = userEvent.setup();
+    // vitest.setup stubs this on HTMLElement.prototype (jsdom has no layout),
+    // so the spy has to replace it there rather than on Element.
+    const scrollIntoView = vi
+      .spyOn(window.HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+
+    const { trigger } = renderSelect();
+    await user.click(trigger);
+    scrollIntoView.mockClear();
+
+    await user.keyboard("{ArrowDown}");
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    scrollIntoView.mockRestore();
+  });
+
   it("keeps a menu wider than its trigger inside the right edge of the window", async () => {
     const user = userEvent.setup();
     const { trigger } = renderSelect();
