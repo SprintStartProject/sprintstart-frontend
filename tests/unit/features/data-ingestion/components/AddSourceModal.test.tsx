@@ -319,6 +319,36 @@ describe("AddSourceModal", () => {
     });
   });
 
+  it("keeps a newly added GitHub token visible when the post-add refetch fails", async () => {
+    // POST succeeds (token persisted), but the follow-up GET fails. Without the
+    // optimistic insert the picker stayed on "no saved tokens" and re-adding
+    // the same name hit the backend's duplicate error.
+    let added = false;
+    server.use(
+      http.get("/api/v1/github/pat", () =>
+        added ? new HttpResponse(null, { status: 500 }) : HttpResponse.json([]),
+      ),
+      http.post("/api/v1/github/pat", () => {
+        added = true;
+        return new HttpResponse(null, { status: 201 });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderModal({ tokenNames: [] });
+    await gotoGithubStep(user);
+
+    await user.click(screen.getByRole("button", { name: /add github token/i }));
+    await user.type(screen.getByTestId("settings-add-token-name"), "fresh-pat");
+    await user.type(screen.getByTestId("settings-add-token-value"), "ghp_secret123");
+    await user.click(screen.getByTestId("settings-add-token-submit"));
+
+    // The token is adopted into the picker despite the failed reload.
+    await waitFor(() =>
+      expect(screen.getByLabelText("Access token")).toHaveTextContent("fresh-pat"),
+    );
+  });
+
   it("keeps building the list across source types before connecting", async () => {
     server.use(discoveryHandler, jiraCredentialsHandler(["default"]));
     const user = userEvent.setup();
