@@ -69,148 +69,149 @@ export function MyEscalations() {
   if (answered.length === 0 && waiting.length === 0 && dismissed.length === 0) return null;
 
   return (
-    // Owns its own page spacing rather than taking it from a wrapper in `BuddyPage`: every
-    // return above this one is `null`, and a padded wrapper around nothing is a visible gap.
-    <div className="shrink-0 px-4 pt-4">
+    // No page spacing of its own, and no width of its own: it is one card in the buddy page's
+    // rail, so the column decides where it sits and how wide it is. Every return above this one
+    // is `null`, which is what keeps a gap from appearing when there is nothing to show — the
+    // rail's `gap` collapses around a component that renders nothing, but not around a padded
+    // wrapper that renders itself.
+    <motion.div {...(prefersReducedMotion ? {} : cardEntrance)}>
       {/* The dashboard's widget frame, borrowed: cursor spotlight, hover border lift and the
                 tilt toggle all come from `SpotlightCard`, so this box reads as the same design
                 system as the PM dashboard while staying a plain informational surface. */}
-      <motion.div {...(prefersReducedMotion ? {} : cardEntrance)}>
-        <SpotlightCard roundedClassName="rounded-2xl" className="mx-auto w-full max-w-3xl">
-          <section
-            className="flex flex-col gap-5 p-5 sm:p-6"
-            aria-label="Questions you sent to your PM"
-          >
-            {answered.length > 0 && (
-              <>
-                <SectionHeading icon={BookCheck} tone="success">
-                  {answered.length === 1 ? "Your PM answered" : "Your PM answered these"}
-                </SectionHeading>
-                <ul className="-mt-4 space-y-4">
-                  {answered.map((request, index) => (
-                    <motion.li
-                      key={request.id}
-                      {...(prefersReducedMotion
-                        ? {}
-                        : {
-                            initial: { opacity: 0, y: 12 },
-                            animate: { opacity: 1, y: 0 },
-                            transition: {
-                              duration: 0.35,
-                              delay: staggerDelay(index),
-                              ease: [0.16, 1, 0.3, 1] as const,
-                            },
-                          })}
-                      className="rounded-xl bg-app-surface-muted/60 p-3"
-                    >
-                      <div className="flex items-start gap-2">
-                        <BookCheck
-                          className="mt-0.5 h-4 w-4 shrink-0 text-app-success-solid"
-                          aria-hidden="true"
-                        />
-                        <p className="text-sm font-medium text-app-text">{request.question}</p>
-                      </div>
-                      <p className="mt-1.5 pl-6 text-sm whitespace-pre-wrap text-app-text-muted">
-                        {request.answer?.answer}
-                      </p>
-                      <p className="mt-1.5 pl-6 text-xs text-app-text-disabled">
-                        Answered by your PM
-                        {request.answeredAt && ` · ${formatDateTime(request.answeredAt)}`}
-                        {" · the buddy knows this now, so you can ask it directly next time"}
-                      </p>
-                    </motion.li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            {waiting.length > 0 && (
-              <>
-                <SectionHeading icon={Hourglass} tone={hasOpenLongWait(waiting) ? "warning" : null}>
-                  Still with your PM
-                </SectionHeading>
-                <ul className="-mt-4 space-y-2">
-                  {waiting.map((request, index) => (
-                    <motion.li
-                      key={request.id}
-                      {...(prefersReducedMotion
-                        ? {}
-                        : {
-                            initial: { opacity: 0, y: 12 },
-                            animate: { opacity: 1, y: 0 },
-                            transition: {
-                              duration: 0.35,
-                              delay: staggerDelay(index),
-                              ease: [0.16, 1, 0.3, 1] as const,
-                            },
-                          })}
-                      className="flex items-start justify-between gap-3 rounded-xl bg-app-surface-muted/60 px-3 py-2.5"
-                    >
-                      <p className="text-sm text-app-text-muted">{request.question}</p>
-                      <span
-                        title="How long this has waited on a person"
-                        className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
-                          hasWaitedADay(request.createdAt)
-                            ? "bg-app-warning-bg font-medium text-app-warning-text"
-                            : "bg-app-surface text-app-text-disabled"
-                        }`}
-                      >
-                        <Clock className="h-3 w-3" aria-hidden="true" />
-                        {formatWaiting(request.createdAt)}
-                        {hasWaitedADay(request.createdAt) && (
-                          <span className="sr-only"> or more</span>
-                        )}
-                      </span>
-                    </motion.li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            {/* A dismissed question is shown rather than quietly dropped: the hire was told to
-                        wait for an answer that is now never coming, and letting it sit under "still with
-                        your PM" forever would be the same broken promise in a different place. */}
-            {dismissed.length > 0 && (
-              <>
-                <SectionHeading icon={MessageSquareOff} tone={null}>
-                  Closed without an answer
-                </SectionHeading>
-                <ul className="-mt-4 space-y-2">
-                  {dismissed.map((request, index) => (
-                    <motion.li
-                      key={request.id}
-                      {...(prefersReducedMotion
-                        ? {}
-                        : {
-                            initial: { opacity: 0, y: 12 },
-                            animate: { opacity: 1, y: 0 },
-                            transition: {
-                              duration: 0.35,
-                              delay: staggerDelay(index),
-                              ease: [0.16, 1, 0.3, 1] as const,
-                            },
-                          })}
-                      className="flex items-start gap-2 rounded-xl bg-app-surface-muted/40 px-3 py-2.5"
-                    >
-                      <MessageSquareOff
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-text-disabled"
+      <SpotlightCard roundedClassName="rounded-2xl" className="w-full">
+        <section
+          className="flex flex-col gap-5 p-4 sm:p-[18px]"
+          aria-label="Questions you sent to your PM"
+        >
+          {answered.length > 0 && (
+            <>
+              <SectionHeading icon={BookCheck} tone="success">
+                {answered.length === 1 ? "Your PM answered" : "Your PM answered these"}
+              </SectionHeading>
+              <ul className="-mt-4 space-y-4">
+                {answered.map((request, index) => (
+                  <motion.li
+                    key={request.id}
+                    {...(prefersReducedMotion
+                      ? {}
+                      : {
+                          initial: { opacity: 0, y: 12 },
+                          animate: { opacity: 1, y: 0 },
+                          transition: {
+                            duration: 0.35,
+                            delay: staggerDelay(index),
+                            ease: [0.16, 1, 0.3, 1] as const,
+                          },
+                        })}
+                    className="rounded-xl bg-app-surface-muted/60 p-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <BookCheck
+                        className="mt-0.5 h-4 w-4 shrink-0 text-app-success-solid"
                         aria-hidden="true"
                       />
-                      <p className="text-sm text-app-text-muted">
-                        {request.question}{" "}
-                        <span className="text-app-text-disabled">
-                          — worth asking your PM directly.
-                        </span>
-                      </p>
-                    </motion.li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
-        </SpotlightCard>
-      </motion.div>
-    </div>
+                      <p className="text-sm font-medium text-app-text">{request.question}</p>
+                    </div>
+                    <p className="mt-1.5 pl-6 text-sm whitespace-pre-wrap text-app-text-muted">
+                      {request.answer?.answer}
+                    </p>
+                    <p className="mt-1.5 pl-6 text-xs text-app-text-disabled">
+                      Answered by your PM
+                      {request.answeredAt && ` · ${formatDateTime(request.answeredAt)}`}
+                      {" · the buddy knows this now, so you can ask it directly next time"}
+                    </p>
+                  </motion.li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {waiting.length > 0 && (
+            <>
+              <SectionHeading icon={Hourglass} tone={hasOpenLongWait(waiting) ? "warning" : null}>
+                Still with your PM
+              </SectionHeading>
+              <ul className="-mt-4 space-y-2">
+                {waiting.map((request, index) => (
+                  <motion.li
+                    key={request.id}
+                    {...(prefersReducedMotion
+                      ? {}
+                      : {
+                          initial: { opacity: 0, y: 12 },
+                          animate: { opacity: 1, y: 0 },
+                          transition: {
+                            duration: 0.35,
+                            delay: staggerDelay(index),
+                            ease: [0.16, 1, 0.3, 1] as const,
+                          },
+                        })}
+                    className="flex items-start justify-between gap-3 rounded-xl bg-app-surface-muted/60 px-3 py-2.5"
+                  >
+                    <p className="text-sm text-app-text-muted">{request.question}</p>
+                    <span
+                      title="How long this has waited on a person"
+                      className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+                        hasWaitedADay(request.createdAt)
+                          ? "bg-app-warning-bg font-medium text-app-warning-text"
+                          : "bg-app-surface text-app-text-disabled"
+                      }`}
+                    >
+                      <Clock className="h-3 w-3" aria-hidden="true" />
+                      {formatWaiting(request.createdAt)}
+                      {hasWaitedADay(request.createdAt) && (
+                        <span className="sr-only"> or more</span>
+                      )}
+                    </span>
+                  </motion.li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {/* A dismissed question is shown rather than quietly dropped: the hire was told to
+                        wait for an answer that is now never coming, and letting it sit under "still with
+                        your PM" forever would be the same broken promise in a different place. */}
+          {dismissed.length > 0 && (
+            <>
+              <SectionHeading icon={MessageSquareOff} tone={null}>
+                Closed without an answer
+              </SectionHeading>
+              <ul className="-mt-4 space-y-2">
+                {dismissed.map((request, index) => (
+                  <motion.li
+                    key={request.id}
+                    {...(prefersReducedMotion
+                      ? {}
+                      : {
+                          initial: { opacity: 0, y: 12 },
+                          animate: { opacity: 1, y: 0 },
+                          transition: {
+                            duration: 0.35,
+                            delay: staggerDelay(index),
+                            ease: [0.16, 1, 0.3, 1] as const,
+                          },
+                        })}
+                    className="flex items-start gap-2 rounded-xl bg-app-surface-muted/40 px-3 py-2.5"
+                  >
+                    <MessageSquareOff
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-text-disabled"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm text-app-text-muted">
+                      {request.question}{" "}
+                      <span className="text-app-text-disabled">
+                        — worth asking your PM directly.
+                      </span>
+                    </p>
+                  </motion.li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      </SpotlightCard>
+    </motion.div>
   );
 }
 

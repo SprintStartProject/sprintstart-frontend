@@ -61,7 +61,11 @@ export function BuddyMessageBubble({
         )}
       </div>
 
-      <div className={`flex max-w-[85%] min-w-0 flex-col ${isUser ? "items-end" : "items-start"}`}>
+      {/* The chat page's two measures, kept identical here: a reply gets more room than a
+                question, because one is prose and the other is a line somebody typed. */}
+      <div
+        className={`flex min-w-0 flex-col ${isUser ? "max-w-[70%] items-end" : "max-w-[85%] items-start"}`}
+      >
         {hasText && (
           <div
             className={`max-w-full min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words shadow-sm ${

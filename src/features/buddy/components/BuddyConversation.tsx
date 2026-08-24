@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { MessagesSquare } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
@@ -22,31 +23,28 @@ type BuddyConversationProps = {
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /**
-   * Rendered inside the scroller, above the thread — the record of what the hire asked a
-   * person. It scrolls with the conversation rather than sitting pinned between the header
-   * and the transcript, which is what used to push the thread halfway down the page.
-   */
-  topSlot?: ReactNode;
-  /**
    * Shown in place of the thread until the hire has said something (see `BuddyWelcome`).
    * Passed in rather than decided here so this component keeps one job: render a conversation.
    */
   welcome?: ReactNode;
-  /** The quiet row under the composer — the escalation trigger, once there is a question to flag. */
-  composerFooter?: ReactNode;
 };
 
 /**
- * The full-page buddy conversation used by the `/buddy` home: the thread, and the box you
- * answer it in.
+ * The conversation, as a card on a page rather than as the page.
  *
- * Bubble styling is shared with the chat page's message row rather than with the floating
- * [BuddyPanel] alone, so the two model surfaces in this app read as one product. What stays
- * particular to the buddy is what the buddy does: a tool label instead of a bare spinner, and
- * proposals the hire confirms inline.
+ * It used to be the whole viewport: a full-bleed column with a bar on top, which is the shape
+ * of a phone messaging app and looked like one dropped into a desktop tool. It is a bounded
+ * surface now — the app's ordinary `rounded-2xl` card, with its own title row, its own
+ * scrolling body and the composer pinned to its bottom edge — so it sits inside the page grid
+ * next to `BuddySidePanel` the way every other panel in this app sits inside a page.
  *
- * It scrolls down, never sideways — `overflow-x-hidden` plus `min-w-0` down the column. This
- * page is wide, so an overflowing reply reads as a slightly odd layout rather than an obvious
+ * Bubble styling is shared with the chat page's message row rather than only with the floating
+ * [BuddyPanel], so the two model surfaces in this app read as one product. What stays
+ * particular to the buddy is what the buddy *does*: a live tool label in the title row instead
+ * of a bare spinner, and proposals the hire confirms inline.
+ *
+ * It scrolls down, never sideways — `overflow-x-hidden` plus `min-w-0` down the column. The
+ * card is wide, so an overflowing reply reads as a slightly odd layout rather than an obvious
  * bug, which is how such a regression survives review; see `BuddyPanel` for the full rule.
  */
 export function BuddyConversation({
@@ -60,9 +58,7 @@ export function BuddyConversation({
   dismissAction,
   bottomRef,
   placeholder,
-  topSlot,
   welcome,
-  composerFooter,
 }: BuddyConversationProps) {
   const prefersReducedMotion = useReducedMotion();
 
@@ -72,12 +68,36 @@ export function BuddyConversation({
   const streamingId = messages[messages.length - 1]?.id;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 overflow-x-hidden overflow-y-auto">
-        {topSlot}
+    <section
+      aria-label="Conversation with your buddy"
+      className="flex min-h-[32rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm xl:h-full xl:min-h-0"
+    >
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-app-border-muted px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <MessagesSquare className="h-4 w-4 shrink-0 text-app-brand-text" aria-hidden="true" />
+          <h2 className="truncate text-sm font-semibold text-app-text">Conversation</h2>
+        </div>
 
+        {/* What the buddy is *doing*, where a desktop app puts a status: in the panel's
+                    title row, not as a line inside the transcript. "Checking your progress…" is an
+                    answer to "why is this taking a moment", which three dots are not. */}
+        {isThinking && activeTool && (
+          <span
+            role="status"
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-app-brand-soft px-2.5 py-1 text-xs font-medium text-app-brand-text"
+          >
+            <span
+              className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-brand"
+              aria-hidden="true"
+            />
+            {toolLabel(activeTool)}
+          </span>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {welcome ?? (
-          <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-5 px-4 py-6">
+          <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6">
             {messages.map((message) => {
               const isUser = message.role === "USER";
               const hasText = message.content.trim().length > 0;
@@ -111,28 +131,20 @@ export function BuddyConversation({
                       animate: { opacity: 1, y: 0 },
                       transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const },
                     })}
-                role="status"
                 className="flex w-full gap-3"
               >
                 <div className="flex size-8 shrink-0 items-center justify-center">
                   <SleepyBot size={30} canSleep={false} className="text-app-brand-text" />
                 </div>
 
-                <div className="flex max-w-[85%] flex-col items-start">
-                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 shadow-sm">
-                    <span className="flex gap-1" aria-hidden="true">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
-                    </span>
-                    {/* What it is *doing*, when the backend says — "Checking your
-                                        progress…" is an answer to "why is this taking a moment",
-                                        which three dots are not. */}
-                    {activeTool && (
-                      <span className="text-sm text-app-text-muted italic">
-                        {toolLabel(activeTool)}
-                      </span>
-                    )}
+                <div className="flex flex-col items-start">
+                  <div
+                    aria-label="Your buddy is writing"
+                    className="flex items-center gap-1 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-3 shadow-sm"
+                  >
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
                   </div>
                 </div>
               </motion.div>
@@ -148,8 +160,7 @@ export function BuddyConversation({
         setDraft={setDraft}
         handleSubmit={handleSubmit}
         placeholder={placeholder}
-        footer={composerFooter}
       />
-    </div>
+    </section>
   );
 }

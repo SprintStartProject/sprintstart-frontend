@@ -6,12 +6,6 @@ type BuddySuggestionChipsProps = {
   onPick: (question: string) => void;
   /** Small print above the row. Omitted where the surrounding copy already says it. */
   heading?: string;
-  /**
-   * Which way the row and its heading line up. `start` for a row sitting above a composer;
-   * `center` for the welcome column, where a left-aligned row under a centred greeting is the
-   * one thing that makes the whole column look accidentally off-centre.
-   */
-  align?: "start" | "center";
 };
 
 /**
@@ -28,30 +22,23 @@ type BuddySuggestionChipsProps = {
  * derives it from the tools mounted for *this* hire — a hardcoded list offers a Scrum Master a
  * pull-request question.
  */
-export function BuddySuggestionChips({
-  suggestions,
-  onPick,
-  heading,
-  align = "start",
-}: BuddySuggestionChipsProps) {
+export function BuddySuggestionChips({ suggestions, onPick, heading }: BuddySuggestionChipsProps) {
   if (suggestions.length === 0) return null;
 
-  const isCentered = align === "center";
-
   return (
-    <div data-testid="buddy-suggestions" className={isCentered ? "text-center" : ""}>
+    <div data-testid="buddy-suggestions">
       {heading && (
-        <p className="mb-3 text-xs font-medium tracking-wide text-app-text-muted uppercase">
+        <p className="mb-2 text-xs font-medium tracking-wide text-app-text-muted uppercase">
           {heading}
         </p>
       )}
-      <div className={`flex flex-wrap gap-2 ${isCentered ? "justify-center" : ""}`}>
+      <div className="flex flex-wrap gap-2">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion.label}
             type="button"
             onClick={() => onPick(suggestion.question)}
-            className="rounded-full border border-app-border-muted bg-app-surface px-3.5 py-1.5 text-sm text-app-text-muted shadow-sm transition-colors hover:border-app-brand-border hover:bg-app-surface-hover hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            className="rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-sm text-app-text transition-colors hover:border-app-brand hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
           >
             {suggestion.label}
           </button>
