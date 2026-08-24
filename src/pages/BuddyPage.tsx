@@ -1,97 +1,104 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { Bot, LayoutDashboard, Users } from "lucide-react";
-import { PageHeader } from "../components/layout/PageHeader";
+import { useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import { Sparkles, Users, X } from "lucide-react";
+import { SleepyBot } from "../features/chatbot/components/SleepyBot";
+import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useBuddyConversation } from "../features/buddy/hooks/useBuddyConversation";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
-import { BuddySidePanel } from "../features/buddy/components/BuddySidePanel";
-import { BuddyWelcome } from "../features/buddy/components/BuddyWelcome";
+import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
+import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
+import { FlagToPmButton } from "../features/knowledge-request/components/FlagToPmButton";
 
 /**
- * The buddy's home: the hire's onboarding front door.
+ * The buddy's home: the hire's onboarding front door, as one conversation.
  *
  * The buddy is not a feature of the onboarding — it *is* the onboarding. The mentor answers
  * from the docs *and* from the hire's own state, and renders what it opens (like a task's
  * orientation packet) in the thread rather than navigating away.
  *
- * **It is a page in this app, not a chat app inside it.** It used to be a full-bleed column
- * with a bar on top and four stacked strips above the transcript — the shape of a phone
- * messenger, on the one screen a new hire spends the most time on. It now wears what every
- * other page here wears: a `PageHeader` in a bordered band, an `app-page-frame` body, and a
- * card grid. The conversation is the wide card; everything that is *not* the conversation —
- * what came back from a person, what is worth asking, the way out when the buddy cannot help
- * — is the rail beside it, which is where the rest of the app already puts such things.
+ * **It is a conversation with somebody, and it is built to feel like one.** Earlier passes at
+ * this page tried to make it look like the rest of the app by putting the chat in a card and
+ * standing a column of widgets next to it — "Ask about", "Not getting anywhere?" — and what
+ * came out was a dashboard about a conversation rather than a conversation. Everything those
+ * boxes held has moved to where a person would expect it: the things worth asking sit above the
+ * box they fill, and "the buddy can't help" hangs off the answer that could not help, because
+ * that is what it is about.
  *
- * The floating widget (mounted app-wide) shares the same one buddy session, so a hire can pick
- * up the conversation from anywhere.
+ * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
+ * pick the conversation up from anywhere and grow it into this page when it needs room.
  */
-
-/** Subtitle for a hire who has a project to be onboarded onto. */
-const MENTOR_SUBTITLE =
-  "Your always-on mentor — ask about the codebase, or about your own onboarding.";
 
 /**
- * The page's outer shape, shared by the mentor and the no-project state so the header does not
- * move between them.
+ * The page's shape, shared by the mentor and the no-project state so nothing moves between
+ * them.
  *
- * Fixed height rather than the `min-h-screen` its sibling pages use, and for one reason: the
+ * Fixed height rather than the `min-h-screen` its sibling pages use, for one reason: the
  * composer has to stay on screen. A conversation whose input scrolls away is one you have to
- * scroll back to in order to answer. The body scrolls inside the two cards instead — until the
- * grid folds to one column below `xl`, where the page takes the scrolling back.
+ * scroll back to in order to answer.
  */
-function BuddyPageShell({
-  showBoardLink = false,
-  children,
-}: {
-  showBoardLink?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex h-[calc(100vh-64px)] flex-col lg:h-screen">
-      <header className="shrink-0 border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-frame py-5 lg:py-6">
-          <PageHeader
-            icon={Bot}
-            title="Buddy"
-            subtitle={
-              showBoardLink ? MENTOR_SUBTITLE : "Your onboarding buddy, once you're on a project."
-            }
-            actions={
-              // This conversation opens fresh every visit by design, so anything worth
-              // keeping lives on the board — linking it here is what stops that being a
-              // page nobody finds. Off for a hire with no project: the board keeps durable
-              // things and there is nothing durable on it yet, so the link would send
-              // somebody to an empty page on their first minute here.
-              //
-              // A `Link`, styled to sit level with the header's buttons: a control that
-              // changes the URL is an anchor, and dressing one as a `Button` does not make
-              // it keyboard- or screen-reader-correct.
-              showBoardLink ? (
-                <Link
-                  to="/board"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                >
-                  <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                  Board
-                </Link>
-              ) : undefined
-            }
-          />
-        </div>
-      </header>
+function BuddyPageShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const prefersReducedMotion = useReducedMotion();
 
-      {/* Scrolls as a page in the stacked layout and hands the scrolling to the cards once
-                the grid splits, so the composer stays put on the width this page is used at.
-                A `div` and not a `main`, unlike the sibling pages that otherwise share this
-                shape: `App.tsx` already wraps every route in one, and a second `main` is a
-                duplicate landmark. The layout classes are the pages' — only the tag differs. */}
-      <div className="app-page-frame min-h-0 flex-1 overflow-y-auto py-5 lg:py-6 xl:overflow-hidden">
-        {children}
-      </div>
+  /**
+   * Leaves the conversation the way you came into it.
+   *
+   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload
+   * straight onto `/buddy`, or a link from outside. There is no history to step back through
+   * there, so going back would leave the app entirely; the board is where a hire belongs
+   * instead, and it is the durable half of this same conversation.
+   */
+  const close = useCallback(() => {
+    if (location.key !== "default") void navigate(-1);
+    else void navigate("/board");
+  }, [location.key, navigate]);
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen">
+      <motion.header
+        {...(prefersReducedMotion
+          ? {}
+          : {
+              initial: { opacity: 0, y: -8 },
+              animate: { opacity: 1, y: 0 },
+              transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const },
+            })}
+        className="shrink-0 border-b border-app-border bg-app-bg/85 backdrop-blur-md"
+      >
+        {/* The conversation's own width, not the page's: the header sits directly over the
+                    thread, and a name that starts 10rem to the left of the first message belongs
+                    to a different page than the one underneath it. */}
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3.5 sm:px-6">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
+            <SleepyBot size={32} canSleep={false} tracksPointer className="text-app-brand-text" />
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base leading-tight font-semibold text-app-text">Buddy</h1>
+            <p className="truncate text-xs text-app-text-muted">{subtitle}</p>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Close the conversation"
+            title="Close"
+            onClick={close}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </motion.header>
+
+      {children}
     </div>
   );
 }
@@ -118,68 +125,73 @@ function BuddyMentorHome() {
 
   const suggestions = useBuddySuggestions();
 
-  // Whatever they were typing in the floating panel when they asked for more room.
+  // Whatever they were typing in the dock when they asked for more room.
   useHandedOffDraft(setDraft);
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
   const lastQuestion = [...messages].reverse().find((m) => m.role === "USER")?.content ?? "";
 
-  // The greeting can carry a proposal the hire has to confirm, and a confirm affordance in a
-  // centred welcome column would sit under the words it belongs to but nowhere near them. That
-  // one case falls through to the thread, which is built for it.
-  const greetingHasActions = messages.some((m) => (m.actions?.length ?? 0) > 0);
-  const showWelcome = !hasUserMessage && !greetingHasActions;
-  const greeting = showWelcome ? (messages.find((m) => m.role === "ASSISTANT")?.content ?? "") : "";
-
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
-  // Nothing here needs the greeting in order to work: the composer sends, the rail renders, and
-  // the greeting drops into the welcome the moment it arrives. It is the rule the board already
-  // holds itself to — a page that waits on a model to open is a page nobody opens.
+  // Nothing here needs the greeting in order to work: the composer sends, the chips render, and
+  // the greeting arrives in its own bubble — as the buddy typing, which is the honest picture
+  // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
-    <BuddyPageShell showBoardLink>
-      {/* Splits at `xl` and not before: the page gutters are already 10rem a side from `lg`,
-                so a rail introduced there would leave the conversation narrower than the rail.
-                It widens again at `2xl`, where there is room for the escalation answers to breathe. */}
-      <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-stretch 2xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <BuddyConversation
-          messages={messages}
-          // While the visit opens, the same indicator stands in for the greeting that is on
-          // its way -- it does not disable the composer, so the hire can type straight past
-          // it. The welcome does that job itself, so it is not doubled there.
-          isThinking={isThinking || (isOpening && !showWelcome)}
-          activeTool={activeTool}
-          draft={draft}
-          setDraft={setDraft}
-          handleSubmit={handleSubmit}
-          confirmAction={confirmAction}
-          dismissAction={dismissAction}
-          bottomRef={bottomRef}
-          welcome={
-            showWelcome ? (
-              <BuddyWelcome
-                greeting={greeting}
-                isOpening={isOpening}
-                openerAction={openerAction}
-                // The opener sends on one click, deliberately: that is accepting something
-                // the mentor just offered, not composing a question.
-                onTakeOpener={(question) => void sendMessage(question)}
-              />
-            ) : undefined
-          }
-        />
-
-        <BuddySidePanel
-          suggestions={suggestions}
-          // The rail's suggestions *fill* the composer instead of sending. The hire presses
-          // send: the words stay theirs, and they can edit the question first — which is how
-          // somebody learns they are allowed to. The list is the backend's too, built from the
-          // tools it actually mounts for this hire, so the rail and the mentor cannot disagree
-          // about whether this role has pull requests.
-          onPick={setDraft}
-          lastQuestion={lastQuestion}
-        />
-      </div>
+    <BuddyPageShell subtitle="Your onboarding mentor — here whenever you're stuck.">
+      <BuddyConversation
+        messages={messages}
+        isThinking={isThinking || isOpening}
+        activeTool={activeTool}
+        draft={draft}
+        setDraft={setDraft}
+        handleSubmit={handleSubmit}
+        confirmAction={confirmAction}
+        dismissAction={dismissAction}
+        bottomRef={bottomRef}
+        // What came back from a person, above what the buddy is saying now. Renders nothing at
+        // all until the hire has escalated something.
+        before={<BuddyPmReplies />}
+        lastMessageFooter={
+          hasUserMessage ? (
+            // Hung off the buddy's answer, because that is what it is about: *this* reply did
+            // not get you there, so take *this* question to a person. In a box on the side it
+            // was an offer with no subject.
+            <div className="mt-1.5 w-full">
+              <FlagToPmButton defaultQuestion={lastQuestion} />
+            </div>
+          ) : (
+            openerAction && (
+              // The greeting's own next step, offered where a messenger offers a quick reply:
+              // right under the message that suggested it. It sends on one click, unlike the
+              // chips — accepting something the mentor just offered is not composing a
+              // question of your own.
+              <Button
+                variant="primary"
+                size="sm"
+                className="mt-1.5"
+                icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+                onClick={() => void sendMessage(openerAction.question)}
+              >
+                {openerAction.label}
+              </Button>
+            )
+          )
+        }
+        aboveComposer={
+          // The chips *fill* the composer instead of sending, which is why they sit on top of
+          // it. The hire presses send: the words stay theirs, and they can edit the question
+          // first — which is how somebody learns they are allowed to. The list is the
+          // backend's, built from the tools it actually mounts for this hire, so the chips and
+          // the mentor cannot disagree about whether this role has pull requests.
+          !hasUserMessage ? (
+            <BuddySuggestionChips
+              suggestions={suggestions}
+              onPick={setDraft}
+              heading="Not sure where to start?"
+            />
+          ) : undefined
+        }
+      />
     </BuddyPageShell>
   );
 }
@@ -189,8 +201,8 @@ export function BuddyPage() {
 
   if (!isLoading && !selectedProjectId) {
     return (
-      <BuddyPageShell>
-        <div className="flex h-full items-center justify-center py-10">
+      <BuddyPageShell subtitle="Your onboarding buddy, once you're on a project.">
+        <div className="flex flex-1 items-center justify-center p-8">
           <EmptyState
             icon={<Users className="h-8 w-8" aria-hidden="true" />}
             title="No project yet"

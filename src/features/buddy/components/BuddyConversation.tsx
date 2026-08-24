@@ -1,14 +1,12 @@
 import type { ReactNode, RefObject } from "react";
-import { MessagesSquare } from "lucide-react";
 import type { BuddyMessageView, ProposedAction } from "../types";
-import { toolLabel } from "../toolLabel";
 import { BuddyComposer } from "./BuddyComposer";
-import { BuddyThinkingTurn, BuddyTurn } from "./BuddyTurn";
+import { BuddyThread } from "./BuddyThread";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
   isThinking: boolean;
-  /** The tool the buddy is running right now, if any — shown as "Checking your progress…". */
+  /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
   draft: string;
   setDraft: (value: string) => void;
@@ -20,28 +18,32 @@ type BuddyConversationProps = {
   bottomRef: RefObject<HTMLDivElement | null>;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
-  /**
-   * Shown in place of the thread until the hire has said something (see `BuddyWelcome`).
-   * Passed in rather than decided here so this component keeps one job: render a conversation.
-   */
-  welcome?: ReactNode;
+  /** Rendered above the first message: what came back from the hire's PM. */
+  before?: ReactNode;
+  /** Rendered under the buddy's most recent reply — the opener, or the offer to ask a person. */
+  lastMessageFooter?: ReactNode;
+  /** Rendered just above the composer: the things this hire could usefully ask. */
+  aboveComposer?: ReactNode;
 };
 
 /**
- * The conversation on the full page: a card in the page grid, not the page.
+ * The `/buddy` conversation: the thread, and the box you answer it in.
  *
- * A bounded surface — the app's ordinary `rounded-2xl` card, with its own title row, its own
- * scrolling body and the composer pinned to its bottom edge — so it sits beside
- * `BuddySidePanel` the way every other panel in this app sits inside a page.
+ * **No card, no panel, no chrome.** It used to be a bordered surface sitting in a page grid
+ * beside a column of widgets, and the widgets were the problem — a box labelled "Ask about"
+ * next to a box labelled "Not getting anywhere?" is a settings screen, not somebody you talk
+ * to. What is left is what a conversation actually needs: the messages, and a place to write.
+ * Everything the widgets used to hold has moved to where it belongs — the suggestions to the
+ * composer they fill, the escalation offer to the answer that prompted it.
  *
- * The transcript is `BuddyTurn`, the same one the dock renders: speakers under their own names
- * at one left margin, prose at a readable measure, no opposing bubbles. That is what stops a
- * wide desktop page reading as a phone messenger stretched sideways.
+ * One reading column rather than the full width of a desktop: this is a conversation with a
+ * person, and every product where that is true — a DM, a support thread, a chat with a tutor —
+ * settles on roughly this measure, because prose past about 75 characters a line is hard to
+ * track back to the left margin. The page around it is what makes it a desktop page: a real
+ * header, real gutters, and the buddy's own name on every message.
  *
- * It scrolls down, never sideways — `overflow-x-hidden` plus `min-w-0` down the column. The
- * card is wide, so an overflowing reply reads as a slightly odd layout rather than an obvious
- * bug, which is how such a regression survives review; see `BuddyMarkdown` for the per-block
- * half of the rule.
+ * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
+ * to `BuddyMarkdown`, where wide blocks get their own scrollers.
  */
 export function BuddyConversation({
   messages,
@@ -54,85 +56,46 @@ export function BuddyConversation({
   dismissAction,
   bottomRef,
   placeholder,
-  welcome,
+  before,
+  lastMessageFooter,
+  aboveComposer,
 }: BuddyConversationProps) {
-  // The send loop appends an empty assistant message up front and streams into it, so the
-  // last turn is the one receiving tokens — that bot stays awake while every older one is
-  // free to doze off.
-  const streamingId = messages[messages.length - 1]?.id;
-
   return (
-    <section
-      aria-label="Conversation with your buddy"
-      className="flex min-h-[32rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm xl:h-full xl:min-h-0"
-    >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-app-border-muted px-4 py-3 sm:px-6">
-        <div className="flex min-w-0 items-center gap-2">
-          <MessagesSquare className="h-4 w-4 shrink-0 text-app-brand-text" aria-hidden="true" />
-          <h2 className="truncate text-sm font-semibold text-app-text">Conversation</h2>
+    <>
+      <div
+        data-testid="buddy-transcript"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4 px-4 py-8 sm:px-6">
+          <BuddyThread
+            messages={messages}
+            isThinking={isThinking}
+            activeTool={activeTool}
+            confirmAction={confirmAction}
+            dismissAction={dismissAction}
+            showNames
+            before={before}
+            lastMessageFooter={lastMessageFooter}
+          />
+
+          <div ref={bottomRef} />
         </div>
-
-        {/* What the buddy is *doing*, where a desktop app puts a status: in the panel's
-                    title row. The thinking turn below carries the same label in the dock, where
-                    there is no title row to put it in. */}
-        {isThinking && activeTool && (
-          <span
-            role="status"
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-app-brand-soft px-2.5 py-1 text-xs font-medium text-app-brand-text"
-          >
-            <span
-              className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-brand"
-              aria-hidden="true"
-            />
-            {toolLabel(activeTool)}
-          </span>
-        )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        {welcome ?? (
-          <div className="flex min-w-0 flex-col gap-6 px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-            {messages.map((message) => {
-              const isUser = message.role === "USER";
-              const hasText = message.content.trim().length > 0;
-              const hasActions = (message.actions?.length ?? 0) > 0;
+      {/* Translucent rather than solid, so the thread does not stop dead at a hard line — the
+                last message fades under the composer as it scrolls past it. */}
+      <div className="shrink-0 border-t border-app-border bg-app-bg/85 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
+          {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
-              // Until the first token (or an action proposal) arrives the streaming
-              // placeholder has nothing to show, and the thinking turn below already stands
-              // in for it — so skip it, otherwise an empty second turn appears while the
-              // buddy is working.
-              if (!isUser && !hasText && !hasActions) {
-                return null;
-              }
-
-              return (
-                <BuddyTurn
-                  key={message.id}
-                  message={message}
-                  isStreaming={message.id === streamingId}
-                  onConfirm={confirmAction}
-                  onDismiss={dismissAction}
-                />
-              );
-            })}
-
-            {isThinking && <BuddyThinkingTurn />}
-
-            <div ref={bottomRef} />
-          </div>
-        )}
+          <BuddyComposer
+            draft={draft}
+            setDraft={setDraft}
+            handleSubmit={handleSubmit}
+            placeholder={placeholder}
+          />
+        </div>
       </div>
-
-      {/* The card supplies the composer's band; the composer itself draws no frame, so the
-                dock can hand the same component to `SidePanel`'s footer. */}
-      <div className="shrink-0 border-t border-app-border-muted bg-app-bg/40 px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8">
-        <BuddyComposer
-          draft={draft}
-          setDraft={setDraft}
-          handleSubmit={handleSubmit}
-          placeholder={placeholder}
-        />
-      </div>
-    </section>
+    </>
   );
 }

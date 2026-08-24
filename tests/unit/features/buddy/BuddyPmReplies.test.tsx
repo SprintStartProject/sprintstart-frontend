@@ -1,20 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MyEscalations } from "../../../../../src/features/knowledge-request/components/MyEscalations";
+import { BuddyPmReplies } from "../../../../src/features/buddy/components/BuddyPmReplies";
 import type {
   CanonicalAnswer,
   KnowledgeRequest,
-} from "../../../../../src/features/knowledge-request/types";
+} from "../../../../src/features/knowledge-request/types";
 
-vi.mock("../../../../../src/hooks/useFetch", () => ({
+vi.mock("../../../../src/hooks/useFetch", () => ({
   useFetch: vi.fn(),
 }));
 
-vi.mock("../../../../../src/services/knowledgeRequestService", () => ({
+vi.mock("../../../../src/services/knowledgeRequestService", () => ({
   knowledgeRequestService: { listMine: vi.fn() },
 }));
 
-import { useFetch } from "../../../../../src/hooks/useFetch";
+import { useFetch } from "../../../../src/hooks/useFetch";
 
 function answer(overrides: Partial<CanonicalAnswer> = {}): CanonicalAnswer {
   return {
@@ -54,26 +54,26 @@ function mockRequests(
   });
 }
 
-describe("MyEscalations", () => {
+describe("BuddyPmReplies", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("renders nothing when the hire has never escalated anything", () => {
     mockRequests([]);
-    const { container } = render(<MyEscalations />);
+    const { container } = render(<BuddyPmReplies />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders nothing while loading, so the page does not shift under the hire", () => {
     mockRequests(null, { loading: true });
-    const { container } = render(<MyEscalations />);
+    const { container } = render(<BuddyPmReplies />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("stays silent on a failed load rather than showing an error the hire cannot act on", () => {
     mockRequests(null, { error: true });
-    const { container } = render(<MyEscalations />);
+    const { container } = render(<BuddyPmReplies />);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -85,7 +85,7 @@ describe("MyEscalations", () => {
         answer: answer(),
       }),
     ]);
-    render(<MyEscalations />);
+    render(<BuddyPmReplies />);
 
     expect(screen.getByText("How do I get staging credentials?")).toBeInTheDocument();
     expect(screen.getByText("Ask in #platform and Dana will provision them.")).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("MyEscalations", () => {
     mockRequests([
       request({ status: "ANSWERED", answeredAt: "2026-07-27T10:00:00Z", answer: answer() }),
     ]);
-    render(<MyEscalations />);
+    render(<BuddyPmReplies />);
 
     expect(screen.getByText(/Answered by your PM/)).toBeInTheDocument();
   });
@@ -106,13 +106,13 @@ describe("MyEscalations", () => {
     mockRequests([
       request({ status: "ANSWERED", answeredAt: "2026-07-27T10:00:00Z", answer: null }),
     ]);
-    const { container } = render(<MyEscalations />);
+    const { container } = render(<BuddyPmReplies />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows a still-open question as waiting, so the hire does not re-flag it", () => {
     mockRequests([request()]);
-    render(<MyEscalations />);
+    render(<BuddyPmReplies />);
 
     expect(screen.getByText("Still with your PM")).toBeInTheDocument();
     expect(screen.queryByText(/Your PM answered/)).not.toBeInTheDocument();
@@ -120,7 +120,7 @@ describe("MyEscalations", () => {
 
   it("surfaces a dismissed question instead of leaving it waiting forever", () => {
     mockRequests([request({ status: "DISMISSED" })]);
-    render(<MyEscalations />);
+    render(<BuddyPmReplies />);
 
     expect(screen.getByText("Closed without an answer")).toBeInTheDocument();
     expect(screen.queryByText("Still with your PM")).not.toBeInTheDocument();
@@ -137,7 +137,7 @@ describe("MyEscalations", () => {
       request({ id: "r2", question: "Who reviews infra PRs?" }),
       request({ id: "r3", question: "Is the wiki current?", status: "DISMISSED" }),
     ]);
-    render(<MyEscalations />);
+    render(<BuddyPmReplies />);
 
     expect(screen.getByText("Your PM answered")).toBeInTheDocument();
     expect(screen.getByText("Still with your PM")).toBeInTheDocument();

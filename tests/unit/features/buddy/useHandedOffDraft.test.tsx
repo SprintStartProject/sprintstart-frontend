@@ -122,6 +122,7 @@ describe("the dock’s hand-off control", () => {
       <BuddyDock
         messages={[]}
         isThinking={false}
+        activeTool={null}
         draft=""
         setDraft={vi.fn()}
         handleSubmit={vi.fn()}
@@ -129,7 +130,6 @@ describe("the dock’s hand-off control", () => {
         dismissAction={vi.fn()}
         bottomRef={{ current: null }}
         suggestions={[]}
-        isOpen
         onClose={vi.fn()}
       />,
     );
@@ -146,6 +146,7 @@ describe("the dock’s hand-off control", () => {
       <BuddyDock
         messages={[]}
         isThinking={false}
+        activeTool={null}
         draft="half a question"
         setDraft={vi.fn()}
         handleSubmit={vi.fn()}
@@ -153,7 +154,6 @@ describe("the dock’s hand-off control", () => {
         dismissAction={vi.fn()}
         bottomRef={{ current: null }}
         suggestions={[]}
-        isOpen
         onClose={vi.fn()}
         onOpenFull={onOpenFull}
       />,

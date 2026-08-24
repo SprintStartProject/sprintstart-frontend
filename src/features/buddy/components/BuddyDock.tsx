@@ -1,15 +1,29 @@
-import { Maximize2 } from "lucide-react";
-import { SidePanel } from "../../../components/ui/SidePanel";
+import { useEffect, useRef } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Maximize2, Minus } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
-import { BuddyThinkingTurn, BuddyTurn } from "./BuddyTurn";
+import { BuddyThread } from "./BuddyThread";
+
+/** How long the expand-to-page animation runs before the route actually changes, in seconds. */
+export const DOCK_EXPAND_S = 0.42;
+
+/** The window's resting size. Big enough to hold a conversation, small enough to leave the page. */
+const DOCK_WIDTH = 400;
+const DOCK_HEIGHT = 560;
+
+/** Distance from the viewport's right edge, and from the launcher sitting below it. */
+const DOCK_RIGHT = 24;
+const DOCK_BOTTOM = 104;
 
 type BuddyDockProps = Pick<
   ReturnType<typeof useBuddy>,
   | "messages"
   | "isThinking"
+  | "activeTool"
   | "draft"
   | "setDraft"
   | "handleSubmit"
@@ -18,38 +32,44 @@ type BuddyDockProps = Pick<
   | "bottomRef"
   | "suggestions"
 > & {
-  isOpen: boolean;
   onClose: () => void;
   /**
    * Opens the full page, carrying the draft. Omitted when there is nowhere to go — on
    * `/buddy` itself, where the control would offer the page the hire is already reading.
    */
   onOpenFull?: () => void;
+  /**
+   * True once the hire has asked for the full page: the window grows to fill the viewport and
+   * the caller navigates when it lands.
+   */
+  isExpanding?: boolean;
 };
 
 /**
- * The buddy, slid in from the right edge over whatever page the hire is on.
+ * The buddy's own little window, in the bottom-right corner over whatever page you are on.
  *
- * **It does not dim the page behind it**, and that is the design: the buddy is consulted
- * *about* what you are looking at, so covering it up would hide the thing you came to ask
- * about. It is `ui/SidePanel` with the overlay turned off — the drawer the admin views and
- * the team detail panels already use, so it slides on the app's one panel curve rather than
- * on a timing invented here, and brings Escape-to-close and focus restore with it.
+ * **Small on purpose.** It is the size of a conversation, not the size of the app: the buddy is
+ * consulted *about* what you are looking at, so a full-height drawer that covered the page hid
+ * the very thing the question was about. This one leaves the page where it is — no dimming, no
+ * overlay, nothing to dismiss before you can carry on reading.
  *
- * It replaced a hand-placed floating box (`fixed right-8 bottom-24 h-[32rem] w-96`), which was
- * a chat bubble stuck to the corner of a desktop app: it covered page content it did not need
- * to, it could not grow, and it looked like a widget from a different product.
+ * It is only mounted while it is open. That matters beyond tidiness: kept mounted and parked
+ * off-screen, a fixed panel is still a fixed panel on every page in the app, and the layout
+ * effects of that are exactly the kind nobody connects back to the buddy.
  *
- * The transcript is the page's transcript, through the same `BuddyTurn` — one buddy, one voice,
- * whichever surface you meet it on. The dock is simply narrower, and the turns wrap into it.
+ * Not a modal, and deliberately not `ui/SidePanel`, which is one: there is no backdrop, the
+ * page behind stays interactive, and trapping focus in a window somebody is meant to consult
+ * *while* working would fight that. `role="dialog"` without `aria-modal` is the honest
+ * description — a named region you can leave.
  *
- * It scrolls down, never sideways. Wide content scrolls inside its own block; `min-w-0` down
- * the column is what lets it, because a flex/grid item's default `min-width: auto` refuses to
- * shrink below its content and the per-block scrollers then never engage.
+ * Growing into the page is one gesture, not a cut: `isExpanding` animates the window out to
+ * the full viewport, and the caller changes the route as it lands. Without that the dock
+ * vanished and a page appeared, and nobody could tell it was the same conversation.
  */
 export function BuddyDock({
   messages,
   isThinking,
+  activeTool,
   draft,
   setDraft,
   handleSubmit,
@@ -57,94 +77,155 @@ export function BuddyDock({
   dismissAction,
   bottomRef,
   suggestions,
-  isOpen,
   onClose,
   onOpenFull,
+  isExpanding = false,
 }: BuddyDockProps) {
-  // Offered until the hire has said something this visit, then out of the way. A chip row is
-  // for somebody who does not know what to type; once they have typed, the dock is narrow and
-  // the conversation should have all of it.
+  const prefersReducedMotion = useReducedMotion();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Escape closes it, the way every other dismissible surface in the app behaves. Bound to the
+  // document rather than the panel so it works while the hire is reading the page behind it.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  // The composer is what somebody opened this for, so the caret starts there.
+  useEffect(() => {
+    const field = panelRef.current?.querySelector("textarea");
+    field?.focus();
+  }, []);
+
   const hasUserMessage = messages.some((message) => message.role === "USER");
-  const streamingId = messages[messages.length - 1]?.id;
+
+  const resting = {
+    width: DOCK_WIDTH,
+    height: DOCK_HEIGHT,
+    right: DOCK_RIGHT,
+    bottom: DOCK_BOTTOM,
+    borderRadius: 20,
+  };
+
+  // Read here rather than kept in state: the viewport size matters for exactly one animation
+  // target, on the render where `isExpanding` flips. A resize listener would be a subscription
+  // held for the life of the widget to serve a value used once — and Framer Motion cannot
+  // interpolate `400px` to `100vw`, so the target has to be in pixels either way.
+  const box =
+    isExpanding && typeof window !== "undefined"
+      ? {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          right: 0,
+          bottom: 0,
+          borderRadius: 0,
+        }
+      : resting;
 
   return (
-    <SidePanel
-      isOpen={isOpen}
-      onClose={onClose}
-      // The panel's own accessible name, and the one the widget's tests look for.
-      title="Onboarding buddy"
-      description="Ask about the codebase, or about your own onboarding."
-      leading={
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft ring-1 ring-app-brand-border/60">
-          <SleepyBot size={30} canSleep={false} className="text-app-brand-text" />
-        </span>
+    <motion.div
+      ref={panelRef}
+      role="dialog"
+      aria-label="Onboarding buddy"
+      initial={
+        prefersReducedMotion
+          ? { opacity: 0, ...resting }
+          : { opacity: 0, scale: 0.86, y: 24, ...resting }
       }
-      actions={
-        // The answer to "this is too small" is the page that already exists, rather than a
-        // resizable dock: `/buddy` renders the same conversation through the same components
-        // with room to spare, and needs no layout state kept correct across viewports. The
-        // draft goes with it — a control that discarded what somebody was typing would be
-        // worse than not offering one.
-        onOpenFull && (
+      animate={{
+        opacity: 1,
+        scale: 1,
+        y: 0,
+        ...box,
+      }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 16 }}
+      transition={
+        prefersReducedMotion
+          ? { duration: 0 }
+          : isExpanding
+            ? { duration: DOCK_EXPAND_S, ease: [0.32, 0.72, 0, 1] }
+            : centralSpringToken
+      }
+      // The corner it grows out of, so opening reads as the buddy standing up rather than as a
+      // box fading in over the page.
+      style={{ transformOrigin: "bottom right" }}
+      // The caps keep the window inside a small viewport at rest; while it is growing into the
+      // page they would stop it a rem short of the edges, which is exactly where the illusion
+      // that it *became* the page would break.
+      className={`fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl ${
+        isExpanding ? "" : "max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)]"
+      }`}
+    >
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface px-4 py-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
+          <SleepyBot size={26} canSleep={false} className="text-app-brand-text" />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-app-text">Buddy</p>
+          <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
+        </div>
+
+        {/* The answer to "this is too small" is the page that already exists, rather than a
+                    resizable window: `/buddy` renders the same conversation through the same
+                    components with room to spare. The draft goes with it — a control that
+                    discarded what somebody was typing would be worse than not offering one. */}
+        {onOpenFull && (
           <button
             type="button"
             onClick={onOpenFull}
             aria-label="Open the full buddy page"
-            className="rounded-xl border border-app-border p-2 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            title="Open the full page"
+            className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
           >
             <Maximize2 className="h-4 w-4" aria-hidden="true" />
           </button>
-        )
-      }
-      footer={
-        <BuddyComposer
-          draft={draft}
-          setDraft={setDraft}
-          handleSubmit={handleSubmit}
-          // The hint belongs on the page, where there is room for it. In a 27rem dock it
-          // costs a line the transcript would rather have.
-          compact
+        )}
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Minimise your buddy"
+          title="Minimise"
+          className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        >
+          <Minus className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </header>
+
+      <div
+        data-testid="buddy-dock-transcript"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
+      >
+        <BuddyThread
+          messages={messages}
+          isThinking={isThinking}
+          activeTool={activeTool}
+          confirmAction={confirmAction}
+          dismissAction={dismissAction}
         />
-      }
-      showOverlay={false}
-      widthClassName="w-full max-w-md sm:w-[27rem]"
-      // Above the launcher that opened it, so the two never fight over the corner.
-      zIndexClassName="z-50"
-      panelBackgroundClassName="bg-app-bg"
-      headerClassName="px-5 py-4"
-      contentClassName="flex min-w-0 flex-col gap-5 px-5 py-5"
-      footerClassName="border-t border-app-border bg-app-bg px-5 py-4"
-      closeAriaLabel="Minimise your buddy"
-    >
-      {messages.map((message) => {
-        const isUser = message.role === "USER";
-        const hasText = message.content.trim().length > 0;
-        const hasActions = (message.actions?.length ?? 0) > 0;
+        <div ref={bottomRef} />
+      </div>
 
-        // The send loop appends an empty assistant message up front and streams into it.
-        // Until the first token (or an action proposal) arrives it has nothing to show and
-        // the thinking turn below already stands in for it, so skip it — otherwise a second
-        // empty turn appears while the buddy is working.
-        if (!isUser && !hasText && !hasActions) return null;
+      <div className="shrink-0 border-t border-app-border bg-app-surface px-4 py-3">
+        {/* Above the composer, not above the transcript: the chips exist to answer "what do I
+                    type here", so they belong next to the box they fill. Gone once the hire has
+                    said something — by then they know how, and the window is narrow. */}
+        {!hasUserMessage && (
+          <div className="mb-3 min-w-0">
+            <BuddySuggestionChips
+              suggestions={suggestions}
+              onPick={setDraft}
+              heading="Try asking"
+            />
+          </div>
+        )}
 
-        return (
-          <BuddyTurn
-            key={message.id}
-            message={message}
-            isStreaming={message.id === streamingId}
-            onConfirm={confirmAction}
-            onDismiss={dismissAction}
-          />
-        );
-      })}
-
-      {isThinking && <BuddyThinkingTurn />}
-
-      {!hasUserMessage && (
-        <BuddySuggestionChips suggestions={suggestions} onPick={setDraft} heading="Try asking" />
-      )}
-
-      <div ref={bottomRef} />
-    </SidePanel>
+        <BuddyComposer draft={draft} setDraft={setDraft} handleSubmit={handleSubmit} compact />
+      </div>
+    </motion.div>
   );
 }

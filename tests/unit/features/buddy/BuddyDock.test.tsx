@@ -17,6 +17,7 @@ function renderDock(
     <BuddyDock
       messages={messages}
       isThinking={false}
+      activeTool={null}
       draft=""
       setDraft={setDraft}
       handleSubmit={vi.fn()}
@@ -24,7 +25,6 @@ function renderDock(
       dismissAction={vi.fn()}
       bottomRef={createRef<HTMLDivElement>()}
       suggestions={suggestions}
-      isOpen
       onClose={vi.fn()}
     />,
   );
@@ -46,21 +46,26 @@ const user = (content: string): BuddyMessageView => ({
 
 /**
  * These assert classes, not layout, and that is deliberate. jsdom computes no layout, so a
- * genuine "does it overflow at 27rem" test is not available here — but the regression they guard
- * against is not a subtle layout shift, it is somebody deleting `min-w-0` because it reads as
- * noise. The class *is* the contract in a Tailwind codebase.
- *
- * The dock no longer needs its own `overflow-x-hidden`: `ui/SidePanel`'s own root carries
- * `overflow-hidden`, so the panel cannot grow a sideways scrollbar. What is still ours is the
- * `min-w-0` chain — without it a grid item refuses to shrink below its content, the turn widens
- * to fit a wide code block, and `BuddyMarkdown`'s per-block scrollers never engage.
+ * genuine "does it overflow at 400 px" test is not available here — but the regression they guard
+ * against is not a subtle layout shift, it is somebody deleting `min-w-0` and `overflow-x-hidden`
+ * because they read as noise. The class *is* the contract in a Tailwind codebase.
  */
 describe("BuddyDock horizontal overflow", () => {
-  it("lets a reply shrink below its content so wide blocks scroll inside themselves", () => {
+  it("never lets the conversation itself scroll sideways", () => {
+    renderDock([assistant("hello")]);
+
+    const transcript = screen.getByTestId("buddy-dock-transcript");
+    // `overflow-y: auto` alone computes overflow-x to `auto` as well, which is what put a
+    // horizontal scrollbar across the whole conversation. Vertical scrolling stays.
+    expect(transcript).toHaveClass("overflow-x-hidden");
+    expect(transcript).toHaveClass("overflow-y-auto");
+  });
+
+  it("lets a bubble shrink below its content so wide blocks scroll inside themselves", () => {
     renderDock([assistant("a reply")]);
 
-    // The chain the fix has to be unbroken along: the markdown wrapper, then the column it
-    // sits in. One `min-width: auto` anywhere between the panel and a `pre` is enough to
+    // The chain the fix has to be unbroken along: the markdown wrapper, then the bubble it
+    // sits in. One `min-width: auto` anywhere between the dock and a `pre` is enough to
     // widen everything above it.
     const markdown = screen.getByText("a reply").closest("div");
     expect(markdown).toHaveClass("min-w-0");
@@ -78,17 +83,16 @@ describe("BuddyDock horizontal overflow", () => {
 });
 
 /**
- * Both speakers are named and both start at the same left margin. Opposing bubbles were the
- * one thing that made this read as a phone messenger rather than as part of the app, and the
- * name is also what a screen reader has to go on — which side of a panel something sits on is
- * not information it can convey.
+ * The window is 400 px wide and has the buddy's name in its own header, so a name over every
+ * bubble would say it twice on a column that cannot spare the line. The page turns them on
+ * (`showNames`) because there the header is far from the messages.
  */
 describe("BuddyDock transcript", () => {
-  it("attributes every turn by name rather than by which side it sits on", () => {
+  it("renders both sides of the conversation", () => {
     renderDock([user("is my PR stuck?"), assistant("It has waited 52 hours.")]);
 
-    expect(screen.getByText("You")).toBeInTheDocument();
-    expect(screen.getByText("Buddy")).toBeInTheDocument();
+    expect(screen.getByText("is my PR stuck?")).toBeInTheDocument();
+    expect(screen.getByText("It has waited 52 hours.")).toBeInTheDocument();
   });
 });
 

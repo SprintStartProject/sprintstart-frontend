@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 
 const projectState = { selectedProjectId: "p1" };
@@ -160,6 +160,29 @@ describe("BuddyPage", () => {
     renderPage();
 
     expect(await screen.findByText("Find me a task")).toBeInTheDocument();
+  });
+
+  /**
+   * Closing a conversation should put you back where you were, not on a page you never chose.
+   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload onto
+   * `/buddy`, or a link from outside — where stepping back would leave the app entirely. The
+   * board is where a hire belongs instead, and it is the durable half of this same conversation.
+   */
+  it("falls back to the board when there is no history to close back into", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/buddy"]}>
+        <Routes>
+          <Route path="/buddy" element={<BuddyPage />} />
+          <Route path="/board" element={<p>the board</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Close the conversation" }));
+
+    expect(await screen.findByText("the board")).toBeInTheDocument();
   });
 
   it("lets the hire type before the greeting has arrived", async () => {
