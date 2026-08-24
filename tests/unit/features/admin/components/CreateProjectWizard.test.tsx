@@ -615,6 +615,68 @@ describe("CreateProjectWizard", () => {
     expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
   });
 
+  it("keeps the new GitHub token visible and selected when the post-add refetch fails", async () => {
+    // The add succeeds and persists the token, but the follow-up list read
+    // fails. Without the optimistic insert this stranded the picker on "no
+    // saved tokens" and a re-add hit the backend's duplicate error.
+    let added = false;
+    vi.mocked(addGithubPat).mockImplementation(() => {
+      added = true;
+      return Promise.resolve();
+    });
+    vi.mocked(getGithubPatNames).mockImplementation(() =>
+      added ? Promise.reject(new Error("Network error")) : Promise.resolve([]),
+    );
+    const user = userEvent.setup();
+    renderWizard({ tokenNames: [] });
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes repositories/i }));
+
+    await user.click(screen.getByRole("button", { name: /add github token/i }));
+    await user.type(screen.getByTestId("settings-add-token-name"), "fresh-pat");
+    await user.type(screen.getByTestId("settings-add-token-value"), "ghp_secret123");
+    await user.click(screen.getByTestId("settings-add-token-submit"));
+
+    await waitFor(() => expect(vi.mocked(addGithubPat)).toHaveBeenCalledTimes(1));
+    // The token shows and is selected despite the failed reload, so no second
+    // add (and no duplicate error) is needed.
+    await waitFor(() =>
+      expect(screen.getByLabelText("Access token")).toHaveTextContent("fresh-pat"),
+    );
+    expect(screen.queryByText(/no token yet/i)).not.toBeInTheDocument();
+    expect(vi.mocked(addGithubPat)).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the new Jira credential visible and selected when the post-add refetch fails", async () => {
+    let added = false;
+    vi.mocked(addJiraCredential).mockImplementation(() => {
+      added = true;
+      return Promise.resolve();
+    });
+    vi.mocked(getMyJiraCredentials).mockImplementation(() =>
+      added ? Promise.reject(new Error("Network error")) : Promise.resolve([]),
+    );
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
+
+    await user.click(screen.getByRole("button", { name: /add jira credential/i }));
+    await user.type(screen.getByTestId("settings-jira-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-jira-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-jira-add-token"), "jira-token");
+    await user.click(screen.getByTestId("settings-jira-add-submit"));
+
+    await waitFor(() => expect(vi.mocked(addJiraCredential)).toHaveBeenCalledTimes(1));
+    await screen.findByText(/Fresh cred - new@example.com/i);
+    expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
+    expect(vi.mocked(addJiraCredential)).toHaveBeenCalledTimes(1);
+  });
+
   it("does not create the project when cancelled on the first step", async () => {
     const user = userEvent.setup();
     const { onClose } = renderWizard();
