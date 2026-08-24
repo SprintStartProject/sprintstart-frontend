@@ -24,9 +24,13 @@ export interface Artifact {
   sourceUrl: string | null;
   mime: string | null;
   language: string | null;
+  /** When the artifact was first imported. Never moves on later updates. */
   ingestedAt: string;
-  createdAtSource: string | null;
-  updatedAtSource: string | null;
+  /**
+   * When ingestion last saw the artifact's content change, or null while it still
+   * matches what was first imported.
+   */
+  lastChangedAt: string | null;
   contentHash: string | null;
   ingestionRunId: string | null;
 }

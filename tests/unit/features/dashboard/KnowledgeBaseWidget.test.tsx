@@ -59,8 +59,7 @@ const createArtifact = (title: string): Artifact => ({
   mime: "text/markdown",
   language: null,
   ingestedAt: "2026-08-20T00:00:00Z",
-  createdAtSource: null,
-  updatedAtSource: null,
+  lastChangedAt: null,
   contentHash: null,
   ingestionRunId: null,
 });

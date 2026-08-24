@@ -485,8 +485,7 @@ export function ChatPage() {
             mime: "text/plain",
             language: null,
             ingestedAt: new Date().toISOString(),
-            createdAtSource: null,
-            updatedAtSource: null,
+            lastChangedAt: null,
             contentHash: null,
             ingestionRunId: null,
           }}
