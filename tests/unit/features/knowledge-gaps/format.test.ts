@@ -1,26 +1,44 @@
 import { describe, it, expect } from "vitest";
 import { formatRelativeDate, formatDate } from "../../../../src/features/knowledge-gaps/format";
 
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
 describe("knowledge-gaps format", () => {
   describe("formatRelativeDate", () => {
-    it('returns "Today" for a timestamp from earlier today', () => {
-      const iso = new Date().toISOString();
-      expect(formatRelativeDate(iso)).toBe("Today");
+    it('returns "just now" for a timestamp seconds old', () => {
+      expect(formatRelativeDate(new Date().toISOString())).toBe("just now");
     });
 
-    it('returns "Yesterday" for a timestamp 1 day ago', () => {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      expect(formatRelativeDate(oneDayAgo)).toBe("Yesterday");
+    it("counts minutes for a timestamp under an hour old", () => {
+      expect(formatRelativeDate(new Date(Date.now() - 12 * MINUTE).toISOString())).toBe(
+        "12 minutes ago",
+      );
     });
 
-    it('returns "<N>d ago" for a timestamp between 2 and 29 days ago', () => {
-      const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
-      expect(formatRelativeDate(fiveDaysAgo)).toBe("5d ago");
+    it("counts hours for a timestamp under a day old", () => {
+      // "Today" used to answer the wrong question here: someone watching an
+      // ingestion run wants to know whether it was minutes or hours ago.
+      expect(formatRelativeDate(new Date(Date.now() - 3 * HOUR).toISOString())).toBe("3 hours ago");
     });
 
-    it('returns "<N>mo ago" for a timestamp 30+ days ago', () => {
-      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-      expect(formatRelativeDate(ninetyDaysAgo)).toBe("3mo ago");
+    it("uses the singular for exactly one unit", () => {
+      expect(formatRelativeDate(new Date(Date.now() - HOUR).toISOString())).toBe("1 hour ago");
+    });
+
+    it('returns "yesterday" for a timestamp a day ago', () => {
+      expect(formatRelativeDate(new Date(Date.now() - DAY).toISOString())).toBe("yesterday");
+    });
+
+    it("counts days for a timestamp between 2 and 29 days ago", () => {
+      expect(formatRelativeDate(new Date(Date.now() - 5 * DAY).toISOString())).toBe("5 days ago");
+    });
+
+    it("counts months for a timestamp 30+ days ago", () => {
+      expect(formatRelativeDate(new Date(Date.now() - 90 * DAY).toISOString())).toBe(
+        "3 months ago",
+      );
     });
   });
 

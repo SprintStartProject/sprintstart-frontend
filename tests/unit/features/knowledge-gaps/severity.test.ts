@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  SEVERITY_FILL,
   SEVERITY_ORDER,
   SEVERITIES,
   SEVERITY_STYLES,
@@ -7,41 +8,80 @@ import {
 
 describe("knowledge-gaps severity", () => {
   describe("SEVERITY_ORDER", () => {
-    it("orders high before medium before low", () => {
+    it("orders high before medium before low before covered", () => {
       expect(SEVERITY_ORDER.high).toBeLessThan(SEVERITY_ORDER.medium);
       expect(SEVERITY_ORDER.medium).toBeLessThan(SEVERITY_ORDER.low);
+      // Covered is not a gap, so it must never outrank one on a panel whose
+      // job is to surface what needs attention.
+      expect(SEVERITY_ORDER.low).toBeLessThan(SEVERITY_ORDER.covered);
     });
   });
 
   describe("SEVERITIES", () => {
-    it("lists severities in display order high → medium → low", () => {
-      expect(SEVERITIES).toEqual(["high", "medium", "low"]);
+    it("lists severities in display order high → medium → low → covered", () => {
+      expect(SEVERITIES).toEqual(["high", "medium", "low", "covered"]);
+    });
+  });
+
+  describe("SEVERITY_FILL", () => {
+    it("gives every step a width", () => {
+      // Regression: the detail page used a ternary chain with no branch for a
+      // fourth step, so `covered` silently inherited the `low` width and drew
+      // a 30%-full bar for a component with nothing missing.
+      for (const severity of SEVERITIES) {
+        expect(SEVERITY_FILL[severity]).toBeTruthy();
+      }
+    });
+
+    it("fills further the worse the gap is, and fills covered completely", () => {
+      const percent = (severity: (typeof SEVERITIES)[number]) =>
+        Number.parseInt(SEVERITY_FILL[severity], 10);
+
+      expect(percent("high")).toBeGreaterThan(percent("medium"));
+      expect(percent("medium")).toBeGreaterThan(percent("low"));
+      // A near-empty bar would read as a component barely holding on; the
+      // colour is what says which of the two full bars is the good one.
+      expect(percent("covered")).toBe(100);
     });
   });
 
   describe("SEVERITY_STYLES", () => {
-    it("maps high to danger tokens", () => {
-      expect(SEVERITY_STYLES.high.bar).toContain("danger");
-      expect(SEVERITY_STYLES.high.badge).toContain("danger");
-      expect(SEVERITY_STYLES.high.ring).toContain("danger");
+    // The four steps are one ramp from red to green, so each is pinned to its
+    // own step of the severity scale rather than to a status role. Sharing a
+    // role would let two steps collapse to the same colour unnoticed.
+    it("gives each step its own rung of the severity ramp", () => {
+      const rungs = SEVERITIES.map((severity) => SEVERITY_STYLES[severity].bar);
+
+      expect(rungs).toEqual([
+        "bg-app-severity-high-solid",
+        "bg-app-severity-medium-solid",
+        "bg-app-severity-low-solid",
+        "bg-app-severity-covered-solid",
+      ]);
+      expect(new Set(rungs).size).toBe(SEVERITIES.length);
+    });
+
+    it("keeps badge and ring on the same rung as the bar", () => {
+      for (const severity of SEVERITIES) {
+        const { bar, badge, ring } = SEVERITY_STYLES[severity];
+        expect(bar).toContain(`severity-${severity}`);
+        expect(badge).toContain(`severity-${severity}`);
+        expect(ring).toContain(`severity-${severity}`);
+      }
+    });
+
+    it("labels the gap severities as severities", () => {
       expect(SEVERITY_STYLES.high.label).toBe("High");
       expect(SEVERITY_STYLES.high.longLabel).toBe("High severity");
-    });
-
-    it("maps medium to warning tokens", () => {
-      expect(SEVERITY_STYLES.medium.bar).toContain("warning");
-      expect(SEVERITY_STYLES.medium.badge).toContain("warning");
-      expect(SEVERITY_STYLES.medium.ring).toContain("warning");
       expect(SEVERITY_STYLES.medium.label).toBe("Medium");
       expect(SEVERITY_STYLES.medium.longLabel).toBe("Medium severity");
-    });
-
-    it("maps low to success tokens", () => {
-      expect(SEVERITY_STYLES.low.bar).toContain("success");
-      expect(SEVERITY_STYLES.low.badge).toContain("success");
-      expect(SEVERITY_STYLES.low.ring).toContain("success");
       expect(SEVERITY_STYLES.low.label).toBe("Low");
       expect(SEVERITY_STYLES.low.longLabel).toBe("Low severity");
+    });
+
+    it("labels covered as a state rather than a severity", () => {
+      expect(SEVERITY_STYLES.covered.label).toBe("Covered");
+      expect(SEVERITY_STYLES.covered.longLabel).toBe("No gaps found");
     });
 
     it("provides a style entry for every severity in SEVERITIES", () => {

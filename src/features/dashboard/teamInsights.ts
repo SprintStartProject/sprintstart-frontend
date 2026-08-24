@@ -36,17 +36,24 @@ export type GapSummary = {
   /**
    * Distinct components the gaps are spread over — the number in the middle of the ring.
    *
-   * Not "components analysed": the overview only carries components that *have* a gap, so
-   * a component the analysis cleared is invisible here. The label says "components with
-   * gaps" for that reason.
+   * Not "components analysed": the overview carries every scanned component now, and the
+   * ones it cleared are dropped below, so this counts the components with something
+   * missing. The label says "components with gaps" for that reason.
    */
   componentCount: number;
   total: number;
-  /** Gaps per severity, always all three keys, so the ring has no holes to special-case. */
+  /** Gaps per severity, always every key, so the ring has no holes to special-case. */
   counts: Record<KnowledgeGapSeverity, number>;
 };
 
-/** Counts the gaps by severity and by component, for the ring and its legend. */
+/**
+ * Counts the gaps by severity and by component, for the ring and its legend.
+ *
+ * Covered components are dropped rather than counted as a fourth segment. The overview is
+ * the project's full component roster now, but this ring answers "how much is outstanding
+ * and how bad is it" — a component with nothing missing would inflate both the number in
+ * the middle and the proportions around it, which are the only two things it says.
+ */
 export function summarizeGaps(gaps: readonly KnowledgeGap[]): GapSummary {
   const counts = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0])) as Record<
     KnowledgeGapSeverity,
@@ -55,12 +62,14 @@ export function summarizeGaps(gaps: readonly KnowledgeGap[]): GapSummary {
 
   const components = new Set<string>();
 
-  for (const gap of gaps) {
+  const outstanding = gaps.filter((gap) => gap.severity !== "covered");
+
+  for (const gap of outstanding) {
     counts[gap.severity] += 1;
     components.add(gap.component);
   }
 
-  return { componentCount: components.size, total: gaps.length, counts };
+  return { componentCount: components.size, total: outstanding.length, counts };
 }
 
 /**

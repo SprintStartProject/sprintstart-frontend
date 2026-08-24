@@ -123,7 +123,9 @@ export function ConnectorList({
                       <motion.span
                         layoutId="connector-selected"
                         aria-hidden="true"
-                        transition={prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken}
+                        transition={
+                          prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
+                        }
                         className="absolute inset-0 hidden rounded-xl border border-app-brand-border-strong bg-app-brand-soft lg:block"
                       />
                     )}
@@ -135,7 +137,9 @@ export function ConnectorList({
                         // Accordion toggle for mobile; on `lg` this only ever
                         // opens/closes the (hidden) inline block, never the
                         // detail column, which follows `selectedId`.
-                        setExpandedId((current) => (current === connector.id ? null : connector.id));
+                        setExpandedId((current) =>
+                          current === connector.id ? null : connector.id,
+                        );
                       }}
                       aria-pressed={isSelected}
                       aria-expanded={isExpanded}
@@ -184,7 +188,9 @@ export function ConnectorList({
                         className="overflow-hidden lg:hidden"
                       >
                         <div className="px-1.5 pb-2">
-                          <p className="text-sm text-app-text-muted">{connector.meta.description}</p>
+                          <p className="text-sm text-app-text-muted">
+                            {connector.meta.description}
+                          </p>
 
                           <ConnectorSourcesSection
                             connector={connector}
@@ -237,7 +243,9 @@ function ConnectorDetail({ connector, projectId, onSourcesSaved }: ConnectorDeta
     <motion.div
       initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      transition={
+        prefersReducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
+      }
     >
       <div className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-surface-muted text-app-text-muted">
