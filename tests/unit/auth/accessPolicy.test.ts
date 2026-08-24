@@ -67,10 +67,12 @@ describe("accessPolicy", () => {
       expect(canAccessRoute(pmProfile, "/team-management", false)).toBe(false);
       expect(canAccessRoute(pmProfile, "/insights/faq", false)).toBe(false);
       expect(canAccessRoute(pmProfile, "/insights/knowledge-gaps", false)).toBe(false);
+      expect(canAccessRoute(pmProfile, "/insights/knowledge-requests", false)).toBe(false);
 
       expect(canAccessRoute(pmProfile, "/team-management", true)).toBe(true);
       expect(canAccessRoute(pmProfile, "/insights/faq", true)).toBe(true);
       expect(canAccessRoute(pmProfile, "/insights/knowledge-gaps", true)).toBe(true);
+      expect(canAccessRoute(pmProfile, "/insights/knowledge-requests", true)).toBe(true);
     });
 
     it("leaves routes outside the manager-scoped set ungated for a PM", () => {

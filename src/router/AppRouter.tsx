@@ -91,7 +91,14 @@ export function AppRouter() {
         <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
         <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
         <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
-        <Route path="/insights/knowledge-requests" element={<KnowledgeRequestInboxPage />} />
+        <Route
+          path="/insights/knowledge-requests"
+          element={
+            <ManagerAreaGuard route="/insights/knowledge-requests">
+              <KnowledgeRequestInboxPage />
+            </ManagerAreaGuard>
+          }
+        />
         <Route path="/insights/onboarding" element={<OnboardingMetricsPage />} />
         {/* The buddy and the surfaces its tools serve. Added beside the onboarding
             path above, not in place of it: both ways in stay open. */}

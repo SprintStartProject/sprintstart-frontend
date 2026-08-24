@@ -497,7 +497,13 @@ export function SourceDetailsPanel({
       )}
 
       {canUnlinkSource && (
-        <DrawerCard label="Project link" icon={Unlink} index={5} variant="danger" className="mt-4 sm:mt-5">
+        <DrawerCard
+          label="Project link"
+          icon={Unlink}
+          index={5}
+          variant="danger"
+          className="mt-4 sm:mt-5"
+        >
           <p className="text-sm text-app-danger-text">
             Remove this {removableNoun} from the current project. The {removableNoun} and its
             artifacts are kept. You can re-link it later.
