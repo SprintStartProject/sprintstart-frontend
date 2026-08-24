@@ -13,7 +13,7 @@ import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
-import { FlagToPmButton } from "../features/knowledge-request/components/FlagToPmButton";
+import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
 
 /**
  * The buddy's home: the hire's onboarding front door, as one conversation.
@@ -61,7 +61,19 @@ function BuddyPageShell({ subtitle, children }: { subtitle: string; children: Re
   }, [location.key, navigate]);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen">
+    // Fades in rather than appearing, which is the second half of the dock's hand-off: the
+    // window grows to fill the screen and empties itself, and the page arrives into the space
+    // it left. Cheap enough to be worth it on a direct visit too.
+    <motion.div
+      {...(prefersReducedMotion
+        ? {}
+        : {
+            initial: { opacity: 0 },
+            animate: { opacity: 1 },
+            transition: { duration: 0.22, ease: "easeOut" as const },
+          })}
+      className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen"
+    >
       <motion.header
         {...(prefersReducedMotion
           ? {}
@@ -72,10 +84,10 @@ function BuddyPageShell({ subtitle, children }: { subtitle: string; children: Re
             })}
         className="shrink-0 border-b border-app-border bg-app-bg/85 backdrop-blur-md"
       >
-        {/* The conversation's own width, not the page's: the header sits directly over the
-                    thread, and a name that starts 10rem to the left of the first message belongs
-                    to a different page than the one underneath it. */}
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3.5 sm:px-6">
+        {/* The same `app-page-frame` gutters the header band of every other page uses, so the
+                    buddy's name starts on the line the PM dashboard's and the knowledge base's
+                    titles start on. */}
+        <div className="app-page-frame flex items-center gap-3 py-4">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
             <SleepyBot size={32} canSleep={false} tracksPointer className="text-app-brand-text" />
           </span>
@@ -99,7 +111,7 @@ function BuddyPageShell({ subtitle, children }: { subtitle: string; children: Re
       </motion.header>
 
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -136,7 +148,6 @@ function BuddyMentorHome() {
   useHandedOffDraft(setDraft);
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
-  const lastQuestion = [...messages].reverse().find((m) => m.role === "USER")?.content ?? "";
 
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
@@ -158,32 +169,25 @@ function BuddyMentorHome() {
         // What came back from a person, above what the buddy is saying now. Renders nothing at
         // all until the hire has escalated something.
         before={<BuddyPmReplies />}
+        // Escalating hangs off the hire's own question now, not off the buddy's answer — see
+        // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
+        // where a messenger offers a quick reply: right under the message that suggested it. It
+        // sends on one click, unlike the chips, because accepting something the mentor just
+        // offered is not composing a question of your own.
         lastMessageFooter={
-          hasUserMessage ? (
-            // Hung off the buddy's answer, because that is what it is about: *this* reply did
-            // not get you there, so take *this* question to a person. In a box on the side it
-            // was an offer with no subject.
-            <div className="mt-1.5 w-full">
-              <FlagToPmButton defaultQuestion={lastQuestion} />
-            </div>
-          ) : (
-            openerAction && (
-              // The greeting's own next step, offered where a messenger offers a quick reply:
-              // right under the message that suggested it. It sends on one click, unlike the
-              // chips — accepting something the mentor just offered is not composing a
-              // question of your own.
-              <Button
-                variant="primary"
-                size="sm"
-                className="mt-1.5"
-                icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
-                onClick={() => void sendMessage(openerAction.question)}
-              >
-                {openerAction.label}
-              </Button>
-            )
-          )
+          !hasUserMessage && openerAction ? (
+            <Button
+              variant="primary"
+              size="sm"
+              className="mt-1.5"
+              icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+              onClick={() => void sendMessage(openerAction.question)}
+            >
+              {openerAction.label}
+            </Button>
+          ) : undefined
         }
+        renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question

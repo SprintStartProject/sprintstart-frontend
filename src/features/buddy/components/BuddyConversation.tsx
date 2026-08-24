@@ -20,8 +20,10 @@ type BuddyConversationProps = {
   placeholder?: string;
   /** Rendered above the first message: what came back from the hire's PM. */
   before?: ReactNode;
-  /** Rendered under the buddy's most recent reply — the opener, or the offer to ask a person. */
+  /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
   lastMessageFooter?: ReactNode;
+  /** Rendered under each of the hire's own questions, handed that question's text. */
+  renderQuestionAction?: (question: string) => ReactNode;
   /** Rendered just above the composer: the things this hire could usefully ask. */
   aboveComposer?: ReactNode;
 };
@@ -36,11 +38,11 @@ type BuddyConversationProps = {
  * Everything the widgets used to hold has moved to where it belongs — the suggestions to the
  * composer they fill, the escalation offer to the answer that prompted it.
  *
- * One reading column rather than the full width of a desktop: this is a conversation with a
- * person, and every product where that is true — a DM, a support thread, a chat with a tutor —
- * settles on roughly this measure, because prose past about 75 characters a line is hard to
- * track back to the left margin. The page around it is what makes it a desktop page: a real
- * header, real gutters, and the buddy's own name on every message.
+ * It sits in the same `app-page-frame` gutters as the PM dashboard, the knowledge base and
+ * data ingestion, so this page lines up with its siblings rather than being a narrow column
+ * floating in the middle of them. The reading measure is kept on the *bubbles* instead: they
+ * hug opposite edges and stop at a readable width, which is how a full-width thread stays
+ * legible — capping the column would have put the gutters back by another name.
  *
  * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
  * to `BuddyMarkdown`, where wide blocks get their own scrollers.
@@ -58,6 +60,7 @@ export function BuddyConversation({
   placeholder,
   before,
   lastMessageFooter,
+  renderQuestionAction,
   aboveComposer,
 }: BuddyConversationProps) {
   return (
@@ -66,7 +69,7 @@ export function BuddyConversation({
         data-testid="buddy-transcript"
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
-        <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4 px-4 py-8 sm:px-6">
+        <div className="app-page-frame flex min-w-0 flex-col gap-4 py-8">
           <BuddyThread
             messages={messages}
             isThinking={isThinking}
@@ -76,6 +79,7 @@ export function BuddyConversation({
             showNames
             before={before}
             lastMessageFooter={lastMessageFooter}
+            renderQuestionAction={renderQuestionAction}
           />
 
           <div ref={bottomRef} />
@@ -85,7 +89,7 @@ export function BuddyConversation({
       {/* Translucent rather than solid, so the thread does not stop dead at a hard line — the
                 last message fades under the composer as it scrolls past it. */}
       <div className="shrink-0 border-t border-app-border bg-app-bg/85 backdrop-blur-md">
-        <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
+        <div className="app-page-frame py-4">
           {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
           <BuddyComposer

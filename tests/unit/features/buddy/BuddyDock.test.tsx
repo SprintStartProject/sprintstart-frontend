@@ -6,6 +6,20 @@ import { BuddyDock } from "../../../../src/features/buddy/components/BuddyDock";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 import type { BuddySuggestion } from "../../../../src/services/buddyService";
 
+// Every question carries the escalation trigger now, and that reads the selected project.
+vi.mock("../../../../src/features/projects/useProjectContext", async () => {
+  const { createProjectContextValue, createSelectableProject } =
+    await import("../../setup/projectContext");
+  return {
+    useProjectContext: () =>
+      createProjectContextValue({
+        selectedProjectId: "p1",
+        projects: [createSelectableProject({ id: "p1", name: "Project One" })],
+        selectedProject: createSelectableProject({ id: "p1", name: "Project One" }),
+      }),
+  };
+});
+
 function renderDock(
   messages: BuddyMessageView[] = [],
   {
@@ -93,6 +107,25 @@ describe("BuddyDock transcript", () => {
 
     expect(screen.getByText("is my PR stuck?")).toBeInTheDocument();
     expect(screen.getByText("It has waited 52 hours.")).toBeInTheDocument();
+  });
+});
+
+/**
+ * Escalating belongs to the question, not to the reply — a hire does not flag an answer, they
+ * flag the thing they still need answered. The corner window could not escalate at all before
+ * this; the offer lived only on the page, and only under the buddy's answer.
+ */
+describe("BuddyDock escalation", () => {
+  it("offers to send any of the hire's own questions to their PM", () => {
+    renderDock([user("how do I get staging credentials?")]);
+
+    expect(screen.getByRole("button", { name: /Send this to your PM/ })).toBeInTheDocument();
+  });
+
+  it("offers nothing of the sort under the buddy's own replies", () => {
+    renderDock([assistant("It has waited 52 hours.")]);
+
+    expect(screen.queryByRole("button", { name: /Send this to your PM/ })).not.toBeInTheDocument();
   });
 });
 

@@ -19,11 +19,18 @@ type BuddyThreadProps = {
   /** Rendered above the first message: what came back from the hire's PM. */
   before?: ReactNode;
   /**
-   * Rendered under the last message, inside the buddy's column — the offer to take the
-   * question to a person. It belongs to the answer it follows, not to a box elsewhere on the
-   * page, because "the buddy could not help with *this*" is a statement about one exchange.
+   * Rendered under the buddy's most recent reply — the greeting's suggested next step.
    */
   lastMessageFooter?: ReactNode;
+  /**
+   * Rendered under each of the hire's *own* questions, handed that question's text.
+   *
+   * This is where escalating belongs. It hung off the buddy's answer before, which read as a
+   * verdict on the reply — but a hire does not flag an answer, they flag the question they
+   * still need answered, and they may well want to send one they asked ten minutes ago. Under
+   * every question, they can. Both surfaces pass it, so the corner window can escalate too.
+   */
+  renderQuestionAction?: (question: string) => ReactNode;
 };
 
 /**
@@ -47,6 +54,7 @@ export function BuddyThread({
   showNames = false,
   before,
   lastMessageFooter,
+  renderQuestionAction,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens.
@@ -80,6 +88,7 @@ export function BuddyThread({
             isStreaming={message.id === streamingId}
             footer={
               <>
+                {isUser && renderQuestionAction?.(message.content)}
                 {!isUser && hasActions && (
                   <BuddyActionProposals
                     messageId={message.id}

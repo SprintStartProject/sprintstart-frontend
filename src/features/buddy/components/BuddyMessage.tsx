@@ -83,7 +83,11 @@ export function BuddyMessage({
       </div>
 
       <div
-        className={`flex max-w-[85%] min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"}`}
+        // The reading measure lives here, not on the thread's column. The page runs the full
+        // `app-page-frame` width like its siblings, and the bubble is what keeps a line short
+        // enough to track back to: it hugs its speaker's edge and stops at 46rem. Capping the
+        // column instead would have put the narrow centred layout back under another name.
+        className={`flex max-w-[min(85%,46rem)] min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"}`}
       >
         {showName && (
           <p className="px-1 text-xs font-medium text-app-text-muted">{SPEAKER_NAME[speaker]}</p>
