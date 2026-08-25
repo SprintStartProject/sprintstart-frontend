@@ -13,6 +13,24 @@ function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);
 }
 
+/**
+ * Renders the editor and waits for the drawer's initial-focus handoff to finish.
+ *
+ * `SidePanel` pulls focus into the panel from a `requestAnimationFrame`, which jsdom services on a
+ * ~16 ms timer. Left to race, that callback can fire in the middle of the first `user.type`,
+ * rerouting its keystrokes to whichever element focus landed on (observed: the close button) —
+ * the field never receives an `input` event and assertions on the draft fail nondeterministically,
+ * depending on how fast the machine runs. Waiting until focus has settled makes typing safe.
+ */
+async function renderEditor(ui: ReactElement) {
+  const view = render(ui);
+  await waitFor(() => {
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+  return view;
+}
+
 const packet: OrientationPacket = {
   taskId: "task-1",
   taskTitle: "Fix the stale cache header",
@@ -40,7 +58,7 @@ describe("OrientationEditor", () => {
     const onSave = vi.fn().mockResolvedValue(true);
     const onClose = vi.fn();
 
-    render(
+    await renderEditor(
       <OrientationEditor
         taskTitle="Fix the stale cache header"
         taskUrl={null}
@@ -69,8 +87,8 @@ describe("OrientationEditor", () => {
     expect(await screen.findByText("Orientation saved")).toBeInTheDocument();
   });
 
-  it("lists the five fixed steps in order and needs none of them pre-added", () => {
-    render(
+  it("lists the five fixed steps in order and needs none of them pre-added", async () => {
+    await renderEditor(
       <OrientationEditor
         taskTitle="A task"
         taskUrl={null}
@@ -91,7 +109,7 @@ describe("OrientationEditor", () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(true);
 
-    render(
+    await renderEditor(
       <OrientationEditor
         taskTitle="A task"
         taskUrl={null}
@@ -122,7 +140,7 @@ describe("OrientationEditor", () => {
     const onRevert = vi.fn().mockResolvedValue(true);
     const onClose = vi.fn();
 
-    render(
+    await renderEditor(
       <OrientationEditor
         taskTitle="A task"
         taskUrl={null}
@@ -140,8 +158,8 @@ describe("OrientationEditor", () => {
     expect(await screen.findByText("Handed back to AI")).toBeInTheDocument();
   });
 
-  it("offers no revert when there is no packet to hand back", () => {
-    render(
+  it("offers no revert when there is no packet to hand back", async () => {
+    await renderEditor(
       <OrientationEditor
         taskTitle="A task"
         taskUrl={null}
