@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   getMessages,
   streamOpenBuddy,
@@ -32,7 +32,6 @@ export function useBuddyConversation() {
   const [isOpening, setIsOpening] = useState(false);
   const [draft, setDraft] = useState("");
 
-  const bottomRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef(false);
 
   /**
@@ -170,10 +169,6 @@ export function useBuddyConversation() {
       setIsOpening(false);
     }
   }, [greet]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   /**
    * Sends a new message and streams the buddy's reply into the conversation.
@@ -377,6 +372,5 @@ export function useBuddyConversation() {
 
     ensureOpened,
     startFreshVisit,
-    bottomRef,
   };
 }

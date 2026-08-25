@@ -8,9 +8,21 @@ import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
 import { BuddyThread } from "./BuddyThread";
+import { useStickToBottom } from "../hooks/useStickToBottom";
 
-/** How long the expand-to-page animation runs before the route actually changes, in seconds. */
+/**
+ * The hand-off to `/buddy`, in seconds, in two parts.
+ *
+ * `DOCK_EXPAND_S` is the growth: the window swells until it covers the viewport. Only *then* is
+ * it safe to change the route, because the window is what the hire is looking at.
+ *
+ * `DOCK_REVEAL_S` is the uncovering, once the page beneath has rendered. Splitting the two is
+ * what removes the flash of the old page that used to sit between them — the dock used to
+ * unmount and navigate at the same instant, so for a frame there was nothing on top and the
+ * page you were leaving showed through.
+ */
 export const DOCK_EXPAND_S = 0.42;
+export const DOCK_REVEAL_S = 0.2;
 
 /** The window's resting size. Big enough to hold a conversation, small enough to leave the page. */
 const DOCK_WIDTH = 400;
@@ -30,7 +42,6 @@ type BuddyDockProps = Pick<
   | "handleSubmit"
   | "confirmAction"
   | "dismissAction"
-  | "bottomRef"
   | "suggestions"
 > & {
   onClose: () => void;
@@ -45,9 +56,14 @@ type BuddyDockProps = Pick<
   onHideSuggestions?: () => void;
   /**
    * True once the hire has asked for the full page: the window grows to fill the viewport and
-   * the caller navigates when it lands.
+   * holds there, covering everything, while the caller changes the route behind it.
    */
   isExpanding?: boolean;
+  /**
+   * True for the last beat of the hand-off: the page underneath has rendered, so the window
+   * that has been standing in for it fades away and reveals it.
+   */
+  isRevealing?: boolean;
 };
 
 /**
@@ -80,16 +96,17 @@ export function BuddyDock({
   handleSubmit,
   confirmAction,
   dismissAction,
-  bottomRef,
   suggestions,
   onClose,
   onOpenFull,
   suggestionsHidden = false,
   onHideSuggestions,
   isExpanding = false,
+  isRevealing = false,
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
+  const { containerRef, onScroll } = useStickToBottom(messages);
 
   // Escape closes it, the way every other dismissible surface in the app behaves. Bound to the
   // document rather than the panel so it works while the hire is reading the page behind it.
@@ -143,7 +160,7 @@ export function BuddyDock({
           : { opacity: 0, scale: 0.86, y: 24, ...resting }
       }
       animate={{
-        opacity: 1,
+        opacity: isRevealing ? 0 : 1,
         scale: 1,
         y: 0,
         ...box,
@@ -152,9 +169,13 @@ export function BuddyDock({
       transition={
         prefersReducedMotion
           ? { duration: 0 }
-          : isExpanding
-            ? { duration: DOCK_EXPAND_S, ease: [0.32, 0.72, 0, 1] }
-            : centralSpringToken
+          : isRevealing
+            ? // A beat of delay before the fade: the route has only just changed, and starting
+              // to uncover the page in the same frame it mounts shows it mid-paint.
+              { duration: DOCK_REVEAL_S, ease: "easeOut", delay: 0.05 }
+            : isExpanding
+              ? { duration: DOCK_EXPAND_S, ease: [0.32, 0.72, 0, 1] }
+              : centralSpringToken
       }
       // The corner it grows out of, so opening reads as the buddy standing up rather than as a
       // box fading in over the page.
@@ -214,6 +235,8 @@ export function BuddyDock({
         </header>
 
         <div
+          ref={containerRef}
+          onScroll={onScroll}
           data-testid="buddy-dock-transcript"
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
@@ -225,7 +248,6 @@ export function BuddyDock({
             dismissAction={dismissAction}
             renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
           />
-          <div ref={bottomRef} />
         </div>
 
         <div className="shrink-0 border-t border-app-border bg-app-surface px-4 py-3">

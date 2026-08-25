@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { createRef } from "react";
 import { BuddyDock } from "../../../../src/features/buddy/components/BuddyDock";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 import type { BuddySuggestion } from "../../../../src/services/buddyService";
@@ -37,7 +36,6 @@ function renderDock(
       handleSubmit={vi.fn()}
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
-      bottomRef={createRef<HTMLDivElement>()}
       suggestions={suggestions}
       onClose={vi.fn()}
     />,

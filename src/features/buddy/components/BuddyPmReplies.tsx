@@ -1,10 +1,7 @@
-import { useMemo } from "react";
-import { BookCheck, Clock, MessageSquareOff, Send } from "lucide-react";
+import { BookCheck, Clock, MessageSquareOff, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useFetch } from "../../../hooks/useFetch";
-import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request/format";
-import type { KnowledgeRequest } from "../../knowledge-request/types";
+import type { PmReplies } from "../hooks/usePmReplies";
 
 /**
  * What the hire has sent to a person, beside the conversation rather than inside it.
@@ -32,40 +29,34 @@ import type { KnowledgeRequest } from "../../knowledge-request/types";
  * Scoped to the hire, not to the selected project: these are their own questions, and hiding the
  * ones asked on another project would mean an answer silently never arriving.
  */
-export function BuddyPmReplies() {
-  const { data, loading, error } = useFetch<KnowledgeRequest[]>(
-    () => knowledgeRequestService.listMine(),
-    [],
-  );
-
-  const { answered, waiting, dismissed } = useMemo(() => {
-    const requests = data ?? [];
-    return {
-      answered: requests.filter((r) => r.status === "ANSWERED" && r.answer !== null),
-      waiting: requests.filter((r) => r.status === "OPEN"),
-      dismissed: requests.filter((r) => r.status === "DISMISSED"),
-    };
-  }, [data]);
-
+export function BuddyPmReplies({
+  answered,
+  waiting,
+  dismissed,
+  onClose,
+}: PmReplies & { onClose: () => void }) {
   // Nothing to say is the common case — a hire who has never escalated should see no trace of a
-  // feature they have not used, and the rail collapses to nothing rather than standing empty. A
-  // failed load is silent for the same reason: this is a record of something that already
-  // happened, so an error banner beside the composer would be noise the hire cannot act on, and
-  // the next mount retries anyway.
-  if (loading || error) return null;
+  // feature they have not used. The page reads the same emptiness from `hasAny` and does not
+  // offer the rail at all, so this guard is the backstop rather than the mechanism.
   if (answered.length === 0 && waiting.length === 0 && dismissed.length === 0) return null;
 
   return (
-    <aside
-      aria-label="Questions you sent to your PM"
-      className="min-h-0 shrink-0 overflow-y-auto border-b border-app-border py-5 xl:w-80 xl:border-r xl:border-b-0 xl:pr-6"
-    >
-      <div className="flex items-center gap-2 pb-4">
-        <Send className="h-4 w-4 shrink-0 text-app-brand-text" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-app-text">Sent to your PM</h2>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-4 pb-3">
+        <h2 className="truncate text-sm font-bold tracking-wide text-app-text-muted uppercase">
+          Sent to your PM
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close the PM replies"
+          className="shrink-0 rounded p-1 text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-5">
         {answered.length > 0 && (
           <Group
             icon={BookCheck}
@@ -131,7 +122,7 @@ export function BuddyPmReplies() {
           </Group>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
 

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { onBuddyPageReady } from "../aiBuddyBus";
 import { useBuddy } from "../hooks/useBuddy";
-import { BuddyDock, DOCK_EXPAND_S } from "./BuddyDock";
+import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
 
 /** Where the full conversation lives. The dock grows into it rather than getting bigger. */
 const BUDDY_PAGE = "/buddy";
+
+/** How long to wait for `/buddy` to announce itself before uncovering it anyway, in ms. */
+const HANDOFF_FALLBACK_MS = 1200;
 
 /**
  * The always-on onboarding companion: the buddy in the corner of every page, and the window it
@@ -39,21 +43,34 @@ export function BuddyWidget() {
     handleSubmit,
     confirmAction,
     dismissAction,
-    bottomRef,
     suggestions,
   } = useBuddy();
 
-  // The beat between "open the full page" and the route actually changing, during which the
-  // dock is growing to fill the viewport.
-  const [isExpanding, setIsExpanding] = useState(false);
+  /**
+   * Where the hand-off to `/buddy` has got to.
+   *
+   * `growing` — the window is swelling to cover the viewport; the route has not changed.
+   * `covering` — it covers everything and the route change is under way behind it. It holds
+   *   here, fully opaque, for as long as that takes.
+   * `revealing` — the page has said it is on screen, so the window fades away and uncovers it.
+   *
+   * The middle phase is not decoration. Navigating too early flashes the buddy page into view
+   * around a small window; unmounting at the end of the growth leaves a frame with nothing on
+   * top. And the wait cannot be a fixed delay: React Router wraps navigation in
+   * `React.startTransition`, so React keeps the *previous* page on screen until the new one is
+   * ready to commit — a clock-driven reveal uncovered the page the hire was leaving. The page
+   * itself says when it has arrived (`onBuddyPageReady`).
+   */
+  const [handoff, setHandoff] = useState<"idle" | "growing" | "covering" | "revealing">("idle");
   // Held here rather than in the dock, which unmounts every time it is closed — a row the hire
   // has already dismissed coming back on the next open is the dismissal not working.
   const [suggestionsHidden, setSuggestionsHidden] = useState(false);
-  const expandTimer = useRef<number | null>(null);
+  const handoffTimers = useRef<number[]>([]);
 
   useEffect(
     () => () => {
-      if (expandTimer.current !== null) window.clearTimeout(expandTimer.current);
+      handoffTimers.current.forEach((id) => window.clearTimeout(id));
+      handoffTimers.current = [];
     },
     [],
   );
@@ -64,12 +81,11 @@ export function BuddyWidget() {
   }, [draft, navigate]);
 
   /**
-   * Grows the open dock into the page, then navigates — one gesture instead of a cut.
+   * Grows the open dock into the page — one gesture instead of a cut.
    *
    * From the launcher (double click, dock closed) there is nothing on screen to grow, so that
-   * path just navigates. The timer is what sequences the two: Framer Motion's
-   * `onAnimationComplete` fires per-property and would race, and the route change has to happen
-   * once, at the end.
+   * path just navigates. Timers sequence the phases rather than Framer Motion's
+   * `onAnimationComplete`, which fires once per animated property and would race itself.
    */
   const openFull = useCallback(() => {
     if (!isOpen) {
@@ -77,18 +93,51 @@ export function BuddyWidget() {
       return;
     }
 
-    setIsExpanding(true);
-    expandTimer.current = window.setTimeout(() => {
-      expandTimer.current = null;
-      setIsExpanding(false);
-      // Closed on the way out: leaving a floating copy of the conversation over the full-page
-      // one is two composers for the same thread.
-      toggleOpen();
-      goToPage();
-    }, DOCK_EXPAND_S * 1000);
-  }, [goToPage, isOpen, toggleOpen]);
+    setHandoff("growing");
 
-  if (pathname === BUDDY_PAGE) return null;
+    handoffTimers.current.push(
+      window.setTimeout(() => {
+        // The window covers the viewport by now, so the route can change behind it unseen.
+        goToPage();
+        setHandoff("covering");
+
+        // Only if the page never announces itself — a render error, or a route that did not
+        // resolve. Better a hand-off that finishes a beat late than a window stuck over the
+        // whole app with no way out.
+        handoffTimers.current.push(
+          window.setTimeout(() => setHandoff("revealing"), HANDOFF_FALLBACK_MS),
+        );
+      }, DOCK_EXPAND_S * 1000),
+    );
+  }, [goToPage, isOpen]);
+
+  // The page is on screen: stop standing in for it.
+  useEffect(
+    () =>
+      onBuddyPageReady(() => setHandoff((phase) => (phase === "covering" ? "revealing" : phase))),
+    [],
+  );
+
+  // ...and once it has faded away, put the dock itself away. Leaving it open would be a second
+  // composer floating over the full-page one, for the same thread.
+  useEffect(() => {
+    if (handoff !== "revealing") return;
+    const id = window.setTimeout(
+      () => {
+        setHandoff("idle");
+        toggleOpen();
+      },
+      (DOCK_REVEAL_S + 0.05) * 1000,
+    );
+    handoffTimers.current.push(id);
+    return () => window.clearTimeout(id);
+  }, [handoff, toggleOpen]);
+
+  // Normally the widget takes itself off `/buddy` — the launcher would offer the page you are
+  // reading, and the dock would put a second composer over the first. During the hand-off it
+  // has to stay: it *is* the transition, and unmounting it the instant the route changes is
+  // precisely the flash this sequencing exists to remove.
+  if (pathname === BUDDY_PAGE && handoff === "idle") return null;
 
   return (
     <>
@@ -107,13 +156,13 @@ export function BuddyWidget() {
             handleSubmit={handleSubmit}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
-            bottomRef={bottomRef}
             suggestions={suggestions}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
             onHideSuggestions={() => setSuggestionsHidden(true)}
-            isExpanding={isExpanding}
+            isExpanding={handoff !== "idle"}
+            isRevealing={handoff === "revealing"}
           />
         )}
       </AnimatePresence>
@@ -121,7 +170,7 @@ export function BuddyWidget() {
       {/* Out of the way while the dock is growing into the page: a button hovering over a
                 full-screen expansion is the one thing that would give away that it is still a
                 floating window. */}
-      {!isExpanding && (
+      {handoff === "idle" && (
         <BuddyLauncher isOpen={isOpen} onToggle={toggleOpen} onOpenFull={openFull} />
       )}
     </>

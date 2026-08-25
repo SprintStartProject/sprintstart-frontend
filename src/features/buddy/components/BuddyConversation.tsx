@@ -1,7 +1,8 @@
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
+import { useStickToBottom } from "../hooks/useStickToBottom";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
@@ -15,7 +16,6 @@ type BuddyConversationProps = {
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
   dismissAction: (messageId: string, actionId: string) => void;
-  bottomRef: RefObject<HTMLDivElement | null>;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /** Rendered above the first message: what came back from the hire's PM. */
@@ -26,6 +26,8 @@ type BuddyConversationProps = {
   renderQuestionAction?: (question: string) => ReactNode;
   /** Rendered just above the composer: the things this hire could usefully ask. */
   aboveComposer?: ReactNode;
+  /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
+  focusComposerOnMount?: boolean;
 };
 
 /**
@@ -57,20 +59,24 @@ export function BuddyConversation({
   handleSubmit,
   confirmAction,
   dismissAction,
-  bottomRef,
   placeholder,
   before,
   lastMessageFooter,
   renderQuestionAction,
   aboveComposer,
+  focusComposerOnMount = false,
 }: BuddyConversationProps) {
+  const { containerRef, onScroll } = useStickToBottom(messages);
+
   return (
     <>
       <div
+        ref={containerRef}
+        onScroll={onScroll}
         data-testid="buddy-transcript"
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
-        <div className="flex min-w-0 flex-col gap-4 py-6 xl:pl-6">
+        <div className="app-page-frame flex min-w-0 flex-col gap-4 py-6">
           <BuddyThread
             messages={messages}
             isThinking={isThinking}
@@ -82,15 +88,13 @@ export function BuddyConversation({
             lastMessageFooter={lastMessageFooter}
             renderQuestionAction={renderQuestionAction}
           />
-
-          <div ref={bottomRef} />
         </div>
       </div>
 
       {/* Translucent rather than solid, so the thread does not stop dead at a hard line — the
                 last message fades under the composer as it scrolls past it. */}
       <div className="shrink-0 border-t border-app-border bg-app-bg/85 backdrop-blur-md">
-        <div className="py-3 xl:pl-6">
+        <div className="app-page-frame py-3">
           {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
           <BuddyComposer
@@ -98,6 +102,7 @@ export function BuddyConversation({
             setDraft={setDraft}
             handleSubmit={handleSubmit}
             placeholder={placeholder}
+            focusOnMount={focusComposerOnMount}
           />
         </div>
       </div>

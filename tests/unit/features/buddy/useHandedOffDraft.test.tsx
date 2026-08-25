@@ -128,7 +128,6 @@ describe("the dock’s hand-off control", () => {
         handleSubmit={vi.fn()}
         confirmAction={vi.fn()}
         dismissAction={vi.fn()}
-        bottomRef={{ current: null }}
         suggestions={[]}
         onClose={vi.fn()}
       />,
@@ -152,7 +151,6 @@ describe("the dock’s hand-off control", () => {
         handleSubmit={vi.fn()}
         confirmAction={vi.fn()}
         dismissAction={vi.fn()}
-        bottomRef={{ current: null }}
         suggestions={[]}
         onClose={vi.fn()}
         onOpenFull={onOpenFull}

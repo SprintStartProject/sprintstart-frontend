@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import { Send } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -12,6 +12,14 @@ type BuddyComposerProps = {
   placeholder?: string;
   /** Drops the keyboard hint under the box, for the dock where the room is better spent. */
   compact?: boolean;
+  /**
+   * Puts the caret in the box on mount, behind whatever is already in it.
+   *
+   * For the full page, which a hire opens in order to type. The caret goes *behind* the text
+   * because a textarea focused with a value starts it at position 0 — a draft handed over from
+   * the dock would otherwise be typed in front of.
+   */
+  focusOnMount?: boolean;
 };
 
 /**
@@ -33,11 +41,22 @@ export function BuddyComposer({
   handleSubmit,
   placeholder = "Ask your buddy anything...",
   compact = false,
+  focusOnMount = false,
 }: BuddyComposerProps) {
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
   // One line at rest, six at most — past that it scrolls rather than eating the thread.
   useAutoResize({ ref: fieldRef, value: draft, minRows: 1, maxRows: 6 });
+
+  // Mount only: focus is the hire's from there, and stealing it back on every draft change
+  // would fight them the moment they clicked anywhere else.
+  useEffect(() => {
+    if (!focusOnMount) return;
+    const field = fieldRef.current;
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [focusOnMount]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;

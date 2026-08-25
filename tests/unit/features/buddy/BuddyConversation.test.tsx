@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { createRef } from "react";
 import { BuddyConversation } from "../../../../src/features/buddy/components/BuddyConversation";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 
@@ -19,7 +18,6 @@ function renderConversation(overrides: {
       handleSubmit={vi.fn()}
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
-      bottomRef={createRef<HTMLDivElement>()}
     />,
   );
 }

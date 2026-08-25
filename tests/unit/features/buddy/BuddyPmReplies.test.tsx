@@ -15,6 +15,17 @@ vi.mock("../../../../src/services/knowledgeRequestService", () => ({
 }));
 
 import { useFetch } from "../../../../src/hooks/useFetch";
+import { usePmReplies } from "../../../../src/features/buddy/hooks/usePmReplies";
+
+/**
+ * The grouping moved into `usePmReplies` so the page can ask "is there anything?" without a
+ * second request, leaving the rail presentational. The tests still drive it end to end through
+ * the mocked `useFetch`, which is what they were always really exercising.
+ */
+function Harness() {
+  const replies = usePmReplies();
+  return <BuddyPmReplies {...replies} onClose={vi.fn()} />;
+}
 
 function answer(overrides: Partial<CanonicalAnswer> = {}): CanonicalAnswer {
   return {
@@ -61,19 +72,19 @@ describe("BuddyPmReplies", () => {
 
   it("renders nothing when the hire has never escalated anything", () => {
     mockRequests([]);
-    const { container } = render(<BuddyPmReplies />);
+    const { container } = render(<Harness />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders nothing while loading, so the page does not shift under the hire", () => {
     mockRequests(null, { loading: true });
-    const { container } = render(<BuddyPmReplies />);
+    const { container } = render(<Harness />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("stays silent on a failed load rather than showing an error the hire cannot act on", () => {
     mockRequests(null, { error: true });
-    const { container } = render(<BuddyPmReplies />);
+    const { container } = render(<Harness />);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -85,7 +96,7 @@ describe("BuddyPmReplies", () => {
         answer: answer(),
       }),
     ]);
-    render(<BuddyPmReplies />);
+    render(<Harness />);
 
     expect(screen.getByText("How do I get staging credentials?")).toBeInTheDocument();
     expect(screen.getByText("Ask in #platform and Dana will provision them.")).toBeInTheDocument();
@@ -95,7 +106,7 @@ describe("BuddyPmReplies", () => {
     mockRequests([
       request({ status: "ANSWERED", answeredAt: "2026-07-27T10:00:00Z", answer: answer() }),
     ]);
-    render(<BuddyPmReplies />);
+    render(<Harness />);
 
     expect(screen.getByText(/Answered by your PM/)).toBeInTheDocument();
   });
@@ -106,13 +117,13 @@ describe("BuddyPmReplies", () => {
     mockRequests([
       request({ status: "ANSWERED", answeredAt: "2026-07-27T10:00:00Z", answer: null }),
     ]);
-    const { container } = render(<BuddyPmReplies />);
+    const { container } = render(<Harness />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows a still-open question as waiting, so the hire does not re-flag it", () => {
     mockRequests([request()]);
-    render(<BuddyPmReplies />);
+    render(<Harness />);
 
     expect(screen.getByText("Still with your PM")).toBeInTheDocument();
     expect(screen.queryByText(/Your PM answered/)).not.toBeInTheDocument();
@@ -120,7 +131,7 @@ describe("BuddyPmReplies", () => {
 
   it("surfaces a dismissed question instead of leaving it waiting forever", () => {
     mockRequests([request({ status: "DISMISSED" })]);
-    render(<BuddyPmReplies />);
+    render(<Harness />);
 
     expect(screen.getByText("Closed without an answer")).toBeInTheDocument();
     expect(screen.queryByText("Still with your PM")).not.toBeInTheDocument();
@@ -137,7 +148,7 @@ describe("BuddyPmReplies", () => {
       request({ id: "r2", question: "Who reviews infra PRs?" }),
       request({ id: "r3", question: "Is the wiki current?", status: "DISMISSED" }),
     ]);
-    render(<BuddyPmReplies />);
+    render(<Harness />);
 
     expect(screen.getByText("Your PM answered")).toBeInTheDocument();
     expect(screen.getByText("Still with your PM")).toBeInTheDocument();
