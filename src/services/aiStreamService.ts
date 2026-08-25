@@ -79,36 +79,49 @@ export async function streamAiProgress(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
+  // The read loop is inside the guard for the same reason the fetch is: a connection dropped
+  // mid-stream used to reject out of this function, past `onError` and past the caller, which
+  // meant the documented fallback -- re-read the normal endpoint on failure -- never ran. The
+  // caller sat in its loading state instead, because nothing had told it anything went wrong.
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
 
-      let event: AiProgressEvent;
-      try {
-        event = JSON.parse(line.replace("data:", "").trim()) as AiProgressEvent;
-      } catch {
-        // A malformed chunk is skipped, never fatal — same tolerance the backend applies.
-        continue;
+        let event: AiProgressEvent;
+        try {
+          event = JSON.parse(line.replace("data:", "").trim()) as AiProgressEvent;
+        } catch {
+          // A malformed chunk is skipped, never fatal — same tolerance the backend applies.
+          continue;
+        }
+
+        // Terminal events have dedicated callbacks; only progress events flow through onEvent.
+        // Both let go of the body on the way out rather than leaving the connection open.
+        if (event.type === "done") {
+          void reader.cancel();
+          handlers.onDone();
+          return;
+        }
+        if (event.type === "error") {
+          void reader.cancel();
+          handlers.onError(event.message ?? "The AI service reported an error.");
+          return;
+        }
+        handlers.onEvent(event);
       }
-
-      // Terminal events have dedicated callbacks; only the progress events flow through onEvent.
-      if (event.type === "done") {
-        handlers.onDone();
-        return;
-      }
-      if (event.type === "error") {
-        handlers.onError(event.message ?? "The AI service reported an error.");
-        return;
-      }
-      handlers.onEvent(event);
     }
+  } catch (error) {
+    console.error("AI progress stream failed mid-response", error);
+    handlers.onError("The connection dropped before the run finished.");
+    return;
   }
 
   // The stream closed without an explicit terminal event: treat it as done rather than an error,

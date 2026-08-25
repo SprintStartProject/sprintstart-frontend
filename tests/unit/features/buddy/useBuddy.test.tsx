@@ -5,6 +5,28 @@ import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
+/**
+ * A greeting that opens the visit and writes nothing.
+ *
+ * The hook opens a visit on mount, so every test below makes that request whether it is about
+ * the greeting or not. Stubbed to silence rather than left unhandled: an unhandled request is a
+ * *failed* greeting, and a failed greeting on an empty thread is reported to the hire -- which
+ * is correct behaviour (see `buddyFailures`) and would put a turn in front of everything these
+ * tests index into. A greeting that produces no words leaves no trace, which is what they want.
+ */
+function silentGreeting() {
+  const encoder = new TextEncoder();
+  return new HttpResponse(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"type":"done"}\\n\\n'));
+        controller.close();
+      },
+    }),
+    { headers: { "Content-Type": "text/event-stream" } },
+  );
+}
+
 describe("useBuddy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,6 +85,7 @@ describe("useBuddy", () => {
   it("optimistically adds messages and streams the reply", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
       http.post("/api/v1/onboarding/me/buddy/messages", () => {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
@@ -111,6 +134,7 @@ describe("useBuddy", () => {
   it("holds a proposal back until the reply it belongs to has been written", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
       http.post("/api/v1/onboarding/me/buddy/messages", () => {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
@@ -166,6 +190,7 @@ describe("useBuddy", () => {
     let confirmBody: Record<string, unknown> = {};
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
       http.post("/api/v1/onboarding/me/buddy/messages", () => {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({

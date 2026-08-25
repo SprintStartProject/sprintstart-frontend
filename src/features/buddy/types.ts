@@ -100,6 +100,15 @@ export type BuddyMessageView = BuddyMessage & {
    * nothing. It drives the divider in `BuddyThread`.
    */
   startsVisit?: boolean;
+  /**
+   * Why this turn has no answer in it, when a stream failed rather than finished.
+   *
+   * The same shape the chat feature uses, and for the same reason: whatever streamed before the
+   * failure stays on screen, with the reason beside it. Without one, a failed reply left the
+   * hire's own question sitting under a turn that renders as nothing, which is indistinguishable
+   * from the buddy having ignored them -- on the surface the whole feature is built around.
+   */
+  error?: string;
 };
 
 /**

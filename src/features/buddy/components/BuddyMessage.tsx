@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { UserRound } from "lucide-react";
+import { AlertCircle, UserRound } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 
@@ -28,6 +28,15 @@ type BuddyMessageProps = {
   showName?: boolean;
   /** A quiet line under the bubble — a timestamp, or who answered and when. */
   meta?: ReactNode;
+  /**
+   * Why this turn has no answer in it, when a stream failed rather than finished.
+   *
+   * Sits beside the bubble rather than replacing it: whatever streamed before the failure is
+   * still the buddy's answer, and half an answer plus the reason it stopped is more use than
+   * either alone. A turn that failed before writing anything has no bubble at all, and then
+   * this is the whole message.
+   */
+  error?: string;
   /** Rendered under the bubble, inside the speaker's column: the escalation offer, mostly. */
   footer?: ReactNode;
   /** True for the turn currently receiving tokens — that bot is working, so it stays awake. */
@@ -59,6 +68,7 @@ export function BuddyMessage({
   children,
   showName = false,
   meta,
+  error,
   footer,
   isStreaming = false,
 }: BuddyMessageProps) {
@@ -98,6 +108,17 @@ export function BuddyMessage({
             className={`max-w-full min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words shadow-sm ${bubbleClasses(speaker)}`}
           >
             {children}
+          </div>
+        )}
+
+        {error && (
+          <div
+            className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
+              children === undefined ? "" : "mt-1"
+            }`}
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
           </div>
         )}
 

@@ -26,6 +26,10 @@ type BuddyConversationProps = {
   renderQuestionAction?: (question: string) => ReactNode;
   /** Rendered just above the composer: the things this hire could usefully ask. */
   aboveComposer?: ReactNode;
+  /** Why the conversation could not be brought on screen at all — see `BuddyThread`. */
+  openError?: string | null;
+  /** Tries the read again, from the banner that reports the failure. */
+  onRetryOpen?: () => void;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
 };
@@ -64,6 +68,8 @@ export function BuddyConversation({
   lastMessageFooter,
   renderQuestionAction,
   aboveComposer,
+  openError,
+  onRetryOpen,
   focusComposerOnMount = false,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
@@ -87,6 +93,8 @@ export function BuddyConversation({
             before={before}
             lastMessageFooter={lastMessageFooter}
             renderQuestionAction={renderQuestionAction}
+            openError={openError}
+            onRetryOpen={onRetryOpen}
           />
         </div>
       </div>

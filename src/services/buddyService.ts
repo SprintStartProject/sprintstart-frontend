@@ -200,14 +200,23 @@ async function readBuddyStream(
     return "aborted";
   }
 
-  const res = await fetch(path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${keycloak.token}`,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${keycloak.token}`,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    // Reported rather than thrown, so "we never reached the server" arrives at the caller's
+    // error surface as a sentence instead of as a rejection it has to translate. The only thing
+    // the hire needs from this is whether trying again is worth it.
+    onError?.("Could not reach the server.");
+    return "aborted";
+  }
 
   if (!res.ok) {
     onError?.(`HTTP error! status: ${res.status}`);
@@ -217,29 +226,54 @@ async function readBuddyStream(
   const reader = res.body?.getReader();
 
   if (!reader) {
-    throw new Error("No response stream");
+    // Reported like every other failure here rather than thrown: a caller that wired up
+    // `onError` should not also have to wrap the call.
+    onError?.("No response stream.");
+    return "aborted";
   }
 
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { value, done } = await reader.read();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
 
-    if (done) break;
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
 
-      const event = JSON.parse(line.replace("data:", "").trim()) as BuddyStreamChunk;
+        let event: BuddyStreamChunk;
+        try {
+          event = JSON.parse(line.replace("data:", "").trim()) as BuddyStreamChunk;
+        } catch {
+          // A malformed chunk is skipped, never fatal -- the same tolerance the backend applies,
+          // and what `aiStreamService` already does with the identical framing. One unparseable
+          // line (a keep-alive, a proxy's own text, a truncated tail) used to throw out of the
+          // loop and take the rest of the reply with it.
+          continue;
+        }
 
-      if (onChunk(event) === "stop") return "terminated";
+        if (onChunk(event) === "stop") {
+          // The caller is finished with this stream, so let go of the body rather than leaving
+          // an open connection for the collector to notice eventually.
+          void reader.cancel();
+          return "terminated";
+        }
+      }
     }
+  } catch (error) {
+    // A connection dropped mid-stream. Without this it rejected out of the function, past every
+    // `onError` the caller wired up, and whatever had streamed so far simply stopped.
+    console.error("Buddy stream failed mid-response", error);
+    onError?.("The connection to your buddy dropped.");
+    return "aborted";
   }
 
   return "ended";

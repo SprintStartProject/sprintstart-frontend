@@ -99,13 +99,38 @@ export function AppRouter() {
             </ManagerAreaGuard>
           }
         />
-        <Route path="/insights/onboarding" element={<OnboardingMetricsPage />} />
+        <Route
+          path="/insights/onboarding"
+          element={
+            <ManagerAreaGuard route="/insights/onboarding">
+              <OnboardingMetricsPage />
+            </ManagerAreaGuard>
+          }
+        />
         {/* The buddy and the surfaces its tools serve. Added beside the onboarding
             path above, not in place of it: both ways in stay open. */}
         <Route path="/buddy" element={<BuddyPage />} />
         <Route path="/board" element={<BoardPage />} />
-        <Route path="/arrival-steps" element={<ArrivalStepsPage />} />
-        <Route path="/starter-work" element={<StarterWorkPage />} />
+        {/* Guarded, because the access policy says they are PM/HR/ADMIN-only and the sidebar
+            merely hides them -- which leaves the URL. Both pages already gate their *actions*
+            by role, but a hire who typed the path still got the page and a column of failed
+            requests, and the policy claimed otherwise. */}
+        <Route
+          path="/arrival-steps"
+          element={
+            <ManagerAreaGuard route="/arrival-steps">
+              <ArrivalStepsPage />
+            </ManagerAreaGuard>
+          }
+        />
+        <Route
+          path="/starter-work"
+          element={
+            <ManagerAreaGuard route="/starter-work">
+              <StarterWorkPage />
+            </ManagerAreaGuard>
+          }
+        />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="*" element={<NotFoundPage />} />

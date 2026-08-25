@@ -9,6 +9,16 @@ import {
 import type { BuddyMessageView, ProposedAction } from "../types";
 
 /**
+ * What the hire is told when a stream does not finish.
+ *
+ * Plain, and never the raw failure: a transport message or an HTTP status answers a question
+ * nobody asked. What matters is whether trying again is worth it, so each line says so.
+ */
+const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a moment.";
+const GREETING_FAILED = "Your buddy could not be reached just now.";
+const HISTORY_FAILED = "Your conversation could not be loaded.";
+
+/**
  * The conversation core behind every buddy surface: the message list, the optimistic
  * send-and-stream loop, and the "which tool is it running" signal.
  *
@@ -30,6 +40,9 @@ export function useBuddyConversation() {
   // True while a surface is opening the conversation, so it can show a loading state rather
   // than an empty thread. Starts false: nothing is opening until somebody asks.
   const [isOpening, setIsOpening] = useState(false);
+  // Set when the conversation could not be brought on screen at all -- distinct from a turn that
+  // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
+  const [openError, setOpenError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
   const loadedRef = useRef(false);
@@ -69,12 +82,16 @@ export function useBuddyConversation() {
       },
     ]);
 
-    let wroteSomething = false;
+    // Read back after the stream, which is why it is a bag rather than two `let`s: the compiler
+    // narrows a local to its initial value when the only writes are inside callbacks, so the
+    // reason would type as `null` at the point it is used. A property's narrowing is dropped at
+    // the call, which is exactly the behaviour wanted here.
+    const stream = { wroteSomething: false, failure: null as string | null };
 
     try {
       await streamOpenBuddy({
         onToken: (token) => {
-          wroteSomething = true;
+          stream.wroteSomething = true;
           setMessages((prev) =>
             prev.map((message) =>
               message.id === id ? { ...message, content: message.content + token } : message,
@@ -86,18 +103,41 @@ export function useBuddyConversation() {
         },
         onAction: setOpenerAction,
         onDone: () => setIsOpening(false),
-        onError: (message) => console.error(message),
+        onError: (message) => {
+          console.error(message);
+          stream.failure = GREETING_FAILED;
+        },
       });
+    } catch (e) {
+      console.error(e);
+      stream.failure = GREETING_FAILED;
     } finally {
-      // A greeting that never produced a word leaves no trace. The placeholder holds the
-      // greeting's *place* while it is being written; once it is established that nothing is
-      // coming — a failed stream, an unreachable model — an empty assistant turn would sit in
-      // the conversation for the rest of the session. It renders as nothing, which is worse
-      // than useless: invisible state that every reader of `messages` still has to account
-      // for, starting with "which turn is streaming".
-      if (!wroteSomething) {
-        setMessages((prev) => prev.filter((message) => message.id !== id));
-      }
+      const reason = stream.failure;
+
+      setMessages((prev) => {
+        const withoutPlaceholder = prev.filter((message) => message.id !== id);
+
+        // Nothing came, and nothing went wrong: the placeholder held the greeting's *place*
+        // while it was being written, and once it is established that no words are coming, an
+        // empty assistant turn would sit in the conversation for the rest of the session. It
+        // renders as nothing, which is worse than useless -- invisible state every reader of
+        // `messages` still has to account for, starting with "which turn is streaming".
+        if (!reason) return stream.wroteSomething ? prev : withoutPlaceholder;
+
+        // A greeting that failed under a conversation the hire can already read is not worth
+        // saying. They did not ask for it -- it is a visit opening behind them -- and a red
+        // banner under their own thread reports a problem they do not have. If they ask
+        // something and *that* fails, the reply says so.
+        if (!stream.wroteSomething && withoutPlaceholder.length > 0) return withoutPlaceholder;
+
+        // Otherwise it is worth saying, and for opposite reasons. Either this is all there is,
+        // and an empty thread would read as "there is no buddy here" rather than as a buddy
+        // that could not be reached; or words did arrive and then stopped, and a greeting
+        // ending mid-sentence needs the explanation more than a missing one does.
+        return prev.map((message) => (message.id === id ? { ...message, error: reason } : message));
+      });
+
+      setIsOpening(false);
     }
   }, []);
 
@@ -131,6 +171,7 @@ export function useBuddyConversation() {
     if (loadedRef.current) return;
     loadedRef.current = true;
     setIsOpening(true);
+    setOpenError(null);
 
     try {
       const history = await getMessages();
@@ -157,10 +198,30 @@ export function useBuddyConversation() {
       }
     } catch (e) {
       console.error(e);
+      // The latch goes back, or one blip is permanent. This runs as the app root mounts, so the
+      // request most likely to fail is the first one there will ever be -- and the widget never
+      // unmounts, so the mount effect that called this will not call it again. Without the
+      // release the hire has an empty thread, no history, no greeting, and no way back short of
+      // a reload. `retryOpen` is what actually offers them one.
+      loadedRef.current = false;
+      setOpenError(HISTORY_FAILED);
     } finally {
       setIsOpening(false);
     }
   }, [greet]);
+
+  /**
+   * Tries again after [ensureOpened] failed.
+   *
+   * Its own function rather than handing the surfaces `ensureOpened` directly, because the two
+   * differ in the one way that matters: this is somebody asking, so it clears the failure first
+   * and always attempts the read. `ensureOpened` is a mount-time warm-up that must stay a no-op
+   * once the conversation is there.
+   */
+  const retryOpen = useCallback(async () => {
+    setOpenError(null);
+    await ensureOpened();
+  }, [ensureOpened]);
 
   /**
    * Starts a new visit: clears the scrollback and greets again.
@@ -183,6 +244,7 @@ export function useBuddyConversation() {
 
     setMessages([]);
     setOpenerAction(null);
+    setOpenError(null);
     setDraft("");
     setIsOpening(true);
     try {
@@ -196,119 +258,140 @@ export function useBuddyConversation() {
   }, [greet]);
 
   /**
+   * Marks the turn a reply was streaming into as failed, so the thread says so.
+   *
+   * Whatever arrived before the failure is kept: a half-written answer with a line under it
+   * saying it stopped is more use than a bubble that silently ends mid-sentence. The turn is
+   * also what makes the failure visible at all -- an assistant turn with no text and no error
+   * renders as nothing, which left the hire's question sitting under a reply that never came.
+   */
+  const failReply = useCallback((messageId: string) => {
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === messageId ? { ...message, error: REPLY_FAILED } : message,
+      ),
+    );
+  }, []);
+
+  /**
    * Sends a new message and streams the buddy's reply into the conversation.
    */
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
 
-    const userMessage: BuddyMessageView = {
-      id: crypto.randomUUID(),
-      role: "USER",
-      content: text,
-      createdAt: new Date().toISOString(),
-    };
+      const userMessage: BuddyMessageView = {
+        id: crypto.randomUUID(),
+        role: "USER",
+        content: text,
+        createdAt: new Date().toISOString(),
+      };
 
-    const assistantId = crypto.randomUUID();
-    const assistantMessage: BuddyMessageView = {
-      id: assistantId,
-      role: "ASSISTANT",
-      content: "",
-      createdAt: new Date().toISOString(),
-      citations: [],
-    };
+      const assistantId = crypto.randomUUID();
+      const assistantMessage: BuddyMessageView = {
+        id: assistantId,
+        role: "ASSISTANT",
+        content: "",
+        createdAt: new Date().toISOString(),
+        citations: [],
+      };
 
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
-    setIsThinking(true);
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setIsThinking(true);
 
-    /**
-     * Proposals held back until the reply is finished.
-     *
-     * The backend can emit `action_proposal` before it has written a word, which put an
-     * "Accept this task" button on screen above an empty bubble — the hire was asked to agree
-     * to something the buddy had not said yet. Buffering them costs nothing (a proposal is
-     * inert until confirmed) and guarantees the only sane order: what it wants to do, then the
-     * button that does it.
-     */
-    const proposed: ProposedAction[] = [];
-    setActiveTool(null);
-    // Once the hire says anything, the opener's one-click suggestion has served its purpose.
-    setOpenerAction(null);
+      /**
+       * Proposals held back until the reply is finished.
+       *
+       * The backend can emit `action_proposal` before it has written a word, which put an
+       * "Accept this task" button on screen above an empty bubble — the hire was asked to agree
+       * to something the buddy had not said yet. Buffering them costs nothing (a proposal is
+       * inert until confirmed) and guarantees the only sane order: what it wants to do, then the
+       * button that does it.
+       */
+      const proposed: ProposedAction[] = [];
+      setActiveTool(null);
+      // Once the hire says anything, the opener's one-click suggestion has served its purpose.
+      setOpenerAction(null);
 
-    try {
-      await streamMessage(text, {
-        onToolUse: (name) => {
-          setActiveTool(name);
-        },
+      try {
+        await streamMessage(text, {
+          onToolUse: (name) => {
+            setActiveTool(name);
+          },
 
-        onToken: (token) => {
-          setIsStreaming(true);
-          setIsThinking(false);
-          setActiveTool(null);
+          onToken: (token) => {
+            setIsStreaming(true);
+            setIsThinking(false);
+            setActiveTool(null);
 
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
-          );
-        },
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
+            );
+          },
 
-        onCitation: (citation) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, citations: [...(m.citations ?? []), citation] } : m,
-            ),
-          );
-        },
-
-        onActionProposal: (proposal) => {
-          // The buddy is offering to do something. Nothing has changed yet and nothing will
-          // until the hire confirms — so this is only recorded here, and attached to the reply
-          // once the reply exists. The confirm payloads ride along so the action runs against
-          // what the buddy actually proposed.
-          setActiveTool(null);
-          proposed.push({
-            id: crypto.randomUUID(),
-            action: proposal.action,
-            label: proposal.label,
-            question: proposal.question,
-            taskId: proposal.taskId,
-            title: proposal.title,
-            attesterId: proposal.attesterId,
-            githubLogin: proposal.githubLogin,
-            competencyKey: proposal.competencyKey,
-            level: proposal.level,
-            status: "idle",
-          });
-        },
-
-        onDone: () => {
-          setIsStreaming(false);
-          // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
-          // emits a token, and the typing dots would sit under it forever.
-          setIsThinking(false);
-          setActiveTool(null);
-
-          if (proposed.length > 0) {
+          onCitation: (citation) => {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), ...proposed] } : m,
+                m.id === assistantId ? { ...m, citations: [...(m.citations ?? []), citation] } : m,
               ),
             );
-          }
-        },
+          },
 
-        onError: (err) => {
-          console.error(err);
-          setIsStreaming(false);
-          setIsThinking(false);
-          setActiveTool(null);
-        },
-      });
-    } catch (e) {
-      console.error(e);
-      setIsStreaming(false);
-      setIsThinking(false);
-      setActiveTool(null);
-    }
-  }, []);
+          onActionProposal: (proposal) => {
+            // The buddy is offering to do something. Nothing has changed yet and nothing will
+            // until the hire confirms — so this is only recorded here, and attached to the reply
+            // once the reply exists. The confirm payloads ride along so the action runs against
+            // what the buddy actually proposed.
+            setActiveTool(null);
+            proposed.push({
+              id: crypto.randomUUID(),
+              action: proposal.action,
+              label: proposal.label,
+              question: proposal.question,
+              taskId: proposal.taskId,
+              title: proposal.title,
+              attesterId: proposal.attesterId,
+              githubLogin: proposal.githubLogin,
+              competencyKey: proposal.competencyKey,
+              level: proposal.level,
+              status: "idle",
+            });
+          },
+
+          onDone: () => {
+            setIsStreaming(false);
+            // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
+            // emits a token, and the typing dots would sit under it forever.
+            setIsThinking(false);
+            setActiveTool(null);
+
+            if (proposed.length > 0) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), ...proposed] } : m,
+                ),
+              );
+            }
+          },
+
+          onError: (err) => {
+            console.error(err);
+            setIsStreaming(false);
+            setIsThinking(false);
+            setActiveTool(null);
+            failReply(assistantId);
+          },
+        });
+      } catch (e) {
+        console.error(e);
+        setIsStreaming(false);
+        setIsThinking(false);
+        setActiveTool(null);
+        failReply(assistantId);
+      }
+    },
+    [failReply],
+  );
 
   /** Patches one proposed action in place, keyed by its message and action id. */
   const patchAction = useCallback(
@@ -387,6 +470,7 @@ export function useBuddyConversation() {
     activeTool,
     openerAction,
     isOpening,
+    openError,
 
     draft,
     setDraft,
@@ -396,6 +480,7 @@ export function useBuddyConversation() {
     dismissAction,
 
     ensureOpened,
+    retryOpen,
     startFreshVisit,
   };
 }

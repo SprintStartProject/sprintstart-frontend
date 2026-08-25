@@ -50,6 +50,14 @@ type BuddyDockProps = Pick<
    * `/buddy` itself, where the control would offer the page the hire is already reading.
    */
   onOpenFull?: () => void;
+  /**
+   * Why the conversation could not be brought on screen at all — see `BuddyThread`. Handed in
+   * rather than picked off the session, like every other callback here: the dock stays a
+   * presentational component the widget drives, which is what keeps it testable without one.
+   */
+  openError?: string | null;
+  /** Tries the read again, from the banner that reports the failure. */
+  onRetryOpen?: () => void;
   /** Whether the hire has put the suggestion row away for this session. */
   suggestionsHidden?: boolean;
   /** Puts it away. Held by the widget so it survives closing and reopening the dock. */
@@ -97,8 +105,10 @@ export function BuddyDock({
   confirmAction,
   dismissAction,
   suggestions,
+  openError,
   onClose,
   onOpenFull,
+  onRetryOpen,
   suggestionsHidden = false,
   onHideSuggestions,
   isExpanding = false,
@@ -247,6 +257,8 @@ export function BuddyDock({
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+            openError={openError}
+            onRetryOpen={onRetryOpen}
           />
         </div>
 

@@ -90,6 +90,63 @@ describe("buddyService", () => {
       expect(messageSent).toBe(false);
     });
 
+    /**
+     * The framing tolerates a line it cannot read, the way the backend does and the way
+     * `aiStreamService` does with the identical wire format. One unparseable `data:` line — a
+     * keep-alive, a proxy writing its own text, a truncated tail — used to throw out of the read
+     * loop and take the rest of the reply with it.
+     */
+    it("skips a chunk it cannot parse instead of losing the reply", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"token","content":"hel"}\n\n'));
+          controller.enqueue(encoder.encode("data: not json at all\n\n"));
+          controller.enqueue(encoder.encode('data: {"type":"token","content":"lo"}\n\n'));
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+        ),
+      );
+
+      const onToken = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      await streamMessage("hello", { onToken, onCitation: vi.fn(), onDone, onError });
+
+      expect(onToken).toHaveBeenCalledTimes(2);
+      expect(onToken).toHaveBeenNthCalledWith(2, "lo");
+      expect(onDone).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Never reaching the server is a failure the caller has to be able to show, so it arrives at
+     * `onError` as a sentence rather than as a rejection out of the call.
+     */
+    it("reports a transport failure instead of rejecting", async () => {
+      server.use(http.post("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.error()));
+
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      await expect(
+        streamMessage("hello", { onToken: vi.fn(), onCitation: vi.fn(), onDone, onError }),
+      ).resolves.toBeUndefined();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      // Nothing arrived, so nothing is finished: announcing completion here would tell the
+      // surface to render an answer that does not exist.
+      expect(onDone).not.toHaveBeenCalled();
+    });
+
     it("calls onError when response is not ok", async () => {
       server.use(
         http.post(

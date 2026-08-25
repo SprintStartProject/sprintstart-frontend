@@ -184,7 +184,9 @@ function BuddyMentorHome() {
     handleSubmit,
     confirmAction,
     dismissAction,
+    openError,
     ensureOpened,
+    retryOpen,
     startFreshVisit,
   } = useBuddySession();
 
@@ -294,6 +296,8 @@ function BuddyMentorHome() {
           ) : undefined
         }
         renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+        openError={openError}
+        onRetryOpen={() => void retryOpen()}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question
