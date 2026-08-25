@@ -46,7 +46,7 @@ export function RunHistory({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-app-border">
-      <div className="hidden grid-cols-[1.2fr_1fr_1fr_1fr_1fr] gap-4 border-b border-app-border bg-app-bg-soft px-5 py-3 text-xs font-semibold tracking-wide text-app-text-subtle uppercase lg:grid">
+      <div className="hidden grid-cols-[1.2fr_1fr_1fr_1fr_1fr] gap-4 border-b border-app-border bg-app-bg-soft px-5 py-3 text-xs font-semibold tracking-wide text-app-text-subtle uppercase xl:grid">
         <span>Source</span>
         <span>Status</span>
         <span>Started</span>
@@ -64,7 +64,7 @@ export function RunHistory({
               type="button"
               onClick={() => onSelectRun?.(run)}
               aria-pressed={isSelected}
-              className={`grid w-full gap-4 px-5 py-5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus lg:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto] lg:items-center ${
+              className={`grid w-full grid-cols-2 gap-x-4 gap-y-3 px-5 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto] xl:items-center xl:gap-4 xl:py-5 ${
                 isSelected
                   ? "bg-app-brand-soft"
                   : // Rows sit in a shared grid, so they get an
@@ -74,7 +74,7 @@ export function RunHistory({
                     "bg-app-surface hover:bg-app-surface-hover hover:shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
               }`}
             >
-              <div>
+              <div className="col-span-2 xl:col-span-1">
                 <p className="text-sm font-semibold text-app-text">
                   {getRunSourceLabel(run, sourceLabelBySourceRef)}
                 </p>
@@ -82,7 +82,7 @@ export function RunHistory({
                 <p className="mt-1 text-xs break-all text-app-text-subtle">{run.runId}</p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="col-span-2 flex flex-wrap items-center gap-1.5 xl:col-span-1">
                 <RunStatusBadge status={run.status} failureReason={run.failureReason} />
                 <AiSyncStatusBadge
                   status={run.aiSyncStatus}
@@ -91,7 +91,7 @@ export function RunHistory({
               </div>
 
               <div>
-                <p className="text-xs tracking-wide text-app-text-subtle uppercase lg:hidden">
+                <p className="text-xs tracking-wide text-app-text-subtle uppercase xl:hidden">
                   Started
                 </p>
 
@@ -99,7 +99,7 @@ export function RunHistory({
               </div>
 
               <div>
-                <p className="text-xs tracking-wide text-app-text-subtle uppercase lg:hidden">
+                <p className="text-xs tracking-wide text-app-text-subtle uppercase xl:hidden">
                   Finished
                 </p>
 
@@ -108,8 +108,8 @@ export function RunHistory({
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs tracking-wide text-app-text-subtle uppercase lg:hidden">
+              <div className="col-span-2 xl:col-span-1">
+                <p className="text-xs tracking-wide text-app-text-subtle uppercase xl:hidden">
                   Counts
                 </p>
 
@@ -141,7 +141,7 @@ export function RunHistory({
               </div>
 
               <ChevronRight
-                className={`hidden h-5 w-5 justify-self-end text-app-text-disabled transition group-hover:translate-x-1 lg:block ${
+                className={`hidden h-5 w-5 justify-self-end text-app-text-disabled transition group-hover:translate-x-1 xl:block ${
                   isSelected ? "text-app-brand" : ""
                 }`}
               />

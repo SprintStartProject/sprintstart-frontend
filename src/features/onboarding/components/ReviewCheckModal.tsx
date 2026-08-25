@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { onboardingService } from "../../../services/onboardingService";
+import { useToast } from "../../../context/useToast";
 import { Modal } from "../../../components/ui/Modal";
 import type {
   ReviewCheckEndpoint,
@@ -38,7 +39,7 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, DraftAnswer>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const toast = useToast();
   const [result, setResult] = useState<ReviewCheckResult | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
@@ -102,7 +103,6 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
   const submit = async () => {
     if (answeredQuestions.length === 0) return;
     setSubmitting(true);
-    setSubmitError(null);
     try {
       const payload: PhaseCheckAnswerSubmission[] = answeredQuestions.map((question) =>
         toSubmission(question, getDraft(question.id)),
@@ -110,7 +110,7 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       setResult(await onboardingService.submitReviewCheck(payload));
       setHasSubmitted(true);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Unknown error");
+      toast.error(err instanceof Error ? err.message : "Couldn't submit the review.");
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +123,6 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
   const continueWithRemaining = async () => {
     setResult(null);
     setAnswers({});
-    setSubmitError(null);
     setPool(null);
     try {
       setPool(await onboardingService.fetchReviewCheck());
@@ -265,13 +264,6 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
             />
           ))}
         </div>
-      )}
-
-      {submitError && (
-        <p className="mt-4 flex items-center gap-2 text-sm text-app-danger-solid">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {submitError}
-        </p>
       )}
     </Modal>
   );

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, RefreshCw, Search, XCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
+import { Input } from "../../../components/ui/Input.tsx";
+import { useToast } from "../../../context/useToast.ts";
 import { connectorService } from "../../../services/connectorService.ts";
 import { buildSourceKey } from "../data.ts";
 import type {
@@ -41,8 +43,8 @@ export function ConnectorSourcesSection({
   const [loadedConnectorId, setLoadedConnectorId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftSourceChanges>(EMPTY_DRAFT);
   const [saveState, setSaveState] = useState<LoadingState>("idle");
-  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
-  const [saveMessageTone, setSaveMessageTone] = useState<"error" | "warning">("error");
+  const [query, setQuery] = useState("");
+  const toast = useToast();
 
   const sourceKey = useMemo(() => buildSourceKey(sources), [sources]);
 
@@ -118,22 +120,17 @@ export function ConnectorSourcesSection({
       return { sourceKey, changedSourceIds };
     });
     setSaveState("idle");
-    setSaveErrorMessage(null);
-    setSaveMessageTone("error");
   };
 
   const discardChanges = () => {
     setDraft(EMPTY_DRAFT);
     setSaveState("idle");
-    setSaveErrorMessage(null);
-    setSaveMessageTone("error");
   };
 
   const saveChanges = async () => {
     if (!hasPendingChanges) return;
 
     setSaveState("loading");
-    setSaveErrorMessage(null);
 
     const patches = draftSources
       .filter((source) => activeDraft.changedSourceIds.has(source.id))
@@ -145,6 +142,7 @@ export function ConnectorSourcesSection({
       setSources(response.sources);
       setDraft(EMPTY_DRAFT);
       setSaveState("success");
+      toast.success("Sources updated");
       onSourcesSaved?.();
     } catch (error) {
       // The batch update may have persisted on the backend even though
@@ -168,37 +166,47 @@ export function ConnectorSourcesSection({
 
         if (matchesIntendedState) {
           setSaveState("success");
-          setSaveMessageTone("warning");
-          setSaveErrorMessage(
-            "Sources were updated, but confirming the change with the AI service failed. The in-scope list shown above is up to date.",
-          );
+          toast.warning("Sources updated", {
+            description:
+              "Confirming the change with the AI service failed, but the in-scope list above is up to date.",
+          });
           onSourcesSaved?.();
         } else {
           setSaveState("error");
-          setSaveMessageTone("error");
-          setSaveErrorMessage(error instanceof Error ? error.message : "Failed to update sources");
+          toast.error(error instanceof Error ? error.message : "Couldn't update the sources.");
         }
       } catch {
         // Could not confirm the true state either - fall back to a
         // plain failure and keep the draft so nothing is lost.
         setSaveState("error");
-        setSaveMessageTone("error");
-        setSaveErrorMessage(error instanceof Error ? error.message : "Failed to update sources");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the sources.");
       }
     }
   };
 
   const isLoading = loadingState === "loading" || !hasLoadedSelectedConnector;
   const isSaving = saveState === "loading";
+  const changeCount = activeDraft.changedSourceIds.size;
+  const inScopeCount = draftSources.filter((source) => source.enabled).length;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredSources = normalizedQuery
+    ? draftSources.filter(
+        (source) =>
+          source.name.toLowerCase().includes(normalizedQuery) ||
+          source.url.toLowerCase().includes(normalizedQuery),
+      )
+    : draftSources;
 
   return (
-    <div className="space-y-4 border-t border-app-border pt-4">
-      <div>
+    <div className="mt-4 space-y-4 border-t border-app-border pt-4">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-app-text">Sources</p>
-        <p className="mt-1 text-xs text-app-text-muted">
-          Toggle which sources are in scope for this connector. Changes are batched and only applied
-          when you save.
-        </p>
+
+        {!isLoading && draftSources.length > 0 && (
+          <span className="inline-flex shrink-0 items-center rounded-full border border-app-border bg-app-bg-soft px-2.5 py-1 text-xs font-medium text-app-text-muted tabular-nums">
+            {inScopeCount} / {draftSources.length} in scope
+          </span>
+        )}
       </div>
 
       {hasLoadedSelectedConnector && errorMessage && (
@@ -212,11 +220,9 @@ export function ConnectorSourcesSection({
       )}
 
       {isLoading && (
-        <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
-          <div className="flex items-center gap-3 text-sm text-app-text-muted">
-            <RefreshCw size={16} className="animate-spin text-app-brand" />
-            Loading sources...
-          </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4 text-sm text-app-text-muted">
+          <RefreshCw size={16} className="animate-spin text-app-brand" />
+          Loading sources...
         </div>
       )}
 
@@ -227,99 +233,105 @@ export function ConnectorSourcesSection({
       )}
 
       {!isLoading && draftSources.length > 0 && (
-        <div className="space-y-3">
-          {draftSources.map((source) => {
-            const isChanged = activeDraft.changedSourceIds.has(source.id);
+        <>
+          {draftSources.length > 5 && (
+            <Input
+              size="sm"
+              icon={<Search className="h-4 w-4" />}
+              aria-label="Search sources"
+              placeholder="Search sources…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          )}
 
-            return (
-              <div
-                key={source.id}
-                className={[
-                  "flex items-center justify-between gap-3 rounded-xl border p-4",
-                  isChanged
-                    ? "border-app-brand-border-strong bg-app-brand-soft"
-                    : "border-app-border bg-app-surface-muted",
-                ].join(" ")}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-app-text">{source.name}</p>
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 truncate text-xs text-app-text-muted hover:text-app-brand-text"
-                  >
-                    <ExternalLink className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{source.url}</span>
-                  </a>
-                </div>
+          <div className="space-y-2">
+            {filteredSources.map((source) => {
+              const isChanged = activeDraft.changedSourceIds.has(source.id);
 
-                <button
-                  type="button"
-                  onClick={() => toggleSource(source.id)}
-                  aria-pressed={source.enabled}
-                  aria-label={
-                    source.enabled
-                      ? `Exclude ${source.name} from ingestion`
-                      : `Include ${source.name} in ingestion`
-                  }
+              return (
+                <div
+                  key={source.id}
                   className={[
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
-                    source.enabled
-                      ? "border-app-success-border bg-app-success-bg text-app-success-text hover:bg-app-success-solid hover:text-white"
-                      : // Red like every other "disabled" marker in the app, so the
-                        // excluded state reads the same here as on the source cards.
-                        "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:bg-app-danger-solid hover:text-white",
+                    "flex items-center justify-between gap-3 rounded-xl border p-3.5 transition-colors",
+                    isChanged
+                      ? "border-app-brand-border-strong bg-app-brand-soft"
+                      : "border-app-border bg-app-surface-muted",
                   ].join(" ")}
                 >
-                  {source.enabled ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <XCircle className="h-3.5 w-3.5" />
-                  )}
-                  {source.enabled ? "In scope" : "Excluded"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-app-text">{source.name}</p>
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate text-xs text-app-text-muted hover:text-app-brand-text"
+                    >
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{source.url}</span>
+                    </a>
+                  </div>
 
-      {saveErrorMessage && (
-        <div
-          className={
-            saveMessageTone === "warning"
-              ? "rounded-2xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text"
-              : "rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text"
-          }
-        >
-          {saveErrorMessage}
-        </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSource(source.id)}
+                    aria-pressed={source.enabled}
+                    aria-label={
+                      source.enabled
+                        ? `Exclude ${source.name} from ingestion`
+                        : `Include ${source.name} in ingestion`
+                    }
+                    className={[
+                      "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                      source.enabled
+                        ? "border-app-success-border bg-app-success-bg text-app-success-text hover:bg-app-success-solid hover:text-white"
+                        : // Red like every other "disabled" marker in the app, so the
+                          // excluded state reads the same here as on the source cards.
+                          "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:bg-app-danger-solid hover:text-white",
+                    ].join(" ")}
+                  >
+                    {source.enabled ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5" />
+                    )}
+                    {source.enabled ? "In scope" : "Excluded"}
+                  </button>
+                </div>
+              );
+            })}
+
+            {filteredSources.length === 0 && (
+              <p className="py-6 text-center text-sm text-app-text-muted">
+                No sources match your search.
+              </p>
+            )}
+          </div>
+        </>
       )}
 
       {hasPendingChanges && (
-        <div className="flex gap-3">
-          <Button
-            variant="secondary"
-            onClick={discardChanges}
-            disabled={isSaving}
-            className="flex-1"
-          >
-            Discard
-          </Button>
+        <div className="flex items-center justify-between gap-3 border-t border-app-border pt-3">
+          <p className="text-xs font-medium text-app-text-muted tabular-nums">
+            {changeCount} unsaved change{changeCount === 1 ? "" : "s"}
+          </p>
 
-          <Button
-            variant="primary"
-            onClick={() => {
-              void saveChanges();
-            }}
-            loading={isSaving}
-            className="flex-1"
-          >
-            {isSaving
-              ? "Saving..."
-              : `Save ${activeDraft.changedSourceIds.size} change${activeDraft.changedSourceIds.size === 1 ? "" : "s"}`}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={discardChanges} disabled={isSaving}>
+              Discard
+            </Button>
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                void saveChanges();
+              }}
+              loading={isSaving}
+            >
+              {isSaving ? "Saving..." : `Save ${changeCount} change${changeCount === 1 ? "" : "s"}`}
+            </Button>
+          </div>
         </div>
       )}
     </div>

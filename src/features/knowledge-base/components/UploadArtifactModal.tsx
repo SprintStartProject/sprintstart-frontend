@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal } from "../../../components/ui/Modal";
+import { useToast } from "../../../context/useToast";
 import { UploadArtifactPanel } from "./UploadArtifactPanel";
 
 /**
@@ -36,6 +37,7 @@ export function UploadArtifactModal({
   title = "Upload Artifacts",
 }: UploadArtifactModalProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const toast = useToast();
 
   return (
     <Modal
@@ -50,7 +52,12 @@ export function UploadArtifactModal({
     >
       <UploadArtifactPanel
         projectId={projectId}
-        onUploadSuccess={onUploadSuccess}
+        onUploadSuccess={() => {
+          toast.success("Files uploaded", {
+            description: "Initial ingestion is running in the background.",
+          });
+          onUploadSuccess?.();
+        }}
         onFinished={onClose}
         onUploadingChange={setIsUploading}
       />

@@ -3,13 +3,21 @@ import { X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
+import { useToast } from "../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../services/apiError";
 import { addGithubPat } from "../../../services/sources/githubService";
 import { INVALID_TOKEN_MESSAGE, isValidGithubPat } from "../utils/patValidation";
 
 type TokenAddFormProps = {
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  /** Receives the name of the token just added, for an optimistic list update. */
+  onSaved: (tokenName: string) => Promise<void>;
+  /**
+   * When the form is already inside a titled container (the wizard's desktop
+   * companion), drop its own card chrome and header so the inputs sit directly
+   * in that panel instead of a card-within-a-card.
+   */
+  embedded?: boolean;
 };
 
 /**
@@ -17,12 +25,16 @@ type TokenAddFormProps = {
  * submitting. A ref guard prevents double-submit even if Enter fires before
  * the disabled state re-renders.
  */
-export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
+export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFormProps) {
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
+  // `error` holds the inline messages shown next to the inputs: the client-side
+  // format check and the post-save refresh failure. Server-side mutation
+  // failures (e.g. a name clash) are surfaced as toasts instead.
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const toast = useToast();
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -52,17 +64,18 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
       try {
         await addGithubPat(trimmedName, trimmedToken);
       } catch (mutationError) {
-        setError(parseApiError(mutationError, INVALID_TOKEN_MESSAGE));
+        // Server-side failures (e.g. a name clash) surface as a toast; the
+        // inline error is reserved for the client-side format check above.
+        toast.error(parseApiError(mutationError, "Failed to add GitHub token."));
         return;
       }
-      // Mutation succeeded — closing now; if the refetch fails we surface
-      // a distinct message but still close the form (server state is correct).
       try {
-        await onSaved();
+        await onSaved(trimmedName);
       } catch (refreshError) {
         setError(describeRefreshFailure(refreshError));
         return;
       }
+      toast.success("GitHub token added");
       onClose();
     } finally {
       savingRef.current = false;
@@ -74,21 +87,27 @@ export function TokenAddForm({ onClose, onSaved }: TokenAddFormProps) {
     <form
       onSubmit={(e) => void handleSubmit(e)}
       aria-label="Add GitHub PAT"
-      className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      className={
+        embedded
+          ? ""
+          : "overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5"
+      }
     >
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={handleClose}
-          disabled={isSaving}
-          aria-label="Cancel add token"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </Button>
-      </div>
+      {!embedded && (
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-app-text">New GitHub PAT</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={handleClose}
+            disabled={isSaving}
+            aria-label="Cancel add token"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Field label="Token name" controlId="settings-add-token-name" disabled={isSaving}>

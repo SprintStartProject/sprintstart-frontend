@@ -98,6 +98,12 @@ export type ChatContextValue = {
    * stream finishes; also exposed so the hook can call it on mount.
    */
   refreshChats: () => Promise<void>;
+
+  /**
+   * Deletes a chat conversation and all of its messages for the authenticated user,
+   * cleaning up associated state and drafts.
+   */
+  deleteChat: (chatId: string) => Promise<void>;
 };
 
 export const ChatContext = createContext<ChatContextValue | undefined>(undefined);

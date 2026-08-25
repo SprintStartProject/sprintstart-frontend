@@ -60,8 +60,8 @@ describe("SourceList", () => {
 
     render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
 
-    expect(screen.getByText("GitHub Repository")).toBeInTheDocument();
-    expect(screen.getByText("Jira Project Board")).toBeInTheDocument();
+    expect(screen.getAllByText("GitHub Repository").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Jira Project Board").length).toBeGreaterThan(0);
     expect(screen.getAllByText("GitHub").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Jira").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Connected").length).toBeGreaterThan(0);
@@ -87,8 +87,8 @@ describe("SourceList", () => {
 
     render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
 
-    expect(screen.getByText("acme.atlassian.net")).toBeInTheDocument();
-    expect(screen.queryByText("https://acme.atlassian.net")).not.toBeInTheDocument();
+    expect(screen.getAllByText("acme.atlassian.net").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("https://acme.atlassian.net")).toHaveLength(0);
   });
 
   it("renders info blocks with formatted values", () => {
@@ -104,14 +104,21 @@ describe("SourceList", () => {
 
     render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
 
+    // Mobile card: inline metrics
+    expect(screen.getByText("artifacts")).toBeInTheDocument();
+    expect(screen.getByText("updated")).toBeInTheDocument();
+    expect(screen.getByText("errors")).toBeInTheDocument();
+    expect(screen.getByText("Last synced")).toBeInTheDocument();
+    // Desktop card: original 2x2 stat grid
     expect(screen.getByText("Artifacts Ingested")).toBeInTheDocument();
-    expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("Latest Updated")).toBeInTheDocument();
-    expect(screen.getByText("7")).toBeInTheDocument();
-    expect(screen.getByText("Last Sync")).toBeInTheDocument();
-    expect(screen.getByText("2026-07-05")).toBeInTheDocument();
     expect(screen.getByText("Errors")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Last Sync")).toBeInTheDocument();
+    // Values appear in both layouts
+    expect(screen.getAllByText("42").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("7").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2026-07-05").length).toBeGreaterThan(0);
   });
 
   it("calls onSelectSource with the source system when a card is clicked", async () => {
@@ -131,7 +138,7 @@ describe("SourceList", () => {
       <SourceList sources={sources} selectedSourceId={null} onSelectSource={onSelectSource} />,
     );
 
-    await user.click(screen.getByText("Jira Project Board"));
+    await user.click(screen.getAllByText("Jira Project Board")[0]);
 
     expect(onSelectSource).toHaveBeenCalledWith("source-jira");
     expect(onSelectSource).toHaveBeenCalledTimes(1);
@@ -152,8 +159,8 @@ describe("SourceList", () => {
       <SourceList sources={sources} selectedSourceId="source-jira" onSelectSource={vi.fn()} />,
     );
 
-    const jiraButton = screen.getByText("Jira Project Board").closest("button");
-    const githubButton = screen.getByText("GitHub Repository").closest("button");
+    const jiraButton = screen.getAllByText("Jira Project Board")[0].closest("button");
+    const githubButton = screen.getAllByText("GitHub Repository")[0].closest("button");
 
     expect(jiraButton).toHaveClass("border-app-brand");
     expect(githubButton).not.toHaveClass("border-app-brand");
@@ -195,6 +202,6 @@ describe("SourceList", () => {
 
     render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
 
-    expect(screen.getByText(/2 failed items in latest status/)).toBeInTheDocument();
+    expect(screen.getAllByText(/2 failed items in latest status/).length).toBeGreaterThan(0);
   });
 });

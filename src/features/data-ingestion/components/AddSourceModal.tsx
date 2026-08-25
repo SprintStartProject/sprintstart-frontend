@@ -1,28 +1,32 @@
-import { AlertTriangle, ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
-import { Input } from "../../../components/ui/Input.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
-import { Select } from "../../../components/ui/Select.tsx";
-import { Stepper } from "../../../components/ui/Stepper.tsx";
-import { ApiError } from "../../../services/apiClient.ts";
+import { useToast } from "../../../context/useToast.ts";
 import {
-  addRepositoryToProject,
-  connectGithubRepository,
-  connectRepositories,
-} from "../../../services/sources/githubService.ts";
-import { parseGithubRepositoryInput } from "../../../services/sources/githubRepositoryInput.ts";
-import { connectJiraInstance } from "../../../services/sources/jiraService.ts";
+  addDraftSource,
+  connectDraftSources,
+  createDraftSourceFromDiscovery,
+  createJiraDraft,
+  createUploadDraft,
+  hasFailedSources,
+  removeDraftSource,
+  type DraftSource,
+} from "../../admin/projectSourcesDraft.ts";
+import { StagedSourceList } from "../../admin/components/StagedSourceList.tsx";
+import {
+  AddSourceFlow,
+  COMPANION_GAP,
+  COMPANION_WIDTH,
+  type AddSourceStep,
+} from "../../admin/components/wizard/sources/AddSourceFlow.tsx";
+import { useGithubTokens } from "../../settings/hooks/useGithubTokens.ts";
 import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
-import { UploadArtifactPanel } from "../../knowledge-base/components/UploadArtifactPanel.tsx";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
-import {
-  GithubRepositoryDiscovery,
-  type DiscoverySelection,
-} from "./GithubRepositoryDiscovery.tsx";
-import { JiraConnectStep } from "./JiraConnectStep.tsx";
-import { SourceTypeStep } from "./SourceTypeStep.tsx";
+import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
+import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -33,19 +37,27 @@ type AddSourceModalProps = {
   /** Human-readable reason shown when `canIngest` is false. */
   ingestBlockedReason?: string;
   onClose: () => void;
-  /** Called after a successful batch connect so the page can refresh. */
+  /** Called after a connect run so the page can refresh and start polling. */
   onConnected: () => void;
 };
 
-type WizardStep = "type" | "detail";
-
 /**
- * Two-step "Add sources" wizard. Step one picks the source type (GitHub, Jira,
- * Upload); step two shows the type-specific flow — GitHub opens the org/user
- * repository discovery (searchable, paginated, multi-select, with a single-repo
- * fallback), Jira enters one instance directly (no discovery endpoint) and picks
- * a stored credential, and Upload adds documents. This keeps the familiar
- * source-type choice while giving each connector its own connect path.
+ * "Add sources" modal for the Data Ingestion page.
+ *
+ * Like the create-project wizard's Sources step, this stages a *list* of sources
+ * across all three connectors (GitHub repositories, Jira instances, uploaded
+ * files) and connects them together — instead of the old flow, which picked one
+ * type, connected it live and closed, so only a single source type could be
+ * added per opening.
+ *
+ * It reuses the wizard's {@link AddSourceFlow} sub-flow verbatim, so the type
+ * grid, the per-connector detail forms and the inline "add GitHub token / add
+ * Jira credential" companions are identical in both places. The modal opens
+ * straight on that type grid; each detail screen can either stage the source
+ * ("Add to list") or connect it — plus anything already staged — right away
+ * ("Connect now"). Connecting runs {@link connectDraftSources} against the
+ * already-existing project with live per-row status and a per-source retry, so
+ * one failing source never strands the others.
  */
 export function AddSourceModal({
   projectId,
@@ -56,57 +68,67 @@ export function AddSourceModal({
   onClose,
   onConnected,
 }: AddSourceModalProps) {
-  const [step, setStep] = useState<WizardStep>("type");
-  const [selectedType, setSelectedType] = useState<SourceSystem>("GITHUB");
-  // Within the GitHub step: browse an org/user, or add one known repository.
-  const [githubMode, setGithubMode] = useState<"discover" | "single">("discover");
-  const [singleOwner, setSingleOwner] = useState("");
-  const [singleName, setSingleName] = useState("");
-  // Locks Back/Cancel while an upload batch is in flight.
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const toast = useToast();
 
-  const [tokenName, setTokenName] = useState(tokenNames[0] ?? "");
+  // The staged list and the screens over it: the add-source sub-flow (type grid
+  // -> detail) and the terminal connecting screen. The modal opens straight on
+  // the type grid — the staged list is where you land after "Add to list".
+  const [sources, setSources] = useState<DraftSource[]>([]);
+  const [isAddingSource, setIsAddingSource] = useState(true);
+  const [addStep, setAddStep] = useState<AddSourceStep>("type");
+  const [addType, setAddType] = useState<SourceSystem>("GITHUB");
+  // Remounts the GitHub picker on each add so a new "Add source" starts clean.
+  const [addFlowKey, setAddFlowKey] = useState(0);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  // True while the desktop "add credential" companion is open, so the modal
+  // slides left to make room for it beside itself.
+  const [companionOpen, setCompanionOpen] = useState(false);
 
-  // The parent loads the saved token names asynchronously *after* opening the
-  // modal, so on the very first open `tokenNames` is empty and `tokenName`
-  // initialises to "" — which made discovery reject with "choose a token" until
-  // the modal was closed and reopened. Adopt the first token as soon as the list
-  // arrives (and heal a selection that is no longer available), instead of only
-  // reading the prop once at mount.
-  useEffect(() => {
-    if (tokenNames.length === 0) return;
+  // GitHub detail state.
+  const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
+  const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
 
-    // Deferred to a microtask so the state update does not run synchronously in
-    // the effect body and cascade a render (the pattern used across the app).
-    void Promise.resolve().then(() => {
-      setTokenName((current) =>
-        current && tokenNames.includes(current) ? current : tokenNames[0],
-      );
-    });
-  }, [tokenNames]);
+  // The token list is owned here so an inline "add token" can refresh it and
+  // auto-select the new token; it falls back to the prop until it has loaded so
+  // discovery works on the first open without waiting for the refetch.
+  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
+    useGithubTokens();
+  const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
-  // Resolved multi-select from the discovery picker.
-  const [selection, setSelection] = useState<DiscoverySelection[]>([]);
-
-  const [connectState, setConnectState] = useState<"idle" | "loading" | "error">("idle");
-  const [connectError, setConnectError] = useState<string | null>(null);
-
-  const isGithub = selectedType === "GITHUB";
-  const isJira = selectedType === "JIRA";
-  const selectedCount = selection.length;
-
-  // --- Jira connect state ---
+  // Jira detail state.
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
 
+  // Upload detail state — files staged in memory until the list is connected.
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+
+  const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
     error: jiraCredentialsError,
     isRefreshing: jiraCredentialsLoading,
-  } = useJiraCredentials(isJira);
+    reload: reloadJiraCredentials,
+    addCredentialLocally,
+  } = useJiraCredentials(isJiraDetail);
 
+  // Adopt the first token as soon as the list arrives (and heal a stale
+  // selection) so discovery is usable on the first open.
+  useEffect(() => {
+    if (effectiveTokenNames.length === 0) return;
+
+    void Promise.resolve().then(() => {
+      setGithubTokenName((current) =>
+        current && effectiveTokenNames.includes(current) ? current : effectiveTokenNames[0],
+      );
+    });
+  }, [effectiveTokenNames]);
+
+  // Adopt the first stored Jira credential once the list arrives, keeping a
+  // still-valid choice.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
@@ -120,534 +142,419 @@ export function AddSourceModal({
     });
   }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
-  const handleConnect = async () => {
-    if (!projectId) {
-      setConnectState("error");
-      setConnectError("Select a project before connecting repositories.");
-      return;
-    }
-
-    if (!canIngest) {
-      setConnectState("error");
-      setConnectError(
-        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
-      );
-      return;
-    }
-
-    if (selection.length === 0) {
-      setConnectState("error");
-      setConnectError("Select at least one repository to connect.");
-      return;
-    }
-
-    setConnectState("loading");
-    setConnectError(null);
-
-    // Repos already ingested elsewhere are linked to this project (reusing their
-    // artifacts); only genuinely new ones go through fetch + ingestion.
-    const toLink = selection.filter((repository) => repository.linkState === "linkable");
-    const toIngest = selection.filter((repository) => repository.linkState !== "linkable");
-
-    try {
-      for (const repository of toLink) {
-        if (!repository.repositoryId) continue;
-
-        await addRepositoryToProject(repository.repositoryId, projectId);
-      }
-
-      if (toIngest.length > 0) {
-        await connectRepositories(
-          toIngest.map((repository) => ({
-            owner: repository.owner,
-            name: repository.name,
-          })),
-          tokenName.trim(),
-          projectId,
-        );
-      }
-
-      setConnectState("idle");
-      onConnected();
-      onClose();
-    } catch (error) {
-      setConnectState("error");
-      setConnectError(
-        error instanceof Error
-          ? error.message
-          : "The selected repositories could not be connected.",
-      );
-    }
+  const resetSourceDraftFields = () => {
+    setGithubSelection([]);
+    setJiraDisplayName("");
+    setJiraUrl("");
+    setJiraCredentialName("");
+    setUploadFiles([]);
   };
 
-  const isSingleRepo = isGithub && githubMode === "single";
-  const isUpload = selectedType === "UPLOAD";
+  // --- Add-source sub-flow ---
 
-  /**
-   * Connects one known repository. Kept inside this modal so the single-repo
-   * path shares the wizard's chrome, project guardrails and token picker instead
-   * of dropping the user into a separate, differently-shaped dialog.
-   */
-  const handleConnectSingle = async () => {
-    if (!projectId) {
-      setConnectState("error");
-      setConnectError("Select a project before connecting a repository.");
-      return;
-    }
-
-    if (!canIngest) {
-      setConnectState("error");
-      setConnectError(
-        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
-      );
-      return;
-    }
-
-    const parsed = parseGithubRepositoryInput(singleOwner, singleName);
-
-    if (!parsed) {
-      setConnectState("error");
-      setConnectError(
-        "Enter the repository as owner/name, a GitHub URL, or fill in owner and repository name.",
-      );
-      return;
-    }
-
-    if (!tokenName.trim()) {
-      setConnectState("error");
-      setConnectError("Choose a stored GitHub access token.");
-      return;
-    }
-
-    setConnectState("loading");
-    setConnectError(null);
-
-    try {
-      await connectGithubRepository({
-        ...parsed,
-        tokenName: tokenName.trim(),
-        projectId,
-      });
-
-      setConnectState("idle");
-      onConnected();
-      onClose();
-    } catch (error) {
-      setConnectState("error");
-      setConnectError(
-        error instanceof Error ? error.message : "The repository could not be connected.",
-      );
-    }
+  const openAddSource = () => {
+    resetSourceDraftFields();
+    setAddType("GITHUB");
+    setAddStep("type");
+    setAddFlowKey((key) => key + 1);
+    setIsAddingSource(true);
   };
 
+  const closeAddSource = () => {
+    setIsAddingSource(false);
+    resetSourceDraftFields();
+  };
+
+  const handleSelectAddType = (type: SourceSystem) => {
+    setAddType(type);
+    setAddStep("detail");
+  };
+
+  const backToTypeGrid = () => {
+    setAddStep("type");
+    resetSourceDraftFields();
+  };
+
+  // Inline credential creation: adopt the new token/credential locally and
+  // select it right away, so a successful add is reflected even if the reload
+  // fails or is aborted; the reload then reconciles with the server.
+  const handleTokenSaved = async (tokenName: string) => {
+    addTokenNameLocally(tokenName);
+    setGithubTokenName(tokenName);
+    await loadTokenNames();
+  };
+
+  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+    addCredentialLocally(credential);
+    setJiraCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
+  const selectedJiraCredential = jiraCredentials.find(
+    (credential) => credential.displayName === jiraCredentialName,
+  );
+
+  const canAddSource =
+    addType === "GITHUB"
+      ? githubSelection.length > 0
+      : addType === "JIRA"
+        ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
+        : addType === "UPLOAD"
+          ? uploadFiles.length > 0
+          : false;
+
   /**
-   * Connects one Jira instance. The connect endpoint returns 202 with an empty
-   * body (no transaction id) — progress surfaces through the ingestion-run
-   * history — so on success we just fire `onConnected` (starts polling) and
-   * close. 404/502 get their own messages (missing instance/credential vs.
-   * Jira unreachable).
+   * The draft(s) captured on the current detail screen — several at once for the
+   * GitHub multi-select, one for Jira/Upload. Empty when the detail isn't
+   * complete enough to stage.
    */
-  const handleConnectJira = async () => {
-    if (!projectId) {
-      setConnectState("error");
-      setConnectError("Select a project before connecting a Jira instance.");
-      return;
-    }
+  const buildDetailDrafts = (): DraftSource[] => {
+    if (!canAddSource) return [];
 
-    if (!canIngest) {
-      setConnectState("error");
-      setConnectError(
-        ingestBlockedReason ?? "You can only connect sources to projects you manage.",
+    if (addType === "GITHUB") {
+      return githubSelection.map((selection) =>
+        createDraftSourceFromDiscovery(selection, githubTokenName),
       );
-      return;
     }
 
-    const displayName = jiraDisplayName.trim();
-    const url = jiraUrl.trim();
-    const tokenName = jiraCredentialName.trim();
-
-    if (!displayName) {
-      setConnectState("error");
-      setConnectError("Enter a display name for the Jira instance.");
-      return;
+    if (addType === "JIRA" && selectedJiraCredential) {
+      return [
+        createJiraDraft({
+          displayName: jiraDisplayName.trim(),
+          url: jiraUrl.trim(),
+          userEmail: selectedJiraCredential.userEmail,
+          tokenName: selectedJiraCredential.displayName,
+        }),
+      ];
     }
 
-    if (!url) {
-      setConnectState("error");
-      setConnectError("Enter the Jira instance URL (e.g. https://your-domain.atlassian.net).");
-      return;
+    if (addType === "UPLOAD") {
+      const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
+      return [createUploadDraft(displayName, uploadFiles)];
     }
 
-    if (!tokenName) {
-      setConnectState("error");
-      setConnectError("Select a stored Jira credential.");
-      return;
-    }
+    return [];
+  };
 
-    const selectedCredential = jiraCredentials.find(
-      (credential) => credential.displayName === tokenName,
-    );
-    if (!selectedCredential) {
-      setConnectState("error");
-      setConnectError("The selected Jira credential is no longer available.");
-      return;
-    }
-    setConnectState("loading");
-    setConnectError(null);
+  /** Appends drafts to a list, skipping any that are already staged. */
+  const mergeDrafts = (base: DraftSource[], added: DraftSource[]): DraftSource[] =>
+    added.reduce((accumulated, draft) => addDraftSource(accumulated, draft), base);
+
+  // "Add to list": stage the current detail and return to the staged list to
+  // keep building or connect later.
+  const commitAddSource = () => {
+    const drafts = buildDetailDrafts();
+    if (drafts.length === 0) return;
+
+    setSources((current) => mergeDrafts(current, drafts));
+    closeAddSource();
+  };
+
+  // --- Connect + retry ---
+
+  /**
+   * Connects a list of staged sources against the existing project with live
+   * per-row status; shared by the list screen's "Connect" and the detail
+   * screen's "Connect now".
+   */
+  const runConnect = async (list: DraftSource[]) => {
+    if (!projectId || !canIngest || list.length === 0 || isSubmitting) return;
+
+    // Show the list being connected (including a just-captured "Connect now"
+    // draft) before the first per-row status lands.
+    setSources(list);
+    setIsAddingSource(false);
+    setIsConnecting(true);
+    setIsSubmitting(true);
 
     try {
-      await connectJiraInstance({
-        displayName,
-        url,
-        userEmail: selectedCredential.userEmail,
-        tokenName: selectedCredential.displayName,
-        projectId,
-      });
+      const connected = await connectDraftSources(projectId, list, setSources);
 
-      setConnectState("idle");
+      // Refresh the page (and start its polling window) regardless of partial
+      // failures so the sources that did connect show up right away.
       onConnected();
-      onClose();
-    } catch (error) {
-      setConnectState("error");
 
-      if (error instanceof ApiError && error.status === 404) {
-        setConnectError(
-          "The Jira instance or credential could not be found. Check the URL and the selected credential.",
-        );
-      } else if (error instanceof ApiError && error.status === 502) {
-        setConnectError(
-          "The Jira server could not be reached. Check the instance URL and try again.",
-        );
+      if (hasFailedSources(connected)) {
+        toast.warning("Some sources couldn't be connected", {
+          description: "Retry the failed ones, or close and try again.",
+        });
       } else {
-        setConnectError(
-          error instanceof Error ? error.message : "The Jira instance could not be connected.",
-        );
+        toast.success("Sources connected", {
+          description: "Initial ingestion is running in the background.",
+        });
+        onClose();
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const modalTitle =
-    step === "type"
-      ? "Add a data source"
-      : isSingleRepo
-        ? "Add a single repository"
-        : isGithub
-          ? "Discover GitHub repositories"
-          : isUpload
-            ? "Upload Files"
-            : `Connect ${SOURCE_META[selectedType].type}`;
+  // "Connect now": stage the current detail and connect the whole list right
+  // away, skipping the intermediate list screen.
+  const handleConnectNow = () => {
+    const drafts = buildDetailDrafts();
+    if (drafts.length === 0) return;
+
+    void runConnect(mergeDrafts(sources, drafts));
+  };
+
+  const handleConnectAll = () => {
+    void runConnect(sources);
+  };
+
+  const retrySource = async (sourceId: string) => {
+    const source = sources.find((current) => current.id === sourceId);
+    if (!source || !projectId || isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const retried = await connectDraftSources(projectId, [source], (progressSources) =>
+        setSources((current) =>
+          current.map(
+            (currentSource) =>
+              progressSources.find((progress) => progress.id === currentSource.id) ?? currentSource,
+          ),
+        ),
+      );
+
+      onConnected();
+
+      if (hasFailedSources(retried)) {
+        toast.error("Couldn't connect the source.");
+      } else {
+        toast.success("Source connected");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // --- Close handling ---
+
+  // Every dismissal path routes through here so a list with unconnected staged
+  // sources asks before discarding them. Nothing is discarded once connecting
+  // has started (those sources are already connected or attempted).
+  const requestClose = () => {
+    if (isSubmitting) return;
+
+    if (!isConnecting && sources.length > 0) {
+      setConfirmingClose(true);
+      return;
+    }
+
+    onClose();
+  };
+
+  // --- Rendering ---
+
+  const modalTitle = isConnecting
+    ? "Connecting sources"
+    : isAddingSource
+      ? addStep === "type"
+        ? "Add a source"
+        : `Add ${SOURCE_META[addType].type}`
+      : "Add data sources";
+
+  const modalDescription =
+    isConnecting || isAddingSource
+      ? undefined
+      : "Stage GitHub repositories, Jira instances and files, then connect them together.";
+
+  const connectLabel =
+    sources.length > 0
+      ? `Connect ${sources.length} ${sources.length === 1 ? "source" : "sources"}`
+      : "Connect sources";
+
+  const footer = isConnecting ? (
+    <Button variant="primary" onClick={requestClose} loading={isSubmitting} disabled={isSubmitting}>
+      Done
+    </Button>
+  ) : isAddingSource ? (
+    addStep === "type" ? (
+      sources.length > 0 ? (
+        <Button
+          variant="secondary"
+          onClick={() => setIsAddingSource(false)}
+          icon={<ArrowLeft className="h-4 w-4" />}
+          className="sm:mr-auto"
+        >
+          Back to source list
+        </Button>
+      ) : (
+        <Button variant="secondary" onClick={requestClose} className="sm:mr-auto">
+          Cancel
+        </Button>
+      )
+    ) : (
+      // The detail screen's "back to types" lives in AddSourceFlow's own header
+      // (master-detail); the footer offers staging the source or connecting it
+      // (plus any already staged) straight away.
+      <>
+        <Button
+          variant="secondary"
+          onClick={handleConnectNow}
+          disabled={!canAddSource || !canIngest || !projectId}
+          loading={isSubmitting}
+        >
+          Connect now
+        </Button>
+
+        <Button
+          variant="primary"
+          onClick={commitAddSource}
+          disabled={!canAddSource}
+          icon={<Plus className="h-4 w-4" />}
+        >
+          Add to list
+        </Button>
+      </>
+    )
+  ) : (
+    <>
+      <Button variant="secondary" onClick={requestClose} className="sm:mr-auto">
+        Cancel
+      </Button>
+
+      <Button
+        variant="primary"
+        onClick={handleConnectAll}
+        disabled={sources.length === 0 || !canIngest || !projectId}
+        loading={isSubmitting}
+      >
+        {connectLabel}
+      </Button>
+    </>
+  );
 
   return (
-    <Modal
-      isOpen
-      title={modalTitle}
-      description={<Stepper steps={["Source type", "Connect"]} current={step === "type" ? 0 : 1} />}
-      size="xl"
-      isDismissDisabled={connectState === "loading" || isUploadingFiles}
-      onClose={onClose}
-      closeLabel="Close add source"
-      bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
-      headerActions={
-        step === "detail" && isGithub ? (
-          <button
-            type="button"
-            onClick={() => {
-              setConnectError(null);
-              setSelection([]);
-              setGithubMode(isSingleRepo ? "discover" : "single");
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs font-semibold text-app-text transition hover:border-app-brand-border hover:bg-app-surface-hover"
-          >
-            {isSingleRepo ? (
-              <>
-                <Search className="h-3.5 w-3.5" />
-                Discover repositories
-              </>
-            ) : (
-              <>
-                <Plus className="h-3.5 w-3.5" />
-                Add single repo
-              </>
-            )}
-          </button>
-        ) : undefined
-      }
-      footer={
-        step === "type" ? (
-          <>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover"
-            >
-              Cancel
-            </button>
+    <>
+      <Modal
+        isOpen
+        title={modalTitle}
+        description={
+          modalDescription ? (
+            <p className="text-sm leading-relaxed text-app-text-muted">{modalDescription}</p>
+          ) : undefined
+        }
+        size="xl"
+        isDismissDisabled={isSubmitting}
+        contentInsetRight={companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
+        onClose={requestClose}
+        closeLabel="Close add source"
+        bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
+        footer={footer}
+      >
+        {isConnecting ? (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-app-text-muted">
+              Connecting {sources.length} {sources.length === 1 ? "source" : "sources"}. Each
+              one&rsquo;s ingestion then continues in the background.
+            </p>
+
+            <StagedSourceList
+              sources={sources}
+              disabled={isSubmitting}
+              onRetry={(sourceId) => void retrySource(sourceId)}
+            />
+          </div>
+        ) : isAddingSource ? (
+          <div className="space-y-5">
+            {!canIngest && <IngestBlockedNotice reason={ingestBlockedReason} />}
+
+            <AddSourceFlow
+              key={addFlowKey}
+              step={addStep}
+              selectedType={addType}
+              availableTypes={SOURCE_SYSTEMS}
+              onSelectType={handleSelectAddType}
+              onBack={backToTypeGrid}
+              isBusy={isSubmitting}
+              onCompanionOpenChange={setCompanionOpen}
+              github={{
+                tokenNames: effectiveTokenNames,
+                tokenName: githubTokenName,
+                onTokenNameChange: setGithubTokenName,
+                onSelectionChange: setGithubSelection,
+                onTokenSaved: handleTokenSaved,
+                projectId,
+                projectName,
+              }}
+              jira={{
+                displayName: jiraDisplayName,
+                url: jiraUrl,
+                credentialName: jiraCredentialName,
+                credentials: jiraCredentials,
+                credentialsLoaded: jiraCredentialsLoaded,
+                credentialsLoading: jiraCredentialsLoading,
+                credentialsError: jiraCredentialsError,
+                defaultUserEmail: null,
+                onDisplayNameChange: setJiraDisplayName,
+                onUrlChange: setJiraUrl,
+                onCredentialNameChange: setJiraCredentialName,
+                onSubmit: commitAddSource,
+                onCredentialSaved: handleCredentialSaved,
+              }}
+              upload={{
+                files: uploadFiles,
+                onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
+                onRemoveFile: (index) =>
+                  setUploadFiles((current) => current.filter((_, position) => position !== index)),
+              }}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {!canIngest && <IngestBlockedNotice reason={ingestBlockedReason} />}
+
+            <div>
+              <p className="text-sm font-medium text-app-text">Data sources</p>
+              <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
+                Sources are ingested in the background once you connect them.
+              </p>
+            </div>
+
+            <StagedSourceList
+              sources={sources}
+              disabled={isSubmitting}
+              onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
+              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, or files to start."
+            />
 
             <Button
-              variant="primary"
-              onClick={() => setStep("detail")}
-              trailingIcon={<ChevronRight className="h-4 w-4" />}
+              variant="secondary"
+              onClick={openAddSource}
+              icon={<Plus className="h-4 w-4" />}
+              className="w-full"
             >
-              Continue
+              Add source
             </Button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => setStep("type")}
-              disabled={connectState === "loading" || isUploadingFiles}
-              className="mr-auto inline-flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={connectState === "loading" || isUploadingFiles}
-              className="rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Cancel
-            </button>
-
-            {isSingleRepo && (
-              <Button
-                variant="primary"
-                onClick={() => void handleConnectSingle()}
-                disabled={!canIngest}
-                loading={connectState === "loading"}
-              >
-                {connectState === "loading" ? "Connecting…" : "Connect repository"}
-              </Button>
-            )}
-
-            {isGithub && !isSingleRepo && (
-              <Button
-                variant="primary"
-                onClick={() => void handleConnect()}
-                disabled={selectedCount === 0 || !canIngest}
-                loading={connectState === "loading"}
-              >
-                {connectState === "loading"
-                  ? "Connecting…"
-                  : `Connect ${selectedCount > 0 ? selectedCount : ""} selected`.replace(
-                      /\s+/g,
-                      " ",
-                    )}
-              </Button>
-            )}
-
-            {isJira && (
-              <Button
-                variant="primary"
-                onClick={() => void handleConnectJira()}
-                disabled={!canIngest}
-                loading={connectState === "loading"}
-              >
-                {connectState === "loading" ? "Connecting…" : "Connect Jira instance"}
-              </Button>
-            )}
-          </>
-        )
-      }
-    >
-      {step === "type" ? (
-        <SourceTypeStep
-          selectedType={selectedType}
-          onSelectType={setSelectedType}
-          availableTypes={SOURCE_SYSTEMS}
-        />
-      ) : isUpload ? (
-        projectId ? (
-          <UploadArtifactPanel
-            projectId={projectId}
-            onUploadSuccess={onConnected}
-            onFinished={onClose}
-            onUploadingChange={setIsUploadingFiles}
-          />
-        ) : (
-          <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-            Select a project before uploading files.
           </div>
-        )
-      ) : isSingleRepo ? (
-        <SingleRepositoryStep
-          owner={singleOwner}
-          repositoryName={singleName}
-          tokenName={tokenName}
-          tokenNames={tokenNames}
-          isBusy={connectState === "loading"}
-          canIngest={canIngest}
-          ingestBlockedReason={ingestBlockedReason}
-          errorMessage={connectError}
-          onOwnerChange={setSingleOwner}
-          onRepositoryNameChange={setSingleName}
-          onTokenNameChange={setTokenName}
-          onSubmit={() => void handleConnectSingle()}
-        />
-      ) : isGithub ? (
-        <div className="space-y-5">
-          {!canIngest && (
-            <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-              {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
-            </div>
-          )}
+        )}
+      </Modal>
 
-          <GithubRepositoryDiscovery
-            tokenNames={tokenNames}
-            projectId={projectId}
-            projectName={projectName}
-            tokenName={tokenName}
-            onTokenNameChange={setTokenName}
-            onSelectionChange={setSelection}
-            isConnecting={connectState === "loading"}
-            connectError={connectError}
-          />
-        </div>
-      ) : (
-        <JiraConnectStep
-          displayName={jiraDisplayName}
-          url={jiraUrl}
-          credentialName={jiraCredentialName}
-          credentials={jiraCredentials}
-          credentialsLoaded={jiraCredentialsLoaded}
-          credentialsLoading={jiraCredentialsLoading}
-          credentialsError={jiraCredentialsError}
-          isBusy={connectState === "loading"}
-          canIngest={canIngest}
-          ingestBlockedReason={ingestBlockedReason}
-          errorMessage={connectError}
-          onDisplayNameChange={setJiraDisplayName}
-          onUrlChange={setJiraUrl}
-          onCredentialNameChange={setJiraCredentialName}
-          onSubmit={() => void handleConnectJira()}
-        />
-      )}
-    </Modal>
+      <AlertDialog
+        isOpen={confirmingClose}
+        title="Discard staged sources?"
+        description="These sources haven't been connected yet. Closing now discards the list you've built."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        variant="danger"
+        onClose={() => setConfirmingClose(false)}
+        onConfirm={() => {
+          setConfirmingClose(false);
+          onClose();
+        }}
+      />
+    </>
   );
 }
 
-/**
- * Single-repository variant of the GitHub step. Mirrors the discovery step's
- * layout and controls (same field styling, same token picker, same guardrails)
- * so switching between the two feels like one flow rather than two dialogs.
- */
-function SingleRepositoryStep({
-  owner,
-  repositoryName,
-  tokenName,
-  tokenNames,
-  isBusy,
-  canIngest,
-  ingestBlockedReason,
-  errorMessage,
-  onOwnerChange,
-  onRepositoryNameChange,
-  onTokenNameChange,
-  onSubmit,
-}: {
-  owner: string;
-  repositoryName: string;
-  tokenName: string;
-  tokenNames: string[];
-  isBusy: boolean;
-  canIngest: boolean;
-  ingestBlockedReason?: string;
-  errorMessage: string | null;
-  onOwnerChange: (value: string) => void;
-  onRepositoryNameChange: (value: string) => void;
-  onTokenNameChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  const hasTokens = tokenNames.length > 0;
-
+/** Warning banner shown when the user may not connect sources to the project. */
+function IngestBlockedNotice({ reason }: { reason?: string }) {
   return (
-    <form
-      className="space-y-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit();
-      }}
-    >
-      {!canIngest && (
-        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
-        </div>
-      )}
-
-      {!hasTokens && (
-        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          Add a GitHub personal access token in Settings first, then come back to connect a
-          repository.
-        </div>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label htmlFor="single-repo-owner" className="text-sm font-medium text-app-text">
-            Repository owner
-          </label>
-          <Input
-            id="single-repo-owner"
-            value={owner}
-            onChange={(event) => onOwnerChange(event.target.value)}
-            disabled={isBusy || !hasTokens}
-            placeholder="octocat or octocat/hello-world"
-            className="mt-2"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="single-repo-name" className="text-sm font-medium text-app-text">
-            Repository name
-          </label>
-          <Input
-            id="single-repo-name"
-            value={repositoryName}
-            onChange={(event) => onRepositoryNameChange(event.target.value)}
-            disabled={isBusy || !hasTokens}
-            placeholder="hello-world"
-            className="mt-2"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="single-repo-token" className="text-sm font-medium text-app-text">
-          Access token
-        </label>
-        <Select
-          id="single-repo-token"
-          value={tokenName}
-          onChange={(event) => onTokenNameChange(event.target.value)}
-          disabled={isBusy || !hasTokens}
-          className="mt-2"
-        >
-          {hasTokens ? (
-            tokenNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))
-          ) : (
-            <option value="">No saved tokens</option>
-          )}
-        </Select>
-      </div>
-
-      <p className="text-xs text-app-text-subtle">
-        Paste a full GitHub URL or <code>owner/name</code> into the owner field and the repository
-        name is filled in for you.
-      </p>
-
-      {errorMessage && (
-        <div className="flex items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-    </form>
+    <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+      {reason ?? "You can only connect sources to projects you manage."}
+    </div>
   );
 }

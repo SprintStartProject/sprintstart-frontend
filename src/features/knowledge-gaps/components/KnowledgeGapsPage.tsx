@@ -5,23 +5,16 @@ import { useNavigate } from "react-router-dom";
 import type { KnowledgeGapSeverity } from "../types";
 
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
-import { useFetch } from "../../../hooks/useFetch";
+import { useToast } from "../../../context/useToast";
+import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { formatRelativeDate } from "../format";
-import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { describeEmptyState } from "../emptyState";
+import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
+import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { Button } from "../../../components/ui/Button";
 
-import {
-  ShieldAlert,
-  AlertCircle,
-  Clock,
-  ArrowLeft,
-  Filter,
-  X,
-  RefreshCw,
-  FileText,
-  User,
-} from "lucide-react";
+import { ShieldAlert, Clock, ArrowLeft, Filter, X, RefreshCw, FileText, User } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
@@ -42,37 +35,44 @@ const SORT_OPTIONS: FilterSelectOption<GapSortOption>[] = [
 
 export function KnowledgeGapsPage() {
   const { selectedProjectId } = useProjectContext();
-  const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([
-    "high",
-    "medium",
-    "low",
-  ]);
+  const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([...SEVERITIES]);
   const [sortBy, setSortBy] = useState<GapSortOption>("severity");
 
   const navigate = useNavigate();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const toast = useToast();
 
   const {
     data: overview,
     loading,
     error,
-  } = useFetch(
+    refresh,
+  } = useLiveFetch(
     () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [refreshKey, selectedProjectId],
+    [selectedProjectId],
   );
+
+  // The backend rescans on its own once new documentation is indexed; while it
+  // does, the gaps below are the previous result.
+  const rescanning = overview?.refreshing ?? false;
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setRefreshError(null);
     try {
-      await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
-      setRefreshKey((key) => key + 1);
+      const result = await knowledgeGapService.refreshKnowledgeGaps(selectedProjectId);
+      refresh();
+      // Read off the refresh's own result rather than off the reloaded panel:
+      // useLiveFetch deliberately keeps the previous data on screen while it
+      // revalidates, so no render marks the moment the new result arrived.
+      if (result.gapCount === 0) {
+        toast.info("No knowledge gaps found", {
+          description: "Nothing needs attention for this project right now.",
+        });
+      }
     } catch (err) {
       console.error("Knowledge-gaps refresh failed", err);
-      setRefreshError("Refresh failed. Is the AI service running?");
+      toast.error("Refresh failed. Is the AI service running?");
     } finally {
       setRefreshing(false);
     }
@@ -82,11 +82,11 @@ export function KnowledgeGapsPage() {
     <Button
       variant="primary"
       onClick={() => void handleRefresh()}
-      loading={refreshing}
+      loading={refreshing || rescanning}
       icon={<RefreshCw className="h-4 w-4" />}
       className="shrink-0"
     >
-      {refreshing ? "Refreshing…" : "Refresh"}
+      {refreshing || rescanning ? "Scanning…" : "Rescan now"}
     </Button>
   );
 
@@ -99,16 +99,20 @@ export function KnowledgeGapsPage() {
   }
 
   if (error || !overview || overview.gaps.length === 0) {
+    const empty = describeEmptyState(overview, error);
+
     return (
       <div className="flex flex-col items-center gap-3 py-20">
-        <AlertCircle className="h-5 w-5 text-app-text-muted" />
-        <p className="text-app-text-muted">
-          No knowledge gaps yet. Trigger a refresh to detect them.
-        </p>
-        {refreshButton}
-        {refreshError && (
-          <p className="max-w-md text-center text-sm text-app-danger-text">{refreshError}</p>
+        <EmptyStateIcon state={empty.state} />
+        <p className="max-w-md text-center text-app-text-muted">{empty.message}</p>
+        {/* Only meaningful once a scan has actually produced a result; before
+            that there is no reading whose age a PM could judge. */}
+        {empty.scannedAt && (
+          <p className="text-xs text-app-text-muted">
+            Last analyzed {formatRelativeDate(empty.scannedAt)}
+          </p>
         )}
+        {refreshButton}
       </div>
     );
   }
@@ -139,6 +143,15 @@ export function KnowledgeGapsPage() {
     return b.missingTypes.length - a.missingTypes.length;
   });
 
+  // The newest ingestion across the components, i.e. how fresh the documentation
+  // these gaps were read from actually is.
+  const lastIngestedAt = overview.gaps
+    .map((gap) => gap.lastIngested)
+    .reduce<string | null>((newest, at) => (!newest || at > newest ? at : newest), null);
+  // Falls back to a gap's own stamp for a backend that predates the field; the
+  // gaps are rebuilt as one set, so any row's stamp is the set's.
+  const lastAnalyzedAt = overview.refreshedAt ?? overview.gaps[0]?.refreshedAt ?? null;
+
   const toggleSeverityFilter = (severity: KnowledgeGapSeverity) => {
     setSeverityFilter((prev) =>
       prev.includes(severity) ? prev.filter((s) => s !== severity) : [...prev, severity],
@@ -163,16 +176,23 @@ export function KnowledgeGapsPage() {
               title="Knowledge Gaps"
               subtitle="Documentation gaps identified across the organization and prioritized by impact."
             />
-            <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
               {refreshButton}
-              {overview.gaps[0] && (
+              {/* Both, because they answer different questions: how old the
+                  documentation is, and how old this reading of it is. A scan
+                  is only ever as current as the ingestion behind it. */}
+              {lastIngestedAt && (
                 <span className="text-xs text-app-text-muted">
-                  Last analyzed {formatRelativeDate(overview.gaps[0].refreshedAt)}
+                  Last ingested {formatRelativeDate(lastIngestedAt)}
+                </span>
+              )}
+              {lastAnalyzedAt && (
+                <span className="text-xs text-app-text-muted">
+                  Last analyzed {formatRelativeDate(lastAnalyzedAt)}
                 </span>
               )}
             </div>
           </div>
-          {refreshError && <p className="mb-4 text-sm text-app-danger-text">{refreshError}</p>}
           <SeveritySummaryBar gaps={overview.gaps} className="mb-6" />
         </div>
       </section>
@@ -191,7 +211,7 @@ export function KnowledgeGapsPage() {
           >
             <Filter aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
 
-            {(["high", "medium", "low"] as KnowledgeGapSeverity[]).map((severity) => {
+            {SEVERITIES.map((severity) => {
               const isSelected = severityFilter.includes(severity);
               const { badge, label } = SEVERITY_STYLES[severity];
 
@@ -222,12 +242,12 @@ export function KnowledgeGapsPage() {
           </span>
 
           <div className="ml-auto flex items-center gap-2">
-            {(severityFilter.length < 3 || sortBy !== "severity") && (
+            {(severityFilter.length < SEVERITIES.length || sortBy !== "severity") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setSeverityFilter(["high", "medium", "low"]);
+                  setSeverityFilter([...SEVERITIES]);
                   setSortBy("severity");
                 }}
                 icon={<X className="h-3.5 w-3.5" />}
@@ -295,14 +315,21 @@ export function KnowledgeGapsPage() {
                       </span>
                     </div>
 
-                    {/* Missing document types for this component */}
+                    {/* Missing document types, or what a covered component has
+                        instead — "Missing documentation (0)" over an empty row
+                        would say nothing about a component that is fine. */}
                     <div className="mb-3">
                       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-app-text-muted">
                         <FileText className="h-3.5 w-3.5" />
-                        Missing documentation ({gap.missingTypes.length})
+                        {gap.missingTypes.length === 0
+                          ? `All expected documentation present (${gap.presentTypes?.length ?? 0})`
+                          : `Missing documentation (${gap.missingTypes.length})`}
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {gap.missingTypes.map((type) => (
+                        {(gap.missingTypes.length === 0
+                          ? (gap.presentTypes ?? [])
+                          : gap.missingTypes
+                        ).map((type) => (
                           <span
                             key={type}
                             className="rounded border border-app-border bg-app-surface-muted px-2 py-1 text-xs"

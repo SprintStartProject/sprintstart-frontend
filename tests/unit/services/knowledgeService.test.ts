@@ -45,15 +45,15 @@ describe("knowledgeService", () => {
       expect(results[0].error).toBeTruthy();
     });
 
-    it("uploads multiple files, aggregating success and failure results", async () => {
+    it("uploads multiple files in a single request, aggregating success and failure results", async () => {
       let callCount = 0;
       server.use(
         http.post("/api/v1/uploads", () => {
           callCount += 1;
-          if (callCount === 2) {
-            return HttpResponse.json({}, { status: 500 });
-          }
-          return HttpResponse.json([{ id: "ok1", filename: "good.txt", status: "ok" }]);
+          return HttpResponse.json([
+            { id: "ok1", filename: "good.txt", status: "ok" },
+            { id: "bad1", filename: "bad.txt", status: "failed", error: "File format rejected" },
+          ]);
         }),
       );
 
@@ -61,21 +61,26 @@ describe("knowledgeService", () => {
       const badFile = new File(["b"], "bad.txt");
       const results = await knowledgeService.uploadDocuments("p1", [goodFile, badFile]);
 
+      expect(callCount).toBe(1);
       expect(results).toHaveLength(2);
-      expect(results[0].status).toBe("success");
-      expect(results[1].status).toBe("error");
+      expect(results[0]).toEqual({ filename: "good.txt", status: "success" });
+      expect(results[1]).toEqual({
+        filename: "bad.txt",
+        status: "error",
+        error: "File format rejected",
+      });
     });
   });
 
   describe("deleteUpload", () => {
-    it("calls apiClient.fetch with DELETE method, the artifactId path, and a FormData body containing the DeleteArtifactsRequest JSON part", async () => {
+    it("calls apiClient.fetch with DELETE method, the collection path, and a FormData body containing the DeleteArtifactsRequest JSON part", async () => {
       const fetchSpy = vi.spyOn(apiClient, "fetch").mockResolvedValue(undefined);
 
       await knowledgeService.deleteUpload("proj-1", "up-1", "remover-1");
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [endpoint, options] = fetchSpy.mock.calls[0];
-      expect(endpoint).toBe("/api/v1/uploads/up-1");
+      expect(endpoint).toBe("/api/v1/uploads");
       expect(options?.method).toBe("DELETE");
       expect(options?.body).toBeInstanceOf(FormData);
 
@@ -91,9 +96,7 @@ describe("knowledgeService", () => {
     });
 
     it("resolves on 204 No Content", async () => {
-      server.use(
-        http.delete("/api/v1/uploads/:artifactId", () => new HttpResponse(null, { status: 204 })),
-      );
+      server.use(http.delete("/api/v1/uploads", () => new HttpResponse(null, { status: 204 })));
 
       await expect(
         knowledgeService.deleteUpload("proj-1", "up-1", "remover-1"),
@@ -102,7 +105,7 @@ describe("knowledgeService", () => {
 
     it("rejects with ApiError on 403", async () => {
       server.use(
-        http.delete("/api/v1/uploads/:artifactId", () =>
+        http.delete("/api/v1/uploads", () =>
           HttpResponse.json({ detail: "Forbidden" }, { status: 403 }),
         ),
       );
@@ -226,6 +229,119 @@ describe("knowledgeService", () => {
       ).rejects.toThrow("Model overload");
 
       expect(onError).toHaveBeenCalledWith("Model overload");
+    });
+  });
+
+  describe("getUnifiedArtifacts", () => {
+    const projectId = "proj-uuid";
+
+    it("fetches a single page of artifacts", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("page")).toBe("1");
+          expect(url.searchParams.get("size")).toBe("100");
+          return HttpResponse.json({
+            items: [
+              {
+                id: "art-1",
+                title: "doc1.md",
+                artifactType: "FILE",
+                sourceSystem: "GITHUB",
+                sourceId: "src-1",
+                sourceUrl: null,
+                mime: "text/markdown",
+                language: null,
+                ingestedAt: "2026-01-01T00:00:00Z",
+                createdAtSource: null,
+                updatedAtSource: null,
+                contentHash: null,
+                ingestionRunId: null,
+              },
+            ],
+            page: {
+              totalPages: 1,
+            },
+          });
+        }),
+      );
+
+      const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
+      expect(artifacts).toHaveLength(1);
+      expect(artifacts[0].title).toBe("doc1.md");
+    });
+
+    it("fetches across multiple pages until all pages are retrieved", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          const url = new URL(request.url);
+          const page = url.searchParams.get("page");
+          if (page === "1") {
+            return HttpResponse.json({
+              items: [
+                {
+                  id: "art-1",
+                  title: "page1.md",
+                  artifactType: "FILE",
+                  sourceSystem: "GITHUB",
+                  sourceId: "src-1",
+                  sourceUrl: null,
+                  mime: "text/markdown",
+                  language: null,
+                  ingestedAt: "2026-01-01T00:00:00Z",
+                  createdAtSource: null,
+                  updatedAtSource: null,
+                  contentHash: null,
+                  ingestionRunId: null,
+                },
+              ],
+              page: {
+                totalPages: 2,
+              },
+            });
+          }
+          return HttpResponse.json({
+            items: [
+              {
+                id: "art-2",
+                title: "page2.md",
+                artifactType: "FILE",
+                sourceSystem: "GITHUB",
+                sourceId: "src-2",
+                sourceUrl: null,
+                mime: "text/markdown",
+                language: null,
+                ingestedAt: "2026-01-01T00:00:00Z",
+                createdAtSource: null,
+                updatedAtSource: null,
+                contentHash: null,
+                ingestionRunId: null,
+              },
+            ],
+            page: {
+              totalPages: 2,
+            },
+          });
+        }),
+      );
+
+      const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
+      expect(artifacts).toHaveLength(2);
+      expect(artifacts[0].title).toBe("page1.md");
+      expect(artifacts[1].title).toBe("page2.md");
+    });
+
+    it("propagates ApiError when the request fails with 500", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, () =>
+          HttpResponse.json({ message: "Internal server error" }, { status: 500 }),
+        ),
+      );
+
+      await expect(knowledgeService.getUnifiedArtifacts(projectId)).rejects.toMatchObject({
+        name: "ApiError",
+        status: 500,
+      });
     });
   });
 });

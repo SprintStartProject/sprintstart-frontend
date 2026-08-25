@@ -126,11 +126,7 @@
         width: 220px;
         height: 220px;
         border-radius: 50%;
-        background: radial-gradient(
-          circle,
-          rgba(37, 99, 235, 0.3) 0%,
-          rgba(37, 99, 235, 0) 68%
-        );
+        background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(37, 99, 235, 0) 68%);
         /* Idles on the pad; becomes the ignition bloom once the flight runs. */
         animation: boot-pulse 1.9s ease-in-out infinite;
       }
@@ -198,7 +194,12 @@
         padding: 0 1.5rem;
         text-align: center;
         font-family:
-          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
       }
 
       #boot-splash .boot-word {
@@ -226,7 +227,12 @@
         transform: translateX(-50%);
         margin: 0;
         font-family:
-          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
         font-size: 11px;
         font-weight: 500;
         letter-spacing: 0.18em;
@@ -250,7 +256,8 @@
         animation: boot-trail 1.25s cubic-bezier(0.4, 0, 0.35, 1) 0.3s both;
       }
       #boot-splash[data-leg="return"] .boot-rocket {
-        animation: boot-appear 0.22s ease-out both,
+        animation:
+          boot-appear 0.22s ease-out both,
           boot-depart 0.3s ease-in 1.45s both;
       }
       #boot-splash[data-leg="return"] .boot-word {
@@ -283,8 +290,7 @@
          is in the numbers. Regenerate rather than hand-edit. */
       @keyframes boot-flight {
         0% {
-          transform: translate(calc(0 * var(--flight-d)), calc(0 * var(--flight-d)))
-            rotate(17.7deg);
+          transform: translate(calc(0 * var(--flight-d)), calc(0 * var(--flight-d))) rotate(17.7deg);
         }
         3.33% {
           transform: translate(calc(0.0074 * var(--flight-d)), calc(0 * var(--flight-d)))
@@ -636,8 +642,7 @@
         try {
           var name = window.localStorage.getItem(NAME_KEY);
           if (name) {
-            document.getElementById("boot-greeting").textContent =
-              "Welcome back, " + name;
+            document.getElementById("boot-greeting").textContent = "Welcome back, " + name;
           }
         } catch (error) {
           // Keep the generic greeting.

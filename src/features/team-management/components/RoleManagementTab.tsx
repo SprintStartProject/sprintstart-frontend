@@ -3,9 +3,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
+import { SaveButton } from "../../../components/ui/SaveButton";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { useToast } from "../../../context/useToast";
 import { RoleCard } from "./RoleCard";
 import {
   assignProjectRoleToUser,
@@ -55,6 +57,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const toast = useToast();
 
   const [roleName, setRoleName] = useState("");
   const [roleDescription, setRoleDescription] = useState("");
@@ -200,6 +203,9 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       // Land on the new role: it is empty, so the next thing to do is
       // always to give it skills or members.
       openRole(newRole.id);
+      toast.success("Role created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't create the role.");
     } finally {
       setCreatingRole(false);
     }
@@ -211,20 +217,25 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     const roleId = deleteRoleId;
     setDeleteRoleId(null);
 
-    await deleteProjectRole(roleId);
+    try {
+      await deleteProjectRole(roleId);
 
-    setSkills((current) =>
-      current.map((skill) => ({
-        ...skill,
-        roleIds: skill.roleIds.filter((id) => id !== roleId),
-      })),
-    );
+      setSkills((current) =>
+        current.map((skill) => ({
+          ...skill,
+          roleIds: skill.roleIds.filter((id) => id !== roleId),
+        })),
+      );
 
-    if (selectedRoleId === roleId) {
-      closeRole();
+      if (selectedRoleId === roleId) {
+        closeRole();
+      }
+
+      await onDataChanged();
+      toast.success("Role deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't delete the role.");
     }
-
-    await onDataChanged();
   }
 
   async function handleAddSkill() {
@@ -242,6 +253,9 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       );
 
       setSkillName("");
+      toast.success("Skill added");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't add the skill.");
     } finally {
       setAddingSkill(false);
     }
@@ -253,19 +267,29 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     const skillId = retireSkillId;
     setRetireSkillId(null);
 
-    await deleteSkill(skillId);
+    try {
+      await deleteSkill(skillId);
 
-    setSkills((current) =>
-      current.map((skill) =>
-        skill.id === skillId ? { ...skill, status: "RETIRED" as const } : skill,
-      ),
-    );
+      setSkills((current) =>
+        current.map((skill) =>
+          skill.id === skillId ? { ...skill, status: "RETIRED" as const } : skill,
+        ),
+      );
+      toast.success("Skill retired");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't retire the skill.");
+    }
   }
 
   async function handleReactivateSkill(skill: Skill) {
-    const updated = await reactivateSkill(skill.id, skill.name, skill.roleIds);
+    try {
+      const updated = await reactivateSkill(skill.id, skill.name, skill.roleIds);
 
-    setSkills((current) => current.map((entry) => (entry.id === skill.id ? updated : entry)));
+      setSkills((current) => current.map((entry) => (entry.id === skill.id ? updated : entry)));
+      toast.success("Skill reactivated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't reactivate the skill.");
+    }
   }
 
   async function handleSaveAssignment() {
@@ -282,6 +306,9 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
       setOriginalUserIds(selectedUserIds);
       await onDataChanged();
+      toast.success("Members updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't update the members.");
     } finally {
       setSavingAssignment(false);
     }
@@ -672,20 +699,14 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                         Reset
                       </button>
 
-                      <Button
-                        variant="primary"
+                      <SaveButton
+                        dirty={hasAssignChanges}
+                        saving={savingAssignment}
                         onClick={() => void handleSaveAssignment()}
-                        disabled={!hasAssignChanges}
-                        loading={savingAssignment}
-                      >
-                        {savingAssignment
-                          ? "Saving..."
-                          : hasAssignChanges
-                            ? `Save ${assignChangeCount} ${
-                                assignChangeCount === 1 ? "change" : "changes"
-                              }`
-                            : "Save changes"}
-                      </Button>
+                        label={`Save ${assignChangeCount} ${
+                          assignChangeCount === 1 ? "change" : "changes"
+                        }`}
+                      />
                     </div>
                   </div>
 

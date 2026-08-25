@@ -23,6 +23,19 @@ function renderSelect(overrides: Partial<Parameters<typeof FilterSelect>[0]> = {
   return { onChange, trigger: screen.getByLabelText("Filter runs by status") };
 }
 
+/** A trigger sitting close enough to the right edge that a wide menu would overflow it. */
+const nearRightEdge = {
+  left: 900,
+  right: 1020,
+  top: 100,
+  bottom: 130,
+  width: 120,
+  height: 30,
+  x: 900,
+  y: 100,
+  toJSON: () => ({}),
+} as DOMRect;
+
 /**
  * This control replaces a native `<select>`, so everything the browser used to
  * provide for free has to be proven here instead.
@@ -126,5 +139,101 @@ describe("FilterSelect", () => {
     await user.click(trigger);
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  /**
+   * The menu may be wider than the control it hangs from — options do not wrap
+   * — so left-aligning it with a trigger near the right edge pushes it off the
+   * window. The dashboard's size picker sits in a toolbar pinned to the right
+   * of its widget, which is where this shows up.
+   */
+  // Focus stays on the trigger in this pattern, so the browser never scrolls
+  // the list on its own the way it would if the options were focused.
+  it("scrolls the highlighted option into view as the keyboard moves it", async () => {
+    const user = userEvent.setup();
+    // vitest.setup stubs this on HTMLElement.prototype (jsdom has no layout),
+    // so the spy has to replace it there rather than on Element.
+    const scrollIntoView = vi
+      .spyOn(window.HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+
+    const { trigger } = renderSelect();
+    await user.click(trigger);
+    scrollIntoView.mockClear();
+
+    await user.keyboard("{ArrowDown}");
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    scrollIntoView.mockRestore();
+  });
+
+  it("keeps a menu wider than its trigger inside the right edge of the window", async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderSelect();
+
+    // jsdom lays nothing out: the trigger is placed near the right edge by hand
+    // and the menu is given a width wider than it.
+    trigger.getBoundingClientRect = () => nearRightEdge;
+    const menuWidth = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(300);
+
+    await user.click(trigger);
+
+    const listbox = screen.getByRole("listbox");
+    const left = Number.parseFloat(listbox.style.left);
+
+    expect(left).toBeLessThan(nearRightEdge.left);
+    expect(left + 300).toBeLessThanOrEqual(window.innerWidth);
+
+    menuWidth.mockRestore();
+  });
+
+  it("leaves a menu with room to its right aligned with the trigger", async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderSelect();
+
+    trigger.getBoundingClientRect = () => ({ ...nearRightEdge, left: 100, right: 220 });
+    const menuWidth = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(300);
+
+    await user.click(trigger);
+
+    expect(screen.getByRole("listbox").style.left).toBe("100px");
+
+    menuWidth.mockRestore();
+  });
+
+  /**
+   * The menu has to escape the caller's stacking context.
+   *
+   * An ancestor with `backdrop-filter` / `transform` / `opacity` creates one,
+   * and a menu rendered inside it is painted under whatever follows the caller
+   * in the DOM however high its `z-index` is — which is how the knowledge-gap
+   * owner dropdown ended up under the card beneath it, unclickable.
+   */
+  it("renders its menu into the body, out of any ancestor stacking context", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <div className="backdrop-blur-md">
+        <FilterSelect
+          label="Filter runs by status"
+          value="ALL"
+          options={OPTIONS}
+          onChange={onChange}
+        />
+      </div>,
+    );
+
+    const trigger = screen.getByLabelText("Filter runs by status");
+    await user.click(trigger);
+
+    const listbox = screen.getByRole("listbox");
+    expect(listbox.parentElement).toBe(document.body);
+    expect(listbox.closest(".backdrop-blur-md")).toBeNull();
+
+    // And it is still a working menu from out there — the outside-click
+    // dismissal must not treat the portaled options as "outside".
+    await user.click(screen.getByRole("option", { name: "Failed" }));
+    expect(onChange).toHaveBeenCalledWith("FAILED");
   });
 });

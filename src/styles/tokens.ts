@@ -36,6 +36,20 @@ export const hoverSpringToken: Transition = {
 };
 
 /**
+ * Spring for the quick-action buttons that reveal on a card's hover or focus
+ * (the Starter Work review decisions, and the issue browser's "Add to the pool").
+ * A touch stiffer and heavier than `hoverSpringToken` so the buttons snap in
+ * decisively as one cluster; shared so the review card and the issue row read as
+ * the same motion. Pair it with `getQuickActionRevealVariants`.
+ */
+export const quickActionSpringToken: Transition = {
+  type: "spring",
+  stiffness: 520,
+  damping: 30,
+  mass: 0.6,
+};
+
+/**
  * Spring for the macOS-dock style magnification of sidebar items.
  * Almost critically damped so items grow and shrink without wobbling
  * while the pointer sweeps across the navigation.
@@ -83,7 +97,7 @@ export const sidePanelSlideToken: Transition = {
 };
 
 /**
- * Hover and press feedback for buttons and other small controls.
+ * Press feedback for buttons and other small controls.
  *
  * Spread onto a `motion.button` so every action in the app answers the pointer
  * the same way:
@@ -92,28 +106,33 @@ export const sidePanelSlideToken: Transition = {
  * <motion.button {...buttonHoverMotion} className="...">Save</motion.button>
  * ```
  *
- * Deliberately gentler than the sidebar's dock magnification (1.03 rather than
- * 1.12): buttons sit inside dense toolbars and rows, where a large scale would
- * collide with neighbours or push a layout around.
+ * **The scale never goes above 1, and that is the point.** This used to grow
+ * the control to 1.03 on hover, with an underdamped spring that then sprang
+ * past 1 again on release. A control sitting flush against the right end of a
+ * toolbar has nothing to grow into: the extra sliver landed outside the
+ * surrounding panel and was visibly sliced off — on the admin filters, and
+ * again on the access view's add button. Hover feedback is carried by the
+ * `hover:` colours every button variant already has, which no layout can clip.
+ *
+ * `dockMagnifySpringToken` rather than `hoverSpringToken` for the same reason:
+ * it is damped to the point of not overshooting, so releasing a press returns
+ * to the resting size from below instead of bouncing through it.
  *
  * Pass `disabled` controls `buttonHoverMotionDisabled` instead, so a dead
  * button also feels dead.
  */
 export const buttonHoverMotion: {
-  whileHover: TargetAndTransition;
   whileTap: TargetAndTransition;
   transition: Transition;
 } = {
-  whileHover: { scale: 1.03 },
   whileTap: { scale: 0.97 },
-  transition: hoverSpringToken,
+  transition: dockMagnifySpringToken,
 };
 
 /** No-op counterpart to {@link buttonHoverMotion} for disabled controls. */
 export const buttonHoverMotionDisabled = {
-  whileHover: undefined,
   whileTap: undefined,
-  transition: hoverSpringToken,
+  transition: dockMagnifySpringToken,
 };
 
 /**
@@ -127,6 +146,26 @@ export const modalBackdropVariants: Variants = {
   visible: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
   exit: { opacity: 0, transition: { duration: 0.16, ease: "easeIn" } },
 };
+
+/**
+ * Enter/rest variants for a hover-revealed quick action. `rest` parks the button
+ * a little to the right, faded and shrunk; `show` slides it home on
+ * {@link quickActionSpringToken}. Reduced motion keeps only the fade. Shared by
+ * the Starter Work review card and the issue browser row so the two reveal
+ * identically; drive it with a `rest`/`show` `animate` value from the card's
+ * hover/focus state (or hold it on `show` outright on touch, where there is no
+ * hover).
+ */
+export function getQuickActionRevealVariants(prefersReducedMotion: boolean): Variants {
+  if (prefersReducedMotion) {
+    return { rest: { opacity: 0 }, show: { opacity: 1 } };
+  }
+
+  return {
+    rest: { opacity: 0, x: 14, scale: 0.85 },
+    show: { opacity: 1, x: 0, scale: 1, transition: quickActionSpringToken },
+  };
+}
 
 /**
  * Motion for a dialog surface, shared by `Modal` and by the dialogs that hand
@@ -222,6 +261,6 @@ export const petPeekSpringToken: Transition = {
  * A smooth tween ease — not a spring, so it pairs well with CSS-only layers.
  */
 export const enterTransition: Transition = {
-    duration: 0.5,
-    ease: [0.22, 1, 0.36, 1],
+  duration: 0.5,
+  ease: [0.22, 1, 0.36, 1],
 };

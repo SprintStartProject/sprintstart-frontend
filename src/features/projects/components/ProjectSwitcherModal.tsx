@@ -187,6 +187,11 @@ export function ProjectSwitcherModal({
       title="Switch project"
       description="Pick the project the whole app should be scoped to."
       size="xl"
+      // The switcher's trigger lives in the sidebar, which on mobile is a
+      // fixed drawer at z-[60] (SideBar.tsx). At the default z-50 the modal
+      // renders under that drawer; raise it above the drawer below lg, and keep
+      // the desktop stacking (z-50) unchanged where no drawer exists.
+      zIndexClassName="z-[70] lg:z-50"
       titleId="project-switcher-title"
       descriptionId="project-switcher-description"
       closeLabel="Close project switcher"

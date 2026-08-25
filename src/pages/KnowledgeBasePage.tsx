@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
@@ -18,11 +19,10 @@ import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeB
 import { useProjectContext } from "../features/projects/useProjectContext";
 
 /** Roles allowed to delete uploaded artifacts. Pattern A gate mirroring
- *  `SettingsPage`'s PAT_ALLOWED_GROUPS — keeps destructive uploads deletion
- *  out of reach of plain USER accounts. */
+ *  the backend `@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")` — keeps
+ *  destructive uploads deletion out of reach of plain USER accounts. */
 const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
   PermissionGroup.PM,
-  PermissionGroup.HR,
   PermissionGroup.ADMIN,
 ]);
 
@@ -40,14 +40,14 @@ const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
  */
 export function KnowledgeBasePage() {
   const { profile } = useAuth();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, isLoading: isProjectLoading } = useProjectContext();
   const projectId = selectedProjectId || (profile?.projectIds?.[0] ?? null);
 
   const canDeleteUpload = profile !== null && DELETE_ALLOWED_GROUPS.has(profile.permissionGroup);
 
   const {
     artifacts,
-    isLoading,
+    isLoading: isArtifactsLoading,
     fetchError,
     fetchArtifacts,
     searchQuery,
@@ -63,7 +63,41 @@ export function KnowledgeBasePage() {
     hasActiveFilters,
   } = useKnowledgeBase(projectId);
 
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const isLoading = isProjectLoading || isArtifactsLoading;
+
+  /*
+    `?artifact=<id>` opens a document straight away, which is what the dashboard's knowledge-base
+    card links to — before this, every row on that card landed on the bare page and the reader
+    had to find the document again themselves.
+
+    It is a hand-off rather than a permanent part of the URL: the id seeds the state once and the
+    parameter is then stripped, so the drawer state stays local (as it already was) and coming
+    back to the page later does not reopen a document the user has since closed.
+  */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(() =>
+    searchParams.get("artifact"),
+  );
+  const [prevProjectId, setPrevProjectId] = useState(projectId);
+
+  const artifactParamConsumed = useRef(false);
+
+  useEffect(() => {
+    if (artifactParamConsumed.current) return;
+    artifactParamConsumed.current = true;
+
+    if (!searchParams.has("artifact")) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("artifact");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Reset active drawer selection whenever the project scope changes.
+  if (prevProjectId !== projectId) {
+    setPrevProjectId(projectId);
+    setSelectedArtifactId(null);
+  }
 
   const selectedArtifact = useMemo(
     () => artifacts.find((a) => a.id === selectedArtifactId) ?? null,

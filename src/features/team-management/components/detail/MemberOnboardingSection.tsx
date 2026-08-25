@@ -85,78 +85,80 @@ export function MemberOnboardingSection({
   return (
     <SpotlightCard roundedClassName="rounded-3xl">
       <div className="rounded-3xl p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-app-brand" />
-            <h2 className="text-lg font-semibold text-app-text">Member onboarding</h2>
-          </div>
-
-          <p className="mt-1 text-sm text-app-text-muted">
-            Preview the member journey and add project-specific steps.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[420px]">
-          <MetricCard label="Done" value={`${finishedSteps}/${totalSteps || 0}`} />
-          <MetricCard label="Estimate" value={formatMinutes(estimatedMinutes)} />
-          <MetricCard label="Skipped" value={String(skippedSteps)} />
-          <MetricCard
-            label="Requests"
-            value={String(pendingSkipCount)}
-            warning={pendingSkipCount > 0}
-          />
-        </div>
-      </div>
-
-      {phases.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-6 text-sm text-app-text-muted">
-          No onboarding path details are available for this user yet.
-        </div>
-      ) : (
-        <>
-          <PhasePicker
-            phases={phases}
-            selectedPhaseId={selectedPhase?.id}
-            onSelectPhase={onSelectPhase}
-          />
-
-          <div className="mt-5">
-            <div>
-              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-app-text">{selectedPhase?.title}</h3>
-                  {selectedPhase?.description && (
-                    <p className="mt-1 text-xs text-app-text-muted">{selectedPhase.description}</p>
-                  )}
-                </div>
-              </div>
-
-              <StepList
-                selectedPhase={selectedPhase}
-                steps={selectedPhaseSteps}
-                selectedStep={selectedStep}
-                nextStep={nextStep}
-                stepTaskCounts={stepTaskCounts}
-                onSelectStep={onSelectStep}
-                onAddStep={onAddStep}
-                onReorderSteps={onReorderSteps}
-                formatMinutes={formatMinutes}
-                getActualMinutes={getActualMinutes}
-                getStepStatusStyles={getStepStatusStyles}
-              />
-
-              {/* Last in the phase, mirroring where the member meets the
-                                check in their own onboarding path. */}
-              <PhaseCheckCard summary={selectedPhase?.checkSummary} onOpenCheck={onOpenCheck} />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-app-brand" />
+              <h2 className="text-lg font-semibold text-app-text">Member onboarding</h2>
             </div>
+
+            <p className="mt-1 text-sm text-app-text-muted">
+              Preview the member journey and add project-specific steps.
+            </p>
           </div>
-        </>
-      )}
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[420px]">
+            <MetricCard label="Done" value={`${finishedSteps}/${totalSteps || 0}`} />
+            <MetricCard label="Estimate" value={formatMinutes(estimatedMinutes)} />
+            <MetricCard label="Skipped" value={String(skippedSteps)} />
+            <MetricCard
+              label="Requests"
+              value={String(pendingSkipCount)}
+              warning={pendingSkipCount > 0}
+            />
+          </div>
         </div>
-      </SpotlightCard>
-    );
-  }
+
+        {phases.length === 0 ? (
+          <div className="mt-5 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-6 text-sm text-app-text-muted">
+            No onboarding path details are available for this user yet.
+          </div>
+        ) : (
+          <>
+            <PhasePicker
+              phases={phases}
+              selectedPhaseId={selectedPhase?.id}
+              onSelectPhase={onSelectPhase}
+            />
+
+            <div className="mt-5">
+              <div>
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-app-text">{selectedPhase?.title}</h3>
+                    {selectedPhase?.description && (
+                      <p className="mt-1 text-xs text-app-text-muted">
+                        {selectedPhase.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <StepList
+                  selectedPhase={selectedPhase}
+                  steps={selectedPhaseSteps}
+                  selectedStep={selectedStep}
+                  nextStep={nextStep}
+                  stepTaskCounts={stepTaskCounts}
+                  onSelectStep={onSelectStep}
+                  onAddStep={onAddStep}
+                  onReorderSteps={onReorderSteps}
+                  formatMinutes={formatMinutes}
+                  getActualMinutes={getActualMinutes}
+                  getStepStatusStyles={getStepStatusStyles}
+                />
+
+                {/* Last in the phase, mirroring where the member meets the
+                                check in their own onboarding path. */}
+                <PhaseCheckCard summary={selectedPhase?.checkSummary} onOpenCheck={onOpenCheck} />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </SpotlightCard>
+  );
+}
 
 /**
  * Knowledge-check status of the selected phase, with the entry points for reviewing the

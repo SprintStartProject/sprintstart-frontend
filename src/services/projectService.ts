@@ -36,6 +36,17 @@ export type ProjectSource = {
   status: ProjectSourceStatus;
 };
 
+/**
+ * A role as the authoring surfaces need it: the id to edit by, the name to show.
+ *
+ * Carried beside `projectRoles` rather than replacing it. The names are what every existing
+ * consumer renders; the ids are what lets a caller remove one role without matching on its name.
+ */
+export type ProjectRoleRef = {
+  id: string;
+  name: string;
+};
+
 export type ProjectUserSummary = {
   id: string;
   username: string;
@@ -43,6 +54,8 @@ export type ProjectUserSummary = {
   profileIcon?: string;
   roles?: GlobalUserRole[];
   projectRoles: ProjectRole[];
+  /** Undefined when the payload did not carry ids, which is not the same as holding no roles. */
+  projectRoleRefs?: ProjectRoleRef[];
 };
 
 export type ProjectUser = {
@@ -54,6 +67,8 @@ export type ProjectUser = {
   profileIcon?: string;
   roles: GlobalUserRole[];
   projectRoles: ProjectRole[];
+  /** Undefined when the payload did not carry ids, which is not the same as holding no roles. */
+  projectRoleRefs?: ProjectRoleRef[];
   enabled: boolean;
 };
 
@@ -127,6 +142,7 @@ type BackendProjectUser = BackendProjectUserSummary & {
   lastName: string;
   roles: string[];
   projectRoles: string[];
+  projectRoleRefs?: ProjectRoleRef[];
   enabled: boolean;
 };
 
@@ -196,6 +212,7 @@ function toProjectUser(user: BackendProjectUser): ProjectUser {
     lastName: user.lastName,
     roles: user.roles,
     projectRoles: user.projectRoles,
+    projectRoleRefs: user.projectRoleRefs,
     enabled: user.enabled,
   };
 }

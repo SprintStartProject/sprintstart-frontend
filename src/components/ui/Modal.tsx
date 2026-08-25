@@ -14,6 +14,12 @@ type ModalProps = {
   description?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
+  /**
+   * Overrides the footer's layout classes (flex direction, gap, alignment).
+   * Defaults to a mobile-stacked / desktop-row layout. The container's spacing
+   * (padding) is always kept; only the layout portion is replaced.
+   */
+  footerClassName?: string;
   /** Optional controls shown in the header, left of the close button. */
   headerActions?: ReactNode;
   size?: ModalSize;
@@ -24,6 +30,11 @@ type ModalProps = {
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
   isDismissDisabled?: boolean;
+  /**
+   * Extra right padding (px) on the centering area, which slides the centered
+   * dialog left. Used to make room for a companion panel opening to its right.
+   */
+  contentInsetRight?: number;
   titleId?: string;
   descriptionId?: string;
   /**
@@ -69,15 +80,17 @@ export function Modal({
   description,
   children,
   footer,
+  footerClassName = "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end",
   headerActions,
   size = "md",
   zIndexClassName = "z-50",
-  bodyClassName = "px-7 py-6",
+  bodyClassName = "px-5 py-5 sm:px-7 sm:py-6",
   role = "dialog",
   closeLabel = "Close dialog",
   closeOnBackdrop = true,
   closeOnEscape = true,
   isDismissDisabled = false,
+  contentInsetRight = 0,
   titleId = "modal-title",
   descriptionId = "modal-description",
   testId,
@@ -173,7 +186,8 @@ export function Modal({
           initial="hidden"
           animate="visible"
           exit="exit"
-          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} flex items-center justify-center bg-app-overlay p-4 backdrop-blur-md`}
+          className={`fixed inset-0 ${zIndexClassName} flex items-center justify-center overflow-y-auto bg-app-overlay p-4 backdrop-blur-md transition-[padding] duration-300 ease-out`}
+          style={contentInsetRight ? { paddingRight: contentInsetRight } : undefined}
         >
           {closeOnBackdrop && (
             <button
@@ -197,11 +211,11 @@ export function Modal({
             initial="hidden"
             animate="visible"
             exit="exit"
-            className={`relative z-10 w-full ${sizeClassNames[size]} overflow-hidden rounded-[28px] border border-app-border bg-app-bg shadow-2xl`}
+            className={`relative z-10 flex max-h-[calc(100dvh-2rem)] w-full ${sizeClassNames[size]} flex-col overflow-hidden rounded-[28px] border border-app-border bg-app-bg shadow-2xl`}
           >
             <div className="pointer-events-none absolute -top-16 -right-16 h-[200px] w-[200px] rounded-full bg-app-brand-glow blur-3xl" />
 
-            <div className="relative z-10 flex items-start justify-between gap-4 px-7 pt-7">
+            <div className="relative z-10 flex shrink-0 items-start justify-between gap-4 px-5 pt-6 sm:px-7 sm:pt-7">
               <div>
                 <h2 id={titleId} className="text-[22px] leading-tight font-bold text-app-text">
                   {title}
@@ -234,11 +248,15 @@ export function Modal({
               </div>
             </div>
 
-            {children && <div className={`relative z-10 ${bodyClassName}`}>{children}</div>}
+            {children && (
+              <div className={`relative z-10 min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>
+                {children}
+              </div>
+            )}
 
             {footer && (
               <div
-                className={`relative z-10 flex flex-col-reverse gap-3 px-7 pb-7 sm:flex-row sm:justify-end ${
+                className={`relative z-10 shrink-0 px-5 pb-6 sm:px-7 sm:pb-7 ${footerClassName} ${
                   children ? "" : "pt-6"
                 }`}
               >

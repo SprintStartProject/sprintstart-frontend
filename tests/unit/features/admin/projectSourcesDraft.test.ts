@@ -5,7 +5,10 @@ import {
   countUnconnectedSources,
   createDraftSource,
   createDraftSourceFromDiscovery,
+  createJiraDraft,
+  createUploadDraft,
   hasFailedSources,
+  isSameSource,
   removeDraftSource,
   type DraftSource,
 } from "../../../../src/features/admin/projectSourcesDraft";
@@ -13,6 +16,8 @@ import {
   addRepositoryToProject,
   connectGithubRepository,
 } from "../../../../src/services/sources/githubService";
+import { connectJiraInstance } from "../../../../src/services/sources/jiraService";
+import { knowledgeService } from "../../../../src/services/knowledgeService";
 import type { DiscoverySelection } from "../../../../src/features/data-ingestion/components/GithubRepositoryDiscovery";
 
 vi.mock("../../../../src/services/sources/githubService", () => ({
@@ -20,14 +25,35 @@ vi.mock("../../../../src/services/sources/githubService", () => ({
   addRepositoryToProject: vi.fn(),
 }));
 
+vi.mock("../../../../src/services/sources/jiraService", () => ({
+  connectJiraInstance: vi.fn(),
+}));
+
+vi.mock("../../../../src/services/knowledgeService", () => ({
+  knowledgeService: { uploadDocuments: vi.fn() },
+}));
+
 const connectGithubRepositoryMock = vi.mocked(connectGithubRepository);
 const addRepositoryToProjectMock = vi.mocked(addRepositoryToProject);
+const connectJiraInstanceMock = vi.mocked(connectJiraInstance);
+const uploadDocumentsMock = vi.mocked(knowledgeService.uploadDocuments);
+
+const jiraDraftParams = {
+  displayName: "Team board",
+  url: "https://acme.atlassian.net",
+  userEmail: "pm@acme.test",
+  tokenName: "jira-token",
+};
 
 beforeEach(() => {
   connectGithubRepositoryMock.mockReset();
   connectGithubRepositoryMock.mockResolvedValue({ transactionId: "tx" });
   addRepositoryToProjectMock.mockReset();
   addRepositoryToProjectMock.mockResolvedValue({ repositoryId: "r1", projectIds: ["p1"] });
+  connectJiraInstanceMock.mockReset();
+  connectJiraInstanceMock.mockResolvedValue(undefined);
+  uploadDocumentsMock.mockReset();
+  uploadDocumentsMock.mockResolvedValue([{ filename: "a.txt", status: "success" }]);
 });
 
 describe("createDraftSource", () => {
@@ -42,7 +68,60 @@ describe("createDraftSource", () => {
   });
 
   it("carries a repository id when one is given", () => {
-    expect(createDraftSource("acme", "widgets", "pat", "repo-1").repositoryId).toBe("repo-1");
+    const draft = createDraftSource("acme", "widgets", "pat", "repo-1");
+
+    expect(draft.type).toBe("GITHUB");
+    expect(draft.repositoryId).toBe("repo-1");
+  });
+});
+
+describe("createJiraDraft / createUploadDraft", () => {
+  it("stages a pending Jira instance", () => {
+    const draft = createJiraDraft(jiraDraftParams);
+
+    expect(draft.type).toBe("JIRA");
+    expect(draft.status).toBe("pending");
+    expect(draft).toMatchObject(jiraDraftParams);
+  });
+
+  it("stages an upload holding its files in memory", () => {
+    const files = [new File(["x"], "spec.pdf")];
+    const draft = createUploadDraft("Docs", files);
+
+    expect(draft.type).toBe("UPLOAD");
+    expect(draft.status).toBe("pending");
+    expect(draft.displayName).toBe("Docs");
+    expect(draft.files).toBe(files);
+  });
+});
+
+describe("isSameSource", () => {
+  it("matches GitHub repositories by owner/name regardless of casing", () => {
+    expect(
+      isSameSource(
+        createDraftSource("acme", "widgets", "a"),
+        createDraftSource("ACME", "Widgets", "b"),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Jira instances by URL regardless of casing and surrounding space", () => {
+    expect(
+      isSameSource(
+        createJiraDraft(jiraDraftParams),
+        createJiraDraft({ ...jiraDraftParams, url: " HTTPS://acme.atlassian.net " }),
+      ),
+    ).toBe(true);
+  });
+
+  it("never treats two uploads as the same source", () => {
+    expect(isSameSource(createUploadDraft("A", []), createUploadDraft("A", []))).toBe(false);
+  });
+
+  it("never matches across types", () => {
+    expect(
+      isSameSource(createDraftSource("acme", "widgets", "a"), createJiraDraft(jiraDraftParams)),
+    ).toBe(false);
   });
 });
 
@@ -188,5 +267,54 @@ describe("connectDraftSources", () => {
     const statuses = onProgress.mock.calls.map((call) => (call[0] as DraftSource[])[0].status);
 
     expect(statuses).toEqual(["connecting", "connected"]);
+  });
+
+  it("connects a Jira draft through the Jira connector", async () => {
+    const result = await connectDraftSources("p1", [createJiraDraft(jiraDraftParams)]);
+
+    expect(connectJiraInstanceMock).toHaveBeenCalledWith({
+      displayName: jiraDraftParams.displayName,
+      url: jiraDraftParams.url,
+      userEmail: jiraDraftParams.userEmail,
+      tokenName: jiraDraftParams.tokenName,
+      projectId: "p1",
+    });
+    expect(result[0].status).toBe("connected");
+  });
+
+  it("uploads an upload draft's files against the created project", async () => {
+    const files = [new File(["x"], "a.txt")];
+
+    const result = await connectDraftSources("p1", [createUploadDraft("Docs", files)]);
+
+    expect(uploadDocumentsMock).toHaveBeenCalledWith("p1", files);
+    expect(result[0].status).toBe("connected");
+  });
+
+  it("fails an upload draft when a file could not be uploaded", async () => {
+    uploadDocumentsMock.mockResolvedValueOnce([
+      { filename: "a.txt", status: "success" },
+      { filename: "b.txt", status: "error", error: "too large" },
+    ]);
+
+    const result = await connectDraftSources("p1", [
+      createUploadDraft("Docs", [new File(["x"], "a.txt"), new File(["y"], "b.txt")]),
+    ]);
+
+    expect(result[0].status).toBe("failed");
+    expect(result[0].errorMessage).toContain("1 of 2");
+  });
+
+  it("dispatches each source type in one mixed batch", async () => {
+    const result = await connectDraftSources("p1", [
+      createDraftSource("acme", "widgets", "pat"),
+      createJiraDraft(jiraDraftParams),
+      createUploadDraft("Docs", [new File(["x"], "a.txt")]),
+    ]);
+
+    expect(connectGithubRepositoryMock).toHaveBeenCalledTimes(1);
+    expect(connectJiraInstanceMock).toHaveBeenCalledTimes(1);
+    expect(uploadDocumentsMock).toHaveBeenCalledTimes(1);
+    expect(result.every((source) => source.status === "connected")).toBe(true);
   });
 });

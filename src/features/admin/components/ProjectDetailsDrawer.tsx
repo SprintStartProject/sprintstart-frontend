@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, Folder, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, FileText, Folder, Link2, Loader2, Trash2 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -7,6 +7,7 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
+import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
 import { getProjectEditFormState, getProjectSourcesCount, getProjectUsersCount } from "../data";
 import {
@@ -25,8 +26,8 @@ import type {
   ProjectUser,
 } from "../types";
 import { AccessBadge } from "./Badges";
+import { DrawerCard } from "./DrawerCard";
 import { ProjectPeopleSection } from "./ProjectPeopleSection";
-import { Section } from "./Section";
 import { SourceList } from "./SourceList";
 
 type ProjectDetailsDrawerProps = {
@@ -73,10 +74,12 @@ export function ProjectDetailsDrawer({
   const [projectDetails, setProjectDetails] = useState<AdminProjectDetails | null>(null);
   const [detailsError, setDetailsError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  // `saveErrorMessage` now only carries the inline "name required" validation;
+  // the save request's own failure is surfaced as a toast.
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+  const toast = useToast();
 
   const [draftProject, setDraftProject] = useState<ProjectEditFormState>(() =>
     getProjectEditFormState(project),
@@ -189,10 +192,9 @@ export function ProjectDetailsDrawer({
       const updatedProject = await projectService.getProjectById(project.id);
       applyProjectUpdate(updatedProject);
       resetDrafts(updatedProject);
+      toast.success("Project saved");
     } catch (error) {
-      setSaveErrorMessage(
-        error instanceof Error ? error.message : "Project changes could not be saved.",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't save the project changes.");
     } finally {
       setIsSaving(false);
     }
@@ -200,17 +202,15 @@ export function ProjectDetailsDrawer({
 
   const confirmDeleteProject = async () => {
     setIsDeleting(true);
-    setDeleteErrorMessage("");
 
     try {
       await projectService.deleteProject(project.id);
       setIsDeleteDialogOpen(false);
       onProjectDeleted?.(project.id);
       onClose();
+      toast.success("Project deleted");
     } catch (error) {
-      setDeleteErrorMessage(
-        error instanceof Error ? error.message : "Project could not be deleted.",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't delete the project.");
     } finally {
       setIsDeleting(false);
     }
@@ -249,7 +249,7 @@ export function ProjectDetailsDrawer({
                 {pendingChangeCount === 1 ? "" : "s"}
               </p>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-end">
                 <Button variant="secondary" onClick={discardChanges} disabled={isSaving}>
                   Discard
                 </Button>
@@ -280,8 +280,8 @@ export function ProjectDetailsDrawer({
             <p className="text-sm text-app-danger-text">{detailsError}</p>
           </div>
         ) : (
-          <>
-            <Section>
+          <div className="space-y-4 sm:space-y-5">
+            <DrawerCard label="Details" icon={FileText} index={0}>
               {saveErrorMessage && (
                 <div className="mb-5 rounded-2xl border border-app-danger-border bg-app-danger-bg p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-app-danger-text">
@@ -291,10 +291,6 @@ export function ProjectDetailsDrawer({
                   <p className="mt-1 text-sm text-app-danger-text">{saveErrorMessage}</p>
                 </div>
               )}
-
-              <p className="mb-4 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
-                Details
-              </p>
 
               <div className="space-y-4">
                 <Field label="Name" controlId={nameInputId} disabled={isSaving}>
@@ -314,9 +310,9 @@ export function ProjectDetailsDrawer({
                   />
                 </Field>
               </div>
-            </Section>
+            </DrawerCard>
 
-            <Section>
+            <DrawerCard index={1}>
               <ProjectPeopleSection
                 members={visibleUsers}
                 manager={projectDetails?.manager ?? null}
@@ -327,12 +323,9 @@ export function ProjectDetailsDrawer({
                 draft={activePeopleDraft}
                 onDraftChange={setPeopleDraft}
               />
-            </Section>
+            </DrawerCard>
 
-            <Section>
-              <p className="mb-3 text-xs font-semibold tracking-wide text-app-text-muted uppercase">
-                Connected sources
-              </p>
+            <DrawerCard label="Connected sources" icon={Link2} index={2}>
               <SourceList
                 sources={visibleProject.sources}
                 onOpenSourceDetails={
@@ -341,35 +334,27 @@ export function ProjectDetailsDrawer({
                     : undefined
                 }
               />
-            </Section>
+            </DrawerCard>
 
             {canManageLifecycle && (
-              <Section>
-                <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg p-5">
-                  <p className="text-xs font-semibold tracking-wide text-app-danger-text uppercase">
-                    Danger zone
-                  </p>
-                  <p className="mt-2 text-sm text-app-danger-text">
-                    Deleting a project removes it and all of its user assignments. Connected sources
-                    are kept and stay available to other projects.
-                  </p>
+              <DrawerCard label="Danger zone" variant="danger" index={3}>
+                <p className="text-sm text-app-danger-text">
+                  Deleting a project removes it and all of its user assignments. Connected sources
+                  are kept and stay available to other projects.
+                </p>
 
-                  <Button
-                    variant="dangerSoft"
-                    onClick={() => {
-                      setDeleteErrorMessage("");
-                      setIsDeleteDialogOpen(true);
-                    }}
-                    disabled={isSaving}
-                    icon={<Trash2 className="h-4 w-4" />}
-                    className="mt-4"
-                  >
-                    Delete project
-                  </Button>
-                </div>
-              </Section>
+                <Button
+                  variant="dangerSoft"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={isSaving}
+                  icon={<Trash2 className="h-4 w-4" />}
+                  className="mt-4"
+                >
+                  Delete project
+                </Button>
+              </DrawerCard>
             )}
-          </>
+          </div>
         )}
       </DetailsSideDrawer>
 
@@ -388,7 +373,6 @@ export function ProjectDetailsDrawer({
         variant="danger"
         isLoading={isDeleting}
         loadingLabel="Deleting..."
-        errorMessage={deleteErrorMessage}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={() => void confirmDeleteProject()}
       />

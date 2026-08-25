@@ -3,3 +3,9 @@
 # perpetually modified on Windows (phantom diff, empty git diff).
 /public/keycloak-theme/.gitignore  text eol=lf
 /src/keycloak-theme/.gitignore     text eol=lf
+
+# Normalize line endings: LF is canonical (Prettier writes LF).
+# Without this, core.autocrlf=true writes CRLF into the working tree while
+# blobs stay LF, so every Windows checkout fails `prettier --check` with
+# thousands of content-free "phantom" diffs.
+* text=auto eol=lf

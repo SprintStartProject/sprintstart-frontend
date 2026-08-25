@@ -2,11 +2,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleSlash,
-  Database,
   FileText,
   GitBranch,
   History,
   Loader2,
+  Ticket,
 } from "lucide-react";
 import type {
   AiSyncStatus,
@@ -34,7 +34,7 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
   JIRA: {
     name: "Jira Project Board",
     type: "Jira",
-    icon: Database,
+    icon: Ticket,
     description: "Indexes Jira issues, tasks, epics, comments and project-related metadata.",
   },
   UPLOAD: {
@@ -174,6 +174,58 @@ export function createJiraSourceFromInstance(
     lastCommitsSyncAt: null,
     // Jira's per-type sync timestamp; the backend maps it to the last update.
     lastIssuesSyncAt: status.lastIssuesSyncAt,
+    lastPullRequestsSyncAt: null,
+  };
+}
+
+/**
+ * Maps an UPLOAD status row from `/api/v1/ingestion-sources/status` into the
+ * full {@link DataSource} model rendered on the ingestion page.
+ */
+export function createUploadSourceFromInstance(status: SourceInstanceIngestionStatus): DataSource {
+  const meta = SOURCE_META.UPLOAD;
+  const backendStatus: BackendProjectSourceStatus =
+    status.enabled === false ? "DISABLED" : status.connectionStatus;
+  const hasErrors = status.failedCount > 0;
+  const hasNeverSynced = status.lastRunTime === null;
+
+  return {
+    sourceId: status.sourceId,
+    sourceSystem: "UPLOAD",
+    name: status.displayName,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled: true,
+    }),
+    artifacts: status.artifactCount,
+    lastSync: formatDateTime(status.lastRunTime),
+    nextSync: "Not available",
+    errors: status.failedCount,
+    description: meta.description,
+    lastRunAt: status.lastRunTime,
+    latestIngestedCount: status.ingestedCount,
+    latestUpdatedCount: status.updatedCount,
+    deletedCount: status.deletedCount,
+    totalArtifactCount: status.artifactCount,
+    runIds: [],
+    sharesSourceSystem: false,
+    failedItems: status.failedItems,
+    githubRepository: null,
+    jiraInstance: null,
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
     lastPullRequestsSyncAt: null,
   };
 }

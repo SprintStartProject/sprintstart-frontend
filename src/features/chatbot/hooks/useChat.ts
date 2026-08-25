@@ -73,6 +73,7 @@ export function useChat() {
     clearFilters,
     sendMessage,
     stopStreaming,
+    deleteChat: ctxDeleteChat,
   } = ctx;
 
   /**
@@ -129,6 +130,8 @@ export function useChat() {
     stopStreaming();
   }, [isActiveChatStreaming, stopStreaming]);
 
+  const deletingChatIdsRef = useRef<Set<string>>(new Set());
+
   /**
    * Loads messages from the backend when a chat is opened for the first time
    * (not yet cached in `messagesByChat`). If the user navigates away and
@@ -136,9 +139,11 @@ export function useChat() {
    */
   useEffect(() => {
     if (!chatId) return;
+    if (deletingChatIdsRef.current.has(chatId)) return;
+    if (chatsProjectId === selectedProjectId && !chats.some((chat) => chat.id === chatId)) return;
     if (messagesByChat[chatId]) return;
     void loadMessages(chatId);
-  }, [chatId, messagesByChat, loadMessages]);
+  }, [chatId, chats, chatsProjectId, selectedProjectId, messagesByChat, loadMessages]);
 
   // A5: Instead of reading scrollHeight/scrollTop on every token (which
   // forces a synchronous layout), an IntersectionObserver watches the bottom
@@ -209,16 +214,17 @@ export function useChat() {
   }, [chatId, messages, isAtBottom]);
 
   /**
-   * The most recent question the user asked in this chat, for the composer's history recall.
-   * Reads from the rendered messages rather than a separate store, so it survives a reload
-   * and always matches what is on screen.
+   * Every question the user has asked in this chat, oldest first — the composer's history.
+   *
+   * Reads from the rendered messages rather than a separate store, so it survives a reload and
+   * always matches what is on screen. Sending a message rebuilds it, which is also what ends
+   * an in-progress walk through it: see `ChatComposer`, where "am I browsing" is derived from
+   * the composer's own contents rather than remembered across a change like that.
    */
-  const lastUserPrompt = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "USER") return messages[i].content;
-    }
-    return "";
-  }, [messages]);
+  const promptHistory = useMemo(
+    () => messages.filter((message) => message.role === "USER").map((message) => message.content),
+    [messages],
+  );
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -254,9 +260,18 @@ export function useChat() {
     }
 
     draftChatIdRef.current = chatId;
+
+    // A composer filled from outside survives this first run. The dashboard's quick-chat card
+    // seeds `newRequest` and then navigates here with `state.newChat`, and loading the stored
+    // draft over it is what made the question — typed or picked from a suggestion — vanish on
+    // arrival. Deliberately narrow: it takes an explicit new-chat navigation *and* text already
+    // in the composer, so text merely left over from another chat is still replaced by this
+    // chat's own draft, which is the case the ref above exists for.
+    if (prevChatId === DRAFT_UNINITIALIZED && isNewChatRequest && newRequest) return;
+
     const saved = localStorage.getItem(DRAFT_KEY(chatId)) ?? "";
     setNewRequest(saved);
-  }, [chatId, newRequest, setNewRequest]);
+  }, [chatId, isNewChatRequest, newRequest, setNewRequest]);
 
   // Debounced save while the user types (no chat switch).
   useEffect(() => {
@@ -296,6 +311,25 @@ export function useChat() {
     [newRequest, addMessage, setNewRequest, chatId],
   );
 
+  const deleteChat = useCallback(
+    async (targetChatId: string) => {
+      deletingChatIdsRef.current.add(targetChatId);
+      try {
+        await ctxDeleteChat(targetChatId);
+        // Navigate only once the backend confirmed the delete. Firing first
+        // left the user on the empty /chat state looking at a chat that still
+        // existed whenever the DELETE failed and was rolled back.
+        if (targetChatId === chatId) {
+          void navigate("/chat", { replace: true, state: { newChat: true } });
+        }
+      } catch (err) {
+        deletingChatIdsRef.current.delete(targetChatId);
+        throw err;
+      }
+    },
+    [ctxDeleteChat, chatId, navigate],
+  );
+
   return {
     chats: sortedChats,
     chatId,
@@ -312,6 +346,7 @@ export function useChat() {
     handleSubmit,
     addMessage,
     stopStreaming: stopActiveStream,
+    deleteChat,
 
     newRequest,
     setNewRequest,
@@ -323,7 +358,7 @@ export function useChat() {
     // the prompt vanish.
     hasProject: selectedProjectId !== "",
 
-    lastUserPrompt,
+    promptHistory,
 
     isThinking: isThinking && isActiveChatStreaming,
     isStreaming: isStreaming && isActiveChatStreaming,

@@ -4,26 +4,30 @@ import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { FaqWidget } from "../../../src/features/faq/components/FaqWidget";
 
-vi.mock("../../../src/hooks/useFetch", () => ({
-  useFetch: () => ({
+vi.mock("../../../src/hooks/useLiveFetch", () => ({
+  useLiveFetch: () => ({
     data: {
       groups: [
         {
           groupId: "g1",
           count: 5,
+          title: "Resetting your password",
           question: "How do I reset my password?",
           topDocuments: [{ id: "d1", title: "Password Guide" }],
         },
         {
           groupId: "g2",
           count: 3,
+          title: "Inviting a teammate",
           question: "How do I invite a teammate?",
           topDocuments: [{ id: "d2", title: "Team Guide" }],
         },
       ],
     },
     loading: false,
+    revalidating: false,
     error: false,
+    refresh: () => {},
   }),
 }));
 
@@ -44,7 +48,7 @@ describe("FaqWidget Accessibility", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("How do I reset my password?")).toBeInTheDocument();
+      expect(screen.getByText("Resetting your password")).toBeInTheDocument();
     });
 
     expect(await axe(baseElement)).toHaveNoViolations();

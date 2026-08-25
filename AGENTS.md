@@ -143,6 +143,18 @@ The primitives already carry the focus ring, the 44px touch target, the `disable
 
 Legitimate exceptions are listed in [docs/FRONTEND_CODING_STANDARDS.md §4](./docs/FRONTEND_CODING_STANDARDS.md) — clickable cards and list rows, `aria-pressed` toggles and filter chips, `role="menuitem"` / combobox triggers, and the game surfaces. Everything else is a `Button`.
 
+### The Keycloak login theme does not inherit any of this for free
+
+`keycloak-theme/` (see §3) boots its own, separate React root — no `ThemeProvider`, no `AuthProvider`, nothing from `main-app.tsx`'s tree. Exactly one thing crosses that boundary automatically:
+
+- **CSS custom properties.** `styleLevelCustomization.tsx` imports `src/styles/index.css` directly, so `--color-app-*` tokens and the `.app-aurora`/`.app-bg-grid`/etc. keyframes are available as-is in `login.css`.
+
+Everything else — `ui/Button`, `ui/Input`, `SpotlightCard`, `AuroraBackground`, the animated `SidebarLogo` mark — is **not shared**. The login theme has its own hand-maintained, trimmed-down copies under `keycloak-theme/login/components/` (reading `localStorage` directly for things like `isAuroraEnabled`/`isTiltEnabled`, since there's no `ThemeContext` to read from there).
+
+**Rule:** if you touch a shared visual primitive or token — button radius/hover, input focus ring, card border/shadow/radius scale, the brand mark's animation, anything in `styles/index.css` — check whether `keycloak-theme/login/` has its own copy of that pattern (`login.css`, or a component under `login/components/`) and port the change there too. Nothing keeps the two in sync for you, and it's easy to ship a design change, see it everywhere it should be, and not notice the login/register page quietly kept the old version.
+
+**Deploying a login-theme change is a second step, in a second repo.** Editing `keycloak-theme/` only changes source here. To make it visible anywhere: `npm run build-keycloak-theme` (needs a local Maven + JDK — `keycloakify build` shells out to `mvn` to package the theme JAR) → copy the resulting `dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar` into `sprintstart-backend/infra/keycloak/themes/` (a **different repo**, the JAR is committed as a binary) → rebuild the Keycloak image there (`docker compose up --build keycloak` locally; `publish-keycloak.yml` in CI). There is no automated sync between the two repos — skip this and the running Keycloak instance keeps serving whatever theme JAR was last committed, however old, while the frontend repo's `keycloak-theme/` source quietly moves on without it.
+
 ---
 
 ## 8. Responsive design

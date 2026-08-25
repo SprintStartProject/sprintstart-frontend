@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Check, Edit, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Edit, FileText, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { useToast } from "../../../context/useToast";
 import { adminUserService } from "../../../services/adminUserService";
 import { projectService } from "../../../services/projectService";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
@@ -20,10 +21,10 @@ import type {
 } from "../types";
 import { AccessBadge } from "./Badges";
 import { DetailRow } from "./DetailRow";
+import { DrawerCard } from "./DrawerCard";
 import { EditableDetailRow } from "./EditableDetailRow";
 import { EditableSelectDetailRow } from "./EditableSelectDetailRow";
 import { ProjectAccessPanel } from "./ProjectAccessPanel";
-import { Section } from "./Section";
 import { UserStatusSection } from "./UserStatusSection";
 
 type UserDetailsDrawerProps = {
@@ -80,7 +81,10 @@ export function UserDetailsDrawer({
 }: UserDetailsDrawerProps) {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  // `saveError` now only carries the inline field validation (email / group
+  // required); the save request's own failure is surfaced as a toast.
   const [saveError, setSaveError] = useState<SaveErrorState | null>(null);
+  const toast = useToast();
   const [draftUserState, setDraftUserState] = useState<DraftUserState>(() => ({
     userId: user.id,
     draftUser: getUserEditFormState(user),
@@ -256,11 +260,9 @@ export function UserDetailsDrawer({
         draftUser: getUserEditFormState(updatedUser),
       });
       setEditingUserId(null);
+      toast.success("User saved");
     } catch (error) {
-      setSaveError({
-        userId: user.id,
-        message: error instanceof Error ? error.message : "User changes could not be saved.",
-      });
+      toast.error(error instanceof Error ? error.message : "Couldn't save the user changes.");
     } finally {
       setSavingUserId((currentSavingUserId) =>
         currentSavingUserId === user.id ? null : currentSavingUserId,
@@ -275,12 +277,24 @@ export function UserDetailsDrawer({
       title={visibleTitle}
       leading={
         <div className="flex shrink-0 items-center justify-center">
-          <UserAvatar
-            profileIcon={user.profileIcon}
-            fallbackName={`${user.firstName} ${user.lastName}`.trim()}
-            seed={user.id}
-            size={64}
-          />
+          {/* Smaller on mobile; original size from sm up. Same seed → identical
+              avatar, just rendered at two sizes. */}
+          <span className="sm:hidden">
+            <UserAvatar
+              profileIcon={user.profileIcon}
+              fallbackName={`${user.firstName} ${user.lastName}`.trim()}
+              seed={user.id}
+              size={48}
+            />
+          </span>
+          <span className="hidden sm:inline-flex">
+            <UserAvatar
+              profileIcon={user.profileIcon}
+              fallbackName={`${user.firstName} ${user.lastName}`.trim()}
+              seed={user.id}
+              size={64}
+            />
+          </span>
         </div>
       }
       badge={
@@ -312,7 +326,7 @@ export function UserDetailsDrawer({
       }
       footer={
         isEditing ? (
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:justify-end">
             <Button variant="secondary" onClick={cancelEditing} disabled={isSaving}>
               Cancel
             </Button>
@@ -329,76 +343,79 @@ export function UserDetailsDrawer({
         ) : undefined
       }
     >
-      <UserStatusSection
-        isEditing={isEditing}
-        enabled={visibleEnabled}
-        onboardingCompleted={user.hasCompletedOnboarding}
-        disabled={isSaving}
-        onEnabledChange={updateDraftEnabled}
-      />
-
-      <Section>
-        {saveErrorMessage && (
-          <div className="mb-5 rounded-2xl border border-app-danger-border bg-app-danger-bg p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-app-danger-text">
-              <AlertCircle className="h-4 w-4" />
-              User changes could not be saved
-            </div>
-            <p className="mt-1 text-sm text-app-danger-text">{saveErrorMessage}</p>
-          </div>
-        )}
-
-        {isEditing ? (
-          <div>
-            <ReadonlyEditRow label="Username" value={user.username} />
-            <EditableDetailRow
-              label="Email"
-              value={draftUser.email}
-              onChange={(value) => updateDraftField("email", value)}
-              type="email"
-              autoComplete="email"
-            />
-            <EditableDetailRow
-              label="First name"
-              value={draftUser.firstName}
-              onChange={(value) => updateDraftField("firstName", value)}
-              autoComplete="given-name"
-            />
-            <EditableDetailRow
-              label="Last name"
-              value={draftUser.lastName}
-              onChange={(value) => updateDraftField("lastName", value)}
-              autoComplete="family-name"
-            />
-            <EditableSelectDetailRow
-              label="Role"
-              value={draftUser.permissionGroup}
-              onChange={(value) => updateDraftField("permissionGroup", value)}
-              options={PERMISSION_GROUP_OPTIONS}
-            />
-            <ReadonlyEditRow label="User ID" value={user.id} mono />
-          </div>
-        ) : (
-          <dl>
-            <DetailRow label="Email" value={user.email} />
-            <DetailRow label="Username" value={user.username} />
-            <DetailRow label="First name" value={user.firstName} />
-            <DetailRow label="Last name" value={user.lastName} />
-            <DetailRow label="Role" value={user.permissionGroup} />
-            <DetailRow label="User ID" value={user.id} mono />
-          </dl>
-        )}
-      </Section>
-
-      <Section>
-        <ProjectAccessPanel
-          assignedProjects={enrichedAssignedProjects}
-          availableProjects={availableProjects}
-          onOpenProjectDetails={onOpenProjectDetails}
-          onAssignProject={assignProjectToUser}
-          onRemoveProject={removeProjectFromUser}
+      <div className="space-y-4 sm:space-y-5">
+        <UserStatusSection
+          isEditing={isEditing}
+          enabled={visibleEnabled}
+          onboardingCompleted={user.hasCompletedOnboarding}
+          disabled={isSaving}
+          onEnabledChange={updateDraftEnabled}
+          index={0}
         />
-      </Section>
+
+        <DrawerCard label="Details" icon={FileText} index={1}>
+          {saveErrorMessage && (
+            <div className="mb-5 rounded-2xl border border-app-danger-border bg-app-danger-bg p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-app-danger-text">
+                <AlertCircle className="h-4 w-4" />
+                User changes could not be saved
+              </div>
+              <p className="mt-1 text-sm text-app-danger-text">{saveErrorMessage}</p>
+            </div>
+          )}
+
+          {isEditing ? (
+            <div>
+              <ReadonlyEditRow label="Username" value={user.username} />
+              <EditableDetailRow
+                label="Email"
+                value={draftUser.email}
+                onChange={(value) => updateDraftField("email", value)}
+                type="email"
+                autoComplete="email"
+              />
+              <EditableDetailRow
+                label="First name"
+                value={draftUser.firstName}
+                onChange={(value) => updateDraftField("firstName", value)}
+                autoComplete="given-name"
+              />
+              <EditableDetailRow
+                label="Last name"
+                value={draftUser.lastName}
+                onChange={(value) => updateDraftField("lastName", value)}
+                autoComplete="family-name"
+              />
+              <EditableSelectDetailRow
+                label="Role"
+                value={draftUser.permissionGroup}
+                onChange={(value) => updateDraftField("permissionGroup", value)}
+                options={PERMISSION_GROUP_OPTIONS}
+              />
+              <ReadonlyEditRow label="User ID" value={user.id} mono />
+            </div>
+          ) : (
+            <dl>
+              <DetailRow label="Email" value={user.email} />
+              <DetailRow label="Username" value={user.username} />
+              <DetailRow label="First name" value={user.firstName} />
+              <DetailRow label="Last name" value={user.lastName} />
+              <DetailRow label="Role" value={user.permissionGroup} />
+              <DetailRow label="User ID" value={user.id} mono />
+            </dl>
+          )}
+        </DrawerCard>
+
+        <DrawerCard bare index={2}>
+          <ProjectAccessPanel
+            assignedProjects={enrichedAssignedProjects}
+            availableProjects={availableProjects}
+            onOpenProjectDetails={onOpenProjectDetails}
+            onAssignProject={assignProjectToUser}
+            onRemoveProject={removeProjectFromUser}
+          />
+        </DrawerCard>
+      </div>
     </DetailsSideDrawer>
   );
 }

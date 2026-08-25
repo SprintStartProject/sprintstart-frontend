@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock3,
   Database,
   GitBranch,
   Loader2,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
+import { DrawerCard } from "../../admin/components/DrawerCard";
 import {
   formatDateTime,
   formatJiraInstanceDomain,
@@ -19,6 +21,7 @@ import {
   getRunStatusTone,
   getSourceLabel,
   isRunInProgress,
+  SOURCE_META,
 } from "../data.ts";
 import type { AiSyncStatus, IngestionRun } from "../types.ts";
 
@@ -56,6 +59,9 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
   const duration = formatDuration(run.startedAt, run.finishedAt, run.status);
   const repoLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
   const originRow = buildOriginRow(run);
+  // Hero icon follows the run's source system (GitHub → GitBranch, Jira → Ticket,
+  // Upload → FileText) so a Jira run never shows the GitHub glyph.
+  const SourceIcon = SOURCE_META[run.sourceSystem].icon;
 
   return (
     <DetailsSideDrawer
@@ -67,7 +73,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
       showOverlay
       leading={
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <GitBranch className="h-6 w-6" />
+          <SourceIcon className="h-6 w-6" />
         </div>
       }
       badge={
@@ -88,7 +94,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
         </div>
       )}
 
-      <Section title="Result">
+      <DrawerCard label="Result" icon={Database} index={0}>
         <div className="grid grid-cols-2 gap-2.5">
           <Tile label="Ingested" icon={Database}>
             {formatNumber(run.ingestedCount)}
@@ -103,38 +109,50 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
             {formatNumber(run.failedCount)}
           </Tile>
         </div>
-      </Section>
+      </DrawerCard>
 
-      <Section title="Pipeline">
-        <ol className="flex flex-col">
-          {buildStages(run).map((stage, index, all) => (
-            <Stage key={stage.title} stage={stage} isLast={index === all.length - 1} />
-          ))}
-        </ol>
-      </Section>
+      {/* On a wide (lg) drawer the pipeline timeline and the run information sit
+          side by side; they stack on narrower widths. */}
+      <div className="mt-4 grid gap-4 sm:mt-5 lg:grid-cols-2">
+        <DrawerCard label="Information" icon={Clock3} index={1}>
+          <dl className="-my-1">
+            <InfoRow label="Repository" value={repoLabel} />
+            {originRow && <InfoRow label={originRow.label} value={originRow.value} />}
+            <InfoRow label="Started" value={formatDateTime(run.startedAt)} />
+            <InfoRow
+              label="Finished"
+              value={
+                run.finishedAt
+                  ? formatDateTime(run.finishedAt)
+                  : isRunInProgress(run.status)
+                    ? "In progress"
+                    : "Not reported"
+              }
+            />
+            <InfoRow label="Duration" value={duration} />
+            <InfoRow label="Run ID" value={run.runId} mono />
+          </dl>
+        </DrawerCard>
 
-      <Section title="Timing">
-        <dl className="overflow-hidden rounded-xl border border-app-border">
-          <InfoRow label="Repository" value={repoLabel} />
-          {originRow && <InfoRow label={originRow.label} value={originRow.value} />}
-          <InfoRow label="Started" value={formatDateTime(run.startedAt)} />
-          <InfoRow
-            label="Finished"
-            value={
-              run.finishedAt
-                ? formatDateTime(run.finishedAt)
-                : isRunInProgress(run.status)
-                  ? "In progress"
-                  : "Not reported"
-            }
-          />
-          <InfoRow label="Duration" value={duration} />
-          <InfoRow label="Run ID" value={run.runId} mono />
-        </dl>
-      </Section>
+        {/* `flex flex-col` + a flex-1 list lets the timeline stretch to the
+            information card's height, so its connecting lines fill the card
+            instead of leaving a gap below the last stage. */}
+        <DrawerCard label="Pipeline" icon={GitBranch} index={2} className="flex flex-col">
+          <ol className="flex flex-1 flex-col">
+            {buildStages(run).map((stage, index, all) => (
+              <Stage key={stage.title} stage={stage} isLast={index === all.length - 1} />
+            ))}
+          </ol>
+        </DrawerCard>
+      </div>
 
       {run.failedItems.length > 0 && (
-        <Section title={`Failed items (${run.failedItems.length})`}>
+        <DrawerCard
+          label={`Failed items (${run.failedItems.length})`}
+          icon={XCircle}
+          index={3}
+          className="mt-4 sm:mt-5"
+        >
           <div className="space-y-3">
             {run.failedItems.map((item) => (
               <div
@@ -148,7 +166,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
               </div>
             ))}
           </div>
-        </Section>
+        </DrawerCard>
       )}
     </DetailsSideDrawer>
   );
@@ -242,17 +260,6 @@ function Chip({
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-8 border-t border-app-border pt-6 first:mt-0 first:border-t-0 first:pt-0">
-      <h3 className="mb-3 text-sm font-semibold tracking-wide text-app-text-subtle uppercase">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
 function Tile({
   label,
   icon: Icon,
@@ -290,26 +297,28 @@ const STAGE_DOT: Record<StageState, string> = {
 
 function Stage({ stage, isLast }: { stage: StageInfo; isLast: boolean }) {
   return (
-    <li className="flex gap-3">
+    // Non-last stages grow so the connecting line stretches and the timeline
+    // fills the card height; a min-height keeps each stage comfortably spaced.
+    <li className={`flex gap-3.5 ${isLast ? "" : "min-h-16 flex-1"}`}>
       <div className="flex flex-col items-center">
         <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${STAGE_DOT[stage.state]}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${STAGE_DOT[stage.state]}`}
         >
           {stage.state === "ok" ? (
-            <CheckCircle2 className="h-3.5 w-3.5" />
+            <CheckCircle2 className="h-4 w-4" />
           ) : stage.state === "run" ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : stage.state === "warn" ? (
-            <AlertTriangle className="h-3.5 w-3.5" />
+            <AlertTriangle className="h-4 w-4" />
           ) : (
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
           )}
         </span>
-        {!isLast && <span className="my-0.5 w-0.5 flex-1 bg-app-border" />}
+        {!isLast && <span className="my-1 w-0.5 flex-1 bg-app-border" />}
       </div>
-      <div className="pb-4">
-        <p className="text-[13px] font-semibold text-app-text">{stage.title}</p>
-        <p className="text-xs text-app-text-subtle">{stage.meta}</p>
+      <div className="pt-1 pb-4">
+        <p className="text-sm font-semibold text-app-text">{stage.title}</p>
+        <p className="mt-0.5 text-xs text-app-text-subtle">{stage.meta}</p>
       </div>
     </li>
   );
@@ -317,7 +326,7 @@ function Stage({ stage, isLast }: { stage: StageInfo; isLast: boolean }) {
 
 function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5 first:border-t-0">
+    <div className="flex items-center gap-3 border-t border-app-border py-2.5 first:border-t-0">
       <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
       <dd
         className={`min-w-0 text-[13px] font-semibold break-words text-app-text ${

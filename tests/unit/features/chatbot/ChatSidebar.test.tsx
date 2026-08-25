@@ -78,4 +78,46 @@ describe("ChatSidebar", () => {
 
     expect(screen.getByText(/No chats match/u)).toBeInTheDocument();
   });
+
+  it("opens delete confirmation modal and calls onDeleteChat on confirm", async () => {
+    const user = userEvent.setup();
+    const onDeleteChat = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} onDeleteChat={onDeleteChat} />
+      </MemoryRouter>,
+    );
+
+    const deleteBtn = screen.getByTestId("chat-delete-button-chat1");
+    expect(deleteBtn).toBeInTheDocument();
+
+    await user.click(deleteBtn);
+
+    // Modal should be open
+    expect(screen.getByText("Delete conversation?")).toBeInTheDocument();
+    expect(screen.getByText(/This will permanently delete "First chat"/u)).toBeInTheDocument();
+
+    // Click confirm
+    const confirmBtn = screen.getByTestId("confirm-delete-chat-btn");
+    await user.click(confirmBtn);
+
+    expect(onDeleteChat).toHaveBeenCalledWith("chat1");
+  });
+
+  it("cancels deletion when cancel button is clicked", async () => {
+    const user = userEvent.setup();
+    const onDeleteChat = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} onDeleteChat={onDeleteChat} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("chat-delete-button-chat1"));
+    expect(screen.getByText("Delete conversation?")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("cancel-delete-chat-btn"));
+    expect(screen.queryByText("Delete conversation?")).not.toBeInTheDocument();
+    expect(onDeleteChat).not.toHaveBeenCalled();
+  });
 });

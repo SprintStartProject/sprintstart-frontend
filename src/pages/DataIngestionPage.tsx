@@ -29,6 +29,7 @@ import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
   createJiraSourceFromInstance,
+  createUploadSourceFromInstance,
   deriveSourceStatus,
   formatDateTime,
   getBackendSourceStatusLabel,
@@ -56,6 +57,7 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
 import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/ingestionService.ts";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import {
   configureAllGithubRepositories,
@@ -238,12 +240,13 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira cards are built solely from the connector-neutral status rows (the
-    // `jiraSources` path on the page), which carry Jira's authoritative health
-    // and counters. The project source list now also exposes Jira instances
-    // (for the admin/project-scoped source lists), so emitting a card here too
-    // would double every connected Jira instance.
+    // Jira cards are built solely from the connector-neutral status rows.
     if (sourceSystem === "JIRA") return [];
+    // Skip UPLOAD only when an authoritative status row already exists so the card
+    // does not vanish when artifact count is 0 or when run status fallback is needed.
+    if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
+      return [];
+    }
 
     const meta = SOURCE_META[sourceSystem];
     const latestRun = latestRunBySource.get(sourceSystem);
@@ -367,6 +370,29 @@ function hasSourceId(sources: DataSource[], sourceId: string) {
   return sources.some((source) => source.sourceId === sourceId);
 }
 
+/**
+ * Turns a `?sourceId=` value into the id this page actually selects by.
+ *
+ * A card's id is its project-source id, but callers do not always have one. The knowledge-gap
+ * detail page links here from a gap, and a gap identifies itself by component — `owner/repo`,
+ * which is the GitHub repository's full name. Accepting that spelling too is what lets its
+ * "Update data source" button open the repository rather than dropping the reader on the page
+ * and leaving them to find it.
+ *
+ * Case-insensitive on the component, matching {@link matchSourceInstance}: GitHub treats owner
+ * and repository names that way, and the component string reaches us from the AI service.
+ */
+function resolveRequestedSourceId(sources: DataSource[], requested: string): string | null {
+  if (requested.length === 0) return null;
+  if (hasSourceId(sources, requested)) return requested;
+
+  const byComponent = sources.find(
+    (source) => source.githubRepository?.fullName.toLowerCase() === requested.toLowerCase(),
+  );
+
+  return byComponent?.sourceId ?? null;
+}
+
 const STATUS_BADGE_TONE = {
   success: "border-app-success-border bg-app-success-bg text-app-success-text",
   brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
@@ -430,14 +456,15 @@ export function DataIngestionPage() {
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
   const [syncSettingsProvider, setSyncSettingsProvider] = useState<SyncSettingsProvider>("github");
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
-  const [connectSuccessMessage, setConnectSuccessMessage] = useState<string | null>(null);
   const [pollingUntil, setPollingUntil] = useState<number | null>(null);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [connectorsLoadingState, setConnectorsLoadingState] = useState<LoadingState>("idle");
+  // Kept for the connectors *load* failure (shown inline in the connectors
+  // modal); the enable/disable toggle reports its outcome via a toast.
   const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<string | null>(null);
   const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
   const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(null);
-  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
+  const toast = useToast();
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
   // search param is still honoured so deep links from the admin view land on
@@ -721,7 +748,11 @@ export function DataIngestionPage() {
         ),
       );
 
-    return [...githubAndUpload, ...jiraSources];
+    const uploadSources = sourceInstances
+      .filter((status) => status.sourceSystem === "UPLOAD")
+      .map((status) => createUploadSourceFromInstance(status));
+
+    return [...githubAndUpload, ...jiraSources, ...uploadSources];
   }, [connectorEnabledById, jiraInstances, projectSources, runs, sourceInstances]);
 
   const totalArtifactCount = useMemo(
@@ -735,16 +766,15 @@ export function DataIngestionPage() {
     void Promise.resolve().then(() => {
       if (!isMounted) return;
 
-      const requestedSourceExists =
-        requestedSourceId.length > 0 && hasSourceId(sources, requestedSourceId);
+      const resolvedSourceId = resolveRequestedSourceId(sources, requestedSourceId);
 
-      if (requestedSourceExists) {
+      if (resolvedSourceId) {
         setActiveSection("sources");
       }
 
       setSelectedSourceId((currentSourceId) => {
-        if (requestedSourceExists) {
-          return requestedSourceId;
+        if (resolvedSourceId) {
+          return resolvedSourceId;
         }
 
         // Keep the current selection while the list is transiently empty (an
@@ -881,28 +911,28 @@ export function DataIngestionPage() {
     }
   }, [connectorsLoadingState, hasLoadedConnectors, loadConnectors]);
 
-  const handleToggleConnectorEnabled = useCallback(async (connector: ConnectorListItem) => {
-    setTogglingConnectorId(connector.id);
-    setConnectorsErrorMessage(null);
+  const handleToggleConnectorEnabled = useCallback(
+    async (connector: ConnectorListItem) => {
+      setTogglingConnectorId(connector.id);
 
-    try {
-      const response = await connectorService.setConnectorEnabled(connector.id, !connector.enabled);
+      try {
+        const response = await connectorService.setConnectorEnabled(
+          connector.id,
+          !connector.enabled,
+        );
 
-      setConnectors((current) =>
-        current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
-      );
-    } catch (error) {
-      setConnectorsErrorMessage(
-        error instanceof Error ? error.message : "Failed to update connector",
-      );
-    } finally {
-      setTogglingConnectorId(null);
-    }
-  }, []);
-
-  const handleToggleConnectorSources = useCallback((connector: ConnectorListItem) => {
-    setSelectedConnectorId((current) => (current === connector.id ? null : connector.id));
-  }, []);
+        setConnectors((current) =>
+          current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
+        );
+        toast.success(connector.enabled ? "Connector disabled" : "Connector enabled");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't update the connector.");
+      } finally {
+        setTogglingConnectorId(null);
+      }
+    },
+    [toast],
+  );
 
   const selectedSource = useMemo(() => {
     if (!selectedSourceId) return null;
@@ -928,12 +958,11 @@ export function DataIngestionPage() {
   };
 
   // Runs after the wizard connects a source (GitHub repositories or a Jira
-  // instance): surface a success message, kick the polling window and refresh
-  // the page's data.
+  // instance): kick the polling window and refresh the page's data (the modal
+  // owns the confirming toast).
   const handleDiscoveryConnected = useCallback(() => {
-    setConnectSuccessMessage(
-      `Selected sources are connecting to ${selectedProject?.name ?? "the project"}. Initial ingestion is running in the background.`,
-    );
+    // The Add-source modal owns the "connected" toast; this only starts the
+    // polling window and jumps to the sources list.
     setPollingUntil(Date.now() + 60000);
     setActiveSection("sources");
 
@@ -947,27 +976,25 @@ export function DataIngestionPage() {
       void reloadSourceStatuses();
       setProjectDataVersion((version) => version + 1);
     }, 1500);
-  }, [loadData, reloadSourceStatuses, reloadProjects, selectedProject]);
+  }, [loadData, reloadSourceStatuses, reloadProjects]);
 
   // Shared post-update refresh: polling window + an immediate and a delayed
   // reload, so a just-started run appears without a manual refresh.
-  const refreshAfterUpdate = useCallback(
-    (startedMessage: string) => {
-      setPollingUntil(Date.now() + 60000);
-      setConnectSuccessMessage(startedMessage);
+  const refreshAfterUpdate = useCallback(() => {
+    // The drawer that triggers the update owns the "Update started" toast, so
+    // this only kicks the polling window and refreshes the page data.
+    setPollingUntil(Date.now() + 60000);
 
-      void Promise.all([loadData(false), reloadSourceStatuses()]).then(() =>
-        setProjectDataVersion((version) => version + 1),
-      );
+    void Promise.all([loadData(false), reloadSourceStatuses()]).then(() =>
+      setProjectDataVersion((version) => version + 1),
+    );
 
-      window.setTimeout(() => {
-        void loadData(false);
-        void reloadSourceStatuses();
-        setProjectDataVersion((version) => version + 1);
-      }, 1500);
-    },
-    [loadData, reloadSourceStatuses],
-  );
+    window.setTimeout(() => {
+      void loadData(false);
+      void reloadSourceStatuses();
+      setProjectDataVersion((version) => version + 1);
+    }, 1500);
+  }, [loadData, reloadSourceStatuses]);
 
   const handleUpdateSource = useCallback(
     async (source: DataSource) => {
@@ -979,7 +1006,7 @@ export function DataIngestionPage() {
         await updateJiraInstance({
           instanceUrl: source.jiraInstance.instanceUrl,
         });
-        refreshAfterUpdate(`Update for ${source.name} started.`);
+        refreshAfterUpdate();
         return;
       }
 
@@ -988,7 +1015,7 @@ export function DataIngestionPage() {
       }
 
       await updateGithubRepository(source.githubRepository);
-      refreshAfterUpdate(`Update for ${source.githubRepository.fullName} started.`);
+      refreshAfterUpdate();
     },
     [refreshAfterUpdate],
   );
@@ -1097,9 +1124,6 @@ export function DataIngestionPage() {
         await removeJiraInstanceFromProject(source.jiraInstance.instanceUrl, selectedProjectId);
 
         setSelectedSourceId(null);
-        setConnectSuccessMessage(
-          `${source.name} was removed from ${selectedProject?.name ?? "the project"}.`,
-        );
         await refreshSourceDetails();
         return;
       }
@@ -1113,12 +1137,9 @@ export function DataIngestionPage() {
       await removeRepositoryFromProject(repositoryId, selectedProjectId);
 
       setSelectedSourceId(null);
-      setConnectSuccessMessage(
-        `${source.githubRepository?.fullName ?? "Repository"} was removed from ${selectedProject?.name ?? "the project"}.`,
-      );
       await refreshSourceDetails();
     },
-    [refreshSourceDetails, selectedProject?.name, selectedProjectId],
+    [refreshSourceDetails, selectedProjectId],
   );
 
   const isLoading = loadingState === "loading";
@@ -1200,20 +1221,6 @@ export function DataIngestionPage() {
               </div>
             )}
 
-            {connectSuccessMessage && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-app-success-border bg-app-success-bg px-5 py-4 text-sm text-app-success-text sm:flex-row sm:items-center sm:justify-between">
-                <p>{connectSuccessMessage}</p>
-
-                <button
-                  type="button"
-                  onClick={() => setConnectSuccessMessage(null)}
-                  className="self-start rounded-lg px-2 py-1 text-xs font-semibold transition hover:bg-app-surface sm:self-auto"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-
             <DataIngestionSectionFilter
               active={activeSection}
               onChange={handleSectionChange}
@@ -1267,14 +1274,15 @@ export function DataIngestionPage() {
                       </div>
 
                       {canManageGithubSyncSettings ? (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={handleOpenConnectorsModal}
                             icon={<Plug className="h-4 w-4" />}
+                            className="w-full sm:w-auto"
                           >
-                            Manage connectors
+                            <span className="min-w-0 truncate">Manage connectors</span>
                           </Button>
 
                           {hasGithubSources || hasJiraSources ? (
@@ -1286,8 +1294,9 @@ export function DataIngestionPage() {
                                 setIsSyncSettingsModalOpen(true);
                               }}
                               icon={<CalendarClock className="h-4 w-4" />}
+                              className="w-full sm:w-auto"
                             >
-                              Manage sync settings
+                              <span className="min-w-0 truncate">Manage sync settings</span>
                             </Button>
                           ) : null}
                         </div>
@@ -1396,7 +1405,7 @@ export function DataIngestionPage() {
         isOpen={isConnectorsModalOpen}
         title="Connectors"
         description="Enable or disable a connector, and choose which sources are in scope for this project."
-        size="lg"
+        size="xl"
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
         onClose={() => setIsConnectorsModalOpen(false)}
       >
@@ -1412,12 +1421,10 @@ export function DataIngestionPage() {
           <ConnectorList
             connectors={connectors}
             togglingConnectorId={togglingConnectorId}
-            expandedConnectorId={selectedConnectorId}
             projectId={selectedProjectId}
             onToggleEnabled={(connector) => {
               void handleToggleConnectorEnabled(connector);
             }}
-            onToggleSources={handleToggleConnectorSources}
             onSourcesSaved={() => {
               void loadConnectors();
               void reloadSourceStatuses();

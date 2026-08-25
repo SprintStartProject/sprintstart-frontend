@@ -1,9 +1,11 @@
 import {
   ArrowUp,
+  CalendarClock,
   Clock3,
   Database,
   GitBranch,
   RefreshCw,
+  Ticket,
   Unlink,
   XCircle,
   type LucideIcon,
@@ -11,9 +13,11 @@ import {
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
+import { useToast } from "../../../context/useToast";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
+import { DrawerCard } from "../../admin/components/DrawerCard.tsx";
 import type {
   ConfigureGithubRepositoryRequest,
   GithubRepositoryConfig,
@@ -91,9 +95,7 @@ export function SourceDetailsPanel({
   const [enabledState, setEnabledState] = useState<LoadingState>("idle");
   const [unlinkState, setUnlinkState] = useState<LoadingState>("idle");
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
-  const [unlinkError, setUnlinkError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
   const Icon = SOURCE_META[source.sourceSystem].icon;
   const repository = source.githubRepository;
   const jira = source.jiraInstance ?? null;
@@ -153,23 +155,19 @@ export function SourceDetailsPanel({
       if (!repository || !onSetSourceEnabled) return;
 
       setEnabledState("loading");
-      setMessage(null);
-      setErrorMessage(null);
 
       try {
         await onSetSourceEnabled(repository, enabled);
         setEnabledState("success");
-        setMessage(
-          enabled
-            ? "Source enabled. It is included in ingestion again."
-            : "Source disabled. It is excluded from ingestion.",
-        );
+        toast.success(enabled ? "Source enabled" : "Source disabled", {
+          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+        });
       } catch (error) {
         setEnabledState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Failed to update the source.");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
       }
     },
-    [onSetSourceEnabled, repository],
+    [onSetSourceEnabled, repository, toast],
   );
 
   const handleToggleJiraEnabled = useCallback(
@@ -177,23 +175,19 @@ export function SourceDetailsPanel({
       if (!jira || !onSetJiraSourceEnabled) return;
 
       setEnabledState("loading");
-      setMessage(null);
-      setErrorMessage(null);
 
       try {
         await onSetJiraSourceEnabled(jira.instanceUrl, enabled);
         setEnabledState("success");
-        setMessage(
-          enabled
-            ? "Source enabled. It is included in ingestion again."
-            : "Source disabled. It is excluded from ingestion.",
-        );
+        toast.success(enabled ? "Source enabled" : "Source disabled", {
+          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+        });
       } catch (error) {
         setEnabledState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Failed to update the source.");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
       }
     },
-    [jira, onSetJiraSourceEnabled],
+    [jira, onSetJiraSourceEnabled, toast],
   );
 
   const loadRepositoryConfig = useCallback(async () => {
@@ -219,55 +213,51 @@ export function SourceDetailsPanel({
     if (!canUpdate || !onUpdateSource) return;
 
     setUpdateState("loading");
-    setMessage(null);
-    setErrorMessage(null);
 
     try {
       await onUpdateSource(source);
       setUpdateState("success");
-      setMessage("Update started. Details will refresh while ingestion runs.");
+      toast.success("Update started", {
+        description: "Details refresh while ingestion runs.",
+      });
     } catch (error) {
       setUpdateState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Failed to start the update");
+      toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
     }
-  }, [canUpdate, onUpdateSource, source]);
+  }, [canUpdate, onUpdateSource, source, toast]);
 
   const handleConfirmUnlink = useCallback(async () => {
     if (!onUnlinkSource) return;
 
     setUnlinkState("loading");
-    setUnlinkError(null);
 
     try {
       await onUnlinkSource(source);
       // The parent closes this drawer on success, so there is nothing to reset
-      // here — the component unmounts.
+      // here — the component unmounts; the confirming toast lives at the root.
+      toast.success("Removed from project");
     } catch (error) {
       setUnlinkState("error");
-      setUnlinkError(
-        error instanceof Error ? error.message : "Failed to remove the source from the project.",
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't remove the source from the project.",
       );
     }
-  }, [onUnlinkSource, source]);
+  }, [onUnlinkSource, source, toast]);
 
   const handleRefreshDetails = useCallback(async () => {
     if (!onRefreshDetails) return;
 
     setRefreshState("loading");
-    setMessage(null);
-    setErrorMessage(null);
 
     try {
       await onRefreshDetails();
       setRefreshState("success");
-      setMessage("Repository details refreshed.");
+      toast.success("Repository details refreshed");
     } catch (error) {
       setRefreshState("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to refresh repository details",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't refresh repository details.");
     }
-  }, [onRefreshDetails]);
+  }, [onRefreshDetails, toast]);
 
   const details = useMemo(() => {
     const artifactCount = source.totalArtifactCount ?? source.artifacts;
@@ -310,7 +300,7 @@ export function SourceDetailsPanel({
         </>
       }
       footer={
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid w-full grid-cols-2 gap-3">
           <Button
             variant="primary"
             onClick={() => {
@@ -318,7 +308,7 @@ export function SourceDetailsPanel({
             }}
             disabled={!canUpdate || isRefreshing}
             loading={isUpdating}
-            icon={isJira ? <Database className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+            icon={isJira ? <Ticket className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
             title={
               canUpdate
                 ? undefined
@@ -344,11 +334,7 @@ export function SourceDetailsPanel({
         </div>
       }
     >
-      {message && <Message tone="success">{message}</Message>}
-
-      {errorMessage && <Message tone="warning">{errorMessage}</Message>}
-
-      <Section title="Ingestion">
+      <DrawerCard label="Ingestion" icon={Database} index={0}>
         {source.statusView.state === "syncing" && (
           <div className="mb-3 rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-3">
             <p className="flex items-center gap-2 text-sm font-medium text-app-brand-text">
@@ -376,21 +362,21 @@ export function SourceDetailsPanel({
             {formatNumber(details.errors)}
           </Tile>
         </div>
-      </Section>
+      </DrawerCard>
 
       {isJira && jira && (
-        <Section title="Instance">
-          <dl className="overflow-hidden rounded-xl border border-app-border">
+        <DrawerCard label="Instance" icon={Icon} index={1} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
             <InfoRow label="Display name" value={jira.displayName} />
             <InfoLinkRow label="URL" value={jira.instanceUrl} />
             {canToggleJiraEnabled ? (
-              <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5">
+              <div className="flex items-center gap-3 border-t border-app-border py-2.5">
                 <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
                 <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <span className="text-[13px] font-semibold text-app-text">
-                    {jiraEnabled ? "Enabled" : "Disabled"}
+                    Include in ingestion
                     <span className="ml-1 font-normal text-app-text-subtle">
-                      · {jiraEnabled ? "included in" : "excluded from"} ingestion
+                      · sync this instance into the knowledge base
                     </span>
                   </span>
                   <AccountEnabledToggle
@@ -407,12 +393,12 @@ export function SourceDetailsPanel({
               <InfoRow label="Source" value={jiraEnabled ? "Enabled" : "Disabled"} />
             )}
           </dl>
-        </Section>
+        </DrawerCard>
       )}
 
       {!isJira && (
-        <Section title="Repository">
-          <dl className="overflow-hidden rounded-xl border border-app-border">
+        <DrawerCard label="Repository" icon={GitBranch} index={1} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
             <InfoRow label="Full name" value={repository?.fullName} />
             <InfoRow label="Owner" value={repository?.owner} />
             <InfoLinkRow label="URL" value={repository?.url} />
@@ -422,13 +408,13 @@ export function SourceDetailsPanel({
               mono
             />
             {canToggleEnabled && repository ? (
-              <div className="flex items-center gap-3 border-t border-app-border px-4 py-2.5">
+              <div className="flex items-center gap-3 border-t border-app-border py-2.5">
                 <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
                 <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <span className="text-[13px] font-semibold text-app-text">
-                    {repository.enabled === false ? "Disabled" : "Enabled"}
+                    Include in ingestion
                     <span className="ml-1 font-normal text-app-text-subtle">
-                      · {repository.enabled === false ? "excluded from" : "included in"} ingestion
+                      · sync this repository into the knowledge base
                     </span>
                   </span>
                   <AccountEnabledToggle
@@ -445,12 +431,12 @@ export function SourceDetailsPanel({
               <InfoRow label="Source" value={formatEnabled(repository?.enabled)} />
             )}
           </dl>
-        </Section>
+        </DrawerCard>
       )}
 
       {hasResourceSyncTimes && (
-        <Section title="Last Synced">
-          <dl className="overflow-hidden rounded-xl border border-app-border">
+        <DrawerCard label="Last Synced" icon={Clock3} index={2} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
             {isJira ? (
               <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
             ) : (
@@ -464,21 +450,21 @@ export function SourceDetailsPanel({
               </>
             )}
           </dl>
-        </Section>
+        </DrawerCard>
       )}
 
       {canManageRepositoryConfig && repository && (
-        <Section title="Sync Schedule">
+        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
           <GithubRepositorySyncSettings
             loadKey={repository.fullName}
             loadConfig={loadRepositoryConfig}
             onSave={saveRepositoryConfig}
           />
-        </Section>
+        </DrawerCard>
       )}
 
       {canManageJiraConfig && jira && onLoadJiraConfig && onSaveJiraConfig && (
-        <Section title="Sync Schedule">
+        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
           {/* Same control as GitHub: the Jira instance sync schedule shares the
               identical schedule contract, only the load/save endpoints differ. */}
           <GithubRepositorySyncSettings
@@ -489,11 +475,11 @@ export function SourceDetailsPanel({
             autoUpdateOffText="Due checks only mark this Jira instance out of date."
             toggleAriaLabel="Toggle Jira instance auto update"
           />
-        </Section>
+        </DrawerCard>
       )}
 
       {source.failedItems.length > 0 && (
-        <Section title="Failed Items">
+        <DrawerCard label="Failed Items" icon={XCircle} index={4} className="mt-4 sm:mt-5">
           <div className="space-y-3">
             {source.failedItems.map((item) => (
               <div
@@ -507,27 +493,31 @@ export function SourceDetailsPanel({
               </div>
             ))}
           </div>
-        </Section>
+        </DrawerCard>
       )}
 
       {canUnlinkSource && (
-        <Section title="Project link">
-          <div className="rounded-xl border border-app-border px-4 py-3">
-            <p className="text-sm text-app-text-muted">
-              Remove this {removableNoun} from the current project. The {removableNoun} and its
-              artifacts are kept. You can re-link it later.
-            </p>
-            <Button
-              variant="dangerSoft"
-              onClick={() => setIsUnlinkDialogOpen(true)}
-              loading={isUnlinking}
-              icon={<Unlink className="h-4 w-4" />}
-              className="mt-3"
-            >
-              Remove from project
-            </Button>
-          </div>
-        </Section>
+        <DrawerCard
+          label="Project link"
+          icon={Unlink}
+          index={5}
+          variant="danger"
+          className="mt-4 sm:mt-5"
+        >
+          <p className="text-sm text-app-danger-text">
+            Remove this {removableNoun} from the current project. The {removableNoun} and its
+            artifacts are kept. You can re-link it later.
+          </p>
+          <Button
+            variant="dangerSoft"
+            onClick={() => setIsUnlinkDialogOpen(true)}
+            loading={isUnlinking}
+            icon={<Unlink className="h-4 w-4" />}
+            className="mt-4"
+          >
+            Remove from project
+          </Button>
+        </DrawerCard>
       )}
 
       <AlertDialog
@@ -538,28 +528,15 @@ export function SourceDetailsPanel({
         loadingLabel="Removing…"
         variant="danger"
         isLoading={isUnlinking}
-        errorMessage={unlinkError ?? undefined}
         onClose={() => {
           if (isUnlinking) return;
           setIsUnlinkDialogOpen(false);
-          setUnlinkError(null);
         }}
         onConfirm={() => {
           void handleConfirmUnlink();
         }}
       />
     </DetailsSideDrawer>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-8 border-t border-app-border pt-6 first:mt-0 first:border-t-0 first:pt-0">
-      <h3 className="mb-3 text-sm font-semibold tracking-wide text-app-text-subtle uppercase">
-        {title}
-      </h3>
-      {children}
-    </section>
   );
 }
 
@@ -601,7 +578,7 @@ function InfoRow({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3 border-t border-app-border px-4 py-2.5 first:border-t-0">
+    <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
       <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
       <dd
         className={`min-w-0 text-[13px] font-semibold wrap-break-word text-app-text ${
@@ -616,7 +593,7 @@ function InfoRow({
 
 function InfoLinkRow({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex items-start gap-3 border-t border-app-border px-4 py-2.5 first:border-t-0">
+    <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
       <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
       <dd className="min-w-0 text-[13px] font-semibold wrap-break-word">
         {value ? (
@@ -640,13 +617,4 @@ function formatEnabled(value?: boolean | null) {
   if (value === true) return "Enabled";
   if (value === false) return "Disabled";
   return "Not available";
-}
-
-function Message({ tone, children }: { tone: "success" | "warning"; children: ReactNode }) {
-  const className =
-    tone === "success"
-      ? "border-app-success-border bg-app-success-bg text-app-success-text"
-      : "border-app-warning-border bg-app-warning-bg text-app-warning-text";
-
-  return <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${className}`}>{children}</div>;
 }

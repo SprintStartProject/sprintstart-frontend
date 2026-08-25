@@ -61,26 +61,35 @@ export function RunHistoryFilters({
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter runs">
-      <FilterSelect
-        label="Filter runs by status"
-        value={status}
-        options={STATUS_OPTIONS}
-        onChange={onStatusChange}
-        disabled={disabled}
-        className="w-40"
-      />
-
-      {sources.length > 1 && (
+    <div
+      className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+      role="group"
+      aria-label="Filter runs"
+    >
+      {/* On mobile the two dropdowns sit side by side (each half width); at sm+
+          the wrapper is display:contents so they flow into the toolbar row
+          exactly as before. */}
+      <div className="flex gap-2 sm:contents">
         <FilterSelect
-          label="Filter runs by source"
-          value={sourceValue}
-          options={sourceOptions}
-          onChange={onSourceChange}
+          label="Filter runs by status"
+          value={status}
+          options={STATUS_OPTIONS}
+          onChange={onStatusChange}
           disabled={disabled}
-          className="w-52"
+          className="w-full max-sm:min-w-0 max-sm:flex-1 sm:w-40"
         />
-      )}
+
+        {sources.length > 1 && (
+          <FilterSelect
+            label="Filter runs by source"
+            value={sourceValue}
+            options={sourceOptions}
+            onChange={onSourceChange}
+            disabled={disabled}
+            className="w-full max-sm:min-w-0 max-sm:flex-1 sm:w-52"
+          />
+        )}
+      </div>
 
       {hasActiveFilter && (
         <Button
@@ -89,7 +98,7 @@ export function RunHistoryFilters({
           onClick={onReset}
           disabled={disabled}
           icon={<RotateCcw className="h-3.5 w-3.5" />}
-          className="text-app-brand-text"
+          className="self-start text-app-brand-text sm:self-auto"
         >
           Reset
         </Button>

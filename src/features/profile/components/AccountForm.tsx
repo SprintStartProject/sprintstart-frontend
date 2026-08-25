@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
+import { SaveButton } from "../../../components/ui/SaveButton";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { useToast } from "../../../context/useToast";
 import type { UserProfile } from "../../../services/types";
 
 type AccountFormProps = {
@@ -21,6 +23,17 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isChoosingIcon, setIsChoosingIcon] = useState(false);
   const [iconOptions, setIconOptions] = useState<string[]>([]);
+  const toast = useToast();
+
+  // Compare the live fields against the profile prop — mirroring the state
+  // initializers above — so the Save button reflects unsaved changes. On a
+  // successful save `useProfile` refreshes the profile prop, which brings the
+  // baseline back in line with the fields and returns the button to "Saved".
+  const isDirty =
+    firstName !== (profile.firstName || "") ||
+    lastName !== (profile.lastName || "") ||
+    email !== (profile.email || "") ||
+    profileIcon !== (profile.profileIcon || profile.id);
 
   const generateOptions = () => {
     const options = Array.from({ length: 5 }, () => Math.random().toString(36).substring(7));
@@ -44,6 +57,9 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
     setIsSaving(true);
     try {
       await onUpdate({ firstName, lastName, email, profileIcon });
+      toast.success("Profile saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save your profile.");
     } finally {
       setIsSaving(false);
     }
@@ -129,9 +145,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
         </Field>
 
         <div className="pt-4">
-          <Button variant="primary" type="submit" loading={isSaving}>
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
+          <SaveButton dirty={isDirty} saving={isSaving} type="submit" />
         </div>
       </form>
     </div>

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -11,15 +11,9 @@ vi.mock("../../../src/context/useAuth", () => ({
   }),
 }));
 
-vi.mock("../../../src/context/useChatPreferences", () => ({
-  useChatPreferences: vi.fn(),
-}));
-
 vi.mock("../../../src/features/projects/useProjectContext", () => ({
   useProjectContext: () => ({ selectedProjectId: "project1" }),
 }));
-
-import { useChatPreferences } from "../../../src/context/useChatPreferences";
 
 const mockHandleSubmit = vi.fn();
 const mockSetNewRequest = vi.fn();
@@ -36,7 +30,7 @@ const mockChatState = {
       citations: [{ artifactId: "c1", filename: "readme.md" }],
     },
   ] as ChatMessage[],
-  chatId: "chat1",
+  chatId: "chat1" as string | undefined,
   activeChat: { id: "chat1", userId: "u1", projectId: "project1", title: "Chat 1", createdAt: "" },
   chats: [{ id: "chat1", userId: "u1", projectId: "project1", title: "Chat 1", createdAt: "" }],
   handleSubmit: mockHandleSubmit,
@@ -78,6 +72,7 @@ describe("ChatPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockChatState.newRequest = "";
+    mockChatState.chatId = "chat1";
     mockChatState.selectedCitation = null;
     mockChatState.messages = [
       { id: "m1", role: "USER" as const, content: "Hello bot", chat: undefined },
@@ -89,10 +84,6 @@ describe("ChatPage", () => {
         citations: [{ artifactId: "c1", filename: "readme.md" }],
       },
     ];
-    vi.mocked(useChatPreferences).mockReturnValue({
-      showThoughtProcess: true,
-      setShowThoughtProcess: vi.fn(),
-    });
   });
 
   it("renders the message list with user and assistant messages", () => {
@@ -103,6 +94,31 @@ describe("ChatPage", () => {
     );
     expect(screen.getByText("Hello bot")).toBeInTheDocument();
     expect(screen.getByText("Hi there")).toBeInTheDocument();
+  });
+
+  /*
+    A question handed over from the dashboard arrives in the composer already written. Focusing
+    a textarea that has a value puts the caret at position 0, so the user was typing in front of
+    their own question instead of continuing it.
+  */
+  it("puts the caret behind a question it was opened with", async () => {
+    mockChatState.chatId = undefined;
+    mockChatState.newRequest = "What should I work on next?";
+
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const composer = screen.getByTestId("chat-input");
+
+    await waitFor(() => {
+      expect(composer).toHaveFocus();
+      expect((composer as HTMLTextAreaElement).selectionStart).toBe(
+        "What should I work on next?".length,
+      );
+    });
   });
 
   it("renders citation chips for assistant messages with citations", async () => {
@@ -139,6 +155,16 @@ describe("ChatPage", () => {
     expect(mockHandleSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("does not render Thought Process block when assistant message has no reasoning", () => {
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("Thought Process")).not.toBeInTheDocument();
+  });
+
   it("shows the Thought Process block when an assistant message has reasoning", () => {
     mockChatState.messages = [
       ...mockChatState.messages,
@@ -156,31 +182,7 @@ describe("ChatPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByText("Thought Process").length).toBeGreaterThan(0);
+    expect(screen.getByText("Thought Process")).toBeInTheDocument();
     expect(screen.getByText("Let me think...")).toBeInTheDocument();
-  });
-
-  it("hides the Thought Process block when the preference is off", () => {
-    vi.mocked(useChatPreferences).mockReturnValue({
-      showThoughtProcess: false,
-      setShowThoughtProcess: vi.fn(),
-    });
-    mockChatState.messages = [
-      {
-        id: "m3",
-        role: "ASSISTANT" as const,
-        content: "Final answer",
-        chat: undefined,
-        reasoning: "Let me think...",
-      },
-    ];
-    render(
-      <MemoryRouter>
-        <ChatPage />
-      </MemoryRouter>,
-    );
-
-    expect(screen.queryByText("Thought Process")).not.toBeInTheDocument();
-    expect(screen.queryByText("Let me think...")).not.toBeInTheDocument();
   });
 });

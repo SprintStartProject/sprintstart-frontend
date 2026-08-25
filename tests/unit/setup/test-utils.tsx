@@ -39,6 +39,11 @@ export function createMockProfile(
     enabled: true,
     profileIcon: null,
     hasCompletedOnboarding: true,
+    githubLogin: null,
+    githubLoginSource: null,
+    githubLoginVerification: null,
+    githubLoginVerifiedAt: null,
+    jiraDisplayName: null,
     ...overrides,
   };
 }

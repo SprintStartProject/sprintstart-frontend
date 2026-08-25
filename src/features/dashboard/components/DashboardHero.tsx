@@ -37,7 +37,7 @@ export function DashboardHero({
       };
 
   return (
-    <section className="relative overflow-hidden rounded-2xl px-6 py-8 sm:px-8 sm:py-10">
+    <section className="relative flex h-full items-center overflow-hidden rounded-2xl px-6 py-5 sm:px-8">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-gradient-to-br from-app-brand/12 via-transparent to-transparent"
@@ -58,7 +58,7 @@ export function DashboardHero({
         style={{ background: "var(--progress-fill-end)" }}
       />
 
-      <div className="relative flex flex-wrap items-center justify-between gap-6">
+      <div className="relative flex w-full flex-wrap items-center justify-between gap-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="relative shrink-0">
             <div

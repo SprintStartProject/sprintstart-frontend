@@ -5,6 +5,21 @@
    Without this, Tailwind uses prefers-color-scheme by default. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* A side drawer slides shut by parking itself one full viewport to the right
+   (Framer animates the panel to translateX(100%)). While it sits there, and
+   (because the closing panel is retained for its exit) briefly after every close,
+   that off-screen panel widens the document, so the whole page ends up scrolled
+   to the right and the user has to scroll back left to see everything. Clipping
+   horizontal overflow at the viewport stops the off-screen panel from ever adding
+   scrollable width. `clip` rather than `hidden` on purpose: it does not turn the
+   root into a scroll container, so the sticky sidebar and the normal vertical
+   document scroll are left exactly as they were. Nothing on any page is meant to
+   scroll sideways at the page level, wide content carries its own scroller. */
+html,
+body {
+  overflow-x: clip;
+}
+
 :root {
   --app-page-gutter: 1.25rem;
   --app-page-block-gutter: 1.25rem;
@@ -61,6 +76,31 @@
   --danger-border: #fca5a5;
   --danger-text: #b91c1c;
   --danger-solid: #dc2626;
+
+  /* Severity — a four-step ramp from red to green for documentation coverage.
+     Its own scale rather than the status roles: the knowledge-gaps panel needs
+     four ordered steps and the status set has three, and stretching Warning to
+     cover two of them would redefine what Warning means everywhere else. Read
+     it as a gradient, not as four independent meanings. */
+  --severity-high-bg: #fee2e2;
+  --severity-high-border: #fca5a5;
+  --severity-high-text: #b91c1c;
+  --severity-high-solid: #dc2626;
+
+  --severity-medium-bg: #ffedd5;
+  --severity-medium-border: #fdba74;
+  --severity-medium-text: #c2410c;
+  --severity-medium-solid: #ea580c;
+
+  --severity-low-bg: #fef3c7;
+  --severity-low-border: #fcd34d;
+  --severity-low-text: #92400e;
+  --severity-low-solid: #d97706;
+
+  --severity-covered-bg: #ecfdf5;
+  --severity-covered-border: #a7f3d0;
+  --severity-covered-text: #047857;
+  --severity-covered-solid: #059669;
 
   /* Orange — a distinct accent for informational markers (e.g. "Private"),
      kept separate from Warning so it carries no "something is wrong" meaning. */
@@ -155,6 +195,27 @@
   --danger-text: #f87171;
   --danger-solid: #dc2626;
 
+  /* Severity */
+  --severity-high-bg: rgba(69, 10, 10, 0.35);
+  --severity-high-border: #dc2626;
+  --severity-high-text: #f87171;
+  --severity-high-solid: #dc2626;
+
+  --severity-medium-bg: rgba(67, 20, 7, 0.35);
+  --severity-medium-border: #ea580c;
+  --severity-medium-text: #fdba74;
+  --severity-medium-solid: #ea580c;
+
+  --severity-low-bg: rgba(69, 26, 3, 0.35);
+  --severity-low-border: #b45309;
+  --severity-low-text: #fde68a;
+  --severity-low-solid: #d97706;
+
+  --severity-covered-bg: rgba(6, 78, 59, 0.25);
+  --severity-covered-border: #047857;
+  --severity-covered-text: #34d399;
+  --severity-covered-solid: #059669;
+
   /* Orange */
   --orange-bg: rgba(249, 115, 22, 0.15);
   --orange-border: rgba(249, 115, 22, 0.4);
@@ -222,6 +283,26 @@
   --color-app-danger-text: var(--danger-text);
   --color-app-danger-solid: var(--danger-solid);
 
+  --color-app-severity-high-bg: var(--severity-high-bg);
+  --color-app-severity-high-border: var(--severity-high-border);
+  --color-app-severity-high-text: var(--severity-high-text);
+  --color-app-severity-high-solid: var(--severity-high-solid);
+
+  --color-app-severity-medium-bg: var(--severity-medium-bg);
+  --color-app-severity-medium-border: var(--severity-medium-border);
+  --color-app-severity-medium-text: var(--severity-medium-text);
+  --color-app-severity-medium-solid: var(--severity-medium-solid);
+
+  --color-app-severity-low-bg: var(--severity-low-bg);
+  --color-app-severity-low-border: var(--severity-low-border);
+  --color-app-severity-low-text: var(--severity-low-text);
+  --color-app-severity-low-solid: var(--severity-low-solid);
+
+  --color-app-severity-covered-bg: var(--severity-covered-bg);
+  --color-app-severity-covered-border: var(--severity-covered-border);
+  --color-app-severity-covered-text: var(--severity-covered-text);
+  --color-app-severity-covered-solid: var(--severity-covered-solid);
+
   --color-app-orange-bg: var(--orange-bg);
   --color-app-orange-border: var(--orange-border);
   --color-app-orange-text: var(--orange-text);
@@ -245,18 +326,18 @@
   --shadow-app-brand-lift: var(--shadow-brand-lift);
 
   --font-sans: var(--sans);
-    --font-heading: var(--heading);
-    --font-mono: var(--mono);
+  --font-heading: var(--heading);
+  --font-mono: var(--mono);
 
-    /* Glassmorphism */
-    --color-app-glass: var(--glass);
-    --color-app-glass-border: var(--glass-border);
+  /* Glassmorphism */
+  --color-app-glass: var(--glass);
+  --color-app-glass-border: var(--glass-border);
 
-    /* Ambient glow */
-    --color-app-glow: var(--glow);
-    --color-app-glow-accent: var(--glow-accent);
-    --color-app-glow-alt: var(--glow-alt);
-  }
+  /* Ambient glow */
+  --color-app-glow: var(--glow);
+  --color-app-glow-accent: var(--glow-accent);
+  --color-app-glow-alt: var(--glow-alt);
+}
 
 @media (max-width: 1024px) {
   :root {
@@ -284,10 +365,15 @@
   padding-right: var(--app-page-gutter);
 }
 
-/* ChatPage: when the desktop history sidebar is open, collapse the left
-   gutter so the sidebar opens "into" the empty gutter space instead of
-   pushing the chat content right and leaving a gap between sidebar and chat. */
-.chat-sidebar-open .app-page-frame {
+/* When a page opens a rail on its left, collapse the left gutter so the rail
+   opens *into* the empty gutter space instead of pushing the content right and
+   leaving a gap between the app sidebar and the page. Put it on the content
+   column that sits beside the rail, not on the page root.
+
+   Used by ChatPage's history sidebar and by the buddy page's PM replies. It
+   started chat-specific; the second caller is what made it worth a name that
+   says what it does rather than where it was first needed. */
+.app-rail-open .app-page-frame {
   padding-left: 1.5rem;
 }
 
@@ -617,9 +703,9 @@ body {
   inset: 0;
   pointer-events: none;
   background: radial-gradient(
-    circle 320px at
-    var(--spot-x, 50%) var(--spot-y, 90%),
-    color-mix(in srgb, var(--color-app-glow) 90%, transparent), transparent 30%
+    circle 320px at var(--spot-x, 50%) var(--spot-y, 90%),
+    color-mix(in srgb, var(--color-app-glow) 90%, transparent),
+    transparent 30%
   );
   mix-blend-mode: plus-lighter;
   transition: opacity 0.3s ease;
@@ -628,7 +714,9 @@ body {
 
 /* Respect users who prefer reduced motion: collapse ALL decorative animation. */
 @media (prefers-reduced-motion: reduce) {
-  .app-spotlight { display: none; }
+  .app-spotlight {
+    display: none;
+  }
 
   *,
   *::before,
@@ -677,4 +765,30 @@ body {
   border: 1px solid var(--border) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+/* ── React Flow controls ──
+   The zoom controls ship with a hardcoded white face and a light drop shadow, which on a dark
+   board is a bright block rather than a control. Repainted from the palette, so they carry the
+   same surface, border and ink as every other control in the app and work in both themes.
+
+   Qualified with `.react-flow` on purpose: the library's stylesheet is imported from the canvas
+   component and therefore lands after this file, so a bare `.react-flow__controls-button` would
+   tie on specificity and lose on order. Global rather than scoped to one canvas, because the
+   library's own class names are the only handle and every canvas should look the same. */
+.react-flow .react-flow__controls {
+  box-shadow: none;
+}
+
+.react-flow .react-flow__controls-button {
+  background-color: var(--color-app-surface);
+  border-bottom: 1px solid var(--color-app-border);
+}
+
+.react-flow .react-flow__controls-button:hover {
+  background-color: var(--color-app-surface-hover);
+}
+
+.react-flow .react-flow__controls-button svg {
+  fill: var(--color-app-text);
 }

@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, MessageSquareText, Pencil, Plus, SkipForward, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useToast } from "../context/useToast";
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
@@ -150,12 +151,13 @@ export function TeamMemberDetailPage() {
     Record<string, { done: number; total: number }>
   >({});
   const [stepTasksById, setStepTasksById] = useState<Record<string, OnboardingTaskEndpoint[]>>({});
-  const [onboardingError, setOnboardingError] = useState("");
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
   const [reviewingSkipAction, setReviewingSkipAction] = useState<"accept" | "deny" | null>(null);
-  const [skipReviewError, setSkipReviewError] = useState("");
+  // `feedbackError` stays for the feedback *load* failure (shown inline where the
+  // list would be); every action outcome on this page is a toast instead.
   const [feedbackError, setFeedbackError] = useState("");
+  const toast = useToast();
 
   useEffect(() => {
     async function loadMember() {
@@ -183,7 +185,11 @@ export function TeamMemberDetailPage() {
       setUser(memberData);
       setAvailableRoles(rolesData);
       setSkillLevels(skills);
-      setKnowledgeGaps(knowledgeGapOverview.gaps);
+      // Covered components are dropped rather than shown: the overview is the
+      // project's full roster now, but this panel is headed "Knowledge gaps"
+      // and counting repositories that are missing nothing would overstate
+      // what the member has to answer for.
+      setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
       setFeedbackItems(feedback);
       setOnboardingPath(path);
       // Open on the phase the member is actually working on. Phase 1 is almost never
@@ -292,15 +298,19 @@ export function TeamMemberDetailPage() {
 
     setSavingRoleId(selectedRoleId);
 
-    await assignProjectRoleToUser(user.userId, selectedRoleId);
-
-    setUser({
-      ...user,
-      roles: [...user.roles, roleToAdd],
-    });
-
-    setSelectedRoleId("");
-    setSavingRoleId(null);
+    try {
+      await assignProjectRoleToUser(user.userId, selectedRoleId);
+      setUser({
+        ...user,
+        roles: [...user.roles, roleToAdd],
+      });
+      setSelectedRoleId("");
+      toast.success("Role assigned");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't assign the role.");
+    } finally {
+      setSavingRoleId(null);
+    }
   }
 
   async function handleRemoveRole(roleId: string) {
@@ -308,14 +318,18 @@ export function TeamMemberDetailPage() {
 
     setSavingRoleId(roleId);
 
-    await unassignProjectRoleFromUser(user.userId, roleId);
-
-    setUser({
-      ...user,
-      roles: user.roles.filter((role) => role.id !== roleId),
-    });
-
-    setSavingRoleId(null);
+    try {
+      await unassignProjectRoleFromUser(user.userId, roleId);
+      setUser({
+        ...user,
+        roles: user.roles.filter((role) => role.id !== roleId),
+      });
+      toast.success("Role removed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't remove the role.");
+    } finally {
+      setSavingRoleId(null);
+    }
   }
 
   async function handleSkipReview(action: "accept" | "deny") {
@@ -323,7 +337,6 @@ export function TeamMemberDetailPage() {
     if (!skipId) return;
 
     setReviewingSkipAction(action);
-    setSkipReviewError("");
 
     try {
       if (action === "accept") {
@@ -333,8 +346,9 @@ export function TeamMemberDetailPage() {
       }
 
       await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      toast.success(action === "accept" ? "Skip request approved" : "Skip request denied");
     } catch (error) {
-      setSkipReviewError(error instanceof Error ? error.message : "Unable to review skip request.");
+      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
     } finally {
       setReviewingSkipAction(null);
     }
@@ -342,7 +356,6 @@ export function TeamMemberDetailPage() {
 
   async function handleDeleteStep(step: DetailOnboardingStep) {
     setStepActionId(step.id);
-    setOnboardingError("");
 
     try {
       await deleteOnboardingStep(step.id);
@@ -351,8 +364,9 @@ export function TeamMemberDetailPage() {
         setDetailStepId("");
       }
       await refreshOnboardingPath();
+      toast.success("Step deleted");
     } catch (error) {
-      setOnboardingError(error instanceof Error ? error.message : "Unable to delete step.");
+      toast.error(error instanceof Error ? error.message : "Couldn't delete the step.");
     } finally {
       setStepActionId(null);
     }
@@ -382,7 +396,6 @@ export function TeamMemberDetailPage() {
     );
 
     setStepActionId(activeStepId);
-    setOnboardingError("");
     setOnboardingPath((currentPath) =>
       currentPath
         ? {
@@ -415,9 +428,7 @@ export function TeamMemberDetailPage() {
 
       await refreshOnboardingPath();
     } catch (error) {
-      setOnboardingError(
-        error instanceof Error ? error.message : "Unable to reorder onboarding steps.",
-      );
+      toast.error(error instanceof Error ? error.message : "Couldn't reorder the steps.");
       await refreshOnboardingPath();
     } finally {
       setStepActionId(null);
@@ -465,7 +476,6 @@ export function TeamMemberDetailPage() {
     );
 
     setStepActionId(stepId);
-    setOnboardingError("");
     setStepTasksById((current) => ({
       ...current,
       [stepId]: nextTasks,
@@ -483,7 +493,7 @@ export function TeamMemberDetailPage() {
 
       await refreshStepTasks(stepId);
     } catch (error) {
-      setOnboardingError(error instanceof Error ? error.message : "Unable to reorder tasks.");
+      toast.error(error instanceof Error ? error.message : "Couldn't reorder the tasks.");
       await refreshStepTasks(stepId);
     } finally {
       setStepActionId(null);
@@ -492,15 +502,15 @@ export function TeamMemberDetailPage() {
 
   async function handleDeleteTask(task: OnboardingTaskEndpoint) {
     setStepActionId(task.stepId);
-    setOnboardingError("");
 
     try {
       await deleteOnboardingTask(task.id);
       setTaskToDelete(null);
       await refreshStepTasks(task.stepId);
       await refreshOnboardingPath();
+      toast.success("Task deleted");
     } catch (error) {
-      setOnboardingError(error instanceof Error ? error.message : "Unable to delete task.");
+      toast.error(error instanceof Error ? error.message : "Couldn't delete the task.");
     } finally {
       setStepActionId(null);
     }
@@ -511,7 +521,6 @@ export function TeamMemberDetailPage() {
 
     setAddingTask(true);
     setStepActionId(taskInsertTarget.stepId);
-    setOnboardingError("");
 
     try {
       await createOnboardingTaskForStep(taskInsertTarget.stepId, {
@@ -529,8 +538,9 @@ export function TeamMemberDetailPage() {
       // IN_PROGRESS). Refresh the path so the step cards update, and the team-overview
       // member data so the header progress bar and current step reflect the change too.
       await Promise.all([refreshOnboardingPath(), refreshMember()]);
+      toast.success("Task added");
     } catch (error) {
-      setOnboardingError(error instanceof Error ? error.message : "Unable to create task.");
+      toast.error(error instanceof Error ? error.message : "Couldn't create the task.");
     } finally {
       setAddingTask(false);
       setStepActionId(null);
@@ -539,7 +549,6 @@ export function TeamMemberDetailPage() {
 
   async function handleMarkFeedbackRead(feedbackId: string) {
     setMarkingFeedbackId(feedbackId);
-    setFeedbackError("");
 
     try {
       await markOnboardingFeedbackRead(feedbackId);
@@ -550,7 +559,7 @@ export function TeamMemberDetailPage() {
       );
       await Promise.all([refreshFeedback(), refreshMember()]);
     } catch (error) {
-      setFeedbackError(error instanceof Error ? error.message : "Unable to mark feedback as read.");
+      toast.error(error instanceof Error ? error.message : "Couldn't mark the feedback as read.");
     } finally {
       setMarkingFeedbackId(null);
     }
@@ -566,7 +575,6 @@ export function TeamMemberDetailPage() {
     if (!selectedPhase) return;
 
     setAddingStep(true);
-    setOnboardingError("");
 
     try {
       const createdStep = await createOnboardingStepForPhase(targetPhaseId, {
@@ -609,9 +617,10 @@ export function TeamMemberDetailPage() {
       if (tasksToCreate.length > 0) {
         await refreshStepTasks(createdStep.id);
       }
+      toast.success("Step added");
     } catch (error) {
-      setOnboardingError(
-        error instanceof Error ? error.message : "Unable to create custom onboarding step.",
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't create the custom onboarding step.",
       );
     } finally {
       setAddingStep(false);
@@ -909,10 +918,6 @@ export function TeamMemberDetailPage() {
                         </button>
                       </div>
                     </div>
-
-                    {skipReviewError && (
-                      <p className="mt-3 text-xs text-app-danger-text">{skipReviewError}</p>
-                    )}
                   </div>
                 )}
 
@@ -1118,7 +1123,6 @@ export function TeamMemberDetailPage() {
         estimatedMinutes={customStepMinutes}
         tasks={customStepTasks}
         addingStep={addingStep}
-        errorMessage={onboardingError}
         onTitleChange={setCustomStepTitle}
         onDescriptionChange={setCustomStepDescription}
         onExpectedOutcomeChange={setCustomStepExpectedOutcome}

@@ -7,6 +7,13 @@ import {
   getMatchingProtectedRoute,
   isOnboardingAccessible,
 } from "../auth/accessPolicy";
+import {
+  clearRedirectTarget,
+  extractFullPath,
+  resolveRedirectTarget,
+  retrieveRedirectTarget,
+  storeRedirectTarget,
+} from "../auth/redirectUtils";
 import { isSkillLinkedToRole } from "../features/team-management/types";
 import {
   getSkillAssessmentPromptState,
@@ -19,12 +26,6 @@ interface AuthGuardProps {
   children: ReactNode;
 }
 
-interface LocationState {
-  from?: {
-    pathname: string;
-  };
-}
-
 export function AuthGuard({ children }: AuthGuardProps) {
   const { status, profile } = useAuth();
   const location = useLocation();
@@ -32,6 +33,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const [needsSkillAssessment, setNeedsSkillAssessment] = useState(false);
   const [skillAssessmentUserId, setSkillAssessmentUserId] = useState<string | null>(null);
   const [checkingSkillAssessment, setCheckingSkillAssessment] = useState(false);
+
+  useEffect(() => {
+    if (status === "authenticated" && location.pathname !== "/login") {
+      clearRedirectTarget();
+    }
+  }, [status, location.pathname]);
 
   useEffect(() => {
     async function checkSkillAssessment() {
@@ -44,23 +51,30 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
       setCheckingSkillAssessment(true);
 
-      const teamMember = await getMyTeamOverview();
-      const completed = await hasCompletedSkillAssessment(teamMember.userId);
-      const promptState = getSkillAssessmentPromptState(teamMember.userId);
-      const allSkills = await getSkills();
+      // Nothing here may throw past this point: the guard renders a full-screen spinner
+      // while it runs, so an unhandled rejection leaves the whole app on that spinner.
+      // A user whose overview cannot be read (no onboarding path, or a role that may not
+      // read it) simply has no assessment to prompt for — that is not a reason to lock
+      // them out of the app.
+      try {
+        const teamMember = await getMyTeamOverview();
+        const completed = await hasCompletedSkillAssessment(teamMember.userId);
+        const promptState = getSkillAssessmentPromptState(teamMember.userId);
+        const allSkills = await getSkills();
 
-      const hasSkillsForRoles =
-        !!teamMember &&
-        teamMember.roles.some((role) =>
+        const hasSkillsForRoles = teamMember.roles.some((role) =>
           allSkills.some(
             (skill) => skill.status === "ACTIVE" && isSkillLinkedToRole(skill, role.id),
           ),
         );
 
-      setSkillAssessmentUserId(teamMember.userId);
-      setNeedsSkillAssessment(
-        !!teamMember && hasSkillsForRoles && !completed && promptState === null,
-      );
+        setSkillAssessmentUserId(teamMember.userId);
+        setNeedsSkillAssessment(hasSkillsForRoles && !completed && promptState === null);
+      } catch (error) {
+        console.warn("Skipping the skill assessment check", error);
+        setSkillAssessmentUserId(null);
+        setNeedsSkillAssessment(false);
+      }
 
       setCheckingSkillAssessment(false);
     }
@@ -77,14 +91,47 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }
 
   if (status === "unauthenticated" && location.pathname !== "/login") {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const fullPath = extractFullPath(location);
+    storeRedirectTarget(fullPath);
+    const search = new URLSearchParams();
+    search.set("redirect", fullPath);
+
+    return <Navigate to={`/login?${search.toString()}`} state={{ from: location }} replace />;
   }
 
-  if (status === "authenticated" && location.pathname === "/login") {
-    const state = location.state as LocationState;
-    const from = state?.from?.pathname || "/";
+  if (status === "authenticated") {
+    if (location.pathname === "/login") {
+      const searchParams = new URLSearchParams(location.search);
+      const storedTarget = retrieveRedirectTarget();
+      const fallback = getDefaultRoute(profile);
 
-    return <Navigate to={from} replace />;
+      const destination = resolveRedirectTarget({
+        searchParams,
+        locationState: location.state,
+        sessionTarget: storedTarget,
+        fallback,
+      });
+
+      return <Navigate to={destination} replace />;
+    }
+
+    // If Keycloak redirected back to "/" or base URL, restore the stored deep link.
+    // The stored target is only read here -- clearing it is left to the effect above,
+    // which runs after the navigation commits. Clearing during render would make the
+    // restore depend on how often React invokes this component: under StrictMode the
+    // body runs twice, and a first pass that emptied the storage would leave the second
+    // pass with nothing to restore.
+    const currentFullPath = extractFullPath(location);
+    const storedTarget = retrieveRedirectTarget();
+    if (storedTarget && storedTarget !== currentFullPath) {
+      if (location.pathname === "/" && storedTarget !== "/") {
+        return <Navigate to={storedTarget} replace />;
+      }
+      // If the path matches but the hash fragment was stripped by OAuth, restore full path
+      if (storedTarget.startsWith(location.pathname) && storedTarget.includes("#")) {
+        return <Navigate to={storedTarget} replace />;
+      }
+    }
   }
 
   if (
