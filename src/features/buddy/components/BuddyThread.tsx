@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
@@ -81,34 +82,47 @@ export function BuddyThread({
         if (!isUser && !hasText && !hasActions) return null;
 
         return (
-          <BuddyMessage
-            key={message.id}
-            speaker={isUser ? "YOU" : "BUDDY"}
-            showName={showNames}
-            isStreaming={message.id === streamingId}
-            footer={
-              <>
-                {isUser && renderQuestionAction?.(message.content)}
-                {!isUser && hasActions && (
-                  <BuddyActionProposals
-                    messageId={message.id}
-                    actions={message.actions ?? []}
-                    onConfirm={confirmAction}
-                    onDismiss={dismissAction}
-                  />
-                )}
-                {!isThinking && message.id === lastAssistantId && lastMessageFooter}
-              </>
-            }
-          >
-            {hasText ? (
-              isUser ? (
-                message.content
-              ) : (
-                <BuddyMarkdown content={message.content} />
-              )
-            ) : undefined}
-          </BuddyMessage>
+          <Fragment key={message.id}>
+            {/* Everything above belongs to the last conversation; the buddy has just opened a
+                            new one under it, grounded in what it remembers rather than in the text
+                            above. Saying so is what stops the greeting reading as a non-sequitur
+                            replying to a question from an hour ago. */}
+            {message.startsVisit && (
+              <div className="flex items-center gap-3 py-1">
+                <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
+                <span className="text-xs font-medium text-app-text-muted">New conversation</span>
+                <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
+              </div>
+            )}
+
+            <BuddyMessage
+              speaker={isUser ? "YOU" : "BUDDY"}
+              showName={showNames}
+              isStreaming={message.id === streamingId}
+              footer={
+                <>
+                  {isUser && renderQuestionAction?.(message.content)}
+                  {!isUser && hasActions && (
+                    <BuddyActionProposals
+                      messageId={message.id}
+                      actions={message.actions ?? []}
+                      onConfirm={confirmAction}
+                      onDismiss={dismissAction}
+                    />
+                  )}
+                  {!isThinking && message.id === lastAssistantId && lastMessageFooter}
+                </>
+              }
+            >
+              {hasText ? (
+                isUser ? (
+                  message.content
+                ) : (
+                  <BuddyMarkdown content={message.content} />
+                )
+              ) : undefined}
+            </BuddyMessage>
+          </Fragment>
         );
       })}
 

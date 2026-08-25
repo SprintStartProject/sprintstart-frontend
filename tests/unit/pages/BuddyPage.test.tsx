@@ -84,13 +84,15 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * The bug this replaced: the page opened a visit unconditionally. Opening is idempotent only
-   * while the hire has said nothing — once they have, a second open rotates the visit
-   * server-side, folding what was said into memory and starting a new window. So asking
-   * something in the dock and then opening the full page really did destroy the context, and
-   * the hire was shown a greeting where their conversation had been.
+   * The bug this replaced: the page opened a visit unconditionally, before reading anything. A
+   * visit ends when the hire speaks, so a later open writes a new opening marker and the
+   * message window starts from there — asking something in the dock and then opening the full
+   * page showed a greeting where the conversation had been.
+   *
+   * Reading first is the fix; *not* opening at all would have been a different bug, since the
+   * greeting is the only thing that reads the buddy's durable memory. So both, in order.
    */
-  it("shows the conversation already in progress instead of opening a new visit", async () => {
+  it("keeps the conversation on screen when the new visit opens under it", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -104,8 +106,9 @@ describe("BuddyPage", () => {
 
     expect(await screen.findByText("where do I start?")).toBeInTheDocument();
     expect(screen.getByText("With the setup guide.")).toBeInTheDocument();
-    // No greeting, and — the part that matters — no model call that would have rotated the visit.
-    expect(streamOpenBuddy).not.toHaveBeenCalled();
+    // The greeting arrives under it, and says so.
+    expect(await screen.findByText("Welcome back!")).toBeInTheDocument();
+    expect(screen.getByText("New conversation")).toBeInTheDocument();
   });
 
   /**

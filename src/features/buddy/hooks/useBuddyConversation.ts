@@ -36,11 +36,15 @@ export function useBuddyConversation() {
   const loadedRef = useRef(false);
 
   /**
-   * Streams the buddy's opening greeting into the thread.
+   * Streams the buddy's opening greeting into the thread, *under* whatever is already there.
    *
-   * Only reached for a visit with nothing in it — see [ensureOpened]. The greeting is a single
-   * growing message rather than one per token, so the hire watches it being written instead of
-   * watching messages pile up.
+   * Appending rather than replacing is what lets a visit open beneath a conversation the hire
+   * can still read. It used to replace the list, which was safe only while this was reached
+   * for an empty visit — and that restriction is exactly what left the buddy's memory-grounded
+   * greeting unreachable in normal use (see [ensureOpened]).
+   *
+   * The greeting is a single growing message rather than one per token, so the hire watches it
+   * being written instead of watching messages pile up.
    */
   const greet = useCallback(async () => {
     const id = crypto.randomUUID();
@@ -50,12 +54,15 @@ export function useBuddyConversation() {
           const existing = prev.find((message) => message.id === id);
           if (!existing) {
             return [
+              ...prev,
               {
                 id,
                 role: "ASSISTANT",
                 content: token,
                 createdAt: new Date().toISOString(),
                 citations: [],
+                // Only worth marking when there is something above it to be divided from.
+                startsVisit: prev.length > 0,
               },
             ];
           }
@@ -76,16 +83,25 @@ export function useBuddyConversation() {
   /**
    * Brings the conversation on screen, once per session.
    *
-   * **Reading comes before greeting, and that ordering is the whole fix.** The page used to
-   * call the open endpoint unconditionally. Opening is idempotent only while the hire has said
-   * nothing; a visit *ends* when they speak, so a later open writes a new opening marker, and
-   * `getMessagesForMe` reads back only to the last marker. A hire who asked something in the
-   * dock and then opened the full page was shown a greeting instead of their conversation.
+   * **It reads first, then opens a visit under what it read.** Both halves matter, and each
+   * fixes the opposite failure.
    *
-   * Nothing is deleted by that: the transcript stays in `buddy_messages`, and the durable
-   * memory note is folded by a separate background pass rather than by opening. Only the hire's
-   * scrollback moves past it — worth stating precisely, because it is the difference between
-   * losing the view and losing the record.
+   * Reading first: a visit *ends* when the hire speaks, so a later open writes a new opening
+   * marker and `getMessagesForMe` reads back only to the last one. Opening blind — which is
+   * what the page and the mount-time warm-up both used to do — therefore replaced the hire's
+   * conversation with a greeting on every reload. Nothing was deleted by that (the transcript
+   * stays in `buddy_messages`, and the memory note is folded by a separate background pass),
+   * but their scrollback moved past it, which is indistinguishable from loss.
+   *
+   * Opening anyway: the greeting is the *only* thing that reads the buddy's durable memory, so
+   * a client that never opened one made the whole continuity mechanism unreachable except by
+   * pressing "new chat" by hand. Continuity you have to ask for is not continuity. The previous
+   * conversation stays on screen and the new visit begins beneath it — see `startsVisit` for
+   * the divider that says so.
+   *
+   * What one visit's window holds is therefore the last conversation plus this one. Anything
+   * older is out of reach: `getMessagesForMe` stops at the last marker, and no hire-facing
+   * endpoint exposes what came before it.
    *
    * Now: fetch what the visit already holds. If there is anything there, that *is* the
    * conversation — show it, and call no model at all. Only a genuinely empty visit gets a
@@ -106,11 +122,20 @@ export function useBuddyConversation() {
 
     try {
       const history = await getMessages();
+      // Merged in front of whatever is already there, never assigned over it. The fetch is in
+      // flight while the composer is live, so a hire who types straight away has an optimistic
+      // turn in the list by the time this resolves — assigning would delete their own message
+      // out from under them. History is older, so it belongs in front.
+      setMessages((prev) => [
+        ...history.map((message) => ({ ...message, id: crypto.randomUUID() })),
+        ...prev,
+      ]);
 
-      if (history.length > 0) {
-        setMessages(history.map((message) => ({ ...message, id: crypto.randomUUID() })));
-        return;
-      }
+      // A window of exactly one message is a greeting nobody answered: the window begins at an
+      // opening marker, so nothing after it means the hire never spoke. The backend would
+      // replay that same greeting rather than write a new one, and appending it would put the
+      // same words on screen twice.
+      if (history.length === 1) return;
 
       await greet();
     } catch (e) {

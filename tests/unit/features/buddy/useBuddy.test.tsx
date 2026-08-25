@@ -11,7 +11,16 @@ describe("useBuddy", () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
-  it("starts closed and does not load history until opened", () => {
+  /**
+   * The dock starts closed, but the conversation does not wait for it to open. Writing a
+   * greeting is the slow part of meeting the buddy — a remote model — and the widget mounts the
+   * moment a hire's session resolves, long before they click. Doing the work here is what makes
+   * the click find the conversation already there.
+   *
+   * It reads rather than opening blind; `buddyVisitContinuity` covers why that distinction is
+   * the whole ballgame.
+   */
+  it("starts closed, with the conversation already on its way", async () => {
     let requested = false;
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", () => {
@@ -23,7 +32,9 @@ describe("useBuddy", () => {
     const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     expect(result.current.isOpen).toBe(false);
-    expect(requested).toBe(false);
+    await waitFor(() => {
+      expect(requested).toBe(true);
+    });
   });
 
   it("loads conversation history when opened", async () => {
