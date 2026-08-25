@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   getMessages,
   streamOpenBuddy,
@@ -10,22 +10,15 @@ import type { BuddyMessageView, ProposedAction } from "../types";
 
 /**
  * The conversation core behind every buddy surface: the message list, the optimistic
- * send-and-stream loop, and the "which tool is it running" signal. Deliberately knows
- * nothing about *where* it is shown -- the floating widget ([useBuddy]) and the
- * full-page `/buddy` home both build on it, so a hire's one buddy session behaves the
- * same in either place.
+ * send-and-stream loop, and the "which tool is it running" signal.
  *
- * @param autoLoad When true, loads the current visit's messages on mount (the widget).
- *   Leave it false and call [loadHistory] on first open so an unopened surface makes no
- *   request.
- * @param open When true, *opens a visit* on mount instead: the buddy folds the previous
- *   visit into its memory and greets proactively (the `/buddy` home). No transcript is
- *   replayed — the greeting is the first message and continuity lives in the memory.
+ * Deliberately knows nothing about *where* it is shown. It is instantiated exactly once, by
+ * [BuddyProvider], and both surfaces read that one instance through `useBuddySession` — so a
+ * hire's one buddy session really is one, rather than two lists that happen to share a name.
+ *
+ * Nothing is requested until a surface calls [ensureOpened].
  */
-export function useBuddyConversation({
-  autoLoad = false,
-  open = false,
-}: { autoLoad?: boolean; open?: boolean } = {}) {
+export function useBuddyConversation() {
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -34,55 +27,60 @@ export function useBuddyConversation({
   const [activeTool, setActiveTool] = useState<string | null>(null);
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
-  // True while the visit is being opened, so the page can show a greeting-loading state.
-  const [isOpening, setIsOpening] = useState(open);
+  // True while a surface is opening the conversation, so it can show a loading state rather
+  // than an empty thread. Starts false: nothing is opening until somebody asks.
+  const [isOpening, setIsOpening] = useState(false);
   const [draft, setDraft] = useState("");
 
-  const bottomRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef(false);
+  // Guards the greeting against overlapping calls — see `startFreshVisit`.
+  const greetingRef = useRef(false);
 
   /**
-   * Loads the conversation so far, at most once. Idempotent so both the widget's
-   * open handler and the page's mount effect can call it without double-fetching.
+   * Streams the buddy's opening greeting into the thread, *under* whatever is already there.
+   *
+   * Appending rather than replacing is what lets a visit open beneath a conversation the hire
+   * can still read. It used to replace the list, which was safe only while this was reached
+   * for an empty visit — and that restriction is exactly what left the buddy's memory-grounded
+   * greeting unreachable in normal use (see [ensureOpened]).
+   *
+   * The greeting is a single growing message rather than one per token, so the hire watches it
+   * being written instead of watching messages pile up.
    */
-  const loadHistory = useCallback(async () => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    const history = await getMessages();
-    setMessages(history.map((message) => ({ ...message, id: crypto.randomUUID() })));
-  }, []);
-
-  /**
-   * Opens a visit: the buddy greets proactively, at most once. The greeting becomes the
-   * first (and only) message shown; the past transcript is deliberately not replayed.
-   */
-  const openVisit = useCallback(async () => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
+  const greet = useCallback(async () => {
     const id = crypto.randomUUID();
+
+    // Its place in the thread is claimed *before* the stream is awaited, not on the first
+    // token. The composer is live while the greeting is being written, so a hire who types
+    // straight away would otherwise have their question appended first and the greeting land
+    // underneath it — answering nothing, with a "New conversation" divider in the wrong place.
+    // An empty assistant turn renders nothing (see `BuddyThread`), so the placeholder is
+    // invisible until the first word arrives.
+    setMessages((prev) => [
+      ...prev,
+      {
+        id,
+        role: "ASSISTANT",
+        content: "",
+        createdAt: new Date().toISOString(),
+        citations: [],
+        // Only worth marking when there is something above it to be divided from.
+        startsVisit: prev.length > 0,
+      },
+    ]);
+
+    let wroteSomething = false;
+
     try {
       await streamOpenBuddy({
         onToken: (token) => {
-          // The greeting is a single growing message rather than one per token, so the
-          // hire watches it being written instead of watching messages pile up.
-          setMessages((prev) => {
-            const existing = prev.find((message) => message.id === id);
-            if (!existing) {
-              return [
-                {
-                  id,
-                  role: "ASSISTANT",
-                  content: token,
-                  createdAt: new Date().toISOString(),
-                  citations: [],
-                },
-              ];
-            }
-            return prev.map((message) =>
+          wroteSomething = true;
+          setMessages((prev) =>
+            prev.map((message) =>
               message.id === id ? { ...message, content: message.content + token } : message,
-            );
-          });
-          // The page stops waiting at the first word, not the last: everything after this
+            ),
+          );
+          // The surface stops waiting at the first word, not the last: everything after this
           // is the hire reading along, and the composer is theirs from here.
           setIsOpening(false);
         },
@@ -90,25 +88,112 @@ export function useBuddyConversation({
         onDone: () => setIsOpening(false),
         onError: (message) => console.error(message),
       });
+    } finally {
+      // A greeting that never produced a word leaves no trace. The placeholder holds the
+      // greeting's *place* while it is being written; once it is established that nothing is
+      // coming — a failed stream, an unreachable model — an empty assistant turn would sit in
+      // the conversation for the rest of the session. It renders as nothing, which is worse
+      // than useless: invisible state that every reader of `messages` still has to account
+      // for, starting with "which turn is streaming".
+      if (!wroteSomething) {
+        setMessages((prev) => prev.filter((message) => message.id !== id));
+      }
+    }
+  }, []);
+
+  /**
+   * Brings the conversation on screen, once per session.
+   *
+   * **It reads first, then opens a visit under what it read.** Both halves matter, and each
+   * fixes the opposite failure.
+   *
+   * Reading first: a visit *ends* when the hire speaks, so a later open writes a new opening
+   * marker and `getMessagesForMe` reads back only to the last one. Opening blind — which is
+   * what the page and the mount-time warm-up both used to do — therefore replaced the hire's
+   * conversation with a greeting on every reload. Nothing was deleted by that (the transcript
+   * stays in `buddy_messages`, and the memory note is folded by a separate background pass),
+   * but their scrollback moved past it, which is indistinguishable from loss.
+   *
+   * Opening anyway: the greeting is the *only* thing that reads the buddy's durable memory, so
+   * a client that never opened one made the whole continuity mechanism unreachable except by
+   * pressing "new chat" by hand. Continuity you have to ask for is not continuity. The previous
+   * conversation stays on screen and the new visit begins beneath it — see `startsVisit` for
+   * the divider that says so.
+   *
+   * What one visit's window holds is therefore the last conversation plus this one. Anything
+   * older is out of reach: `getMessagesForMe` stops at the last marker, and no hire-facing
+   * endpoint exposes what came before it.
+   *
+   * Idempotent by ref rather than by state, so the dock's mount effect and the page's can both
+   * call it without either double-fetching or racing.
+   */
+  const ensureOpened = useCallback(async () => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    setIsOpening(true);
+
+    try {
+      const history = await getMessages();
+      // Merged in front of whatever is already there, never assigned over it. The fetch is in
+      // flight while the composer is live, so a hire who types straight away has an optimistic
+      // turn in the list by the time this resolves — assigning would delete their own message
+      // out from under them. History is older, so it belongs in front.
+      setMessages((prev) => [
+        ...history.map((message) => ({ ...message, id: crypto.randomUUID() })),
+        ...prev,
+      ]);
+
+      // A window of exactly one message is a greeting nobody answered: the window begins at an
+      // opening marker, so nothing after it means the hire never spoke. The backend would
+      // replay that same greeting rather than write a new one, and appending it would put the
+      // same words on screen twice.
+      if (history.length === 1) return;
+
+      greetingRef.current = true;
+      try {
+        await greet();
+      } finally {
+        greetingRef.current = false;
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setIsOpening(false);
     }
-  }, []);
+  }, [greet]);
 
-  useEffect(() => {
-    // Deferred to a microtask (the repo's React-19 pattern) so the first setState never runs
-    // synchronously in the effect body.
-    void (async () => {
-      if (open) await openVisit();
-      else if (autoLoad) await loadHistory();
-    })();
-  }, [open, autoLoad, openVisit, loadHistory]);
+  /**
+   * Starts a new visit: clears the scrollback and greets again.
+   *
+   * The backend's rule is that *a visit ends when the hire speaks*, so opening once they have
+   * writes a fresh opening marker — and `getMessagesForMe` returns from the last marker onward.
+   * Asking to open again is therefore all a "new chat" is; there is no reset endpoint and none
+   * is needed.
+   *
+   * Nothing is deleted. The whole transcript stays in `buddy_messages`, and the buddy's durable
+   * memory note is untouched — it is what the greeting is written from, which is why starting
+   * fresh does not mean starting over. Only the hire's scrollback moves on.
+   */
+  const startFreshVisit = useCallback(async () => {
+    // The button stays enabled while the greeting is written, so a second click would run a
+    // second open. The backend replays the greeting it has just written rather than composing
+    // another, so the hire would read the identical words twice.
+    if (greetingRef.current) return;
+    greetingRef.current = true;
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    setMessages([]);
+    setOpenerAction(null);
+    setDraft("");
+    setIsOpening(true);
+    try {
+      await greet();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      greetingRef.current = false;
+      setIsOpening(false);
+    }
+  }, [greet]);
 
   /**
    * Sends a new message and streams the buddy's reply into the conversation.
@@ -134,6 +219,17 @@ export function useBuddyConversation({
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setIsThinking(true);
+
+    /**
+     * Proposals held back until the reply is finished.
+     *
+     * The backend can emit `action_proposal` before it has written a word, which put an
+     * "Accept this task" button on screen above an empty bubble — the hire was asked to agree
+     * to something the buddy had not said yet. Buffering them costs nothing (a proposal is
+     * inert until confirmed) and guarantees the only sane order: what it wants to do, then the
+     * button that does it.
+     */
+    const proposed: ProposedAction[] = [];
     setActiveTool(null);
     // Once the hire says anything, the opener's one-click suggestion has served its purpose.
     setOpenerAction(null);
@@ -163,12 +259,12 @@ export function useBuddyConversation({
         },
 
         onActionProposal: (proposal) => {
-          // The buddy is offering to do something — attach it to this reply as a pending
-          // action. Nothing has changed yet; the hire confirms it below. The confirm
-          // payloads ride along so the action runs against what the buddy proposed.
-          setIsThinking(false);
+          // The buddy is offering to do something. Nothing has changed yet and nothing will
+          // until the hire confirms — so this is only recorded here, and attached to the reply
+          // once the reply exists. The confirm payloads ride along so the action runs against
+          // what the buddy actually proposed.
           setActiveTool(null);
-          const action: ProposedAction = {
+          proposed.push({
             id: crypto.randomUUID(),
             action: proposal.action,
             label: proposal.label,
@@ -180,17 +276,23 @@ export function useBuddyConversation({
             competencyKey: proposal.competencyKey,
             level: proposal.level,
             status: "idle",
-          };
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), action] } : m,
-            ),
-          );
+          });
         },
 
         onDone: () => {
           setIsStreaming(false);
+          // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
+          // emits a token, and the typing dots would sit under it forever.
+          setIsThinking(false);
           setActiveTool(null);
+
+          if (proposed.length > 0) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), ...proposed] } : m,
+              ),
+            );
+          }
         },
 
         onError: (err) => {
@@ -293,7 +395,7 @@ export function useBuddyConversation({
     confirmAction,
     dismissAction,
 
-    loadHistory,
-    bottomRef,
+    ensureOpened,
+    startFreshVisit,
   };
 }

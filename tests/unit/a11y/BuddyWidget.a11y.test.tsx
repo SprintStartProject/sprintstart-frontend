@@ -5,7 +5,22 @@ import { axe } from "vitest-axe";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { BuddyWidget } from "../../../src/features/buddy/components/BuddyWidget";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { server } from "../setup/vitest.setup";
+
+// The dock's per-question escalation trigger reads the selected project.
+vi.mock("../../../src/features/projects/useProjectContext", async () => {
+  const { createProjectContextValue, createSelectableProject } =
+    await import("../setup/projectContext");
+  return {
+    useProjectContext: () =>
+      createProjectContextValue({
+        selectedProjectId: "p1",
+        projects: [createSelectableProject({ id: "p1", name: "Project One" })],
+        selectedProject: createSelectableProject({ id: "p1", name: "Project One" }),
+      }),
+  };
+});
 
 describe("BuddyWidget Accessibility", () => {
   it("has no axe violations when closed", async () => {
@@ -14,7 +29,9 @@ describe("BuddyWidget Accessibility", () => {
       // router here for the same reason it has one in App: it is mounted inside one.
       <MemoryRouter>
         <main>
-          <BuddyWidget />
+          <BuddyProvider>
+            <BuddyWidget />
+          </BuddyProvider>
         </main>
       </MemoryRouter>,
     );
@@ -38,7 +55,9 @@ describe("BuddyWidget Accessibility", () => {
       // router here for the same reason it has one in App: it is mounted inside one.
       <MemoryRouter>
         <main>
-          <BuddyWidget />
+          <BuddyProvider>
+            <BuddyWidget />
+          </BuddyProvider>
         </main>
       </MemoryRouter>,
     );

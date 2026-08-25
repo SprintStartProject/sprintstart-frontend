@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
+import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -10,7 +11,16 @@ describe("useBuddy", () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
-  it("starts closed and does not load history until opened", () => {
+  /**
+   * The dock starts closed, but the conversation does not wait for it to open. Writing a
+   * greeting is the slow part of meeting the buddy — a remote model — and the widget mounts the
+   * moment a hire's session resolves, long before they click. Doing the work here is what makes
+   * the click find the conversation already there.
+   *
+   * It reads rather than opening blind; `buddyVisitContinuity` covers why that distinction is
+   * the whole ballgame.
+   */
+  it("starts closed, with the conversation already on its way", async () => {
     let requested = false;
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", () => {
@@ -19,10 +29,12 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     expect(result.current.isOpen).toBe(false);
-    expect(requested).toBe(false);
+    await waitFor(() => {
+      expect(requested).toBe(true);
+    });
   });
 
   it("loads conversation history when opened", async () => {
@@ -35,7 +47,7 @@ describe("useBuddy", () => {
       ),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();
@@ -64,7 +76,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();
@@ -90,10 +102,54 @@ describe("useBuddy", () => {
     expect(result.current.draft).toBe("");
   });
 
+  /**
+   * The backend can emit `action_proposal` before it has written a word, which put an
+   * "Accept this task" button on screen above an empty bubble — the hire was asked to agree to
+   * something the buddy had not said yet. Proposals are held until the reply finishes, so the
+   * order is always: what it wants to do, then the button that does it.
+   */
+  it("holds a proposal back until the reply it belongs to has been written", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            // Proposal first, then the words — and the stream stays open, so nothing has
+            // finished yet.
+            controller.enqueue(
+              encoder.encode(
+                'data: {"type":"action_proposal","action":"claim_goal","label":"Accept this task","task_id":"t1"}\n\n',
+              ),
+            );
+            controller.enqueue(
+              encoder.encode('data: {"type":"token","content":"Here is a good first task."}\n\n'),
+            );
+          },
+        });
+        return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+
+    act(() => {
+      result.current.setDraft("what should I work on?");
+    });
+    act(() => {
+      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)?.content).toBe("Here is a good first task.");
+    });
+    expect(result.current.messages.at(-1)?.actions ?? []).toHaveLength(0);
+  });
+
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();
@@ -131,7 +187,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy());
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
 
     act(() => {
       result.current.toggleOpen();

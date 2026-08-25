@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 
 const projectState = { selectedProjectId: "p1" };
 
@@ -22,6 +23,34 @@ vi.mock("../../../src/services/buddyService", () => ({
     .mockResolvedValue([
       { label: "What should I work on?", question: "What should I work on next?" },
     ]),
+}));
+
+vi.mock("../../../src/features/buddy/hooks/usePmReplies", () => ({
+  usePmReplies: () => ({
+    answered: [
+      {
+        id: "r1",
+        projectId: "p1",
+        hireId: "h1",
+        question: "How do I get staging credentials?",
+        status: "ANSWERED",
+        createdAt: "2026-08-24T09:00:00Z",
+        answeredAt: "2026-08-24T10:00:00Z",
+        answer: {
+          id: "a1",
+          projectId: "p1",
+          question: "How do I get staging credentials?",
+          answer: "Ask in #platform.",
+          authorId: "pm1",
+          createdAt: "2026-08-24T10:00:00Z",
+          updatedAt: "2026-08-24T10:00:00Z",
+        },
+      },
+    ],
+    waiting: [],
+    dismissed: [],
+    hasAny: true,
+  }),
 }));
 
 vi.mock("../../../src/services/onboardingMetricsService", () => ({
@@ -47,12 +76,17 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   };
 });
 
-import { streamOpenBuddy, streamMessage } from "../../../src/services/buddyService";
+import { getMessages, streamOpenBuddy, streamMessage } from "../../../src/services/buddyService";
 
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/buddy"]}>
-      <BuddyPage />
+      {/* The conversation belongs to the provider, not to the page — the page is one of two
+                views of it. Rendering the page without one is not a supported arrangement, and
+                `useBuddySession` says so rather than quietly making a second conversation. */}
+      <BuddyProvider>
+        <BuddyPage />
+      </BuddyProvider>
     </MemoryRouter>,
   );
 }
@@ -62,6 +96,9 @@ describe("BuddyPage", () => {
     vi.clearAllMocks();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     projectState.selectedProjectId = "p1";
+    // `clearAllMocks` drops the module mock's resolved values too, so the default — an empty
+    // visit, the case that greets — has to be restored per test.
+    vi.mocked(getMessages).mockResolvedValue([]);
   });
 
   it("shows the no-project state when the hire is not on a project yet", async () => {
@@ -72,6 +109,87 @@ describe("BuddyPage", () => {
     expect(await screen.findByText(/not on a project yet/)).toBeInTheDocument();
     // Nothing is opened for somebody with nowhere to onboard.
     expect(streamOpenBuddy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The bug this replaced: the page opened a visit unconditionally, before reading anything. A
+   * visit ends when the hire speaks, so a later open writes a new opening marker and the
+   * message window starts from there — asking something in the dock and then opening the full
+   * page showed a greeting where the conversation had been.
+   *
+   * Reading first is the fix; *not* opening at all would have been a different bug, since the
+   * greeting is the only thing that reads the buddy's durable memory. So both, in order.
+   */
+  it("keeps the conversation on screen when the new visit opens under it", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+    expect(screen.getByText("With the setup guide.")).toBeInTheDocument();
+    // The greeting arrives under it, and says so.
+    expect(await screen.findByText("Welcome back!")).toBeInTheDocument();
+    expect(screen.getByText("New conversation")).toBeInTheDocument();
+  });
+
+  /**
+   * A visit ends when the hire speaks, so asking the backend to open again writes a fresh
+   * opening marker and the scrollback starts from there. That is all "New chat" is — there is
+   * no reset endpoint and none is needed. Nothing is deleted: the transcript stays in
+   * `buddy_messages` and the buddy's durable memory note, which the next greeting is written
+   * from, is untouched.
+   */
+  it("starts a fresh visit without losing what the buddy has learned", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /New chat/ }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
+    // The greeting is re-requested, which is what opens the new visit server-side.
+    expect(streamOpenBuddy).toHaveBeenCalled();
+  });
+
+  /**
+   * The rail and its toggle were both `hidden … xl:*`, which put a hire on anything narrower
+   * than 1280px out of reach of their PM's answer entirely — the one thing `FlagToPmButton`
+   * promises will show up here. jsdom computes no layout, so this asserts the contract that
+   * carries it: the toggle is not breakpoint-gated, and the replies have a placement that
+   * survives below `xl`.
+   */
+  it("keeps the PM's answer reachable on a narrow screen", async () => {
+    renderPage();
+
+    // Neither the rail nor the control that opens it may be gated on a breakpoint.
+    const toggle = await screen.findByTitle("What you sent to your PM");
+    expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+
+    const rail = await screen.findByRole("complementary", {
+      name: "Questions you sent to your PM",
+    });
+    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+
+    // Open by itself, because an answer is waiting — and present exactly once. Laying it out
+    // twice and hiding one per breakpoint would put the same answer in the document twice.
+    expect(screen.getByText("Ask in #platform.")).toBeInTheDocument();
   });
 
   it("opens the mentor for a hire on a project", async () => {
@@ -160,6 +278,31 @@ describe("BuddyPage", () => {
     renderPage();
 
     expect(await screen.findByText("Find me a task")).toBeInTheDocument();
+  });
+
+  /**
+   * Closing a conversation should put you back where you were, not on a page you never chose.
+   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload onto
+   * `/buddy`, or a link from outside — where stepping back would leave the app entirely. The
+   * board is where a hire belongs instead, and it is the durable half of this same conversation.
+   */
+  it("falls back to the board when there is no history to close back into", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/buddy"]}>
+        <BuddyProvider>
+          <Routes>
+            <Route path="/buddy" element={<BuddyPage />} />
+            <Route path="/board" element={<p>the board</p>} />
+          </Routes>
+        </BuddyProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Close the conversation" }));
+
+    expect(await screen.findByText("the board")).toBeInTheDocument();
   });
 
   it("lets the hire type before the greeting has arrived", async () => {

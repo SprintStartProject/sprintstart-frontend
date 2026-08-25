@@ -1,61 +1,169 @@
-import { Link } from "react-router-dom";
-import { Bot, LayoutDashboard, Sparkles, Users } from "lucide-react";
-import { useBuddyConversation } from "../features/buddy/hooks/useBuddyConversation";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import { Inbox, LayoutDashboard, MessageSquarePlus, Sparkles, Users, X } from "lucide-react";
+import { SleepyBot } from "../features/chatbot/components/SleepyBot";
+import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
+import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
+import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
+import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
+import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
-import { FlagToPmButton } from "../features/knowledge-request/components/FlagToPmButton";
-import { MyEscalations } from "../features/knowledge-request/components/MyEscalations";
+import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
 
 /**
- * The buddy's home: the hire's onboarding front door as a full-page conversation.
+ * The buddy's home: the hire's onboarding front door, as one conversation.
  *
- * The buddy is not a feature of the onboarding — it *is* the onboarding. The mentor
- * answers from the docs *and* from the hire's own state, and renders what it opens
- * (like a task's orientation packet) in the thread rather than navigating away.
+ * The buddy is not a feature of the onboarding — it *is* the onboarding. The mentor answers
+ * from the docs *and* from the hire's own state, and renders what it opens (like a task's
+ * orientation packet) in the thread rather than navigating away.
  *
- * The floating widget (mounted app-wide) shares the same one buddy session, so a hire
- * can pick up the conversation from anywhere.
+ * **It is a conversation with somebody, and it is built to feel like one.** Earlier passes at
+ * this page tried to make it look like the rest of the app by putting the chat in a card and
+ * standing a column of widgets next to it — "Ask about", "Not getting anywhere?" — and what
+ * came out was a dashboard about a conversation rather than a conversation. Everything those
+ * boxes held has moved to where a person would expect it: the things worth asking sit above the
+ * box they fill, sending a question to a person hangs off that question, and the record of what
+ * was sent stands in a rail beside the conversation rather than on top of it.
+ *
+ * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
+ * pick the conversation up from anywhere and grow it into this page when it needs room.
  */
+
 /**
- * The conversation's header.
+ * The page's shape, shared by the mentor and the no-project state so nothing moves between
+ * them.
  *
- * `showBoardLink` is off for a hire with no project: the board is where durable things are kept,
- * and there is nothing durable on it yet. Offering it would send somebody to an almost empty page
- * on their first minute here.
+ * Fixed height rather than the `min-h-screen` its sibling pages use, for one reason: the
+ * composer has to stay on screen. A conversation whose input scrolls away is one you have to
+ * scroll back to in order to answer.
  */
-function BuddyHeader({
+function BuddyPageShell({
   subtitle,
-  showBoardLink = false,
+  actions,
+  rail,
+  children,
 }: {
   subtitle: string;
-  showBoardLink?: boolean;
+  /** Controls that only make sense once there is a conversation — a fresh start, mainly. */
+  actions?: ReactNode;
+  /** The left column, when the page has one open. */
+  rail?: ReactNode;
+  children: ReactNode;
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const prefersReducedMotion = useReducedMotion();
+
+  /**
+   * Leaves the conversation the way you came into it.
+   *
+   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload
+   * straight onto `/buddy`, or a link from outside. There is no history to step back through
+   * there, so going back would leave the app entirely; the board is where a hire belongs
+   * instead, and it is the durable half of this same conversation.
+   */
+  const close = useCallback(() => {
+    if (location.key !== "default") void navigate(-1);
+    else void navigate("/board");
+  }, [location.key, navigate]);
+
+  // Tells the dock's hand-off that the page is really on screen, so it can stop standing in
+  // for it. No entrance animation of its own any more: arriving from the dock, the page is
+  // revealed by that window fading away, and a second fade underneath it only ever showed the
+  // background through both.
+  useEffect(() => {
+    announceBuddyPageReady();
+  }, []);
+
   return (
-    <header className="shrink-0 border-b border-app-border px-4 py-5">
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-brand/10">
-          <Bot className="h-5 w-5 text-app-brand-text" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-lg leading-tight font-bold text-app-text">Buddy</h1>
-          <p className="text-sm text-app-text-muted">{subtitle}</p>
-        </div>
-        {/* This conversation opens fresh every visit by design, so anything worth keeping
-                    lives on the board. Linking it here is what stops it being a page nobody finds. */}
-        {showBoardLink && (
-          <Link
-            to="/board"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border px-3 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          >
-            <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-            Board
-          </Link>
-        )}
+    <div className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen xl:flex-row">
+      {/* A column beside the conversation where there is room for one, a band above it where
+                there is not — one element either way, laid out by the parent's direction.
+                Rendering it twice and hiding one per breakpoint would put the same answers in the
+                document twice, which is a duplicate to anything that reads the page rather than
+                looks at it.
+
+                Deliberately not hidden below `xl`: this is where a hire reads the answer their PM
+                sent, and putting it out of reach on a laptop would quietly break the promise
+                `FlagToPmButton` makes. */}
+      {rail && (
+        <aside
+          aria-label="Questions you sent to your PM"
+          className="max-h-[45vh] shrink-0 overflow-y-auto border-b border-app-border bg-app-bg-soft xl:max-h-none xl:w-80 xl:border-r xl:border-b-0"
+        >
+          {rail}
+        </aside>
+      )}
+
+      {/* `app-rail-open` collapses this column's left gutter, so the rail opens *into* the empty
+                gutter instead of shoving the conversation right. The separating space belongs
+                before the `${'{'}` — prettier-plugin-tailwindcss trims class strings when it sorts
+                them, and gluing two classes together here once turned a whole page into a flex
+                row (see ChatPage). */}
+      <div className={`flex min-w-0 flex-1 flex-col ${rail ? "app-rail-open" : ""}`}>
+        <motion.header
+          {...(prefersReducedMotion
+            ? {}
+            : {
+                initial: { opacity: 0, y: -8 },
+                animate: { opacity: 1, y: 0 },
+                transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const },
+              })}
+          className="shrink-0 border-b border-app-border bg-app-bg/85 backdrop-blur-md"
+        >
+          {/* The same `app-page-frame` gutters the header band of every other page uses, so the
+                    buddy's name starts on the line the PM dashboard's and the knowledge base's
+                    titles start on. */}
+          <div className="app-page-frame flex items-center gap-3 py-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
+              <SleepyBot size={32} canSleep={false} tracksPointer className="text-app-brand-text" />
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base leading-tight font-semibold text-app-text">Buddy</h1>
+              <p className="truncate text-xs text-app-text-muted">{subtitle}</p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              {actions}
+
+              {/* The thread starts fresh every visit, so anything worth keeping lives on the
+                            board — the link is what stops that being a page nobody finds. A `Link`
+                            styled to sit level with the buttons beside it: a control that changes
+                            the URL is an anchor, and dressing one as a `Button` does not make it
+                            keyboard- or screen-reader-correct. */}
+              <Link
+                to="/board"
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              >
+                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                Board
+              </Link>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label="Close the conversation"
+                title="Close"
+                onClick={close}
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        </motion.header>
+
+        {children}
       </div>
-    </header>
+    </div>
   );
 }
 
@@ -76,87 +184,90 @@ function BuddyMentorHome() {
     handleSubmit,
     confirmAction,
     dismissAction,
-    bottomRef,
-  } = useBuddyConversation({ open: true });
+    ensureOpened,
+    startFreshVisit,
+  } = useBuddySession();
+
+  // The same conversation the dock shows, brought on screen the same way. It used to open a
+  // *new* visit here, which is what threw away whatever the hire had already asked.
+  useEffect(() => {
+    void ensureOpened();
+  }, [ensureOpened]);
 
   const suggestions = useBuddySuggestions();
+  const replies = usePmReplies();
 
-  // Whatever they were typing in the floating panel when they asked for more room.
+  // Open when there is an answer waiting, closed otherwise. `FlagToPmButton` promises the hire
+  // that the answer "will show up here", and a reply sitting behind a control they have to find
+  // does not keep that promise. A rail holding nothing but "still waiting" has nothing to say
+  // that the toggle's own count does not, so it stays out of the way.
+  const [isRailOpen, setIsRailOpen] = useState(false);
+  const [railDecided, setRailDecided] = useState(false);
+  if (!railDecided && replies.hasAny) {
+    // React's documented "adjust state when a prop changes" pattern — a guarded setState during
+    // render rather than an effect, so the first paint already has the right layout instead of
+    // showing the closed one and shifting.
+    setRailDecided(true);
+    setIsRailOpen(replies.answered.length > 0);
+  }
+
+  // Whatever they were typing in the dock when they asked for more room.
   useHandedOffDraft(setDraft);
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
-  const lastQuestion = [...messages].reverse().find((m) => m.role === "USER")?.content ?? "";
 
-  // Opening does not gate the page. The greeting costs a model call, and blanking
-  // everything behind a spinner until it lands made the hire's landing page unusable for ~20
-  // seconds. Nothing here needs the greeting to work: the composer sends, the escalation channel
-  // and the chips render, and the greeting drops into the transcript when it arrives. It is the
-  // same rule the board already holds itself to -- a page that waits on a model to open is a
-  // page nobody opens.
+  // Opening does not gate the page. The greeting costs a model call, and blanking everything
+  // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
+  // Nothing here needs the greeting in order to work: the composer sends, the chips render, and
+  // the greeting arrives in its own bubble — as the buddy typing, which is the honest picture
+  // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col lg:h-screen">
-      <BuddyHeader
-        subtitle="Your always-on mentor — ask about the codebase, or about your own onboarding."
-        showBoardLink
-      />
-
-      {/* Directly under the header, and not conditioned on the hire having spoken: an
-                escalation is the last-resort channel, so a hire with an answer waiting is the one
-                most likely to be blocked. Owns its own spacing because it renders nothing at all
-                when they have never flagged anything — a wrapper here would leave a gap instead. */}
-      <MyEscalations />
-
-      {/* The greeting invites one next step; offer it as a single prominent chip until the
-                hire acts or asks something of their own. */}
-      {openerAction && !hasUserMessage && (
-        <div className="shrink-0 px-4 pt-4">
-          <div className="mx-auto w-full max-w-3xl">
-            <button
-              type="button"
-              onClick={() => void sendMessage(openerAction.question)}
-              className="inline-flex items-center gap-2 rounded-full bg-app-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+    <BuddyPageShell
+      subtitle="Your onboarding mentor — here whenever you're stuck."
+      rail={
+        isRailOpen ? (
+          <BuddyPmReplies {...replies} onClose={() => setIsRailOpen(false)} />
+        ) : undefined
+      }
+      actions={
+        // Not a delete. The transcript stays on the server and the buddy's durable memory note
+        // is untouched — it is what the next greeting is written from, which is why starting
+        // fresh does not mean starting over. Only the scrollback moves on.
+        <>
+          {/* Only offered when there is something behind it: a toggle that opens an empty
+                        panel is worse than no toggle. */}
+          {replies.hasAny && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={isRailOpen}
+              icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
+              title="What you sent to your PM"
+              onClick={() => setIsRailOpen((open) => !open)}
             >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              {openerAction.label}
-            </button>
-          </div>
-        </div>
-      )}
+              PM replies
+              <span className="ml-1 rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text">
+                {replies.answered.length + replies.waiting.length + replies.dismissed.length}
+              </span>
+            </Button>
+          )}
 
-      {/* These used to be four hardcoded strings, one of which was "Is my PR stuck?" —
-                offered to every hire, including the roles role-tracks exists to stop showing pull
-                requests to. They now come from the backend, which builds them from the tools it
-                actually mounts for this hire, so the chips and the mentor cannot disagree.
-
-                They also *fill* the composer now instead of sending. The hire presses send: the
-                words stay theirs, and they can edit the question first — which is how somebody
-                learns they are allowed to. The opener's own chip above still sends on one click,
-                deliberately: that one is accepting something the mentor just offered, not composing
-                a question, and it looks different because it is different. */}
-      {!hasUserMessage && (
-        <div className="shrink-0 px-4 pt-4">
-          <div className="mx-auto w-full max-w-3xl">
-            <BuddySuggestionChips
-              suggestions={suggestions}
-              onPick={setDraft}
-              heading="Or ask about something else"
-            />
-          </div>
-        </div>
-      )}
-
-      {hasUserMessage && (
-        <div className="shrink-0 px-4 pt-3">
-          <div className="mx-auto w-full max-w-3xl">
-            <FlagToPmButton defaultQuestion={lastQuestion} />
-          </div>
-        </div>
-      )}
-
+          {hasUserMessage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
+              title="Start a new conversation — your buddy keeps what it has learned about you"
+              onClick={() => void startFreshVisit()}
+            >
+              New chat
+            </Button>
+          )}
+        </>
+      }
+    >
       <BuddyConversation
         messages={messages}
-        // While the visit opens, the same indicator stands in for the greeting that is on
-        // its way -- it does not disable the composer, so the hire can type straight past it.
         isThinking={isThinking || isOpening}
         activeTool={activeTool}
         draft={draft}
@@ -164,9 +275,42 @@ function BuddyMentorHome() {
         handleSubmit={handleSubmit}
         confirmAction={confirmAction}
         dismissAction={dismissAction}
-        bottomRef={bottomRef}
+        // Escalating hangs off the hire's own question now, not off the buddy's answer — see
+        // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
+        // where a messenger offers a quick reply: right under the message that suggested it. It
+        // sends on one click, unlike the chips, because accepting something the mentor just
+        // offered is not composing a question of your own.
+        lastMessageFooter={
+          !hasUserMessage && openerAction ? (
+            <Button
+              variant="primary"
+              size="sm"
+              className="mt-1.5"
+              icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+              onClick={() => void sendMessage(openerAction.question)}
+            >
+              {openerAction.label}
+            </Button>
+          ) : undefined
+        }
+        renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+        aboveComposer={
+          // The chips *fill* the composer instead of sending, which is why they sit on top of
+          // it. The hire presses send: the words stay theirs, and they can edit the question
+          // first — which is how somebody learns they are allowed to. The list is the
+          // backend's, built from the tools it actually mounts for this hire, so the chips and
+          // the mentor cannot disagree about whether this role has pull requests.
+          !hasUserMessage ? (
+            <BuddySuggestionChips
+              suggestions={suggestions}
+              onPick={setDraft}
+              heading="Not sure where to start?"
+            />
+          ) : undefined
+        }
+        focusComposerOnMount
       />
-    </div>
+    </BuddyPageShell>
   );
 }
 
@@ -175,16 +319,18 @@ export function BuddyPage() {
 
   if (!isLoading && !selectedProjectId) {
     return (
-      <div className="flex h-[calc(100vh-64px)] flex-col lg:h-screen">
-        <BuddyHeader subtitle="Your onboarding buddy, once you're on a project." />
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <Users className="h-8 w-8 text-app-text-muted" aria-hidden="true" />
-          <p className="max-w-sm text-sm text-app-text-muted">
+      <BuddyPageShell subtitle="Your onboarding buddy, once you're on a project.">
+        <div className="app-page-frame flex flex-1 items-center justify-center py-8">
+          <EmptyState
+            icon={<Users className="h-8 w-8" aria-hidden="true" />}
+            title="No project yet"
+            className="w-full max-w-md"
+          >
             You&rsquo;re not on a project yet — once you&rsquo;re added to one, your buddy will meet
             you here.
-          </p>
+          </EmptyState>
         </div>
-      </div>
+      </BuddyPageShell>
     );
   }
 

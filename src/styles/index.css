@@ -365,10 +365,15 @@ body {
   padding-right: var(--app-page-gutter);
 }
 
-/* ChatPage: when the desktop history sidebar is open, collapse the left
-   gutter so the sidebar opens "into" the empty gutter space instead of
-   pushing the chat content right and leaving a gap between sidebar and chat. */
-.chat-sidebar-open .app-page-frame {
+/* When a page opens a rail on its left, collapse the left gutter so the rail
+   opens *into* the empty gutter space instead of pushing the content right and
+   leaving a gap between the app sidebar and the page. Put it on the content
+   column that sits beside the rail, not on the page root.
+
+   Used by ChatPage's history sidebar and by the buddy page's PM replies. It
+   started chat-specific; the second caller is what made it worth a name that
+   says what it does rather than where it was first needed. */
+.app-rail-open .app-page-frame {
   padding-left: 1.5rem;
 }
 

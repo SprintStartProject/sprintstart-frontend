@@ -24,10 +24,13 @@ type AskTheBuddyProps = {
  * Opens the always-on widget through the existing bus rather than navigating: keeping the page on
  * screen is the point, since what is on it is what the question is about.
  *
- * It lives with the buddy, not with the board, and only belongs on surfaces a hire can reach.
- * `openAiBuddy` is a no-op wherever the widget is not mounted, and the widget is mounted only for
- * `USER` profiles. Putting this on a PM surface such as `/starter-work` would be a control that
- * silently does nothing, which is why it is not on any of them.
+ * It lives with the buddy, not with the board, and belongs on the hire's own surfaces. The widget
+ * it opens is mounted for every signed-in user — the same audience `/buddy` itself has — so this
+ * would technically work on a PM surface such as `/starter-work`. It is kept off them because the
+ * buddy is the hire's channel, not because the control would do nothing there.
+ *
+ * The one place `openAiBuddy` really is a no-op is `/buddy`, where the widget takes itself off the
+ * page: nothing renders this there, and the page's own composer is the thing to use.
  */
 export function AskTheBuddy({ question, label = "Ask your buddy about this" }: AskTheBuddyProps) {
   return (

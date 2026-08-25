@@ -1,16 +1,13 @@
-import { Bot, Send } from "lucide-react";
-import type { RefObject } from "react";
-import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
-import { UserAvatar } from "../../../components/common/UserAvatar";
+import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
-import { toolLabel } from "../toolLabel";
-import { BuddyActionProposals } from "./BuddyActionProposals";
-import { BuddyMarkdown } from "./BuddyMarkdown";
+import { BuddyComposer } from "./BuddyComposer";
+import { BuddyThread } from "./BuddyThread";
+import { useStickToBottom } from "../hooks/useStickToBottom";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
   isThinking: boolean;
-  /** The tool the buddy is running right now, if any — shown as "Checking your progress…". */
+  /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
   draft: string;
   setDraft: (value: string) => void;
@@ -19,15 +16,39 @@ type BuddyConversationProps = {
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
   dismissAction: (messageId: string, actionId: string) => void;
-  bottomRef: RefObject<HTMLDivElement | null>;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
+  /** Rendered above the first message: what came back from the hire's PM. */
+  before?: ReactNode;
+  /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
+  lastMessageFooter?: ReactNode;
+  /** Rendered under each of the hire's own questions, handed that question's text. */
+  renderQuestionAction?: (question: string) => ReactNode;
+  /** Rendered just above the composer: the things this hire could usefully ask. */
+  aboveComposer?: ReactNode;
+  /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
+  focusComposerOnMount?: boolean;
 };
 
 /**
- * The full-page buddy conversation used by the `/buddy` home. Shares the bubble styling of
- * the floating [BuddyPanel] so both surfaces feel like the same companion, but lays out for
- * a page and surfaces what the buddy is *doing* (a tool label) rather than a bare spinner.
+ * The `/buddy` conversation: the thread, and the box you answer it in.
+ *
+ * **No card, no panel, no chrome.** It used to be a bordered surface sitting in a page grid
+ * beside a column of widgets, and the widgets were the problem — a box labelled "Ask about"
+ * next to a box labelled "Not getting anywhere?" is a settings screen, not somebody you talk
+ * to. What is left is what a conversation actually needs: the messages, and a place to write.
+ * Everything the widgets used to hold has moved to where it belongs — the suggestions to the
+ * composer they fill, the escalation offer to the hire's own question, and what came back from
+ * a person to the rail beside all of it.
+ *
+ * The page owns the `app-page-frame` gutters that the PM dashboard, the knowledge base and
+ * data ingestion use, and this fills the column left inside them — beside the rail when there
+ * is one. The reading measure is kept on the *bubbles* instead of on this column: they hug
+ * opposite edges and stop at a readable width, which is how a full-width thread stays legible
+ * without narrowing the page it sits on.
+ *
+ * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
+ * to `BuddyMarkdown`, where wide blocks get their own scrollers.
  */
 export function BuddyConversation({
   messages,
@@ -38,126 +59,53 @@ export function BuddyConversation({
   handleSubmit,
   confirmAction,
   dismissAction,
-  bottomRef,
-  placeholder = "Ask your buddy anything...",
+  placeholder,
+  before,
+  lastMessageFooter,
+  renderQuestionAction,
+  aboveComposer,
+  focusComposerOnMount = false,
 }: BuddyConversationProps) {
+  const { containerRef, onScroll } = useStickToBottom(messages);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* Same rule as the floating panel, and not merely defensive here: this page is wide,
-                so an overflowing reply reads as a slightly odd layout rather than an obvious bug —
-                which is how it would go unnoticed. See BuddyPanel for why min-w-0 is the fix. */}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4 px-4 py-4">
-          {messages.map((message) => {
-            const isUser = message.role === "USER";
-            const hasText = message.content.trim().length > 0;
-            const hasActions = (message.actions?.length ?? 0) > 0;
-
-            // The send loop appends an empty assistant message up front and streams
-            // into it. Until the first token (or an action proposal) arrives it has
-            // nothing to show, and the `isThinking` indicator below already stands in
-            // for it — so skip it, otherwise an empty second bubble appears while the
-            // buddy is thinking.
-            if (!isUser && !hasText && !hasActions) {
-              return null;
-            }
-
-            return (
-              <div
-                key={message.id}
-                className={`flex w-full gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
-              >
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                    isUser ? "" : "bg-app-surface-muted"
-                  }`}
-                >
-                  {isUser ? (
-                    <UserAvatar fallbackName="You" size={32} />
-                  ) : (
-                    <Bot size={16} className="text-app-brand-text" />
-                  )}
-                </div>
-
-                <div
-                  className={`flex max-w-[80%] min-w-0 flex-col ${isUser ? "items-end" : "items-start"}`}
-                >
-                  {hasText && (
-                    <div
-                      className={`max-w-full min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${
-                        isUser
-                          ? "rounded-tr-none bg-app-brand whitespace-pre-wrap text-white"
-                          : "rounded-tl-none bg-app-surface-muted text-app-text"
-                      }`}
-                    >
-                      {isUser ? message.content : <BuddyMarkdown content={message.content} />}
-                    </div>
-                  )}
-
-                  {!isUser && message.actions && message.actions.length > 0 && (
-                    <BuddyActionProposals
-                      messageId={message.id}
-                      actions={message.actions}
-                      onConfirm={confirmAction}
-                      onDismiss={dismissAction}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {isThinking && (
-            <div className="flex w-full gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
-                <Bot size={16} className="text-app-brand-text" />
-              </div>
-
-              <div className="flex max-w-[80%] flex-col items-start">
-                <div className="rounded-2xl rounded-tl-none bg-app-surface-muted px-4 py-2.5">
-                  {activeTool ? (
-                    <span className="text-sm text-app-text-muted">{toolLabel(activeTool)}</span>
-                  ) : (
-                    <div className="flex gap-1">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
+    <>
+      <div
+        ref={containerRef}
+        onScroll={onScroll}
+        data-testid="buddy-transcript"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        <div className="app-page-frame flex min-w-0 flex-col gap-4 py-6">
+          <BuddyThread
+            messages={messages}
+            isThinking={isThinking}
+            activeTool={activeTool}
+            confirmAction={confirmAction}
+            dismissAction={dismissAction}
+            showNames
+            before={before}
+            lastMessageFooter={lastMessageFooter}
+            renderQuestionAction={renderQuestionAction}
+          />
         </div>
       </div>
 
-      <div className="border-t border-app-border bg-app-bg">
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 py-4"
-        >
-          <AutoResizeTextarea
-            value={draft}
-            onChange={setDraft}
-            placeholder={placeholder}
-            minRows={1}
-            maxRows={6}
-            className="flex-1"
-            submitOnEnter
-          />
+      {/* Translucent rather than solid, so the thread does not stop dead at a hard line — the
+                last message fades under the composer as it scrolls past it. */}
+      <div className="shrink-0 border-t border-app-border bg-app-bg/85 backdrop-blur-md">
+        <div className="app-page-frame py-3">
+          {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
-          <button
-            type="submit"
-            aria-label="Send message"
-            disabled={!draft.trim()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Send size={18} />
-          </button>
-        </form>
+          <BuddyComposer
+            draft={draft}
+            setDraft={setDraft}
+            handleSubmit={handleSubmit}
+            placeholder={placeholder}
+            focusOnMount={focusComposerOnMount}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

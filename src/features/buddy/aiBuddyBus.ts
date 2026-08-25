@@ -31,3 +31,26 @@ export function onOpenAiBuddy(handler: (detail: OpenAiBuddyDetail) => void): () 
   window.addEventListener(OPEN_AI_BUDDY_EVENT, listener);
   return () => window.removeEventListener(OPEN_AI_BUDDY_EVENT, listener);
 }
+
+const BUDDY_PAGE_READY_EVENT = "sprintstart:buddy-page-ready";
+
+/**
+ * Announced by `/buddy` once it has mounted and painted.
+ *
+ * The dock's hand-off needs this because navigation is not synchronous: React Router wraps route
+ * changes in `React.startTransition`, so React keeps the *previous* page on screen until the new
+ * one is ready to commit. A hand-off timed on a clock therefore uncovered whatever was underneath
+ * — which, during that window, is still the page the hire was leaving.
+ *
+ * A signal rather than a longer timeout: the wait depends on how long the page takes to render,
+ * which is not ours to guess. The widget keeps a fallback for the case where this never arrives.
+ */
+export function announceBuddyPageReady(): void {
+  window.dispatchEvent(new Event(BUDDY_PAGE_READY_EVENT));
+}
+
+/** Subscribes to the page's ready signal. Returns an unsubscribe function. */
+export function onBuddyPageReady(handler: () => void): () => void {
+  window.addEventListener(BUDDY_PAGE_READY_EVENT, handler);
+  return () => window.removeEventListener(BUDDY_PAGE_READY_EVENT, handler);
+}

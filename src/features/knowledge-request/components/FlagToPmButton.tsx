@@ -7,8 +7,16 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 
 type FlagToPmButtonProps = {
-  /** Pre-fills the form with the hire's last question, so flagging is one edit, not a re-type. */
+  /** Pre-fills the form with the question being flagged, so flagging is one edit, not a re-type. */
   defaultQuestion?: string;
+  /**
+   * What the closed trigger says.
+   *
+   * The default reads as a reaction to an answer that did not land. Under the hire's own
+   * question — where the control now lives, because the thing being flagged is the question —
+   * that phrasing is about the wrong half of the exchange.
+   */
+  triggerLabel?: string;
 };
 
 /** The form's states swap in place; the shared motion keeps the change continuous. */
@@ -19,7 +27,10 @@ type FormState = "idle" | "sending" | "sent" | "error";
  * to send the question to their PM — the answer comes back as durable buddy knowledge, so the next
  * person never hits the same wall. Hidden when the hire is on no project (there is no PM to route to).
  */
-export function FlagToPmButton({ defaultQuestion = "" }: FlagToPmButtonProps) {
+export function FlagToPmButton({
+  defaultQuestion = "",
+  triggerLabel = "Buddy can't help? Flag it to your PM",
+}: FlagToPmButtonProps) {
   const prefersReducedMotion = useReducedMotion();
   const { selectedProjectId } = useProjectContext();
   const fieldId = useId();
@@ -52,10 +63,10 @@ export function FlagToPmButton({ defaultQuestion = "" }: FlagToPmButtonProps) {
           setIsOpen(true);
           setStatus("idle");
         }}
-        className="flex items-center gap-1.5 text-sm text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="flex items-center gap-1.5 rounded text-xs text-app-text-disabled transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
-        <Flag className="h-4 w-4" aria-hidden="true" />
-        Buddy can&apos;t help? Flag it to your PM
+        <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+        {triggerLabel}
       </button>
     );
   }
