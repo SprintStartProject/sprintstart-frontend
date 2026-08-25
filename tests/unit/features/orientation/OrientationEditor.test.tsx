@@ -109,7 +109,10 @@ describe("OrientationEditor", () => {
     expect(screen.getByTestId("save-orientation")).toBeDisabled();
 
     await user.type(screen.getByTestId("step-body-SET_UP"), "Clone and run it.");
-    expect(screen.getByTestId("save-orientation")).toBeEnabled();
+    // Waited for rather than asserted outright: validity is derived synchronously, but `type`
+    // dispatches one keystroke per act(), and on a loaded runner the last one can still be in
+    // flight on the tick this line runs. Same assertion, minus the race.
+    await waitFor(() => expect(screen.getByTestId("save-orientation")).toBeEnabled());
 
     await user.click(screen.getByTestId("save-orientation"));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
