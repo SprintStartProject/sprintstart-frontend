@@ -178,35 +178,81 @@ describe("the cards the hire writes", () => {
 });
 
 describe("arranging the board", () => {
+  /** The grip on a card, which is both the drag handle and the keyboard control. */
+  function grips() {
+    return screen.getAllByRole("button", { name: /move the note card/i });
+  }
+
   it("moving a card sends the whole resulting order", () => {
     const onReorder = vi.fn();
     render(<BoardGrid board={board([note("first"), note("second")])} onReorder={onReorder} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: /move the note card later/i })[0]);
+    fireEvent.keyDown(grips()[0], { key: "ArrowDown" });
 
+    // Never a from/to pair: the whole resulting order, because that is what the board now is.
     expect(onReorder).toHaveBeenCalledWith(["c1", "c0"]);
   });
 
   it("cannot move the first card earlier or the last one later", () => {
-    render(<BoardGrid board={board([note("first"), note("second")])} onReorder={vi.fn()} />);
+    const onReorder = vi.fn();
+    render(<BoardGrid board={board([note("first"), note("second")])} onReorder={onReorder} />);
 
-    expect(
-      screen.getAllByRole("button", { name: /move the note card earlier/i })[0],
-    ).toBeDisabled();
-    expect(screen.getAllByRole("button", { name: /move the note card later/i })[1]).toBeDisabled();
+    fireEvent.keyDown(grips()[0], { key: "ArrowUp" });
+    fireEvent.keyDown(grips()[1], { key: "ArrowDown" });
+
+    expect(onReorder).not.toHaveBeenCalled();
   });
 
-  it("offers keyboard-reachable buttons rather than a drag alone", () => {
+  it("offers a keyboard-reachable grip rather than a drag alone", () => {
     render(<BoardGrid board={board([note(), note()])} onReorder={vi.fn()} />);
 
-    // A board you can only arrange with a mouse is a board some people cannot arrange.
-    expect(screen.getAllByRole("button", { name: /move the note card/i }).length).toBe(4);
+    // A board you can only arrange with a mouse is a board some people cannot arrange. One grip
+    // per card, and the arrow keys move it while it has focus — the label says so.
+    expect(grips().length).toBe(2);
+    expect(grips()[0]).toHaveAccessibleName(/arrow keys/i);
   });
 
-  it("has no move controls when the board is not arrangeable", () => {
+  it("has no grip when the board is not arrangeable", () => {
     render(<BoardGrid board={board([note(), note()])} />);
 
     expect(screen.queryByRole("button", { name: /move the/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("folding and pinning", () => {
+  it("folds a card down to its header and back", () => {
+    const onToggle = vi.fn();
+    render(
+      <BoardGrid
+        board={board([note("Deploys\nare on Thursdays")])}
+        collapsedIds={new Set(["c0"])}
+        onToggleCollapsed={onToggle}
+      />,
+    );
+
+    // Folded: the heading is still the card's own first line, the body is not rendered.
+    expect(screen.getByRole("heading", { name: "Deploys" })).toBeInTheDocument();
+    expect(screen.queryByText("are on Thursdays")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /unfold the note card/i }));
+    expect(onToggle).toHaveBeenCalledWith("c0");
+  });
+
+  it("says a card is pinned rather than only putting it on top", () => {
+    const onPin = vi.fn();
+    render(
+      <BoardGrid
+        board={board([note("first")])}
+        pinnedIds={new Set(["c0"])}
+        onTogglePinned={onPin}
+      />,
+    );
+
+    // Position alone is a state the hire cannot read: the pin carries an icon and a word.
+    expect(screen.getByText("Pinned")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /unpin the note card/i }));
+    expect(onPin).toHaveBeenCalledWith("c0");
   });
 });
 

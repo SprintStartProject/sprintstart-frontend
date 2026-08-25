@@ -24,6 +24,11 @@ const KINDS: { kind: AuthoredCardKind; label: string; icon: LucideIcon }[] = [
  * that opens a dialog that contains a form. This is the smallest thing on the page and it should
  * take one decision and one sentence.
  *
+ * The three triggers sit quietly at the right, above the board rather than in front of it: they
+ * are always available and rarely the reason somebody opened the page. `+ Note` says what it does
+ * on its own, so the row carries no sentence introducing it, and the empty board — the one place
+ * where the offer needs explaining — explains it there instead.
+ *
  * The submit button is disabled until the card would say something, which is the same rule the
  * server enforces: a blank card nobody can explain later is worse than a button that waits.
  *
@@ -52,20 +57,14 @@ export function AddCardForm({ onAdd }: AddCardFormProps) {
 
   if (!kind) {
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-app-text-muted">Put something of your own here:</span>
-        {KINDS.map(({ kind: option, label: optionLabel, icon: Icon }) => (
+      <div className="flex flex-wrap items-center justify-end gap-1">
+        {KINDS.map(({ kind: option, label: optionLabel }) => (
           <Button
             key={option}
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => setKind(option)}
-            icon={
-              <span className="flex items-center gap-1">
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-              </span>
-            }
+            icon={<Plus className="h-3.5 w-3.5" aria-hidden="true" />}
           >
             {optionLabel}
           </Button>

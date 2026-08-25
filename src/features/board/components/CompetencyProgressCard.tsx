@@ -9,11 +9,6 @@ type CompetencyProgressCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 function CompetencyRow({ competency, held }: { competency: BoardCompetency; held: boolean }) {
@@ -44,11 +39,6 @@ export function CompetencyProgressCard({
   card,
   onDismiss,
   dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
 }: CompetencyProgressCardProps) {
   const { held, inProgress } = content;
   const nothingYet = held.length === 0 && inProgress.length === 0;
@@ -61,11 +51,6 @@ export function CompetencyProgressCard({
       subtitle={held.length > 0 ? `${held.length} shown` : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
     >
       {nothingYet ? (
         <EmptyState size="sm">

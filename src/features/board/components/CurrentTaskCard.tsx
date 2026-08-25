@@ -9,11 +9,6 @@ type CurrentTaskCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -27,17 +22,7 @@ type CurrentTaskCardProps = {
  * cleared would read as the board losing things, and "you have nothing on" is usually the thing
  * worth fixing.
  */
-export function CurrentTaskCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
-}: CurrentTaskCardProps) {
+export function CurrentTaskCard({ content, card, onDismiss, dismissing }: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
 
   return (
@@ -54,11 +39,6 @@ export function CurrentTaskCard({
       }
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
     >
       {hasTask ? (
         <div>

@@ -13,11 +13,6 @@ type ChecklistCardProps = {
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /** The items, as the server needs them back: existing ones keep their id, so a tick lands on a line. */
@@ -50,11 +45,6 @@ export function ChecklistCard({
   onDismiss,
   dismissing,
   onEdit,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
 }: ChecklistCardProps) {
   const [newItem, setNewItem] = useState("");
   const done = content.items.filter((item) => item.done).length;
@@ -108,11 +98,6 @@ export function ChecklistCard({
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
     >
       {content.items.length === 0 ? (
         <EmptyState size="sm">Nothing on it yet.</EmptyState>

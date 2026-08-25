@@ -11,6 +11,8 @@ import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboa
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import {
   AdminIcon,
+  ArrivalStepsIcon,
+  BoardIcon,
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
@@ -51,6 +53,14 @@ const navItems: SidebarNavItem[] = [
     path: "/",
     icon: DashboardIcon,
   },
+  // Directly under the dashboard: the board is where the hire's own onboarding
+  // sits between conversations, so it belongs beside the overview rather than
+  // buried behind the chat that fills it.
+  {
+    label: "Board",
+    path: "/board",
+    icon: BoardIcon,
+  },
   {
     label: "Chat",
     path: "/chat",
@@ -78,6 +88,14 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Data Ingestion",
     path: "/data-ingestion",
     icon: DataIngestionIcon,
+  },
+  // The steps a new hire is walked through on arrival — set up here by the PM,
+  // which is why it sits with the other things a PM prepares rather than in the
+  // hire's own list. `canAccessRoute` keeps it off a hire's sidebar.
+  {
+    label: "Arrival Steps",
+    path: "/arrival-steps",
+    icon: ArrivalStepsIcon,
   },
   {
     label: "Starter Work",

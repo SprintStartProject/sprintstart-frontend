@@ -14,11 +14,6 @@ type ArrivalStepsCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -39,17 +34,7 @@ type ArrivalStepsCardProps = {
  * observe never unsettles one, so an outage, a rate limit and a hire with no work yet are one and
  * the same answer here.
  */
-export function ArrivalStepsCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
-}: ArrivalStepsCardProps) {
+export function ArrivalStepsCard({ content, card, onDismiss, dismissing }: ArrivalStepsCardProps) {
   // Derived, not synced: the card re-reads on every board load, and a confirmation that has
   // landed should not be undone by a stale prop. Same shape the diagram card uses for `redrawn`.
   const [confirmed, setConfirmed] = useState<Record<string, ArrivalStep>>({});
@@ -112,11 +97,6 @@ export function ArrivalStepsCard({
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
       subtitle={summarise({ observed, declared, outstanding })}
     >
       <div className="space-y-4">

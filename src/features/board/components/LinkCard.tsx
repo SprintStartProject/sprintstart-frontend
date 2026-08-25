@@ -7,11 +7,6 @@ type LinkCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -24,17 +19,7 @@ type LinkCardProps = {
  * No inline editing: a link is its address, and changing that makes it a different link. Remove and
  * add is the honest gesture, and it is one click more than an edit form nobody would find.
  */
-export function LinkCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
-}: LinkCardProps) {
+export function LinkCard({ content, card, onDismiss, dismissing }: LinkCardProps) {
   return (
     <BoardCardFrame
       icon={Link2}
@@ -42,11 +27,6 @@ export function LinkCard({
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
     >
       <a
         href={content.url}

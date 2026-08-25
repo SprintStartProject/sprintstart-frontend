@@ -9,11 +9,6 @@ type MemoryRecapCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -28,17 +23,7 @@ type MemoryRecapCardProps = {
  * would present a model's summary as a record. And it invites correction, because the hire is the
  * only one who can tell whether it is right.
  */
-export function MemoryRecapCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
-}: MemoryRecapCardProps) {
+export function MemoryRecapCard({ content, card, onDismiss, dismissing }: MemoryRecapCardProps) {
   const { memory, messagesRemembered } = content;
 
   return (
@@ -53,11 +38,6 @@ export function MemoryRecapCard({
       }
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
     >
       {memory ? (
         <>

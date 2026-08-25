@@ -9,11 +9,6 @@ type SuggestedTasksCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -32,11 +27,6 @@ export function SuggestedTasksCard({
   card,
   onDismiss,
   dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
 }: SuggestedTasksCardProps) {
   return (
     <BoardCardFrame
@@ -46,11 +36,6 @@ export function SuggestedTasksCard({
       subtitle={content.tasks.length > 0 ? "Best fit first" : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
     >
       {content.tasks.length === 0 ? (
         <EmptyState size="sm">

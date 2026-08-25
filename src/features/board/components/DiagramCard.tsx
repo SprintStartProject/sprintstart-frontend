@@ -16,11 +16,6 @@ type DiagramCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 const nodeTypes = { diagramPart: DiagramCardNode };
@@ -40,17 +35,7 @@ const nodeTypes = { diagramPart: DiagramCardNode };
  * drawn rather than waiting on a generation. The date is shown either way: a picture is a claim
  * about code as it was at a moment.
  */
-export function DiagramCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
-}: DiagramCardProps) {
+export function DiagramCard({ content, card, onDismiss, dismissing }: DiagramCardProps) {
   // Only what a revalidation produced. Derived rather than synced from the prop, so a fresh board
   // read cannot be silently overwritten by a stale confirmation of the previous one.
   const [redrawn, setRedrawn] = useState<DiagramContent | null>(null);
@@ -129,11 +114,6 @@ export function DiagramCard({
       subtitle={current.subject}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
       action={
         hasPicture ? (
           <Button

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, Bot, Check, LayoutDashboard, Move, RefreshCw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
+import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
 import { Spinner } from "../components/ui/Spinner";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { AddCardForm } from "../features/board/components/AddCardForm";
@@ -12,6 +13,14 @@ import { BoardPathRail } from "../features/board/components/BoardPathRail";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
+import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
+import {
+  assignToGroup,
+  readBoardGroups,
+  writeBoardGroups,
+  type BoardGroup,
+} from "../features/board/layout/boardGroups";
+import { NEW_GROUP } from "../features/board/components/BoardGrid";
 
 /**
  * The board: the hire's persistent working surface.
@@ -34,10 +43,35 @@ import { readCollapsedCards, writeCollapsedCards } from "../features/board/layou
  * grid renders the rest, and a reorder puts the path back at the index it came from, so lifting it
  * for display never quietly rewrites what the hire arranged.
  */
+/**
+ * How long a removed card can be brought back, in milliseconds.
+ *
+ * The window exists because dismissal is sticky by design — the board never re-adds a card the
+ * hire said no to, and there is no undo behind it. So the undo has to happen *before* the write:
+ * the card leaves the screen at once and the server hears about it only when the window closes.
+ */
+const UNDO_WINDOW_MS = 7000;
+
+/**
+ * Which cards the board is showing.
+ *
+ * Not a search and not a sort — the board is small enough that the only cut worth making is *who
+ * put this here*, which is the one thing a card's content never says on its own. `mine` is the
+ * hire's own notes, links and checklists; `buddy` is everything read for them.
+ */
+type BoardFilter = "all" | "buddy" | "mine";
+
+const FILTER_OPTIONS: FilterSelectOption<BoardFilter>[] = [
+  { value: "all", label: "All cards" },
+  { value: "buddy", label: "From your buddy" },
+  { value: "mine", label: "Yours" },
+];
+
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
   const toast = useToast();
   const [isArranging, setIsArranging] = useState(false);
+  const [filter, setFilter] = useState<BoardFilter>("all");
 
   const {
     board,
@@ -99,6 +133,132 @@ export function BoardPage() {
     [boardId],
   );
 
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+  const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
+
+  if (boardId !== pinsReadFor) {
+    setPinsReadFor(boardId);
+    setPinnedIds(readPinnedCards(boardId));
+  }
+
+  const [groups, setGroups] = useState<BoardGroup[]>([]);
+  const [groupsReadFor, setGroupsReadFor] = useState<string | null>(null);
+
+  if (boardId !== groupsReadFor) {
+    setGroupsReadFor(boardId);
+    setGroups(readBoardGroups(boardId));
+  }
+
+  function saveGroups(next: BoardGroup[]) {
+    setGroups(next);
+    writeBoardGroups(boardId, next);
+  }
+
+  /**
+   * Puts a card in an area, or takes it out of one.
+   *
+   * The picker's "New area…" is handled here rather than in the grid: creating the area and
+   * putting the first card in it are one action, so a card is never dropped into a box that does
+   * not exist yet, and an area never exists with nothing in it.
+   */
+  function handleAssignGroup(cardId: string, groupId: string | null) {
+    if (groupId === NEW_GROUP) {
+      const created: BoardGroup = {
+        id: `group-${Date.now()}`,
+        name: `Area ${groups.length + 1}`,
+        cardIds: [],
+        collapsed: false,
+      };
+      saveGroups(assignToGroup([...groups, created], cardId, created.id));
+
+      return;
+    }
+
+    saveGroups(assignToGroup(groups, cardId, groupId));
+  }
+
+  function handleRenameGroup(groupId: string, name: string) {
+    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, name } : group)));
+  }
+
+  /** Takes the area away and leaves its cards exactly where they are on the board. */
+  function handleDissolveGroup(groupId: string) {
+    saveGroups(groups.filter((group) => group.id !== groupId));
+  }
+
+  function handleToggleGroup(groupId: string) {
+    saveGroups(
+      groups.map((group) =>
+        group.id === groupId ? { ...group, collapsed: !group.collapsed } : group,
+      ),
+    );
+  }
+
+  const togglePinned = useCallback(
+    (cardId: string) => {
+      setPinnedIds((current) => {
+        const next = new Set(current);
+        if (next.has(cardId)) next.delete(cardId);
+        else next.add(cardId);
+        writePinnedCards(boardId, next);
+        return next;
+      });
+    },
+    [boardId],
+  );
+
+  // Cards on their way out: gone from the board on screen, not yet gone from the server. Held here
+  // rather than in `useBoard` because it is a property of this page's undo affordance, not of the
+  // board itself — the hook still knows only about writes that actually happened.
+  //
+  // Plain functions rather than `useCallback`: this project compiles with the React Compiler, which
+  // memoizes them itself and rejects hand-written dependency lists it cannot verify.
+  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
+  const removalTimers = useRef(new Map<string, number>());
+
+  // A page left while a removal is still pending drops the timer with it: the card stays on the
+  // board rather than disappearing from under somebody who navigated away mid-undo.
+  useEffect(() => {
+    const timers = removalTimers.current;
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  function keepCard(cardId: string) {
+    setPendingRemovals((current) => {
+      const next = new Set(current);
+      next.delete(cardId);
+
+      return next;
+    });
+  }
+
+  function handleDismiss(cardId: string) {
+    setPendingRemovals((current) => new Set(current).add(cardId));
+
+    const timer = window.setTimeout(() => {
+      removalTimers.current.delete(cardId);
+      void dismiss(cardId);
+      keepCard(cardId);
+    }, UNDO_WINDOW_MS);
+    removalTimers.current.set(cardId, timer);
+
+    toast.info("Removed from your board", {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          window.clearTimeout(timer);
+          removalTimers.current.delete(cardId);
+          keepCard(cardId);
+        },
+      },
+    });
+  }
+
   // The path is drawn in the header; the grid gets everything else. Its index is kept so a reorder
   // of the visible cards can put it back where it was — the board's order is the hire's, and this
   // is a display decision, not an edit to it.
@@ -106,11 +266,22 @@ export function BoardPage() {
     board?.cards.findIndex((card) => card.content.kind === "PATH_TO_FIRST_CONTRIBUTION") ?? -1;
   const pathCard = pathIndex === -1 ? null : (board?.cards[pathIndex] ?? null);
 
-  const griddedBoard = useMemo(
-    () =>
-      board && pathCard ? { ...board, cards: board.cards.filter((c) => c !== pathCard) } : board,
-    [board, pathCard],
-  );
+  // Pinned first, and the board's own order inside each half — `sort` is stable, so pinning one
+  // card lifts that card and disturbs nothing else. A display sort, not a write: what gets sent on
+  // a reorder is what is on screen, so pinning and dragging cannot disagree about where a card is.
+  const griddedBoard = useMemo(() => {
+    if (!board) return board;
+    const rest = board.cards
+      .filter((c) => c !== pathCard && !pendingRemovals.has(c.id))
+      .filter((c) =>
+        filter === "all" ? true : filter === "buddy" ? c.owner === "AI" : c.owner === "HIRE",
+      );
+    const cards = [...rest].sort(
+      (a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)),
+    );
+
+    return { ...board, cards };
+  }, [board, filter, pathCard, pendingRemovals, pinnedIds]);
 
   const handleReorder = (cardIds: string[]) => {
     if (!pathCard || pathIndex === -1) return void reorder(cardIds);
@@ -200,17 +371,57 @@ export function BoardPage() {
           </div>
         ) : griddedBoard ? (
           <>
-            <AddCardForm onAdd={addCard} />
-            <BoardGrid
-              board={griddedBoard}
-              onDismiss={(cardId) => void dismiss(cardId)}
-              dismissingId={dismissingId}
-              onEdit={(cardId, request) => void editCard(cardId, request)}
-              onReorder={handleReorder}
-              isArranging={isArranging}
-              collapsedIds={collapsedIds}
-              onToggleCollapsed={toggleCollapsed}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Only offered once there is something to cut: a filter over three cards is a
+                  control that costs more attention than it saves. */}
+              {griddedBoard.cards.length + (filter === "all" ? 0 : 1) > 2 ? (
+                <FilterSelect
+                  label="Which cards to show"
+                  value={filter}
+                  options={FILTER_OPTIONS}
+                  onChange={setFilter}
+                />
+              ) : (
+                <span />
+              )}
+
+              <AddCardForm onAdd={addCard} />
+            </div>
+
+            <div className="space-y-4">
+              {/* A board with nothing on it is the first thing a new hire sees, and an empty page
+                cannot say what the board is *for*. Named after what it will hold rather than after
+                its own emptiness — and it points at the two things that fill it, the buddy and the
+                row of buttons directly above. */}
+              {griddedBoard.cards.length === 0 && (
+                <EmptyState
+                  icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
+                  title="Nothing on your board yet"
+                >
+                  This is where things stay put between conversations — the task you are on, work
+                  worth picking up, what your buddy remembers. It fills itself in as you go, and you
+                  can put a note, a link or a checklist of your own here at any time.
+                </EmptyState>
+              )}
+
+              <BoardGrid
+                board={griddedBoard}
+                onDismiss={handleDismiss}
+                dismissingId={dismissingId}
+                onEdit={(cardId, request) => void editCard(cardId, request)}
+                onReorder={handleReorder}
+                isArranging={isArranging}
+                collapsedIds={collapsedIds}
+                onToggleCollapsed={toggleCollapsed}
+                pinnedIds={pinnedIds}
+                onTogglePinned={togglePinned}
+                groups={groups}
+                onAssignGroup={handleAssignGroup}
+                onRenameGroup={handleRenameGroup}
+                onToggleGroup={handleToggleGroup}
+                onDissolveGroup={handleDissolveGroup}
+              />
+            </div>
           </>
         ) : null}
 

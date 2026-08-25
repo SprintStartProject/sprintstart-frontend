@@ -13,11 +13,6 @@ type NoteCardProps = {
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -53,18 +48,7 @@ function splitNote(text: string): { heading: string; body: string } {
  * body as separate fields and joins them back into one text on save: the split is how the note is
  * shown *and* how it is written, but never how it is stored — there is no title on the wire.
  */
-export function NoteCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onEdit,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-  collapsed,
-  onToggleCollapsed,
-}: NoteCardProps) {
+export function NoteCard({ content, card, onDismiss, dismissing, onEdit }: NoteCardProps) {
   const { heading, body } = splitNote(content.text);
 
   const [editing, setEditing] = useState(false);
@@ -94,11 +78,6 @@ export function NoteCard({
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
-      collapsed={collapsed}
-      onToggleCollapsed={onToggleCollapsed}
       action={
         onEdit && !editing ? (
           <Button
