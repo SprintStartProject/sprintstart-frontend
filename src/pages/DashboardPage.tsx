@@ -29,12 +29,12 @@ export function DashboardPage() {
   const [isPickerOpen, setPickerOpen] = useState(false);
   const [isResetOpen, setResetOpen] = useState(false);
 
-  // Easter egg: the dashboard header icon hides the dino runner — three
+  // Easter egg: the dashboard header icon hides the 2048 game — three
   // quick clicks open it, the same gesture language as the Settings
-  // cogwheel hiding its own game. Deliberately ungated: finding it *is*
-  // the unlock, no localStorage flag involved.
-  const [dinoOpen, setDinoOpen] = useState(false);
-  const onHeaderIconClick = useRepeatClicks(3, () => setDinoOpen(true));
+  // cogwheel hiding the dino. Deliberately ungated: finding it *is*
+  // the fun, no localStorage flag involved.
+  const [game2048Open, setGame2048Open] = useState(false);
+  const onHeaderIconClick = useRepeatClicks(3, () => setGame2048Open(true));
 
   return (
     <div className="min-h-screen">
@@ -125,7 +125,7 @@ export function DashboardPage() {
         onClose={() => setResetOpen(false)}
       />
 
-      <EggModalShell eggId="dino" open={dinoOpen} onClose={() => setDinoOpen(false)} />
+      <EggModalShell eggId="game-2048" open={game2048Open} onClose={() => setGame2048Open(false)} />
     </div>
   );
 }
