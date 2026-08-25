@@ -39,6 +39,10 @@ import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckMod
 import { useMoments } from "../features/moments";
 import { ReviewCheckModal } from "../features/onboarding/components/ReviewCheckModal";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
+import {
+  useDinoUnlocked,
+  useSpaceOpensDino,
+} from "../features/easter-eggs/hooks/useDinoWaitingGame";
 //import type {UserProfile} from "../services/types.ts";
 
 type LoadingState = "idle" | "loading" | "generating" | "success" | "error";
@@ -97,8 +101,8 @@ export function OnBoardingPage() {
 
   // Dino easter egg: pressing Space while the path is being generated starts a
   // tiny endless runner. It unmounts by itself once generation finishes.
-  const [gameActive, setGameActive] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(localStorage.getItem("dinoUnlocked") === "true");
+  const dinoUnlocked = useDinoUnlocked();
+  const [gameActive, closeGame] = useSpaceOpensDino(loadingState === "generating", dinoUnlocked);
 
   // Phase whose knowledge check is currently open in the modal (null = closed)
   const [checkPhase, setCheckPhase] = useState<OnboardingPhaseEndpoint | null>(null);
@@ -259,7 +263,7 @@ export function OnBoardingPage() {
   const generatePath = async ({ recoverExisting = false } = {}) => {
     setLoadingState("generating");
     setGenerationStage(null);
-    setGameActive(false);
+    closeGame();
     await onboardingService.personalizePath({
       onStage: (name, detail) => setGenerationStage({ name, detail }),
       onPath: (path) => setOnBoardingPath(path),
@@ -283,45 +287,6 @@ export function OnBoardingPage() {
       },
     });
   };
-
-  // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
-  useEffect(() => {
-    const handleUnlockChange = () => {
-      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
-      setIsUnlocked(unlocked);
-      if (!unlocked) {
-        setGameActive(false);
-      }
-    };
-    window.addEventListener("dinoUnlockChanged", handleUnlockChange);
-    window.addEventListener("storage", handleUnlockChange);
-    return () => {
-      window.removeEventListener("dinoUnlockChanged", handleUnlockChange);
-      window.removeEventListener("storage", handleUnlockChange);
-    };
-  }, []);
-
-  // Easter egg trigger: Space starts the game while the path is generating.
-  useEffect(() => {
-    if (loadingState !== "generating" || gameActive || !isUnlocked) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-
-      // Don't hijack space while the user is typing somewhere.
-      const active = document.activeElement;
-      const typing =
-        active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable);
-      if (typing) return;
-
-      e.preventDefault();
-      setGameActive(true);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [loadingState, gameActive, isUnlocked]);
 
   // ── DATA FETCHING using useEffect ─────────────────────────────
 
@@ -369,7 +334,10 @@ export function OnBoardingPage() {
     void loadOnBoardingPath();
     // Both flags come from the navigation that mounted this page, so they are fixed for the
     // visit; listing them keeps the effect honest about what it reads, and `hasLoadedRef`
-    // makes a re-run a no-op anyway.
+    // makes a re-run a no-op anyway. `generatePath` is a stable component-scope function
+    // (no props/state in its closure beyond the setters it calls), so omitting it here is
+    // intentional and safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusCheckPhaseId, shouldOpenReviewCheck]);
 
   const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
@@ -485,7 +453,7 @@ export function OnBoardingPage() {
 
           {gameActive ? (
             <div className="mt-6">
-              <DinoGame onExit={() => setGameActive(false)} />
+              <DinoGame onExit={closeGame} />
             </div>
           ) : (
             <Loader2 className="mx-auto mt-4 h-6 w-6 animate-spin text-app-brand" />

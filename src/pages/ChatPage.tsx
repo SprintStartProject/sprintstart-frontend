@@ -18,6 +18,11 @@ import { ArtifactViewerDrawer } from "../features/knowledge-base/components/Arti
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
 import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
+import { matchEggPhrase } from "../features/easter-eggs/lib/eggPhrases";
+import {
+  useDinoUnlocked,
+  useSpaceOpensDino,
+} from "../features/easter-eggs/hooks/useDinoWaitingGame";
 
 import "katex/dist/katex.min.css";
 
@@ -131,30 +136,26 @@ export function ChatPage() {
     [viewingCitationArtifact],
   );
 
-  // Easter egg states
+  // Easter egg states. Phrase effects are matched via the shared
+  // eggPhrases lib; the dino waiting-game (unlock flag + Space trigger +
+  // auto-close) lives in one shared hook instead of page-local copies.
   const [isBarrelRolling, setIsBarrelRolling] = useState(false);
   const [isMatrixActive, setIsMatrixActive] = useState(false);
+  const dinoUnlocked = useDinoUnlocked();
+  const [gameActive, closeGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
 
-  // Custom submit handler to intercept easter eggs
-  const handleChatSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      const text = newRequest.trim().toLowerCase();
-      if (text === "do a barrel roll" || text === "do barrel roll" || text === "do barrel") {
-        e.preventDefault();
-        setIsBarrelRolling(true);
-        setNewRequest("");
-        return;
-      }
-      if (text === "the matrix" || text === "do matrix" || text === "matrix") {
-        e.preventDefault();
-        setIsMatrixActive(true);
-        setNewRequest("");
-        return;
-      }
-      handleSubmit(e);
-    },
-    [newRequest, setNewRequest, handleSubmit],
-  );
+  // Close the game as soon as the answer arrives. Uses React's documented
+  // "adjust state when a value changes" pattern (guarded setState during
+  // render) instead of an effect — avoids cascading renders and the
+  // set-state-in-effect lint rule. See:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevIsThinking, setPrevIsThinking] = useState(isThinking);
+  if (prevIsThinking !== isThinking) {
+    setPrevIsThinking(isThinking);
+    if (!isThinking && gameActive) {
+      closeGame();
+    }
+  }
 
   // Barrel roll side-effect
   useEffect(() => {
@@ -171,25 +172,7 @@ export function ChatPage() {
     }
   }, [isBarrelRolling]);
 
-  // Dino easter egg: while the assistant is thinking, pressing Space drops the
-  // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
-  const [gameActive, setGameActive] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(
-    () => localStorage.getItem("dinoUnlocked") === "true",
-  );
-
-  // Close the game as soon as the answer arrives. Uses React's documented
-  // "adjust state when a value changes" pattern (guarded setState during
-  // render) instead of an effect — avoids cascading renders and the
-  // set-state-in-effect lint rule. See:
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  const [prevIsThinking, setPrevIsThinking] = useState(isThinking);
-  if (prevIsThinking !== isThinking) {
-    setPrevIsThinking(isThinking);
-    if (!isThinking && gameActive) {
-      setGameActive(false);
-    }
-  }
+  // Dino easter egg phrase matching happens in `handleChatSubmit` below.
 
   // E5: replacement for the live region that used to wrap the message list.
   // `ThinkingIndicator` already carries `role="status"` for the working
@@ -206,7 +189,7 @@ export function ChatPage() {
   }
 
   // Submitting blurs the composer so Space can start the dino game while the assistant
-  // works. Once the turn is over that reason is gone, so focus goes back — otherwise every
+  // works. Once the turn is over that reason is gone, focus goes back — otherwise every
   // follow-up question needs a click first. Skipped when something else already holds focus,
   // so this never steals the caret from wherever the user went in the meantime.
   useEffect(() => {
@@ -217,43 +200,23 @@ export function ChatPage() {
     textareaRef.current?.focus();
   }, [busy, chatId, textareaRef]);
 
-  // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
-  useEffect(() => {
-    const handleUnlockChange = () => {
-      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
-      setIsUnlocked(unlocked);
-      if (!unlocked) {
-        setGameActive(false);
+  // Custom submit handler to intercept easter eggs: a phrase match plays
+  // the effect and swallows the message (it never reaches the AI); a
+  // normal message goes through unchanged.
+  const handleChatSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      const effect = matchEggPhrase(newRequest);
+      if (!effect) {
+        handleSubmit(e);
+        return;
       }
-    };
-    window.addEventListener("dinoUnlockChanged", handleUnlockChange);
-    window.addEventListener("storage", handleUnlockChange);
-    return () => {
-      window.removeEventListener("dinoUnlockChanged", handleUnlockChange);
-      window.removeEventListener("storage", handleUnlockChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isThinking || gameActive || !isUnlocked) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-
-      // Don't hijack space while the user is typing their next message.
-      const active = document.activeElement;
-      const typing =
-        active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable);
-      if (typing) return;
-
       e.preventDefault();
-      setGameActive(true);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isThinking, gameActive, isUnlocked]);
+      if (effect === "barrel-roll") setIsBarrelRolling(true);
+      else setIsMatrixActive(true);
+      setNewRequest("");
+    },
+    [newRequest, setNewRequest, handleSubmit],
+  );
 
   /**
    * Focuses the composer and puts the caret behind whatever is already in it.
@@ -464,7 +427,7 @@ export function ChatPage() {
               isThinking={isThinking}
               gameActive={gameActive}
               thinkingState={thinkingState}
-              onGameExit={() => setGameActive(false)}
+              onGameExit={closeGame}
             />
 
             <div className="sr-only" role="status" aria-live="polite">
