@@ -9,6 +9,12 @@ type UseJiraCredentialsResult = {
   isRefreshing: boolean;
   /** Reloads the authenticated user's credential list. */
   reload: () => Promise<void>;
+  /**
+   * Adds a just-created credential to the local list without a round-trip, so a
+   * successful add is reflected immediately even if the follow-up reload fails
+   * or is aborted. A later `reload` reconciles with the server.
+   */
+  addCredentialLocally: (credential: JiraCredentialsDto) => void;
 };
 
 /**
@@ -75,9 +81,18 @@ export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
     }
   }, [enabled]);
 
+  const addCredentialLocally = useCallback((credential: JiraCredentialsDto) => {
+    setCredentials((prev) =>
+      prev.some((existing) => existing.displayName === credential.displayName)
+        ? prev
+        : [...prev, credential],
+    );
+    setLoaded(true);
+  }, []);
+
   useEffect(() => {
     void Promise.resolve().then(reload);
   }, [reload]);
 
-  return { credentials, loaded, error, isRefreshing, reload };
+  return { credentials, loaded, error, isRefreshing, reload, addCredentialLocally };
 }
