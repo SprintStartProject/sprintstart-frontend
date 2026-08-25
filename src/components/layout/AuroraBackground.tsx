@@ -99,12 +99,21 @@ export function AuroraBackground({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { isClassicMode: classic, isAuroraEnabled } = useTheme();
+  const { isClassicMode: classic, isAuroraEnabled, glowIntensity } = useTheme();
 
   const enabled = !classic && isAuroraEnabled;
   const effectiveInteractive = interactive && enabled;
   const effectiveGrid = (showGrid ?? variant !== "login") && enabled;
   const blobs = enabled ? variantBlobs[variant] : [];
+
+  // The glow's radius and opacity both scale with the user's intensity setting
+  // (Settings → Appearance). Held in a ref rather than an effect dependency so
+  // dragging the slider doesn't tear down the pointer listener mid-gesture —
+  // the running rAF loop simply reads the latest value each frame.
+  const glowIntensityRef = useRef(glowIntensity);
+  useEffect(() => {
+    glowIntensityRef.current = glowIntensity;
+  }, [glowIntensity]);
 
   // How many extra pixels to extend the canvas beyond the viewport on each
   // side, so the interactive glow trail isn't clipped at the screen edges.
@@ -124,6 +133,12 @@ export function AuroraBackground({
     let rafId = 0;
     let lastTime = performance.now();
     let isRunning = false;
+
+    // Peak stroke width of the trail, in px, at the user's chosen intensity.
+    const maxLineWidth = () => 60 * (glowIntensityRef.current / 100);
+    // Alpha multiplier. A floor keeps the lowest setting visible — radius
+    // shrink alone already does most of the dimming work.
+    const maxAlpha = () => 0.36 * (0.25 + 0.75 * (glowIntensityRef.current / 100));
 
     const resize = () => {
       canvas.width = window.innerWidth + OVERSCAN * 2;
@@ -169,8 +184,8 @@ export function AuroraBackground({
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
-          ctx.strokeStyle = `rgba(${getColor(life)}, ${life * 0.36})`;
-          ctx.lineWidth = 60 * life; // tapers from 60px down to 0
+          ctx.strokeStyle = `rgba(${getColor(life)}, ${life * maxAlpha()})`;
+          ctx.lineWidth = maxLineWidth() * life; // tapers from the peak width down to 0
           ctx.stroke();
         }
       }

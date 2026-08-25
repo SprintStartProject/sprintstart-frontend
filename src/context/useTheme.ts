@@ -20,7 +20,9 @@ export function useTheme(): ThemeContextType {
       toggleStyleMode: () => {},
       isClassicMode: false,
       isAuroraEnabled: false,
-      setIsAuroraEnabled: () => {},
+      setIsAuroraEnabled: () => undefined,
+      glowIntensity: 50,
+      setGlowIntensity: () => undefined,
       isTiltEnabled: false,
       setIsTiltEnabled: () => {},
     };

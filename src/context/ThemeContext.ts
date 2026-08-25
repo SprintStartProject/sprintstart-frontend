@@ -34,6 +34,10 @@ export interface ThemeContextType {
   isAuroraEnabled: boolean;
   /** Enables or disables the aurora background effect (persisted to localStorage). */
   setIsAuroraEnabled: (enabled: boolean) => void;
+  /** Cursor-glow intensity of the aurora spotlight, 10–100 (percent). */
+  glowIntensity: number;
+  /** Sets the cursor-glow intensity, clamped to 10–100 and persisted to localStorage. */
+  setGlowIntensity: (value: number) => void;
   /** Whether the 3D tilt / spotlight hover effect on cards is enabled. */
   isTiltEnabled: boolean;
   /** Enables or disables the card tilt effect (persisted to localStorage). */
