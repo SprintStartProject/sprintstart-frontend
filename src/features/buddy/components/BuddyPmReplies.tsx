@@ -1,13 +1,13 @@
 import { useMemo } from "react";
+import { BookCheck, Clock, MessageSquareOff, Send } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useFetch } from "../../../hooks/useFetch";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request/format";
 import type { KnowledgeRequest } from "../../knowledge-request/types";
-import { BuddyMessage } from "./BuddyMessage";
 
 /**
- * The hire's half of the growth loop, told as part of the conversation: what came back from the
- * person they asked.
+ * What the hire has sent to a person, beside the conversation rather than inside it.
  *
  * `FlagToPmButton` tells a hire "the answer will show up here once they reply", and until this
  * existed the app did not keep that promise — the loop closed only if the hire happened to ask
@@ -16,18 +16,18 @@ import { BuddyMessage } from "./BuddyMessage";
  * blocked on, and a prompt reply that produces no visible signal reads exactly like being
  * ignored.
  *
- * **It is now shown as messages rather than as a widget beside the chat.** A card in a sidebar
- * said "here is some data about your escalations"; a reply from a named person in the thread
- * says what actually happened — somebody answered you. It is still read from the server on
- * every mount rather than being part of the buddy's transcript, which is the point: the buddy
- * thread opens fresh every visit, so a message inside it would scroll away with everything
- * else, and a hire who was not on the page when the answer landed would never see it.
+ * **It sits in a rail, not at the top of the thread.** As messages it pushed the live
+ * conversation down every time — the record grows and never shrinks, so the thing the hire came
+ * for started further from the top each visit. A rail is where a chat keeps this sort of
+ * standing context; the buddy's own thread stays the buddy's own thread.
  *
- * The reply is attributed to the PM, not spoken in the buddy's voice: the hire asked a *person*,
- * and dressing their answer as something the buddy knows would hide that a human was involved.
- * Attribution is by role — a `CanonicalAnswer` carries an `authorId`, and no hire-accessible
- * endpoint resolves one to a name, so "your PM" is what can be said truthfully without a new
- * backend read.
+ * It is still read from the server on every mount rather than being part of the transcript, and
+ * that is the point: a visit opens fresh, so a message inside it would scroll away with
+ * everything else, and a hire who was not on the page when the answer landed would never see it.
+ *
+ * Attributed to the PM by role rather than by name — a `CanonicalAnswer` carries an `authorId`,
+ * and no hire-accessible endpoint resolves one to a name, so "your PM" is what can be said
+ * truthfully without a new backend read.
  *
  * Scoped to the hire, not to the selected project: these are their own questions, and hiding the
  * ones asked on another project would mean an answer silently never arriving.
@@ -48,106 +48,112 @@ export function BuddyPmReplies() {
   }, [data]);
 
   // Nothing to say is the common case — a hire who has never escalated should see no trace of a
-  // feature they have not used. A failed load is silent for the same reason: this is a record of
-  // something that already happened, so an error banner above the conversation would be noise
-  // the hire cannot act on, and the next mount retries anyway.
+  // feature they have not used, and the rail collapses to nothing rather than standing empty. A
+  // failed load is silent for the same reason: this is a record of something that already
+  // happened, so an error banner beside the composer would be noise the hire cannot act on, and
+  // the next mount retries anyway.
   if (loading || error) return null;
   if (answered.length === 0 && waiting.length === 0 && dismissed.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-4" aria-label="Questions you sent to your PM">
-      {answered.length > 0 && (
-        <>
-          <ThreadDivider>
-            {answered.length === 1 ? "Your PM answered" : "Your PM answered these"}
-          </ThreadDivider>
-          {answered.map((request) => (
-            // The question and the answer as the exchange it was: the hire's words, then the
-            // person's. A bare answer with no question above it is the half of a conversation
-            // that needs the other half to make sense.
-            <div key={request.id} className="flex flex-col gap-4">
-              <BuddyMessage speaker="YOU" showName>
-                {request.question}
-              </BuddyMessage>
-              <BuddyMessage
-                speaker="PM"
-                showName
-                meta={
-                  <>
-                    Answered by your PM
-                    {request.answeredAt && ` · ${formatDateTime(request.answeredAt)}`}
-                    {" · the buddy knows this now, so you can ask it directly next time"}
-                  </>
-                }
+    <aside
+      aria-label="Questions you sent to your PM"
+      className="min-h-0 shrink-0 overflow-y-auto border-b border-app-border py-5 xl:w-80 xl:border-r xl:border-b-0 xl:pr-6"
+    >
+      <div className="flex items-center gap-2 pb-4">
+        <Send className="h-4 w-4 shrink-0 text-app-brand-text" aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-app-text">Sent to your PM</h2>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {answered.length > 0 && (
+          <Group
+            icon={BookCheck}
+            title={answered.length === 1 ? "Your PM answered" : "Your PM answered these"}
+          >
+            {answered.map((request) => (
+              <li key={request.id} className="rounded-xl bg-app-surface-muted/60 p-3">
+                <p className="text-sm font-medium text-app-text">{request.question}</p>
+                <p className="mt-1.5 text-sm whitespace-pre-wrap text-app-text-muted">
+                  {request.answer?.answer}
+                </p>
+                <p className="mt-2 text-xs text-app-text-disabled">
+                  Answered by your PM
+                  {request.answeredAt && ` · ${formatDateTime(request.answeredAt)}`}
+                  {" · the buddy knows this now, so you can ask it directly next time"}
+                </p>
+              </li>
+            ))}
+          </Group>
+        )}
+
+        {waiting.length > 0 && (
+          <Group icon={Clock} title="Still with your PM">
+            {waiting.map((request) => (
+              <li
+                key={request.id}
+                className="rounded-xl bg-app-surface-muted/60 px-3 py-2.5 text-sm text-app-text-muted"
               >
-                {request.answer?.answer}
-              </BuddyMessage>
-            </div>
-          ))}
-        </>
-      )}
-
-      {waiting.length > 0 && (
-        <>
-          <ThreadDivider>Still with your PM</ThreadDivider>
-          {waiting.map((request) => (
-            <BuddyMessage
-              key={request.id}
-              speaker="YOU"
-              showName
-              meta={
-                // The wait is the information here, and a long one is worth flagging — so it
-                // is said in words as well as tinted, per the colour-blind rule.
+                {request.question}
+                {/* The wait is the information, and a long one is worth flagging — said in
+                                    words as well as tinted, per the colour-blind rule. */}
                 <span
-                  className={
-                    hasWaitedADay(request.createdAt) ? "font-medium text-app-warning-text" : ""
-                  }
+                  className={`mt-1.5 flex items-center gap-1 text-xs ${
+                    hasWaitedADay(request.createdAt)
+                      ? "font-medium text-app-warning-text"
+                      : "text-app-text-disabled"
+                  }`}
                 >
-                  Waiting on a person · {formatWaiting(request.createdAt)}
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  Waiting {formatWaiting(request.createdAt)}
                 </span>
-              }
-            >
-              {request.question}
-            </BuddyMessage>
-          ))}
-        </>
-      )}
+              </li>
+            ))}
+          </Group>
+        )}
 
-      {/* A dismissed question is shown rather than quietly dropped: the hire was told to wait
-                for an answer that is now never coming, and letting it sit under "still with your
-                PM" forever would be the same broken promise in a different place. */}
-      {dismissed.length > 0 && (
-        <>
-          <ThreadDivider>Closed without an answer</ThreadDivider>
-          {dismissed.map((request) => (
-            <BuddyMessage
-              key={request.id}
-              speaker="YOU"
-              showName
-              meta="Closed without a reply — worth asking your PM directly."
-            >
-              {request.question}
-            </BuddyMessage>
-          ))}
-        </>
-      )}
-
-      <ThreadDivider>Today</ThreadDivider>
-    </section>
+        {/* A dismissed question is shown rather than quietly dropped: the hire was told to wait
+                    for an answer that is now never coming, and letting it sit under "still with your
+                    PM" forever would be the same broken promise in a different place. */}
+        {dismissed.length > 0 && (
+          <Group icon={MessageSquareOff} title="Closed without an answer">
+            {dismissed.map((request) => (
+              <li
+                key={request.id}
+                className="rounded-xl bg-app-surface-muted/40 px-3 py-2.5 text-sm text-app-text-muted"
+              >
+                {request.question}
+                <span className="mt-1 block text-xs text-app-text-disabled">
+                  Worth asking your PM directly.
+                </span>
+              </li>
+            ))}
+          </Group>
+        )}
+      </div>
+    </aside>
   );
 }
 
-/**
- * The hairline-and-label rule a chat puts between days. Here it separates what came back from a
- * person from what the buddy is about to say, which is the same job: telling one stretch of the
- * conversation from another without adding a heading nobody asked for.
- */
-function ThreadDivider({ children }: { children: React.ReactNode }) {
+/** One status group: a tinted icon, its label, and the questions in it. */
+function Group({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-3 py-1">
-      <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-      <span className="text-xs font-medium text-app-text-muted">{children}</span>
-      <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-    </div>
+    <section>
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-app-text-muted" aria-hidden="true" />
+        <h3 className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+          {title}
+        </h3>
+      </div>
+      <ul className="flex flex-col gap-2">{children}</ul>
+    </section>
   );
 }

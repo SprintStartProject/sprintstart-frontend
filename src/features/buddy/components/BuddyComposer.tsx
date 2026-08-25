@@ -58,7 +58,7 @@ export function BuddyComposer({
     <div className="min-w-0">
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 rounded-xl border border-app-border-muted bg-app-surface-muted p-2 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
+        className="flex items-end gap-1.5 rounded-xl border border-app-border-muted bg-app-surface-muted p-1.5 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
       >
         <textarea
           ref={fieldRef}
@@ -68,12 +68,16 @@ export function BuddyComposer({
           placeholder={placeholder}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-2 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
         />
 
         <Button
           type="submit"
           variant="primary"
+          // `sm`, not the default: the send button sets the height of the whole bar, and at
+          // `md` (44px) plus the frame's padding the composer was a good deal taller than the
+          // one line it usually holds.
+          size="sm"
           iconOnly
           aria-label="Send message"
           disabled={!draft.trim()}
@@ -83,7 +87,7 @@ export function BuddyComposer({
       </form>
 
       {!compact && (
-        <p className="mt-2 px-1 text-xs text-app-text-disabled">
+        <p className="mt-1.5 px-1 text-[11px] text-app-text-disabled">
           <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
           <kbd className="font-sans font-medium">Shift</kbd> +{" "}
           <kbd className="font-sans font-medium">Enter</kbd> for a new line

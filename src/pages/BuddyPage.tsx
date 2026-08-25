@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { Sparkles, Users, X } from "lucide-react";
+import { LayoutDashboard, MessageSquarePlus, Sparkles, Users, X } from "lucide-react";
 import { SleepyBot } from "../features/chatbot/components/SleepyBot";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -27,8 +27,8 @@ import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestion
  * standing a column of widgets next to it — "Ask about", "Not getting anywhere?" — and what
  * came out was a dashboard about a conversation rather than a conversation. Everything those
  * boxes held has moved to where a person would expect it: the things worth asking sit above the
- * box they fill, and "the buddy can't help" hangs off the answer that could not help, because
- * that is what it is about.
+ * box they fill, sending a question to a person hangs off that question, and the record of what
+ * was sent stands in a rail beside the conversation rather than on top of it.
  *
  * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
  * pick the conversation up from anywhere and grow it into this page when it needs room.
@@ -42,7 +42,16 @@ import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestion
  * composer has to stay on screen. A conversation whose input scrolls away is one you have to
  * scroll back to in order to answer.
  */
-function BuddyPageShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
+function BuddyPageShell({
+  subtitle,
+  actions,
+  children,
+}: {
+  subtitle: string;
+  /** Controls that only make sense once there is a conversation — a fresh start, mainly. */
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const prefersReducedMotion = useReducedMotion();
@@ -97,16 +106,33 @@ function BuddyPageShell({ subtitle, children }: { subtitle: string; children: Re
             <p className="truncate text-xs text-app-text-muted">{subtitle}</p>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label="Close the conversation"
-            title="Close"
-            onClick={close}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {actions}
+
+            {/* The thread starts fresh every visit, so anything worth keeping lives on the
+                            board — the link is what stops that being a page nobody finds. A `Link`
+                            styled to sit level with the buttons beside it: a control that changes
+                            the URL is an anchor, and dressing one as a `Button` does not make it
+                            keyboard- or screen-reader-correct. */}
+            <Link
+              to="/board"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            >
+              <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+              Board
+            </Link>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              aria-label="Close the conversation"
+              title="Close"
+              onClick={close}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       </motion.header>
 
@@ -134,6 +160,7 @@ function BuddyMentorHome() {
     dismissAction,
     bottomRef,
     ensureOpened,
+    startFreshVisit,
   } = useBuddySession();
 
   // The same conversation the dock shows, brought on screen the same way. It used to open a
@@ -155,54 +182,79 @@ function BuddyMentorHome() {
   // the greeting arrives in its own bubble — as the buddy typing, which is the honest picture
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
-    <BuddyPageShell subtitle="Your onboarding mentor — here whenever you're stuck.">
-      <BuddyConversation
-        messages={messages}
-        isThinking={isThinking || isOpening}
-        activeTool={activeTool}
-        draft={draft}
-        setDraft={setDraft}
-        handleSubmit={handleSubmit}
-        confirmAction={confirmAction}
-        dismissAction={dismissAction}
-        bottomRef={bottomRef}
-        // What came back from a person, above what the buddy is saying now. Renders nothing at
-        // all until the hire has escalated something.
-        before={<BuddyPmReplies />}
-        // Escalating hangs off the hire's own question now, not off the buddy's answer — see
-        // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
-        // where a messenger offers a quick reply: right under the message that suggested it. It
-        // sends on one click, unlike the chips, because accepting something the mentor just
-        // offered is not composing a question of your own.
-        lastMessageFooter={
-          !hasUserMessage && openerAction ? (
-            <Button
-              variant="primary"
-              size="sm"
-              className="mt-1.5"
-              icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
-              onClick={() => void sendMessage(openerAction.question)}
-            >
-              {openerAction.label}
-            </Button>
-          ) : undefined
-        }
-        renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
-        aboveComposer={
-          // The chips *fill* the composer instead of sending, which is why they sit on top of
-          // it. The hire presses send: the words stay theirs, and they can edit the question
-          // first — which is how somebody learns they are allowed to. The list is the
-          // backend's, built from the tools it actually mounts for this hire, so the chips and
-          // the mentor cannot disagree about whether this role has pull requests.
-          !hasUserMessage ? (
-            <BuddySuggestionChips
-              suggestions={suggestions}
-              onPick={setDraft}
-              heading="Not sure where to start?"
-            />
-          ) : undefined
-        }
-      />
+    <BuddyPageShell
+      subtitle="Your onboarding mentor — here whenever you're stuck."
+      actions={
+        // Not a delete. The transcript stays on the server and the buddy's durable memory note
+        // is untouched — it is what the next greeting is written from, which is why starting
+        // fresh does not mean starting over. Only the scrollback moves on.
+        hasUserMessage ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
+            title="Start a new conversation — your buddy keeps what it has learned about you"
+            onClick={() => void startFreshVisit()}
+          >
+            New chat
+          </Button>
+        ) : undefined
+      }
+    >
+      {/* The rail beside the conversation, not above it: the record of what went to a person
+                only grows, and as messages at the top of the thread it pushed the live
+                conversation further down every visit. Stacks above on narrow screens, where
+                there is no room for a column. */}
+      <div className="app-page-frame flex min-h-0 flex-1 flex-col xl:flex-row">
+        <BuddyPmReplies />
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          <BuddyConversation
+            messages={messages}
+            isThinking={isThinking || isOpening}
+            activeTool={activeTool}
+            draft={draft}
+            setDraft={setDraft}
+            handleSubmit={handleSubmit}
+            confirmAction={confirmAction}
+            dismissAction={dismissAction}
+            bottomRef={bottomRef}
+            // Escalating hangs off the hire's own question now, not off the buddy's answer — see
+            // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
+            // where a messenger offers a quick reply: right under the message that suggested it. It
+            // sends on one click, unlike the chips, because accepting something the mentor just
+            // offered is not composing a question of your own.
+            lastMessageFooter={
+              !hasUserMessage && openerAction ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="mt-1.5"
+                  icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+                  onClick={() => void sendMessage(openerAction.question)}
+                >
+                  {openerAction.label}
+                </Button>
+              ) : undefined
+            }
+            renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+            aboveComposer={
+              // The chips *fill* the composer instead of sending, which is why they sit on top of
+              // it. The hire presses send: the words stay theirs, and they can edit the question
+              // first — which is how somebody learns they are allowed to. The list is the
+              // backend's, built from the tools it actually mounts for this hire, so the chips and
+              // the mentor cannot disagree about whether this role has pull requests.
+              !hasUserMessage ? (
+                <BuddySuggestionChips
+                  suggestions={suggestions}
+                  onPick={setDraft}
+                  heading="Not sure where to start?"
+                />
+              ) : undefined
+            }
+          />
+        </div>
+      </div>
     </BuddyPageShell>
   );
 }
@@ -213,7 +265,7 @@ export function BuddyPage() {
   if (!isLoading && !selectedProjectId) {
     return (
       <BuddyPageShell subtitle="Your onboarding buddy, once you're on a project.">
-        <div className="flex flex-1 items-center justify-center p-8">
+        <div className="app-page-frame flex flex-1 items-center justify-center py-8">
           <EmptyState
             icon={<Users className="h-8 w-8" aria-hidden="true" />}
             title="No project yet"

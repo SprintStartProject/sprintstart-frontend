@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Maximize2, Minus } from "lucide-react";
+import { Maximize2, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
@@ -39,6 +39,10 @@ type BuddyDockProps = Pick<
    * `/buddy` itself, where the control would offer the page the hire is already reading.
    */
   onOpenFull?: () => void;
+  /** Whether the hire has put the suggestion row away for this session. */
+  suggestionsHidden?: boolean;
+  /** Puts it away. Held by the widget so it survives closing and reopening the dock. */
+  onHideSuggestions?: () => void;
   /**
    * True once the hire has asked for the full page: the window grows to fill the viewport and
    * the caller navigates when it lands.
@@ -80,6 +84,8 @@ export function BuddyDock({
   suggestions,
   onClose,
   onOpenFull,
+  suggestionsHidden = false,
+  onHideSuggestions,
   isExpanding = false,
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -226,12 +232,29 @@ export function BuddyDock({
           {/* Above the composer, not above the transcript: the chips exist to answer "what do I
                     type here", so they belong next to the box they fill. Gone once the hire has
                     said something — by then they know how, and the window is narrow. */}
-          {!hasUserMessage && (
-            <div className="mb-3 min-w-0">
+          {!hasUserMessage && !suggestionsHidden && (
+            <div className="mb-2.5 min-w-0">
               <BuddySuggestionChips
                 suggestions={suggestions}
                 onPick={setDraft}
                 heading="Try asking"
+                // The full row took roughly half the window: five chips at reading size wrapped
+                // over three lines, leaving the conversation the other half. Compact caps them
+                // and shrinks them, and the hire can put the row away entirely.
+                compact
+                headingAction={
+                  onHideSuggestions && (
+                    <button
+                      type="button"
+                      onClick={onHideSuggestions}
+                      aria-label="Hide suggestions"
+                      title="Hide suggestions"
+                      className="-mr-1 rounded p-1 text-app-text-disabled transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )
+                }
               />
             </div>
           )}

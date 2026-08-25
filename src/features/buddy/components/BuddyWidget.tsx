@@ -46,6 +46,9 @@ export function BuddyWidget() {
   // The beat between "open the full page" and the route actually changing, during which the
   // dock is growing to fill the viewport.
   const [isExpanding, setIsExpanding] = useState(false);
+  // Held here rather than in the dock, which unmounts every time it is closed — a row the hire
+  // has already dismissed coming back on the next open is the dismissal not working.
+  const [suggestionsHidden, setSuggestionsHidden] = useState(false);
   const expandTimer = useRef<number | null>(null);
 
   useEffect(
@@ -108,6 +111,8 @@ export function BuddyWidget() {
             suggestions={suggestions}
             onClose={toggleOpen}
             onOpenFull={openFull}
+            suggestionsHidden={suggestionsHidden}
+            onHideSuggestions={() => setSuggestionsHidden(true)}
             isExpanding={isExpanding}
           />
         )}

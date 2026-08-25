@@ -36,13 +36,14 @@ type BuddyConversationProps = {
  * next to a box labelled "Not getting anywhere?" is a settings screen, not somebody you talk
  * to. What is left is what a conversation actually needs: the messages, and a place to write.
  * Everything the widgets used to hold has moved to where it belongs — the suggestions to the
- * composer they fill, the escalation offer to the answer that prompted it.
+ * composer they fill, the escalation offer to the hire's own question, and what came back from
+ * a person to the rail beside all of it.
  *
- * It sits in the same `app-page-frame` gutters as the PM dashboard, the knowledge base and
- * data ingestion, so this page lines up with its siblings rather than being a narrow column
- * floating in the middle of them. The reading measure is kept on the *bubbles* instead: they
- * hug opposite edges and stop at a readable width, which is how a full-width thread stays
- * legible — capping the column would have put the gutters back by another name.
+ * The page owns the `app-page-frame` gutters that the PM dashboard, the knowledge base and
+ * data ingestion use, and this fills the column left inside them — beside the rail when there
+ * is one. The reading measure is kept on the *bubbles* instead of on this column: they hug
+ * opposite edges and stop at a readable width, which is how a full-width thread stays legible
+ * without narrowing the page it sits on.
  *
  * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
  * to `BuddyMarkdown`, where wide blocks get their own scrollers.
@@ -69,7 +70,7 @@ export function BuddyConversation({
         data-testid="buddy-transcript"
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
-        <div className="app-page-frame flex min-w-0 flex-col gap-4 py-8">
+        <div className="flex min-w-0 flex-col gap-4 py-6 xl:pl-6">
           <BuddyThread
             messages={messages}
             isThinking={isThinking}
@@ -89,7 +90,7 @@ export function BuddyConversation({
       {/* Translucent rather than solid, so the thread does not stop dead at a hard line — the
                 last message fades under the composer as it scrolls past it. */}
       <div className="shrink-0 border-t border-app-border bg-app-bg/85 backdrop-blur-md">
-        <div className="app-page-frame py-4">
+        <div className="py-3 xl:pl-6">
           {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
           <BuddyComposer

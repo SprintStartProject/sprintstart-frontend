@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -106,6 +106,35 @@ describe("BuddyPage", () => {
     expect(screen.getByText("With the setup guide.")).toBeInTheDocument();
     // No greeting, and — the part that matters — no model call that would have rotated the visit.
     expect(streamOpenBuddy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A visit ends when the hire speaks, so asking the backend to open again writes a fresh
+   * opening marker and the scrollback starts from there. That is all "New chat" is — there is
+   * no reset endpoint and none is needed. Nothing is deleted: the transcript stays in
+   * `buddy_messages` and the buddy's durable memory note, which the next greeting is written
+   * from, is untouched.
+   */
+  it("starts a fresh visit without losing what the buddy has learned", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /New chat/ }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
+    // The greeting is re-requested, which is what opens the new visit server-side.
+    expect(streamOpenBuddy).toHaveBeenCalled();
   });
 
   it("opens the mentor for a hire on a project", async () => {
