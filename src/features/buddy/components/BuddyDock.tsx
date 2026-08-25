@@ -177,8 +177,14 @@ export function BuddyDock({
       // The caps keep the window inside a small viewport at rest; while it is growing into the
       // page they would stop it a rem short of the edges, which is exactly where the illusion
       // that it *became* the page would break.
+      //
+      // They have to subtract the offsets the window is anchored by, not just a margin. The
+      // window hangs `DOCK_BOTTOM` above the bottom edge, so a cap of `100vh - 2rem` still let
+      // it grow past the *top* of a short viewport -- which put the header, and with it the
+      // close and expand controls, off screen and out of reach. `8rem` is `DOCK_BOTTOM` plus a
+      // `DOCK_RIGHT`-sized gap at the top; `3rem` is `DOCK_RIGHT` on both sides.
       className={`fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl ${
-        isExpanding ? "" : "max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)]"
+        isExpanding ? "" : "max-h-[calc(100vh-8rem)] max-w-[calc(100vw-3rem)]"
       }`}
     >
       {/* Everything inside fades as the window grows, so by the time the route changes the

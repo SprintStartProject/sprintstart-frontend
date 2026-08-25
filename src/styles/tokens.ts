@@ -148,16 +148,6 @@ export const modalBackdropVariants: Variants = {
 };
 
 /**
- * Motion for a dialog surface, shared by `Modal` and by the dialogs that hand
- * roll their own markup (the game modals, the artifact upload). Use this rather
- * than inlining `initial`/`animate`/`exit` so every dialog in the app opens
- * with the same weight.
- *
- * Enter is a spring -- it should feel like the dialog has mass and settles.
- * Exit is a short tween: dismissing must never feel like waiting, and a spring
- * always spends time easing out that the user reads as lag.
- */
-/**
  * Enter/rest variants for a hover-revealed quick action. `rest` parks the button
  * a little to the right, faded and shrunk; `show` slides it home on
  * {@link quickActionSpringToken}. Reduced motion keeps only the fade. Shared by
@@ -177,6 +167,16 @@ export function getQuickActionRevealVariants(prefersReducedMotion: boolean): Var
   };
 }
 
+/**
+ * Motion for a dialog surface, shared by `Modal` and by the dialogs that hand
+ * roll their own markup (the game modals, the artifact upload). Use this rather
+ * than inlining `initial`/`animate`/`exit` so every dialog in the app opens
+ * with the same weight.
+ *
+ * Enter is a spring -- it should feel like the dialog has mass and settles.
+ * Exit is a short tween: dismissing must never feel like waiting, and a spring
+ * always spends time easing out that the user reads as lag.
+ */
 export function getModalDialogVariants(prefersReducedMotion: boolean): Variants {
   if (prefersReducedMotion) {
     return {

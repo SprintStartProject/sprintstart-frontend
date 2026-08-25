@@ -6,6 +6,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { groupByScope } from "../../arrival/scopeGroups";
+import { safeStepHref } from "../../arrival/stepHref";
 import type { ArrivalStep } from "../../arrival/types";
 import type { ArrivalStepsContent, BoardCard } from "../types";
 
@@ -169,6 +170,8 @@ function StepRow({
   failed: boolean;
   onConfirm: () => void;
 }) {
+  const href = safeStepHref(step.href);
+
   return (
     <li
       className={`rounded-xl border p-3 ${
@@ -192,9 +195,13 @@ function StepRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {step.href && !step.settled && (
+          {/* `safeStepHref`, not `step.href`: the link is free text an author typed, and it
+              lands on somebody else's board. A step whose link does not survive the check
+              simply renders without one — a step nobody can open is better than an anchor
+              that runs whatever was pasted into it. */}
+          {href && !step.settled && (
             <a
-              href={step.href}
+              href={href}
               target="_blank"
               rel="noreferrer"
               className="text-app-text-muted transition hover:text-app-text"

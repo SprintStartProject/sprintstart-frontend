@@ -166,6 +166,37 @@ describe("ArrivalStepsCard", () => {
     expect(screen.queryByText("Everyone")).not.toBeInTheDocument();
   });
 
+  it("links a step whose author gave it an ordinary address", () => {
+    render(
+      <BoardGrid
+        board={board([arrivalContent({ steps: [step({ href: "https://vpn.example/request" })] })])}
+      />,
+    );
+
+    expect(screen.getByLabelText('Open the page for "Request VPN access"')).toHaveAttribute(
+      "href",
+      "https://vpn.example/request",
+    );
+  });
+
+  /**
+   * The link is free text an author typed and it renders on somebody else's board, so a
+   * scheme that executes on click must not become an anchor. The step still shows; only the
+   * link is withheld.
+   */
+  it("renders no link for a step whose address would run code", () => {
+    render(
+      <BoardGrid
+        board={board([arrivalContent({ steps: [step({ href: "javascript:alert(1)" })] })])}
+      />,
+    );
+
+    expect(screen.getByText("Request VPN access")).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Open the page for "Request VPN access"'),
+    ).not.toBeInTheDocument();
+  });
+
   /**
    * A step the hire may not settle is not one they get a button for — the backend refuses the
    * confirmation, and offering it would be an affordance whose only outcome is an error.

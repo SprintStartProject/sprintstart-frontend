@@ -27,7 +27,6 @@ export type StarterWorkTask = {
   status: ProposalStatus;
   /** Whether a person has looked at this task. Unreviewed is claimable, just ranked lower. */
   reviewed: boolean;
-  /** Which track this work is for, or null when it suits any role. */
 };
 
 /** The live tasks nobody has vouched for yet. */
