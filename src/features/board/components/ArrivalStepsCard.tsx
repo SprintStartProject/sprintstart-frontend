@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Check, ExternalLink, Loader2 } from "lucide-react";
+import { Check, ExternalLink, PlaneLanding } from "lucide-react";
 import { arrivalService } from "../../../services/arrivalService";
+import { Button } from "../../../components/ui/Button";
+import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { groupByScope } from "../../arrival/scopeGroups";
@@ -12,9 +14,6 @@ type ArrivalStepsCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 /**
@@ -35,15 +34,7 @@ type ArrivalStepsCardProps = {
  * observe never unsettles one, so an outage, a rate limit and a hire with no work yet are one and
  * the same answer here.
  */
-export function ArrivalStepsCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-}: ArrivalStepsCardProps) {
+export function ArrivalStepsCard({ content, card, onDismiss, dismissing }: ArrivalStepsCardProps) {
   // Derived, not synced: the card re-reads on every board load, and a confirmation that has
   // landed should not be undone by a stale prop. Same shape the diagram card uses for `redrawn`.
   const [confirmed, setConfirmed] = useState<Record<string, ArrivalStep>>({});
@@ -101,13 +92,11 @@ export function ArrivalStepsCard({
 
   return (
     <BoardCardFrame
+      icon={PlaneLanding}
       title="Getting you set up"
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
       subtitle={summarise({ observed, declared, outstanding })}
     >
       <div className="space-y-4">
@@ -145,7 +134,7 @@ export function ArrivalStepsCard({
             */}
       {checking && (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-app-text-muted">
-          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+          <Spinner size="sm" silent />
           Checking what we can see for ourselves…
         </p>
       )}
@@ -225,21 +214,9 @@ function StepRow({
             // there, so offering one would be an affordance whose only outcome is an
             // error.
             step.selfConfirmable && (
-              <button
-                type="button"
-                onClick={onConfirm}
-                disabled={pending}
-                className="rounded-lg border border-app-border px-2 py-1 text-xs text-app-text transition hover:bg-app-surface-muted disabled:opacity-60"
-              >
-                {pending ? (
-                  <Loader2
-                    className="h-3.5 w-3.5 animate-spin"
-                    aria-label={`Saving "${step.title}"`}
-                  />
-                ) : (
-                  "I've done this"
-                )}
-              </button>
+              <Button variant="secondary" size="sm" onClick={onConfirm} loading={pending}>
+                I&apos;ve done this
+              </Button>
             )
           )}
         </div>

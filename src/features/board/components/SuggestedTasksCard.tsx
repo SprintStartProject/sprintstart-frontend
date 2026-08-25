@@ -1,4 +1,5 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, SuggestedTasksContent } from "../types";
@@ -8,9 +9,6 @@ type SuggestedTasksCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 /**
@@ -29,26 +27,21 @@ export function SuggestedTasksCard({
   card,
   onDismiss,
   dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
 }: SuggestedTasksCardProps) {
   return (
     <BoardCardFrame
+      icon={Sparkles}
       title="Good next tasks"
       card={card}
       subtitle={content.tasks.length > 0 ? "Best fit first" : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
     >
       {content.tasks.length === 0 ? (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           No starter tasks are ready for you yet. Your PM approves the ones that fit your role — ask
           your buddy if you want something to get started on in the meantime.
-        </p>
+        </EmptyState>
       ) : (
         <ol className="space-y-3">
           {content.tasks.map((task) => (

@@ -1,3 +1,5 @@
+import { Brain } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, MemoryRecapContent } from "../types";
@@ -7,9 +9,6 @@ type MemoryRecapCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 /**
@@ -24,19 +23,12 @@ type MemoryRecapCardProps = {
  * would present a model's summary as a record. And it invites correction, because the hire is the
  * only one who can tell whether it is right.
  */
-export function MemoryRecapCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-}: MemoryRecapCardProps) {
+export function MemoryRecapCard({ content, card, onDismiss, dismissing }: MemoryRecapCardProps) {
   const { memory, messagesRemembered } = content;
 
   return (
     <BoardCardFrame
+      icon={Brain}
       title="What your buddy remembers"
       card={card}
       subtitle={
@@ -46,9 +38,6 @@ export function MemoryRecapCard({
       }
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
     >
       {memory ? (
         <>
@@ -61,9 +50,9 @@ export function MemoryRecapCard({
           </p>
         </>
       ) : (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           Nothing yet — your buddy starts remembering after your first conversation.
-        </p>
+        </EmptyState>
       )}
 
       <AskTheBuddy

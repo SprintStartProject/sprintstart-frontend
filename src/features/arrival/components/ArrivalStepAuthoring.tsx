@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Eye, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, Eye, Plus, Trash2 } from "lucide-react";
+import { AlertDialog } from "../../../components/ui/AlertDialog";
+import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
+import { Spinner } from "../../../components/ui/Spinner";
+import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
 import type { ArrivalStep, DerivableArrivalStep } from "../types";
 
@@ -15,6 +23,10 @@ import type { ArrivalStep, DerivableArrivalStep } from "../types";
  * board card counts them apart rather than showing one figure.
  *
  * Nothing is seeded, the checkable ones included.
+ *
+ * Every control here is a shared primitive — `Button`, `Field`/`Input`, `EmptyState`, `Badge` — and
+ * the removal goes through the app's one `AlertDialog` rather than an inline confirm of its own, so
+ * a destructive step here behaves exactly like a destructive step anywhere else in the app.
  */
 export function ArrivalStepAuthoring({
   readOnly = false,
@@ -29,14 +41,34 @@ export function ArrivalStepAuthoring({
   const { steps, derivable, loading, error, writeError, create, addDerivable, move, remove } =
     useArrivalAuthoring(projectId);
   const [adding, setAdding] = useState(false);
+  // Held on the list rather than on the row: one dialog at a time, and the row that opened it may
+  // be gone by the time the removal lands.
+  const [confirming, setConfirming] = useState<ArrivalStep | null>(null);
+
+  // A refused write is a toast, like every other refused write in the app — the list below is
+  // still the list the server has, so the message belongs to the attempt rather than to the page.
+  const toast = useToast();
+  const showErrorToast = toast.error;
+
+  useEffect(() => {
+    if (!writeError) return;
+    showErrorToast("That didn't save", { description: writeError });
+  }, [writeError, showErrorToast]);
 
   if (loading) {
-    return <p className="text-sm text-app-text-muted">Loading the arrival list…</p>;
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Spinner size="lg" label="Loading the arrival list" />
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <p className="text-sm text-app-danger-text">
+      <p
+        role="alert"
+        className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+      >
         The arrival list could not be loaded. Refresh to try again.
       </p>
     );
@@ -45,10 +77,10 @@ export function ArrivalStepAuthoring({
   return (
     <section className="space-y-4">
       <header className="space-y-1">
-        <h2 className="text-lg font-medium text-app-text">
+        <h2 className="text-lg font-semibold tracking-tight text-app-text">
           {projectName ? `Arrival steps for ${projectName}` : "Arrival steps"}
         </h2>
-        <p className="text-sm text-app-text-muted">
+        <p className="max-w-2xl text-sm text-app-text-muted">
           {projectName ? (
             <>
               Extra steps for people on{" "}
@@ -67,16 +99,14 @@ export function ArrivalStepAuthoring({
         </p>
       </header>
 
-      {writeError && <p className="text-sm text-app-danger-text">{writeError}</p>}
-
       {steps && steps.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-app-border p-4 text-sm text-app-text-muted">
+        <EmptyState size="sm">
           {projectName
             ? `No steps specific to ${projectName}. People here still get the ` +
               "company-wide list — add something only if this project needs it on top."
             : "No arrival steps yet, so nobody sees this card at all. Add the first " +
               "thing a new joiner has to do before they can work."}
-        </p>
+        </EmptyState>
       ) : (
         <ul className="space-y-2">
           {steps?.map((step, index) => (
@@ -87,17 +117,17 @@ export function ArrivalStepAuthoring({
               canMoveUp={index > 0}
               canMoveDown={index < steps.length - 1}
               onMove={move}
-              onRemove={remove}
+              onRequestRemove={setConfirming}
             />
           ))}
         </ul>
       )}
 
       {readOnly ? (
-        <p className="rounded-xl border border-dashed border-app-border p-4 text-sm text-app-text-muted">
+        <EmptyState size="sm">
           You can see this list but not change it — a PM or an admin can. If something here is wrong
           or missing, that is who to tell.
-        </p>
+        </EmptyState>
       ) : adding ? (
         <AddStepForm
           onCancel={() => setAdding(false)}
@@ -106,13 +136,13 @@ export function ArrivalStepAuthoring({
           }}
         />
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() => setAdding(true)}
-          className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-text transition hover:bg-app-surface-muted"
+          icon={<Plus className="h-4 w-4" aria-hidden="true" />}
         >
           Add a step
-        </button>
+        </Button>
       )}
 
       {/*
@@ -124,6 +154,39 @@ export function ArrivalStepAuthoring({
       {projectId === null && (
         <DerivableCatalog derivable={derivable} readOnly={readOnly} onAdd={addDerivable} />
       )}
+
+      {/*
+              What a PM cannot guess is what survives. State is keyed by the step key, not by a row
+              id, so removing this takes it off everyone's board without destroying who already did
+              it -- and re-adding the same key brings those records back.
+            */}
+      <AlertDialog
+        isOpen={confirming !== null}
+        variant="danger"
+        title={
+          confirming
+            ? `Remove “${confirming.title}” from everyone’s board?`
+            : "Remove this step from everyone’s board?"
+        }
+        description={
+          confirming ? (
+            <p>
+              Records of people who already did it are kept. Adding a step with the key{" "}
+              <span className="font-mono">{confirming.key}</span> again restores them.
+            </p>
+          ) : undefined
+        }
+        confirmLabel="Remove"
+        cancelLabel="Keep it"
+        onClose={() => setConfirming(null)}
+        onConfirm={() => {
+          const step = confirming;
+          if (!step) return;
+          void (async () => {
+            if (await remove(step.key)) setConfirming(null);
+          })();
+        }}
+      />
     </section>
   );
 }
@@ -150,9 +213,9 @@ function DerivableCatalog({
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-dashed border-app-border p-4">
+    <section className="space-y-3 rounded-2xl border border-dashed border-app-border p-4">
       <header className="space-y-1">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-app-text">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-app-text">
           <Eye className="h-4 w-4 text-app-text-muted" aria-hidden="true" />
           Steps we can check ourselves
         </h3>
@@ -167,7 +230,7 @@ function DerivableCatalog({
         {derivable.map((derivation) => (
           <li
             key={derivation.key}
-            className="flex items-start justify-between gap-3 rounded-lg border border-app-border p-3"
+            className="flex items-start justify-between gap-3 rounded-xl border border-app-border bg-app-surface p-3"
           >
             <div className="min-w-0">
               <p className="text-sm text-app-text">{derivation.suggestedTitle}</p>
@@ -185,16 +248,19 @@ function DerivableCatalog({
             </div>
 
             {derivation.added ? (
-              <span className="shrink-0 text-xs text-app-text-muted">On the list</span>
+              <Badge variant="neutral" size="sm" className="shrink-0">
+                On the list
+              </Badge>
             ) : (
               !readOnly && (
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0"
                   onClick={() => void onAdd(derivation)}
-                  className="shrink-0 rounded-lg border border-app-border px-2 py-1 text-xs text-app-text transition hover:bg-app-surface-muted"
                 >
                   Add
-                </button>
+                </Button>
               )
             )}
           </li>
@@ -210,26 +276,24 @@ function StepRow({
   canMoveUp,
   canMoveDown,
   onMove,
-  onRemove,
+  onRequestRemove,
 }: {
   step: ArrivalStep;
   readOnly: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (key: string, direction: "up" | "down") => Promise<boolean>;
-  onRemove: (key: string) => Promise<boolean>;
+  onRequestRemove: (step: ArrivalStep) => void;
 }) {
-  const [confirmingRemove, setConfirmingRemove] = useState(false);
-
   return (
-    <li className="rounded-xl border border-app-border p-3">
+    <li className="rounded-2xl border border-app-border bg-app-surface p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-app-text">{step.title}</p>
           {step.description && (
             <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>
           )}
-          <p className="mt-1 font-mono text-xs text-app-text-muted">{step.key}</p>
+          <p className="mt-1 font-mono text-xs text-app-text-subtle">{step.key}</p>
           {/*
                       Which steps the system checks is not visible from their wording, and it is the
                       difference between a list somebody has to work through and one that partly
@@ -252,68 +316,38 @@ function StepRow({
                 */}
         {!readOnly && (
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               onClick={() => void onMove(step.key, "up")}
               disabled={!canMoveUp}
               aria-label={`Move "${step.title}" earlier`}
-              className="rounded-lg p-1 text-app-text-muted transition hover:bg-app-surface-muted disabled:opacity-40"
             >
               <ChevronUp className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               onClick={() => void onMove(step.key, "down")}
               disabled={!canMoveDown}
               aria-label={`Move "${step.title}" later`}
-              className="rounded-lg p-1 text-app-text-muted transition hover:bg-app-surface-muted disabled:opacity-40"
             >
               <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingRemove(true)}
+            </Button>
+            <Button
+              variant="dangerGhost"
+              size="sm"
+              iconOnly
+              onClick={() => onRequestRemove(step)}
               aria-label={`Remove "${step.title}"`}
-              className="rounded-lg p-1 text-app-text-muted transition hover:bg-app-surface-muted"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         )}
       </div>
-
-      {confirmingRemove && (
-        <div className="mt-3 rounded-lg border border-app-border bg-app-surface-muted/40 p-3">
-          {/*
-                      What a PM cannot guess is what survives. State is keyed by the step key, not by
-                      a row id, so removing this takes it off everyone's board without destroying who
-                      already did it -- and re-adding the same key brings those records back.
-                    */}
-          <p className="text-sm text-app-text">
-            Remove &ldquo;{step.title}&rdquo; from everyone&apos;s board?
-          </p>
-          <p className="mt-1 text-xs text-app-text-muted">
-            Records of people who already did it are kept. Adding a step with the key{" "}
-            <span className="font-mono">{step.key}</span> again restores them.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => void onRemove(step.key)}
-              className="rounded-lg border border-app-danger-border px-2 py-1 text-xs text-app-danger-text transition hover:bg-app-danger-bg/30"
-            >
-              Remove
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingRemove(false)}
-              className="rounded-lg border border-app-border px-2 py-1 text-xs text-app-text transition hover:bg-app-surface-muted"
-            >
-              Keep it
-            </button>
-          </div>
-        </div>
-      )}
     </li>
   );
 }
@@ -339,7 +373,7 @@ function AddStepForm({
 
   return (
     <form
-      className="space-y-3 rounded-xl border border-app-border p-4"
+      className="space-y-3 rounded-2xl border border-app-border bg-app-surface p-4"
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSubmit) return;
@@ -351,81 +385,51 @@ function AddStepForm({
         });
       }}
     >
-      <Field
-        label="Title"
-        hint="What the person has to do, in their words."
-        value={title}
-        onChange={setTitle}
-        placeholder="Request VPN access"
-      />
+      <Field label="Title" hint="What the person has to do, in their words.">
+        <Input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="Request VPN access"
+        />
+      </Field>
+
+      {/* The key is immutable because state points at it; saying so at the point of
+                choosing is cheaper than explaining it after somebody wants to change one. */}
       <Field
         label="Key"
-        // The key is immutable because state points at it; saying so at the point of
-        // choosing is cheaper than explaining it after somebody wants to change one.
         hint="A short id, fixed once saved — it is what people's records point at."
-        value={key}
-        onChange={setKey}
-        placeholder="vpn-access"
-      />
-      <Field
-        label="Description"
-        hint="Optional. Anything they need to know before starting."
-        value={description}
-        onChange={setDescription}
-        placeholder="Ask in #it-helpdesk; usually same-day."
-      />
-      <Field
-        label="Link"
-        hint="Optional. Where to go to actually do it."
-        value={href}
-        onChange={setHref}
-        placeholder="https://…"
-      />
+      >
+        <Input
+          value={key}
+          onChange={(event) => setKey(event.target.value)}
+          placeholder="vpn-access"
+        />
+      </Field>
+
+      <Field label="Description" hint="Optional. Anything they need to know before starting.">
+        <Input
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Ask in #it-helpdesk; usually same-day."
+        />
+      </Field>
+
+      <Field label="Link" hint="Optional. Where to go to actually do it.">
+        <Input
+          value={href}
+          onChange={(event) => setHref(event.target.value)}
+          placeholder="https://…"
+        />
+      </Field>
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="rounded-lg border border-app-border bg-app-brand px-3 py-2 text-sm text-white transition hover:bg-app-brand-hover disabled:opacity-60"
-        >
+        <Button type="submit" variant="primary" disabled={!canSubmit}>
           Add step
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-text transition hover:bg-app-surface-muted"
-        >
+        </Button>
+        <Button variant="secondary" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-sm text-app-text">{label}</span>
-      <input
-        type="text"
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text placeholder:text-app-text-muted"
-      />
-      <span className="block text-xs text-app-text-muted">{hint}</span>
-    </label>
   );
 }

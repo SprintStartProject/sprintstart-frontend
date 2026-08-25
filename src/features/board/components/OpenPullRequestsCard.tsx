@@ -1,5 +1,6 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, GitPullRequest } from "lucide-react";
 import { formatDuration } from "../../onboarding-metrics/format";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, OpenPullRequestsContent } from "../types";
@@ -9,9 +10,6 @@ type OpenPullRequestsCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 /** A wait long enough that it is worth saying out loud rather than just showing. */
@@ -32,21 +30,16 @@ export function OpenPullRequestsCard({
   card,
   onDismiss,
   dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
 }: OpenPullRequestsCardProps) {
   const { pullRequests, attributionMissing } = content;
 
   return (
     <BoardCardFrame
+      icon={GitPullRequest}
       title="Your open pull requests"
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
       subtitle={
         pullRequests.length > 0
           ? `${pullRequests.length} open`
@@ -56,15 +49,15 @@ export function OpenPullRequestsCard({
       }
     >
       {attributionMissing ? (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           No GitHub username on your profile yet, so I can&apos;t tell which pull requests are
           yours. Add it on your profile and this fills itself in.
-        </p>
+        </EmptyState>
       ) : pullRequests.length === 0 ? (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           Nothing open right now. When you open one it shows up here, with how long it has been
           waiting.
-        </p>
+        </EmptyState>
       ) : (
         <ul className="space-y-2">
           {pullRequests.map((pullRequest) => {

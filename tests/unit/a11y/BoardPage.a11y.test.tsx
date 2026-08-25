@@ -75,13 +75,11 @@ describe("BoardPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <BoardPage />
-        </main>
+        <BoardPage />
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText("Your path here")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("Your path here")).toBeInTheDocument());
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 
@@ -90,9 +88,7 @@ describe("BoardPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <BoardPage />
-        </main>
+        <BoardPage />
       </MemoryRouter>,
     );
 

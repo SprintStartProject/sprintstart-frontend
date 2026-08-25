@@ -1,3 +1,5 @@
+import { Award } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, BoardCompetency, CompetencyProgressContent } from "../types";
@@ -7,9 +9,6 @@ type CompetencyProgressCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 function CompetencyRow({ competency, held }: { competency: BoardCompetency; held: boolean }) {
@@ -40,29 +39,24 @@ export function CompetencyProgressCard({
   card,
   onDismiss,
   dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
 }: CompetencyProgressCardProps) {
   const { held, inProgress } = content;
   const nothingYet = held.length === 0 && inProgress.length === 0;
 
   return (
     <BoardCardFrame
+      icon={Award}
       title="Where you stand"
       card={card}
       subtitle={held.length > 0 ? `${held.length} shown` : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
     >
       {nothingYet ? (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           Nothing on your record yet. That&apos;s the normal shape of a first week — it fills in as
           work of yours is accepted.
-        </p>
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {held.length > 0 && (

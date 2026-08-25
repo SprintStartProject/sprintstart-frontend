@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { BoardCard, LinkContent } from "../types";
 
@@ -7,9 +7,6 @@ type LinkCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 /**
@@ -22,24 +19,14 @@ type LinkCardProps = {
  * No inline editing: a link is its address, and changing that makes it a different link. Remove and
  * add is the honest gesture, and it is one click more than an edit form nobody would find.
  */
-export function LinkCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-}: LinkCardProps) {
+export function LinkCard({ content, card, onDismiss, dismissing }: LinkCardProps) {
   return (
     <BoardCardFrame
+      icon={Link2}
       title="Link"
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
     >
       <a
         href={content.url}

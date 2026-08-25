@@ -6,7 +6,9 @@ import {
   ChartColumn,
   Database,
   Inbox,
+  LayoutDashboard,
   MessageSquare,
+  PlaneLanding,
   Rocket,
   Target,
   Terminal,
@@ -418,6 +420,84 @@ export function InboxIcon({ isActive }: SidebarIconProps) {
       {/* The tray itself, with its front lip covering the landed sheet's foot. */}
       <path d="M22 12h-6l-2 3h-4l-2-3H2" />
       <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </IconFrame>
+  );
+}
+
+/**
+ * Board: the tiles land one after another, the way cards settle onto the board.
+ *
+ * Each tile scales up about its own centre rather than the icon's, so the four
+ * grow in place instead of drifting toward the middle — at 18px a shared origin
+ * reads as the whole grid sliding, which is not what the page does.
+ */
+export function BoardIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <LayoutDashboard className={ICON_CLASS} />;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      {[
+        { x: 3, y: 3, width: 7, height: 9, delay: 0 },
+        { x: 14, y: 3, width: 7, height: 5, delay: 0.07 },
+        { x: 14, y: 12, width: 7, height: 9, delay: 0.14 },
+        { x: 3, y: 16, width: 7, height: 5, delay: 0.21 },
+      ].map((tile) => (
+        <motion.rect
+          key={`${tile.x}-${tile.y}`}
+          x={tile.x}
+          y={tile.y}
+          width={tile.width}
+          height={tile.height}
+          rx={1}
+          style={{
+            transformOrigin: `${tile.x + tile.width / 2}px ${tile.y + tile.height / 2}px`,
+            transformBox: "view-box",
+          }}
+          initial={hasPlayed ? { scale: 0.2, opacity: 0 } : false}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ ...bounce, delay: tile.delay }}
+        />
+      ))}
+    </IconFrame>
+  );
+}
+
+/**
+ * Arrival Steps: the plane comes down and touches the runway.
+ *
+ * The ground line draws itself out first and the aircraft descends onto it, so
+ * the pair reads as an arrival rather than as two shapes appearing. Same
+ * silhouette as the page's own header icon, which is what makes the sidebar
+ * entry and the page recognisably the same thing.
+ */
+export function ArrivalStepsIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <PlaneLanding className={ICON_CLASS} />;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      {/* The runway, drawn from the left so the plane has something to meet. */}
+      <motion.path
+        d="M2 22h20"
+        style={{ transformOrigin: "2px 22px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0 } : false}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      />
+      {/* The aircraft, coming down the approach and settling onto it. */}
+      <motion.path
+        d="M3.77 10.77 2 9l2-4.5 1.1.55c.55.28.9.84.9 1.45s.35 1.17.9 1.45L8 8.5l3-6 1.05.53a2 2 0 0 1 1.09 1.52l.72 5.4a2 2 0 0 0 1.09 1.52l4.4 2.2c.42.22.78.55 1.01.96l.6 1.03c.49.88-.06 1.98-1.06 2.1l-1.18.15c-.47.06-.95-.02-1.37-.24L4.29 11.15a2 2 0 0 1-.52-.38Z"
+        initial={hasPlayed ? { x: 3, y: -4, opacity: 0 } : false}
+        animate={{ x: 0, y: 0, opacity: 1 }}
+        transition={{ ...bounce, delay: 0.18 }}
+      />
     </IconFrame>
   );
 }

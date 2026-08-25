@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { List, Network, RefreshCw } from "lucide-react";
 import { boardService } from "../../../services/boardService";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { type GraphShape } from "../../competency-graph/layout";
 import { DiagramCanvas, type DiagramCanvasEdge } from "../../graph-diagram/DiagramCanvas";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -14,9 +16,6 @@ type DiagramCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
-  onMove?: (cardId: string, direction: "up" | "down") => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 };
 
 const nodeTypes = { diagramPart: DiagramCardNode };
@@ -36,15 +35,7 @@ const nodeTypes = { diagramPart: DiagramCardNode };
  * drawn rather than waiting on a generation. The date is shown either way: a picture is a claim
  * about code as it was at a moment.
  */
-export function DiagramCard({
-  content,
-  card,
-  onDismiss,
-  dismissing,
-  onMove,
-  canMoveUp,
-  canMoveDown,
-}: DiagramCardProps) {
+export function DiagramCard({ content, card, onDismiss, dismissing }: DiagramCardProps) {
   // Only what a revalidation produced. Derived rather than synced from the prop, so a fresh board
   // read cannot be silently overwritten by a stale confirmation of the previous one.
   const [redrawn, setRedrawn] = useState<DiagramContent | null>(null);
@@ -117,30 +108,29 @@ export function DiagramCard({
 
   return (
     <BoardCardFrame
+      icon={Network}
       title="How this fits together"
       card={card}
       subtitle={current.subject}
       onDismiss={onDismiss}
       dismissing={dismissing}
-      onMove={onMove}
-      canMoveUp={canMoveUp}
-      canMoveDown={canMoveDown}
       action={
         hasPicture ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={() => setAsList((shown) => !shown)}
             aria-pressed={asList}
             title={asList ? "Show the diagram" : "Read it as a list"}
             aria-label={asList ? "Show the diagram" : "Read it as a list"}
-            className="rounded-lg p-1 text-app-text-muted transition hover:bg-app-surface-hover hover:text-app-text"
           >
             {asList ? (
               <Network className="h-4 w-4" aria-hidden="true" />
             ) : (
               <List className="h-4 w-4" aria-hidden="true" />
             )}
-          </button>
+          </Button>
         ) : undefined
       }
     >
@@ -165,9 +155,9 @@ export function DiagramCard({
           </div>
         )
       ) : (
-        <p className="text-sm text-app-text-muted">
+        <EmptyState size="sm">
           {current.reason ?? "There is nothing in this project’s material to draw this from yet."}
-        </p>
+        </EmptyState>
       )}
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-app-text-muted">
