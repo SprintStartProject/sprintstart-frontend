@@ -2,7 +2,6 @@ import { AppRouter } from "./router/AppRouter";
 import { SideBar } from "./components/layout/SideBar";
 import { AuthProvider } from "./context/AuthProvider";
 import { ChatProvider } from "./context/ChatProvider";
-import { ChatPreferencesProvider } from "./context/ChatPreferencesProvider";
 import { ThemeProvider } from "./context/ThemeProvider";
 import { ToastProvider } from "./context/ToastProvider";
 import { ProjectProvider } from "./features/projects/ProjectProvider";
@@ -49,13 +48,11 @@ function App() {
         <AuthProvider>
           <ProjectProvider>
             <ChatProvider>
-              <ChatPreferencesProvider>
-                {/* Inside AuthProvider: the launch sequence is triggered
-                                by the user becoming authenticated. */}
-                <MomentsProvider>
-                  <AppContent />
-                </MomentsProvider>
-              </ChatPreferencesProvider>
+              {/* Inside AuthProvider: the launch sequence is triggered
+                              by the user becoming authenticated. */}
+              <MomentsProvider>
+                <AppContent />
+              </MomentsProvider>
             </ChatProvider>
           </ProjectProvider>
         </AuthProvider>

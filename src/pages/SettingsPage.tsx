@@ -1,18 +1,17 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
-import { Key, MessageSquare, Palette, Rocket, Settings, User } from "lucide-react";
+import { Key, Palette, Rocket, Settings, User } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { PageHeader } from "../components/layout/PageHeader";
 import { SettingsSection } from "../features/settings/components/SettingsSection";
 import { ProfileSection } from "../features/settings/components/ProfileSection";
 import { AppearanceSection } from "../features/settings/components/AppearanceSection";
-import { ChatSection } from "../features/settings/components/ChatSection";
 import { MomentsSection } from "../features/settings/components/MomentsSection";
 import { AccessTokensSection } from "../features/settings/components/AccessTokensSection";
 import { useDinoEasterEgg } from "../features/settings/hooks/useDinoEasterEgg";
 
-type SectionId = "profile" | "appearance" | "chat" | "moments" | "tokens";
+type SectionId = "profile" | "appearance" | "moments" | "tokens";
 
 type SectionDef = {
   id: SectionId;
@@ -39,14 +38,6 @@ const ALL_SECTIONS: ReadonlyArray<SectionDef> = [
     title: "Appearance",
     description: "Choose a light, dark, or system theme preference.",
     render: () => <AppearanceSection />,
-  },
-  {
-    id: "chat",
-    label: "Chat",
-    icon: MessageSquare,
-    title: "Chat",
-    description: "How the assistant shows progress while generating an answer.",
-    render: () => <ChatSection />,
   },
   {
     id: "moments",

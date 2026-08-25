@@ -105,6 +105,11 @@ export type ChatSidebarProps = {
    * Function that opens or closes the sidebar.
    */
   setSidebarOpen: (open: boolean) => void;
+
+  /**
+   * Optional callback to delete a chat conversation.
+   */
+  onDeleteChat?: (chatId: string) => Promise<void>;
 };
 
 export type StreamHandlers = {

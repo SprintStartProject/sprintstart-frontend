@@ -36,6 +36,17 @@ export async function createChat(projectId: string) {
 }
 
 /**
+ * Deletes an existing chat and all of its messages for the authenticated user.
+ *
+ * @param chatId The unique identifier of the chat to delete.
+ */
+export async function deleteChat(chatId: string): Promise<void> {
+  await apiClient.fetch<void>(`/api/v1/chats/me/${chatId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
  * Retrieves all messages from a specific chat owned by the authenticated user.
  *
  * @param chatId The chat the messages belong to.
@@ -70,7 +81,7 @@ export async function getMessages(chatId: string) {
 type ChatEvent =
   | { type: "tool_use"; name: string }
   | { type: "token"; content: string }
-  | { type: "reasoning"; content: string }
+  | { type: "reasoning"; reasoning?: string; content?: string }
   | {
       type: "citation";
       artifact_id: string;
@@ -200,11 +211,13 @@ export async function streamMessage(
           }
           break;
 
-        case "reasoning":
-          if (event.content !== undefined) {
-            handlers.onReasoning(event.content);
+        case "reasoning": {
+          const reasoningText = event.reasoning ?? event.content;
+          if (reasoningText !== undefined) {
+            handlers.onReasoning(reasoningText);
           }
           break;
+        }
 
         case "token":
           if (event.content !== undefined) {
