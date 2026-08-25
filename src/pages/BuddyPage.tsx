@@ -83,20 +83,24 @@ function BuddyPageShell({
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-app-bg lg:h-screen">
-      {/* Always rendered, width toggled — the same shape ChatPage gives its history sidebar, so
-                the two rails in this app open the same way. `w-0 overflow-hidden` rather than
-                unmounting keeps the transition to a width rather than a pop. */}
-      <aside
-        aria-label="Questions you sent to your PM"
-        aria-hidden={!rail}
-        inert={!rail}
-        className={`hidden shrink-0 flex-col border-r border-app-border bg-app-bg-soft transition-all duration-200 xl:flex ${
-          rail ? "w-80" : "w-0 overflow-hidden border-r-0"
-        }`}
-      >
-        {rail}
-      </aside>
+    <div className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen xl:flex-row">
+      {/* A column beside the conversation where there is room for one, a band above it where
+                there is not — one element either way, laid out by the parent's direction.
+                Rendering it twice and hiding one per breakpoint would put the same answers in the
+                document twice, which is a duplicate to anything that reads the page rather than
+                looks at it.
+
+                Deliberately not hidden below `xl`: this is where a hire reads the answer their PM
+                sent, and putting it out of reach on a laptop would quietly break the promise
+                `FlagToPmButton` makes. */}
+      {rail && (
+        <aside
+          aria-label="Questions you sent to your PM"
+          className="max-h-[45vh] shrink-0 overflow-y-auto border-b border-app-border bg-app-bg-soft xl:max-h-none xl:w-80 xl:border-r xl:border-b-0"
+        >
+          {rail}
+        </aside>
+      )}
 
       {/* `app-rail-open` collapses this column's left gutter, so the rail opens *into* the empty
                 gutter instead of shoving the conversation right. The separating space belongs
@@ -239,7 +243,6 @@ function BuddyMentorHome() {
               aria-expanded={isRailOpen}
               icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
               title="What you sent to your PM"
-              className="hidden xl:inline-flex"
               onClick={() => setIsRailOpen((open) => !open)}
             >
               PM replies

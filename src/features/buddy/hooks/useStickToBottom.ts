@@ -22,12 +22,17 @@ const STICK_THRESHOLD_PX = 120;
  * coming back within {@link STICK_THRESHOLD_PX} of the bottom takes it again. Without that, a
  * hire reading an earlier answer is yanked to the newest one every time a token lands.
  *
- * @param dependency Changes whenever the transcript grows — the message list.
+ * The one thing that overrides a released pin is the hire's own message. Sending is an explicit
+ * act of joining the end of the conversation: staying put would hide both what they just wrote
+ * and the reply to it, which reads as the buddy having ignored them.
+ *
+ * @param messages The transcript. Its identity changes whenever it grows.
  */
-export function useStickToBottom(dependency: unknown) {
+export function useStickToBottom(messages: readonly { role: string }[]) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Starts pinned: a conversation opens at its newest message.
   const isPinned = useRef(true);
+  const previousQuestionCount = useRef(0);
 
   const onScroll = useCallback(() => {
     const element = containerRef.current;
@@ -38,9 +43,21 @@ export function useStickToBottom(dependency: unknown) {
 
   useEffect(() => {
     const element = containerRef.current;
-    if (!element || !isPinned.current) return;
+    if (!element) return;
+
+    // Counted, not read off the tail: the send loop appends the question *and* the empty turn
+    // the reply streams into, so the hire's own message is never the last one in the list.
+    const questionCount = messages.reduce(
+      (count, message) => (message.role === "USER" ? count + 1 : count),
+      0,
+    );
+    const justAsked = questionCount > previousQuestionCount.current;
+    previousQuestionCount.current = questionCount;
+    if (justAsked) isPinned.current = true;
+
+    if (!isPinned.current) return;
     element.scrollTop = element.scrollHeight;
-  }, [dependency]);
+  }, [messages]);
 
   return { containerRef, onScroll };
 }

@@ -33,6 +33,8 @@ export function useBuddyConversation() {
   const [draft, setDraft] = useState("");
 
   const loadedRef = useRef(false);
+  // Guards the greeting against overlapping calls — see `startFreshVisit`.
+  const greetingRef = useRef(false);
 
   /**
    * Streams the buddy's opening greeting into the thread, *under* whatever is already there.
@@ -47,36 +49,56 @@ export function useBuddyConversation() {
    */
   const greet = useCallback(async () => {
     const id = crypto.randomUUID();
-    await streamOpenBuddy({
-      onToken: (token) => {
-        setMessages((prev) => {
-          const existing = prev.find((message) => message.id === id);
-          if (!existing) {
-            return [
-              ...prev,
-              {
-                id,
-                role: "ASSISTANT",
-                content: token,
-                createdAt: new Date().toISOString(),
-                citations: [],
-                // Only worth marking when there is something above it to be divided from.
-                startsVisit: prev.length > 0,
-              },
-            ];
-          }
-          return prev.map((message) =>
-            message.id === id ? { ...message, content: message.content + token } : message,
-          );
-        });
-        // The surface stops waiting at the first word, not the last: everything after this is
-        // the hire reading along, and the composer is theirs from here.
-        setIsOpening(false);
+
+    // Its place in the thread is claimed *before* the stream is awaited, not on the first
+    // token. The composer is live while the greeting is being written, so a hire who types
+    // straight away would otherwise have their question appended first and the greeting land
+    // underneath it — answering nothing, with a "New conversation" divider in the wrong place.
+    // An empty assistant turn renders nothing (see `BuddyThread`), so the placeholder is
+    // invisible until the first word arrives.
+    setMessages((prev) => [
+      ...prev,
+      {
+        id,
+        role: "ASSISTANT",
+        content: "",
+        createdAt: new Date().toISOString(),
+        citations: [],
+        // Only worth marking when there is something above it to be divided from.
+        startsVisit: prev.length > 0,
       },
-      onAction: setOpenerAction,
-      onDone: () => setIsOpening(false),
-      onError: (message) => console.error(message),
-    });
+    ]);
+
+    let wroteSomething = false;
+
+    try {
+      await streamOpenBuddy({
+        onToken: (token) => {
+          wroteSomething = true;
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === id ? { ...message, content: message.content + token } : message,
+            ),
+          );
+          // The surface stops waiting at the first word, not the last: everything after this
+          // is the hire reading along, and the composer is theirs from here.
+          setIsOpening(false);
+        },
+        onAction: setOpenerAction,
+        onDone: () => setIsOpening(false),
+        onError: (message) => console.error(message),
+      });
+    } finally {
+      // A greeting that never produced a word leaves no trace. The placeholder holds the
+      // greeting's *place* while it is being written; once it is established that nothing is
+      // coming — a failed stream, an unreachable model — an empty assistant turn would sit in
+      // the conversation for the rest of the session. It renders as nothing, which is worse
+      // than useless: invisible state that every reader of `messages` still has to account
+      // for, starting with "which turn is streaming".
+      if (!wroteSomething) {
+        setMessages((prev) => prev.filter((message) => message.id !== id));
+      }
+    }
   }, []);
 
   /**
@@ -102,17 +124,8 @@ export function useBuddyConversation() {
    * older is out of reach: `getMessagesForMe` stops at the last marker, and no hire-facing
    * endpoint exposes what came before it.
    *
-   * Now: fetch what the visit already holds. If there is anything there, that *is* the
-   * conversation — show it, and call no model at all. Only a genuinely empty visit gets a
-   * greeting, which is the case the greeting was written for.
-   *
-   * Idempotent by ref rather than by state, so the dock's open handler and the page's mount
-   * effect can both call it without either double-fetching or racing.
-   *
-   * What this cannot do is reach back past the current visit: `getMessages` returns the window
-   * since the buddy last updated its memory, and no hire-facing endpoint exposes anything
-   * older. Showing a hire every question they have ever asked needs a backend change, not a
-   * frontend one.
+   * Idempotent by ref rather than by state, so the dock's mount effect and the page's can both
+   * call it without either double-fetching or racing.
    */
   const ensureOpened = useCallback(async () => {
     if (loadedRef.current) return;
@@ -136,7 +149,12 @@ export function useBuddyConversation() {
       // same words on screen twice.
       if (history.length === 1) return;
 
-      await greet();
+      greetingRef.current = true;
+      try {
+        await greet();
+      } finally {
+        greetingRef.current = false;
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -157,6 +175,12 @@ export function useBuddyConversation() {
    * fresh does not mean starting over. Only the hire's scrollback moves on.
    */
   const startFreshVisit = useCallback(async () => {
+    // The button stays enabled while the greeting is written, so a second click would run a
+    // second open. The backend replays the greeting it has just written rather than composing
+    // another, so the hire would read the identical words twice.
+    if (greetingRef.current) return;
+    greetingRef.current = true;
+
     setMessages([]);
     setOpenerAction(null);
     setDraft("");
@@ -166,6 +190,7 @@ export function useBuddyConversation() {
     } catch (e) {
       console.error(e);
     } finally {
+      greetingRef.current = false;
       setIsOpening(false);
     }
   }, [greet]);

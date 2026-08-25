@@ -44,6 +44,7 @@ export function BuddyWidget() {
     confirmAction,
     dismissAction,
     suggestions,
+    closeDock,
   } = useBuddy();
 
   /**
@@ -65,15 +66,26 @@ export function BuddyWidget() {
   // Held here rather than in the dock, which unmounts every time it is closed — a row the hire
   // has already dismissed coming back on the next open is the dismissal not working.
   const [suggestionsHidden, setSuggestionsHidden] = useState(false);
-  const handoffTimers = useRef<number[]>([]);
+  /**
+   * The hand-off's pending timers, each held by name so it can be cancelled precisely.
+   *
+   * A bag of ids that was only emptied on unmount is what let the fallback below outlive the
+   * hand-off it belonged to: the page announced itself, the sequence finished, and 1.2s later a
+   * timer nobody had cancelled pushed the phase back to `revealing` and toggled the dock open
+   * again. An app-root component never unmounts, so "cleared on unmount" is never.
+   */
+  const growTimer = useRef<number | null>(null);
+  const fallbackTimer = useRef<number | null>(null);
+  const revealTimer = useRef<number | null>(null);
 
-  useEffect(
-    () => () => {
-      handoffTimers.current.forEach((id) => window.clearTimeout(id));
-      handoffTimers.current = [];
-    },
-    [],
-  );
+  const clearHandoffTimers = useCallback(() => {
+    [growTimer, fallbackTimer, revealTimer].forEach((timer) => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+    });
+  }, []);
+
+  useEffect(() => clearHandoffTimers, [clearHandoffTimers]);
 
   const goToPage = useCallback(() => {
     // The draft rides along in history state; `useHandedOffDraft` applies it once on the page.
@@ -93,28 +105,37 @@ export function BuddyWidget() {
       return;
     }
 
+    clearHandoffTimers();
     setHandoff("growing");
 
-    handoffTimers.current.push(
-      window.setTimeout(() => {
-        // The window covers the viewport by now, so the route can change behind it unseen.
-        goToPage();
-        setHandoff("covering");
+    growTimer.current = window.setTimeout(() => {
+      growTimer.current = null;
+      // The window covers the viewport by now, so the route can change behind it unseen.
+      goToPage();
+      setHandoff("covering");
 
-        // Only if the page never announces itself — a render error, or a route that did not
-        // resolve. Better a hand-off that finishes a beat late than a window stuck over the
-        // whole app with no way out.
-        handoffTimers.current.push(
-          window.setTimeout(() => setHandoff("revealing"), HANDOFF_FALLBACK_MS),
-        );
-      }, DOCK_EXPAND_S * 1000),
-    );
-  }, [goToPage, isOpen]);
+      // Only if the page never announces itself — a render error, or a route that did not
+      // resolve. Better a hand-off that finishes a beat late than a window stuck over the
+      // whole app with no way out. Guarded on the phase like every other transition here, so
+      // a stray firing can never restart a sequence that has already finished.
+      fallbackTimer.current = window.setTimeout(() => {
+        fallbackTimer.current = null;
+        setHandoff((phase) => (phase === "covering" ? "revealing" : phase));
+      }, HANDOFF_FALLBACK_MS);
+    }, DOCK_EXPAND_S * 1000);
+  }, [clearHandoffTimers, goToPage, isOpen]);
 
-  // The page is on screen: stop standing in for it.
+  // The page is on screen: stop standing in for it, and drop the fallback that was only there
+  // in case this never came.
   useEffect(
     () =>
-      onBuddyPageReady(() => setHandoff((phase) => (phase === "covering" ? "revealing" : phase))),
+      onBuddyPageReady(() => {
+        if (fallbackTimer.current !== null) {
+          window.clearTimeout(fallbackTimer.current);
+          fallbackTimer.current = null;
+        }
+        setHandoff((phase) => (phase === "covering" ? "revealing" : phase));
+      }),
     [],
   );
 
@@ -122,16 +143,25 @@ export function BuddyWidget() {
   // composer floating over the full-page one, for the same thread.
   useEffect(() => {
     if (handoff !== "revealing") return;
-    const id = window.setTimeout(
+
+    revealTimer.current = window.setTimeout(
       () => {
+        revealTimer.current = null;
         setHandoff("idle");
-        toggleOpen();
+        // `closeDock`, never `toggleOpen`: by this point the dock may already have been closed
+        // — Escape closes it, and it can be closed during the growth — and a toggle would then
+        // open it again behind the page.
+        closeDock();
       },
       (DOCK_REVEAL_S + 0.05) * 1000,
     );
-    handoffTimers.current.push(id);
-    return () => window.clearTimeout(id);
-  }, [handoff, toggleOpen]);
+
+    return () => {
+      if (revealTimer.current === null) return;
+      window.clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+    };
+  }, [handoff, closeDock]);
 
   // Normally the widget takes itself off `/buddy` — the launcher would offer the page you are
   // reading, and the dock would put a second composer over the first. During the hand-off it

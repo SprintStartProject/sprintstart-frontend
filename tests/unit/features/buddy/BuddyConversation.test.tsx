@@ -56,7 +56,7 @@ describe("BuddyConversation", () => {
    * The same overflow fix as the floating panel, because this is the same bubble markup copied.
    * It is worth pinning *here* rather than only there: this page is wide, so an overflowing
    * reply reads as a slightly odd layout instead of an obvious bug — which is how a regression
-   * would survive review. See `BuddyPanel` for why `min-w-0` is what makes the per-block
+   * would survive review. See `BuddyThread` for why `min-w-0` is what makes the per-block
    * scrollers work at all.
    */
   it("keeps a wide reply inside its bubble rather than widening the thread", () => {

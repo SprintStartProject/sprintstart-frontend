@@ -118,12 +118,6 @@ export function BuddyDock({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  // The composer is what somebody opened this for, so the caret starts there.
-  useEffect(() => {
-    const field = panelRef.current?.querySelector("textarea");
-    field?.focus();
-  }, []);
-
   const hasUserMessage = messages.some((message) => message.role === "USER");
 
   const resting = {
@@ -281,7 +275,18 @@ export function BuddyDock({
             </div>
           )}
 
-          <BuddyComposer draft={draft} setDraft={setDraft} handleSubmit={handleSubmit} compact />
+          {/* The composer is what somebody opened this for, so the caret starts there — and
+                        *behind* a seeded draft, which is why this goes through the composer's own
+                        `focusOnMount` rather than a bare `focus()`. A focused textarea with a value
+                        in it starts the caret at position 0, so "Ask your buddy about this" used to
+                        hand over a question the hire then typed in front of. */}
+          <BuddyComposer
+            draft={draft}
+            setDraft={setDraft}
+            handleSubmit={handleSubmit}
+            compact
+            focusOnMount
+          />
         </div>
       </motion.div>
     </motion.div>

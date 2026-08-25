@@ -25,6 +25,34 @@ vi.mock("../../../src/services/buddyService", () => ({
     ]),
 }));
 
+vi.mock("../../../src/features/buddy/hooks/usePmReplies", () => ({
+  usePmReplies: () => ({
+    answered: [
+      {
+        id: "r1",
+        projectId: "p1",
+        hireId: "h1",
+        question: "How do I get staging credentials?",
+        status: "ANSWERED",
+        createdAt: "2026-08-24T09:00:00Z",
+        answeredAt: "2026-08-24T10:00:00Z",
+        answer: {
+          id: "a1",
+          projectId: "p1",
+          question: "How do I get staging credentials?",
+          answer: "Ask in #platform.",
+          authorId: "pm1",
+          createdAt: "2026-08-24T10:00:00Z",
+          updatedAt: "2026-08-24T10:00:00Z",
+        },
+      },
+    ],
+    waiting: [],
+    dismissed: [],
+    hasAny: true,
+  }),
+}));
+
 vi.mock("../../../src/services/onboardingMetricsService", () => ({
   onboardingMetricsService: {
     fetchMyTimeline: vi.fn().mockRejectedValue(new Error("no metrics")),
@@ -138,6 +166,30 @@ describe("BuddyPage", () => {
     });
     // The greeting is re-requested, which is what opens the new visit server-side.
     expect(streamOpenBuddy).toHaveBeenCalled();
+  });
+
+  /**
+   * The rail and its toggle were both `hidden … xl:*`, which put a hire on anything narrower
+   * than 1280px out of reach of their PM's answer entirely — the one thing `FlagToPmButton`
+   * promises will show up here. jsdom computes no layout, so this asserts the contract that
+   * carries it: the toggle is not breakpoint-gated, and the replies have a placement that
+   * survives below `xl`.
+   */
+  it("keeps the PM's answer reachable on a narrow screen", async () => {
+    renderPage();
+
+    // Neither the rail nor the control that opens it may be gated on a breakpoint.
+    const toggle = await screen.findByTitle("What you sent to your PM");
+    expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+
+    const rail = await screen.findByRole("complementary", {
+      name: "Questions you sent to your PM",
+    });
+    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+
+    // Open by itself, because an answer is waiting — and present exactly once. Laying it out
+    // twice and hiding one per breakpoint would put the same answer in the document twice.
+    expect(screen.getByText("Ask in #platform.")).toBeInTheDocument();
   });
 
   it("opens the mentor for a hire on a project", async () => {

@@ -32,6 +32,12 @@ export function useBuddy() {
     setIsOpen((prev) => !prev);
   }, []);
 
+  // Distinct from `toggleOpen`, and the distinction matters: the page hand-off has to *close*
+  // the dock at a point where it may or may not still be open, and a toggle there re-opens it.
+  const closeDock = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
   // On mount, not on first open. Writing the greeting is the slow part of meeting the buddy —
   // a remote model, measured between 2s and 13s — and the widget mounts app-wide the moment a
   // hire's session resolves, long before they click. Doing it here means the click finds the
@@ -61,6 +67,7 @@ export function useBuddy() {
     ...conversation,
     isOpen,
     toggleOpen,
+    closeDock,
     suggestions,
   };
 }
