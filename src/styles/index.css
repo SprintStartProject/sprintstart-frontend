@@ -5,6 +5,21 @@
    Without this, Tailwind uses prefers-color-scheme by default. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* A side drawer slides shut by parking itself one full viewport to the right
+   (Framer animates the panel to translateX(100%)). While it sits there, and
+   (because the closing panel is retained for its exit) briefly after every close,
+   that off-screen panel widens the document, so the whole page ends up scrolled
+   to the right and the user has to scroll back left to see everything. Clipping
+   horizontal overflow at the viewport stops the off-screen panel from ever adding
+   scrollable width. `clip` rather than `hidden` on purpose: it does not turn the
+   root into a scroll container, so the sticky sidebar and the normal vertical
+   document scroll are left exactly as they were. Nothing on any page is meant to
+   scroll sideways at the page level, wide content carries its own scroller. */
+html,
+body {
+  overflow-x: clip;
+}
+
 :root {
   --app-page-gutter: 1.25rem;
   --app-page-block-gutter: 1.25rem;
@@ -350,10 +365,15 @@
   padding-right: var(--app-page-gutter);
 }
 
-/* ChatPage: when the desktop history sidebar is open, collapse the left
-   gutter so the sidebar opens "into" the empty gutter space instead of
-   pushing the chat content right and leaving a gap between sidebar and chat. */
-.chat-sidebar-open .app-page-frame {
+/* When a page opens a rail on its left, collapse the left gutter so the rail
+   opens *into* the empty gutter space instead of pushing the content right and
+   leaving a gap between the app sidebar and the page. Put it on the content
+   column that sits beside the rail, not on the page root.
+
+   Used by ChatPage's history sidebar and by the buddy page's PM replies. It
+   started chat-specific; the second caller is what made it worth a name that
+   says what it does rather than where it was first needed. */
+.app-rail-open .app-page-frame {
   padding-left: 1.5rem;
 }
 
@@ -745,4 +765,30 @@ body {
   border: 1px solid var(--border) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+/* ── React Flow controls ──
+   The zoom controls ship with a hardcoded white face and a light drop shadow, which on a dark
+   board is a bright block rather than a control. Repainted from the palette, so they carry the
+   same surface, border and ink as every other control in the app and work in both themes.
+
+   Qualified with `.react-flow` on purpose: the library's stylesheet is imported from the canvas
+   component and therefore lands after this file, so a bare `.react-flow__controls-button` would
+   tie on specificity and lose on order. Global rather than scoped to one canvas, because the
+   library's own class names are the only handle and every canvas should look the same. */
+.react-flow .react-flow__controls {
+  box-shadow: none;
+}
+
+.react-flow .react-flow__controls-button {
+  background-color: var(--color-app-surface);
+  border-bottom: 1px solid var(--color-app-border);
+}
+
+.react-flow .react-flow__controls-button:hover {
+  background-color: var(--color-app-surface-hover);
+}
+
+.react-flow .react-flow__controls-button svg {
+  fill: var(--color-app-text);
 }

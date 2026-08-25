@@ -21,6 +21,12 @@ import { FaqPage } from "../features/faq/components/FaqPage.tsx";
 import { FaqDetailPage } from "../features/faq/components/FaqDetailPage.tsx";
 import { KnowledgeGapsPage } from "../features/knowledge-gaps/components/KnowledgeGapsPage.tsx";
 import { KnowledgeGapsDetailPage } from "../features/knowledge-gaps/components/KnowledgeGapsDetailPage.tsx";
+import { KnowledgeRequestInboxPage } from "../features/knowledge-request/components/KnowledgeRequestInboxPage.tsx";
+import { OnboardingMetricsPage } from "../features/onboarding-metrics/components/OnboardingMetricsPage.tsx";
+import { BuddyPage } from "../pages/BuddyPage";
+import { BoardPage } from "../pages/BoardPage.tsx";
+import { ArrivalStepsPage } from "../pages/ArrivalStepsPage";
+import { StarterWorkPage } from "../pages/StarterWorkPage";
 import { NotFoundPage } from "../pages/NotFoundPage.tsx";
 
 /**
@@ -85,6 +91,46 @@ export function AppRouter() {
         <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
         <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
         <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
+        <Route
+          path="/insights/knowledge-requests"
+          element={
+            <ManagerAreaGuard route="/insights/knowledge-requests">
+              <KnowledgeRequestInboxPage />
+            </ManagerAreaGuard>
+          }
+        />
+        <Route
+          path="/insights/onboarding"
+          element={
+            <ManagerAreaGuard route="/insights/onboarding">
+              <OnboardingMetricsPage />
+            </ManagerAreaGuard>
+          }
+        />
+        {/* The buddy and the surfaces its tools serve. Added beside the onboarding
+            path above, not in place of it: both ways in stay open. */}
+        <Route path="/buddy" element={<BuddyPage />} />
+        <Route path="/board" element={<BoardPage />} />
+        {/* Guarded, because the access policy says they are PM/HR/ADMIN-only and the sidebar
+            merely hides them -- which leaves the URL. Both pages already gate their *actions*
+            by role, but a hire who typed the path still got the page and a column of failed
+            requests, and the policy claimed otherwise. */}
+        <Route
+          path="/arrival-steps"
+          element={
+            <ManagerAreaGuard route="/arrival-steps">
+              <ArrivalStepsPage />
+            </ManagerAreaGuard>
+          }
+        />
+        <Route
+          path="/starter-work"
+          element={
+            <ManagerAreaGuard route="/starter-work">
+              <StarterWorkPage />
+            </ManagerAreaGuard>
+          }
+        />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="*" element={<NotFoundPage />} />

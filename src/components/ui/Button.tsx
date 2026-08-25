@@ -235,9 +235,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
             <span className="flex shrink-0 items-center">{icon}</span>
           ) : null}
           {children}
-          {trailingIcon ? (
-            <span className="flex shrink-0 items-center">{trailingIcon}</span>
-          ) : null}
+          {trailingIcon ? <span className="flex shrink-0 items-center">{trailingIcon}</span> : null}
         </>
       )}
     </motion.button>

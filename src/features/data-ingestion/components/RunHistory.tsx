@@ -64,7 +64,7 @@ export function RunHistory({
               type="button"
               onClick={() => onSelectRun?.(run)}
               aria-pressed={isSelected}
-              className={`grid w-full grid-cols-2 gap-x-4 gap-y-3 px-5 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto] xl:gap-4 xl:py-5 xl:items-center ${
+              className={`grid w-full grid-cols-2 gap-x-4 gap-y-3 px-5 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto] xl:items-center xl:gap-4 xl:py-5 ${
                 isSelected
                   ? "bg-app-brand-soft"
                   : // Rows sit in a shared grid, so they get an

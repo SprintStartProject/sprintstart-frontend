@@ -11,12 +11,16 @@ import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboa
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import {
   AdminIcon,
+  ArrivalStepsIcon,
+  BoardIcon,
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
+  InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
+  StarterWorkIcon,
   type SidebarIcon,
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
@@ -49,6 +53,14 @@ const navItems: SidebarNavItem[] = [
     path: "/",
     icon: DashboardIcon,
   },
+  // Directly under the dashboard: the board is where the hire's own onboarding
+  // sits between conversations, so it belongs beside the overview rather than
+  // buried behind the chat that fills it.
+  {
+    label: "Board",
+    path: "/board",
+    icon: BoardIcon,
+  },
   {
     label: "Chat",
     path: "/chat",
@@ -76,6 +88,28 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Data Ingestion",
     path: "/data-ingestion",
     icon: DataIngestionIcon,
+  },
+  // The steps a new hire is walked through on arrival — set up here by the PM,
+  // which is why it sits with the other things a PM prepares rather than in the
+  // hire's own list. `canAccessRoute` keeps it off a hire's sidebar.
+  {
+    label: "Arrival Steps",
+    path: "/arrival-steps",
+    icon: ArrivalStepsIcon,
+  },
+  {
+    label: "Starter Work",
+    path: "/starter-work",
+    icon: StarterWorkIcon,
+  },
+  // The escalation inbox, surfaced as its own entry while it is being evaluated
+  // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
+  // already hides it from hires: the route is PM/HR/ADMIN-only, and for a PM it
+  // additionally requires managing the selected project.
+  {
+    label: "Escalation Inbox",
+    path: "/insights/knowledge-requests",
+    icon: InboxIcon,
   },
 ];
 
@@ -132,10 +166,14 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
+  // `/insights/knowledge-requests` is deliberately absent: it has its own
+  // sidebar entry, so listing it here would leave two entries active at once
+  // -- including two active pills sharing one Framer Motion `layoutId`.
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
     location.pathname.startsWith("/insights/faq") ||
-    location.pathname.startsWith("/insights/knowledge-gaps");
+    location.pathname.startsWith("/insights/knowledge-gaps") ||
+    location.pathname.startsWith("/insights/onboarding");
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },

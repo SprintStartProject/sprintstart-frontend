@@ -7,6 +7,10 @@ import { ChatContext } from "../../../context/ChatContext";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { DashboardWidgetSize } from "../layout/types";
 
+/**
+ * The pool the chips are drawn from, best first. Nothing shows all four — see the slices
+ * below for why the wide band stops at three.
+ */
 const SUGGESTIONS = [
   "What should I work on next?",
   "How do I set up the project locally?",
@@ -32,9 +36,16 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
   // under it — a left-aligned row of chips under a centred bot reads as a mistake.
   const isWide = size === "wide";
 
-  // Two chips at half a row. The cell is a fixed height, and four of them wrap onto a second
-  // line that the card has no room for — which is what was clipping them at the bottom edge.
-  const suggestions = isWide ? SUGGESTIONS : SUGGESTIONS.slice(0, 2);
+  // Two chips at half a row, three across the band — never four, and the cost of getting this
+  // wrong is not a slightly tighter row. The cell height is fixed by the dashboard grid
+  // (`row-span-3`, 136px), and a second line of chips does not fit in it: the row wraps, the
+  // card cannot grow, and the chips are clipped at the bottom edge.
+  //
+  // Four fitted on one line only on a wide monitor. Subtract the sidebar and the page's 10rem
+  // gutters and a laptop had barely a chip's width of slack, so anything that moved the layout
+  // by a few pixels — a scrollbar appearing, a slightly longer suggestion — tipped it over.
+  // Three leaves real room instead of relying on nothing ever changing.
+  const suggestions = isWide ? SUGGESTIONS.slice(0, 3) : SUGGESTIONS.slice(0, 2);
   const navigate = useNavigate();
   const chat = useContext(ChatContext);
   const [question, setQuestion] = useState("");
