@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import type { NavigateFunction } from "react-router-dom";
-import { createChat, getMyChats, getMessages, streamMessage } from "../services/chatService";
+import {
+  createChat,
+  deleteChat as apiDeleteChat,
+  getMyChats,
+  getMessages,
+  streamMessage,
+} from "../services/chatService";
 import { useAuth } from "./useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
@@ -112,6 +118,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     chatsRef.current = chats;
   }, [chats]);
 
+  // Always-current snapshot of the (user, project) scope for the same reason:
+  // the chat-list fetch below reads these through the ref so a slow response
+  // can tell whether the user or the selected project changed while it was in
+  // flight — and drop itself instead of overwriting the newer scope's list.
+  const scopeRef = useRef({ userId, selectedProjectId });
+  useEffect(() => {
+    scopeRef.current = { userId, selectedProjectId };
+  }, [userId, selectedProjectId]);
+
   // Always-current snapshot of filter state for the same reason.
   const filtersRef = useRef({ sourceSystems, from, to });
   useEffect(() => {
@@ -122,6 +137,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // slow response for an older chat can't overwrite the messages of the
   // chat the user has since navigated to.
   const latestLoadRef = useRef<string | null>(null);
+
+  // Set of deleted chat IDs to prevent any in-flight or subsequent message loading.
+  const deletedChatIdsRef = useRef<Set<string>>(new Set());
 
   // rAF-batched draft of the in-flight assistant message (see StreamingDraft).
   const draftRef = useRef<StreamingDraft | null>(null);
@@ -222,9 +240,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       try {
         const data = await getMyChats(selectedProjectId);
-        setChats(data?.chats ?? []);
+        // Drop the response if the user or the selected project changed while
+        // the fetch was in flight — otherwise a slow reply for the previous
+        // project can land after the new scope's list and overwrite it.
+        const { userId: currentUserId, selectedProjectId: currentProjectId } = scopeRef.current;
+        if (currentUserId !== userId || currentProjectId !== selectedProjectId) return;
+        const filtered = (data?.chats ?? []).filter((c) => !deletedChatIdsRef.current.has(c.id));
+        setChats(filtered);
         setChatsProjectId(selectedProjectId);
       } catch (e) {
+        if (
+          scopeRef.current.userId !== userId ||
+          scopeRef.current.selectedProjectId !== selectedProjectId
+        ) {
+          return;
+        }
         console.error("Failed to load chats", e);
         setChats([]);
         setChatsProjectId(selectedProjectId);
@@ -243,19 +273,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const refreshChats = useCallback(async () => {
     if (!selectedProjectId) return;
     const data = await getMyChats(selectedProjectId);
-    setChats(data?.chats ?? []);
+    const filtered = (data?.chats ?? []).filter((c) => !deletedChatIdsRef.current.has(c.id));
+    setChats(filtered);
     setChatsProjectId(selectedProjectId);
   }, [selectedProjectId]);
 
   const loadMessages = useCallback(async (chatId: string) => {
+    if (deletedChatIdsRef.current.has(chatId)) return;
+
     // Mark this chat as the latest requested so a slow earlier response
     // can be ignored after the user switches chats.
     latestLoadRef.current = chatId;
     try {
       const data = await getMessages(chatId);
 
-      // Ignore the response if the user has since navigated to a different chat.
-      if (latestLoadRef.current !== chatId) return;
+      // Ignore the response if the user has since navigated to a different chat or deleted it.
+      if (latestLoadRef.current !== chatId || deletedChatIdsRef.current.has(chatId)) return;
 
       setMessagesByChat((prev) => {
         // Don't overwrite if messages were added while we were fetching
@@ -267,6 +300,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return { ...prev, [chatId]: data.messages };
       });
     } catch (e) {
+      if (latestLoadRef.current !== chatId || deletedChatIdsRef.current.has(chatId)) return;
       console.error("Failed to load messages for chat " + chatId, e);
     }
   }, []);
@@ -292,7 +326,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         flushDraft();
         draftRef.current = null;
         // Partial content stays visible, exactly like a manual stop. Only a
-        // bubble that never received a token needs an explanation.
+        // bubble that never received a content token needs an explanation.
         if (!orphan.content) {
           setMessagesByChat((prev) => ({
             ...prev,
@@ -460,7 +494,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             onReasoning: (reasoningText) => {
               if (!isCurrentStream()) return;
               armStreamTimeout();
-              setIsThinking(false);
+              if (!streamingStartedRef.current) {
+                streamingStartedRef.current = true;
+                setIsStreaming(true);
+                setIsThinking(false);
+                setStreamingMessageId(assistantId);
+              }
 
               const draft = draftRef.current;
               if (draft) {
@@ -600,7 +639,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setStreamingChatId(null);
 
     // Stopping before the first token would otherwise leave a bare empty
-    // bubble — the placeholder is only hidden while `isThinking` is true.
+    // bubble (or reasoning without an answer/explanation) — the placeholder
+    // is only hidden while `isThinking` is true.
     if (stopped && !stopped.content) {
       setMessagesByChat((prev) => ({
         ...prev,
@@ -617,6 +657,49 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // would keep the client-side fallback title forever.
     void refreshChats().catch((e) => console.error("Failed to refresh chats", e));
   }, [cancelDraft, flushDraft, clearStreamTimeout, refreshChats]);
+
+  /**
+   * Deletes a chat conversation and all of its messages for the authenticated user,
+   * cleaning up associated state and drafts.
+   */
+  const deleteChat = useCallback(
+    async (chatId: string) => {
+      deletedChatIdsRef.current.add(chatId);
+
+      try {
+        // If the deleted chat is actively streaming, abort it cleanly first
+        if (streamingChatId === chatId) {
+          stopStreaming();
+        }
+
+        if (latestLoadRef.current === chatId) {
+          latestLoadRef.current = null;
+        }
+
+        await apiDeleteChat(chatId);
+
+        // Remove from chats list
+        setChats((prev) => prev.filter((c) => c.id !== chatId));
+
+        // Evict cached messages
+        setMessagesByChat((prev) => {
+          const next = { ...prev };
+          delete next[chatId];
+          return next;
+        });
+
+        // Evict persisted draft from localStorage
+        localStorage.removeItem(`chatDraft.${chatId}`);
+      } catch (err) {
+        deletedChatIdsRef.current.delete(chatId);
+        void refreshChats().catch((e) =>
+          console.error("Failed to refresh chats after delete rollback", e),
+        );
+        throw err;
+      }
+    },
+    [streamingChatId, stopStreaming, refreshChats],
+  );
 
   const value: ChatContextValue = {
     chats,
@@ -647,6 +730,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     sendMessage,
     stopStreaming,
     refreshChats,
+    deleteChat,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

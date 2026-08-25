@@ -34,8 +34,6 @@ type MessageRowProps = {
   isStreaming: boolean;
   /** id of the message currently receiving streamed tokens (for the caret). */
   streamingMessageId: string | null;
-  /** Whether the "Thought Process" reasoning block should be rendered. */
-  showThoughtProcess: boolean;
   /** Avatar/profile context for the user (request) side. */
   profileIcon?: string;
   profileFallbackName: string;
@@ -61,7 +59,6 @@ function MessageRowImpl({
   isThinking,
   isStreaming,
   streamingMessageId,
-  showThoughtProcess,
   profileIcon,
   profileFallbackName,
   profileSeed,
@@ -86,7 +83,13 @@ function MessageRowImpl({
   // bubble that carries an error is never suppressed: an interrupted or
   // stopped turn leaves exactly that (empty content + error) and would
   // otherwise stay invisible for the rest of the session.
-  if (message.role === "ASSISTANT" && message.content === "" && !message.error && isThinking) {
+  if (
+    message.role === "ASSISTANT" &&
+    message.content === "" &&
+    !message.reasoning &&
+    !message.error &&
+    isThinking
+  ) {
     return null;
   }
 
@@ -96,6 +99,7 @@ function MessageRowImpl({
   // An assistant turn that carries an error and no text: the error banner is the whole
   // message, so it replaces the bubble instead of hanging underneath an empty one.
   const isEmptyErrorTurn = !isRequest && !!message.error && message.content === "";
+  const hasBubbleContent = isRequest || message.content !== "" || citations.length > 0;
 
   return (
     <>
@@ -132,7 +136,7 @@ function MessageRowImpl({
             isRequest ? "max-w-[70%] items-end" : "max-w-[85%] items-start"
           }`}
         >
-          {!isRequest && showThoughtProcess && (
+          {!isRequest && Boolean(message.reasoning) && (
             <details
               open={reasoningOpen}
               onToggle={(e) => setReasoningOpen(e.currentTarget.open)}
@@ -143,13 +147,9 @@ function MessageRowImpl({
                 Thought Process
               </summary>
               <div className="chat-md px-4 pb-3 text-app-text-muted opacity-80">
-                {message.reasoning ? (
-                  <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
-                    {message.reasoning}
-                  </ReactMarkdown>
-                ) : (
-                  <span className="text-sm italic">No thoughts.</span>
-                )}
+                <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
+                  {message.reasoning}
+                </ReactMarkdown>
               </div>
             </details>
           )}
@@ -158,7 +158,7 @@ function MessageRowImpl({
                         before the first token — has nothing to put in a bubble. Rendering one
                         anyway left a stray empty pill above the error, which is what made a
                         cancelled chat look broken rather than cancelled. */}
-          {!isEmptyErrorTurn && (
+          {!isEmptyErrorTurn && hasBubbleContent && (
             <div
               // E5: mark the actively-streaming message as busy so
               // screen readers don't announce partial content mid-stream.
@@ -176,7 +176,9 @@ function MessageRowImpl({
                 onCitationClick={onCitationClick}
               />
 
-              {showStreamingCaret && <span className="streaming-caret" aria-hidden="true" />}
+              {showStreamingCaret && message.content !== "" && (
+                <span className="streaming-caret" aria-hidden="true" />
+              )}
 
               {!isRequest && citations.length > 0 && (
                 <MessageCitations citations={citations} onOpenArtifact={onOpenArtifact} />

@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../src/context/ThemeProvider";
-import { ChatPreferencesProvider } from "../../../src/context/ChatPreferencesProvider";
 import { SettingsPage } from "../../../src/pages/SettingsPage";
 
 vi.mock("../../../src/context/useAuth", () => ({
@@ -40,9 +39,7 @@ describe("SettingsPage Accessibility", () => {
     const { baseElement } = render(
       <MemoryRouter>
         <ThemeProvider>
-          <ChatPreferencesProvider>
-            <SettingsPage />
-          </ChatPreferencesProvider>
+          <SettingsPage />
         </ThemeProvider>
       </MemoryRouter>,
     );

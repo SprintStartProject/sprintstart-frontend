@@ -8,6 +8,13 @@ type CitationPopoverProps = {
   selected: SelectedCitation;
   /** Called when the popover should close (Esc, outside click, or X button). */
   onClose: () => void;
+  /** Optional callback to open the artifact in the side drawer. */
+  onOpenArtifact?: (data: {
+    artifactId: string;
+    filename: string;
+    sourceUrl?: string;
+    lines: number[];
+  }) => void;
 };
 
 /**
@@ -17,7 +24,7 @@ type CitationPopoverProps = {
  * (E2). Position is computed by {@link getCitationPopoverStyle} so it stays
  * on-screen near the anchor.
  */
-export function CitationPopover({ selected, onClose }: CitationPopoverProps) {
+export function CitationPopover({ selected, onClose, onOpenArtifact }: CitationPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,17 +79,38 @@ export function CitationPopover({ selected, onClose }: CitationPopoverProps) {
         {citation.startPage !== undefined && `Page ${citation.startPage}`}
       </div>
 
-      {citation.sourceUrl && (
+      {onOpenArtifact && citation.artifactId ? (
+        <button
+          type="button"
+          onClick={() => {
+            onOpenArtifact({
+              artifactId: citation.artifactId,
+              filename: citation.filename,
+              sourceUrl: citation.sourceUrl,
+              lines:
+                citation.startLine !== undefined && citation.startLine !== null
+                  ? [citation.startLine]
+                  : [],
+            });
+            onClose();
+          }}
+          className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
+        >
+          Open source
+          <ExternalLink size={12} />
+        </button>
+      ) : citation.sourceUrl ? (
         <a
           href={citation.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={onClose}
           className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
         >
           Open source
           <ExternalLink size={12} />
         </a>
-      )}
+      ) : null}
     </div>
   );
 }
