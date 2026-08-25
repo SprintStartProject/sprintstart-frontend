@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, BookCheck, FolderKanban, Inbox, Loader2 } from "lucide-react";
+import { AlertCircle, BookCheck, FolderKanban, Inbox } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
 import { useFetch } from "../../../hooks/useFetch";
 import { PermissionGroup } from "../../../services/types";
@@ -10,6 +14,8 @@ import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
 
 type Tab = "open" | "answered";
+
+const TAB_ORDER: Tab[] = ["open", "answered"];
 
 /**
  * The PM side of the buddy's growth loop: the escalation inbox. A hire flags a question the buddy
@@ -92,6 +98,22 @@ export function KnowledgeRequestInboxPage() {
   const openCount = orderedOpen.length;
   const answeredCount = orderedAnswers.length;
 
+  // Counts stay undefined while their list is loading, so the pill doesn't flash a stale "0".
+  const TAB_OPTIONS: SegmentedTabOption<Tab>[] = [
+    {
+      value: "open",
+      label: "Open",
+      icon: <Inbox className="h-4 w-4" aria-hidden="true" />,
+      count: openLoading ? undefined : openCount,
+    },
+    {
+      value: "answered",
+      label: "Durable answers",
+      icon: <BookCheck className="h-4 w-4" aria-hidden="true" />,
+      count: answersLoading ? undefined : answeredCount,
+    },
+  ];
+
   return (
     // No root background: the app-wide aurora and cursor-glow canvas sit behind
     // every route, and painting `bg-app-bg` here would hide them — the same
@@ -113,81 +135,84 @@ export function KnowledgeRequestInboxPage() {
           <EmptyState
             icon={<FolderKanban className="h-8 w-8 text-app-text-disabled" />}
             title="No projects"
-            body="There are no projects with an escalation inbox yet."
-          />
+          >
+            There are no projects with an escalation inbox yet.
+          </EmptyState>
         ) : (
           <>
-            <nav className="flex gap-1 border-b border-app-border" aria-label="Inbox views">
-              <TabButton
-                active={tab === "open"}
-                onClick={() => setTab("open")}
-                icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
-                label="Open"
-                count={openLoading ? undefined : openCount}
-              />
-              <TabButton
-                active={tab === "answered"}
-                onClick={() => setTab("answered")}
-                icon={<BookCheck className="h-4 w-4" aria-hidden="true" />}
-                label="Durable answers"
-                count={answersLoading ? undefined : answeredCount}
-              />
-            </nav>
+            {/* The app's shared segmented control rather than a tab bar of this page's own —
+                same reason ArrivalStepsPage cites: the sliding pill and hover magnify are the
+                house look for switching sections, so the inbox shouldn't grow a second one. */}
+            <SegmentedTabs
+              value={tab}
+              options={TAB_OPTIONS}
+              onChange={setTab}
+              layoutId="knowledge-request-inbox-tab-pill"
+              ariaLabel="Inbox views"
+            />
 
-            {tab === "open" ? (
-              <View
-                loading={openLoading}
-                error={openError}
-                isEmpty={openCount === 0}
-                empty={
-                  <EmptyState
-                    icon={<Inbox className="h-8 w-8 text-app-success-solid" />}
-                    title="Inbox clear"
-                    body="No open escalations. When the buddy can't answer something and a hire flags it, it lands here."
-                  />
-                }
-              >
-                <ul className="space-y-3">
-                  {orderedOpen.map((request) => (
-                    <RequestCard
-                      key={request.id}
-                      request={request}
-                      onAnswer={handleAnswer}
-                      onDismiss={handleDismiss}
-                    />
-                  ))}
-                </ul>
-              </View>
-            ) : (
-              <View
-                loading={answersLoading}
-                error={answersError}
-                isEmpty={answeredCount === 0}
-                empty={
-                  <EmptyState
-                    icon={<BookCheck className="h-8 w-8 text-app-text-disabled" />}
-                    title="No durable answers yet"
-                    body="Answers you give in the inbox collect here — the growing body of knowledge the buddy serves."
-                  />
-                }
-              >
-                {!canWrite && (
-                  <p className="mb-3 text-sm text-app-text-muted">
-                    You can read these; editing is a PM action.
-                  </p>
-                )}
-                <ul className="space-y-3">
-                  {orderedAnswers.map((answer) => (
-                    <CanonicalAnswerCard
-                      key={answer.id}
-                      answer={answer}
-                      onSave={handleEdit}
-                      readOnly={!canWrite}
-                    />
-                  ))}
-                </ul>
-              </View>
-            )}
+            {/* Directional slide matches the sibling pages' tab panels; the key/index pair
+                derives travel direction from the tab order. */}
+            <SlidingTabPanel activeKey={tab} index={TAB_ORDER.indexOf(tab)}>
+              {tab === "open" ? (
+                <View
+                  loading={openLoading}
+                  error={openError}
+                  isEmpty={openCount === 0}
+                  empty={
+                    <EmptyState
+                      icon={<Inbox className="h-8 w-8 text-app-success-solid" />}
+                      title="Inbox clear"
+                    >
+                      No open escalations. When the buddy can&apos;t answer something and a hire
+                      flags it, it lands here.
+                    </EmptyState>
+                  }
+                >
+                  <ul className="space-y-3">
+                    {orderedOpen.map((request) => (
+                      <RequestCard
+                        key={request.id}
+                        request={request}
+                        onAnswer={handleAnswer}
+                        onDismiss={handleDismiss}
+                      />
+                    ))}
+                  </ul>
+                </View>
+              ) : (
+                <View
+                  loading={answersLoading}
+                  error={answersError}
+                  isEmpty={answeredCount === 0}
+                  empty={
+                    <EmptyState
+                      icon={<BookCheck className="h-8 w-8 text-app-text-disabled" />}
+                      title="No durable answers yet"
+                    >
+                      Answers you give in the inbox collect here — the growing body of knowledge the
+                      buddy serves.
+                    </EmptyState>
+                  }
+                >
+                  {!canWrite && (
+                    <p className="mb-3 text-sm text-app-text-muted">
+                      You can read these; editing is a PM action.
+                    </p>
+                  )}
+                  <ul className="space-y-3">
+                    {orderedAnswers.map((answer) => (
+                      <CanonicalAnswerCard
+                        key={answer.id}
+                        answer={answer}
+                        onSave={handleEdit}
+                        readOnly={!canWrite}
+                      />
+                    ))}
+                  </ul>
+                </View>
+              )}
+            </SlidingTabPanel>
           </>
         )}
       </main>
@@ -209,9 +234,11 @@ function View({
   children: React.ReactNode;
 }) {
   if (loading) {
+    // The shared Spinner announces the wait (role="status") — the raw Loader2
+    // this replaces left screen readers silent while the page waited.
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-app-brand" aria-hidden="true" />
+        <Spinner size="lg" label="Loading escalations" />
       </div>
     );
   }
@@ -220,60 +247,11 @@ function View({
       <EmptyState
         icon={<AlertCircle className="h-8 w-8 text-app-danger-solid" />}
         title="Couldn't load this"
-        body="Try again shortly."
-      />
+      >
+        Try again shortly.
+      </EmptyState>
     );
   }
   if (isEmpty) return <>{empty}</>;
   return <>{children}</>;
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  label,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  count?: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-        active
-          ? "border-app-brand text-app-text"
-          : "border-transparent text-app-text-muted hover:text-app-text"
-      }`}
-    >
-      {icon}
-      {label}
-      {count !== undefined && (
-        <span
-          className={`rounded-full px-1.5 py-0.5 text-xs ${
-            active
-              ? "bg-app-brand/10 text-app-brand-text"
-              : "bg-app-surface-muted text-app-text-muted"
-          }`}
-        >
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function EmptyState({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-3xl border border-app-border bg-app-surface p-16 text-center">
-      {icon}
-      <h2 className="text-lg font-semibold text-app-text">{title}</h2>
-      <p className="max-w-md text-sm text-app-text-muted">{body}</p>
-    </div>
-  );
 }
