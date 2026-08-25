@@ -38,35 +38,61 @@ describe("the cards the hire writes", () => {
     expect(screen.queryByText("Kept for you")).not.toBeInTheDocument();
   });
 
-  it("shows a note as the hire typed it, line breaks and all", () => {
+  it("heads a note with its own first line and keeps the rest beneath", () => {
     render(<BoardGrid board={board([note("one\ntwo")])} />);
 
-    expect(screen.getByText(/one\s+two/)).toBeInTheDocument();
+    // A card headed "Note" told the hire nothing they could not already see. The note names
+    // itself, and nothing of what they typed is dropped to do it.
+    expect(screen.getByRole("heading", { name: "one" })).toBeInTheDocument();
+    expect(screen.getByText("two")).toBeInTheDocument();
+  });
+
+  it("shows a one-line note as its own heading, with no body repeating it", () => {
+    render(<BoardGrid board={board([note("deploys are on Thursdays")])} />);
+
+    expect(screen.getByRole("heading", { name: "deploys are on Thursdays" })).toBeInTheDocument();
+    expect(screen.getAllByText("deploys are on Thursdays")).toHaveLength(1);
   });
 
   it("edits a note in place rather than sending the hire elsewhere", () => {
     const onEdit = vi.fn();
-    render(<BoardGrid board={board([note()])} onEdit={onEdit} />);
+    render(<BoardGrid board={board([note("Deploys\nare on Thursdays")])} onEdit={onEdit} />);
 
     fireEvent.click(screen.getByRole("button", { name: /edit this note/i }));
     fireEvent.change(screen.getByLabelText("Note text"), {
-      target: { value: "deploys are on Wednesdays" },
+      target: { value: "are on Wednesdays" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
+    // Title and body are edited apart and stored as one text: the first line is the heading, which
+    // is exactly what the card reads back off it. Nothing about the wire format changed.
     expect(onEdit).toHaveBeenCalledWith("c0", {
       kind: "NOTE",
-      text: "deploys are on Wednesdays",
+      text: "Deploys\nare on Wednesdays",
     });
+  });
+
+  it("keeps a note that is only a title", () => {
+    const onEdit = vi.fn();
+    render(<BoardGrid board={board([note("Deploys\nare on Thursdays")])} onEdit={onEdit} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /edit this note/i }));
+    fireEvent.change(screen.getByLabelText("Note text"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // A heading on its own is a note worth keeping — "Ask Mia about deploys" needs no body.
+    expect(onEdit).toHaveBeenCalledWith("c0", { kind: "NOTE", text: "Deploys" });
   });
 
   it("will not save a note the hire has emptied", () => {
     render(<BoardGrid board={board([note()])} onEdit={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /edit this note/i }));
+    fireEvent.change(screen.getByLabelText(/title/i), { target: { value: "  " } });
     fireEvent.change(screen.getByLabelText("Note text"), { target: { value: "   " } });
 
-    // Same rule the server enforces: a blank card nobody can explain is worse than a wait.
+    // Same rule the server enforces: a blank card nobody can explain is worse than a wait. Both
+    // fields have to be empty for that — either one alone is still a note.
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 

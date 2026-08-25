@@ -79,7 +79,7 @@ describe("BoardPage Accessibility", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText("Your path here")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("Your path here")).toBeInTheDocument());
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

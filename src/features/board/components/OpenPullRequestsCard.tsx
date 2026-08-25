@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, GitPullRequest } from "lucide-react";
 import { formatDuration } from "../../onboarding-metrics/format";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
@@ -13,6 +13,8 @@ type OpenPullRequestsCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /** A wait long enough that it is worth saying out loud rather than just showing. */
@@ -36,11 +38,14 @@ export function OpenPullRequestsCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: OpenPullRequestsCardProps) {
   const { pullRequests, attributionMissing } = content;
 
   return (
     <BoardCardFrame
+      icon={GitPullRequest}
       title="Your open pull requests"
       card={card}
       onDismiss={onDismiss}
@@ -48,6 +53,8 @@ export function OpenPullRequestsCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
       subtitle={
         pullRequests.length > 0
           ? `${pullRequests.length} open`

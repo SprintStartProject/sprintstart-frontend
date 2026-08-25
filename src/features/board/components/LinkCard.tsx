@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { BoardCard, LinkContent } from "../types";
 
@@ -10,6 +10,8 @@ type LinkCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -30,9 +32,12 @@ export function LinkCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: LinkCardProps) {
   return (
     <BoardCardFrame
+      icon={Link2}
       title="Link"
       card={card}
       onDismiss={onDismiss}
@@ -40,6 +45,8 @@ export function LinkCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     >
       <a
         href={content.url}

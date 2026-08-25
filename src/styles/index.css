@@ -761,3 +761,48 @@ body {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* ── React Flow controls ──
+   The zoom controls ship with a hardcoded white face and a light drop shadow, which on a dark
+   board is a bright block rather than a control. Repainted from the palette, so they carry the
+   same surface, border and ink as every other control in the app and work in both themes.
+   Global rather than scoped to the canvas: the library's own class names are the only handle,
+   and every canvas in the app should look the same. */
+.react-flow__controls {
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  background-color: var(--color-app-surface);
+  border-bottom: 1px solid var(--color-app-border);
+  fill: var(--color-app-text);
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--color-app-surface-hover);
+}
+/* ── React Flow controls ──
+   The zoom controls ship with a hardcoded white face and a light drop shadow, which on a dark
+   board is a bright block rather than a control. Repainted from the palette, so they carry the
+   same surface, border and ink as every other control in the app and work in both themes.
+
+   Qualified with `.react-flow` on purpose: the library's stylesheet is imported from the canvas
+   component and therefore lands after this file, so a bare `.react-flow__controls-button` would
+   tie on specificity and lose on order. Global rather than scoped to one canvas, because the
+   library's own class names are the only handle and every canvas should look the same. */
+.react-flow .react-flow__controls {
+  box-shadow: none;
+}
+
+.react-flow .react-flow__controls-button {
+  background-color: var(--color-app-surface);
+  border-bottom: 1px solid var(--color-app-border);
+}
+
+.react-flow .react-flow__controls-button:hover {
+  background-color: var(--color-app-surface-hover);
+}
+
+.react-flow .react-flow__controls-button svg {
+  fill: var(--color-app-text);
+}

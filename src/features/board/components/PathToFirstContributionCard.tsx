@@ -1,9 +1,10 @@
 import { CONTRIBUTION_WORDING } from "../../../config/contributionWording";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Route } from "lucide-react";
 import { formatMoment } from "../../onboarding-metrics/format";
+import { momentLabel, pathSummary } from "../momentLabels";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
-import type { BoardCard, BoardMomentKey, PathToFirstContributionContent } from "../types";
+import type { BoardCard, PathToFirstContributionContent } from "../types";
 
 type PathCardProps = {
   content: PathToFirstContributionContent;
@@ -13,29 +14,9 @@ type PathCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
-
-/**
- * What each moment is called.
- *
- * The two middle moments are built from the track's noun rather than named after git, because the
- * moments themselves are not about git — somebody whose work is a facilitated ceremony still
- * submits it and still waits for somebody to respond.
- */
-function momentLabel(key: BoardMomentKey): string {
-  switch (key) {
-    case "JOINED":
-      return "Joined";
-    case "TASK_CLAIMED":
-      return "Task claimed";
-    case "WORK_SUBMITTED":
-      return `First ${CONTRIBUTION_WORDING.noun} submitted`;
-    case "FIRST_RESPONSE":
-      return "Somebody responded";
-    case "WORK_ACCEPTED":
-      return `First ${CONTRIBUTION_WORDING.noun} ${CONTRIBUTION_WORDING.verbPast}`;
-  }
-}
 
 /**
  * The path from joining to a first accepted piece of work.
@@ -55,11 +36,14 @@ export function PathToFirstContributionCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: PathCardProps) {
   const { acceptedCount, autonomyReachedAt, stalledReason } = content;
 
   return (
     <BoardCardFrame
+      icon={Route}
       title="Your path here"
       card={card}
       onDismiss={onDismiss}
@@ -67,13 +51,9 @@ export function PathToFirstContributionCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
-      subtitle={
-        acceptedCount > 0
-          ? `${acceptedCount} ${
-              acceptedCount === 1 ? CONTRIBUTION_WORDING.noun : CONTRIBUTION_WORDING.nounPlural
-            } ${CONTRIBUTION_WORDING.verbPast}`
-          : `Nothing ${CONTRIBUTION_WORDING.verbPast} yet — that's normal early on`
-      }
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
+      subtitle={pathSummary(acceptedCount)}
     >
       <ol className="space-y-2">
         {content.moments.map((moment) => {

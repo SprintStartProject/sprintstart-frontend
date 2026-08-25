@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, Bot, LayoutDashboard, RefreshCw } from "lucide-react";
+import { AlertCircle, Bot, Check, LayoutDashboard, Move, RefreshCw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -8,8 +8,10 @@ import { Spinner } from "../components/ui/Spinner";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { AddCardForm } from "../features/board/components/AddCardForm";
 import { BoardGrid } from "../features/board/components/BoardGrid";
+import { BoardPathRail } from "../features/board/components/BoardPathRail";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
+import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 
 /**
  * The board: the hire's persistent working surface.
@@ -25,10 +27,17 @@ import { useToast } from "../context/useToast";
  * The shell is the app's page shell — banner header over `app-page-frame`, `PageHeader` for the
  * title block, shared primitives for the actions and for every empty, loading and error state — so
  * the board sits at the same gutter and reads with the same weight as Starter Work beside it.
+ *
+ * **The path is lifted out of the grid into the header.** It is the one card that says where the
+ * hire stands overall; every other card is a detail of some part of it, so it belongs above them
+ * rather than competing with a checklist for a slot. It keeps its place in the board's order — the
+ * grid renders the rest, and a reorder puts the path back at the index it came from, so lifting it
+ * for display never quietly rewrites what the hire arranged.
  */
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
   const toast = useToast();
+  const [isArranging, setIsArranging] = useState(false);
 
   const {
     board,
@@ -63,6 +72,53 @@ export function BoardPage() {
     });
   }, [writeError, showErrorToast]);
 
+  // Folded cards are a preference, not board state: kept per board in local storage, read once the
+  // board arrives and written on every fold. A board that will not load has nothing to fold.
+  const boardId = board?.boardId ?? "";
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [readFor, setReadFor] = useState<string | null>(null);
+
+  // Derived during render rather than in an effect, the way `SlidingTabPanel` derives its
+  // direction: the fold state has to be right on the render that first shows the board, and
+  // reading a key back out of storage is an idempotent read with nothing to synchronise.
+  if (boardId !== readFor) {
+    setReadFor(boardId);
+    setCollapsedIds(readCollapsedCards(boardId));
+  }
+
+  const toggleCollapsed = useCallback(
+    (cardId: string) => {
+      setCollapsedIds((current) => {
+        const next = new Set(current);
+        if (next.has(cardId)) next.delete(cardId);
+        else next.add(cardId);
+        writeCollapsedCards(boardId, next);
+        return next;
+      });
+    },
+    [boardId],
+  );
+
+  // The path is drawn in the header; the grid gets everything else. Its index is kept so a reorder
+  // of the visible cards can put it back where it was — the board's order is the hire's, and this
+  // is a display decision, not an edit to it.
+  const pathIndex =
+    board?.cards.findIndex((card) => card.content.kind === "PATH_TO_FIRST_CONTRIBUTION") ?? -1;
+  const pathCard = pathIndex === -1 ? null : (board?.cards[pathIndex] ?? null);
+
+  const griddedBoard = useMemo(
+    () =>
+      board && pathCard ? { ...board, cards: board.cards.filter((c) => c !== pathCard) } : board,
+    [board, pathCard],
+  );
+
+  const handleReorder = (cardIds: string[]) => {
+    if (!pathCard || pathIndex === -1) return void reorder(cardIds);
+    const next = [...cardIds];
+    next.splice(Math.min(pathIndex, next.length), 0, pathCard.id);
+    return void reorder(next);
+  };
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
@@ -70,19 +126,49 @@ export function BoardPage() {
           <PageHeader
             icon={LayoutDashboard}
             title="Board"
-            subtitle="Where your onboarding stays put between conversations."
+            subtitle={
+              isArranging
+                ? "Drag a card to move it, or fold one shut to get it out of the way."
+                : "Where your onboarding stays put between conversations."
+            }
             actions={
-              <Button
-                variant="secondary"
-                onClick={refresh}
-                disabled={!selectedProjectId}
-                loading={loading}
-                icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
-              >
-                Refresh
-              </Button>
+              isArranging ? (
+                <Button
+                  variant="primary"
+                  onClick={() => setIsArranging(false)}
+                  icon={<Check className="h-4 w-4" aria-hidden="true" />}
+                >
+                  Done
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    iconOnly
+                    onClick={() => setIsArranging(true)}
+                    disabled={!board}
+                    title="Arrange the board"
+                    aria-label="Arrange the board"
+                  >
+                    <Move className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={refresh}
+                    disabled={!selectedProjectId}
+                    loading={loading}
+                    icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                  >
+                    Refresh
+                  </Button>
+                </>
+              )
             }
           />
+
+          {pathCard && pathCard.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
+            <BoardPathRail content={pathCard.content} />
+          )}
         </div>
       </header>
 
@@ -112,15 +198,18 @@ export function BoardPage() {
               </Button>
             </div>
           </div>
-        ) : board ? (
+        ) : griddedBoard ? (
           <>
             <AddCardForm onAdd={addCard} />
             <BoardGrid
-              board={board}
+              board={griddedBoard}
               onDismiss={(cardId) => void dismiss(cardId)}
               dismissingId={dismissingId}
               onEdit={(cardId, request) => void editCard(cardId, request)}
-              onReorder={(cardIds) => void reorder(cardIds)}
+              onReorder={handleReorder}
+              isArranging={isArranging}
+              collapsedIds={collapsedIds}
+              onToggleCollapsed={toggleCollapsed}
             />
           </>
         ) : null}

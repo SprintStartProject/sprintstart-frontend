@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -12,6 +12,8 @@ type SuggestedTasksCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -33,9 +35,12 @@ export function SuggestedTasksCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: SuggestedTasksCardProps) {
   return (
     <BoardCardFrame
+      icon={Sparkles}
       title="Good next tasks"
       card={card}
       subtitle={content.tasks.length > 0 ? "Best fit first" : undefined}
@@ -44,6 +49,8 @@ export function SuggestedTasksCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     >
       {content.tasks.length === 0 ? (
         <EmptyState size="sm">

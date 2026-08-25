@@ -1,3 +1,4 @@
+import { Brain } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -11,6 +12,8 @@ type MemoryRecapCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -33,11 +36,14 @@ export function MemoryRecapCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: MemoryRecapCardProps) {
   const { memory, messagesRemembered } = content;
 
   return (
     <BoardCardFrame
+      icon={Brain}
       title="What your buddy remembers"
       card={card}
       subtitle={
@@ -50,6 +56,8 @@ export function MemoryRecapCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     >
       {memory ? (
         <>

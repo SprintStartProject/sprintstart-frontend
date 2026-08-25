@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Target } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -12,6 +12,8 @@ type CurrentTaskCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -33,11 +35,14 @@ export function CurrentTaskCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
 
   return (
     <BoardCardFrame
+      icon={Target}
       title="What you're working on"
       card={card}
       subtitle={
@@ -52,6 +57,8 @@ export function CurrentTaskCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     >
       {hasTask ? (
         <div>

@@ -19,6 +19,8 @@ type DiagramCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 const nodeTypes = { diagramPart: DiagramCardNode };
@@ -46,6 +48,8 @@ export function DiagramCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: DiagramCardProps) {
   // Only what a revalidation produced. Derived rather than synced from the prop, so a fresh board
   // read cannot be silently overwritten by a stale confirmation of the previous one.
@@ -119,6 +123,7 @@ export function DiagramCard({
 
   return (
     <BoardCardFrame
+      icon={Network}
       title="How this fits together"
       card={card}
       subtitle={current.subject}
@@ -127,6 +132,8 @@ export function DiagramCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
       action={
         hasPicture ? (
           <Button

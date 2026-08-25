@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, PlaneLanding } from "lucide-react";
 import { arrivalService } from "../../../services/arrivalService";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
@@ -17,6 +17,8 @@ type ArrivalStepsCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /**
@@ -45,6 +47,8 @@ export function ArrivalStepsCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: ArrivalStepsCardProps) {
   // Derived, not synced: the card re-reads on every board load, and a confirmation that has
   // landed should not be undone by a stale prop. Same shape the diagram card uses for `redrawn`.
@@ -103,6 +107,7 @@ export function ArrivalStepsCard({
 
   return (
     <BoardCardFrame
+      icon={PlaneLanding}
       title="Getting you set up"
       card={card}
       onDismiss={onDismiss}
@@ -110,6 +115,8 @@ export function ArrivalStepsCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
       subtitle={summarise({ observed, declared, outstanding })}
     >
       <div className="space-y-4">

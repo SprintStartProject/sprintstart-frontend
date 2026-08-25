@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, CheckSquare, Plus, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
+import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
@@ -15,6 +16,8 @@ type ChecklistCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 /** The items, as the server needs them back: existing ones keep their id, so a tick lands on a line. */
@@ -33,6 +36,11 @@ function toRequest(content: ChecklistContent, items: ChecklistItem[]): AuthoredC
  * that line rather than to a position: without ids, adding a line above a ticked item would move
  * the tick.
  *
+ * **Done sinks to the bottom, and only on screen.** What is left to do is why somebody opens a
+ * checklist, and it should not be interleaved with what is finished. The stored order is untouched
+ * — sorting here would mean a tick silently rewrote the list the hire wrote, and unticking would
+ * have nowhere to put the line back.
+ *
  * The count is `2/5 done`, never a percentage or a bar. A checklist somebody wrote for themselves
  * is not a progress metric, and dressing it as one invites treating it like a score.
  */
@@ -45,9 +53,17 @@ export function ChecklistCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: ChecklistCardProps) {
   const [newItem, setNewItem] = useState("");
   const done = content.items.filter((item) => item.done).length;
+
+  // `sort` is stable, so within each half the hire's own order survives.
+  const shown = useMemo(
+    () => [...content.items].sort((a, b) => Number(a.done) - Number(b.done)),
+    [content.items],
+  );
 
   const toggle = (itemId: string) => {
     onEdit?.(
@@ -86,6 +102,7 @@ export function ChecklistCard({
 
   return (
     <BoardCardFrame
+      icon={CheckSquare}
       title={content.title ?? "Checklist"}
       card={card}
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
@@ -94,29 +111,47 @@ export function ChecklistCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     >
       {content.items.length === 0 ? (
         <EmptyState size="sm">Nothing on it yet.</EmptyState>
       ) : (
-        <ul className="space-y-1.5">
-          {content.items.map((item) => (
-            <li key={item.id} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id={`item-${item.id}`}
-                checked={item.done}
-                disabled={!onEdit}
-                onChange={() => toggle(item.id)}
-                className="h-4 w-4 shrink-0 rounded border-app-border accent-app-brand"
-              />
-              <label
-                htmlFor={`item-${item.id}`}
+        <ul className="space-y-1">
+          {shown.map((item) => (
+            <li key={item.id} className="group/item flex items-center gap-2.5">
+              {onEdit ? (
+                <SelectionCheckbox
+                  checked={item.done}
+                  onChange={() => toggle(item.id)}
+                  ariaLabel={item.text}
+                />
+              ) : (
+                // Nothing to tick when the board is not editable, so this is a picture of the
+                // state rather than a control that would refuse.
+                <span
+                  aria-hidden="true"
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${
+                    item.done
+                      ? "border-app-brand bg-app-brand text-white"
+                      : "border-app-border bg-app-surface"
+                  }`}
+                >
+                  {item.done && <Check className="h-4 w-4 stroke-3" />}
+                </span>
+              )}
+
+              <span
                 className={`flex-1 text-sm ${
                   item.done ? "text-app-text-muted line-through" : "text-app-text"
                 }`}
               >
                 {item.text}
-              </label>
+                {!onEdit && (
+                  <span className="sr-only">{item.done ? " — done" : " — not done"}</span>
+                )}
+              </span>
+
               {onEdit && (
                 <Button
                   variant="dangerGhost"
@@ -124,6 +159,7 @@ export function ChecklistCard({
                   iconOnly
                   onClick={() => remove(item.id)}
                   aria-label={`Remove "${item.text}"`}
+                  className="opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>

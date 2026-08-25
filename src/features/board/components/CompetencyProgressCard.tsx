@@ -1,3 +1,4 @@
+import { Award } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -11,6 +12,8 @@ type CompetencyProgressCardProps = {
   onMove?: (cardId: string, direction: "up" | "down") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: (cardId: string) => void;
 };
 
 function CompetencyRow({ competency, held }: { competency: BoardCompetency; held: boolean }) {
@@ -44,12 +47,15 @@ export function CompetencyProgressCard({
   onMove,
   canMoveUp,
   canMoveDown,
+  collapsed,
+  onToggleCollapsed,
 }: CompetencyProgressCardProps) {
   const { held, inProgress } = content;
   const nothingYet = held.length === 0 && inProgress.length === 0;
 
   return (
     <BoardCardFrame
+      icon={Award}
       title="Where you stand"
       card={card}
       subtitle={held.length > 0 ? `${held.length} shown` : undefined}
@@ -58,6 +64,8 @@ export function CompetencyProgressCard({
       onMove={onMove}
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     >
       {nothingYet ? (
         <EmptyState size="sm">
