@@ -78,11 +78,14 @@ export function useBuddyConversation() {
    *
    * **Reading comes before greeting, and that ordering is the whole fix.** The page used to
    * call the open endpoint unconditionally. Opening is idempotent only while the hire has said
-   * nothing; once they have, a second open *rotates the visit* — the backend folds what was
-   * said into the buddy's memory and starts a new window. So a hire who asked something in the
-   * dock and then opened the full page destroyed their own context and was shown a greeting
-   * instead of their conversation. It was not a rendering problem; the messages were really
-   * gone.
+   * nothing; a visit *ends* when they speak, so a later open writes a new opening marker, and
+   * `getMessagesForMe` reads back only to the last marker. A hire who asked something in the
+   * dock and then opened the full page was shown a greeting instead of their conversation.
+   *
+   * Nothing is deleted by that: the transcript stays in `buddy_messages`, and the durable
+   * memory note is folded by a separate background pass rather than by opening. Only the hire's
+   * scrollback moves past it — worth stating precisely, because it is the difference between
+   * losing the view and losing the record.
    *
    * Now: fetch what the visit already holds. If there is anything there, that *is* the
    * conversation — show it, and call no model at all. Only a genuinely empty visit gets a
@@ -109,6 +112,32 @@ export function useBuddyConversation() {
         return;
       }
 
+      await greet();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsOpening(false);
+    }
+  }, [greet]);
+
+  /**
+   * Starts a new visit: clears the scrollback and greets again.
+   *
+   * The backend's rule is that *a visit ends when the hire speaks*, so opening once they have
+   * writes a fresh opening marker — and `getMessagesForMe` returns from the last marker onward.
+   * Asking to open again is therefore all a "new chat" is; there is no reset endpoint and none
+   * is needed.
+   *
+   * Nothing is deleted. The whole transcript stays in `buddy_messages`, and the buddy's durable
+   * memory note is untouched — it is what the greeting is written from, which is why starting
+   * fresh does not mean starting over. Only the hire's scrollback moves on.
+   */
+  const startFreshVisit = useCallback(async () => {
+    setMessages([]);
+    setOpenerAction(null);
+    setDraft("");
+    setIsOpening(true);
+    try {
       await greet();
     } catch (e) {
       console.error(e);
@@ -322,6 +351,7 @@ export function useBuddyConversation() {
     dismissAction,
 
     ensureOpened,
+    startFreshVisit,
     bottomRef,
   };
 }

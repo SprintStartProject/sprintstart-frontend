@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { warmBuddyVisit } from "../../../services/buddyService";
+import { useCallback, useEffect, useState } from "react";
 import { onOpenAiBuddy } from "../aiBuddyBus";
 import { useBuddySession } from "../buddySessionContext";
 import { useBuddySuggestions } from "./useBuddySuggestions";
@@ -12,22 +11,16 @@ import { useBuddySuggestions } from "./useBuddySuggestions";
  * whole app, so the dock and the `/buddy` page are two views of one conversation rather than
  * two conversations — see the provider for what the split used to cost.
  *
- * The conversation is brought on screen the first time the dock opens, so an unopened dock
- * makes no request. Other surfaces can open the dock and seed a draft via the aiBuddyBus
- * (e.g. "Draft with AI" on the human-buddy card).
- *
- * The one thing that does not wait for the dock is opening the visit, and it is the exception
- * that makes the rest cheap. Writing the greeting is the slow part of meeting the buddy — a
- * remote model, measured between 2s and 13s and occasionally far worse — and the widget mounts
- * app-wide the moment a hire's session resolves, long before they click. Warming it there turns
- * the click into the replay path, which costs no model call at all.
+ * The conversation is brought on screen at mount rather than on first open, so the click finds
+ * it already there — see the effect below for why that read must never be a bare open. Other
+ * surfaces can open the dock and seed a draft via the aiBuddyBus (e.g. "Draft with AI" on the
+ * human-buddy card).
  */
 export function useBuddy() {
   const conversation = useBuddySession();
   const { ensureOpened, setDraft } = conversation;
 
   const [isOpen, setIsOpen] = useState(false);
-  const warmedRef = useRef(false);
 
   // Gated on the dock being open for the same reason the conversation is: an unopened dock
   // makes no request. Chips are the answer to an empty composer, so they have to be ready by
@@ -39,19 +32,19 @@ export function useBuddy() {
     setIsOpen((prev) => !prev);
   }, []);
 
+  // On mount, not on first open. Writing the greeting is the slow part of meeting the buddy —
+  // a remote model, measured between 2s and 13s — and the widget mounts app-wide the moment a
+  // hire's session resolves, long before they click. Doing it here means the click finds the
+  // conversation already there.
+  //
+  // It is `ensureOpened`, never a bare open. A blind open used to run here, on the premise that
+  // opening twice is idempotent — true only while the hire has said nothing. Once they have, a
+  // visit has ended, so an open writes a *new* opening marker and `getMessagesForMe` returns
+  // only from there: every reload silently threw the hire's scrollback away. Reading first
+  // costs one cheap request and greets only a visit that really is empty.
   useEffect(() => {
-    // Guarded by a ref rather than by the effect's deps: <React.StrictMode> double-invokes
-    // this in development, and two concurrent opens is the read-then-write race in miniature.
-    // The backend is idempotent per visit, so a duplicate is harmless rather than wrong — this
-    // just declines to send it.
-    if (warmedRef.current) return;
-    warmedRef.current = true;
-    void warmBuddyVisit();
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) void ensureOpened();
-  }, [isOpen, ensureOpened]);
+    void ensureOpened();
+  }, [ensureOpened]);
 
   useEffect(() => {
     /**

@@ -48,39 +48,6 @@ export interface BuddyOpeningHandlers {
 }
 
 /**
- * Opens this hire's visit ahead of them asking for it, discarding the greeting.
- *
- * Safe to fire speculatively because opening twice without the hire saying anything is the
- * same visit: the greeting is persisted server-side, so the second open replays rather than
- * spending a second model call.
- *
- * Failure is silent. Nobody asked for this and nobody is looking at it; the real open runs
- * later and reports its own error.
- *
- * The cost to accept: a greeting generated per login even when the hire never opens the buddy.
- */
-export function warmBuddyVisit(): Promise<void> {
-  warmingVisit ??= readBuddyStream(`/api/v1/onboarding/me/buddy/open/stream`, undefined, (chunk) =>
-    chunk.type === "done" || chunk.type === "error" ? "stop" : undefined,
-  )
-    .then(() => undefined)
-    // See above: there is nobody to tell.
-    .catch(() => undefined);
-  return warmingVisit;
-}
-
-/**
- * The warm-up in flight, if any. Never cleared once settled, so a settled warm-up is a free
- * await and a second one never re-fires.
- *
- * Two concurrent opens would each find no greeting and each spend a model call. Not
- * hypothetical: the widget is mounted on `/buddy` too, so a hire landing straight there has the
- * widget warming the visit while the page opens it. A shared promise closes that window rather than
- * narrowing it.
- */
-let warmingVisit: Promise<void> | null = null;
-
-/**
  * Opens a buddy visit, streaming the greeting as the mentor writes it.
  *
  * The mentor greets the hire grounded in their durable memory and current state; the past
@@ -95,11 +62,6 @@ let warmingVisit: Promise<void> | null = null;
  * replayed whole and no model is called.
  */
 export async function streamOpenBuddy(handlers: BuddyOpeningHandlers): Promise<void> {
-  // Let a warm-up finish first if one is running: it is opening this same visit, and racing it
-  // would spend a second model call to produce a second greeting. Once it has, this call takes
-  // the replay path and the greeting arrives whole.
-  await warmingVisit;
-
   const outcome = await readBuddyStream(
     `/api/v1/onboarding/me/buddy/open/stream`,
     undefined,
