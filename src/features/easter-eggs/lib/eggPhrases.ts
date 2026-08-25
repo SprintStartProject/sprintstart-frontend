@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 /**
  * Recognized chat phrases → effect ids. Kept verbatim from ChatPage's old
  * inline matching so existing behaviour (and muscle memory) is unchanged:
@@ -8,13 +6,14 @@ import type { ReactNode } from "react";
  * "do barrel" exists because users abbreviate mid-thought; "matrix" alone
  * matches because asking the AI about the movie was nobody's actual intent.
  */
+import type { EggEffectId } from "../eggEffectBus";
 const EGG_PHRASES: ReadonlyArray<readonly [phrases: string[], effect: EggEffectId]> = [
   [["do a barrel roll", "do barrel roll", "do barrel"], "barrel-roll"],
   [["the matrix", "do matrix", "matrix"], "matrix"],
 ];
 
 /** The whole-window easter eggs a chat surface can trigger by phrase. */
-export type EggEffectId = "barrel-roll" | "matrix";
+export type { EggEffectId } from "../eggEffectBus";
 
 /**
  * Returns the easter-egg effect a submitted chat message should trigger,
@@ -28,15 +27,3 @@ export function matchEggPhrase(text: string): EggEffectId | null {
   }
   return null;
 }
-
-/**
- * What a phrase-triggered easter egg needs to run anywhere in the app.
- *
- * Barrel roll and matrix are not modals — they are whole-window effects
- * that must be mounted by whoever owns that part of the screen. Each chat
- * surface passes this record of renderers down to its submit handler, so
- * trigger logic never hardcodes *where* an effect lives: ChatPage owns
- * the real implementations today, and a buddy chat can later reuse or
- * replace them without touching phrase matching.
- */
-export type EggEffects = Record<EggEffectId, ReactNode>;

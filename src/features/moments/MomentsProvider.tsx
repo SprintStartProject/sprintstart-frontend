@@ -4,7 +4,6 @@ import { useReducedMotion } from "framer-motion";
 import { useAuth } from "../../context/useAuth.ts";
 import { dismissBootSplash, rememberBootGreeting } from "../../bootSplash.ts";
 import { MomentsContext } from "./MomentsContext.ts";
-import { useMomentDevShortcuts } from "./useMomentDevShortcuts.ts";
 import { LaunchSequence } from "./components/LaunchSequence.tsx";
 import { MomentCelebration } from "./components/MomentCelebration.tsx";
 import { MissionComplete } from "./components/MissionComplete.tsx";
@@ -157,15 +156,6 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
   // beats off timers keyed to this callback, and a fresh closure on every
   // provider render would keep resetting them.
   const endPathReveal = useCallback(() => setPathReveal(null), []);
-
-  // TEMPORARY — remove this call together with the hook before merging to dev.
-  useMomentDevShortcuts({
-    celebrate,
-    flyby,
-    completeMission,
-    revealPath,
-    playLaunchSequence,
-  });
 
   const value = useMemo(
     () => ({
