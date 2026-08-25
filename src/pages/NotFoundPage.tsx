@@ -6,9 +6,9 @@ import { Button } from "../components/ui/Button";
 import { Rocket } from "lucide-react";
 
 /**
- * Catch-all 404 page. Shows a "not found" message with a dashboard link;
- * the Space Invaders egg opens on demand instead of covering the page on
- * arrival (see the teaser added in the next commit).
+ * Catch-all 404 page. Shows a "not found" message with a dashboard link
+ * and a small easter-egg teaser: a rocket that opens the Space Invaders
+ * game for whoever notices it while waiting.
  */
 export function NotFoundPage() {
   const navigate = useNavigate();
@@ -31,6 +31,19 @@ export function NotFoundPage() {
             you save the galaxy?
           </p>
         </div>
+
+        {/* Easter-egg teaser, styled to blend into the page: only people who
+            read the copy closely will think of clicking it. The whole row is
+            the button (text + rocket) so the target is generous. */}
+        <button
+          type="button"
+          onClick={() => setInvadersOpen(true)}
+          className="mt-4 flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-app-text-subtle transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          aria-label="Open Space Invaders"
+        >
+          While you wait for your manager&apos;s approval&hellip;
+          <span aria-hidden="true">🚀</span>
+        </button>
 
         <Button
           variant="secondary"
