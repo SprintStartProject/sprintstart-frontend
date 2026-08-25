@@ -55,6 +55,15 @@ type BuddyDockProps = Pick<
    * rather than picked off the session, like every other callback here: the dock stays a
    * presentational component the widget drives, which is what keeps it testable without one.
    */
+  /**
+   * Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`).
+   * The prop is named `onDinoGameExit` to match BuddyThread, which is what the
+   * dock forwards it to — keeping one name across the dock → thread boundary
+   * so callers pass it once and forget.
+   */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
@@ -105,6 +114,8 @@ export function BuddyDock({
   confirmAction,
   dismissAction,
   suggestions,
+  dinoGameActive = false,
+  onDinoGameExit,
   openError,
   onClose,
   onOpenFull,
@@ -259,6 +270,8 @@ export function BuddyDock({
             renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={onDinoGameExit}
           />
         </div>
 

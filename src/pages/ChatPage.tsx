@@ -17,8 +17,8 @@ import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
-import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
 import { matchEggPhrase } from "../features/easter-eggs/lib/eggPhrases";
+import { playEggEffect } from "../features/easter-eggs/eggEffectBus";
 import {
   useDinoUnlocked,
   useSpaceOpensDino,
@@ -136,11 +136,8 @@ export function ChatPage() {
     [viewingCitationArtifact],
   );
 
-  // Easter egg states. Phrase effects are matched via the shared
-  // eggPhrases lib; the dino waiting-game (unlock flag + Space trigger +
-  // auto-close) lives in one shared hook instead of page-local copies.
-  const [isBarrelRolling, setIsBarrelRolling] = useState(false);
-  const [isMatrixActive, setIsMatrixActive] = useState(false);
+  // Easter eggs play through the app-wide bus + EggEffectsLayer, so the
+  // buddy chat can trigger the same effects without this page owning them.
   const dinoUnlocked = useDinoUnlocked();
   const [gameActive, closeGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
 
@@ -156,21 +153,6 @@ export function ChatPage() {
       closeGame();
     }
   }
-
-  // Barrel roll side-effect
-  useEffect(() => {
-    if (isBarrelRolling) {
-      document.body.classList.add("barrel-roll-active");
-      const timeout = setTimeout(() => {
-        document.body.classList.remove("barrel-roll-active");
-        setIsBarrelRolling(false);
-      }, 2000);
-      return () => {
-        clearTimeout(timeout);
-        document.body.classList.remove("barrel-roll-active");
-      };
-    }
-  }, [isBarrelRolling]);
 
   // Dino easter egg phrase matching happens in `handleChatSubmit` below.
 
@@ -201,8 +183,8 @@ export function ChatPage() {
   }, [busy, chatId, textareaRef]);
 
   // Custom submit handler to intercept easter eggs: a phrase match plays
-  // the effect and swallows the message (it never reaches the AI); a
-  // normal message goes through unchanged.
+  // the app-wide effect (via the bus) and swallows the message — it never
+  // reaches the AI; a normal message goes through unchanged.
   const handleChatSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       const effect = matchEggPhrase(newRequest);
@@ -211,8 +193,7 @@ export function ChatPage() {
         return;
       }
       e.preventDefault();
-      if (effect === "barrel-roll") setIsBarrelRolling(true);
-      else setIsMatrixActive(true);
+      playEggEffect(effect);
       setNewRequest("");
     },
     [newRequest, setNewRequest, handleSubmit],
@@ -497,8 +478,6 @@ export function ChatPage() {
           onDelete={() => {}}
         />
       )}
-
-      {isMatrixActive && <MatrixRain onClose={() => setIsMatrixActive(false)} />}
     </div>
   );
 }

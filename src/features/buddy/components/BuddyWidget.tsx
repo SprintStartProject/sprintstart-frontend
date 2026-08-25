@@ -44,6 +44,8 @@ export function BuddyWidget() {
     confirmAction,
     dismissAction,
     suggestions,
+    dinoGameActive,
+    closeDinoGame,
     openError,
     retryOpen,
     closeDock,
@@ -189,6 +191,8 @@ export function BuddyWidget() {
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             suggestions={suggestions}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={closeDinoGame}
             openError={openError}
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}
