@@ -13,10 +13,21 @@ describe("matchEggPhrase", () => {
     expect(matchEggPhrase(text)).toBe("matrix");
   });
 
-  it.each(["how do I do a barrel roll?", "the matrix movie", "", "   "])(
-    "treats %j as a normal message",
+  it.each(["party", "party time", "let's party", "🎉", "  PARTY  "])(
+    "recognizes %j as party",
     (text) => {
-      expect(matchEggPhrase(text)).toBeNull();
+      expect(matchEggPhrase(text)).toBe("party");
     },
   );
+
+  it.each([
+    "how do I do a barrel roll?",
+    "the matrix movie",
+    "",
+    "   ",
+    "partying",
+    "a party for two",
+  ])("treats %j as a normal message", (text) => {
+    expect(matchEggPhrase(text)).toBeNull();
+  });
 });

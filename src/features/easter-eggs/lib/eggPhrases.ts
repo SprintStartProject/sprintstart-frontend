@@ -10,6 +10,7 @@ import type { EggEffectId } from "../eggEffectBus";
 const EGG_PHRASES: ReadonlyArray<readonly [phrases: string[], effect: EggEffectId]> = [
   [["do a barrel roll", "do barrel roll", "do barrel"], "barrel-roll"],
   [["the matrix", "do matrix", "matrix"], "matrix"],
+  [["party", "party time", "let's party", "🎉"], "party"],
 ];
 
 /** The whole-window easter eggs a chat surface can trigger by phrase. */

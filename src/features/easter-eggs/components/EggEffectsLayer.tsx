@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { clearEggEffect, useActiveEggEffect } from "../eggEffectBus";
 import { MatrixRain } from "./MatrixRain";
+import { ConfettiBurst } from "./ConfettiBurst";
 
 /** How long the barrel roll spins before the page settles again (ms). */
 const BARREL_ROLL_MS = 2000;
@@ -37,6 +38,9 @@ export function EggEffectsLayer() {
   }, [effect?.id]);
 
   if (!effect) return null;
+
+  // Keyed by seq so re-triggering while running replays the burst.
+  if (effect.id === "party") return <ConfettiBurst key={effect.seq} />;
 
   if (effect.id === "matrix") {
     return <MatrixRain onClose={clearEggEffect} />;

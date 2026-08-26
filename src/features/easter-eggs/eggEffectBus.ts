@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
  * take over (or decorate) the entire screen, so any surface must be able to
  * fire them, and exactly one app-level layer renders them.
  */
-export type EggEffectId = "barrel-roll" | "matrix";
+export type EggEffectId = "barrel-roll" | "matrix" | "party";
 
 type ActiveEffect = {
   id: EggEffectId;
