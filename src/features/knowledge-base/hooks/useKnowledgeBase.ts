@@ -107,6 +107,9 @@ export function useKnowledgeBase(projectId: string | null) {
         case "COMMITS":
           matchesTab = artifact.artifactType === "COMMIT";
           break;
+        case "ORGANIZATIONS":
+          matchesTab = artifact.artifactType === "ORG_METADATA";
+          break;
       }
 
       return matchesSearch && matchesTab;
