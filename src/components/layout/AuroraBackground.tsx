@@ -117,8 +117,8 @@ export function AuroraBackground({
 
   // How many extra pixels to extend the canvas beyond the viewport on each
   // side, so the interactive glow trail isn't clipped at the screen edges.
-  // Half the maximum line width (60px) is enough.
-  const OVERSCAN = 30;
+  // Half the maximum line width (90px) is enough.
+  const OVERSCAN = 45;
 
   useEffect(() => {
     if (!effectiveInteractive) return;
@@ -134,11 +134,16 @@ export function AuroraBackground({
     let lastTime = performance.now();
     let isRunning = false;
 
-    // Peak stroke width of the trail, in px, at the user's chosen intensity.
-    const maxLineWidth = () => 60 * (glowIntensityRef.current / 100);
-    // Alpha multiplier. A floor keeps the lowest setting visible — radius
-    // shrink alone already does most of the dimming work.
-    const maxAlpha = () => 0.36 * (0.25 + 0.75 * (glowIntensityRef.current / 100));
+    // Normalized progress across the 10–100 slider range (0.0 at 10%, 1.0 at 100%).
+    const sliderProgress = () => Math.max(0, Math.min(1, (glowIntensityRef.current - 10) / 90));
+
+    // Peak stroke width of the trail, in px.
+    // 6px at 10% (keeping the original fine cursor size), scaling up to 90px at 100% (expanded atmospheric aura).
+    const maxLineWidth = () => 6 + sliderProgress() * 84;
+
+    // Alpha multiplier.
+    // 0.28 at 10% (2x higher color saturation and density vs previous 0.12), scaling up to 0.70 at 100% (bright, radiant intensity).
+    const maxAlpha = () => 0.28 + sliderProgress() * 0.42;
 
     const resize = () => {
       canvas.width = window.innerWidth + OVERSCAN * 2;

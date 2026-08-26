@@ -732,6 +732,30 @@ body {
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
 }
 
+/* ── Sleek custom scrollbar utility for sidebars and panels ─── */
+.app-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-strong);
+}
+
 /* ── Mouse-follow spotlight (decorative, applied via AuroraBackground) ─── */
 
 .app-spotlight {
