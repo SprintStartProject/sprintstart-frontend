@@ -1,7 +1,57 @@
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { useState } from "react";
+import { motion, useReducedMotion, type TargetAndTransition, type Variants } from "framer-motion";
+import { useRepeatClicks } from "../../features/easter-eggs/hooks/useRepeatClicks";
 
 const BADGE_SIZE = 44;
 const MARK_SIZE = 28;
+
+/**
+ * How far the badge falls before it hits the floor. Chosen to clear the
+ * header row visually (parents are overflow-visible) so the drop reads as
+ * "fell past its shelf, bounced, hopped back" without portals or measured
+ * rects — a fixed translateY keeps the effect layout-independent.
+ */
+const DROP_DISTANCE = 140;
+
+/**
+ * The gravity choreography, one entry per phase. Each phase animates the
+ * whole badge; `onAnimationComplete` walks idle → falling → impact →
+ * bouncing → hopping → idle, so every beat lands exactly when the previous
+ * one finishes instead of relying on hand-tuned delays.
+ */
+const DROP_PHASES: Record<Exclude<DropPhase, "idle">, TargetAndTransition> = {
+  // Gravity accelerates: easeIn, with a slight forward tumble.
+  falling: { y: DROP_DISTANCE, rotate: 6, transition: { duration: 0.45, ease: "easeIn" } },
+  // Sideways squash on impact — the classic cartoon beat.
+  impact: {
+    scaleX: 1.14,
+    scaleY: 0.8,
+    rotate: 0,
+    transition: { duration: 0.09, ease: "easeOut" },
+  },
+  // Two diminishing bounces; each landing re-squashes a little less.
+  bouncing: {
+    y: [DROP_DISTANCE, 94, DROP_DISTANCE, 119, DROP_DISTANCE],
+    scaleX: [1.14, 1.02, 1.1, 1.03, 1.1],
+    scaleY: [0.8, 1, 0.87, 1, 0.93],
+    transition: {
+      duration: 0.62,
+      times: [0, 0.26, 0.5, 0.74, 1],
+      ease: ["easeOut", "easeIn", "easeOut", "easeIn"],
+    },
+  },
+  // Spring back to the shelf with a small overshoot, rotation settling.
+  hopping: {
+    y: 0,
+    scaleX: 1,
+    scaleY: 1,
+    rotate: 0,
+    transition: { type: "spring", stiffness: 260, damping: 11 },
+  },
+};
+
+/** The gravity sequence phases: idle at rest, then falling → impact → bouncing → hopping. */
+type DropPhase = "idle" | "falling" | "impact" | "bouncing" | "hopping";
 
 /**
  * Where the exhaust meets the body, in viewBox units. The flame scales from
@@ -28,6 +78,24 @@ const NOZZLE_ORIGIN = { transformOrigin: "7px 17px", transformBox: "view-box" } 
  */
 export function SidebarLogo({ className = "" }: { className?: string }) {
   const prefersReducedMotion = useReducedMotion();
+
+  // The gravity easter egg: five clicks drop the badge off its shelf.
+  // Reduced motion skips the animation entirely (pure motion has no honest
+  // static equivalent) — the counter still consumes, nothing plays.
+  const [dropPhase, setDropPhase] = useState<DropPhase>("idle");
+  const handleLogoClick = useRepeatClicks(5, () => {
+    if (!prefersReducedMotion && dropPhase === "idle") setDropPhase("falling");
+  });
+
+  /** Walks the choreography forward as each beat's animation completes. */
+  const advanceDrop = () => {
+    setDropPhase((current) => {
+      if (current === "falling") return "impact";
+      if (current === "impact") return "bouncing";
+      if (current === "bouncing") return "hopping";
+      return "idle";
+    });
+  };
 
   const badgeVariants: Variants = prefersReducedMotion
     ? { rest: {}, lift: {} }
@@ -94,11 +162,19 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
   return (
     <motion.div
       initial="rest"
-      animate="rest"
-      whileHover="lift"
+      animate={dropPhase === "idle" ? "rest" : DROP_PHASES[dropPhase]}
+      // Hover lift is suppressed while the gravity sequence plays so the
+      // two transforms never fight over the same element.
+      whileHover={dropPhase === "idle" ? "lift" : undefined}
       variants={badgeVariants}
+      onAnimationComplete={advanceDrop}
+      onClick={handleLogoClick}
+      // The logo is deliberately decorative markup — the egg behind it is
+      // pure whimsy with no function, and making it tab-focusable on all
+      // three surfaces (including the login page's focus order) would
+      // worsen keyboard navigation for everyone to serve a secret.
       style={{ width: BADGE_SIZE, height: BADGE_SIZE }}
-      className={`relative flex shrink-0 items-center justify-center rounded-[12px] bg-app-brand shadow-lg ${className}`}
+      className={`relative flex shrink-0 cursor-pointer items-center justify-center rounded-[12px] bg-app-brand shadow-lg select-none ${className}`}
     >
       <motion.svg
         variants={rocketVariants}
