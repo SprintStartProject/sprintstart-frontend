@@ -44,6 +44,7 @@ export function DashboardPage() {
             icon={ChartColumn}
             title="Dashboard"
             onIconClick={onHeaderIconClick}
+            eggHint
             subtitle={
               isEditing
                 ? "Drag a widget to move it, change its size, or add another one."

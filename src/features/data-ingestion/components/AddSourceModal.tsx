@@ -93,8 +93,12 @@ export function AddSourceModal({
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token; it falls back to the prop until it has loaded so
   // discovery works on the first open without waiting for the refetch.
-  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
-    useGithubTokens();
+  const {
+    tokenNames: loadedTokenNames,
+    tokensLoaded,
+    loadTokenNames,
+    addTokenNameLocally,
+  } = useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
   // Jira detail state.

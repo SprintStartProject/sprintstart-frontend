@@ -17,31 +17,73 @@ type Game2048FrameProps = {
   onExit: () => void;
 };
 
+function isEggExitMessage(data: unknown): data is { type: "EGG_EXIT" } {
+  return (
+    typeof data === "object" && data !== null && (data as { type?: unknown }).type === "EGG_EXIT"
+  );
+}
+
 const GAME_URL = "/easter-eggs/2048.html";
 
 export function Game2048Frame({ onExit }: Game2048FrameProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const onExitRef = useRef(onExit);
+
+  useEffect(() => {
+    onExitRef.current = onExit;
+  }, [onExit]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent<unknown>) => {
+      if (isEggExitMessage(event.data)) {
+        onExitRef.current();
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const handleLoad = () => {
-      const win = iframe.contentWindow;
-      const doc = iframe.contentDocument;
-      if (!win || !doc) return;
-      win.focus();
-      doc.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "Escape") onExit();
-      });
-      // The iframe is unmounted when the modal closes (AnimatePresence
-      // exit), discarding its contentDocument and this listener with it.
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onExitRef.current();
+      }
     };
 
-    if (iframe.contentDocument?.readyState === "complete") handleLoad();
-    else iframe.addEventListener("load", handleLoad);
-    return () => iframe.removeEventListener("load", handleLoad);
-  }, [onExit]);
+    const attachListener = () => {
+      try {
+        const win = iframe.contentWindow;
+        const doc = iframe.contentDocument;
+        if (win) {
+          win.focus();
+          win.addEventListener("keydown", handleKeyDown);
+        }
+        if (doc) {
+          doc.addEventListener("keydown", handleKeyDown);
+        }
+      } catch {
+        // Fallback to window message listener if cross-origin
+      }
+    };
+
+    if (iframe.contentDocument?.readyState === "complete") {
+      attachListener();
+    }
+    iframe.addEventListener("load", attachListener);
+
+    return () => {
+      iframe.removeEventListener("load", attachListener);
+      try {
+        iframe.contentWindow?.removeEventListener("keydown", handleKeyDown);
+        iframe.contentDocument?.removeEventListener("keydown", handleKeyDown);
+      } catch {
+        // Ignore
+      }
+    };
+  }, []);
 
   return (
     <iframe
