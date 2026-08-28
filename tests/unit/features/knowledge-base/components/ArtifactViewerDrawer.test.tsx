@@ -619,4 +619,74 @@ describe("ArtifactViewerDrawer", () => {
       expect(await screen.findByText("Network failure")).toBeInTheDocument();
     });
   });
+
+  describe("ORG_METADATA artifacts", () => {
+    const orgMetadata = JSON.stringify({
+      login: "sprintstart",
+      name: "SprintStart",
+      description: "Campus project",
+      company: null,
+      blog: "https://sprintstart.dev",
+      location: "Berlin",
+      email: null,
+      publicRepos: 12,
+      privateRepos: 3,
+      teams: [
+        {
+          name: "Platform",
+          slug: "platform",
+          orgLogin: "sprintstart",
+          orgName: "SprintStart",
+          members: [{ login: "alice", name: "Alice" }],
+        },
+      ],
+      members: [{ login: "alice", url: "https://github.com/alice" }],
+    });
+
+    it("renders the org profile from metadata and never fetches content", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "SprintStart",
+          sourceSystem: "GITHUB",
+          metadata: orgMetadata,
+        }),
+        { canDelete: true },
+      );
+
+      expect(await screen.findByTestId("org-metadata-view")).toBeInTheDocument();
+      expect(screen.getAllByText("SprintStart").length).toBeGreaterThan(0);
+      expect(screen.getByText("@sprintstart")).toBeInTheDocument();
+      expect(screen.getByText("Campus project")).toBeInTheDocument();
+      expect(screen.getByText("Berlin")).toBeInTheDocument();
+      expect(screen.getByText("12 public · 3 private")).toBeInTheDocument();
+      // Teams + members come from the metadata, not from a fetched body.
+      expect(screen.getByText("Platform")).toBeInTheDocument();
+      expect(screen.getAllByText("alice").length).toBe(2);
+
+      // The content endpoint 302-redirects for this type; the drawer must not
+      // follow it into GitHub's HTML.
+      expect(knowledgeService.getArtifactContent).not.toHaveBeenCalled();
+      // No summarise (nothing summarisable) and no delete (not an UPLOAD artifact).
+      expect(screen.queryByTestId("summarise-btn")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("delete-artifact-btn")).not.toBeInTheDocument();
+    });
+
+    it("shows a quiet empty state when the metadata JSON is unusable", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "SprintStart",
+          sourceSystem: "GITHUB",
+          metadata: "{not json",
+        }),
+      );
+
+      expect(await screen.findByText("Organization profile unavailable.")).toBeInTheDocument();
+      expect(screen.queryByTestId("summarise-btn")).not.toBeInTheDocument();
+      expect(warn).toHaveBeenCalled();
+    });
+  });
 });

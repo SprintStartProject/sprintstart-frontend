@@ -1,5 +1,20 @@
 import { useEffect, useReducer, useRef, useMemo, useCallback, type ReactNode } from "react";
-import { Sparkles, ArrowLeft, Loader2, RefreshCw, Trash2, ArrowDown, BookOpen } from "lucide-react";
+import {
+  Sparkles,
+  ArrowLeft,
+  Loader2,
+  RefreshCw,
+  Trash2,
+  ArrowDown,
+  BookOpen,
+  Building2,
+  MapPin,
+  Globe,
+  Mail,
+  Users,
+  Hash,
+  Link2,
+} from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -9,6 +24,11 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from "../types";
 import { preprocessMarkdown } from "../markdown";
+import {
+  parseOrgMetadata,
+  type OrgMetadataArtifactMetadata,
+  type OrgMetadataTeam,
+} from "../orgMetadata";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
@@ -60,6 +80,7 @@ type DrawerAction =
   | { type: "loadStart" }
   | { type: "loadSuccess"; content: ArtifactContent }
   | { type: "loadError"; error: string }
+  | { type: "skipContentLoad" }
   | { type: "setMarkdownViewMode"; mode: MarkdownViewMode }
   | { type: "summarizeStart" }
   | { type: "summarizeIndexing" }
@@ -98,6 +119,10 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
       return { ...state, isLoading: true, error: null };
     case "loadSuccess":
       return { ...state, isLoading: false, content: action.content };
+    case "skipContentLoad":
+      // ORG_METADATA artifacts have no stored content (their content endpoint
+      // redirects), so nothing to fetch — just end the loading state.
+      return { ...state, isLoading: false };
     case "loadError":
       return { ...state, isLoading: false, error: action.error };
     case "setMarkdownViewMode":
@@ -577,6 +602,184 @@ const getLanguage = (filename?: string | null) => {
 };
 
 /**
+ * Renders a health-check info row (icon + label + value) for the org profile.
+ */
+function OrgProfileRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 shrink-0 text-app-text-subtle">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <dt className="text-xs font-medium text-app-text-subtle">{label}</dt>
+        <dd className="text-sm text-app-text">{children}</dd>
+      </div>
+    </div>
+  );
+}
+
+/** GitHub's `blog` is usually a URL; link it, prefixing a scheme when bare. */
+function normalizeUrl(value: string | null): string | null {
+  if (!value) return null;
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+/** Org profile view, rendered purely from the artifact's `metadata` JSON. */
+function OrgMetadataView({
+  metadata,
+  title,
+}: {
+  metadata: OrgMetadataArtifactMetadata | null;
+  title: string | null;
+}) {
+  if (!metadata) {
+    // Known backend gap: the org artifact exists but its metadata couldn't be
+    // parsed. Show a quiet empty state instead of killing the drawer or falling
+    // through to the (redirect-following) content fetch.
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-12 text-app-text-muted">
+        <Building2 className="h-10 w-10 opacity-50" />
+        <p className="text-sm">Organization profile unavailable.</p>
+      </div>
+    );
+  }
+
+  const blogUrl = normalizeUrl(metadata.blog);
+
+  return (
+    <div className="space-y-6" data-testid="org-metadata-view">
+      <header className="flex items-start gap-3">
+        <div className="shrink-0 rounded-xl border border-app-border bg-app-bg-soft p-2.5">
+          <Building2 className="h-6 w-6 text-app-text-muted" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="truncate text-xl font-semibold text-app-text">
+            {metadata.name || title || "Organization"}
+          </h2>
+          <a
+            href={`https://github.com/${metadata.login}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-app-brand hover:underline"
+          >
+            @{metadata.login}
+          </a>
+          {metadata.description && (
+            <p className="mt-2 text-sm text-app-text-muted">{metadata.description}</p>
+          )}
+        </div>
+      </header>
+
+      <dl className="grid gap-3 sm:grid-cols-2">
+        {metadata.location && (
+          <OrgProfileRow icon={<MapPin className="h-4 w-4" />} label="Location">
+            {metadata.location}
+          </OrgProfileRow>
+        )}
+        {blogUrl && (
+          <OrgProfileRow icon={<Globe className="h-4 w-4" />} label="Blog">
+            <a
+              href={blogUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-app-brand hover:underline"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              {metadata.blog}
+            </a>
+          </OrgProfileRow>
+        )}
+        {metadata.company && (
+          <OrgProfileRow icon={<Building2 className="h-4 w-4" />} label="Company">
+            {metadata.company}
+          </OrgProfileRow>
+        )}
+        {metadata.email && (
+          <OrgProfileRow icon={<Mail className="h-4 w-4" />} label="Email">
+            <a href={`mailto:${metadata.email}`} className="text-app-brand hover:underline">
+              {metadata.email}
+            </a>
+          </OrgProfileRow>
+        )}
+        <OrgProfileRow icon={<Hash className="h-4 w-4" />} label="Repositories">
+          {metadata.publicRepos !== null && metadata.privateRepos !== null ? (
+            <>
+              {metadata.publicRepos} public · {metadata.privateRepos} private
+            </>
+          ) : (
+            "N/A"
+          )}
+        </OrgProfileRow>
+      </dl>
+
+      {metadata.teams && metadata.teams.length > 0 && (
+        <section aria-label="Teams">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
+            <Users className="h-4 w-4 text-app-text-subtle" />
+            Teams
+          </h3>
+          <div className="space-y-3">
+            {metadata.teams.map((team: OrgMetadataTeam) => (
+              <div
+                key={team.slug ?? team.name}
+                className="rounded-xl border border-app-border bg-app-bg-soft/60 p-3.5"
+              >
+                <p className="text-sm font-semibold text-app-text">{team.name}</p>
+                {team.members.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {team.members.map((member) => (
+                      <li
+                        key={member.login}
+                        className="rounded-md border border-app-border bg-app-bg px-2 py-0.5 text-xs text-app-text-muted"
+                      >
+                        {member.login}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {metadata.members.length > 0 && (
+        <section aria-label="Members">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
+            <Users className="h-4 w-4 text-app-text-subtle" />
+            Members
+            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-bold text-app-text-subtle">
+              {metadata.members.length}
+            </span>
+          </h3>
+          <ul className="flex flex-wrap gap-1.5">
+            {metadata.members.map((member) => (
+              <li key={member.login}>
+                <a
+                  href={member.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-bg px-2 py-1 text-xs text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
+                >
+                  <Users className="h-3 w-3" />
+                  {member.login}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/**
  * ArtifactViewerDrawer
  *
  * Slide-out panel that displays the raw content of a selected artifact.
@@ -620,6 +823,21 @@ export function ArtifactViewerDrawer({
     // `reset` action also closes any open delete-confirm modal so a stale
     // confirmation for the previous artifact can't be carried over.
     dispatch({ type: "reset" });
+
+    // ORG_METADATA artifacts carry no stored bytes: the backend's content
+    // endpoint answers a 302 redirect to the org's GitHub page, and following it
+    // would land the drawer on GitHub's HTML. They render purely from
+    // `artifact.metadata` (org profile/teams/members), so skip the fetch entirely.
+    if (artifact.artifactType === "ORG_METADATA") {
+      dispatch({ type: "skipContentLoad" });
+      const myGeneration = summarizeGenerationRef.current;
+      return () => {
+        isMounted = false;
+        summarizeGenerationRef.current = myGeneration + 1;
+        abortRef.current?.abort();
+        abortRef.current = null;
+      };
+    }
 
     knowledgeService
       .getArtifactContent(projectId, artifact.id, artifact.sourceSystem)
@@ -875,7 +1093,12 @@ export function ArtifactViewerDrawer({
     content?.mimeType === "application/pdf" || (content?.mimeType.startsWith("image/") ?? false);
   const canHighlight = highlightLines && highlightLines.length > 0 && !isPdfOrImage;
 
-  const actionsContent = viewMode === "raw" && (
+  const orgMetadata = useMemo(
+    () => (artifact?.artifactType === "ORG_METADATA" ? parseOrgMetadata(artifact.metadata) : null),
+    [artifact],
+  );
+
+  const actionsContent = viewMode === "raw" && artifact?.artifactType !== "ORG_METADATA" && (
     <div className="flex items-center gap-2">
       {isMarkdownArtifact && content && (
         <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5 text-xs">
@@ -945,6 +1168,10 @@ export function ArtifactViewerDrawer({
         <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg p-4 text-app-danger-text">
           <p className="font-medium">Error loading content</p>
           <p className="mt-1 text-sm">{error}</p>
+        </div>
+      ) : viewMode === "raw" && artifact?.artifactType === "ORG_METADATA" ? (
+        <div data-testid="raw-content" aria-busy={false}>
+          <OrgMetadataView metadata={orgMetadata} title={artifact?.title ?? null} />
         </div>
       ) : viewMode === "raw" ? (
         <div ref={contentContainerRef} data-testid="raw-content" aria-busy={isLoading}>
