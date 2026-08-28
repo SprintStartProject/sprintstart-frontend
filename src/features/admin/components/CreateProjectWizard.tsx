@@ -13,6 +13,7 @@ import {
 import {
   addDraftSource,
   connectDraftSources,
+  createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
   createUploadDraft,
@@ -70,8 +71,8 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   review: 3,
 };
 
-// All three connectors can now be staged from the add-source sub-flow.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
+// All four connectors can now be staged from the add-source sub-flow.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -127,13 +128,22 @@ export function CreateProjectWizard({
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token. It falls back to the prop until it has loaded so
   // discovery still works on the first open without waiting for the refetch.
-  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
-    useGithubTokens();
+  const {
+    tokenNames: loadedTokenNames,
+    tokensLoaded,
+    loadTokenNames,
+    addTokenNameLocally,
+  } = useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
+
+  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
+  const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
+  const [confluenceEmail, setConfluenceEmail] = useState("");
+  const [confluenceApiToken, setConfluenceApiToken] = useState("");
 
   // Upload files staged in memory; uploaded during provisioning once a project
   // id exists.
@@ -234,6 +244,13 @@ export function CreateProjectWizard({
     void Promise.resolve().then(loadManagerCandidates);
   }, [isOpen, loadManagerCandidates]);
 
+  const resetConfluenceDraftFields = () => {
+    setConfluenceBaseUrl("");
+    setConfluenceSpaceId("");
+    setConfluenceEmail("");
+    setConfluenceApiToken("");
+  };
+
   const resetWizard = () => {
     setPhase("details");
     setName("");
@@ -249,6 +266,7 @@ export function CreateProjectWizard({
     setAddType("GITHUB");
     setGithubSelection([]);
     resetJiraDraftFields();
+    resetConfluenceDraftFields();
     setUploadFiles([]);
     setCreatedProjectId("");
   };
@@ -262,6 +280,7 @@ export function CreateProjectWizard({
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
     resetJiraDraftFields();
+    resetConfluenceDraftFields();
     setUploadFiles([]);
   };
 
@@ -391,7 +410,14 @@ export function CreateProjectWizard({
         ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
         : addType === "UPLOAD"
           ? uploadFiles.length > 0
-          : false;
+          : addType === "CONFLUENCE"
+            ? Boolean(
+                confluenceBaseUrl.trim() &&
+                confluenceSpaceId.trim() &&
+                confluenceEmail.trim() &&
+                confluenceApiToken.trim(),
+              )
+            : false;
 
   const commitAddSource = () => {
     if (!canAddSource) return;
@@ -419,6 +445,18 @@ export function CreateProjectWizard({
     } else if (addType === "UPLOAD") {
       const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
       setSources((current) => addDraftSource(current, createUploadDraft(displayName, uploadFiles)));
+    } else if (addType === "CONFLUENCE") {
+      setSources((current) =>
+        addDraftSource(
+          current,
+          createConfluenceDraft({
+            baseUrl: confluenceBaseUrl.trim(),
+            spaceId: confluenceSpaceId.trim(),
+            email: confluenceEmail.trim(),
+            apiToken: confluenceApiToken.trim(),
+          }),
+        ),
+      );
     }
 
     closeAddSource();
@@ -780,6 +818,17 @@ export function CreateProjectWizard({
                     setUploadFiles((current) =>
                       current.filter((_, position) => position !== index),
                     ),
+                }}
+                confluence={{
+                  baseUrl: confluenceBaseUrl,
+                  spaceId: confluenceSpaceId,
+                  email: confluenceEmail,
+                  apiToken: confluenceApiToken,
+                  onBaseUrlChange: setConfluenceBaseUrl,
+                  onSpaceIdChange: setConfluenceSpaceId,
+                  onEmailChange: setConfluenceEmail,
+                  onApiTokenChange: setConfluenceApiToken,
+                  onSubmit: commitAddSource,
                 }}
               />
             ) : (

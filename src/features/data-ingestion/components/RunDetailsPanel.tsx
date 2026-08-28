@@ -189,6 +189,10 @@ function buildOriginRow(run: IngestionRun): { label: string; value: string } | n
     return owner ? { label: "Owner", value: owner } : null;
   }
 
+  if (run.sourceSystem === "CONFLUENCE") {
+    return run.sourceId ? { label: "Space", value: run.sourceId } : null;
+  }
+
   return null;
 }
 

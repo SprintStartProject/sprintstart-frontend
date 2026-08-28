@@ -17,6 +17,12 @@ describe("SourceConnectModal Accessibility", () => {
       },
       JIRA: { name: "Jira", description: "Connect to Jira", type: "Tracker", icon: Activity },
       UPLOAD: { name: "Upload", description: "Upload File", type: "File", icon: Activity },
+      CONFLUENCE: {
+        name: "Confluence",
+        description: "Connect to Confluence",
+        type: "Space",
+        icon: Activity,
+      },
     };
     const { baseElement } = render(
       <MemoryRouter>

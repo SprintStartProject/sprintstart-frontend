@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   CircleSlash,
   FileText,
@@ -21,8 +22,9 @@ import type {
   SourceSystem,
 } from "./types.ts";
 import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
+import type { ConfluenceConnectionDto } from "../../services/sources/confluenceService.ts";
 
-export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
+export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
 
 export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
   GITHUB: {
@@ -42,6 +44,12 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
     type: "Upload",
     icon: FileText,
     description: "Indexes manually uploaded documentation, markdown files and project knowledge.",
+  },
+  CONFLUENCE: {
+    name: "Confluence Space",
+    type: "Confluence",
+    icon: BookOpen,
+    description: "Indexes pages, hierarchical documents and spaces from Confluence Cloud.",
   },
 };
 
@@ -224,6 +232,71 @@ export function createUploadSourceFromInstance(status: SourceInstanceIngestionSt
     failedItems: status.failedItems,
     githubRepository: null,
     jiraInstance: null,
+    confluenceSpace: null,
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
+  };
+}
+
+/**
+ * Maps a CONFLUENCE status row from `/api/v1/ingestion-sources/status` into the
+ * full {@link DataSource} model rendered on the ingestion page.
+ */
+export function createConfluenceSourceFromInstance(
+  status: SourceInstanceIngestionStatus,
+  connection?: ConfluenceConnectionDto | null,
+  connectorEnabled?: boolean,
+): DataSource {
+  const meta = SOURCE_META.CONFLUENCE;
+  const backendStatus: BackendProjectSourceStatus =
+    status.enabled === false ? "DISABLED" : status.connectionStatus;
+  const hasErrors = status.failedCount > 0;
+  const hasNeverSynced = status.lastRunTime === null;
+
+  return {
+    sourceId: status.sourceId,
+    sourceSystem: "CONFLUENCE",
+    name: status.displayName,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled,
+    }),
+    artifacts: status.artifactCount,
+    lastSync: formatDateTime(status.lastRunTime),
+    nextSync: "Not available",
+    errors: status.failedCount,
+    description: meta.description,
+    lastRunAt: status.lastRunTime,
+    latestIngestedCount: status.ingestedCount,
+    latestUpdatedCount: status.updatedCount,
+    deletedCount: status.deletedCount,
+    totalArtifactCount: status.artifactCount,
+    runIds: [],
+    sharesSourceSystem: false,
+    failedItems: status.failedItems,
+    githubRepository: null,
+    jiraInstance: null,
+    confluenceSpace: connection
+      ? {
+          connectionId: connection.id,
+          baseUrl: connection.baseUrl,
+          spaceId: connection.spaceId,
+          spaceKey: connection.spaceKey,
+        }
+      : null,
     lastCommitsSyncAt: null,
     lastIssuesSyncAt: null,
     lastPullRequestsSyncAt: null,
@@ -550,7 +623,10 @@ export function buildRunSourceLabels(sources: DataSource[]): Map<string, string>
   const labels = new Map<string, string>();
 
   sources.forEach((source) => {
-    const ref = source.jiraInstance?.instanceUrl ?? source.githubRepository?.fullName;
+    const ref =
+      source.jiraInstance?.instanceUrl ??
+      source.githubRepository?.fullName ??
+      (source.sourceSystem === "CONFLUENCE" ? source.sourceId : undefined);
     if (ref && !labels.has(ref)) {
       labels.set(ref, source.name);
     }

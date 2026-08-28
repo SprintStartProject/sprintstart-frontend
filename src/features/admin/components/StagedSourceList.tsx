@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  BookOpen,
   Check,
   FileText,
   GitBranch,
@@ -43,6 +44,10 @@ function TypeIcon({ source }: { source: DraftSource }) {
     return <FileText className="h-4 w-4 text-app-text-muted" />;
   }
 
+  if (source.type === "CONFLUENCE") {
+    return <BookOpen className="h-4 w-4 text-app-text-muted" />;
+  }
+
   return <GitBranch className="h-4 w-4 text-app-text-muted" />;
 }
 
@@ -81,6 +86,10 @@ function sourceDetail(source: DraftSource): string {
 
   if (source.type === "JIRA") {
     return source.url;
+  }
+
+  if (source.type === "CONFLUENCE") {
+    return `${source.baseUrl} (${source.spaceId})`;
   }
 
   return source.tokenName;

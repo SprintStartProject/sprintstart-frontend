@@ -27,7 +27,7 @@ import type { JiraInstanceDto } from "../../../../src/services/sources/jiraServi
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
     it("lists all known source systems", () => {
-      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD"]);
+      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"]);
     });
 
     it("provides meta for every source system", () => {

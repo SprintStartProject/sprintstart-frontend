@@ -521,4 +521,9 @@ export const handlers = [
   }),
 
   http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
+
+  http.get("/api/v1/confluence/projects/:projectId/connections", () => HttpResponse.json([])),
+  http.get("/api/v1/connectors/confluence/sources", () =>
+    HttpResponse.json({ connectorId: "confluence", sources: [] }),
+  ),
 ];

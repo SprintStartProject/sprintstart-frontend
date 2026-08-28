@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, RefreshCw, Search, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, Plus, RefreshCw, Search, XCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { useToast } from "../../../context/useToast.ts";
 import { connectorService } from "../../../services/connectorService.ts";
 import { buildSourceKey } from "../data.ts";
+import { ConfluenceConnectStep } from "./ConfluenceConnectStep.tsx";
+import { useConfluenceSync } from "./useConfluenceSync.ts";
 import type {
   ConnectorListItem,
   ConnectorSourceRow,
@@ -44,7 +46,10 @@ export function ConnectorSourcesSection({
   const [draft, setDraft] = useState<DraftSourceChanges>(EMPTY_DRAFT);
   const [saveState, setSaveState] = useState<LoadingState>("idle");
   const [query, setQuery] = useState("");
+  const [isAddingConfluence, setIsAddingConfluence] = useState(false);
   const toast = useToast();
+  const { syncConnection, syncingId } = useConfluenceSync(projectId);
+  const isConfluence = connector.id === "confluence";
 
   const sourceKey = useMemo(() => buildSourceKey(sources), [sources]);
 
@@ -202,12 +207,36 @@ export function ConnectorSourcesSection({
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-app-text">Sources</p>
 
-        {!isLoading && draftSources.length > 0 && (
-          <span className="inline-flex shrink-0 items-center rounded-full border border-app-border bg-app-bg-soft px-2.5 py-1 text-xs font-medium text-app-text-muted tabular-nums">
-            {inScopeCount} / {draftSources.length} in scope
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {isConfluence && projectId && !isAddingConfluence && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={() => setIsAddingConfluence(true)}
+            >
+              Add space
+            </Button>
+          )}
+
+          {!isLoading && draftSources.length > 0 && (
+            <span className="inline-flex shrink-0 items-center rounded-full border border-app-border bg-app-bg-soft px-2.5 py-1 text-xs font-medium text-app-text-muted tabular-nums">
+              {inScopeCount} / {draftSources.length} in scope
+            </span>
+          )}
+        </div>
       </div>
+
+      {isAddingConfluence && projectId && (
+        <ConfluenceConnectStep
+          projectId={projectId}
+          onClose={() => setIsAddingConfluence(false)}
+          onSaved={() => {
+            retryLoadSources();
+            onSourcesSaved?.();
+          }}
+        />
+      )}
 
       {hasLoadedSelectedConnector && errorMessage && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
@@ -272,31 +301,51 @@ export function ConnectorSourcesSection({
                     </a>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleSource(source.id)}
-                    aria-pressed={source.enabled}
-                    aria-label={
-                      source.enabled
-                        ? `Exclude ${source.name} from ingestion`
-                        : `Include ${source.name} in ingestion`
-                    }
-                    className={[
-                      "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                      source.enabled
-                        ? "border-app-success-border bg-app-success-bg text-app-success-text hover:bg-app-success-solid hover:text-white"
-                        : // Red like every other "disabled" marker in the app, so the
-                          // excluded state reads the same here as on the source cards.
-                          "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:bg-app-danger-solid hover:text-white",
-                    ].join(" ")}
-                  >
-                    {source.enabled ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <XCircle className="h-3.5 w-3.5" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isConfluence && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={syncingId === source.id}
+                        disabled={syncingId !== null}
+                        onClick={() =>
+                          void syncConnection(source.id, () => {
+                            retryLoadSources();
+                            onSourcesSaved?.();
+                          })
+                        }
+                        icon={<RefreshCw className="h-3.5 w-3.5" />}
+                      >
+                        Sync now
+                      </Button>
                     )}
-                    {source.enabled ? "In scope" : "Excluded"}
-                  </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleSource(source.id)}
+                      aria-pressed={source.enabled}
+                      aria-label={
+                        source.enabled
+                          ? `Exclude ${source.name} from ingestion`
+                          : `Include ${source.name} in ingestion`
+                      }
+                      className={[
+                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        source.enabled
+                          ? "border-app-success-border bg-app-success-bg text-app-success-text hover:bg-app-success-solid hover:text-white"
+                          : // Red like every other "disabled" marker in the app, so the
+                            // excluded state reads the same here as on the source cards.
+                            "border-app-danger-border bg-app-danger-bg text-app-danger-text hover:bg-app-danger-solid hover:text-white",
+                      ].join(" ")}
+                    >
+                      {source.enabled ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5" />
+                      )}
+                      {source.enabled ? "In scope" : "Excluded"}
+                    </button>
+                  </div>
                 </div>
               );
             })}

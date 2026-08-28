@@ -5,7 +5,10 @@ import { Field } from "../../../../components/ui/Field";
 import { Input } from "../../../../components/ui/Input";
 import { useToast } from "../../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
-import { addJiraCredential, type JiraCredentialsDto } from "../../../../services/sources/jiraService";
+import {
+  addJiraCredential,
+  type JiraCredentialsDto,
+} from "../../../../services/sources/jiraService";
 
 type JiraCredentialAddFormProps = {
   /** Login email used only as the initial Jira account email. */
