@@ -1,6 +1,13 @@
 import { memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, FileCode, CircleDot, GitPullRequest, ChevronRight } from "lucide-react";
+import {
+  BookOpen,
+  CircleDot,
+  FileCode,
+  FileText,
+  GitPullRequest,
+  ChevronRight,
+} from "lucide-react";
 import type { Artifact, ArtifactType } from "../types";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -24,6 +31,8 @@ const getIcon = (type: ArtifactType) => {
       return <CircleDot className="h-5 w-5 text-app-warning-text" />;
     case "PULL_REQUEST":
       return <GitPullRequest className="h-5 w-5 text-app-success-text" />;
+    case "PAGE":
+      return <BookOpen className="h-5 w-5 text-app-brand" />;
     default:
       return <FileText className="h-5 w-5 text-app-text-muted" />;
   }

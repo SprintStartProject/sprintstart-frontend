@@ -144,7 +144,7 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
 
 /**
  * Determines whether an artifact should be rendered as Markdown.
- * Issues, Pull Requests, Jira items, and Markdown files (.md/.markdown) are always rendered as Markdown.
+ * Issues, Pull Requests, Jira items, Confluence pages, and Markdown files (.md/.markdown) are always rendered as Markdown.
  */
 const shouldRenderAsMarkdown = (
   content: ArtifactContent | null | undefined,
@@ -171,7 +171,12 @@ const shouldRenderAsMarkdown = (
     sourceUrl.includes("/issues/") ||
     sourceUrl.includes("/browse/");
 
-  return content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd;
+  const isConfluence =
+    artifact?.sourceSystem === "CONFLUENCE" ||
+    artifact?.artifactType === "PAGE" ||
+    sourceUrl.includes("/wiki/spaces/");
+
+  return content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd || isConfluence;
 };
 
 // Hoisted to module scope so ReactMarkdown doesn't see a new array on every render
