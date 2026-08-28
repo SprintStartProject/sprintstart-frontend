@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from "react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import type { Artifact } from "../types";
-import type { KnowledgeTab } from "../components/ArtifactFilters";
+import type { KnowledgeTab } from "../tabs";
 
 const ITEMS_PER_PAGE = 20;
 

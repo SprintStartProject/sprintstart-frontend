@@ -79,5 +79,10 @@ export function parseOrgMetadata(
     return null;
   }
 
+  const p = parsed as Record<string, unknown>;
+  if (typeof p["login"] !== "string" || !Array.isArray(p["members"])) {
+    return null;
+  }
+
   return parsed as OrgMetadataArtifactMetadata;
 }

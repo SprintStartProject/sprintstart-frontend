@@ -91,4 +91,12 @@ describe("parseOrgMetadata", () => {
     expect(parseOrgMetadata('"hello"')).toBeNull();
     expect(parseOrgMetadata("[]")).toBeNull();
   });
+
+  it("returns null when required fields are missing or the wrong type", () => {
+    // members is declared non-nullable — a null value must be rejected before the cast
+    // to prevent a TypeError when the viewer calls members.length / members.map().
+    expect(parseOrgMetadata(JSON.stringify({ login: "org", members: null }))).toBeNull();
+    // login is the primary key — an object without it must be rejected.
+    expect(parseOrgMetadata(JSON.stringify({ members: [] }))).toBeNull();
+  });
 });

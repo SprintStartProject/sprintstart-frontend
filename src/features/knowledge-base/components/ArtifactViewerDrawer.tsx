@@ -597,7 +597,7 @@ const getLanguage = (filename?: string | null) => {
 };
 
 /**
- * Renders a health-check info row (icon + label + value) for the org profile.
+ * Renders a labeled metadata row (icon + label + value) for the org profile.
  */
 function OrgProfileRow({
   icon,
@@ -621,11 +621,15 @@ function OrgProfileRow({
 
 /** GitHub's `blog` is usually a URL; link it, prefixing a scheme when bare. */
 function normalizeUrl(value: string | null): string | null {
-  if (!value) return null;
-  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  const trimmed = value?.trim();
+  // Shortest realistic hostname is 4 chars (e.g. a.io); anything shorter
+  // (including "N/A", "?", whitespace) is not a real URL and must not be linked.
+  if (!trimmed || trimmed.length < 4) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-/** Org profile view, rendered purely from the artifact's `metadata` JSON. */
+/** Org profile view, rendered purely from the artifact's `metadata` JSON.
+ *  Teams and members are always fully expanded. */
 function OrgMetadataView({
   metadata,
   title,
