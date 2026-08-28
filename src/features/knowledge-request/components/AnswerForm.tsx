@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
+import { BookCheck } from "lucide-react";
 import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
+import { Button } from "../../../components/ui/Button";
 
 type AnswerFormProps = {
   /** The hire's original wording — pre-fills the (optional) generalised question. */
@@ -64,22 +66,19 @@ export function AnswerForm({ originalQuestion, onSubmit, onCancel }: AnswerFormP
         <p className="text-xs text-app-danger-text">Couldn&apos;t save that — try again.</p>
       )}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<BookCheck className="h-3.5 w-3.5" />}
+          loading={status === "saving"}
+          disabled={!answer.trim()}
           onClick={() => void submit()}
-          disabled={!answer.trim() || status === "saving"}
-          className="rounded-lg bg-app-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {status === "saving" ? "Saving…" : "Answer & publish"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={status === "saving"}
-          className="rounded-lg px-3 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-        >
+          Answer &amp; publish
+        </Button>
+        <Button variant="secondary" size="sm" disabled={status === "saving"} onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

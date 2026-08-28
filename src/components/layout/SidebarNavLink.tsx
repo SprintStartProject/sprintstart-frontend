@@ -155,8 +155,12 @@ export function SidebarNavLink({
 
     measure();
     window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
 
-    return () => window.removeEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
   });
 
   // Derived from the pointer rather than from `pointerenter` on this element.
