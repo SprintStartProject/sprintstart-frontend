@@ -1080,7 +1080,19 @@ export function DataIngestionPage() {
           throw new Error("Project ID is required to update Confluence space.");
         }
 
-        await confluenceService.syncConnection(selectedProjectId, source.sourceId);
+        const result = await confluenceService.syncConnection(selectedProjectId, source.sourceId);
+        if (result.status === "COMPLETED") {
+          const count = result.ingested + result.updated + result.unchanged;
+          if (count === 0) {
+            toast.info("Confluence sync completed: 0 pages found. Publish pages in this space on Confluence to ingest them.");
+          } else {
+            toast.success(`Confluence sync completed: ${count} page${count === 1 ? "" : "s"} processed.`);
+          }
+        } else if (result.status === "PARTIAL") {
+          toast.warning(`Confluence sync partially completed with ${result.failures.length} issues.`);
+        } else {
+          toast.error("Confluence sync failed.");
+        }
         refreshAfterUpdate();
         return;
       }
