@@ -107,4 +107,29 @@ describe("confluenceService", () => {
     expect(result.status).toBe("COMPLETED");
     expect(result.created).toBe(10);
   });
+
+  it("configureSchedule calls PUT /api/v1/confluence/projects/:projectId/connections/:connectionId/schedule", async () => {
+    expect.assertions(2);
+
+    server.use(
+      http.put(
+        "/api/v1/confluence/projects/proj-1/connections/conn-123/schedule",
+        async ({ request }) => {
+          const body = await request.json();
+          expect(body).toEqual({
+            autoUpdate: true,
+            schedule: { type: "INTERVAL", everyMinutes: 60 },
+          });
+
+          return HttpResponse.json({ ...mockConnection, autoUpdate: true });
+        },
+      ),
+    );
+
+    const result = await confluenceService.configureSchedule("proj-1", "conn-123", {
+      autoUpdate: true,
+      schedule: { type: "INTERVAL", everyMinutes: 60 },
+    });
+    expect(result.autoUpdate).toBe(true);
+  });
 });

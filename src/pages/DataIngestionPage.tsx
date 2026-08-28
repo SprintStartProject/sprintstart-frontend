@@ -1085,12 +1085,18 @@ export function DataIngestionPage() {
         if (result.status === "COMPLETED") {
           const count = result.created + result.updated + result.unchanged;
           if (count === 0) {
-            toast.info("Confluence sync completed: 0 pages found. Publish pages in this space on Confluence to ingest them.");
+            toast.info(
+              "Confluence sync completed: 0 pages found. Publish pages in this space on Confluence to ingest them.",
+            );
           } else {
-            toast.success(`Confluence sync completed: ${count} page${count === 1 ? "" : "s"} processed.`);
+            toast.success(
+              `Confluence sync completed: ${count} page${count === 1 ? "" : "s"} processed.`,
+            );
           }
         } else if (result.status === "PARTIAL") {
-          toast.warning(`Confluence sync partially completed with ${result.failures.length} issues.`);
+          toast.warning(
+            `Confluence sync partially completed with ${result.failures.length} issues.`,
+          );
         } else {
           toast.error("Confluence sync failed.");
         }
@@ -1105,7 +1111,7 @@ export function DataIngestionPage() {
       await updateGithubRepository(source.githubRepository);
       refreshAfterUpdate();
     },
-    [refreshAfterUpdate, selectedProjectId],
+    [refreshAfterUpdate, selectedProjectId, toast],
   );
 
   const handleSaveGlobalGithubConfig = useCallback(

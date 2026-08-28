@@ -9,6 +9,16 @@ export type CreateConfluenceConnectionRequest = {
   pageDenylist?: string[];
 };
 
+export type ScheduleSpec = {
+  type: "INTERVAL";
+  everyMinutes: number;
+};
+
+export type ConfigureConfluenceScheduleRequest = {
+  schedule: ScheduleSpec;
+  autoUpdate: boolean;
+};
+
 export type ConfluenceConnectionDto = {
   id: string;
   projectId: string;
@@ -22,6 +32,10 @@ export type ConfluenceConnectionDto = {
   updatedAt: string;
   version: number;
   sourceEnabled: boolean;
+  autoUpdate?: boolean;
+  spec?: ScheduleSpec;
+  schedule?: string;
+  nextSyncAt?: string | null;
 };
 
 export type ConfluenceIngestionStatus = "COMPLETED" | "PARTIAL" | "FAILED";
@@ -105,6 +119,23 @@ export const confluenceService = {
       `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}/update`,
       {
         method: "POST",
+      },
+    );
+  },
+
+  /**
+   * Updates automatic synchronization settings for one Confluence connection.
+   */
+  async configureSchedule(
+    projectId: string,
+    connectionId: string,
+    request: ConfigureConfluenceScheduleRequest,
+  ): Promise<ConfluenceConnectionDto> {
+    return apiClient.fetch<ConfluenceConnectionDto>(
+      `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}/schedule`,
+      {
+        method: "PUT",
+        body: JSON.stringify(request),
       },
     );
   },

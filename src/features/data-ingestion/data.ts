@@ -719,7 +719,7 @@ export function getRunSourceLabel(run: IngestionRun, labelBySourceRef?: Map<stri
   return getSourceLabel(run.sourceSystem);
 }
 
-export function formatDateTime(value: string | null) {
+export function formatDateTime(value: string | null | undefined) {
   if (!value) return "Never";
 
   const date = new Date(value);
