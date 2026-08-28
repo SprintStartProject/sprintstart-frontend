@@ -111,7 +111,7 @@ export function AppearanceSection() {
               type="range"
               min={GLOW_INTENSITY_MIN}
               max={GLOW_INTENSITY_MAX}
-              step={10}
+              step={1}
               value={glowIntensity}
               aria-labelledby="glow-intensity-label"
               onChange={(event) => setGlowIntensity(event.target.valueAsNumber)}

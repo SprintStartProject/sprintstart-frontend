@@ -64,7 +64,9 @@ export function RequestCard({ request, onAnswer, onDismiss }: RequestCardProps) 
             loading={dismissing}
             onClick={() => {
               setDismissing(true);
-              void onDismiss(request.id).catch(() => setDismissing(false));
+              void onDismiss(request.id)
+                .then(() => setDismissing(false))
+                .catch(() => setDismissing(false));
             }}
           >
             Dismiss

@@ -152,7 +152,9 @@ export function KnowledgeRequestInboxPage() {
             />
 
             {/* Directional slide matches the sibling pages' tab panels; the key/index pair
-                derives travel direction from the tab order. */}
+                derives travel direction from the tab order.
+                tabIndex must be ≥ 0 — TAB_ORDER must stay in sync with the Tab type, or
+                indexOf returns -1 and SlidingTabPanel's direction calculation breaks. */}
             <SlidingTabPanel activeKey={tab} index={TAB_ORDER.indexOf(tab)}>
               {tab === "open" ? (
                 <View

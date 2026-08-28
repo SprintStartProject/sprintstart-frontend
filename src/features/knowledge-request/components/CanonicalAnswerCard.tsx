@@ -111,14 +111,14 @@ export function CanonicalAnswerCard({
               <p className="text-sm font-medium text-app-text">{answer.question}</p>
             </div>
             {!readOnly && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Pencil className="h-3.5 w-3.5" aria-hidden="true" />}
                 onClick={() => setEditing(true)}
-                className="flex shrink-0 items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
               >
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 Edit
-              </button>
+              </Button>
             )}
           </div>
           <p className="mt-2 pl-6 text-sm whitespace-pre-wrap text-app-text-muted">
