@@ -28,6 +28,7 @@ import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
+  createConfluenceSourceFromConnection,
   createConfluenceSourceFromInstance,
   createJiraSourceFromInstance,
   createUploadSourceFromInstance,
@@ -774,19 +775,26 @@ export function DataIngestionPage() {
         ),
       );
 
-    const confluenceConnectionById = new Map(
-      confluenceConnections.map((conn) => [conn.id.toLowerCase(), conn]),
-    );
-
-    const confluenceSources = sourceInstances
-      .filter((status) => status.sourceSystem === "CONFLUENCE")
-      .map((status) =>
-        createConfluenceSourceFromInstance(
-          status,
-          confluenceConnectionById.get(status.sourceId.toLowerCase()) ?? null,
-          connectorEnabledById.get("confluence"),
-        ),
+    const confluenceSources = confluenceConnections.map((conn) => {
+      const status = sourceInstances.find(
+        (s) =>
+          s.sourceSystem === "CONFLUENCE" &&
+          (s.sourceId.toLowerCase() === conn.id.toLowerCase() ||
+            s.sourceId.toLowerCase() === conn.spaceId.toLowerCase()),
       );
+      if (status) {
+        return createConfluenceSourceFromInstance(
+          status,
+          conn,
+          connectorEnabledById.get("confluence"),
+        );
+      }
+      return createConfluenceSourceFromConnection(
+        conn,
+        runs,
+        connectorEnabledById.get("confluence"),
+      );
+    });
 
     const uploadSources = sourceInstances
       .filter((status) => status.sourceSystem === "UPLOAD")

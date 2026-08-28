@@ -303,6 +303,76 @@ export function createConfluenceSourceFromInstance(
   };
 }
 
+/**
+ * Creates a DataSource directly from a {@link ConfluenceConnectionDto},
+ * matching against recent ingestion runs for counters and sync status.
+ */
+export function createConfluenceSourceFromConnection(
+  connection: ConfluenceConnectionDto,
+  runs: IngestionRun[] = [],
+  connectorEnabled?: boolean,
+): DataSource {
+  const meta = SOURCE_META.CONFLUENCE;
+  const latestRun = runs.find(
+    (r) =>
+      r.sourceSystem === "CONFLUENCE" &&
+      (r.sourceId?.toLowerCase() === connection.spaceId.toLowerCase() ||
+        r.sourceId?.toLowerCase() === connection.id.toLowerCase() ||
+        r.sourceId?.toLowerCase() === connection.spaceKey.toLowerCase()),
+  );
+
+  const hasNeverSynced = !latestRun;
+  const hasErrors = (latestRun?.failedCount ?? 0) > 0;
+  const backendStatus: BackendProjectSourceStatus =
+    connection.sourceEnabled === false ? "DISABLED" : "CONNECTED";
+
+  return {
+    sourceId: connection.id,
+    sourceSystem: "CONFLUENCE",
+    name: connection.spaceKey || connection.spaceId,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, latestRun?.status ?? null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, latestRun?.status ?? null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled,
+    }),
+    artifacts: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
+    lastSync: formatDateTime(latestRun?.finishedAt ?? latestRun?.startedAt),
+    nextSync: "Not available",
+    errors: latestRun?.failedCount ?? 0,
+    description: meta.description,
+    lastRunAt: latestRun?.startedAt ?? null,
+    latestIngestedCount: latestRun?.ingestedCount ?? 0,
+    latestUpdatedCount: latestRun?.updatedCount ?? 0,
+    deletedCount: latestRun?.deletedCount ?? 0,
+    totalArtifactCount: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
+    runIds: latestRun ? [latestRun.runId] : [],
+    sharesSourceSystem: false,
+    failedItems: latestRun?.failedItems ?? [],
+    githubRepository: null,
+    jiraInstance: null,
+    confluenceSpace: {
+      connectionId: connection.id,
+      baseUrl: connection.baseUrl,
+      spaceId: connection.spaceId,
+      spaceKey: connection.spaceKey,
+    },
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
+  };
+}
+
 export function getSourceStatus(
   hasNeverSynced: boolean,
   hasErrors: boolean,
