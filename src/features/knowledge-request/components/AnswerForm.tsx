@@ -29,6 +29,7 @@ export function AnswerForm({ originalQuestion, onSubmit, onCancel }: AnswerFormP
     setStatus("saving");
     try {
       await onSubmit(answer.trim(), question.trim());
+      setStatus("idle");
     } catch {
       setStatus("error");
     }
