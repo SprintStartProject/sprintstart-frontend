@@ -123,31 +123,37 @@ describe("KnowledgeRequestInboxPage", () => {
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
   });
 
-  it("hides editing affordances from readers who cannot write (HR)", async () => {
-    mocks.profile.permissionGroup = "HR";
+  describe("when the user is HR (read-only)", () => {
+    beforeEach(() => {
+      mocks.profile.permissionGroup = "HR";
+    });
 
-    mockedService.listOpen.mockResolvedValue([]);
-    mockedService.listAnswers.mockResolvedValue([
-      {
-        id: "ans-1",
-        projectId: "proj1",
-        question: "Why does npm test hang?",
-        answer: "Delete node_modules.",
-        authorId: "pm-1",
-        createdAt: "2026-08-20T10:00:00Z",
-        updatedAt: "2026-08-21T10:00:00Z",
-      },
-    ]);
+    afterEach(() => {
+      mocks.profile.permissionGroup = "PM";
+    });
 
-    const user = userEvent.setup();
-    render(<KnowledgeRequestInboxPage />);
+    it("hides editing affordances from readers who cannot write", async () => {
+      mockedService.listOpen.mockResolvedValue([]);
+      mockedService.listAnswers.mockResolvedValue([
+        {
+          id: "ans-1",
+          projectId: "proj1",
+          question: "Why does npm test hang?",
+          answer: "Delete node_modules.",
+          authorId: "pm-1",
+          createdAt: "2026-08-20T10:00:00Z",
+          updatedAt: "2026-08-21T10:00:00Z",
+        },
+      ]);
 
-    await user.click(screen.getByRole("button", { name: /durable answers/i }));
+      const user = userEvent.setup();
+      render(<KnowledgeRequestInboxPage />);
 
-    expect(await screen.findByText("Delete node_modules.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/editing is a PM action/i)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /durable answers/i }));
 
-    mocks.profile.permissionGroup = "PM";
+      expect(await screen.findByText("Delete node_modules.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/editing is a PM action/i)).toBeInTheDocument();
+    });
   });
 });
