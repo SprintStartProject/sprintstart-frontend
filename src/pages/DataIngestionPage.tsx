@@ -779,8 +779,9 @@ export function DataIngestionPage() {
       const status = sourceInstances.find(
         (s) =>
           s.sourceSystem === "CONFLUENCE" &&
-          (s.sourceId.toLowerCase() === conn.id.toLowerCase() ||
-            s.sourceId.toLowerCase() === conn.spaceId.toLowerCase()),
+          (s.sourceId.toLowerCase() === `${conn.baseUrl}|${conn.spaceId}`.toLowerCase() ||
+            s.sourceId.toLowerCase() === conn.spaceId.toLowerCase() ||
+            s.sourceId.toLowerCase() === conn.id.toLowerCase()),
       );
       if (status) {
         return createConfluenceSourceFromInstance(
@@ -1082,7 +1083,7 @@ export function DataIngestionPage() {
 
         const result = await confluenceService.syncConnection(selectedProjectId, source.sourceId);
         if (result.status === "COMPLETED") {
-          const count = result.ingested + result.updated + result.unchanged;
+          const count = result.created + result.updated + result.unchanged;
           if (count === 0) {
             toast.info("Confluence sync completed: 0 pages found. Publish pages in this space on Confluence to ingest them.");
           } else {

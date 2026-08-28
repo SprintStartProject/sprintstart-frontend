@@ -255,7 +255,7 @@ export function createConfluenceSourceFromInstance(
   const hasNeverSynced = status.lastRunTime === null;
 
   return {
-    sourceId: status.sourceId,
+    sourceId: connection?.id ?? status.sourceId,
     sourceSystem: "CONFLUENCE",
     name: status.displayName,
     type: meta.type,
