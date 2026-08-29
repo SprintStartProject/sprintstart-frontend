@@ -320,7 +320,8 @@ export function createConfluenceSourceFromConnection(
       (r.sourceId?.toLowerCase() === compositeRef ||
         r.sourceId?.toLowerCase() === connection.spaceId.toLowerCase() ||
         r.sourceId?.toLowerCase() === connection.id.toLowerCase() ||
-        r.sourceId?.toLowerCase() === connection.spaceKey.toLowerCase()),
+        r.sourceId?.toLowerCase() === connection.spaceKey.toLowerCase() ||
+        r.repositoryId === connection.id),
   );
 
   const hasNeverSynced = !latestRun;
@@ -695,12 +696,23 @@ export function buildRunSourceLabels(sources: DataSource[]): Map<string, string>
   const labels = new Map<string, string>();
 
   sources.forEach((source) => {
-    const ref =
-      source.jiraInstance?.instanceUrl ??
-      source.githubRepository?.fullName ??
-      source.confluenceSpace?.connectionId;
-    if (ref && !labels.has(ref)) {
-      labels.set(ref, source.name);
+    if (source.jiraInstance?.instanceUrl) {
+      labels.set(source.jiraInstance.instanceUrl, source.name);
+    }
+
+    if (source.githubRepository?.fullName) {
+      labels.set(source.githubRepository.fullName, source.name);
+    }
+
+    if (source.confluenceSpace) {
+      const { connectionId, baseUrl, spaceId, spaceKey } = source.confluenceSpace;
+      if (connectionId) labels.set(connectionId, source.name);
+      if (baseUrl && spaceId) {
+        labels.set(`${baseUrl}|${spaceId}`, source.name);
+        labels.set(`${baseUrl}|${spaceId}`.toLowerCase(), source.name);
+      }
+      if (spaceKey) labels.set(spaceKey, source.name);
+      if (spaceId) labels.set(spaceId, source.name);
     }
   });
 

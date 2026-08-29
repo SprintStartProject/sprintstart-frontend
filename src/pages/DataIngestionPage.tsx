@@ -614,15 +614,15 @@ export function DataIngestionPage() {
         page,
         size: RUN_PAGE_SIZE,
         projectId: selectedProjectId || undefined,
-        // GitHub scopes by repositoryId; Jira/Confluence (and any connector-neutral source)
-        // scopes by the run's sourceInstanceRef via sourceRef.
+        // GitHub and Confluence scope by repositoryId (filtering on backend sourceInstanceId UUID);
+        // Jira scopes by the run's sourceInstanceRef via sourceRef (instance URL).
         repositoryId:
-          hasSource && runFilter.sourceSystem === "GITHUB" ? runFilter.sourceValue : undefined,
-        sourceRef:
           hasSource &&
-          (runFilter.sourceSystem === "JIRA" || runFilter.sourceSystem === "CONFLUENCE")
+          (runFilter.sourceSystem === "GITHUB" || runFilter.sourceSystem === "CONFLUENCE")
             ? runFilter.sourceValue
             : undefined,
+        sourceRef:
+          hasSource && runFilter.sourceSystem === "JIRA" ? runFilter.sourceValue : undefined,
         status: runFilter.status !== "ALL" ? runFilter.status : undefined,
       };
     },
