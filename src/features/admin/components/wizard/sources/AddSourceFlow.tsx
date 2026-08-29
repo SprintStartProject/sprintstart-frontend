@@ -19,6 +19,7 @@ import {
   type DiscoverySelection,
 } from "../../../../data-ingestion/components/GithubRepositoryDiscovery";
 import { JiraConnectStep } from "../../../../data-ingestion/components/JiraConnectStep";
+import { ConfluenceConnectStep } from "../../../../data-ingestion/components/ConfluenceConnectStep";
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
 import { FileUploadZone } from "../../../../knowledge-base/components/FileUploadZone";
 import { TokenAddForm } from "../../../../settings/components/TokenAddForm";
@@ -82,6 +83,20 @@ type UploadDetailProps = {
   onRemoveFile: (index: number) => void;
 };
 
+/** Confluence detail — a staged form; nothing connects until provisioning. */
+type ConfluenceDetailProps = {
+  baseUrl: string;
+  spaceId: string;
+  email: string;
+  apiToken: string;
+  onBaseUrlChange: (value: string) => void;
+  onSpaceIdChange: (value: string) => void;
+  onEmailChange: (value: string) => void;
+  onApiTokenChange: (value: string) => void;
+  /** Enter in a field stages the source (guarded), matching "Add to list". */
+  onSubmit: () => void;
+};
+
 type AddSourceFlowProps = {
   step: AddSourceStep;
   selectedType: SourceSystem;
@@ -98,6 +113,7 @@ type AddSourceFlowProps = {
   github: GithubDetailProps;
   jira: JiraDetailProps;
   upload: UploadDetailProps;
+  confluence: ConfluenceDetailProps;
   /**
    * Told when the desktop credential companion opens/closes, so the wizard can
    * slide its modal left to make room for it.
@@ -454,11 +470,39 @@ function UploadDetail({ files, onAddFiles, onRemoveFile }: UploadDetailProps) {
   );
 }
 
+/** Confluence detail form for connecting spaces. */
+function ConfluenceDetail({
+  isBusy,
+  confluence,
+}: {
+  isBusy: boolean;
+  confluence: ConfluenceDetailProps;
+}) {
+  return (
+    <div className="space-y-4">
+      <ConfluenceConnectStep
+        baseUrl={confluence.baseUrl}
+        spaceId={confluence.spaceId}
+        email={confluence.email}
+        apiToken={confluence.apiToken}
+        isBusy={isBusy}
+        onBaseUrlChange={confluence.onBaseUrlChange}
+        onSpaceIdChange={confluence.onSpaceIdChange}
+        onEmailChange={confluence.onEmailChange}
+        onApiTokenChange={confluence.onApiTokenChange}
+        onSubmit={confluence.onSubmit}
+      />
+    </div>
+  );
+}
+
 /** One-line brief shown under the detail header, per source type. */
 const DETAIL_SUBTITLE: Record<SourceSystem, string> = {
   GITHUB: "Pick the repositories to index, then add them to your source list.",
   JIRA: "Point to your Jira instance and pick a credential, then add it to the list.",
   UPLOAD: "Files are staged now and uploaded right after the project is created.",
+  CONFLUENCE:
+    "Enter your Confluence Cloud details and credentials, then add the space to the list.",
 };
 
 /**
@@ -516,6 +560,7 @@ export function AddSourceFlow({
   github,
   jira,
   upload,
+  confluence,
   onCompanionOpenChange,
 }: AddSourceFlowProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -529,6 +574,8 @@ export function AddSourceFlow({
         onAddFiles={upload.onAddFiles}
         onRemoveFile={upload.onRemoveFile}
       />
+    ) : selectedType === "CONFLUENCE" ? (
+      <ConfluenceDetail isBusy={isBusy} confluence={confluence} />
     ) : (
       <GithubDetail isBusy={isBusy} github={github} onCompanionOpenChange={onCompanionOpenChange} />
     );
