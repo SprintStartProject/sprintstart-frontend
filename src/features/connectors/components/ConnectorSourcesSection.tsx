@@ -309,6 +309,10 @@ export function ConnectorSourcesSection({
                         loading={syncingId === source.id}
                         disabled={syncingId !== null}
                         onClick={() =>
+                          // TODO(issue #6): source.id must be the same UUID as
+                          // ConfluenceConnectionDto.id from the connections endpoint.
+                          // Verify that GET /connectors/confluence/sources returns
+                          // connection UUIDs before removing this comment.
                           void syncConnection(source.id, () => {
                             retryLoadSources();
                             onSourcesSaved?.();

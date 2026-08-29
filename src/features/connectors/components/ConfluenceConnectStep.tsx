@@ -121,6 +121,8 @@ export function ConfluenceConnectStep({ projectId, onClose, onSaved }: Confluenc
           <Input
             data-testid="connectors-confluence-space-id"
             type="text"
+            inputMode="numeric"
+            pattern="[0-9]+"
             value={spaceId}
             onChange={(e) => setSpaceId(e.target.value)}
             placeholder="e.g. 123456"

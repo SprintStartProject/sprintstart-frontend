@@ -276,7 +276,7 @@ export function createConfluenceSourceFromInstance(
     }),
     artifacts: status.artifactCount,
     lastSync: formatDateTime(status.lastRunTime),
-    nextSync: "Not available",
+    nextSync: connection?.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
     errors: status.failedCount,
     description: meta.description,
     lastRunAt: status.lastRunTime,
@@ -313,10 +313,12 @@ export function createConfluenceSourceFromConnection(
   connectorEnabled?: boolean,
 ): DataSource {
   const meta = SOURCE_META.CONFLUENCE;
+  const compositeRef = `${connection.baseUrl}|${connection.spaceId}`.toLowerCase();
   const latestRun = runs.find(
     (r) =>
       r.sourceSystem === "CONFLUENCE" &&
-      (r.sourceId?.toLowerCase() === connection.spaceId.toLowerCase() ||
+      (r.sourceId?.toLowerCase() === compositeRef ||
+        r.sourceId?.toLowerCase() === connection.spaceId.toLowerCase() ||
         r.sourceId?.toLowerCase() === connection.id.toLowerCase() ||
         r.sourceId?.toLowerCase() === connection.spaceKey.toLowerCase()),
   );
@@ -348,7 +350,7 @@ export function createConfluenceSourceFromConnection(
     }),
     artifacts: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
     lastSync: formatDateTime(latestRun?.finishedAt ?? latestRun?.startedAt),
-    nextSync: "Not available",
+    nextSync: connection.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
     errors: latestRun?.failedCount ?? 0,
     description: meta.description,
     lastRunAt: latestRun?.startedAt ?? null,
@@ -696,7 +698,7 @@ export function buildRunSourceLabels(sources: DataSource[]): Map<string, string>
     const ref =
       source.jiraInstance?.instanceUrl ??
       source.githubRepository?.fullName ??
-      (source.sourceSystem === "CONFLUENCE" ? source.sourceId : undefined);
+      source.confluenceSpace?.connectionId;
     if (ref && !labels.has(ref)) {
       labels.set(ref, source.name);
     }

@@ -337,6 +337,28 @@ describe("ArtifactViewerDrawer", () => {
       expect(await screen.findByText("Meeting Notes")).toBeInTheDocument();
     });
 
+    it("does not render a PAGE artifact from a non-Confluence source as markdown", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Should NOT be markdown",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Some Page",
+          artifactType: "PAGE",
+          sourceSystem: "GITHUB", // not CONFLUENCE, not a /wiki/spaces/ URL
+          sourceUrl: "https://github.com/org/repo/blob/main/page.txt",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      // Should be rendered in the syntax highlighter, not in the .prose markdown container.
+      expect(rawContent.querySelector(".prose")).not.toBeInTheDocument();
+    });
+
     it("gracefully handles KaTeX math parse errors without breaking the drawer", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({

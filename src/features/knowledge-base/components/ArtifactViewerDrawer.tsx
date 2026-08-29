@@ -169,7 +169,8 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
 
 /**
  * Determines whether an artifact should be rendered as Markdown.
- * Issues, Pull Requests, Jira items, Confluence pages, and Markdown files (.md/.markdown) are always rendered as Markdown.
+ * Issues, Pull Requests, Jira items, Confluence artifacts, and Markdown files (.md/.markdown) are always rendered as Markdown.
+ * Confluence is detected via sourceSystem or a /wiki/spaces/ URL pattern.
  */
 const shouldRenderAsMarkdown = (
   content: ArtifactContent | null | undefined,
@@ -197,9 +198,7 @@ const shouldRenderAsMarkdown = (
     sourceUrl.includes("/browse/");
 
   const isConfluence =
-    artifact?.sourceSystem === "CONFLUENCE" ||
-    artifact?.artifactType === "PAGE" ||
-    sourceUrl.includes("/wiki/spaces/");
+    artifact?.sourceSystem === "CONFLUENCE" || sourceUrl.includes("/wiki/spaces/");
 
   return content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd || isConfluence;
 };

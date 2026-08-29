@@ -71,6 +71,8 @@ export function ConfluenceConnectStep({
         <Input
           data-testid="confluence-space-id"
           type="text"
+          inputMode="numeric"
+          pattern="[0-9]+"
           value={spaceId}
           onChange={(event) => onSpaceIdChange(event.target.value)}
           placeholder="e.g. 123456"

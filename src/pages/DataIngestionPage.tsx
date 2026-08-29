@@ -24,6 +24,7 @@ import { SourceList } from "../features/data-ingestion/components/SourceList.tsx
 import { ConnectorList } from "../features/connectors/components/ConnectorList.tsx";
 import { ConnectorsLoadingState } from "../features/connectors/components/ConnectorsLoadingState.tsx";
 import { toConnectorListItems } from "../features/connectors/data.ts";
+import { useConfluenceSync } from "../features/connectors/components/useConfluenceSync.ts";
 import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
@@ -484,6 +485,8 @@ export function DataIngestionPage() {
   const { selectedProject, selectedProjectId, setSelectedProjectId, reloadProjects } =
     useProjectContext();
 
+  const { syncConnection: syncConfluenceConnection } = useConfluenceSync(selectedProjectId);
+
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
 
@@ -907,10 +910,10 @@ export function DataIngestionPage() {
           ];
         }
 
-        if (source.sourceSystem === "CONFLUENCE") {
+        if (source.sourceSystem === "CONFLUENCE" && source.confluenceSpace?.connectionId) {
           return [
             {
-              value: source.sourceId,
+              value: source.confluenceSpace.connectionId,
               label: source.name,
               sourceSystem: "CONFLUENCE",
             },
@@ -1077,30 +1080,13 @@ export function DataIngestionPage() {
       }
 
       if (source.sourceSystem === "CONFLUENCE") {
-        if (!selectedProjectId) {
-          throw new Error("Project ID is required to update Confluence space.");
+        // Use confluenceSpace.connectionId (the connection UUID) rather than
+        // source.sourceId which may hold a raw status-row ref string.
+        const connectionId = source.confluenceSpace?.connectionId;
+        if (!connectionId) {
+          throw new Error("Confluence connection ID is not available for this source.");
         }
-
-        const result = await confluenceService.syncConnection(selectedProjectId, source.sourceId);
-        if (result.status === "COMPLETED") {
-          const count = result.created + result.updated + result.unchanged;
-          if (count === 0) {
-            toast.info(
-              "Confluence sync completed: 0 pages found. Publish pages in this space on Confluence to ingest them.",
-            );
-          } else {
-            toast.success(
-              `Confluence sync completed: ${count} page${count === 1 ? "" : "s"} processed.`,
-            );
-          }
-        } else if (result.status === "PARTIAL") {
-          toast.warning(
-            `Confluence sync partially completed with ${result.failures.length} issues.`,
-          );
-        } else {
-          toast.error("Confluence sync failed.");
-        }
-        refreshAfterUpdate();
+        await syncConfluenceConnection(connectionId, () => refreshAfterUpdate());
         return;
       }
 
@@ -1111,7 +1097,7 @@ export function DataIngestionPage() {
       await updateGithubRepository(source.githubRepository);
       refreshAfterUpdate();
     },
-    [refreshAfterUpdate, selectedProjectId, toast],
+    [refreshAfterUpdate, syncConfluenceConnection],
   );
 
   const handleSaveGlobalGithubConfig = useCallback(

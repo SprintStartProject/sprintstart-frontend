@@ -111,7 +111,7 @@ export function SourceDetailsPanel({
     onUpdateSource !== undefined &&
     ((source.sourceSystem === "GITHUB" && repository !== null) ||
       (isJira && jira !== null) ||
-      (isConfluence && Boolean(source.sourceId)));
+      (isConfluence && Boolean(confluence?.connectionId)));
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
