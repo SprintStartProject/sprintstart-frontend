@@ -531,10 +531,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               const draft = draftRef.current;
               if (draft) {
                 // Paragraph break between any pre-tool preamble and the
-                // post-tool answer — once, at the first token after tool
-                // activity, and only when there is preamble to separate.
+                // post-tool answer — at the first token after tool activity,
+                // and only when there is preamble to separate. Re-arms on
+                // every `tool_use`, so a multi-tool turn separates each round.
+                // trimEnd first: a preamble that already ends in a space or a
+                // newline would otherwise leave a trailing space before the
+                // break, or stack three-plus newlines, purely depending on how
+                // the model happened to chunk it.
                 if (sawToolUseRef.current && draft.content.trim() !== "") {
-                  draft.content += "\n\n";
+                  draft.content = `${draft.content.trimEnd()}\n\n`;
                   sawToolUseRef.current = false;
                 }
                 draft.content += token;
