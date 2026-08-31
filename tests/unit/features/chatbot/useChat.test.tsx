@@ -881,3 +881,75 @@ describe("useChat", () => {
     expect(result.current.chats).toEqual([{ id: "fresh-chat", userId: "user1" }]);
   });
 });
+
+it("inserts a paragraph break between tool preamble and post-tool answer tokens", async () => {
+  mockNavigate.mockReset();
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(
+        encoder.encode('data: {"type":"reasoning","reasoning":"Planning the search."}\n\n'),
+      );
+      controller.enqueue(encoder.encode('data: {"type":"token","content":"Let me look. "}\n\n'));
+      controller.enqueue(
+        encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+      );
+      controller.enqueue(
+        encoder.encode('data: {"type":"token","content":"Blockers were the auth work."}\n\n'),
+      );
+      controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+      controller.close();
+    },
+  });
+
+  server.use(
+    http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+    http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+    http.get("/api/v1/users/me", () =>
+      HttpResponse.json({
+        id: "user1",
+        authId: "auth-1",
+        username: "testuser",
+        email: "test@example.com",
+        firstName: "Test",
+        lastName: "User",
+        projectRoles: [],
+        permissionGroup: "USER",
+        enabled: true,
+        profileIcon: null,
+        hasCompletedOnboarding: true,
+      }),
+    ),
+    http.post(
+      "/api/v1/chats/me/prompt",
+      () =>
+        new HttpResponse(stream, {
+          headers: { "Content-Type": "text/event-stream" },
+        }),
+    ),
+    http.post("/api/v1/chats/me", () =>
+      HttpResponse.json({
+        id: "newChatId",
+      }),
+    ),
+  );
+
+  const { result } = renderHook(() => useChat(), { wrapper });
+
+  await waitFor(() => {
+    expect(result.current.chats).toEqual([]);
+  });
+
+  await act(async () => {
+    await result.current.addMessage("My new prompt");
+  });
+
+  await waitFor(() => {
+    expect(result.current.messages.length).toBe(2);
+  });
+
+  const aiMsg = result.current.messages[1];
+  expect(aiMsg.role).toBe("ASSISTANT");
+  expect(aiMsg.content).toBe("Let me look. \n\nBlockers were the auth work.");
+});
