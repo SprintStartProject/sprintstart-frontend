@@ -4,8 +4,10 @@ import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { NotFoundPage } from "../../../src/pages/NotFoundPage";
 
-vi.mock("../../../src/features/space-invaders/components/SpaceInvadersModal", () => ({
-  SpaceInvadersModal: () => null,
+// Keep the page hermetic: the egg modal (and its lazy game chunks) must not
+// load in an accessibility scan.
+vi.mock("../../../src/features/easter-eggs/components/EggModalShell", () => ({
+  EggModalShell: () => null,
 }));
 
 describe("NotFoundPage Accessibility", () => {

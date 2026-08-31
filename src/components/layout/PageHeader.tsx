@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 type PageHeaderProps = {
   icon: LucideIcon;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   actions?: ReactNode;
   className?: string;
   /**
@@ -13,20 +13,26 @@ type PageHeaderProps = {
    * where the subtitle is secondary. `undefined` keeps the subtitle always visible.
    */
   hideSubtitleBelow?: "sm" | "md" | "lg";
-  /**
-   * Optional click handler for the header icon (e.g., for easter eggs).
-   */
+  /** Optional click handler for the header icon (e.g., for easter eggs). */
   onIconClick?: () => void;
+  /**
+   * Marks the icon as hiding an easter egg: it grows slightly on hover and
+   * plays a one-shot glow pulse on mount. Purely decorative, so it is not
+   * reflected in the accessible name; users who prefer reduced motion get
+   * neither effect (see the page-header-icon rules in styles/index.css).
+   */
+  eggHint?: boolean;
 };
 
 export function PageHeader({
   icon: Icon,
   title,
-  subtitle,
+  subtitle = "",
   actions,
   className = "",
   hideSubtitleBelow,
   onIconClick,
+  eggHint = false,
 }: PageHeaderProps) {
   return (
     <div className={className}>
@@ -36,10 +42,11 @@ export function PageHeader({
             {onIconClick ? (
               <button
                 onClick={onIconClick}
-                className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand"
+                data-egg-hint={eggHint ? "true" : undefined}
+                className="page-header-icon-button rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand"
                 aria-label={`${title} icon`}
               >
-                <Icon className="h-6 w-6 shrink-0 text-app-brand-text transition-transform active:scale-95" />
+                <Icon className="page-header-icon h-6 w-6 shrink-0 text-app-brand-text transition-transform active:scale-95" />
               </button>
             ) : (
               <Icon className="h-6 w-6 shrink-0 text-app-brand-text" />
@@ -50,13 +57,15 @@ export function PageHeader({
             </h1>
           </div>
 
-          <p
-            className={`mt-2 max-w-2xl text-sm leading-6 text-app-text-subtle ${
-              hideSubtitleBelow ? `hidden ${hideSubtitleBelow}:block` : ""
-            }`}
-          >
-            {subtitle}
-          </p>
+          {subtitle ? (
+            <p
+              className={`mt-2 max-w-2xl text-sm leading-6 text-app-text-subtle ${
+                hideSubtitleBelow ? `hidden ${hideSubtitleBelow}:block` : ""
+              }`}
+            >
+              {subtitle}
+            </p>
+          ) : null}
         </div>
 
         {actions ? (

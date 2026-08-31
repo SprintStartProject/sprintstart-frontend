@@ -1,14 +1,10 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { ChartColumn, Check, LayoutGrid, Plus, RotateCcw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import { Button } from "../components/ui/Button";
-import { Game2048Modal } from "../features/game2048/components/Game2048Modal";
-import { useGame2048Shortcut } from "../features/game2048/hooks/useGame2048Shortcut";
-import { DinoGameModal } from "../features/dino/components/DinoGameModal";
-import { useDinoShortcut } from "../features/dino/hooks/useDinoShortcut";
-import { SpaceInvadersModal } from "../features/space-invaders/components/SpaceInvadersModal";
-import { useSpaceInvadersShortcut } from "../features/space-invaders/hooks/useSpaceInvadersShortcut";
+import { EggModalShell } from "../features/easter-eggs/components/EggModalShell";
+import { useRepeatClicks } from "../features/easter-eggs/hooks/useRepeatClicks";
 import { AddWidgetModal } from "../features/dashboard/components/AddWidgetModal";
 import { DashboardGrid } from "../features/dashboard/components/DashboardGrid";
 import { useDashboardLayout } from "../features/dashboard/layout/useDashboardLayout";
@@ -33,22 +29,12 @@ export function DashboardPage() {
   const [isPickerOpen, setPickerOpen] = useState(false);
   const [isResetOpen, setResetOpen] = useState(false);
 
-  // 2048 easter egg: Ctrl+Shift+2 opens the game in a modal.
+  // Easter egg: the dashboard header icon hides the 2048 game — three
+  // quick clicks open it, the same gesture language as the Settings
+  // cogwheel hiding the dino. Deliberately ungated: finding it *is*
+  // the fun, no localStorage flag involved.
   const [game2048Open, setGame2048Open] = useState(false);
-  const openGame2048 = useCallback(() => setGame2048Open(true), []);
-  useGame2048Shortcut(openGame2048);
-
-  // Dino easter egg: Ctrl+Shift+1 opens the runner in a modal.
-  // Bypasses the `dinoUnlocked` gate that the sidebar/chat use — the
-  // dashboard chord is a true easter egg, always available.
-  const [dinoOpen, setDinoOpen] = useState(false);
-  const openDino = useCallback(() => setDinoOpen(true), []);
-  useDinoShortcut(openDino);
-
-  // Space Invaders easter egg: Ctrl+Shift+3 opens the game in a modal.
-  const [invadersOpen, setInvadersOpen] = useState(false);
-  const openInvaders = useCallback(() => setInvadersOpen(true), []);
-  useSpaceInvadersShortcut(openInvaders);
+  const onHeaderIconClick = useRepeatClicks(3, () => setGame2048Open(true));
 
   return (
     <div className="min-h-screen">
@@ -57,6 +43,8 @@ export function DashboardPage() {
           <PageHeader
             icon={ChartColumn}
             title="Dashboard"
+            onIconClick={onHeaderIconClick}
+            eggHint
             subtitle={
               isEditing
                 ? "Drag a widget to move it, change its size, or add another one."
@@ -138,9 +126,7 @@ export function DashboardPage() {
         onClose={() => setResetOpen(false)}
       />
 
-      <Game2048Modal open={game2048Open} onClose={() => setGame2048Open(false)} />
-      <DinoGameModal open={dinoOpen} onClose={() => setDinoOpen(false)} />
-      <SpaceInvadersModal open={invadersOpen} onClose={() => setInvadersOpen(false)} />
+      <EggModalShell eggId="game-2048" open={game2048Open} onClose={() => setGame2048Open(false)} />
     </div>
   );
 }

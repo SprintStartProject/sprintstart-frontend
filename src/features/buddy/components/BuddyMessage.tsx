@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, UserRound } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { BotGlyph } from "../../chatbot/components/BotGlyph";
+import { DinoGame } from "../../chatbot/components/DinoGame";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 
 /** Who is talking. Three, because a hire's PM really does answer in here. */
@@ -175,11 +177,54 @@ function SpeakerAvatar({ speaker, isStreaming }: { speaker: BuddySpeaker; isStre
 export function BuddyTypingMessage({
   label,
   showName = false,
+  gameActive = false,
+  onGameExit,
 }: {
   label?: string;
   showName?: boolean;
+  /** True when the dino waiting-game is open instead of the dots. */
+  gameActive?: boolean;
+  /** Called when the player leaves the dino game (Escape / exit button). */
+  onGameExit?: () => void;
 }) {
   const prefersReducedMotion = useReducedMotion();
+
+  // The unlocked dino waiting-game replaces the dots while the buddy works —
+  // the same deal the AI chat's ThinkingIndicator offers. The dots stay
+  // underneath as the status row, exactly like ThinkingIndicator does, and
+  // the label keeps explaining what the buddy is doing behind the game.
+  if (gameActive && onGameExit) {
+    return (
+      <motion.div
+        {...(prefersReducedMotion
+          ? {}
+          : {
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              transition: { duration: 0.26, ease: [0.16, 1, 0.3, 1] as const },
+            })}
+        role="status"
+        className="flex w-full min-w-0 gap-2.5"
+      >
+        <div className="flex size-8 shrink-0 items-center justify-center">
+          <BotGlyph size={30} state="cheering" className="text-app-brand-text" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <DinoGame onExit={onGameExit} />
+
+          <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">
+            <span className="flex gap-1" aria-hidden="true">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+            </span>
+            {label && <span className="text-sm text-app-text-muted italic">{label}</span>}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

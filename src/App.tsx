@@ -10,6 +10,7 @@ import { BuddyWidget } from "./features/buddy/components/BuddyWidget";
 import { BuddyProvider } from "./features/buddy/BuddyProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLayer";
 
 function AppContent() {
   const { status } = useAuth();
@@ -45,6 +46,12 @@ function AppContent() {
           sits on top of the login screen, and off unless turned on in
           Settings (see MomentsSection). */}
         {showSidebar && showRocketPet && <RocketPet />}
+
+        {/* Whole-window egg effects (barrel roll, matrix rain), rendered
+          once for the whole app. Any chat surface fires them through the
+          bus (playEggEffect); this is where they actually draw. Not gated
+          on showSidebar: a fired effect must always have its renderer. */}
+        <EggEffectsLayer />
       </div>
     </BuddyProvider>
   );

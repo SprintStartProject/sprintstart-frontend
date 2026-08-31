@@ -1000,6 +1000,13 @@
             const mapped = keyMap[event.key];
 
             if (!modifiers) {
+              if (event.key === "Escape") {
+                try {
+                  window.parent.postMessage({ type: "EGG_EXIT" }, "*");
+                } catch (_) {}
+                return;
+              }
+
               if (mapped !== undefined) {
                 event.preventDefault();
                 // Ignore auto-repeat key events so holding an arrow doesn't

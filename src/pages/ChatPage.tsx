@@ -17,7 +17,12 @@ import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
-import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
+import { matchEggPhrase } from "../features/easter-eggs/lib/eggPhrases";
+import { playEggEffect } from "../features/easter-eggs/eggEffectBus";
+import {
+  useDinoUnlocked,
+  useSpaceOpensDino,
+} from "../features/easter-eggs/hooks/useDinoWaitingGame";
 
 import "katex/dist/katex.min.css";
 
@@ -131,52 +136,10 @@ export function ChatPage() {
     [viewingCitationArtifact],
   );
 
-  // Easter egg states
-  const [isBarrelRolling, setIsBarrelRolling] = useState(false);
-  const [isMatrixActive, setIsMatrixActive] = useState(false);
-
-  // Custom submit handler to intercept easter eggs
-  const handleChatSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      const text = newRequest.trim().toLowerCase();
-      if (text === "do a barrel roll" || text === "do barrel roll" || text === "do barrel") {
-        e.preventDefault();
-        setIsBarrelRolling(true);
-        setNewRequest("");
-        return;
-      }
-      if (text === "the matrix" || text === "do matrix" || text === "matrix") {
-        e.preventDefault();
-        setIsMatrixActive(true);
-        setNewRequest("");
-        return;
-      }
-      handleSubmit(e);
-    },
-    [newRequest, setNewRequest, handleSubmit],
-  );
-
-  // Barrel roll side-effect
-  useEffect(() => {
-    if (isBarrelRolling) {
-      document.body.classList.add("barrel-roll-active");
-      const timeout = setTimeout(() => {
-        document.body.classList.remove("barrel-roll-active");
-        setIsBarrelRolling(false);
-      }, 2000);
-      return () => {
-        clearTimeout(timeout);
-        document.body.classList.remove("barrel-roll-active");
-      };
-    }
-  }, [isBarrelRolling]);
-
-  // Dino easter egg: while the assistant is thinking, pressing Space drops the
-  // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
-  const [gameActive, setGameActive] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(
-    () => localStorage.getItem("dinoUnlocked") === "true",
-  );
+  // Easter eggs play through the app-wide bus + EggEffectsLayer, so the
+  // buddy chat can trigger the same effects without this page owning them.
+  const dinoUnlocked = useDinoUnlocked();
+  const [gameActive, closeGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
 
   // Close the game as soon as the answer arrives. Uses React's documented
   // "adjust state when a value changes" pattern (guarded setState during
@@ -187,9 +150,11 @@ export function ChatPage() {
   if (prevIsThinking !== isThinking) {
     setPrevIsThinking(isThinking);
     if (!isThinking && gameActive) {
-      setGameActive(false);
+      closeGame();
     }
   }
+
+  // Dino easter egg phrase matching happens in `handleChatSubmit` below.
 
   // E5: replacement for the live region that used to wrap the message list.
   // `ThinkingIndicator` already carries `role="status"` for the working
@@ -206,7 +171,7 @@ export function ChatPage() {
   }
 
   // Submitting blurs the composer so Space can start the dino game while the assistant
-  // works. Once the turn is over that reason is gone, so focus goes back — otherwise every
+  // works. Once the turn is over that reason is gone, focus goes back — otherwise every
   // follow-up question needs a click first. Skipped when something else already holds focus,
   // so this never steals the caret from wherever the user went in the meantime.
   useEffect(() => {
@@ -217,43 +182,22 @@ export function ChatPage() {
     textareaRef.current?.focus();
   }, [busy, chatId, textareaRef]);
 
-  // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
-  useEffect(() => {
-    const handleUnlockChange = () => {
-      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
-      setIsUnlocked(unlocked);
-      if (!unlocked) {
-        setGameActive(false);
+  // Custom submit handler to intercept easter eggs: a phrase match plays
+  // the app-wide effect (via the bus) and swallows the message — it never
+  // reaches the AI; a normal message goes through unchanged.
+  const handleChatSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      const effect = matchEggPhrase(newRequest);
+      if (!effect) {
+        handleSubmit(e);
+        return;
       }
-    };
-    window.addEventListener("dinoUnlockChanged", handleUnlockChange);
-    window.addEventListener("storage", handleUnlockChange);
-    return () => {
-      window.removeEventListener("dinoUnlockChanged", handleUnlockChange);
-      window.removeEventListener("storage", handleUnlockChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isThinking || gameActive || !isUnlocked) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-
-      // Don't hijack space while the user is typing their next message.
-      const active = document.activeElement;
-      const typing =
-        active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable);
-      if (typing) return;
-
       e.preventDefault();
-      setGameActive(true);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isThinking, gameActive, isUnlocked]);
+      playEggEffect(effect);
+      setNewRequest("");
+    },
+    [newRequest, setNewRequest, handleSubmit],
+  );
 
   /**
    * Focuses the composer and puts the caret behind whatever is already in it.
@@ -464,7 +408,7 @@ export function ChatPage() {
               isThinking={isThinking}
               gameActive={gameActive}
               thinkingState={thinkingState}
-              onGameExit={() => setGameActive(false)}
+              onGameExit={closeGame}
             />
 
             <div className="sr-only" role="status" aria-live="polite">
@@ -534,8 +478,6 @@ export function ChatPage() {
           onDelete={() => {}}
         />
       )}
-
-      {isMatrixActive && <MatrixRain onClose={() => setIsMatrixActive(false)} />}
     </div>
   );
 }

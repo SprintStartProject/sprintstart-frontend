@@ -44,6 +44,14 @@ type BuddyThreadProps = {
   openError?: string | null;
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
+  /**
+   * Whether the dino waiting-game is open while the buddy thinks (unlocked
+   * users only; Space opens it — see useSpaceOpensDino). Both surfaces pass
+   * it so dock and page offer the same deal.
+   */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
 };
 
 /**
@@ -70,6 +78,8 @@ export function BuddyThread({
   renderQuestionAction,
   openError,
   onRetryOpen,
+  dinoGameActive = false,
+  onDinoGameExit,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens.
@@ -165,6 +175,8 @@ export function BuddyThread({
         <BuddyTypingMessage
           label={activeTool ? toolLabel(activeTool) : undefined}
           showName={showNames}
+          gameActive={dinoGameActive}
+          onGameExit={onDinoGameExit}
         />
       )}
     </div>

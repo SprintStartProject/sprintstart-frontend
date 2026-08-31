@@ -617,6 +617,42 @@ body {
   animation: barrelRoll 2s ease-in-out;
 }
 
+/* ── Page-header icon easter-egg hint ──
+   Header icons that hide a game (Settings cogwheel, dashboard chart) get two
+   affordances: they grow slightly on hover, and on mount the icon that owns
+   a game plays ONE short glow pulse — a detail-level wink, not an obvious
+   call to action. The animation is one-shot: it runs once per mount and is
+   never re-triggered, so it reads as a flicker, not as a notification.
+   Users who prefer reduced motion get neither effect (the hover scale is
+   motion, so it goes too). */
+@keyframes header-icon-egg-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(37, 99, 235, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 6px var(--brand-border-strong));
+  }
+}
+
+.page-header-icon-button:hover .page-header-icon {
+  transform: scale(1.15);
+}
+
+.page-header-icon-button[data-egg-hint="true"] .page-header-icon {
+  animation: header-icon-egg-glow 0.5s ease-in-out 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-header-icon-button:hover .page-header-icon {
+    transform: none;
+  }
+
+  .page-header-icon-button[data-egg-hint="true"] .page-header-icon {
+    animation: none;
+  }
+}
+
 /* 
  * Override KaTeX's default error style (which is blinding red and makes the
  * entire document look broken if a math block fails to close).

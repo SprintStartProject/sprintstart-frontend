@@ -92,6 +92,7 @@ export function SettingsPage() {
               title="Settings"
               subtitle="Manage your profile, appearance and access tokens in one place."
               onIconClick={dino.handleIconClick}
+              eggHint
             />
           </div>
         </div>

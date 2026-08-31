@@ -32,6 +32,10 @@ type BuddyConversationProps = {
   onRetryOpen?: () => void;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
+  /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
 };
 
 /**
@@ -71,6 +75,8 @@ export function BuddyConversation({
   openError,
   onRetryOpen,
   focusComposerOnMount = false,
+  dinoGameActive = false,
+  onDinoGameExit,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
 
@@ -95,6 +101,8 @@ export function BuddyConversation({
             renderQuestionAction={renderQuestionAction}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={onDinoGameExit}
           />
         </div>
       </div>
