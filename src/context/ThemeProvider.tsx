@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import type { StyleMode, Theme } from "./ThemeContext";
-import { ThemeContext } from "./ThemeContext";
+import {
+  GLOW_INTENSITY_DEFAULT,
+  GLOW_INTENSITY_MAX,
+  GLOW_INTENSITY_MIN,
+  ThemeContext,
+} from "./ThemeContext";
 
 const STORAGE_KEY = "theme";
 const STYLE_STORAGE_KEY = "style-mode";
@@ -130,11 +135,6 @@ function getInitialTiltEnabled(): boolean {
   }
   return false;
 }
-
-/** Bounds and default for the cursor-glow intensity slider. */
-export const GLOW_INTENSITY_MIN = 10;
-export const GLOW_INTENSITY_MAX = 100;
-export const GLOW_INTENSITY_DEFAULT = 50;
 
 /**
  * Reads the user's stored cursor-glow intensity, clamped into 10–100.

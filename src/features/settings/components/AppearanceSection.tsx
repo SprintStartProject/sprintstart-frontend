@@ -1,5 +1,5 @@
 import { Monitor, Moon, Pointer, Sparkles, Sun } from "lucide-react";
-import { GLOW_INTENSITY_MAX, GLOW_INTENSITY_MIN } from "../../../context/ThemeProvider";
+import { GLOW_INTENSITY_MAX, GLOW_INTENSITY_MIN } from "../../../context/ThemeContext";
 import { useTheme } from "../../../context/useTheme";
 import type { Theme } from "../../../context/ThemeContext";
 
@@ -114,6 +114,9 @@ export function AppearanceSection() {
               step={1}
               value={glowIntensity}
               aria-labelledby="glow-intensity-label"
+              // Without this a screen reader announces a bare "50"; the visible
+              // readout carries the unit, so the slider must too.
+              aria-valuetext={`${glowIntensity}%`}
               onChange={(event) => setGlowIntensity(event.target.valueAsNumber)}
               // Native control tinted with the brand colour — deliberately no
               // custom track CSS until a second slider justifies extracting one.

@@ -210,6 +210,9 @@ function SidebarContent({
 
       <nav
         aria-label={ariaLabel}
+        // Marks this element as the scroll container the nav rows re-measure
+        // against — see the scroll listener in `SidebarNavLink`.
+        data-sidebar-scroll="true"
         // Tracked on the nav, not per entry: pointer enter/leave on the
         // individual rows is skipped outright when the mouse crosses
         // several of them inside one frame.

@@ -145,6 +145,8 @@ export function SidebarNavLink({
   const centerYRef = useRef(0);
 
   useLayoutEffect(() => {
+    let frame = 0;
+
     function measure() {
       const element = elementRef.current;
       if (!element) return;
@@ -153,13 +155,35 @@ export function SidebarNavLink({
       centerYRef.current = rect.top + rect.height / 2;
     }
 
+    // Scroll and resize both fire far faster than the layout they invalidate,
+    // and every row runs its own handler — so coalesce into one measurement
+    // per frame instead of one per event.
+    function scheduleMeasure() {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    }
+
     measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", scheduleMeasure);
+    // Bubble phase, so this only fires for the document scroller.
+    window.addEventListener("scroll", scheduleMeasure, { passive: true });
+
+    // The sidebar's own scroll container is the other thing that moves these
+    // rows. Listening on `window` in the *capture* phase would catch it, but
+    // would also re-measure every row on every scroll anywhere in the app —
+    // main content, drawers, tables — which is exactly the per-entry
+    // `getBoundingClientRect` cost `centerYRef` exists to avoid.
+    const scroller = elementRef.current?.closest("[data-sidebar-scroll]");
+    scroller?.addEventListener("scroll", scheduleMeasure, { passive: true });
 
     return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure);
+      scroller?.removeEventListener("scroll", scheduleMeasure);
     };
   });
 
