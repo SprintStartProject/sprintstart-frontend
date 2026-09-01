@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { motion, useDragControls, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
 import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -75,23 +75,6 @@ const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
 export const NEW_GROUP = "__new__";
 
 /**
- * The rest of the pile, showing under the card that is standing in for it.
- *
- * Real card edges rather than a hint of one: the same surface, border and shadow an actual card
- * wears, inset and pushed down so what you see below the top card is unmistakably *another card*.
- * This is what says "there is more here" — a caption saying so underneath was the board explaining
- * a picture it should simply have drawn properly.
- *
- * Two edges at most, and they slide visibly further out when the pointer is over the card — that is
- * the moment somebody is deciding whether there is anything under it, and a pile that answers by
- * moving answers before they have read anything. The deepest stops at 28px, which is the room the
- * card's own bottom margin and the column's gap leave before it would lie on the next card. Past
- * two sheets the count on the chip says how deep it goes; a third only makes the card look like it
- * is sagging.
- *
- * They come first in the DOM and the card paints opaque over them, so only the offset shows.
- */
-/**
  * Everything on a card that already does something when it is clicked.
  *
  * The top card of a closed stack opens the pile — but these cards are full of controls, and a card
@@ -103,9 +86,28 @@ export const NEW_GROUP = "__new__";
 const INTERACTIVE_WITHIN_CARD =
   "a, button, input, select, textarea, label, [role='button'], [role='checkbox'], [role='link']";
 
+/**
+ * The rest of the pile, showing under the card that is standing in for it.
+ *
+ * Real card edges rather than a hint of one: the same surface, border and shadow an actual card
+ * wears, inset and pushed down so what you see below the top card is unmistakably *another card*.
+ *
+ * **Hovering fans them out.** That is the moment somebody is deciding whether there is anything
+ * under this card, and a pile that answers by moving answers before they have read a word. Three
+ * things move together, because sliding down alone just looked like the card had grown a border:
+ * they travel much further out, they *rotate* a little — loose sheets, not a stack of rectangles —
+ * and their shadow deepens, which is what sells them as sitting above the board rather than drawn
+ * on it. They rotate about their top edge, so the swing happens at the bottom where it is visible
+ * and the hidden top stays hidden behind the card.
+ *
+ * Two sheets at most. Past that the count on the chip says how deep it goes, and a third only makes
+ * the card look like it is sagging.
+ *
+ * They come first in the DOM and the card paints opaque over them, so only the offset shows.
+ */
 const STACK_EDGES = [
-  "inset-x-2 top-2 -bottom-2 motion-safe:group-hover/stack:-bottom-4",
-  "inset-x-5 top-4 -bottom-4 motion-safe:group-hover/stack:-bottom-7",
+  "inset-x-3 top-2 -bottom-2 motion-safe:group-hover/stack:-bottom-5 motion-safe:group-hover/stack:rotate-[1.2deg]",
+  "inset-x-6 top-4 -bottom-4 motion-safe:group-hover/stack:-bottom-8 motion-safe:group-hover/stack:rotate-[-2.2deg]",
 ];
 
 /**
@@ -752,9 +754,37 @@ export function BoardGrid({
           >
             {row.columns.map((column, columnIndex) => (
               <div key={columnIndex} className="space-y-4">
-                {column.map((block) => (
-                  <div key={block.key}>{renderBlock(block, indexOfBlock(block), false)}</div>
-                ))}
+                {/* A block that leaves fades out instead of being cut. Opening a pile swaps one
+                    block for another in the same slot, and without this the card was gone and the
+                    frame simply *there* — the crossfade is what makes it read as the same thing
+                    changing shape. `initial={false}` so a board arriving does not fade every card
+                    in behind the page's own entrance. */}
+                <AnimatePresence initial={false}>
+                  {column.map((block) => (
+                    <motion.div
+                      key={block.key}
+                      // Deliberately no `layout` here: the cells inside already carry
+                      // `layout="position"`, and a second projection wrapped around a card that
+                      // can be dragged is exactly the measurement fight the wiggle comment warns
+                      // about further down.
+                      initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      // The exit is deliberately quick and its own transition. A leaving block
+                      // still holds its space until it is gone, so a spring-length exit would have
+                      // the old card and the new frame both in the column for half a second and
+                      // the height would visibly overshoot and settle. Short enough that the two
+                      // read as a crossfade; the arrival keeps the app's spring.
+                      exit={{
+                        opacity: 0,
+                        ...(reduceMotion ? {} : { scale: 0.97 }),
+                        transition: { duration: 0.12, ease: "easeIn" },
+                      }}
+                      transition={centralSpringToken}
+                    >
+                      {renderBlock(block, indexOfBlock(block), false)}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             ))}
           </div>
@@ -789,8 +819,22 @@ type ExpandedStackProps = {
  * elsewhere.
  */
 function ExpandedStack({ stack, onCollapse, children }: ExpandedStackProps) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <section
+    <motion.section
+      // `layout` so the frame grows and shrinks with what is in it rather than jumping to its
+      // final height. Safe here in a way it is not around a card: nothing inside this is a drag
+      // target, so there is no hit-test being measured mid-animation.
+      layout
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{
+        opacity: 0,
+        ...(reduceMotion ? {} : { scale: 0.98 }),
+        transition: { duration: 0.12, ease: "easeIn" },
+      }}
+      transition={centralSpringToken}
       aria-label={`Sequence of ${stack.memberIds.length} cards`}
       // Read by the click-away handler: a press on this frame's header, padding or numbers is a
       // press *on the open pile*, not away from it. Without it, "Put back" would be caught as a
@@ -815,17 +859,26 @@ function ExpandedStack({ stack, onCollapse, children }: ExpandedStackProps) {
 
       {/* Numbered so the order survives being spread out. `tabular-nums` keeps a two-digit step
           from shifting its card a pixel left of the one above it. */}
+      {/* The cards arrive one after another rather than all at once. Four appearing on the same
+          frame is a pop; the same four arriving down the list is a pile being dealt out, which is
+          what just happened. 45ms apart — enough to read as a sequence, short enough that the last
+          one is not still on its way when the eye gets there. */}
       <ol className="space-y-4">
         {Children.map(children, (child, index) => (
-          <li className="flex min-w-0 items-start gap-2">
+          <motion.li
+            initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...centralSpringToken, delay: reduceMotion ? 0 : index * 0.045 }}
+            className="flex min-w-0 items-start gap-2"
+          >
             <span className="mt-4 w-4 shrink-0 text-right text-xs text-app-text-subtle tabular-nums">
               {index + 1}
             </span>
             <div className="min-w-0 flex-1">{child}</div>
-          </li>
+          </motion.li>
         ))}
       </ol>
-    </section>
+    </motion.section>
   );
 }
 
@@ -1096,9 +1149,9 @@ function BoardCardCell({
       onClick={handleStackClick}
       onPointerEnter={() => onHoverChange(true)}
       onPointerLeave={() => onHoverChange(false)}
-      // The extra bottom margin is the room the pile needs: the deepest edge sits 24px below the
-      // card, and the column's own 16px gap would otherwise have it lying on the next card.
-      className={`group/stack relative ${stack ? "mb-4 cursor-pointer" : ""} ${
+      // The extra bottom margin is the room the fan needs: hovered, the deepest sheet sits 32px
+      // below the card, and the column's own 16px gap alone would have it lying on the next one.
+      className={`group/stack relative ${stack ? "mb-6 cursor-pointer" : ""} ${
         isDragging ? "z-40 cursor-grabbing" : ""
       }`}
       style={isArranging ? { touchAction: "none" } : undefined}
@@ -1111,7 +1164,7 @@ function BoardCardCell({
           <div
             key={depth}
             aria-hidden="true"
-            className={`pointer-events-none absolute rounded-2xl border border-app-border bg-app-surface shadow-sm transition-[bottom] duration-200 ${edge}`}
+            className={`pointer-events-none absolute origin-top rounded-2xl border border-app-border bg-app-surface shadow-sm transition-all duration-200 ease-out group-hover/stack:shadow-lg ${edge}`}
           />
         ))}
 
