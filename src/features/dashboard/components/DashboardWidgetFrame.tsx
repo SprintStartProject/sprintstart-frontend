@@ -5,7 +5,7 @@ import { Button } from "../../../components/ui/Button";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
-import { DASHBOARD_SIZE_LABELS, dashboardCellClass } from "../layout/sizes";
+import { DASHBOARD_SIZE_LABELS, dashboardCellClass, dashboardRenderSize } from "../layout/sizes";
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetId,
@@ -13,14 +13,13 @@ import type {
 } from "../layout/types";
 
 /**
- * The tilt that says "this can be moved".
+ * How far apart two neighbouring cards start their tilt, in seconds.
  *
- * Under a degree, and every card starts at a different point in the cycle, so the board
- * shimmers rather than pulsing in lockstep. It stops the moment the pointer is over a card:
- * a moving target is hard to aim a 36px button at, and the card is already saying it can be
- * moved by the time you have reached it.
+ * Enough that the board shimmers rather than pulsing in lockstep, and modulo a small number
+ * so a long dashboard does not end up with cards a full cycle behind each other.
  */
-const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
+const WIGGLE_STAGGER_S = 0.09;
+const WIGGLE_STAGGER_GROUPS = 5;
 
 export type DashboardWidgetFrameProps = {
   definition: DashboardWidgetDefinition;
@@ -30,6 +29,15 @@ export type DashboardWidgetFrameProps = {
   total: number;
   isEditing: boolean;
   isDragging: boolean;
+  /**
+   * Whether the board is running as a single column (below `sm`).
+   *
+   * The placed size still decides the cell, but on one column every card is the full width of
+   * the page whatever it was given — so the *rendered* form is chosen for the column that is
+   * actually there rather than for the one the user picked on a desktop. See
+   * {@link dashboardRenderSize}.
+   */
+  isNarrow: boolean;
   onRemove: (id: DashboardWidgetId) => void;
   onResize: (id: DashboardWidgetId, size: DashboardWidgetSize) => void;
   onMoveBy: (id: DashboardWidgetId, offset: number) => void;
@@ -49,13 +57,13 @@ export type DashboardWidgetFrameProps = {
  * not navigate when it is being dragged. Everything editable lives in this frame, which is
  * what keeps the eleven widgets from each needing an edit mode of their own.
  *
- * **Two nested motion elements, deliberately.** The outer one is the grid cell: it does
- * `layout` and `drag`, and Framer measures it. The inner one carries the decoration — the
- * wiggle's rotation and the lift while dragging. They were on the same element until a card
- * kept coming back about 3% larger from every drag: `whileDrag`'s scale and the wiggle's
- * rotation both change an element's measured box, and a layout projection measured against a
- * scaled or rotated box stays wrong until the element is remounted. Decoration on a child
- * Framer does not measure cannot poison the measurement.
+ * **The decoration sits on a child, deliberately.** The outer element is the grid cell: it
+ * does `layout` and `drag`, and Framer measures it. Everything decorative — the edit-mode
+ * tilt, the lift while dragging — lives on the plain `div` inside it. They were on the same
+ * element until a card kept coming back about 3% larger from every drag: a scale or a
+ * rotation changes an element's measured box, and a layout projection measured against a
+ * transformed box stays wrong until the element is remounted. Decoration on a child Framer
+ * does not measure cannot poison the measurement.
  */
 export function DashboardWidgetFrame({
   definition,
@@ -64,6 +72,7 @@ export function DashboardWidgetFrame({
   total,
   isEditing,
   isDragging,
+  isNarrow,
   onRemove,
   onResize,
   onMoveBy,
@@ -79,7 +88,12 @@ export function DashboardWidgetFrame({
   // The controls appear on approach and stay for the keyboard: they are always mounted, so
   // Tab can reach them, and focusing one is what reveals it.
   const showControls = isPointerOver || isFocusWithin;
+
+  // The tilt stops the moment the pointer is over a card: a moving target is hard to aim a
+  // 36px button at, and the card has already said it can be moved by the time you reach it.
   const isWiggling = isEditing && !reduceMotion && !isPointerOver && !isDragging;
+
+  const renderSize = dashboardRenderSize(definition, size, isNarrow);
 
   return (
     <motion.div
@@ -107,14 +121,20 @@ export function DashboardWidgetFrame({
       )} relative ${isDragging ? "z-40" : ""}`}
       style={isEditing ? { touchAction: "none" } : undefined}
     >
-      <motion.div
-        animate={isWiggling ? WIGGLE : { rotate: 0 }}
-        transition={
+      {/* The tilt is a CSS animation on a plain element, not a Framer keyframe loop on a
+                motion one. Two reasons, and the second is the bug the customer reported: Framer
+                measures the outer cell, so decoration that changes an element's box has to live
+                on a child it does not measure -- and an infinitely repeating `animate` target
+                that is swapped out mid-cycle does not reliably settle, which is why a card could
+                still be wiggling after "Done" until the page was reloaded. Removing a class
+                cannot get stuck. */}
+      <div
+        className={`h-full ${isWiggling ? "app-widget-wiggle" : ""}`}
+        style={
           isWiggling
-            ? { duration: 0.6, repeat: Infinity, ease: "easeInOut", delay: (index % 5) * 0.08 }
-            : centralSpringToken
+            ? { animationDelay: `${(index % WIGGLE_STAGGER_GROUPS) * WIGGLE_STAGGER_S}s` }
+            : undefined
         }
-        className="h-full"
       >
         <SpotlightCard
           roundedClassName="rounded-3xl"
@@ -123,17 +143,20 @@ export function DashboardWidgetFrame({
           }`}
         >
           <div className={`h-full ${isEditing ? "pointer-events-none select-none" : ""}`}>
-            {definition.render(size)}
+            {definition.render(renderSize)}
           </div>
         </SpotlightCard>
-      </motion.div>
+      </div>
 
       {isEditing && (
         <div
           data-widget-controls
           // Keeps a press on the controls from also grabbing the card underneath.
           onPointerDownCapture={(event) => event.stopPropagation()}
-          className={`absolute -top-4 right-4 z-50 flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface-muted p-1.5 shadow-lg transition-opacity duration-150 ${
+          // `right-2` on a phone: at the desktop inset the bar's own width plus the gutter ran
+          // past the left edge of a single-column card, which put the grip and the move
+          // buttons off screen.
+          className={`absolute -top-4 right-2 z-50 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-full border border-app-border bg-app-surface-muted p-1.5 shadow-lg transition-opacity duration-150 sm:right-4 sm:max-w-none ${
             showControls ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
@@ -171,7 +194,7 @@ export function DashboardWidgetFrame({
                 label: DASHBOARD_SIZE_LABELS[option],
               }))}
               onChange={(next) => onResize(definition.id, next)}
-              className="w-32"
+              className="w-24 sm:w-32"
             />
           )}
 
