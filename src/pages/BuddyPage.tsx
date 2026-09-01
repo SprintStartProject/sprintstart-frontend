@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Inbox, LayoutDashboard, MessageSquarePlus, Sparkles, Users, X } from "lucide-react";
 import { SleepyBot } from "../features/chatbot/components/SleepyBot";
 import { Button } from "../components/ui/Button";
+import { AssistantSurfaceSwitch } from "../components/common/AssistantSurfaceSwitch";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -121,7 +122,9 @@ function BuddyPageShell({
           {/* The same `app-page-frame` gutters the header band of every other page uses, so the
                     buddy's name starts on the line the PM dashboard's and the knowledge base's
                     titles start on. */}
-          <div className="app-page-frame flex items-center gap-3 py-4">
+          {/* `flex-wrap`, so the switch below can take a line of its own on a phone rather than
+                    squeezing the buddy's name to nothing. */}
+          <div className="app-page-frame flex flex-wrap items-center gap-3 py-4">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
               <SleepyBot size={32} canSleep={false} tracksPointer className="text-app-brand-text" />
             </span>
@@ -130,6 +133,14 @@ function BuddyPageShell({
               <h1 className="text-base leading-tight font-semibold text-app-text">Buddy</h1>
               <p className="truncate text-xs text-app-text-muted">{subtitle}</p>
             </div>
+
+            {/* The way back to the chat, in the same place it sits on the chat's own page. Its
+                        own line under the title on a phone, where the header already holds a name,
+                        two or three controls and a close button. */}
+            <AssistantSurfaceSwitch
+              current="buddy"
+              className="order-last w-full sm:order-none sm:w-auto [&>button]:grow sm:[&>button]:grow-0"
+            />
 
             <div className="flex shrink-0 items-center gap-1.5">
               {actions}

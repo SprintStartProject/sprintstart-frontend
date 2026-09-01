@@ -14,6 +14,7 @@ import { CitationPopover } from "../features/chatbot/components/CitationPopover.
 import { ChatEmptyState } from "../features/chatbot/components/ChatEmptyState.tsx";
 import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { AssistantSurfaceSwitch } from "../components/common/AssistantSurfaceSwitch.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
@@ -416,6 +417,17 @@ export function ChatPage() {
             subtitle="Ask questions about project knowledge, code, documentation and onboarding."
             hideSubtitleBelow="md"
             className="flex-1"
+            // The way to the buddy, in the same place it sits on the buddy's own page. In
+            // `PageHeader`'s actions rather than a bar of its own, because the chat is a
+            // fixed-height column: a second band would come out of the transcript's height on
+            // every screen to say something that fits beside the title. The header stacks its
+            // actions below the title on a phone, which is where the stretched pills come from.
+            actions={
+              // `mr-14` for exactly as long as the floating sidebar toggle exists (below `md`):
+              // that button is fixed to the top-right corner *over* this header, and without
+              // the gap it would sit on top of the "Buddy" half of the switch.
+              <AssistantSurfaceSwitch current="chat" className="mr-14 md:mr-0" />
+            }
           />
         </div>
 

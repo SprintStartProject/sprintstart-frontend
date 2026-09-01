@@ -4,6 +4,13 @@ import { describe, it, expect, vi } from "vitest";
 import { BuddyConversation } from "../../../../src/features/buddy/components/BuddyConversation";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 
+vi.mock("../../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
+
 function renderConversation(overrides: {
   messages?: BuddyMessageView[];
   isThinking?: boolean;

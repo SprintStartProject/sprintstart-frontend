@@ -56,12 +56,16 @@ export function ReasoningPanel({ reasoning, isStreaming, hasAnswer }: ReasoningP
   const bodyRef = useRef<HTMLDivElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
 
-  // The thinking is over — fold it away. Guarded on the reader not having decided for
-  // themselves, and written as an effect rather than derived state because it must happen
-  // exactly once, on the transition, and stay undone if they reopen it afterwards.
-  useEffect(() => {
-    if (hasAnswer && !isReaderControlled) setIsOpen(false);
-  }, [hasAnswer, isReaderControlled]);
+  /** Whether the answer has ever arrived, so the fold below happens once and not every render. */
+  const [answerSeen, setAnswerSeen] = useState(hasAnswer);
+
+  // The thinking is over — fold it away. React's documented "adjust state when a prop changes"
+  // pattern, a guarded setState during render rather than an effect: it has to happen on the
+  // transition and stay undone if the reader opens the panel again afterwards.
+  if (!answerSeen && hasAnswer) {
+    setAnswerSeen(true);
+    if (!isReaderControlled) setIsOpen(false);
+  }
 
   // Follow the newest line while it is being written. `scrollTop` rather than
   // `scrollIntoView`: the latter scrolls every ancestor too, which would drag the whole

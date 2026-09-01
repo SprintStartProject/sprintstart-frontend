@@ -7,6 +7,13 @@ import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 
 const projectState = { selectedProjectId: "p1" };
 
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
+
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
   streamOpenBuddy: vi.fn((handlers: { onToken: (token: string) => void; onDone: () => void }) => {

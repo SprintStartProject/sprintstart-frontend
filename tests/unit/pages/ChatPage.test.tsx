@@ -155,17 +155,24 @@ describe("ChatPage", () => {
     expect(mockHandleSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("does not render Thought Process block when assistant message has no reasoning", () => {
+  it("does not render the thought process block when assistant message has no reasoning", () => {
     render(
       <MemoryRouter>
         <ChatPage />
       </MemoryRouter>,
     );
 
-    expect(screen.queryByText("Thought Process")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thought process")).not.toBeInTheDocument();
   });
 
-  it("shows the Thought Process block when an assistant message has reasoning", () => {
+  /**
+   * A turn that already has its answer is a finished turn, and its reasoning is the working
+   * rather than the result — so the panel is there and folded, one click from being read. This
+   * is the rule that stops a long chain of thought becoming the whole chat window; see
+   * `ReasoningPanel`.
+   */
+  it("folds the thought process away once the answer is there, and opens on request", async () => {
+    const user = userEvent.setup();
     mockChatState.messages = [
       ...mockChatState.messages,
       {
@@ -182,7 +189,13 @@ describe("ChatPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Thought Process")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /Thought process/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Let me think...")).not.toBeInTheDocument();
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Let me think...")).toBeInTheDocument();
   });
 });
