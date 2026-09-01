@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Inbox, Sparkles, Users } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -8,6 +8,7 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
+import { useNewConversationShortcut } from "../hooks/useNewConversationShortcut";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
@@ -128,6 +129,7 @@ function BuddyMentorHome() {
     openError,
     ensureOpened,
     retryOpen,
+    startFreshVisit,
   } = useBuddySession();
 
   // The same conversation the dock shows, brought on screen the same way. It used to open a
@@ -157,6 +159,15 @@ function BuddyMentorHome() {
   useHandedOffDraft(setDraft);
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
+
+  // Memoised so the listener is bound once rather than torn down and rebuilt on every token
+  // that arrives while the buddy is answering.
+  const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
+
+  // The keyboard half of the control in the visit divider. Gated the same way that control is:
+  // a visit nobody has spoken in is already the fresh one, and re-opening it would only replay
+  // the greeting.
+  useNewConversationShortcut(startFresh, hasUserMessage);
 
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
@@ -221,6 +232,7 @@ function BuddyMentorHome() {
         renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
         openError={openError}
         onRetryOpen={() => void retryOpen()}
+        onStartFreshVisit={startFresh}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question

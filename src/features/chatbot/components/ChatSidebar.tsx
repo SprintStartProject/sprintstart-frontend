@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
+import { ShortcutHint } from "../../../components/ui/ShortcutHint";
+import { NEW_CONVERSATION_CHORD } from "../../../hooks/useNewConversationShortcut";
 import { useToast } from "../../../context/useToast";
 import { parseApiError } from "../../../services/apiError";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -89,11 +91,13 @@ export function ChatSidebar({ chats, setSidebarOpen, onDeleteChat }: ChatSidebar
           to="/chat"
           state={{ newChat: true }}
           data-testid="chat-new"
-          className="flex items-center justify-center gap-2 rounded-lg bg-app-brand p-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          title={`New chat (${NEW_CONVERSATION_CHORD})`}
+          className="group flex items-center justify-center gap-2 rounded-lg bg-app-brand p-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
           onClick={() => setSidebarOpen(false)}
         >
           <Plus size={18} />
           New Chat
+          <ShortcutHint keys={NEW_CONVERSATION_CHORD} className="border-white/40" />
         </NavLink>
 
         {chats.length > 0 && (

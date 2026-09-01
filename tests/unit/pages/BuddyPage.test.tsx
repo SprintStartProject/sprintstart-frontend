@@ -162,7 +162,7 @@ describe("BuddyPage", () => {
    * `buddy_messages` and the buddy's durable memory note, which the next greeting is written
    * from, is untouched.
    */
-  it("starts a fresh visit without losing what the buddy has learned", async () => {
+  it("starts a fresh visit from the divider, without losing what the buddy has learned", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -175,13 +175,37 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /New chat/ }));
+    // The control lives on the line that already says "everything above here is the last
+    // conversation", so it only exists once there is such a line.
+    await user.click(await screen.findByTestId("buddy-clear-previous"));
 
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
     // The greeting is re-requested, which is what opens the new visit server-side.
     expect(streamOpenBuddy).toHaveBeenCalled();
+  });
+
+  /**
+   * `Alt+N` rather than `Ctrl+N`, which every desktop browser owns. It fires while the composer
+   * has focus on purpose — halfway through typing into the wrong conversation is exactly when
+   * somebody reaches for it.
+   */
+  it("starts a fresh visit on Alt+N", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
   });
 
   /**

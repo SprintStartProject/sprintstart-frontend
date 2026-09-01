@@ -1,7 +1,8 @@
 import { Fragment } from "react";
 import type { ReactNode } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { NEW_CONVERSATION_CHORD } from "../../../hooks/useNewConversationShortcut";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
@@ -44,6 +45,16 @@ type BuddyThreadProps = {
   openError?: string | null;
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
+  /**
+   * Clears the conversation above the visit divider and opens a clean one.
+   *
+   * Offered from the divider itself rather than from a button in the page header, because the
+   * divider is the one place on screen that already means "everything above here is the last
+   * conversation" — a control that tidies exactly that belongs on the line that says so, and
+   * nowhere else. Which is also why it is only ever drawn when there *is* a divider: a visit
+   * with nothing above it is already the fresh one.
+   */
+  onStartFreshVisit?: () => void;
 };
 
 /**
@@ -70,6 +81,7 @@ export function BuddyThread({
   renderQuestionAction,
   openError,
   onRetryOpen,
+  onStartFreshVisit,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens.
@@ -124,7 +136,24 @@ export function BuddyThread({
             {message.startsVisit && (
               <div className="flex items-center gap-3 py-1">
                 <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-                <span className="text-xs font-medium text-app-text-muted">New conversation</span>
+
+                <span className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-app-text-muted">New conversation</span>
+
+                  {onStartFreshVisit && (
+                    <button
+                      type="button"
+                      onClick={onStartFreshVisit}
+                      data-testid="buddy-clear-previous"
+                      aria-label="Clear the earlier conversation"
+                      title={`Clear the earlier conversation (${NEW_CONVERSATION_CHORD})`}
+                      className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
+
                 <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
               </div>
             )}

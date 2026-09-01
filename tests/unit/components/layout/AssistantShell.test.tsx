@@ -3,21 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AssistantShell } from "../../../../src/components/layout/AssistantShell";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
 
 function renderShell(at: string) {
   return render(
     <MemoryRouter initialEntries={[at]}>
-      {/* The header carries the buddy's "New chat", which reads the one shared conversation. */}
-      <BuddyProvider>
-        <Routes>
-          <Route element={<AssistantShell />}>
-            <Route path="/chat" element={<p>the chat surface</p>} />
-            <Route path="/chat/:id" element={<p>the chat surface</p>} />
-            <Route path="/buddy" element={<p>the buddy surface</p>} />
-          </Route>
-        </Routes>
-      </BuddyProvider>
+      <Routes>
+        <Route element={<AssistantShell />}>
+          <Route path="/chat" element={<p>the chat surface</p>} />
+          <Route path="/chat/:id" element={<p>the chat surface</p>} />
+          <Route path="/buddy" element={<p>the buddy surface</p>} />
+        </Route>
+      </Routes>
     </MemoryRouter>,
   );
 }

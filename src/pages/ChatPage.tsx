@@ -1,6 +1,7 @@
 import { MessageSquareText, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
@@ -17,6 +18,7 @@ import { ArtifactViewerDrawer } from "../features/knowledge-base/components/Arti
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
 import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
+import { useNewConversationShortcut } from "../hooks/useNewConversationShortcut.ts";
 
 import "katex/dist/katex.min.css";
 
@@ -328,6 +330,17 @@ export function ChatPage() {
     [],
   );
   const profileFallbackName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : "User";
+
+  // The keyboard half of the sidebar's "New Chat" — the same navigation, `state.newChat` and
+  // all, because that flag is what stops `useChat` redirecting straight back into the most
+  // recent conversation.
+  const navigate = useNavigate();
+  const startNewChat = useCallback(
+    () => void navigate("/chat", { state: { newChat: true } }),
+    [navigate],
+  );
+
+  useNewConversationShortcut(startNewChat);
 
   return (
     // No height of its own any more: the page is a panel inside `AssistantShell`, which owns

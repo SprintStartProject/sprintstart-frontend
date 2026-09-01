@@ -30,6 +30,8 @@ type BuddyConversationProps = {
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
+  /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
+  onStartFreshVisit?: () => void;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
 };
@@ -70,6 +72,7 @@ export function BuddyConversation({
   aboveComposer,
   openError,
   onRetryOpen,
+  onStartFreshVisit,
   focusComposerOnMount = false,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
@@ -95,6 +98,7 @@ export function BuddyConversation({
             renderQuestionAction={renderQuestionAction}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            onStartFreshVisit={onStartFreshVisit}
           />
         </div>
       </div>

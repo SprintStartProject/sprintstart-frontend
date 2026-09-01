@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ChatPage } from "../../../src/pages/ChatPage";
 import type { ChatMessage } from "../../../src/features/chatbot/types";
 
@@ -153,6 +153,28 @@ describe("ChatPage", () => {
     const sendButton = screen.getByRole("button", { name: "Send message" });
     await user.click(sendButton);
     expect(mockHandleSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * `Alt+N`, not `Ctrl+N`: every desktop browser owns that one and opens a window with it, and
+   * a page cannot refuse. `state.newChat` rides along because that flag is what stops `useChat`
+   * redirecting straight back into the most recent conversation.
+   */
+  it("starts a new chat on Alt+N", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/chat/chat1"]}>
+        <Routes>
+          <Route path="/chat/:id" element={<ChatPage />} />
+          <Route path="/chat" element={<p>the new chat</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    expect(await screen.findByText("the new chat")).toBeInTheDocument();
   });
 
   it("does not render the thought process block when assistant message has no reasoning", () => {

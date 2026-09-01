@@ -5,7 +5,6 @@ import { PageHeader } from "./PageHeader";
 import { SlidingTabPanel } from "../ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../../hooks/useHorizontalWheelNavigation";
 import { AssistantSurfaceSwitch } from "../common/AssistantSurfaceSwitch";
-import { BuddyNewChatAction } from "../../features/buddy/components/BuddyNewChatAction";
 import {
   ASSISTANT_SURFACES,
   ASSISTANT_SURFACE_ROUTES,
@@ -76,16 +75,10 @@ export function AssistantShell() {
             // the line with the least to say — so it is also the one that makes room for the
             // switch rather than pushing the conversation further down.
             hideSubtitleBelow="md"
-            actions={
-              <>
-                {/* Page-level actions belong beside the switch, the way "Edit dashboard" sits
-                    beside the dashboard's title. Mounted only for the half it belongs to —
-                    which is also what keeps the chat from subscribing to a conversation that
-                    streams in the corner window of every other page. */}
-                {surface === "buddy" && <BuddyNewChatAction />}
-                <AssistantSurfaceSwitch current={surface} />
-              </>
-            }
+            // The switch and nothing else. This header is the one thing both halves share, so
+            // anything that belongs to only one of them belongs in that half — a control that
+            // appeared and vanished as you crossed would undo what the shared header is for.
+            actions={<AssistantSurfaceSwitch current={surface} />}
           />
         </div>
       </header>
