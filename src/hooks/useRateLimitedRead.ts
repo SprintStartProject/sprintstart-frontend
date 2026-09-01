@@ -55,7 +55,14 @@ export function useRateLimitedRead<T>(
   fallback: T,
   { key, enabled, refreshKey, nonce = 0 }: RateLimitedReadOptions,
 ): T {
-  const [value, setValue] = useState<T>(fallback);
+  // The key the value in hand actually answers for. Without it, a value read for
+  // one key goes on being served while the next key's read is in flight -- which
+  // as a boolean dot was invisible, and as a number is a confident wrong answer
+  // about the wrong thing.
+  const [answer, setAnswer] = useState<{ key: string | null; value: T }>({
+    key: null,
+    value: fallback,
+  });
   // Bumped on tab focus. Unlike `nonce` this only *asks* for a check and still
   // respects the rate limit, since nothing is known to have changed.
   const [revalidateNonce, setRevalidateNonce] = useState(0);
@@ -128,11 +135,11 @@ export function useRateLimitedRead<T>(
         if (!active) return;
 
         applied = true;
-        setValue(next);
+        setAnswer({ key, value: next });
       } catch {
         if (!active) return;
         applied = true;
-        setValue(fallback);
+        setAnswer({ key, value: fallback });
       }
     };
 
@@ -156,7 +163,9 @@ export function useRateLimitedRead<T>(
   }, [key, isActive, refreshKey, nonce, revalidateNonce]);
 
   // Gated on read rather than reset in the effect: somebody who cannot see the
-  // thing, or a session with no key, must never be shown a stale answer, and
-  // this keeps that rule out of the async path entirely.
-  return isActive ? value : fallback;
+  // thing, a session with no key, or a key whose answer has not arrived yet must
+  // never be shown somebody else's number, and this keeps that rule out of the
+  // async path entirely -- no reset-on-change effect, and so no render where the
+  // previous key's value is still on screen.
+  return isActive && answer.key === key ? answer.value : fallback;
 }

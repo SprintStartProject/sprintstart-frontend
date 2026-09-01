@@ -38,7 +38,8 @@ vi.mock("../../../../src/context/useAuth", () => ({
 // hit the network, and asserted on below: the sidebar renders twice at once,
 // so "who owns the request" is a thing this suite has to keep honest.
 vi.mock("../../../../src/services/knowledgeRequestService", () => ({
-  knowledgeRequestService: { listOpen: vi.fn() },
+  knowledgeRequestService: { countOpen: vi.fn() },
+  onOpenEscalationsChanged: () => () => {},
 }));
 
 const mockProfile = {
@@ -354,23 +355,19 @@ describe("SideBar", () => {
       });
     };
 
-    it("reads the queue once for both sidebars", async () => {
+    it("counts once for both sidebars", async () => {
       asPm();
-      vi.mocked(knowledgeRequestService.listOpen).mockResolvedValue([]);
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
 
       renderWithProviders(<SideBar />);
 
-      await waitFor(() => expect(knowledgeRequestService.listOpen).toHaveBeenCalled());
-      expect(knowledgeRequestService.listOpen).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(knowledgeRequestService.countOpen).toHaveBeenCalled());
+      expect(knowledgeRequestService.countOpen).toHaveBeenCalledTimes(1);
     });
 
     it("puts the number on the Escalation Inbox entry", async () => {
       asPm();
-      vi.mocked(knowledgeRequestService.listOpen).mockResolvedValue([
-        { id: "r1" },
-        { id: "r2" },
-        { id: "r3" },
-      ] as never);
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(3);
 
       renderWithProviders(<SideBar />);
 
@@ -390,7 +387,7 @@ describe("SideBar", () => {
 
       renderWithProviders(<SideBar />);
 
-      expect(knowledgeRequestService.listOpen).not.toHaveBeenCalled();
+      expect(knowledgeRequestService.countOpen).not.toHaveBeenCalled();
     });
   });
 });
