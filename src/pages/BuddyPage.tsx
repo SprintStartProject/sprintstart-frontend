@@ -3,6 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Inbox, Sparkles, Users } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
+import {
+  ConversationRail,
+  RailToggle,
+  RAIL_DESKTOP_QUERY,
+} from "../components/layout/ConversationRail";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
@@ -14,6 +20,42 @@ import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
 import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
+
+/**
+ * Names the rail for assistive tech and labels the control that reopens it.
+ *
+ * One constant, because those two have to say the same thing: `aria-controls` points the
+ * second at the first, and a screen reader that announced two different names for one region
+ * would be describing two things that do not exist.
+ */
+const PM_REPLIES_LABEL = "What you sent to your PM";
+
+/**
+ * Where the rail's collapsed state lives between visits, next to the chat's own
+ * (`chatSidebarOpen`) and for the same reason: it is a statement about how much room this
+ * window has to spare, not about a conversation or a user.
+ */
+const RAIL_OPEN_KEY = "buddyPmRepliesOpen";
+
+/** `null` when the hire has never said either way — see the auto-open in `BuddyMentorHome`. */
+function readRailOpen(): boolean | null {
+  try {
+    const stored = localStorage.getItem(RAIL_OPEN_KEY);
+
+    return stored === null ? null : stored === "true";
+  } catch {
+    // Private modes can refuse storage outright. Not a reason to fail to render a rail.
+    return null;
+  }
+}
+
+function writeRailOpen(open: boolean): void {
+  try {
+    localStorage.setItem(RAIL_OPEN_KEY, String(open));
+  } catch {
+    // Nothing to do: the rail still opens and closes, it just will not be remembered.
+  }
+}
 
 /**
  * The buddy's home: the hire's onboarding front door, as one conversation.
@@ -48,14 +90,17 @@ import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestion
  * to scroll back to in order to answer.
  */
 function BuddyPageShell({
-  actions,
   rail,
+  railToggle,
+  isRailOpen = false,
   children,
 }: {
-  /** Controls that only make sense once there is a conversation — a fresh start, mainly. */
-  actions?: ReactNode;
-  /** The left column, when the page has one open. */
+  /** The standing column beside the conversation — see `ConversationRail`. */
   rail?: ReactNode;
+  /** What brings it back when it is closed. Positioned by the rail's own control. */
+  railToggle?: ReactNode;
+  /** Whether that column is currently taking width, which decides this column's left gutter. */
+  isRailOpen?: boolean;
   children: ReactNode;
 }) {
   // Tells the dock's hand-off that the page is really on screen, so it can stop standing in
@@ -67,41 +112,18 @@ function BuddyPageShell({
   }, []);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-app-bg xl:flex-row">
-      {/* A column beside the conversation where there is room for one, a band above it where
-                there is not — one element either way, laid out by the parent's direction.
-                Rendering it twice and hiding one per breakpoint would put the same answers in the
-                document twice, which is a duplicate to anything that reads the page rather than
-                looks at it.
-
-                Deliberately not hidden below `xl`: this is where a hire reads the answer their PM
-                sent, and putting it out of reach on a laptop would quietly break the promise
-                `FlagToPmButton` makes. */}
-      {rail && (
-        <aside
-          aria-label="Questions you sent to your PM"
-          className="max-h-[45vh] shrink-0 overflow-y-auto border-b border-app-border bg-app-bg-soft xl:max-h-none xl:w-80 xl:border-r xl:border-b-0"
-        >
-          {rail}
-        </aside>
-      )}
+    <div className="flex min-h-0 flex-1 bg-app-bg">
+      {rail}
 
       {/* `app-rail-open` collapses this column's left gutter, so the rail opens *into* the empty
                 gutter instead of shoving the conversation right. The separating space belongs
                 before the `${'{'}` — prettier-plugin-tailwindcss trims class strings when it sorts
                 them, and gluing two classes together here once turned a whole page into a flex
                 row (see ChatPage). */}
-      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${rail ? "app-rail-open" : ""}`}>
-        {/* Only what belongs to this conversation and nowhere else. The title, the switch and
-                    "New chat" are the shell's; the board is in the app sidebar. What is left is
-                    the PM's answers, which appear only once a PM has sent one — so most visits
-                    have no row here at all, and the conversation starts straight under the page
-                    header. */}
-        {actions && (
-          <div className="app-page-frame flex shrink-0 flex-wrap items-center justify-end gap-1.5 pt-3">
-            {actions}
-          </div>
-        )}
+      <div
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${isRailOpen ? "app-rail-open" : ""}`}
+      >
+        {railToggle}
 
         {children}
       </div>
@@ -141,19 +163,34 @@ function BuddyMentorHome() {
   const suggestions = useBuddySuggestions();
   const replies = usePmReplies();
 
-  // Open when there is an answer waiting, closed otherwise. `FlagToPmButton` promises the hire
-  // that the answer "will show up here", and a reply sitting behind a control they have to find
-  // does not keep that promise. A rail holding nothing but "still waiting" has nothing to say
-  // that the toggle's own count does not, so it stays out of the way.
-  const [isRailOpen, setIsRailOpen] = useState(false);
-  const [railDecided, setRailDecided] = useState(false);
-  if (!railDecided && replies.hasAny) {
+  // Below `md` the rail is a drawer over the conversation, so it must never open by itself
+  // there — the auto-open below is a desktop courtesy, not a takeover.
+  const isDesktop = useMediaQuery(RAIL_DESKTOP_QUERY);
+
+  const [rail, setRail] = useState(() => {
+    const stored = readRailOpen();
+
+    return { open: stored ?? false, decided: stored !== null };
+  });
+
+  // Open when there is an answer waiting, closed otherwise — but only until the hire says
+  // otherwise, and never again after that. `FlagToPmButton` promises them the answer "will show
+  // up here", and a reply sitting behind a control they have to find does not keep that
+  // promise; a rail holding nothing but "still waiting" has nothing to say that the toggle's
+  // own count does not.
+  if (!rail.decided && replies.hasAny) {
     // React's documented "adjust state when a prop changes" pattern — a guarded setState during
     // render rather than an effect, so the first paint already has the right layout instead of
     // showing the closed one and shifting.
-    setRailDecided(true);
-    setIsRailOpen(replies.answered.length > 0);
+    setRail({ open: isDesktop && replies.answered.length > 0, decided: true });
   }
+
+  // Their choice is written through as they make it, the way the chat's own rail remembers
+  // being collapsed. Not inside the updater: React may run one twice.
+  const setRailOpen = useCallback((open: boolean) => {
+    writeRailOpen(open);
+    setRail({ open, decided: true });
+  }, []);
 
   // Whatever they were typing in the dock when they asked for more room.
   useHandedOffDraft(setDraft);
@@ -176,29 +213,28 @@ function BuddyMentorHome() {
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
     <BuddyPageShell
+      isRailOpen={rail.open}
       rail={
-        isRailOpen ? (
-          <BuddyPmReplies {...replies} onClose={() => setIsRailOpen(false)} />
+        // Mounted whenever the hire has ever escalated something, open or not: the count on the
+        // control that reopens it is read from the same list the rail is showing, and a rail
+        // that unmounted would lose its scroll position every time it was put away.
+        replies.hasAny ? (
+          <ConversationRail id="buddy-pm-replies" isOpen={rail.open} label={PM_REPLIES_LABEL}>
+            <BuddyPmReplies {...replies} onClose={() => setRailOpen(false)} />
+          </ConversationRail>
         ) : undefined
       }
-      actions={
-        // Only offered when there is something behind it: a toggle that opens an empty panel is
-        // worse than no toggle. Starting a fresh visit is a page-level action and lives in the
-        // header with the switch — see `BuddyNewChatAction`.
-        replies.hasAny ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-expanded={isRailOpen}
+      railToggle={
+        // Only offered when there is something behind it: a control that opens an empty panel
+        // is worse than no control.
+        replies.hasAny && !rail.open ? (
+          <RailToggle
+            label={PM_REPLIES_LABEL}
+            controls="buddy-pm-replies"
             icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
-            title="What you sent to your PM"
-            onClick={() => setIsRailOpen((open) => !open)}
-          >
-            PM replies
-            <span className="ml-1 rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text">
-              {replies.answered.length + replies.waiting.length + replies.dismissed.length}
-            </span>
-          </Button>
+            count={replies.answered.length + replies.waiting.length + replies.dismissed.length}
+            onClick={() => setRailOpen(true)}
+          />
         ) : undefined
       }
     >
@@ -233,6 +269,7 @@ function BuddyMentorHome() {
         openError={openError}
         onRetryOpen={() => void retryOpen()}
         onStartFreshVisit={startFresh}
+        hasFloatingControl={replies.hasAny && !rail.open}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question

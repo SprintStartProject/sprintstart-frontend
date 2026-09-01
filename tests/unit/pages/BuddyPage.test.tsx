@@ -110,6 +110,9 @@ function renderPage() {
 describe("BuddyPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The rail's collapsed state is remembered per browser, so one test's choice would
+    // otherwise decide the next one's starting layout.
+    window.localStorage.clear();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     projectState.selectedProjectId = "p1";
     // `clearAllMocks` drops the module mock's resolved values too, so the default — an empty
@@ -209,27 +212,47 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * The rail and its toggle were both `hidden … xl:*`, which put a hire on anything narrower
-   * than 1280px out of reach of their PM's answer entirely — the one thing `FlagToPmButton`
-   * promises will show up here. jsdom computes no layout, so this asserts the contract that
-   * carries it: the toggle is not breakpoint-gated, and the replies have a placement that
-   * survives below `xl`.
+   * The rail and its toggle were both `hidden … xl:*` once, which put a hire on anything
+   * narrower than 1280px out of reach of their PM's answer entirely — the one thing
+   * `FlagToPmButton` promises will show up here. It works like the chat's history rail now: a
+   * column beside the conversation from `md` up, a drawer over it below that, one element
+   * either way. jsdom computes no layout, so this asserts the contract that carries it —
+   * neither piece is gated on a breakpoint.
    */
   it("keeps the PM's answer reachable on a narrow screen", async () => {
+    const user = userEvent.setup();
     renderPage();
 
-    // Neither the rail nor the control that opens it may be gated on a breakpoint.
     const toggle = await screen.findByTitle("What you sent to your PM");
     expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
 
-    const rail = await screen.findByRole("complementary", {
-      name: "Questions you sent to your PM",
-    });
-    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+    await user.click(toggle);
 
-    // Open by itself, because an answer is waiting — and present exactly once. Laying it out
-    // twice and hiding one per breakpoint would put the same answer in the document twice.
-    expect(screen.getByText("Ask in #platform.")).toBeInTheDocument();
+    const rail = await screen.findByRole("complementary", { name: "What you sent to your PM" });
+    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+  });
+
+  /**
+   * The same preference the chat's rail keeps, for the same reason: it says how much room this
+   * window has to spare. Until the hire says either way the rail decides for itself — closed
+   * here, because jsdom reports a viewport below `md`, where the rail is a drawer and opening
+   * itself over the conversation would be a takeover rather than a courtesy.
+   */
+  it("remembers the rail being opened", async () => {
+    const user = userEvent.setup();
+    const first = renderPage();
+
+    await user.click(await screen.findByTitle("What you sent to your PM"));
+    expect(
+      await screen.findByRole("complementary", { name: "What you sent to your PM" }),
+    ).toBeInTheDocument();
+
+    first.unmount();
+    renderPage();
+
+    expect(
+      await screen.findByRole("complementary", { name: "What you sent to your PM" }),
+    ).toBeInTheDocument();
   });
 
   it("opens the mentor for a hire on a project", async () => {
