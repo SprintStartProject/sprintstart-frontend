@@ -111,6 +111,30 @@ describe("useChat", () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
+  /**
+   * Collapsing the conversation rail is a statement about how much room this window has to
+   * spare, and it survived exactly until the next reload. It is remembered per browser rather
+   * than per chat or per user for the same reason: it is about the window, not the content.
+   */
+  it("remembers the conversation rail being collapsed", () => {
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    expect(result.current.desktopSidebarOpen).toBe(true);
+
+    act(() => result.current.setDesktopSidebarOpen(false));
+
+    expect(result.current.desktopSidebarOpen).toBe(false);
+
+    // A fresh mount, the way a reload arrives.
+    const reopened = renderHook(() => useChat(), { wrapper });
+
+    expect(reopened.result.current.desktopSidebarOpen).toBe(false);
+
+    act(() => reopened.result.current.setDesktopSidebarOpen(true));
+
+    expect(renderHook(() => useChat(), { wrapper }).result.current.desktopSidebarOpen).toBe(true);
+  });
+
   it("fetches chats and user profile on mount", async () => {
     server.use(
       http.get("/api/v1/chats/me", () =>

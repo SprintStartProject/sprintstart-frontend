@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
+import { AssistantShell } from "../../../src/components/layout/AssistantShell";
 
 const projectState = { selectedProjectId: "p1" };
 
@@ -12,7 +13,6 @@ vi.mock("../../../src/context/useAuth", () => ({
     profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
   }),
 }));
-
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
@@ -90,9 +90,18 @@ function renderPage() {
     <MemoryRouter initialEntries={["/buddy"]}>
       {/* The conversation belongs to the provider, not to the page — the page is one of two
                 views of it. Rendering the page without one is not a supported arrangement, and
-                `useBuddySession` says so rather than quietly making a second conversation. */}
+                `useBuddySession` says so rather than quietly making a second conversation.
+
+                Under `AssistantShell`, because that is the arrangement the app runs: the page
+                is a panel inside a layout route that owns the header, the switch between the
+                two assistants, and "New chat". Testing the page bare would leave the controls
+                it depends on untested from either side. */}
       <BuddyProvider>
-        <BuddyPage />
+        <Routes>
+          <Route element={<AssistantShell />}>
+            <Route path="/buddy" element={<BuddyPage />} />
+          </Route>
+        </Routes>
       </BuddyProvider>
     </MemoryRouter>,
   );
@@ -285,31 +294,6 @@ describe("BuddyPage", () => {
     renderPage();
 
     expect(await screen.findByText("Find me a task")).toBeInTheDocument();
-  });
-
-  /**
-   * Closing a conversation should put you back where you were, not on a page you never chose.
-   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload onto
-   * `/buddy`, or a link from outside — where stepping back would leave the app entirely. The
-   * board is where a hire belongs instead, and it is the durable half of this same conversation.
-   */
-  it("falls back to the board when there is no history to close back into", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter initialEntries={["/buddy"]}>
-        <BuddyProvider>
-          <Routes>
-            <Route path="/buddy" element={<BuddyPage />} />
-            <Route path="/board" element={<p>the board</p>} />
-          </Routes>
-        </BuddyProvider>
-      </MemoryRouter>,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "Close the conversation" }));
-
-    expect(await screen.findByText("the board")).toBeInTheDocument();
   });
 
   it("lets the hire type before the greeting has arrived", async () => {

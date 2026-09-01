@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Inbox, LayoutDashboard, MessageSquarePlus, Sparkles, Users, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Inbox, Sparkles, Users } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
@@ -58,22 +57,6 @@ function BuddyPageShell({
   rail?: ReactNode;
   children: ReactNode;
 }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  /**
-   * Leaves the conversation the way you came into it.
-   *
-   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload
-   * straight onto `/buddy`, or a link from outside. There is no history to step back through
-   * there, so going back would leave the app entirely; the board is where a hire belongs
-   * instead, and it is the durable half of this same conversation.
-   */
-  const close = useCallback(() => {
-    if (location.key !== "default") void navigate(-1);
-    else void navigate("/board");
-  }, [location.key, navigate]);
-
   // Tells the dock's hand-off that the page is really on screen, so it can stop standing in
   // for it. No entrance animation of its own any more: arriving from the dock, the page is
   // revealed by that window fading away, and a second fade underneath it only ever showed the
@@ -108,39 +91,16 @@ function BuddyPageShell({
                 them, and gluing two classes together here once turned a whole page into a flex
                 row (see ChatPage). */}
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${rail ? "app-rail-open" : ""}`}>
-        {/* A control row, not a header. The page's title, its subtitle and the switch between
-                    the two assistants all belong to `AssistantShell` now, and repeating any of
-                    them here would be the second header the reformat set out to remove. What is
-                    left is buddy-only: what came back from a PM, a fresh visit, the board, and
-                    the way out. Right-aligned and unbordered so it reads as a set of controls on
-                    the conversation rather than as a band across the page. */}
-        <div className="app-page-frame flex shrink-0 flex-wrap items-center justify-end gap-1.5 pt-3">
-          {actions}
-
-          {/* The thread starts fresh every visit, so anything worth keeping lives on the
-                        board — the link is what stops that being a page nobody finds. A `Link`
-                        styled to sit level with the buttons beside it: a control that changes
-                        the URL is an anchor, and dressing one as a `Button` does not make it
-                        keyboard- or screen-reader-correct. */}
-          <Link
-            to="/board"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          >
-            <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-            Board
-          </Link>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label="Close the conversation"
-            title="Close"
-            onClick={close}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
+        {/* Only what belongs to this conversation and nowhere else. The title, the switch and
+                    "New chat" are the shell's; the board is in the app sidebar. What is left is
+                    the PM's answers, which appear only once a PM has sent one — so most visits
+                    have no row here at all, and the conversation starts straight under the page
+                    header. */}
+        {actions && (
+          <div className="app-page-frame flex shrink-0 flex-wrap items-center justify-end gap-1.5 pt-3">
+            {actions}
+          </div>
+        )}
 
         {children}
       </div>
@@ -168,7 +128,6 @@ function BuddyMentorHome() {
     openError,
     ensureOpened,
     retryOpen,
-    startFreshVisit,
   } = useBuddySession();
 
   // The same conversation the dock shows, brought on screen the same way. It used to open a
@@ -212,40 +171,24 @@ function BuddyMentorHome() {
         ) : undefined
       }
       actions={
-        // Not a delete. The transcript stays on the server and the buddy's durable memory note
-        // is untouched — it is what the next greeting is written from, which is why starting
-        // fresh does not mean starting over. Only the scrollback moves on.
-        <>
-          {/* Only offered when there is something behind it: a toggle that opens an empty
-                        panel is worse than no toggle. */}
-          {replies.hasAny && (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-expanded={isRailOpen}
-              icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
-              title="What you sent to your PM"
-              onClick={() => setIsRailOpen((open) => !open)}
-            >
-              PM replies
-              <span className="ml-1 rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text">
-                {replies.answered.length + replies.waiting.length + replies.dismissed.length}
-              </span>
-            </Button>
-          )}
-
-          {hasUserMessage && (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
-              title="Start a new conversation — your buddy keeps what it has learned about you"
-              onClick={() => void startFreshVisit()}
-            >
-              New chat
-            </Button>
-          )}
-        </>
+        // Only offered when there is something behind it: a toggle that opens an empty panel is
+        // worse than no toggle. Starting a fresh visit is a page-level action and lives in the
+        // header with the switch — see `BuddyNewChatAction`.
+        replies.hasAny ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={isRailOpen}
+            icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
+            title="What you sent to your PM"
+            onClick={() => setIsRailOpen((open) => !open)}
+          >
+            PM replies
+            <span className="ml-1 rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text">
+              {replies.answered.length + replies.waiting.length + replies.dismissed.length}
+            </span>
+          </Button>
+        ) : undefined
       }
     >
       <BuddyConversation
