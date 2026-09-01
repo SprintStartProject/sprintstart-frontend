@@ -62,6 +62,7 @@ describe("FlagToPmButton", () => {
       createdAt: "2026-08-22T09:00:00Z",
       answeredAt: null,
       answer: null,
+      hire: null,
     });
     render(<FlagToPmButton />);
 
@@ -106,6 +107,7 @@ describe("FlagToPmButton", () => {
         createdAt: "2026-08-22T09:00:00Z",
         answeredAt: null,
         answer: null,
+        hire: null,
       });
     render(<FlagToPmButton defaultQuestion="Who reviews infra PRs?" />);
 
