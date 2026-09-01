@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Maximize2, Minus, X } from "lucide-react";
+import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
@@ -43,6 +43,7 @@ type BuddyDockProps = Pick<
   | "confirmAction"
   | "dismissAction"
   | "suggestions"
+  | "startFreshVisit"
 > & {
   onClose: () => void;
   /**
@@ -105,6 +106,7 @@ export function BuddyDock({
   confirmAction,
   dismissAction,
   suggestions,
+  startFreshVisit,
   openError,
   onClose,
   onOpenFull,
@@ -216,6 +218,24 @@ export function BuddyDock({
             <p className="truncate text-sm font-semibold text-app-text">Buddy</p>
             <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
           </div>
+
+          {/* Same control, same words and the same promise as the one on `/buddy`: the window is
+                    a view of that conversation, so anything it can do to the conversation it has to
+                    be able to do here — a hire who had to open the full page to start over would
+                    reasonably conclude the two were different buddies. Offered only once there is
+                    something to leave behind; on an untouched thread it would start the visit that
+                    is already on screen. */}
+          {hasUserMessage && (
+            <button
+              type="button"
+              onClick={() => void startFreshVisit()}
+              aria-label="Start a new conversation"
+              title="Start a new conversation — your buddy keeps what it has learned about you"
+              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            >
+              <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
 
           {/* The answer to "this is too small" is the page that already exists, rather than a
                     resizable window: `/buddy` renders the same conversation through the same

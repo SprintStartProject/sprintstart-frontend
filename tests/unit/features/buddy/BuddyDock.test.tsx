@@ -37,6 +37,7 @@ function renderDock(
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
       suggestions={suggestions}
+      startFreshVisit={vi.fn()}
       onClose={vi.fn()}
     />,
   );
