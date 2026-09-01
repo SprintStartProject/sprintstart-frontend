@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
+import { SaveReplyToBoard } from "./SaveReplyToBoard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 
 type BuddyConversationProps = {
@@ -84,6 +85,7 @@ export function BuddyConversation({
       >
         <div className="app-page-frame flex min-w-0 flex-col gap-4 py-6">
           <BuddyThread
+            renderReplyAction={(reply) => <SaveReplyToBoard content={reply} />}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}

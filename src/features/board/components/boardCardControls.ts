@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { cardAccent, type CardAccent } from "../layout/cardAccents";
+import type { CardState } from "../layout/boardStructure";
 
 /**
  * What the board offers for one card, handed to its frame by the grid.
@@ -20,12 +21,47 @@ export type BoardCardControls = {
   /** The grip, already wired to this cell's drag. Absent when the board is not arrangeable. */
   dragHandle?: ReactNode;
   /**
-   * The group picker for this card, shown in the header while the board is being arranged.
+   * The area picker for this card.
    *
-   * Only offered in arrange mode: putting a card in a named area is a rearrangement, and a select
-   * on every card the rest of the time is a control nobody asked for.
+   * Offered at all times, in the hover-revealed cluster with the fold and dismiss controls. It used
+   * to be arrange-mode only, on the reasoning that filing a card is a rearrangement — which put the
+   * one gesture people reach for most behind an unlabelled button they had to find first. Filing a
+   * card is not rearranging the board; it is saying what the card is about.
    */
   groupPicker?: ReactNode;
+  /**
+   * Where this card sits in the process, and what that makes it.
+   *
+   * Absent on a board with no process layer — a card rendered on its own, or a board shown
+   * read-only — so the frame says nothing about sequence rather than claiming everything is open.
+   */
+  state?: CardState;
+  /**
+   * Ticks a card off, for the kinds whose completion nothing can observe.
+   *
+   * Absent for a checklist or an arrival card: those report their own progress, and a hand-set
+   * "done" beside a list with three items outstanding is the board contradicting itself.
+   */
+  onToggleDone?: () => void;
+  /** The stage picker for this card, shown while the board is being arranged. */
+  stagePicker?: ReactNode;
+  /** The "waits on…" picker for this card, shown while the board is being arranged. */
+  dependencyPicker?: ReactNode;
+  /**
+   * This card's place in a stack of cards that have to be worked in order.
+   *
+   * Set on exactly one card: the one standing in for the rest while the pile is *closed*. An open
+   * pile is drawn by its own frame, which carries the way back — and repeating "3 of 5" on every
+   * card of a spread-out run would be the board narrating itself.
+   */
+  stack?: {
+    /** Which of the chain this is, and how many there are. Counted from one, for a person. */
+    position: number;
+    total: number;
+    /** How many are still to do, this one included. */
+    remaining: number;
+    onToggle: () => void;
+  };
 };
 
 const EMPTY: BoardCardControls = {

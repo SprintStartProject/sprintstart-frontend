@@ -8,6 +8,7 @@ import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
 import { BuddyThread } from "./BuddyThread";
+import { SaveReplyToBoard } from "./SaveReplyToBoard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 
 /**
@@ -251,6 +252,7 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
+            renderReplyAction={(reply) => <SaveReplyToBoard content={reply} />}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}

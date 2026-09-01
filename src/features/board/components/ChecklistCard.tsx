@@ -4,6 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
+import { readableTitle } from "../generation/pathToCards";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
@@ -93,7 +94,9 @@ export function ChecklistCard({
   return (
     <BoardCardFrame
       icon={CheckSquare}
-      title={content.title ?? "Checklist"}
+      // Stripped of the marker a generated card carries: it exists so a second generation run can
+      // recognise its own work, and it is never something the hire should read.
+      title={content.title ? readableTitle(content.title) : "Checklist"}
       card={card}
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
       onDismiss={onDismiss}

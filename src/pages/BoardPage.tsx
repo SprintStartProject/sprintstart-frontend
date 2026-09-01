@@ -1,19 +1,45 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, Bot, Check, LayoutDashboard, Move, RefreshCw } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  Check,
+  LayoutDashboard,
+  ListChecks,
+  Move,
+  RefreshCw,
+  Sparkles,
+  Telescope,
+} from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { Spinner } from "../components/ui/Spinner";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
+import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
+import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathCards";
 import { AddCardForm } from "../features/board/components/AddCardForm";
+import type { BoardCard } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
 import { BoardPathRail } from "../features/board/components/BoardPathRail";
+import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
+import {
+  ALL_SECTIONS,
+  cardsInSection,
+  sectionTabOrder,
+  summariseSections,
+} from "../features/board/layout/boardSections";
+import { currentStage, STAGE_LABELS } from "../features/board/layout/boardStructure";
+import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
+import { sourceOfTitle } from "../features/board/generation/pathToCards";
 import {
   assignToGroup,
   readBoardGroups,
@@ -42,7 +68,22 @@ import { NEW_GROUP } from "../features/board/components/BoardGrid";
  * rather than competing with a checklist for a slot. It keeps its place in the board's order — the
  * grid renders the rest, and a reorder puts the path back at the index it came from, so lifting it
  * for display never quietly rewrites what the hire arranged.
+ *
+ * **The board is now a process, not a pile.** Three things carry that, and none of them changes the
+ * board's own order:
+ *
+ * - a *stage* per card — now, next, later — so the board can say what is due rather than only what
+ *   exists;
+ * - a *predecessor* per card, so "read the runbook before you deploy" is a fact the board holds
+ *   instead of one the hire has to remember;
+ * - *sections* down the side, so a board of forty cards is read one part at a time.
+ *
+ * The reason for all three is the same. A board that shows everything at once is fine at eight
+ * cards and unusable at forty, and forty is what a generated onboarding path produces. See
+ * `layout/boardStructure.ts` for the model and `generation/pathToCards.ts` for where the cards come
+ * from.
  */
+
 /**
  * How long a removed card can be brought back, in milliseconds.
  *
@@ -53,25 +94,61 @@ import { NEW_GROUP } from "../features/board/components/BoardGrid";
 const UNDO_WINDOW_MS = 7000;
 
 /**
+ * The board size at which the focus view turns itself on.
+ *
+ * Below it, showing everything *is* the right view: a hire with six cards can read all six, and
+ * hiding four of them behind a mode would be the board being clever at their expense. Above it the
+ * cost flips, and it flips quickly — the complaint the focus view answers is not "this is slightly
+ * long", it is "forty cards appeared and I do not know where to start".
+ */
+const FOCUS_THRESHOLD = 8;
+
+/**
  * Which cards the board is showing.
  *
- * Not a search and not a sort — the board is small enough that the only cut worth making is *who
- * put this here*, which is the one thing a card's content never says on its own. `mine` is the
- * hire's own notes, links and checklists; `buddy` is everything read for them.
+ * Not a search and not a sort — the one cut worth making by hand is *who put this here*, which is
+ * the one thing a card's content never says on its own. Three sources, and they partition the
+ * board:
+ *
+ * - `buddy` — placed for the hire in conversation, contents read live.
+ * - `team` — a card blueprint their PM wrote for everybody in this role.
+ * - `mine` — everything else they own: their own notes and lists, and the steps of their own
+ *   personalised path. The path counts as theirs because it *is*: it was drafted for them, they
+ *   edit it, and nobody else on the project has the same one.
+ *
+ * Where a card sits in the process is a separate question, and the stages, the focus view and the
+ * section tabs answer that one.
  */
-type BoardFilter = "all" | "buddy" | "mine";
+type BoardFilter = "all" | "buddy" | "team" | "mine";
 
-const FILTER_OPTIONS: FilterSelectOption<BoardFilter>[] = [
-  { value: "all", label: "All cards" },
-  { value: "buddy", label: "From your buddy" },
-  { value: "mine", label: "Yours" },
-];
+/**
+ * Whether a card came from the project's blueprints rather than from the hire or their buddy.
+ *
+ * Read off the invisible marker its title carries — see `generation/pathToCards.ts`, which explains
+ * why provenance is smuggled through a text field and what should replace it.
+ */
+function isFromTeam(card: BoardCard): boolean {
+  return card.content.kind === "CHECKLIST" && sourceOfTitle(card.content.title) === "TEAM";
+}
+
+function matchesFilter(card: BoardCard, filter: BoardFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "buddy") return card.owner === "AI";
+  if (filter === "team") return isFromTeam(card);
+
+  return card.owner === "HIRE" && !isFromTeam(card);
+}
 
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
+  const { profile } = useAuth();
   const toast = useToast();
+
+  /** The hire's roles on this project, which decide which of the team's blueprints reach them. */
+  const roleIds = useMemo(() => (profile?.projectRoles ?? []).map((role) => role.id), [profile]);
   const [isArranging, setIsArranging] = useState(false);
   const [filter, setFilter] = useState<BoardFilter>("all");
+  const [sectionId, setSectionId] = useState<string | null>(null);
 
   const {
     board,
@@ -149,6 +226,9 @@ export function BoardPage() {
     setGroups(readBoardGroups(boardId));
   }
 
+  /** The area whose name is open for editing, because it was just created. */
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+
   function saveGroups(next: BoardGroup[]) {
     setGroups(next);
     writeBoardGroups(boardId, next);
@@ -170,6 +250,9 @@ export function BoardPage() {
         collapsed: false,
       };
       saveGroups(assignToGroup([...groups, created], cardId, created.id));
+      // Naming it is the other half of creating it, so the name opens focused and selected rather
+      // than leaving the hire with a box called "Area 3" and a rename control to go and find.
+      setRenamingGroupId(created.id);
 
       return;
     }
@@ -184,6 +267,9 @@ export function BoardPage() {
   /** Takes the area away and leaves its cards exactly where they are on the board. */
   function handleDissolveGroup(groupId: string) {
     saveGroups(groups.filter((group) => group.id !== groupId));
+    // A rail pointed at an area that no longer exists would show an empty pane, so the view falls
+    // back to the whole board rather than to nothing.
+    if (sectionId === groupId) setSectionId(null);
   }
 
   function handleToggleGroup(groupId: string) {
@@ -266,22 +352,177 @@ export function BoardPage() {
     board?.cards.findIndex((card) => card.content.kind === "PATH_TO_FIRST_CONTRIBUTION") ?? -1;
   const pathCard = pathIndex === -1 ? null : (board?.cards[pathIndex] ?? null);
 
-  // Pinned first, and the board's own order inside each half — `sort` is stable, so pinning one
-  // card lifts that card and disturbs nothing else. A display sort, not a write: what gets sent on
-  // a reorder is what is on screen, so pinning and dragging cannot disagree about where a card is.
-  const griddedBoard = useMemo(() => {
-    if (!board) return board;
-    const rest = board.cards
-      .filter((c) => c !== pathCard && !pendingRemovals.has(c.id))
-      .filter((c) =>
-        filter === "all" ? true : filter === "buddy" ? c.owner === "AI" : c.owner === "HIRE",
-      );
-    const cards = [...rest].sort(
-      (a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)),
-    );
+  /**
+   * Every card the board is holding, whatever the current view.
+   *
+   * The process layer and the section counts are both computed from this rather than from what is
+   * on screen. A rail that said "3 of 4 done" because the fourth card happened to be filtered out
+   * would be worse than no rail at all — the counts are about the board, and the view is about the
+   * hire's attention.
+   */
+  const allCards = useMemo(
+    () => board?.cards.filter((card) => card !== pathCard && !pendingRemovals.has(card.id)) ?? [],
+    [board, pathCard, pendingRemovals],
+  );
 
-    return { ...board, cards };
-  }, [board, filter, pathCard, pendingRemovals, pinnedIds]);
+  const { states, assignStage, assignGroupStage, toggleDone, setPredecessor, applyPlan } =
+    useBoardStructure(boardId, allCards);
+
+  const sections = useMemo(
+    () => summariseSections(allCards, groups, states),
+    [allCards, groups, states],
+  );
+
+  const stage = currentStage(states);
+
+  /**
+   * The provenance cuts worth offering on *this* board.
+   *
+   * "From your team" only appears once the team has actually prescribed something. An option that
+   * can only ever come back empty is a promise the board cannot keep, and on an installation where
+   * nobody has written a blueprint that is every board.
+   */
+  const filterOptions = useMemo<FilterSelectOption<BoardFilter>[]>(() => {
+    const options: FilterSelectOption<BoardFilter>[] = [
+      { value: "all", label: "All cards" },
+      { value: "buddy", label: "From your buddy" },
+    ];
+    if (allCards.some(isFromTeam)) options.push({ value: "team", label: "From your team" });
+    options.push({ value: "mine", label: "Yours" });
+
+    return options;
+  }, [allCards]);
+
+  /**
+   * Whether the board has been divided into anything worth navigating.
+   *
+   * One section called "Everything" is a table of contents for a book with one chapter, so an
+   * undivided board gets no bar at all, rather than a bar with a single tab in it.
+   */
+  const hasSectionTabs = sections.length > 1;
+
+  /**
+   * The sections as the tab machinery sees them: a fixed left-to-right order, and a string for the
+   * current one.
+   *
+   * Built from the same array the bar renders, so a swipe and a tap walk the same list — a second
+   * order defined anywhere else would drift the first time a card changed area.
+   */
+  const sectionOrder = useMemo(() => sectionTabOrder(sections), [sections]);
+  const sectionValue = sectionId ?? ALL_SECTIONS;
+  const sectionIndex = Math.max(sectionOrder.indexOf(sectionValue), 0);
+
+  /**
+   * Two-finger swipe between the sections, the same gesture every other tabbed page in the app
+   * answers to. Off on an undivided board, where there is nothing to swipe between.
+   */
+  const swipeRef = useSwipeableTabs<string, HTMLElement>({
+    order: sectionOrder,
+    value: sectionValue,
+    onChange: (value) => setSectionId(value === ALL_SECTIONS ? null : value),
+    enabled: hasSectionTabs,
+  });
+
+  /**
+   * Whether the board is showing only what is due.
+   *
+   * Decided once per board rather than remembered: which mode is right is a question about how big
+   * *this* board is, and a hire who turned focus off on a six-card board last month should not
+   * meet a forty-card one unfocused. Turning it off within a visit is one click and sticks for that
+   * visit, which is the timescale the decision actually has.
+   */
+  const [focused, setFocused] = useState(false);
+  const [focusDecidedFor, setFocusDecidedFor] = useState<string | null>(null);
+
+  if (board && boardId !== focusDecidedFor) {
+    setFocusDecidedFor(boardId);
+    setFocused(allCards.length > FOCUS_THRESHOLD);
+  }
+
+  /**
+   * The chains on this board, and which of them the hire has opened.
+   *
+   * Kept for the visit rather than stored: opening a stack is looking into it, not rearranging the
+   * board, and a pile that was still spread out a week later would have quietly become five cards
+   * again. Keyed by root id, which does not move as cards are ticked off — see `cardStacks.ts`.
+   */
+  const stacks = useMemo(() => buildStacks(allCards, states), [allCards, states]);
+  const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
+
+  /**
+   * Undoes every cut at once: the filter, the section, the focus view and every folded stack.
+   *
+   * One function because the line that offers it counts *all* the cards the board is holding back,
+   * and an offer that cleared the filters but left four cards folded inside a stack would be a
+   * button that does not do what the sentence above it says.
+   */
+  function showEverything() {
+    setFocused(false);
+    setSectionId(null);
+    setFilter("all");
+    setExpandedStackIds(allRootIds(stacks));
+  }
+
+  function toggleStack(rootId: string) {
+    setExpandedStackIds((current) => {
+      const next = new Set(current);
+      if (next.has(rootId)) next.delete(rootId);
+      else next.add(rootId);
+
+      return next;
+    });
+  }
+
+  /**
+   * The cards on screen: stacks folded to one card each, then the owner filter, then the section,
+   * then the focus view.
+   *
+   * Pinned last and stably, so pinning one card lifts that card and disturbs nothing else. A
+   * display sort, not a write: what gets sent on a reorder is what is on screen, so pinning and
+   * dragging cannot disagree about where a card is.
+   *
+   * The focus view keeps pinned cards whatever their stage. A pin is the hire saying *this one
+   * matters to me now*, and a mode that overrode it would be the board arguing with them.
+   */
+  const shownCards = useMemo(() => {
+    // Stacks fold first, so every later cut sees one card where there is one card to work on. The
+    // alternative — filtering the members and then folding — would let the focus view hide the card
+    // a stack was about to stand on and leave the pile claiming a depth it no longer had.
+    const folded = collapseStacks(allCards, stacks, expandedStackIds);
+
+    const bySource = folded.filter((card) => matchesFilter(card, filter));
+    const inSection = cardsInSection(bySource, groups, sectionId);
+    const visible = focused
+      ? inSection.filter((card) => {
+          if (pinnedIds.has(card.id)) return true;
+          // A stack somebody opened stays open. They asked for these cards by name, and the focus
+          // view hiding the ones that are not due yet would answer that by taking most of them
+          // straight back — which reads as the board refusing rather than as a mode.
+          const stackedOpen = stacks.get(card.id);
+          if (stackedOpen && expandedStackIds.has(stackedOpen.rootId)) return true;
+
+          const state = states.get(card.id);
+
+          return state !== undefined && state.stage === stage && state.status !== "DONE";
+        })
+      : inSection;
+
+    return [...visible].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)));
+  }, [
+    allCards,
+    expandedStackIds,
+    filter,
+    focused,
+    groups,
+    pinnedIds,
+    sectionId,
+    stacks,
+    stage,
+    states,
+  ]);
+
+  const griddedBoard = board ? { ...board, cards: shownCards } : null;
+  const hiddenCount = allCards.length - shownCards.length;
 
   const handleReorder = (cardIds: string[]) => {
     if (!pathCard || pathIndex === -1) return void reorder(cardIds);
@@ -289,6 +530,85 @@ export function BoardPage() {
     next.splice(Math.min(pathIndex, next.length), 0, pathCard.id);
     return void reorder(next);
   };
+
+  /**
+   * Enters arrange mode with every card on screen.
+   *
+   * A reorder sends the whole order of what is *shown*, so arranging a filtered board would tell
+   * the server about a fraction of it and let the rest fall to the end. Rather than teaching the
+   * reorder to reconstruct the hidden cards' positions — which is the kind of thing that works
+   * until two of them are adjacent — arranging simply means looking at all of it.
+   */
+  function startArranging() {
+    setFilter("all");
+    setSectionId(null);
+    setFocused(false);
+    // Stacks open too. A reorder sends the order of what is *shown*, so arranging a board with
+    // four cards folded away would tell the server about a fraction of it — the same reason the
+    // filters are cleared here.
+    setExpandedStackIds(allRootIds(stacks));
+    setIsArranging(true);
+  }
+
+  const { generate, generating } = useGeneratedPathCards();
+
+  /**
+   * Builds the hire's personalised onboarding path into cards, and files them.
+   *
+   * The cards are written server-side; the areas, stages and order between them are this client's
+   * to keep, so both halves are applied here rather than left for the hire to arrange by hand. A
+   * generated path that landed as forty loose cards would be the exact complaint this answers.
+   */
+  async function handleGenerate() {
+    if (!selectedProjectId) return;
+
+    const existingTitles = new Set(
+      allCards.flatMap((card) =>
+        card.content.kind === "CHECKLIST" && card.content.title ? [card.content.title] : [],
+      ),
+    );
+
+    const result = await generate(selectedProjectId, roleIds, existingTitles);
+
+    if (result === "NOTHING_TO_BUILD") {
+      toast.info("Nothing to build from yet", {
+        description:
+          "Generate your onboarding path on the Onboarding page, or ask your PM to set up card blueprints.",
+      });
+      return;
+    }
+    if (result === "NOTHING_NEW") {
+      toast.info("Your path is already on the board", {
+        description: "Every step that isn't finished is already a card here.",
+      });
+      return;
+    }
+    if (result === "FAILED") {
+      showErrorToast("Your path couldn't be built into cards", {
+        description: "Nothing was changed — try again.",
+      });
+      return;
+    }
+
+    // One area per phase, named after it. The index is in the id because a plan is applied inside
+    // a single millisecond and `Date.now()` alone would mint the same id for every phase.
+    const stamp = Date.now();
+    saveGroups([
+      ...groups,
+      ...result.areas.map((area, index) => ({
+        id: `group-path-${stamp}-${index}`,
+        name: area.name,
+        cardIds: area.cardIds,
+        collapsed: false,
+      })),
+    ]);
+    applyPlan(result.areas, result.chain);
+
+    refresh();
+    toast.success(`${result.cardCount} cards added from your path`, {
+      description: "Grouped by phase, in the order the path puts them in.",
+    });
+  }
 
   return (
     <div className="min-h-screen">
@@ -299,7 +619,7 @@ export function BoardPage() {
             title="Board"
             subtitle={
               isArranging
-                ? "Drag a card to move it, or fold one shut to get it out of the way."
+                ? "Drag a card to move it, set when it's due, or say what it waits on."
                 : "Where your onboarding stays put between conversations."
             }
             actions={
@@ -315,8 +635,18 @@ export function BoardPage() {
                 <>
                   <Button
                     variant="secondary"
+                    onClick={() => void handleGenerate()}
+                    disabled={!selectedProjectId}
+                    loading={generating}
+                    icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                    title="Turn your personalised onboarding path into checklists here"
+                  >
+                    Build my path
+                  </Button>
+                  <Button
+                    variant="secondary"
                     iconOnly
-                    onClick={() => setIsArranging(true)}
+                    onClick={startArranging}
                     disabled={!board}
                     title="Arrange the board"
                     aria-label="Arrange the board"
@@ -343,7 +673,7 @@ export function BoardPage() {
         </div>
       </header>
 
-      <main className="app-page-frame space-y-5 py-6 lg:py-8">
+      <main ref={swipeRef} className="app-page-frame space-y-5 py-6 lg:py-8">
         {!selectedProjectId && !projectsLoading ? (
           <EmptyState
             icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
@@ -370,59 +700,156 @@ export function BoardPage() {
             </div>
           </div>
         ) : griddedBoard ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              {/* Only offered once there is something to cut: a filter over three cards is a
-                  control that costs more attention than it saves. */}
-              {griddedBoard.cards.length + (filter === "all" ? 0 : 1) > 2 ? (
-                <FilterSelect
-                  label="Which cards to show"
-                  value={filter}
-                  options={FILTER_OPTIONS}
-                  onChange={setFilter}
-                />
+          <div className="min-w-0 space-y-5">
+            {/* One row: which part of the board on the left, what to do with it on the right. The
+                filter used to sit on a line of its own under the tabs, which read as a second
+                navigation for the same board — they are two halves of "what am I looking at", and
+                they belong side by side. `items-start` so the tab bar's own status line hangs
+                under the tabs rather than dragging the controls down with it. */}
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              {hasSectionTabs ? (
+                <div className="min-w-0 flex-1">
+                  <BoardSectionTabs
+                    sections={sections}
+                    selectedId={sectionId}
+                    onSelect={setSectionId}
+                  />
+                </div>
               ) : (
                 <span />
               )}
 
-              <AddCardForm onAdd={addCard} />
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Only offered once there is something to cut: a filter over three cards is a
+                    control that costs more attention than it saves. */}
+                {allCards.length > 2 && (
+                  <FilterSelect
+                    label="Which cards to show"
+                    value={filter}
+                    options={filterOptions}
+                    onChange={setFilter}
+                  />
+                )}
+
+                {allCards.length > FOCUS_THRESHOLD && (
+                  <Button
+                    variant={focused ? "primary" : "secondary"}
+                    size="sm"
+                    onClick={() => setFocused(!focused)}
+                    aria-pressed={focused}
+                    icon={
+                      focused ? (
+                        <ListChecks className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Telescope className="h-4 w-4" aria-hidden="true" />
+                      )
+                    }
+                    title={
+                      focused
+                        ? "Showing what's due now, plus anything you pinned"
+                        : "Showing every card on the board"
+                    }
+                  >
+                    {focused ? `Focused on ${STAGE_LABELS[stage].title}` : "Everything"}
+                  </Button>
+                )}
+
+                <AddCardForm onAdd={addCard} />
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {/* A board with nothing on it is the first thing a new hire sees, and an empty page
+            <div className="min-w-0 space-y-4">
+              {/* Only the cards travel. The controls above are the same controls whatever section
+                  is open, and sliding them out and back would be the page redrawing its own
+                  furniture every time somebody moved one tab across. */}
+              <SlidingTabPanel activeKey={sectionValue} index={sectionIndex} className="space-y-4">
+                {/* A board with nothing on it is the first thing a new hire sees, and an empty page
                 cannot say what the board is *for*. Named after what it will hold rather than after
-                its own emptiness — and it points at the two things that fill it, the buddy and the
+                its own emptiness — and it points at the two things that fill it: the path, and the
                 row of buttons directly above. */}
-              {griddedBoard.cards.length === 0 && (
-                <EmptyState
-                  icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
-                  title="Nothing on your board yet"
-                >
-                  This is where things stay put between conversations — the task you are on, work
-                  worth picking up, what your buddy remembers. It fills itself in as you go, and you
-                  can put a note, a link or a checklist of your own here at any time.
-                </EmptyState>
-              )}
+                {allCards.length === 0 && (
+                  <EmptyState
+                    icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
+                    title="Nothing on your board yet"
+                    action={
+                      <Button
+                        variant="primary"
+                        onClick={() => void handleGenerate()}
+                        loading={generating}
+                        icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                      >
+                        Build my path
+                      </Button>
+                    }
+                  >
+                    This is where things stay put between conversations — the task you are on, work
+                    worth picking up, what your buddy remembers. Build your onboarding path into
+                    checklists here, and add a note, a link or a list of your own at any time.
+                  </EmptyState>
+                )}
 
-              <BoardGrid
-                board={griddedBoard}
-                onDismiss={handleDismiss}
-                dismissingId={dismissingId}
-                onEdit={(cardId, request) => void editCard(cardId, request)}
-                onReorder={handleReorder}
-                isArranging={isArranging}
-                collapsedIds={collapsedIds}
-                onToggleCollapsed={toggleCollapsed}
-                pinnedIds={pinnedIds}
-                onTogglePinned={togglePinned}
-                groups={groups}
-                onAssignGroup={handleAssignGroup}
-                onRenameGroup={handleRenameGroup}
-                onToggleGroup={handleToggleGroup}
-                onDissolveGroup={handleDissolveGroup}
-              />
+                {/* The section is empty rather than the board: different states, and only one of them
+                  is fixed by generating anything. */}
+                {allCards.length > 0 && shownCards.length === 0 && (
+                  <EmptyState size="sm">
+                    Nothing here right now.{" "}
+                    {hiddenCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={showEverything}
+                        className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      >
+                        Show all {allCards.length} cards
+                      </button>
+                    )}
+                  </EmptyState>
+                )}
+
+                <BoardGrid
+                  board={griddedBoard}
+                  onDismiss={handleDismiss}
+                  dismissingId={dismissingId}
+                  onEdit={(cardId, request) => void editCard(cardId, request)}
+                  onReorder={handleReorder}
+                  isArranging={isArranging}
+                  collapsedIds={collapsedIds}
+                  onToggleCollapsed={toggleCollapsed}
+                  pinnedIds={pinnedIds}
+                  onTogglePinned={togglePinned}
+                  groups={groups}
+                  onAssignGroup={handleAssignGroup}
+                  onRenameGroup={handleRenameGroup}
+                  renamingGroupId={renamingGroupId}
+                  onRenameGroupDone={() => setRenamingGroupId(null)}
+                  onToggleGroup={handleToggleGroup}
+                  onDissolveGroup={handleDissolveGroup}
+                  states={states}
+                  onAssignStage={assignStage}
+                  onAssignGroupStage={assignGroupStage}
+                  onToggleDone={toggleDone}
+                  onSetPredecessor={setPredecessor}
+                  stacks={stacks}
+                  expandedStackIds={expandedStackIds}
+                  onToggleStack={toggleStack}
+                />
+
+                {/* What the focus view is holding back, said out loud. A mode that hides work without
+                  saying how much is a mode that gets distrusted the first time somebody notices. */}
+                {shownCards.length > 0 && hiddenCount > 0 && (
+                  <p className="text-sm text-app-text-muted">
+                    {hiddenCount} more {hiddenCount === 1 ? "card" : "cards"} on this board.{" "}
+                    <button
+                      type="button"
+                      onClick={showEverything}
+                      className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    >
+                      Show everything
+                    </button>
+                  </p>
+                )}
+              </SlidingTabPanel>
             </div>
-          </>
+          </div>
         ) : null}
 
         {/* The board is curated by the mentor, so it should always be one click from them. */}
@@ -438,4 +865,9 @@ export function BoardPage() {
       </main>
     </div>
   );
+}
+
+/** Every stack's root id — what "open all of them" means. */
+function allRootIds(stacks: Map<string, { rootId: string }>): Set<string> {
+  return new Set([...stacks.values()].map((stack) => stack.rootId));
 }

@@ -35,6 +35,14 @@ type BuddyThreadProps = {
    */
   renderQuestionAction?: (question: string) => ReactNode;
   /**
+   * Rendered under each of the buddy's *replies*, handed that reply's Markdown.
+   *
+   * Where keeping something from the conversation belongs. The thread does not know what is worth
+   * keeping or how — it hands over the text and lets the caller decide, which is what stops this
+   * component from growing a dependency on the board.
+   */
+  renderReplyAction?: (reply: string) => ReactNode;
+  /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
    * Distinct from a turn that failed, which carries its own reason: this one has no turn to hang
@@ -68,6 +76,7 @@ export function BuddyThread({
   before,
   lastMessageFooter,
   renderQuestionAction,
+  renderReplyAction,
   openError,
   onRetryOpen,
 }: BuddyThreadProps) {
@@ -137,6 +146,7 @@ export function BuddyThread({
               footer={
                 <>
                   {isUser && renderQuestionAction?.(message.content)}
+                  {!isUser && hasText && renderReplyAction?.(message.content)}
                   {!isUser && hasActions && (
                     <BuddyActionProposals
                       messageId={message.id}

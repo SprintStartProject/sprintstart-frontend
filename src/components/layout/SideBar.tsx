@@ -13,6 +13,7 @@ import {
   AdminIcon,
   ArrivalStepsIcon,
   BoardIcon,
+  CardBlueprintsIcon,
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
@@ -101,6 +102,13 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Starter Work",
     path: "/starter-work",
     icon: StarterWorkIcon,
+  },
+  // The cards every new hire's board starts with. Sits with the other things a PM prepares
+  // before anybody arrives, next to the arrival steps it complements.
+  {
+    label: "Card Blueprints",
+    path: "/card-blueprints",
+    icon: CardBlueprintsIcon,
   },
   // The escalation inbox, surfaced as its own entry while it is being evaluated
   // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`

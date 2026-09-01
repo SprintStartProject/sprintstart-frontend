@@ -3,6 +3,7 @@ import { motion, useReducedMotion, type Transition } from "framer-motion";
 import {
   BookOpen,
   Briefcase,
+  ClipboardList,
   ChartColumn,
   Database,
   Inbox,
@@ -498,6 +499,40 @@ export function ArrivalStepsIcon({ isActive }: SidebarIconProps) {
         animate={{ x: 0, y: 0, opacity: 1 }}
         transition={{ ...bounce, delay: 0.18 }}
       />
+    </IconFrame>
+  );
+}
+
+/**
+ * Card blueprints: the clipboard's lines rule themselves in, one after another.
+ *
+ * A blueprint *is* a list somebody wrote down for other people to work through, so the drawing is
+ * the writing: the board is there from the start and the lines arrive in order. Staggered rather
+ * than simultaneous, which is the same thing the entry stands for — a sequence, not a pile.
+ */
+export function CardBlueprintsIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <ClipboardList className={ICON_CLASS} />;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+
+      {[11, 15, 19].map((y, index) => (
+        <motion.g
+          key={y}
+          initial={hasPlayed ? { opacity: 0 } : false}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, delay: 0.12 + index * 0.1 }}
+        >
+          <path d={`M8 ${y}h8`} />
+          <path d={`M5.5 ${y}h.01`} />
+        </motion.g>
+      ))}
     </IconFrame>
   );
 }

@@ -17,6 +17,7 @@ export type AppRoute =
   | "/starter-work"
   | "/admin"
   | "/pm-dashboard"
+  | "/card-blueprints"
   | "/team-management"
   | "/insights/faq"
   | "/insights/knowledge-gaps"
@@ -50,6 +51,10 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
   "/starter-work": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/admin": [PermissionGroup.HR, PermissionGroup.ADMIN],
   "/pm-dashboard": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  // The cards every new hire starts with. Authoring, like the arrival steps beside it, which is
+  // why it is PM/HR/ADMIN and not on a hire's sidebar -- a hire consumes blueprints, they do not
+  // write them. Enforced server-side too once the endpoints exist.
+  "/card-blueprints": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/team-management": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/insights/faq": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/insights/knowledge-gaps": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
@@ -75,6 +80,7 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
  */
 const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
   "/pm-dashboard",
+  "/card-blueprints",
   "/data-ingestion",
   "/team-management",
   "/insights/faq",

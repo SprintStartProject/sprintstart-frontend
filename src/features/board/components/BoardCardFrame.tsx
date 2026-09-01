@@ -1,9 +1,21 @@
 import { useState, type ReactNode } from "react";
-import { ChevronsDownUp, ChevronsUpDown, Bot, Pin, PinOff, X } from "lucide-react";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Bot,
+  CircleCheckBig,
+  CircleDashed,
+  Layers,
+  Lock,
+  Pin,
+  PinOff,
+  X,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
+import { cardName } from "../layout/cardNames";
 import { useBoardCardControls } from "./boardCardControls";
 import type { BoardCard } from "../types";
 
@@ -64,6 +76,12 @@ type BoardCardFrameProps = {
  * to reveal anything — they stay visible, as they do while a dismissal is in flight and while the
  * board is being arranged.
  *
+ * **A blocked card stays visible and goes quiet.** It is dimmed and says what it is waiting on,
+ * rather than being hidden or disabled: a hire who cannot yet do something is entitled to know it
+ * exists and why it is not their turn, and a card that vanished until its moment would read as the
+ * board losing things. Nothing about it is actually locked — the block is a statement about order,
+ * not a permission, and somebody who has a reason to get on with it still can.
+ *
  * The body stops taking clicks while the board is being arranged, so a card that is a drag target
  * does not also tick a checkbox on the way past. That is driven by `data-arranging` on the grid
  * rather than by a prop, because it is a fact about the board and not about any one card — and the
@@ -81,8 +99,20 @@ export function BoardCardFrame({
   action,
   children,
 }: BoardCardFrameProps) {
-  const { collapsed, pinned, accent, onToggleCollapsed, onTogglePinned, dragHandle, groupPicker } =
-    useBoardCardControls();
+  const {
+    collapsed,
+    pinned,
+    accent,
+    onToggleCollapsed,
+    onTogglePinned,
+    dragHandle,
+    groupPicker,
+    state,
+    onToggleDone,
+    stagePicker,
+    dependencyPicker,
+    stack,
+  } = useBoardCardControls();
 
   // A folded card opens while it is under the pointer and closes again when it is left. The fold
   // is for getting a card out of the way, not for hiding it — having to unfold, read one line and
@@ -92,6 +122,8 @@ export function BoardCardFrame({
   const open = !collapsed || peeking;
 
   const placedByBuddy = card.placedAt !== null;
+  const blocked = state?.status === "BLOCKED";
+  const done = state?.status === "DONE";
   const label = controlLabel ?? title;
   const reveal = dismissing
     ? ""
@@ -102,7 +134,12 @@ export function BoardCardFrame({
       roundedClassName="rounded-2xl"
       // A visible "this can be moved" state while the board is being arranged, matching the ring
       // the dashboard puts on its widgets in edit mode.
-      className="[[data-arranging]_&]:ring-2 [[data-arranging]_&]:ring-app-border-muted"
+      className={`[[data-arranging]_&]:ring-2 [[data-arranging]_&]:ring-app-border-muted ${
+        // Turned down rather than turned off. Full opacity would put a card nobody can act on at
+        // the same volume as the one they should be reading; hiding it would lose the fact that it
+        // is coming. Restored on approach, so reading a blocked card costs nothing.
+        blocked ? "opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100" : ""
+      }`}
     >
       <section
         className="relative flex flex-col overflow-hidden p-4"
@@ -146,6 +183,43 @@ export function BoardCardFrame({
                   </Badge>
                 )}
 
+                {/* Purple, not green: "done" sits beside status pills that mean healthy, and a
+                    finished card is a state reached rather than a thing going well. Icon and word
+                    both, so the colour is never the message. */}
+                {done && (
+                  <Badge variant="purple" size="sm" className="gap-1">
+                    <CircleCheckBig className="h-3 w-3" aria-hidden="true" />
+                    Done
+                  </Badge>
+                )}
+
+                {blocked && (
+                  <Badge variant="neutral" size="sm" className="gap-1">
+                    <Lock className="h-3 w-3" aria-hidden="true" />
+                    Waiting
+                  </Badge>
+                )}
+
+                {/* A badge that is also the way in. `aria-expanded` says what it does, and the
+                    count is the reassurance that opening it holds no surprises — a pile whose
+                    depth you cannot see is a pile you do not trust to be small. Deliberately not
+                    the whole card: these cards are full of things to click, and a card that both
+                    ticks a checkbox and unfolds a stack gets one of the two wrong. */}
+                {stack && (
+                  <button
+                    type="button"
+                    onClick={stack.onToggle}
+                    aria-expanded={false}
+                    aria-label={`Show all ${stack.total} cards in this sequence`}
+                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  >
+                    <Layers className="h-3 w-3" aria-hidden="true" />
+                    <span className="tabular-nums">
+                      Step {stack.position} of {stack.total}
+                    </span>
+                  </button>
+                )}
+
                 {card.owner === "AI" && (
                   <Badge
                     variant="brand"
@@ -163,6 +237,18 @@ export function BoardCardFrame({
                 )}
               </div>
               {subtitle && <p className="mt-1 text-xs text-app-text-muted">{subtitle}</p>}
+
+              {/* Named, not counted. "Waiting on 2 cards" tells the hire they are stuck; naming
+                  them tells them what to go and do about it. */}
+              {blocked && state && (
+                <p className="mt-1 text-xs text-app-text-muted">
+                  Don{"\u2019"}t start yet — first finish{" "}
+                  <span className="font-medium text-app-text">
+                    {state.blockedBy.map((blocker) => cardName(blocker)).join(", ")}
+                  </span>
+                  .
+                </p>
+              )}
             </div>
           </div>
 
@@ -171,7 +257,37 @@ export function BoardCardFrame({
             onPointerDownCapture={(event) => event.stopPropagation()}
             className="flex shrink-0 items-center gap-1"
           >
-            {groupPicker}
+            {stagePicker}
+            {dependencyPicker}
+
+            {onToggleDone && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={onToggleDone}
+                aria-pressed={done}
+                aria-label={
+                  done ? `Mark the ${label} card as not done` : `Mark the ${label} card as done`
+                }
+                title={
+                  done
+                    ? "Not finished after all"
+                    : "Tick this off — it stops blocking whatever waits on it"
+                }
+                // Outside `reveal` once ticked, for the reason the pin is: a state that only shows
+                // on hover is a state the hire has to go looking for.
+                className={
+                  done ? "text-app-purple-text" : `transition-opacity duration-150 ${reveal}`
+                }
+              >
+                {done ? (
+                  <CircleCheckBig className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <CircleDashed className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+            )}
 
             {onTogglePinned && (
               <Button
@@ -196,6 +312,11 @@ export function BoardCardFrame({
             )}
 
             <span className={`flex items-center gap-1 transition-opacity duration-150 ${reveal}`}>
+              {/* In the revealed cluster rather than always on show: it is available on every card
+                  now, and a select sitting permanently in eleven headers would be the loudest thing
+                  on the board. */}
+              {groupPicker}
+
               {onToggleCollapsed && (
                 <Button
                   variant="ghost"
