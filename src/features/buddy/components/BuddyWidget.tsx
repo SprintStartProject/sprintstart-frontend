@@ -47,6 +47,7 @@ export function BuddyWidget() {
     openError,
     retryOpen,
     closeDock,
+    startFreshVisit,
   } = useBuddy();
 
   /**
@@ -193,6 +194,7 @@ export function BuddyWidget() {
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}
             onOpenFull={openFull}
+            onNewConversation={() => void startFreshVisit()}
             suggestionsHidden={suggestionsHidden}
             onHideSuggestions={() => setSuggestionsHidden(true)}
             isExpanding={handoff !== "idle"}

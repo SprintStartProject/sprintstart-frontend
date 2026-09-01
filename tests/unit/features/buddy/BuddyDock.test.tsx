@@ -24,7 +24,12 @@ function renderDock(
   {
     suggestions = [],
     setDraft = vi.fn(),
-  }: { suggestions?: BuddySuggestion[]; setDraft?: () => void } = {},
+    onNewConversation,
+  }: {
+    suggestions?: BuddySuggestion[];
+    setDraft?: () => void;
+    onNewConversation?: () => void;
+  } = {},
 ) {
   return render(
     <BuddyDock
@@ -38,6 +43,7 @@ function renderDock(
       dismissAction={vi.fn()}
       suggestions={suggestions}
       onClose={vi.fn()}
+      onNewConversation={onNewConversation}
     />,
   );
 }
@@ -168,5 +174,53 @@ describe("BuddyDock suggestion chips", () => {
 
     expect(screen.queryByTestId("buddy-suggestions")).not.toBeInTheDocument();
     expect(screen.queryByText("Try asking")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The control the tutor asked for: a new conversation without leaving the page you are on. The
+ * full page has had one since the buddy integration landed; the window reachable from everywhere
+ * had only minimise and maximise.
+ */
+describe("BuddyDock new conversation", () => {
+  it("offers nothing to restart before the hire has said anything", () => {
+    renderDock([assistant("Hello, welcome aboard.")], { onNewConversation: vi.fn() });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("offers to start fresh once there is a conversation to leave behind", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      onNewConversation: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  it("stays out of the header entirely when the widget hands in no handler", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")]);
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("asks the widget to start fresh rather than reaching into the session itself", async () => {
+    const onNewConversation = vi.fn();
+    renderDock([assistant("Hello."), user("How do we deploy?")], { onNewConversation });
+
+    await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
+
+    expect(onNewConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it("promises a new conversation, never a deletion — nothing is thrown away", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      onNewConversation: vi.fn(),
+    });
+
+    const control = screen.getByRole("button", { name: "Start a new conversation" });
+    expect(control).toHaveAttribute(
+      "title",
+      "Start a new conversation — your buddy keeps what it has learned about you",
+    );
   });
 });

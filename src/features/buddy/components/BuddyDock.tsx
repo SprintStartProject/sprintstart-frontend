@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Maximize2, Minus, X } from "lucide-react";
+import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
@@ -50,6 +50,11 @@ type BuddyDockProps = Pick<
    * `/buddy` itself, where the control would offer the page the hire is already reading.
    */
   onOpenFull?: () => void;
+  /**
+   * Puts the current conversation behind them and greets afresh. Optional for the same reason
+   * `onOpenFull` is: the control is only handed in where it means something.
+   */
+  onNewConversation?: () => void;
   /**
    * Why the conversation could not be brought on screen at all — see `BuddyThread`. Handed in
    * rather than picked off the session, like every other callback here: the dock stays a
@@ -108,6 +113,7 @@ export function BuddyDock({
   openError,
   onClose,
   onOpenFull,
+  onNewConversation,
   onRetryOpen,
   suggestionsHidden = false,
   onHideSuggestions,
@@ -216,6 +222,26 @@ export function BuddyDock({
             <p className="truncate text-sm font-semibold text-app-text">Buddy</p>
             <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
           </div>
+
+          {/* Offered only once there is a conversation to leave behind. Before that it would
+                    restart a thread that has not started, which is a control the hire can see doing
+                    nothing.
+
+                    Nothing is discarded: the transcript stays in `buddy_messages` and the buddy's
+                    durable memory note is untouched — it is what the next greeting is written from.
+                    Only the scrollback moves on, which is why the wording here is "new
+                    conversation" and never "clear" or "delete". */}
+          {onNewConversation && hasUserMessage && (
+            <button
+              type="button"
+              onClick={onNewConversation}
+              aria-label="Start a new conversation"
+              title="Start a new conversation — your buddy keeps what it has learned about you"
+              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            >
+              <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
 
           {/* The answer to "this is too small" is the page that already exists, rather than a
                     resizable window: `/buddy` renders the same conversation through the same
