@@ -219,7 +219,14 @@ function BuddyMentorHome() {
         // control that reopens it is read from the same list the rail is showing, and a rail
         // that unmounted would lose its scroll position every time it was put away.
         replies.hasAny ? (
-          <ConversationRail id="buddy-pm-replies" isOpen={rail.open} label={PM_REPLIES_LABEL}>
+          <ConversationRail
+            id="buddy-pm-replies"
+            isOpen={rail.open}
+            label={PM_REPLIES_LABEL}
+            onDismiss={() => setRailOpen(false)}
+            // The same words the cross inside `BuddyPmReplies` uses.
+            dismissLabel="Close the PM replies"
+          >
             <BuddyPmReplies {...replies} onClose={() => setRailOpen(false)} />
           </ConversationRail>
         ) : undefined

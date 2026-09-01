@@ -356,6 +356,10 @@ export function ChatPage() {
         isOpen={isRailOpen}
         label="Chat history"
         openWidthClassName="md:w-64"
+        onDismiss={() => setRailOpen(false)}
+        // The same words the cross inside it uses, so the backdrop and the button are not two
+        // different-sounding ways to do one thing.
+        dismissLabel="Close the conversation list"
       >
         <div className="flex shrink-0 items-center justify-between px-4 pt-4 pb-2">
           <h2 className="text-sm font-bold tracking-wide text-app-text-muted uppercase">Chats</h2>
