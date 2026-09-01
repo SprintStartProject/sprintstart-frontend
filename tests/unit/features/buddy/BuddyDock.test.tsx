@@ -25,16 +25,21 @@ function renderDock(
     suggestions = [],
     setDraft = vi.fn(),
     onNewConversation,
+    isThinking = false,
+    isStreaming = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
     onNewConversation?: () => void;
+    isThinking?: boolean;
+    isStreaming?: boolean;
   } = {},
 ) {
   return render(
     <BuddyDock
       messages={messages}
-      isThinking={false}
+      isThinking={isThinking}
+      isStreaming={isStreaming}
       activeTool={null}
       draft=""
       setDraft={setDraft}
@@ -210,6 +215,35 @@ describe("BuddyDock new conversation", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
 
     expect(onNewConversation).toHaveBeenCalledTimes(1);
+  });
+
+  // startFreshVisit clears the thread and greets, but cannot call back the request already
+  // streaming into it: that stream's callbacks still hold the shared conversation, so its tool
+  // events would land under the brand-new greeting.
+  it("withdraws while the buddy is still thinking", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      onNewConversation: vi.fn(),
+      isThinking: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("withdraws while a reply is still arriving", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      onNewConversation: vi.fn(),
+      isStreaming: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("comes back once the turn is over", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")], {
+      onNewConversation: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });
 
   it("promises a new conversation, never a deletion — nothing is thrown away", () => {

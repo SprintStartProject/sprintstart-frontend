@@ -36,6 +36,7 @@ type BuddyDockProps = Pick<
   ReturnType<typeof useBuddy>,
   | "messages"
   | "isThinking"
+  | "isStreaming"
   | "activeTool"
   | "draft"
   | "setDraft"
@@ -103,6 +104,7 @@ type BuddyDockProps = Pick<
 export function BuddyDock({
   messages,
   isThinking,
+  isStreaming,
   activeTool,
   draft,
   setDraft,
@@ -135,6 +137,10 @@ export function BuddyDock({
   }, [onClose]);
 
   const hasUserMessage = messages.some((message) => message.role === "USER");
+  // Mid-turn: the buddy is deciding, running a tool, or writing. Not a spinner's worth of
+  // state -- it gates the one control that would pull the thread out from under a reply
+  // that is still arriving.
+  const isBusy = isThinking || isStreaming;
 
   const resting = {
     width: DOCK_WIDTH,
@@ -230,8 +236,16 @@ export function BuddyDock({
                     Nothing is discarded: the transcript stays in `buddy_messages` and the buddy's
                     durable memory note is untouched — it is what the next greeting is written from.
                     Only the scrollback moves on, which is why the wording here is "new
-                    conversation" and never "clear" or "delete". */}
-          {onNewConversation && hasUserMessage && (
+                    conversation" and never "clear" or "delete".
+
+                    Withdrawn while a turn is in flight. `startFreshVisit` clears the thread and
+                    greets, but it cannot call back the request already streaming into it: that
+                    stream's callbacks still hold the shared conversation, so its tool events
+                    would land under the new greeting, and its completion would clear the
+                    greeting's own thinking state. Offering the control only between turns is
+                    the cheap half of that fix; aborting the stream is the other half and
+                    belongs in the session, alongside the same gap on `BuddyPage`. */}
+          {onNewConversation && hasUserMessage && !isBusy && (
             <button
               type="button"
               onClick={onNewConversation}

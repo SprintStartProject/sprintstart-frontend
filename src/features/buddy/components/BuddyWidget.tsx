@@ -35,6 +35,7 @@ export function BuddyWidget() {
   const {
     messages,
     isThinking,
+    isStreaming,
     activeTool,
     isOpen,
     toggleOpen,
@@ -183,6 +184,7 @@ export function BuddyWidget() {
             key="buddy-dock"
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             draft={draft}
             setDraft={setDraft}
