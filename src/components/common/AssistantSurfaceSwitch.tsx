@@ -1,17 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { Bot, MessagesSquare } from "lucide-react";
 import { SegmentedTabs, type SegmentedTabOption } from "../ui/SegmentedTabs";
-
-/** The two places a question can be asked. */
-export type AssistantSurface = "chat" | "buddy";
-
-const SURFACE_ROUTES: Record<AssistantSurface, string> = {
-  chat: "/chat",
-  buddy: "/buddy",
-};
+import { ASSISTANT_SURFACE_ROUTES, type AssistantSurface } from "./assistantSurfaces";
 
 // Module scope: the options never depend on anything, and a fresh array each render would
-// re-key the sliding pill.
+// re-key the sliding pill. In `ASSISTANT_SURFACES` order, which is what makes a swipe and the
+// pill agree about which way "next" is.
 const OPTIONS: SegmentedTabOption<AssistantSurface>[] = [
   { value: "chat", label: "Chat", icon: <MessagesSquare className="h-4 w-4" aria-hidden="true" /> },
   { value: "buddy", label: "Buddy", icon: <Bot className="h-4 w-4" aria-hidden="true" /> },
@@ -51,7 +45,7 @@ export function AssistantSurfaceSwitch({
       options={OPTIONS}
       onChange={(next) => {
         if (next === current) return;
-        void navigate(SURFACE_ROUTES[next]);
+        void navigate(ASSISTANT_SURFACE_ROUTES[next]);
       }}
       layoutId="assistant-surface-pill"
       ariaLabel="Assistant"

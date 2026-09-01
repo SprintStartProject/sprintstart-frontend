@@ -1,4 +1,4 @@
-import { MessageSquareText, Sparkles, X } from "lucide-react";
+import { MessageSquareText, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,8 +13,6 @@ import { ThinkingIndicator } from "../features/chatbot/components/ThinkingIndica
 import { CitationPopover } from "../features/chatbot/components/CitationPopover.tsx";
 import { ChatEmptyState } from "../features/chatbot/components/ChatEmptyState.tsx";
 import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
-import { PageHeader } from "../components/layout/PageHeader.tsx";
-import { AssistantSurfaceSwitch } from "../components/common/AssistantSurfaceSwitch.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
@@ -332,7 +330,9 @@ export function ChatPage() {
   const profileFallbackName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : "User";
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden text-app-text lg:h-screen">
+    // No height of its own any more: the page is a panel inside `AssistantShell`, which owns
+    // the viewport and the header above it.
+    <div className="flex min-h-0 flex-1 overflow-hidden text-app-text">
       {/* Mobile slide-out drawer — slides in from the left on mobile */}
       <aside
         id="chat-mobile-sidebar"
@@ -354,17 +354,6 @@ export function ChatPage() {
         </div>
         <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} onDeleteChat={deleteChat} />
       </aside>
-
-      {/* Mobile toggle button — top-right so it doesn't overlap the mobile header burger */}
-      <button
-        aria-label="Toggle sidebar"
-        aria-controls="chat-mobile-sidebar"
-        aria-expanded={sidebarOpen}
-        className="fixed top-4 right-[var(--app-page-gutter)] z-50 mt-15 rounded-full border border-app-border bg-app-surface p-3 text-app-text shadow-lg hover:cursor-pointer hover:bg-app-surface-hover md:hidden"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-      >
-        <MessageSquareText size={24} />
-      </button>
 
       {/* Desktop chat history sidebar — LEFT side, always rendered */}
       <aside
@@ -396,40 +385,35 @@ export function ChatPage() {
            prettier-plugin-tailwindcss trims class strings when it sorts them,
            which once silently glued `flex-col` to the rail class and
            turned the whole page into a flex row. */
-        className={`relative flex min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "app-rail-open" : ""}`}
+        // `min-h-0` because this is now a flex item inside the shell's column rather than a
+        // child of its own fixed-height page: without it the transcript would grow the column
+        // instead of scrolling inside it.
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "app-rail-open" : ""}`}
       >
-        {/* Header: open-sidebar toggle floats at the far-left edge so it
-                    doesn't crowd the page title's icon; title stays aligned with
-                    the message column below (toggle is out of flow). */}
-        <div className="app-page-frame relative flex shrink-0 items-center border-b border-app-border bg-app-bg/80 py-3 backdrop-blur-md">
-          {!desktopSidebarOpen && (
-            <button
-              aria-label="Open sidebar"
-              onClick={() => setDesktopSidebarOpen(true)}
-              className="absolute top-1/2 left-2 hidden shrink-0 -translate-y-1/2 items-center justify-center rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text md:flex"
-            >
-              <MessageSquareText size={18} />
-            </button>
-          )}
-          <PageHeader
-            icon={Sparkles}
-            title="AI Assistant"
-            subtitle="Ask questions about project knowledge, code, documentation and onboarding."
-            hideSubtitleBelow="md"
-            className="flex-1"
-            // The way to the buddy, in the same place it sits on the buddy's own page. In
-            // `PageHeader`'s actions rather than a bar of its own, because the chat is a
-            // fixed-height column: a second band would come out of the transcript's height on
-            // every screen to say something that fits beside the title. The header stacks its
-            // actions below the title on a phone, which is where the stretched pills come from.
-            actions={
-              // `mr-14` for exactly as long as the floating sidebar toggle exists (below `md`):
-              // that button is fixed to the top-right corner *over* this header, and without
-              // the gap it would sit on top of the "Buddy" half of the switch.
-              <AssistantSurfaceSwitch current="chat" className="mr-14 md:mr-0" />
-            }
-          />
-        </div>
+        {/* The two ways back to the conversation list, floating over the top of the transcript
+                    rather than sitting in a bar of their own. The page header belongs to
+                    `AssistantShell` now, and a strip under it holding nothing but one toggle
+                    would be a second header for a single button. The transcript pads itself out
+                    from under them — see `pt-14` below. */}
+        {!desktopSidebarOpen && (
+          <button
+            aria-label="Open sidebar"
+            onClick={() => setDesktopSidebarOpen(true)}
+            className="absolute top-3 left-2 z-20 hidden shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors hover:bg-app-surface-hover hover:text-app-text md:flex"
+          >
+            <MessageSquareText size={18} />
+          </button>
+        )}
+
+        <button
+          aria-label="Toggle sidebar"
+          aria-controls="chat-mobile-sidebar"
+          aria-expanded={sidebarOpen}
+          className="absolute top-3 right-[var(--app-page-gutter)] z-30 rounded-full border border-app-border bg-app-surface p-2.5 text-app-text shadow-lg hover:cursor-pointer hover:bg-app-surface-hover md:hidden"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+        >
+          <MessageSquareText size={20} />
+        </button>
 
         <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">
           {!chatId && <ChatEmptyState onPickSuggestion={fillSuggestion} />}
@@ -438,7 +422,9 @@ export function ChatPage() {
                         list `aria-live` made screen readers re-announce the
                         whole answer on every streamed token; the sr-only
                         status node below announces the end of a turn instead. */}
-          <div className="app-page-frame flex w-full flex-col gap-8 py-8">
+          {/* `pt-14` on a phone: the conversation-list toggle floats over this column's top
+                        right corner, and the first message used to start underneath it. */}
+          <div className="app-page-frame flex w-full flex-col gap-8 pt-14 pb-8 md:pt-8">
             {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
                             switch, new messages). Per AGENTS.md §11. */}

@@ -1,11 +1,8 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { motion, useReducedMotion } from "framer-motion";
 import { Inbox, LayoutDashboard, MessageSquarePlus, Sparkles, Users, X } from "lucide-react";
-import { SleepyBot } from "../features/chatbot/components/SleepyBot";
 import { Button } from "../components/ui/Button";
-import { AssistantSurfaceSwitch } from "../components/common/AssistantSurfaceSwitch";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -41,17 +38,20 @@ import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestion
  * The page's shape, shared by the mentor and the no-project state so nothing moves between
  * them.
  *
- * Fixed height rather than the `min-h-screen` its sibling pages use, for one reason: the
- * composer has to stay on screen. A conversation whose input scrolls away is one you have to
- * scroll back to in order to answer.
+ * It fills the panel `AssistantShell` gives it rather than claiming a height of its own — the
+ * shell owns the viewport, the page header and the switch. What is left here is the
+ * conversation, the rail beside it, and the handful of controls that only mean anything on
+ * this half of the assistant.
+ *
+ * It still never grows past that panel, for the reason it used to set its own fixed height:
+ * the composer has to stay on screen. A conversation whose input scrolls away is one you have
+ * to scroll back to in order to answer.
  */
 function BuddyPageShell({
-  subtitle,
   actions,
   rail,
   children,
 }: {
-  subtitle: string;
   /** Controls that only make sense once there is a conversation — a fresh start, mainly. */
   actions?: ReactNode;
   /** The left column, when the page has one open. */
@@ -60,7 +60,6 @@ function BuddyPageShell({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const prefersReducedMotion = useReducedMotion();
 
   /**
    * Leaves the conversation the way you came into it.
@@ -84,7 +83,7 @@ function BuddyPageShell({
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen xl:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col bg-app-bg xl:flex-row">
       {/* A column beside the conversation where there is room for one, a band above it where
                 there is not — one element either way, laid out by the parent's direction.
                 Rendering it twice and hiding one per breakpoint would put the same answers in the
@@ -108,69 +107,40 @@ function BuddyPageShell({
                 before the `${'{'}` — prettier-plugin-tailwindcss trims class strings when it sorts
                 them, and gluing two classes together here once turned a whole page into a flex
                 row (see ChatPage). */}
-      <div className={`flex min-w-0 flex-1 flex-col ${rail ? "app-rail-open" : ""}`}>
-        <motion.header
-          {...(prefersReducedMotion
-            ? {}
-            : {
-                initial: { opacity: 0, y: -8 },
-                animate: { opacity: 1, y: 0 },
-                transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const },
-              })}
-          className="shrink-0 border-b border-app-border bg-app-bg/85 backdrop-blur-md"
-        >
-          {/* The same `app-page-frame` gutters the header band of every other page uses, so the
-                    buddy's name starts on the line the PM dashboard's and the knowledge base's
-                    titles start on. */}
-          {/* `flex-wrap`, so the switch below can take a line of its own on a phone rather than
-                    squeezing the buddy's name to nothing. */}
-          <div className="app-page-frame flex flex-wrap items-center gap-3 py-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
-              <SleepyBot size={32} canSleep={false} tracksPointer className="text-app-brand-text" />
-            </span>
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${rail ? "app-rail-open" : ""}`}>
+        {/* A control row, not a header. The page's title, its subtitle and the switch between
+                    the two assistants all belong to `AssistantShell` now, and repeating any of
+                    them here would be the second header the reformat set out to remove. What is
+                    left is buddy-only: what came back from a PM, a fresh visit, the board, and
+                    the way out. Right-aligned and unbordered so it reads as a set of controls on
+                    the conversation rather than as a band across the page. */}
+        <div className="app-page-frame flex shrink-0 flex-wrap items-center justify-end gap-1.5 pt-3">
+          {actions}
 
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base leading-tight font-semibold text-app-text">Buddy</h1>
-              <p className="truncate text-xs text-app-text-muted">{subtitle}</p>
-            </div>
+          {/* The thread starts fresh every visit, so anything worth keeping lives on the
+                        board — the link is what stops that being a page nobody finds. A `Link`
+                        styled to sit level with the buttons beside it: a control that changes
+                        the URL is an anchor, and dressing one as a `Button` does not make it
+                        keyboard- or screen-reader-correct. */}
+          <Link
+            to="/board"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          >
+            <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+            Board
+          </Link>
 
-            {/* The way back to the chat, in the same place it sits on the chat's own page. Its
-                        own line under the title on a phone, where the header already holds a name,
-                        two or three controls and a close button. */}
-            <AssistantSurfaceSwitch
-              current="buddy"
-              className="order-last w-full sm:order-none sm:w-auto [&>button]:grow sm:[&>button]:grow-0"
-            />
-
-            <div className="flex shrink-0 items-center gap-1.5">
-              {actions}
-
-              {/* The thread starts fresh every visit, so anything worth keeping lives on the
-                            board — the link is what stops that being a page nobody finds. A `Link`
-                            styled to sit level with the buttons beside it: a control that changes
-                            the URL is an anchor, and dressing one as a `Button` does not make it
-                            keyboard- or screen-reader-correct. */}
-              <Link
-                to="/board"
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-              >
-                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                Board
-              </Link>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                aria-label="Close the conversation"
-                title="Close"
-                onClick={close}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
-        </motion.header>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Close the conversation"
+            title="Close"
+            onClick={close}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
 
         {children}
       </div>
@@ -236,7 +206,6 @@ function BuddyMentorHome() {
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
     <BuddyPageShell
-      subtitle="Your onboarding mentor — here whenever you're stuck."
       rail={
         isRailOpen ? (
           <BuddyPmReplies {...replies} onClose={() => setIsRailOpen(false)} />
@@ -334,7 +303,7 @@ export function BuddyPage() {
 
   if (!isLoading && !selectedProjectId) {
     return (
-      <BuddyPageShell subtitle="Your onboarding buddy, once you're on a project.">
+      <BuddyPageShell>
         <div className="app-page-frame flex flex-1 items-center justify-center py-8">
           <EmptyState
             icon={<Users className="h-8 w-8" aria-hidden="true" />}
