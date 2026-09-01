@@ -1,6 +1,8 @@
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChatContext } from "../../../context/ChatContext";
+import { RAIL_DESKTOP_QUERY } from "../../../components/layout/ConversationRail";
+import { useMediaQuery } from "../../../hooks/useMediaQuery";
 
 /**
  * localStorage key prefix for per-chat draft persistence (E10). Each chat's
@@ -19,7 +21,7 @@ const DRAFT_KEY = (chatId: string | undefined) => `chatDraft.${chatId ?? "__new_
 const DRAFT_UNINITIALIZED = Symbol("draftUninitialized");
 
 /**
- * Where the desktop conversation rail's collapsed state lives between visits.
+ * Where the conversation rail's collapsed state lives between visits.
  *
  * Not per chat and not per user: it is a statement about how much room this browser window has
  * to spare, and re-opening a rail somebody closed on every reload is the app forgetting a
@@ -54,10 +56,17 @@ export function useChat() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // The mobile drawer is not persisted: it covers the conversation, so an app that reopened
-  // itself over the thread on every visit would be worse than one that forgets.
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(readSidebarOpen);
+  /**
+   * Whether the rail is currently a drawer *over* the conversation rather than a column beside
+   * it. One `ConversationRail` covers both, so this is what tells the page which of the two
+   * it is looking at — see `onNavigate` below.
+   */
+  const isRailOverlay = !useMediaQuery(RAIL_DESKTOP_QUERY);
+
+  // One state for both widths, because there is one rail now. The stored preference is only
+  // honoured where the rail is a column: restoring an *overlay* on load would put the app
+  // behind its own conversation list on every visit from a phone.
+  const [isRailOpen, setIsRailOpen] = useState(() => readSidebarOpen() && !isRailOverlay);
 
   /**
    * Writes the rail's state through as it changes, rather than in an effect watching it.
@@ -65,8 +74,8 @@ export function useChat() {
    * The write belongs to the act of opening or closing it, and doing it here keeps the stored
    * value and the state in step even across a render React throws away.
    */
-  const setDesktopSidebarOpenPersisted = useCallback((open: boolean) => {
-    setDesktopSidebarOpen(open);
+  const setRailOpen = useCallback((open: boolean) => {
+    setIsRailOpen(open);
     try {
       localStorage.setItem(SIDEBAR_OPEN_KEY, String(open));
     } catch {
@@ -374,11 +383,9 @@ export function useChat() {
 
     messages,
 
-    sidebarOpen,
-    setSidebarOpen,
-
-    desktopSidebarOpen,
-    setDesktopSidebarOpen: setDesktopSidebarOpenPersisted,
+    isRailOpen,
+    setRailOpen,
+    isRailOverlay,
 
     handleSubmit,
     addMessage,

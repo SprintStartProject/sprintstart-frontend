@@ -17,6 +17,7 @@ import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
+import { ConversationRail, RailToggle } from "../components/layout/ConversationRail.tsx";
 import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
 import { useNewConversationShortcut } from "../hooks/useNewConversationShortcut.ts";
 
@@ -95,10 +96,9 @@ export function ChatPage() {
     streamingMessageId,
     newRequest,
     setNewRequest,
-    sidebarOpen,
-    setSidebarOpen,
-    desktopSidebarOpen,
-    setDesktopSidebarOpen,
+    isRailOpen,
+    setRailOpen,
+    isRailOverlay,
     textareaRef,
     bottomRef,
     selectedCitation,
@@ -346,51 +346,41 @@ export function ChatPage() {
     // No height of its own any more: the page is a panel inside `AssistantShell`, which owns
     // the viewport and the header above it.
     <div className="flex min-h-0 flex-1 overflow-hidden text-app-text">
-      {/* Mobile slide-out drawer — slides in from the left on mobile */}
-      <aside
-        id="chat-mobile-sidebar"
-        aria-label="Mobile chat navigation"
-        aria-hidden={!sidebarOpen}
-        inert={!sidebarOpen}
-        className={[
-          "fixed top-0 left-0 z-50 h-full w-64 bg-app-bg-soft",
-          "border-r border-app-border shadow-2xl",
-          "transform transition-transform duration-300 md:hidden",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
-        ].join(" ")}
+      {/* One rail for both widths: a drawer over the conversation on a phone, a column beside
+                it from `md` up. It used to be two asides rendering the same list, one hidden per
+                breakpoint — the chat list stood twice in the document, which is invisible on the
+                page and a plain duplicate to a screen reader, the browser's own find, and any
+                selector. The buddy's PM replies run on the same component. */}
+      <ConversationRail
+        id="chat-history"
+        isOpen={isRailOpen}
+        label="Chat history"
+        openWidthClassName="md:w-64"
       >
-        <div className="flex items-center justify-between p-4">
-          <h2 className="font-bold">Chats</h2>
-          <button aria-label="Close sidebar" onClick={() => setSidebarOpen(false)}>
-            <X size={24} />
-          </button>
-        </div>
-        <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} onDeleteChat={deleteChat} />
-      </aside>
-
-      {/* Desktop chat history sidebar — LEFT side, always rendered */}
-      <aside
-        aria-label="Chat history"
-        className={[
-          "hidden shrink-0 flex-col border-r border-app-border bg-app-bg-soft transition-all duration-200 md:flex",
-          desktopSidebarOpen ? "w-64" : "w-0 overflow-hidden border-r-0",
-        ].join(" ")}
-      >
-        {/* Sidebar header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex shrink-0 items-center justify-between px-4 pt-4 pb-2">
           <h2 className="text-sm font-bold tracking-wide text-app-text-muted uppercase">Chats</h2>
           <button
-            aria-label="Close sidebar"
-            onClick={() => setDesktopSidebarOpen(false)}
-            className="text-app-text-muted transition-colors hover:text-app-text"
+            type="button"
+            aria-label="Close the conversation list"
+            onClick={() => setRailOpen(false)}
+            className="rounded p-1 text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <ChatSidebar chats={chats} setSidebarOpen={() => {}} onDeleteChat={deleteChat} />
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <ChatSidebar
+            chats={chats}
+            // Only the drawer has to get out of the way after a chat is picked. Closing the
+            // column too would mean the list put itself away every time it was used.
+            onNavigate={() => {
+              if (isRailOverlay) setRailOpen(false);
+            }}
+            onDeleteChat={deleteChat}
+          />
         </div>
-      </aside>
+      </ConversationRail>
 
       {/* Main content column */}
       <div
@@ -401,32 +391,21 @@ export function ChatPage() {
         // `min-h-0` because this is now a flex item inside the shell's column rather than a
         // child of its own fixed-height page: without it the transcript would grow the column
         // instead of scrolling inside it.
-        className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "app-rail-open" : ""}`}
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${isRailOpen ? "app-rail-open" : ""}`}
       >
-        {/* The two ways back to the conversation list, floating over the top of the transcript
-                    rather than sitting in a bar of their own. The page header belongs to
+        {/* The way back to the conversation list, floating over the top of the transcript
+                    rather than sitting in a bar of its own. The page header belongs to
                     `AssistantShell` now, and a strip under it holding nothing but one toggle
                     would be a second header for a single button. The transcript pads itself out
-                    from under them — see `pt-14` below. */}
-        {!desktopSidebarOpen && (
-          <button
-            aria-label="Open sidebar"
-            onClick={() => setDesktopSidebarOpen(true)}
-            className="absolute top-3 left-2 z-20 hidden shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors hover:bg-app-surface-hover hover:text-app-text md:flex"
-          >
-            <MessageSquareText size={18} />
-          </button>
+                    from under it — see `pt-14` below. */}
+        {!isRailOpen && (
+          <RailToggle
+            label="Show your conversations"
+            controls="chat-history"
+            icon={<MessageSquareText size={18} />}
+            onClick={() => setRailOpen(true)}
+          />
         )}
-
-        <button
-          aria-label="Toggle sidebar"
-          aria-controls="chat-mobile-sidebar"
-          aria-expanded={sidebarOpen}
-          className="absolute top-3 right-[var(--app-page-gutter)] z-30 rounded-full border border-app-border bg-app-surface p-2.5 text-app-text shadow-lg hover:cursor-pointer hover:bg-app-surface-hover md:hidden"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          <MessageSquareText size={20} />
-        </button>
 
         <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">
           {!chatId && <ChatEmptyState onPickSuggestion={fillSuggestion} />}

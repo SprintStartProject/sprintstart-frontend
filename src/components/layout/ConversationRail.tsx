@@ -88,6 +88,9 @@ export function RailToggle({
       type="button"
       aria-label={label}
       aria-controls={controls}
+      // Constant, and true: this control only exists while the rail is collapsed. Saying so is
+      // what tells a screen reader that pressing it opens something rather than navigating.
+      aria-expanded={false}
       title={label}
       onClick={onClick}
       className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"

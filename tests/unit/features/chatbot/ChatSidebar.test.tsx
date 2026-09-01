@@ -26,7 +26,7 @@ describe("ChatSidebar", () => {
   it("renders chats grouped by date bucket with relative timestamps", () => {
     render(
       <MemoryRouter>
-        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} />
+        <ChatSidebar chats={mockChats} onNavigate={vi.fn()} />
       </MemoryRouter>,
     );
 
@@ -39,24 +39,24 @@ describe("ChatSidebar", () => {
     expect(screen.getByText("Thinking...")).toBeInTheDocument();
   });
 
-  it("calls setSidebarOpen when a chat is clicked", async () => {
+  it("reports that the list navigated, so a drawer can get out of the way", async () => {
     const user = userEvent.setup();
-    const setSidebarOpen = vi.fn();
+    const onNavigate = vi.fn();
     render(
       <MemoryRouter>
-        <ChatSidebar chats={mockChats} setSidebarOpen={setSidebarOpen} />
+        <ChatSidebar chats={mockChats} onNavigate={onNavigate} />
       </MemoryRouter>,
     );
 
     await user.click(screen.getByText("First chat"));
-    expect(setSidebarOpen).toHaveBeenCalledWith(false);
+    expect(onNavigate).toHaveBeenCalled();
   });
 
   it("filters chats by the search query", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} />
+        <ChatSidebar chats={mockChats} onNavigate={vi.fn()} />
       </MemoryRouter>,
     );
 
@@ -70,7 +70,7 @@ describe("ChatSidebar", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} />
+        <ChatSidebar chats={mockChats} onNavigate={vi.fn()} />
       </MemoryRouter>,
     );
 
@@ -84,7 +84,7 @@ describe("ChatSidebar", () => {
     const onDeleteChat = vi.fn().mockResolvedValue(undefined);
     render(
       <MemoryRouter>
-        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} onDeleteChat={onDeleteChat} />
+        <ChatSidebar chats={mockChats} onNavigate={vi.fn()} onDeleteChat={onDeleteChat} />
       </MemoryRouter>,
     );
 
@@ -109,7 +109,7 @@ describe("ChatSidebar", () => {
     const onDeleteChat = vi.fn().mockResolvedValue(undefined);
     render(
       <MemoryRouter>
-        <ChatSidebar chats={mockChats} setSidebarOpen={vi.fn()} onDeleteChat={onDeleteChat} />
+        <ChatSidebar chats={mockChats} onNavigate={vi.fn()} onDeleteChat={onDeleteChat} />
       </MemoryRouter>,
     );
 

@@ -7,6 +7,7 @@ import { ChatProvider } from "../../../../src/context/ChatProvider";
 import { ChatContext } from "../../../../src/context/ChatContext";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
+import { mockViewport } from "../../setup/matchMedia";
 
 const mockNavigate = vi.fn();
 
@@ -105,6 +106,9 @@ describe("useChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // Back to the narrowest viewport between tests: `mockViewport` writes to `window`, so a
+    // test that pinned a desktop width would otherwise decide the layout of every one after it.
+    mockViewport(false);
     routerState.params = { id: "chat1" };
     routerState.location = { pathname: "/" };
     projectState.selectedProjectId = "proj1";
@@ -117,22 +121,39 @@ describe("useChat", () => {
    * than per chat or per user for the same reason: it is about the window, not the content.
    */
   it("remembers the conversation rail being collapsed", () => {
+    // The preference only applies where the rail is a column. jsdom reports the narrowest
+    // viewport by default, which is the width where it is a drawer instead.
+    mockViewport(true);
+
     const { result } = renderHook(() => useChat(), { wrapper });
 
-    expect(result.current.desktopSidebarOpen).toBe(true);
+    expect(result.current.isRailOpen).toBe(true);
 
-    act(() => result.current.setDesktopSidebarOpen(false));
+    act(() => result.current.setRailOpen(false));
 
-    expect(result.current.desktopSidebarOpen).toBe(false);
+    expect(result.current.isRailOpen).toBe(false);
 
     // A fresh mount, the way a reload arrives.
-    const reopened = renderHook(() => useChat(), { wrapper });
+    expect(renderHook(() => useChat(), { wrapper }).result.current.isRailOpen).toBe(false);
+  });
 
-    expect(reopened.result.current.desktopSidebarOpen).toBe(false);
+  /**
+   * The same preference, deliberately not honoured on a phone: there the rail is a drawer over
+   * the conversation, and restoring it on load would put the app behind its own chat list on
+   * every visit.
+   */
+  it("does not reopen the rail over the conversation on a narrow screen", () => {
+    mockViewport(true);
+    const wide = renderHook(() => useChat(), { wrapper });
 
-    act(() => reopened.result.current.setDesktopSidebarOpen(true));
+    act(() => wide.result.current.setRailOpen(true));
+    expect(wide.result.current.isRailOpen).toBe(true);
 
-    expect(renderHook(() => useChat(), { wrapper }).result.current.desktopSidebarOpen).toBe(true);
+    mockViewport(false);
+    const narrow = renderHook(() => useChat(), { wrapper });
+
+    expect(narrow.result.current.isRailOverlay).toBe(true);
+    expect(narrow.result.current.isRailOpen).toBe(false);
   });
 
   it("fetches chats and user profile on mount", async () => {
