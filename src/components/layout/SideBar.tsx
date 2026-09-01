@@ -9,6 +9,7 @@ import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitc
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
+import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import {
   AdminIcon,
   ArrivalStepsIcon,
@@ -45,7 +46,19 @@ type SidebarContentProps = {
    * once (desktop and mobile), so owning the request would fire it twice.
    */
   hasPmAttentionItems?: boolean;
+  /**
+   * How many escalated questions are waiting on a person. Passed in for the
+   * same reason as the flag above: this component is mounted twice at once.
+   */
+  openEscalationCount?: number;
 };
+
+/**
+ * The escalation inbox's route, named because three things have to agree on it:
+ * the nav entry, the access check that decides whether to read the count, and
+ * the entry the count is handed to.
+ */
+const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
 const navItems: SidebarNavItem[] = [
   {
@@ -108,7 +121,7 @@ const projectManagerNavItems: SidebarNavItem[] = [
   // additionally requires managing the selected project.
   {
     label: "Escalation Inbox",
-    path: "/insights/knowledge-requests",
+    path: ESCALATION_INBOX_PATH,
     icon: InboxIcon,
   },
 ];
@@ -134,6 +147,7 @@ function SidebarContent({
   onNavigate,
   "aria-label": ariaLabel = "Primary Navigation",
   hasPmAttentionItems = false,
+  openEscalationCount = 0,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
@@ -248,6 +262,8 @@ function SidebarContent({
                   pointerY={pointerY}
                   hasAttentionMarker={item.path === "/pm-dashboard" && hasPmAttentionItems}
                   attentionLabel="Open skip requests or unread feedback"
+                  count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
+                  countLabel={(open) => `${open} open ${open === 1 ? "escalation" : "escalations"}`}
                   onNavigate={onNavigate}
                 />
               ))}
@@ -354,6 +370,18 @@ export function SideBar() {
     pathname,
   );
 
+  // Its own read, not a second use of the flag above: that one counts pending
+  // skip requests and unread feedback off the team overview, and knows nothing
+  // about escalations. Gated on the inbox route rather than the dashboard --
+  // for a PM it additionally requires managing the selected project, so a PM
+  // who is only a member of it neither pays for the request nor sees a badge
+  // for an entry their sidebar does not show.
+  const openEscalationCount = useOpenEscalationCount(
+    selectedProjectId,
+    canAccessRoute(profile, ESCALATION_INBOX_PATH, canManageSelected),
+    pathname,
+  );
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
@@ -364,7 +392,11 @@ export function SideBar() {
         aria-label="Desktop Sidebar"
         className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex"
       >
-        <SidebarContent aria-label="Desktop Navigation" hasPmAttentionItems={hasPmAttentionItems} />
+        <SidebarContent
+          aria-label="Desktop Navigation"
+          hasPmAttentionItems={hasPmAttentionItems}
+          openEscalationCount={openEscalationCount}
+        />
       </aside>
 
       <header className="fixed top-0 right-0 left-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
@@ -415,6 +447,7 @@ export function SideBar() {
           aria-label="Mobile Navigation"
           onNavigate={closeMobileSidebar}
           hasPmAttentionItems={hasPmAttentionItems}
+          openEscalationCount={openEscalationCount}
         />
       </aside>
     </>
