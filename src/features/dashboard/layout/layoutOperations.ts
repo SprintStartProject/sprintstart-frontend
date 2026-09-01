@@ -86,6 +86,34 @@ export function addWidget(
   return [...layout, { id: definition.id, size: definition.defaultSize }];
 }
 
+/**
+ * Replaces the set of placed widgets in one go, keeping everything the user has already
+ * arranged exactly where and how it was.
+ *
+ * The picker's operation. Adding and removing one at a time already exist and are what the
+ * board's own controls use; this is the batch behind a dialog where somebody ticks several
+ * boxes and presses save, and the difference matters: a kept widget must not lose its position
+ * or the size it was given just because the picker was opened, so the existing layout is
+ * filtered rather than rebuilt.
+ *
+ * Newly ticked widgets go on the end, in catalog order, at their default size — the same
+ * place and shape a single "add" would have put them.
+ */
+export function setPlacedWidgets(
+  layout: DashboardLayout,
+  selectedIds: ReadonlySet<DashboardWidgetId>,
+  available: readonly DashboardWidgetDefinition[],
+): DashboardLayout {
+  const kept = layout.filter((item) => selectedIds.has(item.id));
+  const alreadyPlaced = new Set(kept.map((item) => item.id));
+
+  const added = available
+    .filter((widget) => selectedIds.has(widget.id) && !alreadyPlaced.has(widget.id))
+    .map((widget) => ({ id: widget.id, size: widget.defaultSize }));
+
+  return [...kept, ...added];
+}
+
 export function removeWidget(layout: DashboardLayout, id: DashboardWidgetId): DashboardLayout {
   return layout.filter((item) => item.id !== id);
 }
