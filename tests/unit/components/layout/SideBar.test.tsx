@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -6,6 +6,7 @@ import { SideBar } from "../../../../src/components/layout/SideBar";
 import * as useAuthHook from "../../../../src/context/useAuth";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { PermissionGroup } from "../../../../src/services/types";
+import { knowledgeRequestService } from "../../../../src/services/knowledgeRequestService";
 
 // Mutable so individual tests can flip it mid-suite. Module-level mock
 // factories cannot close over `let`, hence the `vi.hoisted` shared object
@@ -31,6 +32,13 @@ vi.mock("../../../../src/features/projects/useProjectContext", async () => {
 
 vi.mock("../../../../src/context/useAuth", () => ({
   useAuth: vi.fn(),
+}));
+
+// The escalation count is a real read now. Mocked here rather than left to
+// hit the network, and asserted on below: the sidebar renders twice at once,
+// so "who owns the request" is a thing this suite has to keep honest.
+vi.mock("../../../../src/services/knowledgeRequestService", () => ({
+  knowledgeRequestService: { listOpen: vi.fn() },
 }));
 
 const mockProfile = {
@@ -327,5 +335,62 @@ describe("SideBar", () => {
 
     expect(screen.getByLabelText("Close sidebar")).toBeInTheDocument();
     expect(screen.getByLabelText("Close sidebar overlay")).toBeInTheDocument();
+  });
+
+  /**
+   * The count is owned by `SideBar`, not by `SidebarContent` — that renders
+   * twice at once, once for the desktop rail and once for the mobile drawer,
+   * so owning the read there would fire it twice on every page load and every
+   * project switch. Same reason the PM attention flag lives up there.
+   */
+  describe("open escalation count", () => {
+    const asPm = () => {
+      vi.mocked(useAuthHook.useAuth).mockReturnValue({
+        status: "authenticated",
+        profile: { ...mockProfile, permissionGroup: PermissionGroup.PM },
+        login: vi.fn(),
+        logout: vi.fn(),
+        refetchProfile: vi.fn(),
+      });
+    };
+
+    it("reads the queue once for both sidebars", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.listOpen).mockResolvedValue([]);
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(knowledgeRequestService.listOpen).toHaveBeenCalled());
+      expect(knowledgeRequestService.listOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it("puts the number on the Escalation Inbox entry", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.listOpen).mockResolvedValue([
+        { id: "r1" },
+        { id: "r2" },
+        { id: "r3" },
+      ] as never);
+
+      renderWithProviders(<SideBar />);
+
+      // Once per sidebar: the desktop rail and the mobile drawer both render it.
+      await waitFor(() => expect(screen.getAllByText("3").length).toBeGreaterThan(0));
+      expect(screen.getAllByText("3 open escalations").length).toBeGreaterThan(0);
+    });
+
+    it("never reads it for somebody who cannot open the inbox", () => {
+      vi.mocked(useAuthHook.useAuth).mockReturnValue({
+        status: "authenticated",
+        profile: mockProfile,
+        login: vi.fn(),
+        logout: vi.fn(),
+        refetchProfile: vi.fn(),
+      });
+
+      renderWithProviders(<SideBar />);
+
+      expect(knowledgeRequestService.listOpen).not.toHaveBeenCalled();
+    });
   });
 });

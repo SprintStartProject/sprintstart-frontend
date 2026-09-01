@@ -96,6 +96,16 @@ type SidebarNavLinkProps = {
   hasAttentionMarker?: boolean;
   /** Announced to assistive tech in place of the purely visual marker. */
   attentionLabel?: string;
+  /**
+   * How many things are waiting behind this entry. Shown as a pill when above
+   * zero; a count of nothing is not news, so zero renders nothing at all.
+   */
+  count?: number;
+  /**
+   * What the number counts, announced instead of the bare figure -- "3" on its
+   * own tells a screen reader nothing about what three of them there are.
+   */
+  countLabel?: (count: number) => string;
   onNavigate?: () => void;
 };
 
@@ -128,6 +138,8 @@ export function SidebarNavLink({
   pointerY,
   hasAttentionMarker = false,
   attentionLabel,
+  count = 0,
+  countLabel,
   onNavigate,
 }: SidebarNavLinkProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -288,13 +300,41 @@ export function SidebarNavLink({
                                         and movement is invisible to a screen
                                         reader -- and to anyone who has reduced
                                         motion on, which is why the colour
-                                        change is not conditional on it. */}
-                  <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                                        change is not conditional on it.
+
+                                        Conditional on the marker, which it was
+                                        not: rendered unconditionally, every
+                                        entry in the sidebar announced "Needs
+                                        attention", so the one entry that really
+                                        did said nothing a screen reader could
+                                        distinguish. */}
+                  {hasAttentionMarker && (
+                    <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                  )}
                 </motion.span>
 
                 <span>{label}</span>
 
-                {isHighlighted ? (
+                {/* One trailing slot, not two. The count takes it when there is
+                                    one: a number and the active dot side by side read as
+                                    two separate signals about the same row, and the row
+                                    you are already on has less to tell you than the one
+                                    with work waiting behind it. */}
+                {count > 0 ? (
+                  <span className="ml-auto flex items-center">
+                    <span
+                      aria-hidden="true"
+                      className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold ${
+                        isHighlighted
+                          ? "bg-white/20 text-white"
+                          : "bg-app-brand-soft text-app-brand-text"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                    <span className="sr-only">{countLabel?.(count) ?? `${count} waiting`}</span>
+                  </span>
+                ) : isHighlighted ? (
                   <span className="ml-auto h-[6px] w-[6px] rounded-full bg-white" />
                 ) : null}
               </span>
