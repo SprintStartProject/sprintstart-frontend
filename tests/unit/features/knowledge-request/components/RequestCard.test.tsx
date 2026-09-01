@@ -78,6 +78,25 @@ describe("RequestCard identity", () => {
     expect(screen.getByText("Onboarding not started")).toBeInTheDocument();
   });
 
+  // A finished path has no active step either, so reading "no step" as "not started" told the PM
+  // that somebody three weeks in and fully ramped had never begun -- the inverse of the signal.
+  it("does not mistake a finished onboarding for one that never began", () => {
+    renderCard({
+      hire: hire({ currentStep: null, currentPhase: null, progressPercentage: 1 }),
+    });
+
+    expect(screen.getByText("Onboarding complete")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding not started")).toBeNull();
+  });
+
+  it("reports the number rather than guessing when there is no active step mid-path", () => {
+    renderCard({
+      hire: hire({ currentStep: null, currentPhase: null, progressPercentage: 0.6 }),
+    });
+
+    expect(screen.getByText("No active step — 60% through")).toBeInTheDocument();
+  });
+
   it("names the step even when its phase is missing", () => {
     renderCard({ hire: hire({ currentPhase: null, progressPercentage: 0.5 }) });
 

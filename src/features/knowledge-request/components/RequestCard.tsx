@@ -121,14 +121,28 @@ function HireIdentity({ hire }: { hire: EscalationHire }) {
 /**
  * Where somebody is, in one line.
  *
- * "Onboarding not started" is said outright rather than left as an empty row: a blank line under a
- * name reads as a value that failed to load, and the difference between "we don't know" and "there
- * is nothing yet" is exactly what a PM is trying to judge.
+ * A missing `currentStep` means two opposite things, and saying the wrong one is worse than saying
+ * nothing. The backend has no active step both for somebody who has not begun *and* for somebody
+ * who has finished every step — so the progress figure, not the step, is what separates them.
+ * Telling a PM that a hire three weeks in and fully ramped has "not started" would invert the very
+ * signal this card exists to give.
+ *
+ * Said outright either way rather than left as an empty row: a blank line under a name reads as a
+ * value that failed to load, and "we don't know" versus "there is nothing yet" is exactly the
+ * distinction a PM is trying to draw.
  */
 function positionOf(hire: EscalationHire): string {
-  if (!hire.currentStep) return "Onboarding not started";
-
   const progress = `${Math.round(hire.progressPercentage * 100)}% through`;
+
+  if (!hire.currentStep) {
+    if (hire.progressPercentage >= 1) return "Onboarding complete";
+    // Nothing active and nothing finished is somebody who has not begun. In between is a state the
+    // backend does not currently produce -- every step is waiting, running, finished or skipped, so
+    // "none active" implies "all done" -- but reporting the number beats asserting either extreme
+    // if that ever stops being true.
+    return hire.progressPercentage > 0 ? `No active step — ${progress}` : "Onboarding not started";
+  }
+
   const where = hire.currentPhase ? `${hire.currentStep} · ${hire.currentPhase}` : hire.currentStep;
 
   return `${where} — ${progress}`;
