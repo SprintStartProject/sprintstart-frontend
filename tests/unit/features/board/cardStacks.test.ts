@@ -45,6 +45,17 @@ describe("buildStacks", () => {
     expect(stacks.get("b")?.rootId).toBe("a");
   });
 
+  it("keeps walking a run however long it is", () => {
+    // The model was never the limit on chain length — the board's arrange mode was, by folding a
+    // pair into a pile the moment it was made and taking the card you would chain next off the
+    // screen with it. Nailed down here so the two cannot be confused again.
+    const cards = [card("a"), card("b"), card("c"), card("d"), card("e")];
+    const stacks = stacksOf(cards, chain("a", "b", "c", "d", "e"));
+
+    expect(stacks.get("c")?.memberIds).toEqual(["a", "b", "c", "d", "e"]);
+    expect(stacks.get("c")?.remaining).toBe(5);
+  });
+
   it("puts the first unfinished card on top", () => {
     const cards = [card("a", true), card("b", true), card("c")];
     const stacks = stacksOf(cards, chain("a", "b", "c"));
@@ -136,5 +147,56 @@ describe("collapseStacks", () => {
     const cards = [card("a"), card("b")];
 
     expect(collapseStacks(cards, new Map(), new Set()).map((c) => c.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("stacks and the areas they sit in", () => {
+  /** Every card in the area its id is listed under. */
+  function areas(map: Record<string, string[]>) {
+    const byCard = new Map<string, string>();
+    for (const [area, ids] of Object.entries(map)) for (const id of ids) byCard.set(id, area);
+
+    return (cardId: string) => byCard.get(cardId) ?? null;
+  }
+
+  it("ends a run where the area changes", () => {
+    const cards = [card("a"), card("b"), card("c")];
+    const states = deriveCardStates(cards, chain("a", "b", "c"));
+
+    // A pile is drawn in one place, and the layout files a block under exactly one area — a chain
+    // running out of one area into another had two, and the grid drew it in both.
+    const stacks = buildStacks(cards, states, areas({ week1: ["a", "b"], team: ["c"] }));
+
+    expect(stacks.get("a")?.memberIds).toEqual(["a", "b"]);
+    expect(stacks.get("c")).toBeUndefined();
+  });
+
+  it("carries what its members are called and what they are, because they will be folded away", () => {
+    const cards = [card("a"), card("b")];
+    const stacks = stacksOf(cards, chain("a", "b"));
+
+    // By the time anything draws a closed pile, its members are gone from the card list — folding
+    // them away is the point. The names have to travel with the pile or there is nothing left to
+    // say about what is underneath but a number.
+    expect(stacks.get("a")?.members.get("b")).toEqual({ name: "b", kind: "CHECKLIST" });
+  });
+
+  it("still stacks a chain that stays inside one area", () => {
+    const cards = [card("a"), card("b")];
+    const states = deriveCardStates(cards, chain("a", "b"));
+    const stacks = buildStacks(cards, states, areas({ team: ["a", "b"] }));
+
+    expect(stacks.get("a")?.memberIds).toEqual(["a", "b"]);
+  });
+
+  it("shows a pile whose top card is filtered away rather than none of it", () => {
+    const cards = [card("a"), card("b")];
+    const stacks = stacksOf(cards, chain("a", "b"));
+
+    // The board hands this a filtered list — one source, one area. Keying on the top card alone
+    // would take every member of the pile with it.
+    const shown = collapseStacks([cards[1]], stacks, new Set());
+
+    expect(shown.map((shownCard) => shownCard.id)).toEqual(["b"]);
   });
 });

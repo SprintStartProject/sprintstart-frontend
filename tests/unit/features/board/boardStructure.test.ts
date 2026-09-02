@@ -112,10 +112,10 @@ describe("currentStage", () => {
 
     const states = deriveCardStates(
       [done, later],
-      structure({ done: { stage: "NOW" }, later: { stage: "NEXT" } }),
+      structure({ done: { stage: "NOW" }, later: { stage: "LATER" } }),
     );
 
-    expect(currentStage(states)).toBe("NEXT");
+    expect(currentStage(states)).toBe("LATER");
   });
 
   it("stays on a stage whose only open card is blocked", () => {
@@ -157,7 +157,7 @@ describe("setDependency", () => {
 describe("pruneStructure", () => {
   it("forgets cards that are gone, and edges pointing at them", () => {
     const stored = structure({
-      kept: { stage: "NEXT", dependsOn: ["gone"] },
+      kept: { stage: "LATER", dependsOn: ["gone"] },
       gone: { stage: "NOW" },
     });
 
@@ -180,6 +180,23 @@ describe("storage", () => {
     window.localStorage.setItem("sprintstart:board-structure:board-2", "{not json");
 
     expect(readBoardStructure("board-2")).toEqual(EMPTY);
+  });
+
+  it("reads a stage written before there were two of them as 'not now'", () => {
+    window.localStorage.setItem(
+      "sprintstart:board-structure:board-4",
+      JSON.stringify({
+        version: 1,
+        structure: { cards: { a: { stage: "NEXT" } }, groupStages: { g1: "NEXT" } },
+      }),
+    );
+
+    // Dropping it would fall back to the default, `NOW` — so every card somebody deliberately
+    // deferred would arrive on top of the pile, which is the worst of the available answers.
+    expect(readBoardStructure("board-4")).toEqual({
+      cards: { a: { stage: "LATER" } },
+      groupStages: { g1: "LATER" },
+    });
   });
 
   it("drops entries it does not recognise instead of trusting them", () => {

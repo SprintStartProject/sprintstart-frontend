@@ -8,6 +8,14 @@ import type { BoardCard } from "../types";
  * resize. An estimate is stable, runs before the first paint, and is only ever used to decide which
  * column a card starts in; being a little wrong costs a slightly uneven column, not a broken one.
  */
+/**
+ * How many lines a checklist card draws before it collapses the rest into a count.
+ *
+ * Lives here rather than being imported from the card so the layout has no dependency on a
+ * component; {@link ChecklistCard} holds the matching constant and the reasoning behind the number.
+ */
+const CHECKLIST_LINES_SHOWN = 6;
+
 export function cardWeight(card: BoardCard, collapsed: boolean): number {
   // A folded card is its header, whatever it holds.
   if (collapsed) return 1.6;
@@ -23,7 +31,9 @@ export function cardWeight(card: BoardCard, collapsed: boolean): number {
     case "COMPETENCY_PROGRESS":
       return 3 + (content.held.length + content.inProgress.length) * 0.7;
     case "CHECKLIST":
-      return 3 + content.items.length;
+      // Capped the way the card is: a checklist shows six lines and counts the rest, so a list of
+      // twenty is not the tall block this estimate used to reserve a column for.
+      return 3 + Math.min(content.items.length, CHECKLIST_LINES_SHOWN + 1);
     case "NOTE":
       return 2 + content.text.split("\n").length * 0.6;
     case "CURRENT_TASK":

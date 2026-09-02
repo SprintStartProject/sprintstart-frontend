@@ -27,7 +27,7 @@ export type CardBlueprint = {
   description: string;
   /** The lines on the checklist, in order. A blueprint with no lines is a card with a title only. */
   items: string[];
-  /** When it is due — the same three stages the board sorts and hides by. */
+  /** When it is due — the same stages the board sorts and folds by. */
   stage: BoardStage;
   /**
    * Which project roles get this card. Empty means everybody on the project.

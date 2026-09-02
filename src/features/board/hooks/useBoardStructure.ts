@@ -41,10 +41,7 @@ export type UseBoardStructureResult = {
    * iteration overwrite the last and leave only the final card sequenced — the kind of bug that
    * looks like "the generator only did the last phase" and is nothing of the sort.
    */
-  applyPlan: (
-    areas: { stage: BoardStage; cardIds: string[] }[],
-    chain: Record<string, string>,
-  ) => void;
+  applyPlan: (stages: Record<string, BoardStage>, chain: Record<string, string>) => void;
 };
 
 /**
@@ -109,18 +106,15 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
       };
       save(blockerId ? setDependency(cleared, cardId, blockerId, true) : cleared);
     },
-    applyPlan: (areas, chain) => {
+    applyPlan: (stages, chain) => {
       let next = structure;
-      for (const area of areas) {
-        for (const cardId of area.cardIds) next = setCardStage(next, cardId, area.stage);
+      for (const [cardId, stage] of Object.entries(stages)) {
+        next = setCardStage(next, cardId, stage);
       }
       for (const [cardId, blockerId] of Object.entries(chain)) {
         next = setDependency(next, cardId, blockerId, true);
       }
-      save(
-        next,
-        areas.flatMap((area) => area.cardIds),
-      );
+      save(next, Object.keys(stages));
     },
   };
 }

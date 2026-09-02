@@ -4,6 +4,7 @@ import {
   planCardsFromPath,
   readableTitle,
   sourceOfTitle,
+  titleKey,
 } from "../../../../src/features/board/generation/pathToCards";
 import type {
   OnboardingPathEndpoint,
@@ -104,9 +105,11 @@ describe("planCardsFromPath", () => {
       ]),
     );
 
-    expect(plan.areas.map((area) => [area.name, area.stage])).toEqual([
+    // The stage rides on the card, not on the area: an area is where a card is filed, and when it
+    // is due is a separate question that folds inside every area the same way.
+    expect(plan.areas.map((area) => [area.name, area.cards[0].stage])).toEqual([
       ["Week one", "NOW"],
-      ["Week two", "NEXT"],
+      ["Week two", "LATER"],
       ["Later on", "LATER"],
     ]);
   });
@@ -196,5 +199,32 @@ describe("card source markers", () => {
 
     expect(sourceOfTitle(request.title ?? null)).toBe("PATH");
     expect(readableTitle(request.title ?? "")).toBe("Set up your machine");
+  });
+});
+
+describe("recognising a card that is already there", () => {
+  it("stores a title the way the server will, so a second run finds it", () => {
+    // The server trims what it stores. A title planned with the space still on it would never
+    // match the card it just wrote, and every run would add another copy.
+    expect(markTitle("TEAM", "Read the runbook ")).toBe(markTitle("TEAM", "Read the runbook"));
+  });
+
+  it("matches a stored title against the one that was planned", () => {
+    expect(titleKey(markTitle("TEAM", "Read the runbook"))).toBe(titleKey("Read the runbook"));
+  });
+
+  it("ignores the differences nobody can see", () => {
+    expect(titleKey("  Read the runbook  ")).toBe(titleKey("read the  runbook"));
+  });
+
+  it("treats the same work from the path and from the team as one card", () => {
+    expect(titleKey(markTitle("PATH", "Read the runbook"))).toBe(
+      titleKey(markTitle("TEAM", "Read the runbook")),
+    );
+  });
+
+  it("keeps two differently named cards apart", () => {
+    expect(titleKey("Read the runbook")).not.toBe(titleKey("Read the handbook"));
+    expect(titleKey(null)).toBe("");
   });
 });

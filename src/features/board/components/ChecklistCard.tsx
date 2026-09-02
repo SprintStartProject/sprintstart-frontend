@@ -16,6 +16,19 @@ type ChecklistCardProps = {
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
 };
 
+/**
+ * How many lines a checklist shows before it starts counting the rest.
+ *
+ * A twenty-line list is a card three screens tall, and a board of those is a board nobody scrolls
+ * to the bottom of — one long card pushes everything after it out of sight, which is the same
+ * clutter as ten short ones and harder to see coming. Six is enough to tell what the list is about
+ * and what is next on it; the rest are one click away and counted, so nothing is hidden silently.
+ *
+ * Done lines sink to the bottom, so a list that is half ticked off spends its six on the half that
+ * is still to do.
+ */
+const VISIBLE_ITEMS = 6;
+
 /** The items, as the server needs them back: existing ones keep their id, so a tick lands on a line. */
 function toRequest(content: ChecklistContent, items: ChecklistItem[]): AuthoredCardRequest {
   return {
@@ -48,13 +61,17 @@ export function ChecklistCard({
   onEdit,
 }: ChecklistCardProps) {
   const [newItem, setNewItem] = useState("");
+  const [showingAll, setShowingAll] = useState(false);
   const done = content.items.filter((item) => item.done).length;
 
   // `sort` is stable, so within each half the hire's own order survives.
-  const shown = useMemo(
+  const ordered = useMemo(
     () => [...content.items].sort((a, b) => Number(a.done) - Number(b.done)),
     [content.items],
   );
+
+  const overflow = showingAll ? 0 : Math.max(ordered.length - VISIBLE_ITEMS, 0);
+  const shown = overflow > 0 ? ordered.slice(0, VISIBLE_ITEMS) : ordered;
 
   const toggle = (itemId: string) => {
     onEdit?.(
@@ -155,6 +172,18 @@ export function ChecklistCard({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Counted, and it opens in place — a list that just stopped at six would have the card
+          quietly lying about how long it is. */}
+      {overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowingAll(true)}
+          className="mt-2 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        >
+          {overflow} more {overflow === 1 ? "line" : "lines"}
+        </button>
       )}
 
       {onEdit && (

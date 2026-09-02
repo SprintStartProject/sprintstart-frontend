@@ -14,6 +14,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { Collapsible } from "../../../components/ui/Collapsible";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { cardName } from "../layout/cardNames";
 import { useBoardCardControls } from "./boardCardControls";
@@ -220,11 +221,15 @@ export function BoardCardFrame({
                   </button>
                 )}
 
+                {/* The mark, not the sentence. Who placed a card is worth knowing and is almost
+                    never what the hire is here to read — and spelled out it was the widest thing in
+                    the header, pushing the title onto a second line on half the cards. The icon
+                    keeps the fact on screen; the tooltip and the screen-reader text keep the
+                    sentence for whoever wants it. */}
                 {card.owner === "AI" && (
                   <Badge
                     variant="brand"
                     size="sm"
-                    className="gap-1"
                     title={
                       placedByBuddy
                         ? "Your buddy put this here — it reads your onboarding live"
@@ -232,7 +237,9 @@ export function BoardCardFrame({
                     }
                   >
                     <Bot className="h-3 w-3" aria-hidden="true" />
-                    {placedByBuddy ? "Buddy added this" : "Kept for you"}
+                    <span className="sr-only">
+                      {placedByBuddy ? "Your buddy added this card" : "Kept up to date for you"}
+                    </span>
                   </Badge>
                 )}
               </div>
@@ -353,11 +360,11 @@ export function BoardCardFrame({
           </div>
         </header>
 
-        {open && (
+        <Collapsible open={open}>
           <div className="relative [[data-arranging]_&]:pointer-events-none [[data-arranging]_&]:select-none">
             {children}
           </div>
-        )}
+        </Collapsible>
       </section>
     </SpotlightCard>
   );

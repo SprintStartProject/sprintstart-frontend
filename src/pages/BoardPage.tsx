@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  AlertCircle,
-  Bot,
-  Check,
-  LayoutDashboard,
-  ListChecks,
-  Move,
-  RefreshCw,
-  Sparkles,
-  Telescope,
-} from "lucide-react";
+import { AlertCircle, Bot, Check, LayoutDashboard, Move, RefreshCw, Sparkles } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -26,6 +16,7 @@ import type { BoardCard } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
 import { BoardPathRail } from "../features/board/components/BoardPathRail";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
+import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
@@ -37,11 +28,16 @@ import {
   sectionTabOrder,
   summariseSections,
 } from "../features/board/layout/boardSections";
-import { currentStage, STAGE_LABELS } from "../features/board/layout/boardStructure";
+import {
+  BOARD_STAGES,
+  currentStage,
+  type BoardStage,
+} from "../features/board/layout/boardStructure";
 import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import { sourceOfTitle } from "../features/board/generation/pathToCards";
 import {
   assignToGroup,
+  groupOf,
   readBoardGroups,
   writeBoardGroups,
   type BoardGroup,
@@ -94,14 +90,14 @@ import { NEW_GROUP } from "../features/board/components/BoardGrid";
 const UNDO_WINDOW_MS = 7000;
 
 /**
- * The board size at which the focus view turns itself on.
+ * The board size at which the stage bands arrive folded.
  *
- * Below it, showing everything *is* the right view: a hire with six cards can read all six, and
- * hiding four of them behind a mode would be the board being clever at their expense. Above it the
- * cost flips, and it flips quickly — the complaint the focus view answers is not "this is slightly
- * long", it is "forty cards appeared and I do not know where to start".
+ * Below it, everything open *is* the right view: a hire with six cards can read all six, and
+ * folding four of them under three headings would be ceremony rather than help. Above it the cost
+ * flips, and it flips quickly — the complaint the bands answer is not "this is slightly long", it
+ * is "forty cards appeared and I do not know where to start".
  */
-const FOCUS_THRESHOLD = 8;
+const FOLD_THRESHOLD = 8;
 
 /**
  * Which cards the board is showing.
@@ -369,11 +365,16 @@ export function BoardPage() {
     useBoardStructure(boardId, allCards);
 
   const sections = useMemo(
-    () => summariseSections(allCards, groups, states),
-    [allCards, groups, states],
+    () =>
+      summariseSections(allCards, groups, states, {
+        // The focus tab is for a board somebody can get lost on. Below the fold threshold every
+        // card is already in front of them, and a tab offering a subset of six is a choice made
+        // for its own sake.
+        focus: allCards.length > FOLD_THRESHOLD,
+        pinnedIds,
+      }),
+    [allCards, groups, pinnedIds, states],
   );
-
-  const stage = currentStage(states);
 
   /**
    * The provenance cuts worth offering on *this* board.
@@ -424,19 +425,37 @@ export function BoardPage() {
   });
 
   /**
-   * Whether the board is showing only what is due.
+   * Which stage bands are open.
    *
-   * Decided once per board rather than remembered: which mode is right is a question about how big
-   * *this* board is, and a hire who turned focus off on a six-card board last month should not
-   * meet a forty-card one unfocused. Turning it off within a visit is one click and sticks for that
-   * visit, which is the timescale the decision actually has.
+   * This is what used to be the focus view, turned from a mode into a fold. Focus took the cards
+   * that were not due *off the board* and left a count behind; a hire looking at six of thirty-four
+   * had to take the other twenty-eight on trust. The bands put all of it on the page — named,
+   * counted, and one click from being read — which is the same reduction in what you have to look
+   * at without the part that made the board feel unreliable.
+   *
+   * Decided once per board rather than remembered, for the reason focus was: which shape is right
+   * is a question about how big *this* board is, and a hire who opened everything on a six-card
+   * board last month should not meet a forty-card one wide open. A small board arrives with every
+   * band open, because folding four cards into three headings is ceremony, not help.
    */
-  const [focused, setFocused] = useState(false);
-  const [focusDecidedFor, setFocusDecidedFor] = useState<string | null>(null);
+  const [openStages, setOpenStages] = useState<Set<BoardStage>>(new Set(BOARD_STAGES));
+  const [bandsDecidedFor, setBandsDecidedFor] = useState<string | null>(null);
 
-  if (board && boardId !== focusDecidedFor) {
-    setFocusDecidedFor(boardId);
-    setFocused(allCards.length > FOCUS_THRESHOLD);
+  if (board && boardId !== bandsDecidedFor) {
+    setBandsDecidedFor(boardId);
+    setOpenStages(
+      allCards.length > FOLD_THRESHOLD ? new Set([currentStage(states)]) : new Set(BOARD_STAGES),
+    );
+  }
+
+  function toggleStage(stage: BoardStage) {
+    setOpenStages((current) => {
+      const next = new Set(current);
+      if (next.has(stage)) next.delete(stage);
+      else next.add(stage);
+
+      return next;
+    });
   }
 
   /**
@@ -446,8 +465,32 @@ export function BoardPage() {
    * board, and a pile that was still spread out a week later would have quietly become five cards
    * again. Keyed by root id, which does not move as cards are ticked off — see `cardStacks.ts`.
    */
-  const stacks = useMemo(() => buildStacks(allCards, states), [allCards, states]);
+  // Area-aware, because a pile is drawn in one place and a chain that ran out of one area into
+  // another had two — see `cardStacks.ts`. Blueprints hit this routinely: a PM's "comes after"
+  // points at whatever card it names, wherever that card ended up filed.
+  const stacks = useMemo(
+    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null),
+    [allCards, groups, states],
+  );
   const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
+
+  /**
+   * The piles that are spread out — and while the board is being arranged, that is all of them.
+   *
+   * Derived rather than stored, because arranging is when chains get *made*. Saying "B comes after
+   * A" turns those two into a pile the moment it is set; a snapshot taken when arrange mode opened
+   * knows nothing about a pile that did not exist yet, so B folded away under A on the spot — out
+   * of the board, and out of the "waits on…" list on every other card. Which meant a run could
+   * never grow past two: the card you had just chained was gone before you could point the next one
+   * at it. Nothing was wrong with the chain; it was the surface refusing to show its own middle.
+   *
+   * The hire's own open set is kept untouched underneath, so leaving arrange mode puts the piles
+   * back exactly as they were before.
+   */
+  const openStackIds = useMemo(
+    () => (isArranging ? allRootIds(stacks) : expandedStackIds),
+    [expandedStackIds, isArranging, stacks],
+  );
 
   /**
    * Undoes every cut at once: the filter, the section, the focus view and every folded stack.
@@ -457,7 +500,7 @@ export function BoardPage() {
    * button that does not do what the sentence above it says.
    */
   function showEverything() {
-    setFocused(false);
+    setOpenStages(new Set(BOARD_STAGES));
     setSectionId(null);
     setFilter("all");
     setExpandedStackIds(allRootIds(stacks));
@@ -488,41 +531,46 @@ export function BoardPage() {
     // Stacks fold first, so every later cut sees one card where there is one card to work on. The
     // alternative — filtering the members and then folding — would let the focus view hide the card
     // a stack was about to stand on and leave the pile claiming a depth it no longer had.
-    const folded = collapseStacks(allCards, stacks, expandedStackIds);
+    const folded = collapseStacks(allCards, stacks, openStackIds);
 
     const bySource = folded.filter((card) => matchesFilter(card, filter));
-    const inSection = cardsInSection(bySource, groups, sectionId);
-    const visible = focused
-      ? inSection.filter((card) => {
-          if (pinnedIds.has(card.id)) return true;
-          // A stack somebody opened stays open. They asked for these cards by name, and the focus
-          // view hiding the ones that are not due yet would answer that by taking most of them
-          // straight back — which reads as the board refusing rather than as a mode.
-          const stackedOpen = stacks.get(card.id);
-          if (stackedOpen && expandedStackIds.has(stackedOpen.rootId)) return true;
-
-          const state = states.get(card.id);
-
-          return state !== undefined && state.stage === stage && state.status !== "DONE";
-        })
-      : inSection;
+    const visible = cardsInSection(bySource, groups, sectionId, { states, pinnedIds });
 
     return [...visible].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)));
-  }, [
-    allCards,
-    expandedStackIds,
-    filter,
-    focused,
-    groups,
-    pinnedIds,
-    sectionId,
-    stacks,
-    stage,
-    states,
-  ]);
+  }, [allCards, filter, groups, openStackIds, pinnedIds, sectionId, stacks, states]);
 
   const griddedBoard = board ? { ...board, cards: shownCards } : null;
   const hiddenCount = allCards.length - shownCards.length;
+
+  /**
+   * Every cut currently taking cards off the screen, named the way its own control names it.
+   *
+   * In the order they are applied, so the line reads as the pipeline it describes. A cut that is
+   * set but removing nothing — a filter matching every card, a section holding all of them — is
+   * left out: the line exists to explain cards that are missing, and naming a control that took
+   * nothing away would send the hire to reset something that was never the problem.
+   */
+  const activeCuts = useMemo(() => {
+    const cuts: string[] = [];
+
+    const foldedAway = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
+    if (foldedAway > 0) cuts.push(`${foldedAway} folded into sequences`);
+
+    if (filter !== "all") {
+      const option = filterOptions.find((candidate) => candidate.value === filter);
+      if (option) cuts.push(option.label);
+    }
+
+    if (sectionId !== null) {
+      const section = sections.find((candidate) => candidate.id === sectionId);
+      if (section) cuts.push(section.name);
+    }
+
+    // Folded bands are deliberately not listed. They are the one cut that says so where it happens
+    // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
+    // page explaining something that is not hidden.
+    return cuts;
+  }, [allCards, filter, filterOptions, openStackIds, sectionId, sections, stacks]);
 
   const handleReorder = (cardIds: string[]) => {
     if (!pathCard || pathIndex === -1) return void reorder(cardIds);
@@ -542,11 +590,13 @@ export function BoardPage() {
   function startArranging() {
     setFilter("all");
     setSectionId(null);
-    setFocused(false);
-    // Stacks open too. A reorder sends the order of what is *shown*, so arranging a board with
-    // four cards folded away would tell the server about a fraction of it — the same reason the
-    // filters are cleared here.
-    setExpandedStackIds(allRootIds(stacks));
+    // Every band opens with them: arranging is about the board's whole order, and a fold that hid
+    // a third of it while somebody dragged a card through would be the surface arguing with the
+    // gesture. The grid draws no bands at all while the board is being arranged.
+    setOpenStages(new Set(BOARD_STAGES));
+    // Stacks spread out too — see `openStackIds`, which does that for as long as the mode lasts
+    // rather than once on the way in. A reorder sends the order of what is *shown*, so arranging a
+    // board with four cards folded away would tell the server about a fraction of it.
     setIsArranging(true);
   }
 
@@ -590,19 +640,35 @@ export function BoardPage() {
       return;
     }
 
-    // One area per phase, named after it. The index is in the id because a plan is applied inside
-    // a single millisecond and `Date.now()` alone would mint the same id for every phase.
+    // One area per phase, named after it — and a second run adds to the area it made the first
+    // time rather than making another one beside it. Without that, generating again after the PM
+    // added a blueprint left two areas called "From your team", one holding the old cards and one
+    // holding the new, which is the same card twice as far as anybody reading the board can tell.
+    //
+    // The index is in the id because a plan is applied inside a single millisecond and `Date.now()`
+    // alone would mint the same id for every phase.
     const stamp = Date.now();
-    saveGroups([
-      ...groups,
-      ...result.areas.map((area, index) => ({
+    const filed = [...groups];
+    result.areas.forEach((area, index) => {
+      const existing = filed.findIndex((group) => group.name === area.name);
+      if (existing !== -1) {
+        filed[existing] = {
+          ...filed[existing],
+          cardIds: [...filed[existing].cardIds, ...area.cardIds],
+        };
+
+        return;
+      }
+
+      filed.push({
         id: `group-path-${stamp}-${index}`,
         name: area.name,
         cardIds: area.cardIds,
         collapsed: false,
-      })),
-    ]);
-    applyPlan(result.areas, result.chain);
+      });
+    });
+    saveGroups(filed);
+    applyPlan(result.stages, result.chain);
 
     refresh();
     toast.success(`${result.cardCount} cards added from your path`, {
@@ -731,29 +797,6 @@ export function BoardPage() {
                   />
                 )}
 
-                {allCards.length > FOCUS_THRESHOLD && (
-                  <Button
-                    variant={focused ? "primary" : "secondary"}
-                    size="sm"
-                    onClick={() => setFocused(!focused)}
-                    aria-pressed={focused}
-                    icon={
-                      focused ? (
-                        <ListChecks className="h-4 w-4" aria-hidden="true" />
-                      ) : (
-                        <Telescope className="h-4 w-4" aria-hidden="true" />
-                      )
-                    }
-                    title={
-                      focused
-                        ? "Showing what's due now, plus anything you pinned"
-                        : "Showing every card on the board"
-                    }
-                  >
-                    {focused ? `Focused on ${STAGE_LABELS[stage].title}` : "Everything"}
-                  </Button>
-                )}
-
                 <AddCardForm onAdd={addCard} />
               </div>
             </div>
@@ -805,6 +848,13 @@ export function BoardPage() {
                   </EmptyState>
                 )}
 
+                <BoardViewStatus
+                  shown={shownCards.length}
+                  total={allCards.length}
+                  cuts={activeCuts}
+                  onShowEverything={showEverything}
+                />
+
                 <BoardGrid
                   board={griddedBoard}
                   onDismiss={handleDismiss}
@@ -829,24 +879,11 @@ export function BoardPage() {
                   onToggleDone={toggleDone}
                   onSetPredecessor={setPredecessor}
                   stacks={stacks}
-                  expandedStackIds={expandedStackIds}
+                  expandedStackIds={openStackIds}
                   onToggleStack={toggleStack}
+                  openStages={openStages}
+                  onToggleStage={toggleStage}
                 />
-
-                {/* What the focus view is holding back, said out loud. A mode that hides work without
-                  saying how much is a mode that gets distrusted the first time somebody notices. */}
-                {shownCards.length > 0 && hiddenCount > 0 && (
-                  <p className="text-sm text-app-text-muted">
-                    {hiddenCount} more {hiddenCount === 1 ? "card" : "cards"} on this board.{" "}
-                    <button
-                      type="button"
-                      onClick={showEverything}
-                      className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                    >
-                      Show everything
-                    </button>
-                  </p>
-                )}
               </SlidingTabPanel>
             </div>
           </div>

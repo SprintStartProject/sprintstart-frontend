@@ -32,18 +32,15 @@ import type { BoardStage } from "../layout/boardStructure";
 const CARD_WORTHY: readonly OnboardingStepEndpoint["status"][] = ["WAITING", "IN_PROGRESS"];
 
 /**
- * How a phase's position maps onto the board's three stages.
+ * How a phase's position maps onto the board's two stages.
  *
- * A path has as many phases as it needs; the board has three coarse buckets, on purpose — see
- * `boardStructure.ts`. The first phase is what the hire does now, the second is what is coming, and
- * everything beyond that is later. The finer order survives inside the areas, which keep the
- * phases' own names and sequence.
+ * A path has as many phases as it needs; the board has two coarse buckets, on purpose — see
+ * `boardStructure.ts`. The first phase is what the hire does now, everything after it is later.
+ * The finer order survives inside the areas, which keep the phases' own names and sequence, and in
+ * the chains between the steps of a phase.
  */
 export function stageForPhase(index: number): BoardStage {
-  if (index === 0) return "NOW";
-  if (index === 1) return "NEXT";
-
-  return "LATER";
+  return index === 0 ? "NOW" : "LATER";
 }
 
 /** One card to create, and where it belongs once it exists. */
@@ -51,14 +48,23 @@ export type PlannedCard = {
   /** A key for this plan only — the real id is minted by the server on creation. */
   key: string;
   request: AuthoredCardRequest;
+  /**
+   * When this card is due.
+   *
+   * Per card rather than per area, because the two are different questions and only one of them is
+   * a place. An area is where a card is filed — "Week one", "From your team" — and a stage is when
+   * it comes up; a team's blueprints are one named set of cards that deliberately spans all three
+   * stages. Carrying the stage on the area forced that set to be split into three areas with three
+   * tab stops, which is a table of contents describing the sequencing rather than the board.
+   */
+  stage: BoardStage;
   /** The key of the card that must be finished first, or null for the first of a phase. */
   afterKey: string | null;
 };
 
-/** One phase, as an area of cards. */
+/** One named area of cards, as a plan would file them. */
 export type PlannedArea = {
   name: string;
-  stage: BoardStage;
   cards: PlannedCard[];
 };
 
@@ -95,9 +101,17 @@ export const CARD_SOURCE_MARKERS = {
 
 export type GeneratedSource = keyof typeof CARD_SOURCE_MARKERS;
 
-/** The title as stored: marked with where it came from. */
+/**
+ * The title as stored: marked with where it came from.
+ *
+ * **Trimmed, because the server trims.** A blueprint whose title a PM typed with a trailing space,
+ * or a path step the AI service handed over with a newline on the end, is stored without it — and a
+ * later run that planned the untrimmed string would find no card by that name and write a second
+ * one. Trimming here is the cheap half of that fix; {@link titleKey} is the half that holds when
+ * something else in the round trip changes the string.
+ */
 export function markTitle(source: GeneratedSource, title: string): string {
-  return `${CARD_SOURCE_MARKERS[source]}${title}`;
+  return `${CARD_SOURCE_MARKERS[source]}${title.trim()}`;
 }
 
 /** Where a stored title came from, or null when the hire wrote it themselves. */
@@ -121,6 +135,27 @@ export function readableTitle(title: string): string {
   const source = sourceOfTitle(title);
 
   return source === null ? title : title.slice(CARD_SOURCE_MARKERS[source].length);
+}
+
+/**
+ * What makes two cards the same card, for the purpose of not writing one twice.
+ *
+ * A generation run skips anything already on the board, and it can only recognise its own work by
+ * the title — so the comparison has to survive everything that happens to a title between being
+ * planned and being read back. It is trimmed and its inner runs of whitespace are collapsed,
+ * because the server stores a trimmed string and nobody can see the difference between one space
+ * and two. It is lowercased, because a card that differs from another only in capitalisation is a
+ * duplicate to the person reading the board, whatever a string comparison thinks.
+ *
+ * **The marker comes off.** A step of the hire's path and a blueprint their PM wrote can name the
+ * same piece of work, and the board would carry both as two cards with one visible title and no way
+ * to tell them apart. Keyed on what the hire reads, the second one is recognised as already there —
+ * and since blueprints are planned first, the version that survives is the one a person wrote.
+ */
+export function titleKey(title: string | null): string {
+  if (title === null) return "";
+
+  return readableTitle(title).trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 /**
@@ -151,12 +186,11 @@ export function planCardsFromPath(path: OnboardingPathEndpoint): CardPlan {
         title: markTitle("PATH", step.title),
         items: linesFor(step).map((text) => ({ text, done: false })),
       },
+      stage: stageForPhase(phaseIndex),
       afterKey: stepIndex === 0 ? null : steps[stepIndex - 1].id,
     }));
 
-    if (cards.length > 0) {
-      areas.push({ name: phase.title, stage: stageForPhase(phaseIndex), cards });
-    }
+    if (cards.length > 0) areas.push({ name: phase.title, cards });
   });
 
   return { areas, cardCount: areas.reduce((total, area) => total + area.cards.length, 0) };

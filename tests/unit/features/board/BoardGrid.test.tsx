@@ -1,6 +1,8 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { BoardGrid } from "../../../../src/features/board/components/BoardGrid";
+import type { BoardStage, CardState } from "../../../../src/features/board/layout/boardStructure";
+import type { CardStack } from "../../../../src/features/board/layout/cardStacks";
 import type {
   Board,
   BoardCard,
@@ -168,14 +170,16 @@ describe("BoardGrid", () => {
   });
 
   it("claims the buddy added a card only when the buddy actually placed it", () => {
+    // The mark is an icon in the header; the sentence lives in its screen-reader text, which is
+    // what this asserts on — the fact is what matters, not how wide it is drawn.
     const { rerender } = render(<BoardGrid board={board([pathContent()])} />);
-    expect(screen.getByText("Kept for you")).toBeInTheDocument();
-    expect(screen.queryByText("Buddy added this")).not.toBeInTheDocument();
+    expect(screen.getByText("Kept up to date for you")).toBeInTheDocument();
+    expect(screen.queryByText("Your buddy added this card")).not.toBeInTheDocument();
 
     rerender(<BoardGrid board={board([pathContent()], "2026-07-27T09:00:00Z")} />);
     // Attribution the hire cannot check is attribution they cannot trust, so the stronger
     // label is reserved for cards that carry a placement.
-    expect(screen.getByText("Buddy added this")).toBeInTheDocument();
+    expect(screen.getByText("Your buddy added this card")).toBeInTheDocument();
   });
 
   it("offers to remove a card, and says the buddy will not put it back", () => {
@@ -243,5 +247,152 @@ describe("BoardGrid", () => {
     render(<BoardGrid board={board([suggestedTasksContent()])} />);
 
     expect(screen.getByText(/your pm approves the ones that fit your role/i)).toBeInTheDocument();
+  });
+});
+
+describe("the stage bands", () => {
+  /** Every card open, in the stage it is given, keyed the way the grid reads them. */
+  function states(...stages: BoardStage[]): Map<string, CardState> {
+    return new Map(
+      stages.map((stage, index) => [
+        `c${index}`,
+        { status: "OPEN", stage, blockedBy: [], predecessorId: null, progress: null },
+      ]),
+    );
+  }
+
+  const twoStages = () => board([currentTaskContent(), suggestedTasksContent()]);
+
+  it("files the board under its stages and counts what is left in each", () => {
+    render(
+      <BoardGrid
+        board={twoStages()}
+        states={states("NOW", "LATER")}
+        openStages={new Set<BoardStage>(["NOW", "LATER"])}
+        onToggleStage={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /now/i })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
+  });
+
+  it("folds a band without taking it off the page", () => {
+    render(
+      <BoardGrid
+        board={twoStages()}
+        states={states("NOW", "LATER")}
+        openStages={new Set<BoardStage>(["NOW"])}
+        onToggleStage={vi.fn()}
+      />,
+    );
+
+    // The heading still says what is filed under it — a fold is not a disappearance, which is the
+    // whole difference between this and the focus mode it replaced.
+    const later = screen.getByRole("button", { name: /later/i });
+    expect(later).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Fix the flaky login test")).toBeInTheDocument();
+  });
+
+  it("draws no bands at all when everything sits in one stage", () => {
+    render(
+      <BoardGrid
+        board={twoStages()}
+        states={states("NOW", "NOW")}
+        openStages={new Set<BoardStage>(["NOW"])}
+        onToggleStage={vi.fn()}
+      />,
+    );
+
+    // One band is a heading over the whole board saying what the board already says.
+    expect(screen.queryByRole("button", { name: /^now/i })).not.toBeInTheDocument();
+  });
+
+  it("folds an area's own stages inside it rather than filing the area under one", () => {
+    render(
+      <BoardGrid
+        board={twoStages()}
+        groups={[{ id: "g1", name: "From your team", cardIds: ["c0", "c1"], collapsed: false }]}
+        states={states("NOW", "LATER")}
+        openStages={new Set<BoardStage>(["NOW", "LATER"])}
+        onToggleStage={vi.fn()}
+      />,
+    );
+
+    // A team's blueprints are one set somebody wrote in one sitting, deliberately spread across
+    // the stages. It keeps its name and folds by stage within itself.
+    expect(screen.getByText("From your team")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /now/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
+  });
+
+  it("lays the board out flat while it is being arranged", () => {
+    render(
+      <BoardGrid
+        board={twoStages()}
+        states={states("NOW", "LATER")}
+        openStages={new Set<BoardStage>(["NOW"])}
+        onToggleStage={vi.fn()}
+        isArranging
+      />,
+    );
+
+    // Arranging is about the board's own order; a fold hiding a third of it mid-drag would be the
+    // surface arguing with the gesture.
+    expect(screen.queryByRole("button", { name: /^later/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("a closed pile", () => {
+  const chain: CardStack = {
+    rootId: "c0",
+    memberIds: ["c0", "c1"],
+    topId: "c0",
+    remaining: 2,
+    members: new Map([
+      ["c0", { name: "Fix the flaky login test", kind: "CURRENT_TASK" as const }],
+      ["c1", { name: "Read the runbook", kind: "NOTE" as const }],
+    ]),
+  };
+
+  /** The board as the page hands it over: the members behind the top card are folded away. */
+  const closed = (onToggleStack = vi.fn()) => {
+    render(
+      <BoardGrid
+        board={board([currentTaskContent()])}
+        stacks={new Map([["c0", chain] as const])}
+        expandedStackIds={new Set()}
+        onToggleStack={onToggleStack}
+      />,
+    );
+
+    return onToggleStack;
+  };
+
+  it("names the card behind the top one instead of only counting it", () => {
+    closed();
+
+    // "There are two more" is a worse answer than saying what the next one is — a pile that only
+    // admitted to a count made you open it to find out whether it was worth opening. The name
+    // comes off the stack, because the card itself is folded away and not on this board at all.
+    expect(screen.getByText("Read the runbook")).toBeInTheDocument();
+  });
+
+  it("shows what kind of card is underneath, not just its name", () => {
+    closed();
+
+    // A name with the right glyph beside it is recognisable a good deal faster than a name alone,
+    // and the strip is the one place the card itself is not there to draw its own.
+    const strip = screen.getByText("Read the runbook").closest("button");
+
+    expect(strip?.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("opens the pile when the named card behind it is pressed", () => {
+    const onToggleStack = closed();
+
+    fireEvent.click(screen.getByText("Read the runbook"));
+
+    expect(onToggleStack).toHaveBeenCalledWith("c0");
   });
 });

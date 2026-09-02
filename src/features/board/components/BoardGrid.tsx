@@ -12,6 +12,7 @@ import { AnimatePresence, motion, useDragControls, useReducedMotion } from "fram
 import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { Collapsible } from "../../../components/ui/Collapsible";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
@@ -28,8 +29,10 @@ import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
 import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { BoardCardContext } from "./boardCardControls";
+import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
+import { cardIcon } from "../layout/cardIcons";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
 import {
@@ -92,23 +95,102 @@ const INTERACTIVE_WITHIN_CARD =
  * Real card edges rather than a hint of one: the same surface, border and shadow an actual card
  * wears, inset and pushed down so what you see below the top card is unmistakably *another card*.
  *
- * **Hovering fans them out.** That is the moment somebody is deciding whether there is anything
- * under this card, and a pile that answers by moving answers before they have read a word. Three
- * things move together, because sliding down alone just looked like the card had grown a border:
- * they travel much further out, they *rotate* a little — loose sheets, not a stack of rectangles —
- * and their shadow deepens, which is what sells them as sitting above the board rather than drawn
- * on it. They rotate about their top edge, so the swing happens at the bottom where it is visible
- * and the hidden top stays hidden behind the card.
+ * **Hovering fans them out and names them.** That is the moment somebody is deciding whether there
+ * is anything under this card, and "there are two more" is a worse answer than "next is *Set up
+ * your machine*, then *Read the runbook*". So the fan is not decoration: each sheet slides and
+ * swings far enough to show a strip carrying that card's own glyph and title, and the strip is a
+ * button that opens the pile at that card. A pile that only ever admitted to a count made you open
+ * it to find out whether it was worth opening.
  *
- * Two sheets at most. Past that the count on the chip says how deep it goes, and a third only makes
- * the card look like it is sagging.
+ * They rotate about their top edge, so the swing happens at the bottom where it is visible and the
+ * hidden top stays hidden behind the card — a hand of cards being fanned, which is the picture
+ * everybody already has for "there are more of these".
  *
- * They come first in the DOM and the card paints opaque over them, so only the offset shows.
+ * **Both turn the same way, each a little further than the one above it**, so the pile splays open
+ * to the left and the deepest sheet is the one lying lowest. Opposite angles made the two sheets
+ * lean away from each other, which is a splay rather than a fan: nothing about it says which of
+ * them is further down the run. Turning them the same way makes the depth the thing the shape is
+ * about — and it puts the low corner on the same side as the strips' own text, which starts at the
+ * left. The angles stay small because those strips carry words: past about five degrees a fan stops
+ * reading as a fan and starts reading as text that did not line up.
+ *
+ * **The tones step back with the sheets.** The nearest sheet takes the brand fill and the strong
+ * border the card itself takes on hover; the one behind it takes a lighter wash of the same colour.
+ * Depth is the thing being drawn, and two sheets highlighted identically read as one wide sheet.
+ * Pointing at a particular strip promotes *that* one to the strong tone, so the fan answers the
+ * pointer the way a list of rows does — whichever card you are about to open is the lit one.
  */
-const STACK_EDGES = [
-  "inset-x-3 top-2 -bottom-2 motion-safe:group-hover/stack:-bottom-5 motion-safe:group-hover/stack:rotate-[1.2deg]",
-  "inset-x-6 top-4 -bottom-4 motion-safe:group-hover/stack:-bottom-8 motion-safe:group-hover/stack:rotate-[-2.2deg]",
+const STACK_SHEETS = [
+  {
+    /**
+     * The next card: its strip sits directly under the top card, and it is the one the pile is
+     * about, so it takes the same strong tone the card itself takes.
+     *
+     * `peer-hover/deep` is the other half of the trade. The deeper sheet is drawn first and is
+     * therefore this one's *earlier* sibling, so it can say "somebody is pointing at me" — and
+     * when they are, this one steps back to the light tone. Whichever strip is under the pointer
+     * is the lit one, in both directions.
+     */
+    box: "inset-x-3 top-2 -bottom-2 motion-safe:group-hover/stack:-bottom-6 motion-safe:group-hover/stack:-rotate-[1.2deg]",
+    tone: "group-hover/stack:border-app-brand-border-strong group-hover/stack:bg-app-brand-soft peer-hover/deep:border-app-brand-border peer-hover/deep:bg-app-brand-soft/50",
+  },
+  {
+    /** The one after it: half a step further out, further down, and turned further the same way. */
+    box: "peer/deep inset-x-6 top-4 -bottom-3 motion-safe:group-hover/stack:-bottom-12 motion-safe:group-hover/stack:-rotate-[2.5deg]",
+    tone: "group-hover/stack:border-app-brand-border group-hover/stack:bg-app-brand-soft/50",
+  },
 ];
+
+/**
+ * The room a fanned pile takes under it, by how many sheets it has.
+ *
+ * Real space rather than an overlap. The first cut let the deeper sheet lie over whatever was below
+ * it on the theory that a hover is momentary — which was wrong twice over. It looked like the pile
+ * was lying on the next card, and it could not even do that cleanly: every block in a column
+ * carries its own opacity and transform for the entrance animation, so each is its own stacking
+ * context and they paint in document order. A `z-index` on a sheet cannot lift it above the *next*
+ * card however high it is set; the fan went *under* the card below and came out as torn edges.
+ *
+ * **But it is only taken while the fan is out.** Holding 56px of empty page under every pile for a
+ * strip nobody is looking at is a tax on the whole board for a moment that lasts as long as a
+ * pointer rests. So the margin grows on hover instead, on the same curve and over the same 300ms
+ * as the sheets themselves: the cards below drift down a little, the fan opens into the space they
+ * left, and both go back when the pointer leaves. The board answering the gesture *is* the effect
+ * — a pile that pushes its neighbours aside to be read looks like something being lifted out of a
+ * stack, which is what it is.
+ *
+ * At rest a little is still claimed. The column's own 16px gap technically *covers* the 8 and 12
+ * pixels the resting sheets show, but covering is not the same as looking right: a pile whose
+ * bottom edge stops four pixels short of the next card reads as two cards that have been pushed
+ * into each other, not as one card with something behind it. So a resting pile keeps a few pixels
+ * of its own — enough that the edges under it are edges rather than a collision. Only piles that
+ * have that many sheets take the room, and an ordinary card takes none.
+ *
+ * **The numbers are the sheet's depth plus what turning it costs**, and the second part is bigger
+ * than it looks. A sheet rotates about its top edge, so its low corner drops by half the card's
+ * width times the sine of the angle — a few pixels on a card in a two-column layout, twice that on
+ * the same card at full width on a phone. The deepest sheet sits 48px out and can be another 13
+ * below that, and its shadow is drawn below *that* again. So the room is the depth rounded
+ * generously up rather than the depth exactly: measured to the pixel it is right on the layout it
+ * was measured on and a hair short everywhere else, which is what "it still overlaps a little"
+ * looks like.
+ *
+ * It also has to *beat* the gaps around it rather than match them. This margin does not add to the
+ * space below the card, it collapses with it — a 64px fan margin under a 40px band gap leaves 64px
+ * in total, not 104. Set close to the fan's real reach, the two numbers cancel out to almost
+ * nothing and the last pile in a band still touches the heading below it. So the room is set well
+ * clear of anything it might collapse against.
+ */
+const FAN_ROOM = ["", "mb-4 motion-safe:hover:mb-12", "mb-6 motion-safe:hover:mb-20"];
+
+/**
+ * What pointing straight at a strip does, whichever depth it is drawn at.
+ *
+ * Marked important on purpose. This has to beat both the group's tone and the peer's step-back,
+ * and which of three same-specificity variants wins would otherwise come down to the order Tailwind
+ * happens to emit them in — a rule that is right today and silently inverts on an upgrade.
+ */
+const SHEET_HOVERED = "hover:border-app-brand-border-strong! hover:bg-app-brand-soft!";
 
 /**
  * Roughly how much taller an area is than the cards inside it: its header, its padding, and the
@@ -133,10 +215,13 @@ type Item =
 type Block =
   Item | { kind: "group"; key: string; group: BoardGroup; cards: BoardCard[]; items: Item[] };
 
-/** One band of the board: blocks dealt into columns, or one block that needs the whole width. */
+/** One row of the board: blocks dealt into columns, or one block that needs the whole width. */
 type Row =
   | { kind: "run"; key: string; columns: Block[][] }
   | { kind: "full"; key: string; block: Block; columns: number };
+
+/** One stage of the board, with everything filed under it. */
+type Band = { stage: BoardStage; blocks: Block[]; total: number; remaining: number };
 
 /** Where a dragged card counts as being: its own middle, which is what the eye is following. */
 function centerOf(element: HTMLElement): { x: number; y: number } {
@@ -223,6 +308,16 @@ type BoardGridProps = {
   expandedStackIds?: ReadonlySet<string>;
   /** Opens a closed pile, or closes an open one. */
   onToggleStack?: (rootId: string) => void;
+  /**
+   * The stages to draw as foldable bands, and which of them are open.
+   *
+   * Absent — and on a board being arranged, or one with no process layer — the grid is one flat
+   * surface, exactly as it was: arranging is about the board's own order, and a fold that hid half
+   * of it while somebody dragged a card through would be the surface arguing with the gesture.
+   */
+  openStages?: ReadonlySet<BoardStage>;
+  /** Folds one band. Absent on a board whose bands cannot be folded. */
+  onToggleStage?: (stage: BoardStage) => void;
 };
 
 type SharedProps = {
@@ -329,6 +424,8 @@ export function BoardGrid({
   stacks,
   expandedStackIds,
   onToggleStack,
+  openStages,
+  onToggleStage,
 }: BoardGridProps) {
   const twoColumns = useMediaQuery(TWO_COLUMN_QUERY);
   const elements = useRef(new Map<string, HTMLDivElement>());
@@ -336,6 +433,13 @@ export function BoardGrid({
   const lastMoveAt = useRef(0);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  /**
+   * A card the pile was opened *for*, to be brought into view once it is on the board.
+   *
+   * A ref rather than state: nothing renders from it, and setting state to schedule a scroll would
+   * be a second render for something the DOM answers on its own.
+   */
+  const revealId = useRef<string | null>(null);
   const reduceMotion = useReducedMotion();
 
   const ids = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
@@ -527,40 +631,110 @@ export function BoardGrid({
    * visible on screen. An area holding a diagram takes the full width too — half of a half-width
    * column is not enough of a picture to read, wherever the picture is filed.
    */
-  const rows = useMemo(() => {
-    const columns = twoColumns ? 2 : 1;
-    const weightOf = (card: BoardCard) => cardWeight(card, collapsedIds?.has(card.id) ?? false);
-    const blockWeight = (block: Block) =>
-      block.cards.reduce((total, card) => total + weightOf(card), 0) +
-      (block.kind === "card" ? 0 : GROUP_CHROME_WEIGHT);
+  const toRows = useCallback(
+    (input: Block[]): Row[] => {
+      const columns = twoColumns ? 2 : 1;
+      const weightOf = (card: BoardCard) => cardWeight(card, collapsedIds?.has(card.id) ?? false);
+      const blockWeight = (block: Block) =>
+        block.cards.reduce((total, card) => total + weightOf(card), 0) +
+        (block.kind === "card" ? 0 : GROUP_CHROME_WEIGHT);
 
-    const built: Row[] = [];
-    let run: Block[] = [];
+      const built: Row[] = [];
+      let run: Block[] = [];
 
-    const flushRun = () => {
-      if (run.length === 0) return;
-      built.push({
-        kind: "run",
-        key: `run-${run[0].key}`,
-        // Never more columns than there are blocks: two columns for one block is an empty column,
-        // which is the same empty half the area bands used to have.
-        columns: packIntoColumns(run, Math.min(columns, run.length), blockWeight),
-      });
-      run = [];
-    };
+      const flushRun = () => {
+        if (run.length === 0) return;
+        built.push({
+          kind: "run",
+          key: `run-${run[0].key}`,
+          // Never more columns than there are blocks: two columns for one block is an empty column,
+          // which is the same empty half the area bands used to have.
+          columns: packIntoColumns(run, Math.min(columns, run.length), blockWeight),
+        });
+        run = [];
+      };
 
-    for (const block of blocks) {
-      if (block.cards.some(spansFullWidth)) {
-        flushRun();
-        built.push({ kind: "full", key: block.key, block, columns: columns });
-      } else {
-        run.push(block);
+      for (const block of input) {
+        if (block.cards.some(spansFullWidth)) {
+          flushRun();
+          built.push({ kind: "full", key: block.key, block, columns: columns });
+        } else {
+          run.push(block);
+        }
       }
-    }
-    flushRun();
+      flushRun();
 
-    return built;
-  }, [blocks, collapsedIds, twoColumns]);
+      return built;
+    },
+    [collapsedIds, twoColumns],
+  );
+
+  const rows = useMemo(() => toRows(blocks), [blocks, toRows]);
+
+  /**
+   * The board's blocks filed under their stage, in stage order.
+   *
+   * **An area goes in the band of its earliest card**, whole, rather than being split across three.
+   * Two grouping axes have to agree about which one owns a block, and an area is a thing somebody
+   * named and expects to find in one piece — the same rule the section bar already uses for an
+   * area's stage, so the two never disagree.
+   *
+   * Empty bands are not drawn. A board where nothing is due later should not carry a heading saying
+   * so; the fold exists to hold cards, and a band with none holds a sentence nobody needs.
+   */
+  const banding = states !== undefined && openStages !== undefined && !isArranging;
+
+  /** Which stages a set of cards covers, earliest first. */
+  const stagesOf = useCallback(
+    (cards: BoardCard[]): BoardStage[] =>
+      BOARD_STAGES.filter((stage) =>
+        cards.some((card) => (states?.get(card.id)?.stage ?? "NOW") === stage),
+      ),
+    [states],
+  );
+
+  /**
+   * The areas that carry stages of their own: a named set of cards that is not all due at once.
+   *
+   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
+   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
+   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
+   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
+   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
+   * the same fold, one level in.
+   *
+   * They lead, above the bands. An area is a decision somebody made about what belongs together,
+   * and the bands are the board's own answer to when; the named thing goes first.
+   */
+  const spanningGroups = useMemo<Block[]>(() => {
+    if (!banding) return [];
+
+    return blocks.filter((block) => block.kind === "group" && stagesOf(block.cards).length > 1);
+  }, [banding, blocks, stagesOf]);
+
+  const bands = useMemo<Band[]>(() => {
+    if (!states || !banding) return [];
+
+    const stageOf = (block: Block): BoardStage => stagesOf(block.cards)[0] ?? "NOW";
+    const rest = blocks.filter((block) => !spanningGroups.includes(block));
+
+    const filled = BOARD_STAGES.map((stage) => {
+      const own = rest.filter((block) => stageOf(block) === stage);
+      const cards = own.flatMap((block) => block.cards);
+
+      return {
+        stage,
+        blocks: own,
+        total: cards.length,
+        remaining: cards.filter((card) => states.get(card.id)?.status !== "DONE").length,
+      };
+    }).filter((band) => band.total > 0);
+
+    // One band is not a band, it is a heading over the whole board saying what everything on it
+    // already says. A board where nothing has been sequenced yet is exactly that board, and it
+    // should look the way it did before there were bands at all.
+    return filled.length > 1 ? filled : [];
+  }, [banding, blocks, spanningGroups, stagesOf, states]);
 
   /**
    * Moves a whole block — a named area, or the diagram that owns its row — past its neighbour.
@@ -607,6 +781,40 @@ export function BoardGrid({
   const moveBlock = (blockIndex: number, direction: "up" | "down") =>
     moveBlockTo(blockIndex, direction === "up" ? blockIndex - 1 : blockIndex + 1);
 
+  /**
+   * Opens a pile because somebody clicked one of the cards behind the top one, and takes them to it.
+   *
+   * Opening alone would be technically right and quietly wrong: a run of five unfolds into five
+   * cards, and the one they actually asked about is somewhere in the middle of them. The scroll is
+   * what makes clicking a named strip feel like following a link rather than like pressing "expand".
+   *
+   * The card is not on the board yet when this runs — the pile opens through the page's state, so
+   * the members mount on the render this click causes. `revealId` carries the intention across to
+   * the effect below, which runs after that render has attached its refs.
+   */
+  const revealMember = (rootId: string, cardId: string) => {
+    onToggleStack?.(rootId);
+    revealId.current = cardId;
+  };
+
+  // Keyed on the open piles: this runs on exactly the render that put the members on the board.
+  useEffect(() => {
+    const pending = revealId.current;
+    revealId.current = null;
+    if (pending === null) return;
+
+    const element = elements.current.get(pending);
+    if (!element) return;
+
+    // After the paint, so the card is where it is going to be rather than where the layout
+    // animation started it.
+    const frame = requestAnimationFrame(() =>
+      element.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" }),
+    );
+
+    return () => cancelAnimationFrame(frame);
+  }, [expandedStackIds, reduceMotion]);
+
   const renderCard = (card: BoardCard) => {
     const stack = stacks?.get(card.id);
     const expanded = stack !== undefined && (expandedStackIds?.has(stack.rootId) ?? false);
@@ -652,6 +860,9 @@ export function BoardGrid({
         }
         stack={chipOwner}
         onToggleStack={onToggleStack}
+        onRevealMember={
+          stack && onToggleStack ? (memberId) => revealMember(stack.rootId, memberId) : undefined
+        }
       />
     );
   };
@@ -677,8 +888,59 @@ export function BoardGrid({
     );
   };
 
+  /** An area's items, folded by stage — the same fold as the board's own, one level in. */
+  const renderBandedItems = (items: Item[]) => (
+    <div className="space-y-3">
+      {BOARD_STAGES.map((stage) => {
+        const own = items.filter((item) => stagesOf(item.cards)[0] === stage);
+        if (own.length === 0) return null;
+
+        const cards = own.flatMap((item) => item.cards);
+
+        return (
+          <BoardStageBand
+            key={stage}
+            stage={stage}
+            total={cards.length}
+            remaining={cards.filter((card) => states?.get(card.id)?.status !== "DONE").length}
+            open={openStages?.has(stage) ?? true}
+            onToggle={onToggleStage ? () => onToggleStage(stage) : undefined}
+          >
+            <div className="space-y-4">
+              {own.map((item) => (
+                <div key={item.key}>{renderItem(item)}</div>
+              ))}
+            </div>
+          </BoardStageBand>
+        );
+      })}
+    </div>
+  );
+
   const renderBlock = (block: Block, blockIndex: number, wide: boolean) => {
     if (block.kind !== "group") return renderItem(block);
+
+    if (spanningGroups.includes(block)) {
+      return (
+        <BoardGroupSection
+          group={block.group}
+          isArranging={isArranging}
+          canMove={onReorder !== undefined}
+          onMoveStep={(direction) => moveBlock(blockIndex, direction)}
+          onDragMove={(element) => handleGroupDrag(blockIndex, element)}
+          onRename={onRenameGroup}
+          autoEditName={block.group.id === renamingGroupId}
+          onNameEditDone={onRenameGroupDone}
+          onToggle={onToggleGroup}
+          onDissolve={onDissolveGroup}
+          // No stage badge: the whole point of this area is that its cards do not share one, and
+          // the bands inside say what each of them is.
+          registerElement={registerGroupElement}
+        >
+          {renderBandedItems(block.items)}
+        </BoardGroupSection>
+      );
+    }
 
     const inner =
       wide && twoColumns ? (
@@ -737,9 +999,10 @@ export function BoardGrid({
   /** Where a block sits in the board's order, which is what its move controls act on. */
   const indexOfBlock = (block: Block) => blocks.findIndex((candidate) => candidate === block);
 
-  return (
-    <div className="space-y-4" data-arranging={isArranging || undefined}>
-      {rows.map((row) => {
+  /** One list of rows, dealt into columns. Drawn once flat, or once per band. */
+  const renderRows = (input: Row[]) => (
+    <div className="space-y-4">
+      {input.map((row) => {
         if (row.kind === "full") {
           return <div key={row.key}>{renderBlock(row.block, indexOfBlock(row.block), true)}</div>;
         }
@@ -758,8 +1021,16 @@ export function BoardGrid({
                     block for another in the same slot, and without this the card was gone and the
                     frame simply *there* — the crossfade is what makes it read as the same thing
                     changing shape. `initial={false}` so a board arriving does not fade every card
-                    in behind the page's own entrance. */}
-                <AnimatePresence initial={false}>
+                    in behind the page's own entrance.
+
+                    `popLayout` is what keeps the swap smooth. In the default mode the leaving card
+                    still holds its space for the length of its exit while the frame that replaces
+                    it is already at full height, so the column spiked to the height of both and
+                    settled back — a visible jolt at exactly the moment somebody asked to look
+                    inside something. Popped, the old block leaves the flow the frame it starts
+                    fading, and the cards below travel to their new places on their own `layout`
+                    instead of being shoved. */}
+                <AnimatePresence initial={false} mode="popLayout">
                   {column.map((block) => (
                     <motion.div
                       key={block.key}
@@ -790,6 +1061,38 @@ export function BoardGrid({
           </div>
         );
       })}
+    </div>
+  );
+
+  return (
+    // `space-y-12` between the bands, against `space-y-4` between the cards inside one. A heading is
+    // only a heading if the gap above it is clearly wider than the gaps it presides over — at the
+    // same 24px as everything else, "Later" read as one more thing in the list above rather than as
+    // the start of the next one. It is also the room a fanned pile in the last row needs, so the
+    // sheets of a card at the bottom of "Now" do not reach into the heading under it.
+    <div className="space-y-12" data-arranging={isArranging || undefined}>
+      {spanningGroups.map((block) => (
+        <div key={block.key}>{renderBlock(block, indexOfBlock(block), true)}</div>
+      ))}
+
+      {bands.length > 0
+        ? bands.map((band) => (
+            <BoardStageBand
+              key={band.stage}
+              stage={band.stage}
+              total={band.total}
+              remaining={band.remaining}
+              open={openStages?.has(band.stage) ?? true}
+              onToggle={onToggleStage ? () => onToggleStage(band.stage) : undefined}
+            >
+              {renderRows(toRows(band.blocks))}
+            </BoardStageBand>
+          ))
+        : renderRows(
+            spanningGroups.length > 0
+              ? toRows(blocks.filter((block) => !spanningGroups.includes(block)))
+              : rows,
+          )}
     </div>
   );
 }
@@ -909,6 +1212,8 @@ type BoardCardCellProps = {
    */
   stack?: CardStack;
   onToggleStack?: (rootId: string) => void;
+  /** Opens the pile and brings one member into view. Absent when the pile cannot be opened. */
+  onRevealMember?: (cardId: string) => void;
   onDrop: (cardId: string, point: { x: number; y: number }) => void;
   onMove?: (cardId: string, direction: "up" | "down") => void;
   onDismiss?: (cardId: string) => void;
@@ -958,6 +1263,7 @@ function BoardCardCell({
   onSetPredecessor,
   stack,
   onToggleStack,
+  onRevealMember,
   onDrop,
   onMove,
   onDismiss,
@@ -996,8 +1302,61 @@ function BoardCardCell({
    * arranged, and the click that ends a text selection — releasing after selecting a line is not a
    * request to rearrange the page under it.
    */
+  /**
+   * Folds a card, or opens a folded one, on a double click anywhere on it.
+   *
+   * The fold button is a four-pixel target that only appears on hover, at the far end of a cluster
+   * of four — which is fine as the deliberate control and hopeless as the one you reach for while
+   * skim-reading a board. A double click is the gesture people already try on anything folded, and
+   * it costs nothing to answer: a single click on a card still does what it did.
+   *
+   * Same three exclusions as the pile below, and one more — a card standing in for a closed stack
+   * is already answering clicks by opening the pile, and a card that both unfolds itself and opens
+   * a sequence gets one of the two wrong.
+   *
+   * The selection a double click leaves behind is cleared: the gesture was aimed at the card, and
+   * a highlighted word left over from it reads as the card having been mis-clicked.
+   */
+  function handleDoubleClick(event: ReactMouseEvent<HTMLDivElement>) {
+    if (isArranging || stack || !onToggleCollapsed) return;
+    if ((event.target as HTMLElement).closest(INTERACTIVE_WITHIN_CARD)) return;
+
+    window.getSelection()?.removeAllRanges();
+    onToggleCollapsed(card.id);
+  }
+
+  /**
+   * The cards behind this one, nearest first — the ones the fanned sheets name.
+   *
+   * Everything after the card standing on top, which is by construction what is still to do in the
+   * run. Two at most, because there are two sheets: a third strip would be a card the eye has to
+   * work to read on a pile that is already asking for a click.
+   */
+  const behind = useMemo(() => {
+    if (!stack) return [];
+
+    const top = stack.memberIds.indexOf(stack.topId);
+
+    // Named from the stack, not from the board: these cards are folded away, so they are not in
+    // the list this grid was handed.
+    return stack.memberIds
+      .slice(top + 1)
+      .slice(0, STACK_SHEETS.length)
+      .map((memberId) => {
+        const member = stack.members.get(memberId);
+
+        return {
+          id: memberId,
+          name: member?.name ?? "The next card",
+          Icon: cardIcon(member?.kind ?? "NOTE"),
+        };
+      });
+  }, [stack]);
+
   function handleStackClick(event: ReactMouseEvent<HTMLDivElement>) {
     if (!stack || isArranging || !onToggleStack) return;
+    // The second click of a double click, which would otherwise open the pile and shut it again.
+    if (event.detail > 1) return;
     if ((event.target as HTMLElement).closest(INTERACTIVE_WITHIN_CARD)) return;
     if ((window.getSelection()?.toString().length ?? 0) > 0) return;
 
@@ -1147,25 +1506,43 @@ function BoardCardCell({
         onDragEnd();
       }}
       onClick={handleStackClick}
+      onDoubleClick={handleDoubleClick}
       onPointerEnter={() => onHoverChange(true)}
       onPointerLeave={() => onHoverChange(false)}
-      // The extra bottom margin is the room the fan needs: hovered, the deepest sheet sits 32px
-      // below the card, and the column's own 16px gap alone would have it lying on the next one.
-      className={`group/stack relative ${stack ? "mb-6 cursor-pointer" : ""} ${
-        isDragging ? "z-40 cursor-grabbing" : ""
-      }`}
+      className={`group/stack relative ${
+        stack
+          ? `cursor-pointer transition-[margin-bottom] duration-300 ease-out ${FAN_ROOM[behind.length]}`
+          : ""
+      } ${isDragging ? "z-40 cursor-grabbing" : ""}`}
       style={isArranging ? { touchAction: "none" } : undefined}
     >
-      {/* Counted from what is still to do, not from how long the run is: three of five ticked off
-          leaves one card behind this one, and drawing two would be the board overstating what is
-          left. */}
-      {stack &&
-        STACK_EDGES.slice(0, Math.max(stack.remaining - 1, 0)).map((edge, depth) => (
-          <div
-            key={depth}
+      {/* Deepest first, so the nearer sheet paints over it and the two strips stack rather than
+          overlap. Only what is still to do is drawn: three of five ticked off leaves one card
+          behind this one, and drawing two would be the board overstating what is left.
+
+          Hidden from screen readers and out of the tab order on purpose. This is the pointer
+          shortcut; the chip in the card's header is the control — it says "Step 2 of 5", carries
+          `aria-expanded`, and opening the pile puts every one of these cards on the board in full,
+          so nothing here is the only way to reach anything. */}
+      {behind
+        .map((member, depth) => ({ member, depth }))
+        .reverse()
+        .map(({ member, depth }) => (
+          <button
+            type="button"
+            key={member.id}
             aria-hidden="true"
-            className={`pointer-events-none absolute origin-top rounded-2xl border border-app-border bg-app-surface shadow-sm transition-all duration-200 ease-out group-hover/stack:shadow-lg ${edge}`}
-          />
+            tabIndex={-1}
+            onClick={() => onRevealMember?.(member.id)}
+            className={`pointer-events-none absolute flex origin-top items-end overflow-hidden rounded-2xl border border-app-border bg-app-surface pb-1 text-left shadow-sm transition-all duration-300 ease-out group-hover/stack:pointer-events-auto group-hover/stack:shadow-lg ${STACK_SHEETS[depth].tone} ${STACK_SHEETS[depth].box} ${SHEET_HOVERED}`}
+          >
+            {/* Faded in rather than always there: at rest the strip is a few pixels of card edge,
+                and a title clipped to three of its letters is worse than no title. */}
+            <span className="flex w-full min-w-0 items-center gap-1.5 px-4 text-xs font-medium text-app-text-muted opacity-0 transition-opacity duration-200 group-hover/stack:text-app-brand-text group-hover/stack:opacity-100">
+              <member.Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{member.name}</span>
+            </span>
+          </button>
         ))}
 
       {/* Two nested motion elements, deliberately — the same split the dashboard needs. The outer
@@ -1307,7 +1684,19 @@ function BoardGroupSection({
       // kept low so a board of several areas is still a board and not a set of banners.
       className="rounded-2xl border border-app-brand-border bg-app-brand-soft p-3 shadow-sm"
     >
-      <header className="mb-3 flex items-center justify-between gap-2">
+      <header
+        className="mb-3 flex items-center justify-between gap-2"
+        // The same gesture the cards answer to: double-click the bar and the area folds or opens.
+        // Anything in the header that already does something on a click — the name, the grip, the
+        // stage, the fold and dissolve buttons — keeps doing exactly that.
+        onDoubleClick={(event) => {
+          if (!onToggle) return;
+          if ((event.target as HTMLElement).closest(INTERACTIVE_WITHIN_CARD)) return;
+
+          window.getSelection()?.removeAllRanges();
+          onToggle(group.id);
+        }}
+      >
         <div className="flex min-w-0 items-center gap-2">
           {canMove && (
             <Button
@@ -1439,7 +1828,7 @@ function BoardGroupSection({
         </div>
       </header>
 
-      {!group.collapsed && children}
+      <Collapsible open={!group.collapsed}>{children}</Collapsible>
     </motion.section>
   );
 }

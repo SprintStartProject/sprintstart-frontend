@@ -28,22 +28,42 @@ const STORAGE_VERSION = 1;
 /**
  * How far into the ramp a card belongs.
  *
- * Three, not five, and named after when rather than after a week number. A hire who starts on a
- * Wednesday, or who spends four days waiting for a laptop, still knows what "now" means; "week 2"
- * would already be a lie by the time they read it. Areas carry the finer structure — this is only
- * ever the coarse sequence the board sorts and hides by.
+ * Named after when rather than after a week number: a hire who starts on a Wednesday, or who spends
+ * four days waiting for a laptop, still knows what "now" means, where "week 2" is already a lie by
+ * the time they read it.
+ *
+ * **Two, not three.** There used to be a `NEXT` between these, and nobody could defend the line: a
+ * PM writing a blueprint and a hire filing a card both had to decide whether something was "next"
+ * or "later", and both were guessing at a distinction that meant the same thing — not now. Two
+ * buckets carry the whole point of the ramp with half the vocabulary, and what order things come in
+ * *within* a bucket is what the dependencies and the stacks are for. That is the division of labour
+ * here: the stage is the board's coarse answer for the cards nobody has sequenced, and a chain is a
+ * hard claim about the few that somebody has.
  */
-export type BoardStage = "NOW" | "NEXT" | "LATER";
+export type BoardStage = "NOW" | "LATER";
 
 /** Every stage, earliest first. The one place the order of the ramp is written down. */
-export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "NEXT", "LATER"];
+export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "LATER"];
 
 /** What each stage is called on screen, and the sentence under it. */
 export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> = {
   NOW: { title: "Now", hint: "What to work through today." },
-  NEXT: { title: "Next", hint: "Once the current stage is done." },
-  LATER: { title: "Later", hint: "Worth having, not worth reading yet." },
+  LATER: { title: "Later", hint: "Not yet — it will be here when it is." },
 };
+
+/**
+ * A stored stage, including one written before there were two of them.
+ *
+ * A board sequenced under the old three reads back with `NEXT` in it, and dropping the value would
+ * fall back to the default — `NOW` — which is the worst of the three answers: every card somebody
+ * deliberately deferred would arrive on top of the pile. `NEXT` meant "not now", and so does
+ * `LATER`.
+ */
+function toStage(value: unknown): BoardStage | null {
+  if (value === "NEXT") return "LATER";
+
+  return isStage(value) ? value : null;
+}
 
 /** Where a stage sits in the ramp; higher means further out. */
 export function stageOrder(stage: BoardStage): number {
@@ -104,7 +124,8 @@ function toCardStructure(value: unknown): CardStructure | null {
   const raw = value as Record<string, unknown>;
 
   const entry: CardStructure = {};
-  if (isStage(raw.stage)) entry.stage = raw.stage;
+  const stage = toStage(raw.stage);
+  if (stage) entry.stage = stage;
   if (Array.isArray(raw.dependsOn)) {
     entry.dependsOn = raw.dependsOn.filter((id): id is string => typeof id === "string");
   }
@@ -142,7 +163,8 @@ export function readBoardStructure(boardId: string): BoardStructure {
 
     const groupStages: Record<string, BoardStage> = {};
     for (const [groupId, value] of Object.entries((stored.groupStages as object) ?? {})) {
-      if (isStage(value)) groupStages[groupId] = value;
+      const groupStage = toStage(value);
+      if (groupStage) groupStages[groupId] = groupStage;
     }
 
     return { cards, groupStages };

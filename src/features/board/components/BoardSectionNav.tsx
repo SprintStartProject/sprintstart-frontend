@@ -1,7 +1,12 @@
-import { CircleCheckBig, CircleSlash, FolderOpen, Layers, Lock } from "lucide-react";
+import { CircleCheckBig, CircleSlash, FolderOpen, Layers, ListChecks, Lock } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
-import { ALL_SECTIONS, LOOSE_SECTION, type SectionSummary } from "../layout/boardSections";
+import {
+  ALL_SECTIONS,
+  FOCUS_SECTION,
+  LOOSE_SECTION,
+  type SectionSummary,
+} from "../layout/boardSections";
 import { STAGE_LABELS } from "../layout/boardStructure";
 
 type BoardSectionTabsProps = {
@@ -37,9 +42,11 @@ export function BoardSectionTabs({ sections, selectedId, onSelect }: BoardSectio
       ? CircleCheckBig
       : section.id === null
         ? Layers
-        : section.id === LOOSE_SECTION
-          ? CircleSlash
-          : FolderOpen;
+        : section.id === FOCUS_SECTION
+          ? ListChecks
+          : section.id === LOOSE_SECTION
+            ? CircleSlash
+            : FolderOpen;
 
     return {
       value: section.id ?? ALL_SECTIONS,

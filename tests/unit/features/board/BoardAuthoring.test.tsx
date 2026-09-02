@@ -34,8 +34,8 @@ describe("the cards the hire writes", () => {
   it("claims nothing about who added a card the hire wrote", () => {
     render(<BoardGrid board={board([note()])} />);
 
-    expect(screen.queryByText("Buddy added this")).not.toBeInTheDocument();
-    expect(screen.queryByText("Kept for you")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your buddy added this card")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kept up to date for you")).not.toBeInTheDocument();
   });
 
   it("heads a note with its own first line and keeps the rest beneath", () => {

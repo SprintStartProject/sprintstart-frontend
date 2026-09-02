@@ -39,7 +39,9 @@ function toBlueprint(value: unknown): CardBlueprint | null {
     items: Array.isArray(raw.items)
       ? raw.items.filter((i): i is string => typeof i === "string")
       : [],
-    stage: raw.stage === "NEXT" || raw.stage === "LATER" ? raw.stage : "NOW",
+    // "NEXT" is a blueprint written when the board had three stages; it meant "not now", which is
+    // what "LATER" means.
+    stage: raw.stage === "NEXT" || raw.stage === "LATER" ? "LATER" : "NOW",
     roleIds: Array.isArray(raw.roleIds)
       ? raw.roleIds.filter((i): i is string => typeof i === "string")
       : [],
