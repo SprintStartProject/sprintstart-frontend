@@ -8,6 +8,7 @@ import { ProjectProvider } from "./features/projects/ProjectProvider";
 import { MomentsProvider, RocketPet, useMoments } from "./features/moments";
 import { BuddyWidget } from "./features/buddy/components/BuddyWidget";
 import { BuddyProvider } from "./features/buddy/BuddyProvider";
+import { SelectionActions } from "./features/board/selection/SelectionActions";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
 
@@ -40,6 +41,10 @@ function AppContent() {
           nobody on the login screen has a session for. It takes itself off `/buddy`,
           where the page already is the buddy. */}
         {showSidebar && <BuddyWidget />}
+
+        {/* Offers to keep whatever the hire has highlighted, from any page. Mounted here for the
+          same reason the buddy is: what is worth keeping is almost never found on the board. */}
+        {showSidebar && <SelectionActions />}
 
         {/* Decorative easter egg; only for signed-in users, so it never
           sits on top of the login screen, and off unless turned on in

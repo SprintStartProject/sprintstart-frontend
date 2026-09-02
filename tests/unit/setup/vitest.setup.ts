@@ -207,3 +207,27 @@ if (!window.matchMedia) {
 if (!window.HTMLElement.prototype.scrollIntoView) {
   window.HTMLElement.prototype.scrollIntoView = function () {};
 }
+
+// jsdom implements Range but not its layout methods, so anything that positions UI against a
+// selection (the board's "add to board" toolbar) throws rather than returning a zero rect. A zero
+// rect is the honest answer in a DOM with no layout, and it keeps the geometry out of the way of
+// tests that are about what was selected rather than where it was.
+if (!Range.prototype.getBoundingClientRect) {
+  Range.prototype.getBoundingClientRect = () =>
+    ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: 0,
+      height: 0,
+      toJSON: () => ({}),
+    });
+}
+
+if (!Range.prototype.getClientRects) {
+  Range.prototype.getClientRects = () =>
+    ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} }) as unknown as DOMRectList;
+}
