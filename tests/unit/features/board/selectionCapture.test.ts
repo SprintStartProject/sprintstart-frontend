@@ -80,6 +80,31 @@ describe("selectionCapture", () => {
       expect(cardFor(capture("#t")).kind).toBe("NOTE");
     });
 
+    /**
+     * LinkCard renders the stored URL straight into an `href`, and the knowledge base renders
+     * material ingested from elsewhere. An anchor's href gets the same scheme check bare text
+     * does, or dragging across somebody else's issue body could mint a card that runs script.
+     */
+    it("refuses an anchor whose href is not http", () => {
+      document.body.innerHTML = "<p><a id='t' href='javascript:alert(1)'>click me</a></p>";
+
+      expect(cardFor(capture("#t")).kind).toBe("NOTE");
+    });
+
+    it("refuses a data: anchor too", () => {
+      document.body.innerHTML = "<p><a id='t' href='data:text/html,hi'>click me</a></p>";
+
+      expect(cardFor(capture("#t")).kind).toBe("NOTE");
+    });
+
+    it("resolves a relative href against the page, so the card means something elsewhere", () => {
+      document.body.innerHTML = "<p><a id='t' href='/board'>your board</a></p>";
+      const card = cardFor(capture("#t"));
+
+      expect(card.kind).toBe("LINK");
+      expect((card as { url: string }).url).toMatch(/^https?:\/\/.+\/board$/);
+    });
+
     it("is not fooled by a sentence containing spaces", () => {
       document.body.innerHTML = "<p id='t'>see https://example.test for more</p>";
 

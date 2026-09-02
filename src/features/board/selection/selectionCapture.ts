@@ -115,18 +115,30 @@ function truncateAtWord(text: string, limit: number): string {
 function linkFor(node: Node, text: string): string | null {
   const anchor = elementOf(node)?.closest("a");
   const href = anchor?.getAttribute("href");
-  if (href && !href.startsWith("#")) return anchor?.href ?? href;
-  return isUrl(text) ? text : null;
+  if (href && !href.startsWith("#")) {
+    // `anchor.href` rather than the attribute: it resolves a relative link against the page, and a
+    // card holding "/board" would mean nothing from anywhere else.
+    const resolved = httpUrl(anchor?.href ?? href);
+    if (resolved) return resolved;
+  }
+  // A selection containing whitespace is prose that mentions a link, not a link.
+  return /\s/.test(text) ? null : httpUrl(text);
 }
 
-/** Only http(s). A `javascript:` or `data:` selection is not a link somebody meant to keep. */
-function isUrl(text: string): boolean {
-  if (/\s/.test(text)) return false;
+/**
+ * The URL, if it is one worth putting behind a link — `http(s)` only.
+ *
+ * Applied to an anchor's href as much as to bare text, and that is the point. `LinkCard` renders
+ * the stored URL straight into an `href`, and the knowledge base renders material this project
+ * ingested from elsewhere. A `javascript:` or `data:` link in somebody else's issue body is not
+ * something to mint a card from because a hire happened to drag across it.
+ */
+function httpUrl(candidate: string): string | null {
   try {
-    const parsed = new URL(text);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
+    const parsed = new URL(candidate);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? candidate : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

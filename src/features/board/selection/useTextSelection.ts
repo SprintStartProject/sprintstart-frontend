@@ -35,10 +35,15 @@ export function useTextSelection(): {
     return () => document.removeEventListener("selectionchange", read);
   }, []);
 
+  // Whether to track, rather than what is tracked: recomputing produces a fresh object every
+  // time, so depending on the selection itself would tear down and rebuild these listeners on
+  // every scroll event they handle.
+  const hasSelection = selection !== null;
+
   useEffect(() => {
     // The rect is in viewport coordinates and the page can move under it. Recomputing on scroll
     // beats freezing the toolbar somewhere the text no longer is.
-    if (!selection) return;
+    if (!hasSelection) return;
 
     function reposition() {
       setSelection(captureSelection(window.getSelection()));
@@ -50,7 +55,7 @@ export function useTextSelection(): {
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
     };
-  }, [selection]);
+  }, [hasSelection]);
 
   return { selection: dismissed ? null : selection, clear };
 }
