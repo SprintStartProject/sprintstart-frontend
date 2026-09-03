@@ -1,5 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ClipboardList, Lock, Pencil, Plus, Trash2, Users } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  CheckSquare,
+  ClipboardList,
+  Layers,
+  Lock,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -9,9 +20,10 @@ import { SpotlightCard } from "../components/ui/SpotlightCard";
 import { Spinner } from "../components/ui/Spinner";
 import { useToast } from "../context/useToast";
 import { useFetch } from "../hooks/useFetch";
-import { STAGE_LABELS } from "../features/board/layout/boardStructure";
+import { BOARD_STAGES, STAGE_LABELS } from "../features/board/layout/boardStructure";
 import { CardBlueprintEditor } from "../features/card-blueprints/components/CardBlueprintEditor";
 import { cardBlueprintService } from "../features/card-blueprints/cardBlueprintService";
+import { previewBands } from "../features/card-blueprints/preview";
 import {
   blueprintsForRoles,
   EMPTY_DRAFT,
@@ -20,6 +32,9 @@ import {
 } from "../features/card-blueprints/types";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { getProjectRoles } from "../services/teamManagementService";
+
+/** The sentinel for "not filtered by role", which is not the same as "a hire with no role". */
+const EVERY_ROLE = "__all__";
 
 /**
  * Where a PM writes the cards every new hire starts with.
@@ -31,15 +46,21 @@ import { getProjectRoles } from "../services/teamManagementService";
  *
  * So this page is that knowledge, written down once and aimed at the roles it applies to. It is
  * authoring, not monitoring: nothing here is about any particular hire, and no hire's board is
- * changed by opening it. What a blueprint produces is a card on the boards of the people whose
- * roles match it, in the stage it names, waiting on whatever it says it waits on.
+ * changed by opening it.
  *
- * **The preview is the point of the right-hand column.** A PM cannot check a set of blueprints by
- * reading them — the question is always "what does a new backend hire actually get", and answering
- * it by hiring somebody is a slow feedback loop. Picking a role here answers it immediately.
+ * **It is laid out like the thing it produces.** The first cut was one flat list in creation order
+ * with a numbered summary beside it, which is a fine way to store blueprints and a poor way to
+ * think about them: a PM cannot tell from a list of twelve whether a new hire's first day is
+ * reasonable or brutal, because the board does not show a list of twelve. So the blueprints are
+ * grouped into the same stages the board bands by — a heading that says "Now · 9 cards" is the
+ * warning a flat list could not give — and the preview draws what the cards actually become,
+ * chains and all.
  *
- * Scoped to the globally selected project, like every other PM surface, and reachable by the same
- * audience as the PM dashboard.
+ * One role selector drives both halves. "What does a new backend hire get" is the only question
+ * anybody asks here, and answering it in the preview while the list beside it still shows
+ * everything would be two screens disagreeing about what is being discussed.
+ *
+ * Scoped to the globally selected project, like every other PM surface.
  */
 export function CardBlueprintsPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
@@ -62,17 +83,38 @@ export function CardBlueprintsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  /** The role the preview is answering for; empty is "a hire with no role in particular". */
-  const [previewRoleId, setPreviewRoleId] = useState("");
+  /** Whose board both halves of this page are talking about. */
+  const [roleId, setRoleId] = useState<string>(EVERY_ROLE);
 
   const roleOptions: FilterSelectOption<string>[] = [
-    { value: "", label: "A hire with no role set" },
+    { value: EVERY_ROLE, label: "Every role" },
     ...projectRoles.map((role) => ({ value: role.id, label: role.name })),
   ];
 
-  const preview = useMemo(
-    () => blueprintsForRoles(all, previewRoleId ? [previewRoleId] : []),
-    [all, previewRoleId],
+  const roleName = (id: string) =>
+    projectRoles.find((role) => role.id === id)?.name ?? "Unknown role";
+
+  /**
+   * The blueprints in play: all of them, or the ones that reach the chosen role.
+   *
+   * `blueprintsForRoles` is the same function the generator uses, so what this page narrows to is
+   * exactly what that hire's board would be filled from — not a second rule that happens to agree.
+   */
+  const shown = useMemo(
+    () => (roleId === EVERY_ROLE ? all : blueprintsForRoles(all, [roleId])),
+    [all, roleId],
+  );
+
+  const bands = useMemo(() => previewBands(shown), [shown]);
+
+  /** The chosen role's blueprints, grouped by stage, in the PM's own order. */
+  const sections = useMemo(
+    () =>
+      BOARD_STAGES.map((stage) => ({
+        stage,
+        blueprints: shown.filter((blueprint) => blueprint.stage === stage),
+      })).filter((section) => section.blueprints.length > 0),
+    [shown],
   );
 
   function openNew() {
@@ -118,20 +160,39 @@ export function CardBlueprintsPage() {
     }
   }
 
-  async function move(index: number, direction: "up" | "down") {
+  /**
+   * Moves a blueprint past its neighbour *within its own stage*.
+   *
+   * The stored order is one list across every stage, because that is the order the cards are
+   * created in. What a PM is arranging, though, is the order inside a band — the position of a
+   * "Later" card relative to a "Now" one is not something they can see or care about. So the swap
+   * is with the next blueprint sharing this one's stage, wherever that sits in the global list.
+   */
+  async function move(blueprint: CardBlueprint, direction: "up" | "down") {
     if (!selectedProjectId) return;
 
-    const target = direction === "up" ? index - 1 : index + 1;
-    if (target < 0 || target >= all.length) return;
+    const siblings = all.filter((other) => other.stage === blueprint.stage);
+    const at = siblings.findIndex((other) => other.id === blueprint.id);
+    const neighbour = siblings[direction === "up" ? at - 1 : at + 1];
+    if (!neighbour) return;
 
-    const ids = all.map((blueprint) => blueprint.id);
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const ids = all.map((other) => other.id);
+    const from = ids.indexOf(blueprint.id);
+    const to = ids.indexOf(neighbour.id);
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+
     await cardBlueprintService.reorder(selectedProjectId, ids);
     reload();
   }
 
-  const roleName = (roleId: string) =>
-    projectRoles.find((role) => role.id === roleId)?.name ?? "Unknown role";
+  const isFirstInStage = (blueprint: CardBlueprint) =>
+    all.filter((other) => other.stage === blueprint.stage)[0]?.id === blueprint.id;
+
+  const isLastInStage = (blueprint: CardBlueprint) => {
+    const siblings = all.filter((other) => other.stage === blueprint.stage);
+
+    return siblings[siblings.length - 1]?.id === blueprint.id;
+  };
 
   return (
     <div className="min-h-screen">
@@ -167,153 +228,237 @@ export function CardBlueprintsPage() {
           <div className="flex items-center justify-center py-16">
             <Spinner size="lg" label="Loading blueprints" />
           </div>
+        ) : all.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardList className="h-8 w-8" aria-hidden="true" />}
+            title="No blueprints yet"
+            action={
+              <Button variant="primary" onClick={openNew}>
+                Write the first one
+              </Button>
+            }
+          >
+            A blueprint is a card every matching new hire starts with — the on-call rota for
+            backend, the design handover for UX, the incident write-up for everybody. Write it once
+            here instead of saying it once per hire.
+          </EmptyState>
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <div className="space-y-3">
-              {all.length === 0 ? (
-                <EmptyState
-                  icon={<ClipboardList className="h-8 w-8" aria-hidden="true" />}
-                  title="No blueprints yet"
-                  action={
-                    <Button variant="primary" onClick={openNew}>
-                      Write the first one
-                    </Button>
-                  }
-                >
-                  A blueprint is a card every matching new hire starts with — the on-call rota for
-                  backend, the design handover for UX, the incident write-up for everybody. Write it
-                  once here instead of saying it once per hire.
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="min-w-0 space-y-6">
+              {/* One control, above both halves: it decides whose board is being discussed. */}
+              <div className="flex flex-wrap items-center gap-3">
+                <FilterSelect
+                  label="Whose board"
+                  value={roleId}
+                  options={roleOptions}
+                  onChange={setRoleId}
+                />
+                <p className="text-xs text-app-text-muted">
+                  {roleId === EVERY_ROLE
+                    ? `${all.length} ${all.length === 1 ? "blueprint" : "blueprints"} on this project`
+                    : `${shown.length} of ${all.length} reach a ${roleName(roleId)}`}
+                </p>
+              </div>
+
+              {sections.length === 0 ? (
+                <EmptyState size="sm">
+                  Nothing reaches this role yet. A blueprint with no roles ticked would.
                 </EmptyState>
               ) : (
-                all.map((blueprint, index) => (
-                  <SpotlightCard key={blueprint.id} roundedClassName="rounded-2xl">
-                    <article className="flex items-start gap-3 p-4">
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-sm font-semibold text-app-text">{blueprint.title}</h2>
+                sections.map((section) => (
+                  <section key={section.stage} className="space-y-3">
+                    {/* The heading a flat list could not give: nine cards due on day one is a
+                        judgement a PM can make in a glance and cannot make from a list. */}
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-1">
+                      <h2 className="text-sm font-semibold text-app-text">
+                        {STAGE_LABELS[section.stage].title}
+                      </h2>
+                      <span className="text-xs text-app-text-muted tabular-nums">
+                        {section.blueprints.length}{" "}
+                        {section.blueprints.length === 1 ? "card" : "cards"}
+                      </span>
+                      <span className="text-xs text-app-text-subtle">
+                        {STAGE_LABELS[section.stage].hint}
+                      </span>
+                    </div>
 
-                          <Badge
-                            variant={blueprint.stage === "NOW" ? "brand" : "neutral"}
-                            size="sm"
-                          >
-                            {STAGE_LABELS[blueprint.stage].title}
-                          </Badge>
+                    <div className="space-y-3">
+                      {section.blueprints.map((blueprint) => (
+                        <SpotlightCard key={blueprint.id} roundedClassName="rounded-2xl">
+                          <article className="flex items-start gap-3 p-4">
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-sm font-semibold text-app-text">
+                                  {blueprint.title}
+                                </h3>
 
-                          {blueprint.items.length > 0 && (
-                            <Badge variant="neutral" size="sm">
-                              {blueprint.items.length}{" "}
-                              {blueprint.items.length === 1 ? "line" : "lines"}
-                            </Badge>
-                          )}
+                                {blueprint.items.length > 0 && (
+                                  <Badge variant="neutral" size="sm" className="gap-1">
+                                    <CheckSquare className="h-3 w-3" aria-hidden="true" />
+                                    {blueprint.items.length}
+                                  </Badge>
+                                )}
 
-                          {blueprint.afterId && (
-                            <Badge variant="neutral" size="sm" className="gap-1">
-                              <Lock className="h-3 w-3" aria-hidden="true" />
-                              After:{" "}
-                              {all.find((other) => other.id === blueprint.afterId)?.title ??
-                                "a removed blueprint"}
-                            </Badge>
-                          )}
-                        </div>
+                                {blueprint.afterId && (
+                                  <Badge variant="neutral" size="sm" className="gap-1">
+                                    <Lock className="h-3 w-3" aria-hidden="true" />
+                                    After{" "}
+                                    {all.find((other) => other.id === blueprint.afterId)?.title ??
+                                      "a removed blueprint"}
+                                  </Badge>
+                                )}
+                              </div>
 
-                        {blueprint.description && (
-                          <p className="text-sm text-app-text-muted">{blueprint.description}</p>
-                        )}
+                              {blueprint.description && (
+                                <p className="text-sm text-app-text-muted">
+                                  {blueprint.description}
+                                </p>
+                              )}
 
-                        <p className="flex flex-wrap items-center gap-1.5 text-xs text-app-text-muted">
-                          <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                          {blueprint.roleIds.length === 0
-                            ? "Everybody on the project"
-                            : blueprint.roleIds.map(roleName).join(", ")}
-                        </p>
-                      </div>
+                              <p className="flex flex-wrap items-center gap-1.5 text-xs text-app-text-muted">
+                                <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {blueprint.roleIds.length === 0
+                                  ? "Everybody on the project"
+                                  : blueprint.roleIds.map(roleName).join(", ")}
+                              </p>
+                            </div>
 
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          iconOnly
-                          onClick={() => void move(index, "up")}
-                          disabled={index === 0}
-                          aria-label={`Move "${blueprint.title}" earlier`}
-                        >
-                          <ArrowUp className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          iconOnly
-                          onClick={() => void move(index, "down")}
-                          disabled={index === all.length - 1}
-                          aria-label={`Move "${blueprint.title}" later`}
-                        >
-                          <ArrowDown className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          iconOnly
-                          onClick={() => openEdit(blueprint)}
-                          aria-label={`Edit "${blueprint.title}"`}
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="dangerGhost"
-                          size="sm"
-                          iconOnly
-                          onClick={() => void handleRemove(blueprint)}
-                          aria-label={`Remove "${blueprint.title}"`}
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </article>
-                  </SpotlightCard>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                onClick={() => void move(blueprint, "up")}
+                                disabled={isFirstInStage(blueprint)}
+                                aria-label={`Move "${blueprint.title}" earlier`}
+                              >
+                                <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                onClick={() => void move(blueprint, "down")}
+                                disabled={isLastInStage(blueprint)}
+                                aria-label={`Move "${blueprint.title}" later`}
+                              >
+                                <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                onClick={() => openEdit(blueprint)}
+                                aria-label={`Edit "${blueprint.title}"`}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="dangerGhost"
+                                size="sm"
+                                iconOnly
+                                onClick={() => void handleRemove(blueprint)}
+                                aria-label={`Remove "${blueprint.title}"`}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          </article>
+                        </SpotlightCard>
+                      ))}
+                    </div>
+                  </section>
                 ))
               )}
             </div>
 
-            <SpotlightCard roundedClassName="rounded-2xl">
-              <section className="space-y-3 p-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-app-text">What a new hire gets</h2>
+            <aside className="min-w-0">
+              <div className="space-y-3 xl:sticky xl:top-6">
+                <div className="px-1">
+                  <h2 className="text-sm font-semibold text-app-text">
+                    {roleId === EVERY_ROLE
+                      ? "What every hire gets"
+                      : `What a new ${roleName(roleId)} gets`}
+                  </h2>
                   <p className="text-xs text-app-text-muted">
-                    The cards this role would find on their board on day one, in order.
+                    Their board on day one — the stages it folds into, and the runs that stand as
+                    one card.
                   </p>
                 </div>
 
-                <FilterSelect
-                  label="Role to preview"
-                  value={previewRoleId}
-                  options={roleOptions}
-                  onChange={setPreviewRoleId}
-                />
-
-                {preview.length === 0 ? (
-                  <EmptyState size="sm">
-                    Nothing yet — a blueprint with no roles ticked would reach this hire.
-                  </EmptyState>
+                {bands.length === 0 ? (
+                  <EmptyState size="sm">Nothing would be on it yet.</EmptyState>
                 ) : (
-                  <ol className="space-y-1.5">
-                    {preview.map((blueprint, index) => (
-                      <li key={blueprint.id} className="flex items-start gap-2 text-sm">
-                        <span className="mt-0.5 w-5 shrink-0 text-xs text-app-text-subtle tabular-nums">
-                          {index + 1}.
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-app-text">{blueprint.title}</span>
-                          <span className="text-xs text-app-text-muted">
-                            {STAGE_LABELS[blueprint.stage].title}
-                            {blueprint.items.length > 0 && ` · ${blueprint.items.length} to tick`}
+                  <div className="space-y-5">
+                    {bands.map((band) => (
+                      <section key={band.stage} className="space-y-2">
+                        <p className="flex items-baseline gap-2 px-1">
+                          <span className="text-xs font-semibold text-app-text">
+                            {STAGE_LABELS[band.stage].title}
                           </span>
-                        </span>
-                      </li>
+                          <span className="text-xs text-app-text-muted tabular-nums">
+                            {band.entries.length} {band.entries.length === 1 ? "card" : "cards"}
+                          </span>
+                        </p>
+
+                        {band.entries.map((entry) => (
+                          <div
+                            key={entry.blueprint.id}
+                            className="rounded-xl border border-app-border bg-app-surface p-3"
+                          >
+                            <p className="flex items-center gap-1.5 text-sm font-medium text-app-text">
+                              <CheckSquare
+                                className="h-3.5 w-3.5 shrink-0 text-app-text-muted"
+                                aria-hidden="true"
+                              />
+                              <span className="min-w-0 truncate">{entry.blueprint.title}</span>
+                            </p>
+
+                            {entry.blueprint.items.length > 0 && (
+                              <ul className="mt-1.5 space-y-0.5">
+                                {entry.blueprint.items.slice(0, 3).map((item, index) => (
+                                  <li
+                                    key={`${item}-${index}`}
+                                    className="truncate text-xs text-app-text-muted"
+                                  >
+                                    · {item}
+                                  </li>
+                                ))}
+                                {entry.blueprint.items.length > 3 && (
+                                  <li className="text-xs text-app-text-subtle">
+                                    +{entry.blueprint.items.length - 3} more
+                                  </li>
+                                )}
+                              </ul>
+                            )}
+
+                            {/* A run is one card with the rest behind it, so the preview says so
+                                rather than listing them as separate cards the hire will not see. */}
+                            {entry.behind.length > 0 && (
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-app-brand-text">
+                                <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="min-w-0 truncate">
+                                  then {entry.behind.map((behind) => behind.title).join(" → ")}
+                                </span>
+                              </p>
+                            )}
+
+                            {entry.waitsOn && (
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-app-text-muted">
+                                <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="min-w-0 truncate">
+                                  waits for {entry.waitsOn.title}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </section>
                     ))}
-                  </ol>
+                  </div>
                 )}
-              </section>
-            </SpotlightCard>
+              </div>
+            </aside>
           </div>
         )}
       </main>

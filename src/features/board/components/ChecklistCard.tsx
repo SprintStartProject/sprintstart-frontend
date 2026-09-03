@@ -5,6 +5,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { readableTitle } from "../generation/pathToCards";
+import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
@@ -64,14 +65,19 @@ export function ChecklistCard({
   const [showingAll, setShowingAll] = useState(false);
   const done = content.items.filter((item) => item.done).length;
 
+  // A card the hire pulled wide has room for more of the list before it starts counting: the same
+  // six lines in twice the width would be half a card of white space beside them.
+  const { size } = useBoardCardControls();
+  const limit = size?.width === "wide" ? VISIBLE_ITEMS * 2 : VISIBLE_ITEMS;
+
   // `sort` is stable, so within each half the hire's own order survives.
   const ordered = useMemo(
     () => [...content.items].sort((a, b) => Number(a.done) - Number(b.done)),
     [content.items],
   );
 
-  const overflow = showingAll ? 0 : Math.max(ordered.length - VISIBLE_ITEMS, 0);
-  const shown = overflow > 0 ? ordered.slice(0, VISIBLE_ITEMS) : ordered;
+  const overflow = showingAll ? 0 : Math.max(ordered.length - limit, 0);
+  const shown = overflow > 0 ? ordered.slice(0, limit) : ordered;
 
   const toggle = (itemId: string) => {
     onEdit?.(

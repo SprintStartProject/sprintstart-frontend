@@ -8,14 +8,64 @@ import { Textarea } from "../../../components/ui/Textarea";
 import type { AuthoredCardKind, AuthoredCardRequest } from "../types";
 
 type AddCardFormProps = {
+  /** Which kind is being written. The form is not rendered at all until one is chosen. */
+  kind: AuthoredCardKind;
   onAdd: (request: AuthoredCardRequest) => Promise<boolean>;
+  onClose: () => void;
 };
 
-const KINDS: { kind: AuthoredCardKind; label: string; icon: LucideIcon }[] = [
+const ADD_CARD_KINDS: { kind: AuthoredCardKind; label: string; icon: LucideIcon }[] = [
   { kind: "NOTE", label: "Note", icon: PenLine },
   { kind: "LINK", label: "Link", icon: Link2 },
   { kind: "CHECKLIST", label: "Checklist", icon: CheckSquare },
 ];
+
+type AddCardTriggersProps = {
+  onPick: (kind: AuthoredCardKind) => void;
+  /** Which one is open, so the row can show where the form below it came from. */
+  active: AuthoredCardKind | null;
+  /** Drops the words and keeps the glyphs, for the narrow rail in the page's own margin. */
+  compact?: boolean;
+  /** Stacks them, for the rail: three glyphs down the margin rather than across it. */
+  vertical?: boolean;
+  className?: string;
+};
+
+/**
+ * The three offers: a note, a link, a list.
+ *
+ * Split out from the form because they now appear in two places at once. On a wide screen they sit
+ * in the page's right margin, which is dead space on every board and the natural home for something
+ * always available and rarely urgent; below that width there is no margin to speak of, so they stay
+ * in the row above the board where they have always been. Both drive the same choice, and the form
+ * opens in the same place either way — over the board, where there is room to type.
+ */
+export function AddCardTriggers({
+  onPick,
+  active,
+  compact,
+  vertical,
+  className = "",
+}: AddCardTriggersProps) {
+  return (
+    <div className={`flex items-center gap-1 ${vertical ? "flex-col" : "flex-wrap"} ${className}`}>
+      {ADD_CARD_KINDS.map(({ kind, label, icon: Icon }) => (
+        <Button
+          key={kind}
+          variant={active === kind ? "secondary" : "ghost"}
+          size="sm"
+          iconOnly={compact}
+          onClick={() => onPick(kind)}
+          aria-label={compact ? `Add a ${label.toLowerCase()}` : undefined}
+          title={compact ? `Add a ${label.toLowerCase()}` : undefined}
+          icon={compact ? undefined : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
+        >
+          {compact ? <Icon className="h-4 w-4" aria-hidden="true" /> : label}
+        </Button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Putting something of your own on the board.
@@ -36,17 +86,16 @@ const KINDS: { kind: AuthoredCardKind; label: string; icon: LucideIcon }[] = [
  * ones, so the prompt is a real `<label>` bound to its control and the form matches every other
  * form in the app.
  */
-export function AddCardForm({ onAdd }: AddCardFormProps) {
-  const [kind, setKind] = useState<AuthoredCardKind | null>(null);
+export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
   const [text, setText] = useState("");
   const [label, setLabel] = useState("");
   const [noteTitle, setNoteTitle] = useState("");
 
   const close = () => {
-    setKind(null);
     setText("");
     setLabel("");
     setNoteTitle("");
+    onClose();
   };
 
   const submit = async () => {
@@ -54,24 +103,6 @@ export function AddCardForm({ onAdd }: AddCardFormProps) {
     if (!request) return;
     if (await onAdd(request)) close();
   };
-
-  if (!kind) {
-    return (
-      <div className="flex flex-wrap items-center justify-end gap-1">
-        {KINDS.map(({ kind: option, label: optionLabel }) => (
-          <Button
-            key={option}
-            variant="ghost"
-            size="sm"
-            onClick={() => setKind(option)}
-            icon={<Plus className="h-3.5 w-3.5" aria-hidden="true" />}
-          >
-            {optionLabel}
-          </Button>
-        ))}
-      </div>
-    );
-  }
 
   const fieldId = `add-card-${kind.toLowerCase()}`;
 

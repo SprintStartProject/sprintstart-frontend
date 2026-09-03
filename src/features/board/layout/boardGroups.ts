@@ -1,3 +1,4 @@
+import { isAreaAccent, type AreaAccent } from "./areaAccents";
 import { BOARD_STAGES, STAGE_LABELS } from "./boardStructure";
 
 /**
@@ -18,6 +19,13 @@ export type BoardGroup = {
   /** Members, in no particular order — the board's own order decides how they are laid out. */
   cardIds: string[];
   collapsed: boolean;
+  /**
+   * The colour the hire painted this area, or none for the blue every area used to be.
+   *
+   * A property of the area rather than of its cards: see `areaAccents.ts` for why a person may
+   * colour a group they named and may not colour a card.
+   */
+  accent?: AreaAccent;
 };
 
 function storageKey(boardId: string): string {
@@ -62,6 +70,7 @@ export function readBoardGroups(boardId: string): BoardGroup[] {
         ...group,
         name: unsplitTeamArea(group.name),
         collapsed: !!group.collapsed,
+        accent: isAreaAccent(group.accent) ? group.accent : undefined,
       })),
     );
   } catch {

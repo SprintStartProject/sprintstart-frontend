@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { cardAccent, type CardAccent } from "../layout/cardAccents";
+import type { CardSize } from "../layout/cardSizes";
 import type { CardState } from "../layout/boardStructure";
 
 /**
@@ -20,6 +21,13 @@ export type BoardCardControls = {
   onTogglePinned?: () => void;
   /** The grip, already wired to this cell's drag. Absent when the board is not arrangeable. */
   dragHandle?: ReactNode;
+  /**
+   * The corner the card is pulled by to change its size. Absent while the board is being arranged,
+   * where every drag already means something else.
+   */
+  resizeHandle?: ReactNode;
+  /** The size this card was pulled to, so the card can show more of itself when there is room. */
+  size?: CardSize;
   /**
    * The area picker for this card.
    *

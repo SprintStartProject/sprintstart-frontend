@@ -70,12 +70,14 @@ type BoardCardFrameProps = {
  * target included — instead of re-deriving them here. The surface is a `SpotlightCard`, the same
  * card the pool, the source list and the dashboard widgets sit on.
  *
- * **The controls fade in on hover, from `lg` up only.** Four icon buttons on eleven cards is more
- * chrome than content, and none of them is what the hire came to the board to read. They keep
- * their space in the header rather than expanding into it, so nothing shifts under the pointer,
- * and `focus-within` brings them back for a keyboard user. Below `lg` — where there is no hover
- * to reveal anything — they stay visible, as they do while a dismissal is in flight and while the
- * board is being arranged.
+ * **The controls float in on approach and take no room at rest.** Four icon buttons on eleven cards
+ * is more chrome than content, and none of them is what the hire came to the board to read. They
+ * used to fade but keep their width, which is the arrangement that squeezed the title on a narrow
+ * card down to an ellipsis: reserved space is reserved whether or not anything is drawn in it. Now
+ * the cluster is lifted out of the header's flow, so the title has the whole row until somebody
+ * comes near, and `focus-within` brings the cluster back for a keyboard user. While the board is
+ * being arranged it sits in the flow again — there it holds the stage and dependency pickers and
+ * *is* what somebody came for.
  *
  * **A blocked card stays visible and goes quiet.** It is dimmed and says what it is waiting on,
  * rather than being hidden or disabled: a hire who cannot yet do something is entitled to know it
@@ -113,6 +115,7 @@ export function BoardCardFrame({
     stagePicker,
     dependencyPicker,
     stack,
+    resizeHandle,
   } = useBoardCardControls();
 
   // A folded card opens while it is under the pointer and closes again when it is left. The fold
@@ -126,6 +129,7 @@ export function BoardCardFrame({
   const blocked = state?.status === "BLOCKED";
   const done = state?.status === "DONE";
   const label = controlLabel ?? title;
+  /** The grip's own fade. The rest of the controls travel together — see the cluster below. */
   const reveal = dismissing
     ? ""
     : "lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 [[data-arranging]_&]:opacity-100";
@@ -143,7 +147,9 @@ export function BoardCardFrame({
       }`}
     >
       <section
-        className="relative flex flex-col overflow-hidden p-4"
+        // The board's density setting, read off the grid root rather than passed in — a card should
+        // not have to be told how much padding the board is in the mood for.
+        className="relative flex flex-col overflow-hidden p-4 pl-5 [[data-density=compact]_&]:p-2.5 [[data-density=compact]_&]:pl-4"
         onPointerEnter={() => collapsed && setPeeking(true)}
         onPointerLeave={() => setPeeking(false)}
         onFocusCapture={() => collapsed && setPeeking(true)}
@@ -156,6 +162,14 @@ export function BoardCardFrame({
         <div
           aria-hidden="true"
           className={`pointer-events-none absolute -top-14 -right-14 h-36 w-36 rounded-full blur-2xl ${accent.bloom}`}
+        />
+
+        {/* The kind, in the one place the eye reads without being asked to. A card is recognised at
+            a glance by its edge long before its title is read, so this is what turns a board of
+            mixed kinds from one texture into a sorted one. */}
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-y-0 left-0 w-1 ${accent.edge}`}
         />
 
         <header className={`relative flex items-start justify-between gap-3 ${open ? "mb-3" : ""}`}>
@@ -171,7 +185,13 @@ export function BoardCardFrame({
               </span>
             )}
 
-            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${accent.icon}`} aria-hidden="true" />
+            {/* The glyph in a tinted square rather than loose on the surface: the same colour
+                twice the size, which is what makes two cards of a kind look like a pair. */}
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${accent.chip}`}
+            >
+              <Icon className={`h-3.5 w-3.5 ${accent.icon}`} aria-hidden="true" />
+            </span>
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -262,7 +282,24 @@ export function BoardCardFrame({
           <div
             // Keeps a press on a control from also grabbing the card underneath while arranging.
             onPointerDownCapture={(event) => event.stopPropagation()}
-            className="flex shrink-0 items-center gap-1"
+            // Lifted out of the flow until somebody comes near the card.
+            //
+            // The cluster used to sit in the header row and hold its width whether or not it was
+            // showing anything — four icon buttons' worth of reserved space on every card, all the
+            // time. On a wide card that is a gap; on a card one column of four wide it was most of
+            // the header, and the title — the one thing on a card that cannot be guessed from
+            // anything else — was squeezed down to an ellipsis. Floated, the header is the title's
+            // for as long as nobody is doing anything, which is nearly always.
+            //
+            // The states it used to keep visible are not lost with it: "Pinned" and "Done" are
+            // badges next to the title, and they are the ones that say so.
+            //
+            // Not floated while the board is being arranged: there the cluster carries the stage
+            // and the "waits on" pickers, it *is* what somebody came for, and a panel of selects
+            // hovering over the title would be the mode fighting itself.
+            className={`absolute top-0 right-0 z-10 flex items-center gap-1 rounded-xl bg-app-surface/90 px-1 opacity-0 shadow-sm backdrop-blur transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [[data-arranging]_&]:pointer-events-auto [[data-arranging]_&]:static [[data-arranging]_&]:bg-transparent [[data-arranging]_&]:opacity-100 [[data-arranging]_&]:shadow-none [[data-arranging]_&]:backdrop-blur-none ${
+              dismissing ? "" : "pointer-events-none"
+            }`}
           >
             {stagePicker}
             {dependencyPicker}
@@ -282,11 +319,7 @@ export function BoardCardFrame({
                     ? "Not finished after all"
                     : "Tick this off — it stops blocking whatever waits on it"
                 }
-                // Outside `reveal` once ticked, for the reason the pin is: a state that only shows
-                // on hover is a state the hire has to go looking for.
-                className={
-                  done ? "text-app-purple-text" : `transition-opacity duration-150 ${reveal}`
-                }
+                className={done ? "text-app-purple-text" : undefined}
               >
                 {done ? (
                   <CircleCheckBig className="h-4 w-4" aria-hidden="true" />
@@ -304,11 +337,7 @@ export function BoardCardFrame({
                 onClick={onTogglePinned}
                 aria-pressed={pinned}
                 aria-label={pinned ? `Unpin the ${label} card` : `Pin the ${label} card to the top`}
-                // Deliberately outside `reveal`: a pin is a state, and a state that only shows on
-                // hover is a state the hire has to go looking for.
-                className={
-                  pinned ? "text-app-brand-text" : `transition-opacity duration-150 ${reveal}`
-                }
+                className={pinned ? "text-app-brand-text" : undefined}
               >
                 {pinned ? (
                   <PinOff className="h-4 w-4" aria-hidden="true" />
@@ -318,10 +347,7 @@ export function BoardCardFrame({
               </Button>
             )}
 
-            <span className={`flex items-center gap-1 transition-opacity duration-150 ${reveal}`}>
-              {/* In the revealed cluster rather than always on show: it is available on every card
-                  now, and a select sitting permanently in eleven headers would be the loudest thing
-                  on the board. */}
+            <span className="flex items-center gap-1">
               {groupPicker}
 
               {onToggleCollapsed && (
@@ -365,6 +391,10 @@ export function BoardCardFrame({
             {children}
           </div>
         </Collapsible>
+
+        {/* Last in the box and pinned to its corner: the handle belongs to the card, not to any
+            one thing on it, and the bottom-right is where every resize in every app lives. */}
+        {resizeHandle}
       </section>
     </SpotlightCard>
   );

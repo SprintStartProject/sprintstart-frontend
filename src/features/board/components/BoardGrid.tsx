@@ -31,6 +31,8 @@ import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { BoardCardContext } from "./boardCardControls";
 import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
+import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents";
+import type { BoardDensity } from "../layout/boardPreferences";
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
 import { cardIcon } from "../layout/cardIcons";
 import { cardName } from "../layout/cardNames";
@@ -42,7 +44,15 @@ import {
   type BoardStage,
   type CardState,
 } from "../layout/boardStructure";
-import { cardWeight, packIntoColumns, spansFullWidth } from "../layout/cardWeights";
+import { spansFullWidth } from "../layout/cardWidths";
+import {
+  GRID_COLUMNS,
+  sizeFromDrag,
+  sizeOf,
+  WIDTH_SPAN,
+  type CardSize,
+  type CardSizes,
+} from "../layout/cardSizes";
 import type { AuthoredCardRequest, Board, BoardCard } from "../types";
 
 /** Two columns from Tailwind's `lg` up; one below it. The only width this grid branches on. */
@@ -193,13 +203,6 @@ const FAN_ROOM = ["", "mb-4 motion-safe:hover:mb-12", "mb-6 motion-safe:hover:mb
 const SHEET_HOVERED = "hover:border-app-brand-border-strong! hover:bg-app-brand-soft!";
 
 /**
- * Roughly how much taller an area is than the cards inside it: its header, its padding, and the
- * gaps its own border adds. In the same 40px units `cardWeight` works in — an estimate, used only
- * to decide which column a block starts in.
- */
-const GROUP_CHROME_WEIGHT = 2.4;
-
-/**
  * One thing that sits in a column or inside an area: a card, or a sequence spread out.
  *
  * A spread-out stack stays one item rather than becoming its members. Letting the members loose
@@ -215,13 +218,88 @@ type Item =
 type Block =
   Item | { kind: "group"; key: string; group: BoardGroup; cards: BoardCard[]; items: Item[] };
 
-/** One row of the board: blocks dealt into columns, or one block that needs the whole width. */
-type Row =
-  | { kind: "run"; key: string; columns: Block[][] }
-  | { kind: "full"; key: string; block: Block; columns: number };
+/**
+ * The board's grid, in pixels.
+ *
+ * `ROW_UNIT` is deliberately tiny: a card is given as many of these rows as it measures, so the
+ * unit is the resolution of the layout rather than a row height anybody sees. Small enough that a
+ * card is never rounded up by more than a few pixels, large enough that the browser is not laying
+ * out a thousand tracks.
+ */
+const ROW_UNIT = 8;
+
+/** The gap between cards, per density. In JS because the row maths has to use the same number. */
+const GRID_GAP = { cozy: 16, compact: 10 } as const;
 
 /** One stage of the board, with everything filed under it. */
 type Band = { stage: BoardStage; blocks: Block[]; total: number; remaining: number };
+
+type GridBlockProps = {
+  /** How many of the grid's columns this block takes. */
+  span: number;
+  /** The grid's gap, which the row maths has to agree with. */
+  gap: number;
+  /** Whether the reader asked for less motion, which the arrival and exit honour. */
+  reduceMotion: boolean;
+  children: ReactNode;
+};
+
+/**
+ * One block in the board's grid: as wide as it was told, and as tall as it turns out to be.
+ *
+ * **Measured, not estimated.** The board used to guess every card's height from its content and deal
+ * the blocks into two balanced columns — good enough while the only question was which column a
+ * card starts in, and useless the moment a card can be one column, two, or four: a grid places
+ * things in rows, and a row is only as honest as the height it was given. So the block asks the
+ * browser how tall it actually is and claims that many of the grid's small rows. A wrong answer
+ * here is not a slightly uneven column any more, it is cards overlapping.
+ *
+ * The `ResizeObserver` is what keeps it right afterwards: a checklist that is ticked, a card that
+ * is folded, a band that opens — all of them change a height without changing anything this
+ * component is passed, and all of them would otherwise leave the grid holding the old number.
+ */
+function GridBlock({ span, gap, reduceMotion, children }: GridBlockProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [rows, setRows] = useState(1);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    // No first measurement of our own: `ResizeObserver` reports the initial size as soon as it
+    // observes, so calling it here as well would be a second render for the same number.
+    const observer = new ResizeObserver(() => {
+      const height = element.getBoundingClientRect().height;
+      setRows(Math.max(1, Math.ceil((height + gap) / (ROW_UNIT + gap))));
+    });
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [gap]);
+
+  return (
+    // The animation lives here rather than one level in, because `AnimatePresence` can only hold a
+    // block back long enough to fade it if the block it is holding is a motion element.
+    <motion.div
+      style={{ gridColumn: `span ${span}`, gridRow: `span ${rows}` }}
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      // Quick and its own transition: a leaving block is out of the flow already, and a
+      // spring-length exit would leave it fading over whatever moved into its place.
+      exit={{
+        opacity: 0,
+        ...(reduceMotion ? {} : { scale: 0.97 }),
+        transition: { duration: 0.12, ease: "easeIn" },
+      }}
+      transition={centralSpringToken}
+    >
+      {/* Deliberately not stretched to the grid row: a measurement that read back the height the
+          grid gave it would be measuring its own answer. */}
+      <div ref={ref}>{children}</div>
+    </motion.div>
+  );
+}
 
 /** Where a dragged card counts as being: its own middle, which is what the eye is following. */
 function centerOf(element: HTMLElement): { x: number; y: number } {
@@ -282,6 +360,18 @@ type BoardGridProps = {
   onToggleGroup?: (groupId: string) => void;
   /** Takes the area away and leaves its cards on the board, where they already are. */
   onDissolveGroup?: (groupId: string) => void;
+  /** Paints an area. Absent on a board that cannot be changed. */
+  onRecolourGroup?: (groupId: string, accent: AreaAccent) => void;
+  /**
+   * How much room the board gives each card.
+   *
+   * Applied as a `data-density` attribute on the grid's root rather than threaded through every
+   * card: the cards that respond to it are ten components deep and belong to eleven different
+   * files, and the two places it actually changes anything — a card's padding and the gaps between
+   * them — are better read as two rules next to the values they override than as a prop that
+   * arrives everywhere and is used twice. Same mechanism as `data-arranging`.
+   */
+  density?: BoardDensity;
   /**
    * Every card's derived place in the process, keyed by id.
    *
@@ -318,6 +408,17 @@ type BoardGridProps = {
   openStages?: ReadonlySet<BoardStage>;
   /** Folds one band. Absent on a board whose bands cannot be folded. */
   onToggleStage?: (stage: BoardStage) => void;
+  /**
+   * The sizes the hire pulled their cards to, keyed by id.
+   *
+   * The layout reads them in exactly two places — how wide a card's block is, and how tall the
+   * packing should assume it is — because those are the two things a size can honestly change on a
+   * board that packs itself. See `cardSizes.ts` for why it is two widths and two heights and not a
+   * pixel box.
+   */
+  cardSizes?: CardSizes;
+  /** Sets one card's size. Absent on a board that cannot be changed. */
+  onResizeCard?: (cardId: string, size: CardSize) => void;
 };
 
 type SharedProps = {
@@ -416,6 +517,8 @@ export function BoardGrid({
   onRenameGroupDone,
   onToggleGroup,
   onDissolveGroup,
+  onRecolourGroup,
+  density,
   states,
   onAssignStage,
   onAssignGroupStage,
@@ -426,8 +529,24 @@ export function BoardGrid({
   onToggleStack,
   openStages,
   onToggleStage,
+  cardSizes,
+  onResizeCard,
 }: BoardGridProps) {
-  const twoColumns = useMediaQuery(TWO_COLUMN_QUERY);
+  const wideEnough = useMediaQuery(TWO_COLUMN_QUERY);
+
+  /**
+   * How many columns the board has right now.
+   *
+   * Four or one, with nothing in between: the widths are spans on this number, and a board of two
+   * columns would make "narrow" and "normal" the same thing while "wide" quietly became "normal".
+   * One column below the breakpoint is what the board has always done, and it is what a phone
+   * should do — the spans all clamp to it, so a hire's sizes are ignored rather than honoured into
+   * something unreadable.
+   */
+  const columns = wideEnough ? GRID_COLUMNS : 1;
+
+  /** The gap between blocks, which the row maths has to agree with — see {@link GridBlock}. */
+  const gap = GRID_GAP[density ?? "cozy"];
   const elements = useRef(new Map<string, HTMLDivElement>());
   const groupElements = useRef(new Map<string, HTMLElement>());
   const lastMoveAt = useRef(0);
@@ -618,58 +737,32 @@ export function BoardGrid({
   }, [board.cards, expandedStackIds, groups, stacks]);
 
   /**
-   * The blocks dealt into columns, broken by anything that needs the full width.
+   * How wide a block is, in columns of the board's grid.
    *
-   * **Areas are packed like cards, not laid out around them.** An area used to be a full-width band
-   * with its own two-column grid inside it, which meant an area holding one short note was a band
-   * across the whole board with an empty half beside the note — a box claiming far more importance
-   * than its contents. Packed, it is as wide as a column and as tall as what is in it, which is
-   * what an area of one small card should look like.
+   * The card's own size, clamped to what the grid it sits in actually has: a card pulled wide
+   * inside an area two columns across is two columns across, not four sticking out of its own
+   * container. A diagram is wide whatever anybody chose, because half of a half-width picture is
+   * not a picture.
    *
-   * Runs rather than one packing pass, so a full-width block is a real break: what follows it
-   * starts fresh columns instead of flowing around it, which keeps its position in the order
-   * visible on screen. An area holding a diagram takes the full width too — half of a half-width
-   * column is not enough of a picture to read, wherever the picture is filed.
+   * An area is as wide as the widest thing in it, and never narrower than two — an area of one
+   * narrow note would otherwise be a tinted box the size of a stamp with a name in it.
    */
-  const toRows = useCallback(
-    (input: Block[]): Row[] => {
-      const columns = twoColumns ? 2 : 1;
-      const weightOf = (card: BoardCard) => cardWeight(card, collapsedIds?.has(card.id) ?? false);
-      const blockWeight = (block: Block) =>
-        block.cards.reduce((total, card) => total + weightOf(card), 0) +
-        (block.kind === "card" ? 0 : GROUP_CHROME_WEIGHT);
+  const spanOf = useCallback(
+    (block: Block, columns: number): number => {
+      const widest = block.cards.reduce(
+        (span, card) =>
+          Math.max(
+            span,
+            spansFullWidth(card) ? GRID_COLUMNS : WIDTH_SPAN[sizeOf(cardSizes, card.id).width],
+          ),
+        1,
+      );
+      const wanted = block.kind === "group" ? Math.max(widest, 2) : widest;
 
-      const built: Row[] = [];
-      let run: Block[] = [];
-
-      const flushRun = () => {
-        if (run.length === 0) return;
-        built.push({
-          kind: "run",
-          key: `run-${run[0].key}`,
-          // Never more columns than there are blocks: two columns for one block is an empty column,
-          // which is the same empty half the area bands used to have.
-          columns: packIntoColumns(run, Math.min(columns, run.length), blockWeight),
-        });
-        run = [];
-      };
-
-      for (const block of input) {
-        if (block.cards.some(spansFullWidth)) {
-          flushRun();
-          built.push({ kind: "full", key: block.key, block, columns: columns });
-        } else {
-          run.push(block);
-        }
-      }
-      flushRun();
-
-      return built;
+      return Math.min(wanted, columns);
     },
-    [collapsedIds, twoColumns],
+    [cardSizes],
   );
-
-  const rows = useMemo(() => toRows(blocks), [blocks, toRows]);
 
   /**
    * The board's blocks filed under their stage, in stage order.
@@ -863,6 +956,8 @@ export function BoardGrid({
         onRevealMember={
           stack && onToggleStack ? (memberId) => revealMember(stack.rootId, memberId) : undefined
         }
+        size={sizeOf(cardSizes, card.id)}
+        onResize={onResizeCard ? (next) => onResizeCard(card.id, next) : undefined}
       />
     );
   };
@@ -889,7 +984,7 @@ export function BoardGrid({
   };
 
   /** An area's items, folded by stage — the same fold as the board's own, one level in. */
-  const renderBandedItems = (items: Item[]) => (
+  const renderBandedItems = (items: Item[], span: number) => (
     <div className="space-y-3">
       {BOARD_STAGES.map((stage) => {
         const own = items.filter((item) => stagesOf(item.cards)[0] === stage);
@@ -906,18 +1001,14 @@ export function BoardGrid({
             open={openStages?.has(stage) ?? true}
             onToggle={onToggleStage ? () => onToggleStage(stage) : undefined}
           >
-            <div className="space-y-4">
-              {own.map((item) => (
-                <div key={item.key}>{renderItem(item)}</div>
-              ))}
-            </div>
+            {renderBlocks(own, span)}
           </BoardStageBand>
         );
       })}
     </div>
   );
 
-  const renderBlock = (block: Block, blockIndex: number, wide: boolean) => {
+  const renderBlock = (block: Block, blockIndex: number, span: number) => {
     if (block.kind !== "group") return renderItem(block);
 
     if (spanningGroups.includes(block)) {
@@ -933,38 +1024,20 @@ export function BoardGrid({
           onNameEditDone={onRenameGroupDone}
           onToggle={onToggleGroup}
           onDissolve={onDissolveGroup}
+          onRecolour={onRecolourGroup}
           // No stage badge: the whole point of this area is that its cards do not share one, and
           // the bands inside say what each of them is.
           registerElement={registerGroupElement}
         >
-          {renderBandedItems(block.items)}
+          {renderBandedItems(block.items, span)}
         </BoardGroupSection>
       );
     }
 
-    const inner =
-      wide && twoColumns ? (
-        <div className="grid items-start gap-4 lg:grid-cols-2">
-          {packIntoColumns(block.items, Math.min(2, block.items.length), (item) =>
-            item.cards.reduce(
-              (total, card) => total + cardWeight(card, collapsedIds?.has(card.id) ?? false),
-              0,
-            ),
-          ).map((column, columnIndex) => (
-            <div key={columnIndex} className="space-y-4">
-              {column.map((item) => (
-                <div key={item.key}>{renderItem(item)}</div>
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {block.items.map((item) => (
-            <div key={item.key}>{renderItem(item)}</div>
-          ))}
-        </div>
-      );
+    // The area's cards in the area's own grid. This is what "things inside an area can sit next to
+    // each other" comes down to: an area two columns wide is two columns inside, so filing a card
+    // into an area no longer means dropping it into a single-file queue.
+    const inner = renderBlocks(block.items, span);
 
     return (
       <BoardGroupSection
@@ -978,6 +1051,7 @@ export function BoardGrid({
         onNameEditDone={onRenameGroupDone}
         onToggle={onToggleGroup}
         onDissolve={onDissolveGroup}
+        onRecolour={onRecolourGroup}
         stage={states?.get(block.cards[0]?.id ?? "")?.stage}
         onAssignStage={
           onAssignGroupStage
@@ -1000,67 +1074,45 @@ export function BoardGrid({
   const indexOfBlock = (block: Block) => blocks.findIndex((candidate) => candidate === block);
 
   /** One list of rows, dealt into columns. Drawn once flat, or once per band. */
-  const renderRows = (input: Row[]) => (
-    <div className="space-y-4">
-      {input.map((row) => {
-        if (row.kind === "full") {
-          return <div key={row.key}>{renderBlock(row.block, indexOfBlock(row.block), true)}</div>;
-        }
+  /**
+   * A list of blocks as a grid: each one as wide as it asked for, each one as tall as it measures.
+   *
+   * This replaced a two-column packing that balanced blocks by an estimate of their height. The
+   * packing was the reason a card could only ever be one column or the whole row, why an area laid
+   * its cards out one under another, and why "taller" could do nothing but put a floor under a card
+   * — none of which were decisions, they were what a flow of two columns can express.
+   *
+   * `columns` is passed rather than read from a breakpoint, because an area draws the same grid
+   * inside itself at its own width: two columns wide means two columns inside, so a card in an area
+   * is the same size as a narrow card outside one.
+   */
+  const renderBlocks = (input: Block[], columns: number) => (
+    <div
+      className="grid items-start"
+      style={{
+        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        gridAutoRows: `${ROW_UNIT}px`,
+        gap,
+      }}
+    >
+      {/* A block that leaves fades out instead of being cut. Opening a pile swaps one block for
+          another in the same slot, and without this the card was gone and the frame simply *there*
+          — the crossfade is what makes it read as the same thing changing shape. `initial={false}`
+          so a board arriving does not fade every card in behind the page's own entrance.
 
-        return (
-          <div
-            key={row.key}
-            // `items-start` so a short column stops at its last card instead of stretching to
-            // match the tall one beside it — which is what would put an area's tinted box back to
-            // twice the height of the one card in it.
-            className={row.columns.length > 1 ? "grid items-start gap-4 lg:grid-cols-2" : undefined}
-          >
-            {row.columns.map((column, columnIndex) => (
-              <div key={columnIndex} className="space-y-4">
-                {/* A block that leaves fades out instead of being cut. Opening a pile swaps one
-                    block for another in the same slot, and without this the card was gone and the
-                    frame simply *there* — the crossfade is what makes it read as the same thing
-                    changing shape. `initial={false}` so a board arriving does not fade every card
-                    in behind the page's own entrance.
+          `popLayout` takes a leaving block out of the flow the frame it starts fading, so the grid
+          closes over it instead of holding its cell for the length of an exit. */}
+      <AnimatePresence initial={false} mode="popLayout">
+        {input.map((block) => {
+          const span = spanOf(block, columns);
 
-                    `popLayout` is what keeps the swap smooth. In the default mode the leaving card
-                    still holds its space for the length of its exit while the frame that replaces
-                    it is already at full height, so the column spiked to the height of both and
-                    settled back — a visible jolt at exactly the moment somebody asked to look
-                    inside something. Popped, the old block leaves the flow the frame it starts
-                    fading, and the cards below travel to their new places on their own `layout`
-                    instead of being shoved. */}
-                <AnimatePresence initial={false} mode="popLayout">
-                  {column.map((block) => (
-                    <motion.div
-                      key={block.key}
-                      // Deliberately no `layout` here: the cells inside already carry
-                      // `layout="position"`, and a second projection wrapped around a card that
-                      // can be dragged is exactly the measurement fight the wiggle comment warns
-                      // about further down.
-                      initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      // The exit is deliberately quick and its own transition. A leaving block
-                      // still holds its space until it is gone, so a spring-length exit would have
-                      // the old card and the new frame both in the column for half a second and
-                      // the height would visibly overshoot and settle. Short enough that the two
-                      // read as a crossfade; the arrival keeps the app's spring.
-                      exit={{
-                        opacity: 0,
-                        ...(reduceMotion ? {} : { scale: 0.97 }),
-                        transition: { duration: 0.12, ease: "easeIn" },
-                      }}
-                      transition={centralSpringToken}
-                    >
-                      {renderBlock(block, indexOfBlock(block), false)}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            ))}
-          </div>
-        );
-      })}
+          return (
+            <GridBlock key={block.key} span={span} gap={gap} reduceMotion={reduceMotion ?? false}>
+              {renderBlock(block, indexOfBlock(block), span)}
+            </GridBlock>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 
@@ -1070,9 +1122,13 @@ export function BoardGrid({
     // same 24px as everything else, "Later" read as one more thing in the list above rather than as
     // the start of the next one. It is also the room a fanned pile in the last row needs, so the
     // sheets of a card at the bottom of "Now" do not reach into the heading under it.
-    <div className="space-y-12" data-arranging={isArranging || undefined}>
+    <div
+      className="space-y-12"
+      data-arranging={isArranging || undefined}
+      data-density={density ?? undefined}
+    >
       {spanningGroups.map((block) => (
-        <div key={block.key}>{renderBlock(block, indexOfBlock(block), true)}</div>
+        <div key={block.key}>{renderBlock(block, indexOfBlock(block), columns)}</div>
       ))}
 
       {bands.length > 0
@@ -1085,13 +1141,12 @@ export function BoardGrid({
               open={openStages?.has(band.stage) ?? true}
               onToggle={onToggleStage ? () => onToggleStage(band.stage) : undefined}
             >
-              {renderRows(toRows(band.blocks))}
+              {renderBlocks(band.blocks, columns)}
             </BoardStageBand>
           ))
-        : renderRows(
-            spanningGroups.length > 0
-              ? toRows(blocks.filter((block) => !spanningGroups.includes(block)))
-              : rows,
+        : renderBlocks(
+            blocks.filter((block) => !spanningGroups.includes(block)),
+            columns,
           )}
     </div>
   );
@@ -1214,6 +1269,9 @@ type BoardCardCellProps = {
   onToggleStack?: (rootId: string) => void;
   /** Opens the pile and brings one member into view. Absent when the pile cannot be opened. */
   onRevealMember?: (cardId: string) => void;
+  size: CardSize;
+  /** Sets this card's size. Absent on a board that cannot be changed. */
+  onResize?: (size: CardSize) => void;
   onDrop: (cardId: string, point: { x: number; y: number }) => void;
   onMove?: (cardId: string, direction: "up" | "down") => void;
   onDismiss?: (cardId: string) => void;
@@ -1264,6 +1322,8 @@ function BoardCardCell({
   stack,
   onToggleStack,
   onRevealMember,
+  size,
+  onResize,
   onDrop,
   onMove,
   onDismiss,
@@ -1332,6 +1392,9 @@ function BoardCardCell({
    * run. Two at most, because there are two sheets: a third strip would be a card the eye has to
    * work to read on a pile that is already asking for a click.
    */
+  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
+  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
+
   const behind = useMemo(() => {
     if (!stack) return [];
 
@@ -1436,6 +1499,44 @@ function BoardCardCell({
               onToggle: () => onToggleStack(stack.rootId),
             }
           : undefined,
+      size,
+      resizeHandle:
+        onResize && !isArranging ? (
+          <button
+            type="button"
+            // Pointer capture, so a drag that leaves the little handle — which it does immediately —
+            // keeps being this handle's drag rather than the page's.
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              resizeStart.current = { x: event.clientX, y: event.clientY, size };
+            }}
+            onPointerMove={(event) => {
+              const from = resizeStart.current;
+              if (!from) return;
+
+              const next = sizeFromDrag(from.size, event.clientX - from.x);
+              if (next.width !== size.width) onResize(next);
+            }}
+            onPointerUp={() => (resizeStart.current = null)}
+            onPointerCancel={() => (resizeStart.current = null)}
+            // The keyboard steps the same ramp rather than simulating a drag: a gesture nobody can
+            // perform is not an affordance, it is a picture of one.
+            onKeyDown={(event) => {
+              const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+              if (step === 0) return;
+              event.preventDefault();
+              onResize(sizeFromDrag(size, step * 60));
+            }}
+            title="Drag sideways to make this card narrower or wider, or use the arrow keys"
+            aria-label={`Resize the ${label} card — drag sideways, or use the arrow keys`}
+            className="absolute right-1 bottom-1 z-20 hidden h-5 w-5 cursor-ew-resize items-center justify-center rounded text-app-text-subtle opacity-0 transition-opacity duration-150 group-hover/stack:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex"
+          >
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-[2px] border-r-2 border-b-2 border-current"
+            />
+          </button>
+        ) : undefined,
       onToggleCollapsed: onToggleCollapsed ? () => onToggleCollapsed(card.id) : undefined,
       onTogglePinned: onTogglePinned ? () => onTogglePinned(card.id) : undefined,
       dragHandle: onMove ? (
@@ -1473,9 +1574,12 @@ function BoardCardCell({
       onMove,
       onSetPredecessor,
       onToggleStack,
+      isArranging,
+      onResize,
       onToggleCollapsed,
       onToggleDone,
       onTogglePinned,
+      size,
       pinned,
       predecessorId,
       stack,
@@ -1514,6 +1618,8 @@ function BoardCardCell({
           ? `cursor-pointer transition-[margin-bottom] duration-300 ease-out ${FAN_ROOM[behind.length]}`
           : ""
       } ${isDragging ? "z-40 cursor-grabbing" : ""}`}
+      // The floor for a tall card lives on the grid block that measures it, not here — see
+      // `GridBlock`. Two floors would be one too many, and this one is inside the measurement.
       style={isArranging ? { touchAction: "none" } : undefined}
     >
       {/* Deepest first, so the nearer sheet paints over it and the two strips stack rather than
@@ -1550,6 +1656,8 @@ function BoardCardCell({
           rotation, which changes an element's measured box and would poison a layout projection
           measured against it. */}
       <motion.div
+        // Full height only when the card was pulled tall, so the frame inside can fill the floor
+        // the cell keeps under it.
         animate={isWiggling ? WIGGLE : { rotate: 0 }}
         transition={
           isWiggling
@@ -1583,6 +1691,8 @@ type BoardGroupSectionProps = {
   onNameEditDone?: () => void;
   onToggle?: (groupId: string) => void;
   onDissolve?: (groupId: string) => void;
+  /** Paints the area. Absent on a board that cannot be changed. */
+  onRecolour?: (groupId: string, accent: AreaAccent) => void;
   /** The earliest stage among the area's cards, shown as the area's own. */
   stage?: BoardStage;
   /** Puts every card of this area in one stage. Absent when the board has no process layer. */
@@ -1614,11 +1724,13 @@ function BoardGroupSection({
   onNameEditDone,
   onToggle,
   onDissolve,
+  onRecolour,
   stage,
   onAssignStage,
   registerElement,
   children,
 }: BoardGroupSectionProps) {
+  const accent = areaAccent(group.accent);
   const dragControls = useDragControls();
   const element = useRef<HTMLElement | null>(null);
 
@@ -1680,9 +1792,10 @@ function BoardGroupSection({
       onDrag={() => element.current && onDragMove(element.current)}
       aria-label={group.name}
       // Tinted rather than outlined: an area is a tray the cards sit *in*, and a dashed rectangle
-      // around white cards on a white page reads as a gap, not as a container. The brand tint is
-      // kept low so a board of several areas is still a board and not a set of banners.
-      className="rounded-2xl border border-app-brand-border bg-app-brand-soft p-3 shadow-sm"
+      // around white cards on a white page reads as a gap, not as a container. The tint is kept low
+      // so a board of several areas is still a board and not a set of banners — which is also why
+      // the hire picks from four quiet colours rather than from a colour wheel.
+      className={`group/area rounded-2xl border p-3 shadow-sm ${accent.box}`}
     >
       <header
         className="mb-3 flex items-center justify-between gap-2"
@@ -1747,7 +1860,7 @@ function BoardGroupSection({
               className="max-w-56"
             />
           ) : (
-            <h2 className="min-w-0 truncate text-sm font-semibold text-app-brand-text">
+            <h2 className={`min-w-0 truncate text-sm font-semibold ${accent.title}`}>
               {onRename ? (
                 <button
                   type="button"
@@ -1794,6 +1907,31 @@ function BoardGroupSection({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          {/* Four dots, revealed on approach like the controls on a card. Always-on swatches would
+              put a paint set in the header of every area on the board, which is a lot of colour for
+              a decision most people make once and never revisit. */}
+          {onRecolour && (
+            <span className="mr-1 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within/area:opacity-100 group-hover/area:opacity-100 [[data-arranging]_&]:opacity-100">
+              {AREA_ACCENTS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => onRecolour(group.id, option)}
+                  aria-pressed={(group.accent ?? "blue") === option}
+                  title={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
+                  aria-label={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
+                  className={`h-3.5 w-3.5 rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                    areaAccent(option).swatch
+                  } ${
+                    (group.accent ?? "blue") === option
+                      ? "ring-2 ring-app-text/40 ring-offset-1 ring-offset-app-surface"
+                      : "hover:scale-125"
+                  }`}
+                />
+              ))}
+            </span>
+          )}
+
           {onDissolve && (
             <Button
               variant="ghost"

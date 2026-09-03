@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, Bot, Check, LayoutDashboard, Move, RefreshCw, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  Check,
+  LayoutDashboard,
+  Move,
+  PanelTopClose,
+  PanelTopOpen,
+  RefreshCw,
+  Rows2,
+  Rows3,
+  Sparkles,
+} from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -11,8 +23,8 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathCards";
-import { AddCardForm } from "../features/board/components/AddCardForm";
-import type { BoardCard } from "../features/board/types";
+import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
+import type { AuthoredCardKind, BoardCard } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
 import { BoardPathRail } from "../features/board/components/BoardPathRail";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
@@ -35,6 +47,20 @@ import {
 } from "../features/board/layout/boardStructure";
 import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import { sourceOfTitle } from "../features/board/generation/pathToCards";
+import type { AreaAccent } from "../features/board/layout/areaAccents";
+import {
+  DEFAULT_PREFERENCES,
+  readBoardPreferences,
+  writeBoardPreferences,
+  type BoardPreferences,
+} from "../features/board/layout/boardPreferences";
+import {
+  isDefault,
+  readCardSizes,
+  writeCardSizes,
+  type CardSize,
+  type CardSizes,
+} from "../features/board/layout/cardSizes";
 import {
   assignToGroup,
   groupOf,
@@ -268,6 +294,11 @@ export function BoardPage() {
     if (sectionId === groupId) setSectionId(null);
   }
 
+  /** Paints an area. A colour the hire chose, on a group the hire named — see `areaAccents.ts`. */
+  function handleRecolourGroup(groupId: string, accent: AreaAccent) {
+    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, accent } : group)));
+  }
+
   function handleToggleGroup(groupId: string) {
     saveGroups(
       groups.map((group) =>
@@ -473,6 +504,56 @@ export function BoardPage() {
     [allCards, groups, states],
   );
   const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
+
+  /**
+   * How this hire wants their board to look: how much room the cards get, and whether the tools
+   * above them are on screen at all.
+   *
+   * Read once per board, the way the folds, the pins and the areas are — see `boardPreferences.ts`
+   * for the storage bargain and for why this one wants a server more than the others do.
+   */
+  const [preferences, setPreferences] = useState<BoardPreferences>(DEFAULT_PREFERENCES);
+  const [preferencesReadFor, setPreferencesReadFor] = useState<string | null>(null);
+
+  if (boardId !== preferencesReadFor) {
+    setPreferencesReadFor(boardId);
+    setPreferences(readBoardPreferences(boardId));
+  }
+
+  function savePreferences(next: BoardPreferences) {
+    setPreferences(next);
+    writeBoardPreferences(boardId, next);
+  }
+
+  /** The kind of card being written, or null when nothing is being added. */
+  const [addingKind, setAddingKind] = useState<AuthoredCardKind | null>(null);
+
+  /** The sizes the hire pulled their cards to — see `cardSizes.ts`. */
+  const [cardSizes, setCardSizes] = useState<CardSizes>({});
+  const [sizesReadFor, setSizesReadFor] = useState<string | null>(null);
+
+  if (boardId !== sizesReadFor) {
+    setSizesReadFor(boardId);
+    setCardSizes(readCardSizes(boardId));
+  }
+
+  /**
+   * Sets one card's size, and forgets the entry entirely when it is pulled back to the default.
+   *
+   * Storage should hold the decisions somebody made. A row per card saying "unchanged" is not a
+   * decision, and it is what would slowly turn a preference into a copy of the board.
+   */
+  function resizeCard(cardId: string, size: CardSize) {
+    setCardSizes((current) => {
+      const next = { ...current };
+      if (isDefault(size)) delete next[cardId];
+      else next[cardId] = size;
+
+      writeCardSizes(boardId, next);
+
+      return next;
+    });
+  }
 
   /**
    * The piles that are spread out — and while the board is being arranged, that is all of them.
@@ -709,6 +790,60 @@ export function BoardPage() {
                   >
                     Build my path
                   </Button>
+                  {/* The same two switches the rail carries, for the widths where there is no
+                      margin to put a rail in. `lg:hidden` rather than a second implementation:
+                      one state, two places it can be reached from. */}
+                  <Button
+                    variant="secondary"
+                    iconOnly
+                    className="lg:hidden"
+                    onClick={() =>
+                      savePreferences({
+                        ...preferences,
+                        density: preferences.density === "cozy" ? "compact" : "cozy",
+                      })
+                    }
+                    disabled={!board}
+                    aria-pressed={preferences.density === "compact"}
+                    title={
+                      preferences.density === "compact"
+                        ? "Give the cards more room"
+                        : "Fit more on screen"
+                    }
+                    aria-label={
+                      preferences.density === "compact"
+                        ? "Give the cards more room"
+                        : "Fit more on screen"
+                    }
+                  >
+                    {preferences.density === "compact" ? (
+                      <Rows2 className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Rows3 className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    iconOnly
+                    className="lg:hidden"
+                    onClick={() =>
+                      savePreferences({ ...preferences, toolsHidden: !preferences.toolsHidden })
+                    }
+                    disabled={!board}
+                    aria-pressed={preferences.toolsHidden}
+                    title={preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"}
+                    aria-label={
+                      preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"
+                    }
+                  >
+                    {preferences.toolsHidden ? (
+                      <PanelTopOpen className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <PanelTopClose className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+
                   <Button
                     variant="secondary"
                     iconOnly
@@ -739,7 +874,76 @@ export function BoardPage() {
         </div>
       </header>
 
-      <main ref={swipeRef} className="app-page-frame space-y-5 py-6 lg:py-8">
+      <main ref={swipeRef} className="app-page-frame relative space-y-5 py-6 lg:py-8">
+        {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
+            space: the board is a column of cards and the margin is where a hand rests. So the
+            three offers live there — always in reach, never in the way, and out of the row above
+            the board where they were competing with the controls that decide what is *shown*.
+            Absolute rather than a column of its own, so nothing about the board's own width or its
+            two-column packing changes; hidden below `lg`, where there is no margin to sit in. */}
+        {selectedProjectId && !isArranging && (
+          <div className="absolute top-6 right-3 z-20 hidden lg:top-8 lg:block">
+            <div className="sticky top-6 flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur">
+              {/* The two view switches lead, because they are about the board as a whole and the
+                  three below them are about adding one thing to it. Hiding the tools is the
+                  topmost: it is the one control that has to stay reachable *after* it has taken
+                  the others off the screen. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() =>
+                  savePreferences({ ...preferences, toolsHidden: !preferences.toolsHidden })
+                }
+                disabled={!board}
+                aria-pressed={preferences.toolsHidden}
+                title={preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"}
+                aria-label={preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"}
+              >
+                {preferences.toolsHidden ? (
+                  <PanelTopOpen className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <PanelTopClose className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() =>
+                  savePreferences({
+                    ...preferences,
+                    density: preferences.density === "cozy" ? "compact" : "cozy",
+                  })
+                }
+                disabled={!board}
+                aria-pressed={preferences.density === "compact"}
+                title={
+                  preferences.density === "compact"
+                    ? "Give the cards more room"
+                    : "Fit more on screen"
+                }
+                aria-label={
+                  preferences.density === "compact"
+                    ? "Give the cards more room"
+                    : "Fit more on screen"
+                }
+              >
+                {preferences.density === "compact" ? (
+                  <Rows2 className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Rows3 className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+
+              <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+
+              <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
+            </div>
+          </div>
+        )}
+
         {!selectedProjectId && !projectsLoading ? (
           <EmptyState
             icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
@@ -772,34 +976,48 @@ export function BoardPage() {
                 navigation for the same board — they are two halves of "what am I looking at", and
                 they belong side by side. `items-start` so the tab bar's own status line hangs
                 under the tabs rather than dragging the controls down with it. */}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              {hasSectionTabs ? (
-                <div className="min-w-0 flex-1">
-                  <BoardSectionTabs
-                    sections={sections}
-                    selectedId={sectionId}
-                    onSelect={setSectionId}
-                  />
-                </div>
-              ) : (
-                <span />
-              )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Only offered once there is something to cut: a filter over three cards is a
-                    control that costs more attention than it saves. */}
-                {allCards.length > 2 && (
-                  <FilterSelect
-                    label="Which cards to show"
-                    value={filter}
-                    options={filterOptions}
-                    onChange={setFilter}
-                  />
+            {!preferences.toolsHidden && (
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                {hasSectionTabs ? (
+                  <div className="min-w-0 flex-1">
+                    <BoardSectionTabs
+                      sections={sections}
+                      selectedId={sectionId}
+                      onSelect={setSectionId}
+                    />
+                  </div>
+                ) : (
+                  <span />
                 )}
 
-                <AddCardForm onAdd={addCard} />
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Only offered once there is something to cut: a filter over three cards is a
+                      control that costs more attention than it saves. */}
+                  {allCards.length > 2 && (
+                    <FilterSelect
+                      label="Which cards to show"
+                      value={filter}
+                      options={filterOptions}
+                      onChange={setFilter}
+                    />
+                  )}
+
+                  {/* The rail in the margin takes over from `lg` up, where there is a margin to
+                      put it in. Below that these are the only three offers on the page. */}
+                  <AddCardTriggers
+                    onPick={setAddingKind}
+                    active={addingKind}
+                    className="lg:hidden"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
+                room for three glyphs and not for a form. */}
+            {addingKind && (
+              <AddCardForm kind={addingKind} onAdd={addCard} onClose={() => setAddingKind(null)} />
+            )}
 
             <div className="min-w-0 space-y-4">
               {/* Only the cards travel. The controls above are the same controls whatever section
@@ -873,6 +1091,7 @@ export function BoardPage() {
                   onRenameGroupDone={() => setRenamingGroupId(null)}
                   onToggleGroup={handleToggleGroup}
                   onDissolveGroup={handleDissolveGroup}
+                  onRecolourGroup={handleRecolourGroup}
                   states={states}
                   onAssignStage={assignStage}
                   onAssignGroupStage={assignGroupStage}
@@ -883,6 +1102,9 @@ export function BoardPage() {
                   onToggleStack={toggleStack}
                   openStages={openStages}
                   onToggleStage={toggleStage}
+                  density={preferences.density}
+                  cardSizes={cardSizes}
+                  onResizeCard={resizeCard}
                 />
               </SlidingTabPanel>
             </div>
