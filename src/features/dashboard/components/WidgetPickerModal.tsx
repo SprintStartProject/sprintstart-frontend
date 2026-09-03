@@ -25,6 +25,13 @@ function pendingChange(isSelected: boolean, wasPlaced: boolean): PendingChange {
   return wasPlaced ? "removing" : "absent";
 }
 
+/** What each state is called, in the chip and — the same words — in the accessible name. */
+const CHANGE_LABELS: Record<Exclude<PendingChange, "absent">, string> = {
+  adding: "Adding",
+  removing: "Removing",
+  placed: "On your dashboard",
+};
+
 export type WidgetPickerModalProps = {
   isOpen: boolean;
   /** Everything this user may have, placed or not — the picker shows the whole catalog. */
@@ -183,9 +190,17 @@ function summarize(adding: number, removing: number): string {
  * One widget in the picker: a toggle, not a command.
  *
  * `aria-pressed` rather than a checkbox role, because that is what the whole card is — a button
- * whose two states are "on my dashboard" and "not". The accessible name is the widget's title
- * alone, with the description attached through `aria-describedby`, so a screen reader does not
- * re-read the blurb every time the state flips.
+ * whose two states are "on my dashboard" and "not". The description is attached through
+ * `aria-describedby` rather than left in the name, so a screen reader does not re-read the
+ * blurb every time the state flips.
+ *
+ * The change chip is described rather than named, and that is the whole reason it is wired up at
+ * all: `aria-label` overrides the entire subtree, so the chip was invisible to anything not
+ * looking at the card — and `aria-pressed` alone says ticked or not, which is the one distinction
+ * this dialog exists *not* to stop at. Ticked because it has been on the board for a month and
+ * ticked ten seconds ago are the same state and different news. In the description and not in the
+ * name, because the name has to stay put while the button is being pressed: a control that
+ * renames itself on activation reads as a different control.
  */
 function WidgetOption({
   widget,
@@ -200,13 +215,16 @@ function WidgetOption({
 }) {
   const Icon = widget.icon;
   const descriptionId = `widget-option-${widget.id}-description`;
+  const changeId = `widget-option-${widget.id}-change`;
 
   return (
     <button
       type="button"
       aria-pressed={isSelected}
       aria-label={widget.title}
-      aria-describedby={descriptionId}
+      // The chip joins the blurb in the description when there is one to report, which is what
+      // gets it past the `aria-label` above.
+      aria-describedby={change === "absent" ? descriptionId : `${descriptionId} ${changeId}`}
       onClick={onToggle}
       className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
         isSelected
@@ -230,7 +248,7 @@ function WidgetOption({
           {DASHBOARD_SIZE_LABELS[widget.defaultSize]} by default
         </span>
 
-        <ChangeChip change={change} />
+        <ChangeChip id={changeId} change={change} />
       </span>
 
       {/* The tick, so "which of these am I keeping" is answerable at a glance rather than by
@@ -257,23 +275,21 @@ function WidgetOption({
  * got that one already?" the picker used to leave the reader with. Never colour alone — each
  * state carries its own icon and its own word.
  */
-function ChangeChip({ change }: { change: PendingChange }) {
+function ChangeChip({ id, change }: { id: string; change: PendingChange }) {
   if (change === "absent") return null;
 
   const chips = {
-    adding: { icon: Plus, label: "Adding", className: "bg-app-success-bg text-app-success-text" },
-    removing: {
-      icon: Minus,
-      label: "Removing",
-      className: "bg-app-danger-bg text-app-danger-text",
-    },
-    placed: { icon: Check, label: "On your dashboard", className: "text-app-text-subtle" },
+    adding: { icon: Plus, className: "bg-app-success-bg text-app-success-text" },
+    removing: { icon: Minus, className: "bg-app-danger-bg text-app-danger-text" },
+    placed: { icon: Check, className: "text-app-text-subtle" },
   } as const;
 
-  const { icon: ChipIcon, label, className } = chips[change];
+  const { icon: ChipIcon, className } = chips[change];
+  const label = CHANGE_LABELS[change];
 
   return (
     <span
+      id={id}
       className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${className}`}
     >
       <ChipIcon className="h-3 w-3" aria-hidden="true" />

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  addWidget,
   buildDefaultLayout,
   moveWidgetBy,
   moveWidgetTo,
@@ -119,23 +118,6 @@ describe("setPlacedWidgets", () => {
     const layout: DashboardLayout = [{ id: "greeting", size: "wide" }];
 
     expect(setPlacedWidgets(layout, new Set(), available)).toEqual([]);
-  });
-});
-
-describe("addWidget", () => {
-  it("appends at the widget's default size", () => {
-    const layout: DashboardLayout = [{ id: "greeting", size: "wide" }];
-
-    expect(addWidget(layout, definition("skills"))).toEqual([
-      { id: "greeting", size: "wide" },
-      { id: "skills", size: "medium" },
-    ]);
-  });
-
-  it("leaves a widget that is already placed alone, rather than doubling it", () => {
-    const layout: DashboardLayout = [{ id: "greeting", size: "wide" }];
-
-    expect(addWidget(layout, definition("greeting"))).toBe(layout);
   });
 });
 

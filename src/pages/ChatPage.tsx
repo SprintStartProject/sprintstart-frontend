@@ -419,7 +419,9 @@ export function ChatPage() {
                         whole answer on every streamed token; the sr-only
                         status node below announces the end of a turn instead. */}
           {/* `pt-14` on a phone: the conversation-list toggle floats over this column's top
-                        right corner, and the first message used to start underneath it. */}
+                        left corner, and the first message used to start underneath it. From `md`
+                        up the page gutter is wide enough that the toggle sits beside the column
+                        rather than over it, so the normal `pt-8` stands. */}
           <div className="app-page-frame flex w-full flex-col gap-8 pt-14 pb-8 md:pt-8">
             {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat

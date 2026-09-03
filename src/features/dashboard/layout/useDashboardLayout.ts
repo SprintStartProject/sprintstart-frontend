@@ -2,7 +2,7 @@ import { useState } from "react";
 import { isOnboardingAccessible } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { useProjectContext } from "../../projects/useProjectContext";
-import { DASHBOARD_WIDGET_IDS, getAvailableWidgets, getDashboardWidget } from "./catalog";
+import { DASHBOARD_WIDGET_IDS, getAvailableWidgets } from "./catalog";
 import * as operations from "./layoutOperations";
 import { clearStoredLayout, readStoredLayout, storeLayout } from "./storage";
 import type {
@@ -23,7 +23,13 @@ export type DashboardLayoutController = {
   availableWidgets: DashboardWidgetDefinition[];
   /** Whether the user has arranged anything, so "reset" is only offered when it does something. */
   isCustomized: boolean;
-  addWidget: (id: DashboardWidgetId) => void;
+  /**
+   * Takes one widget off the board — the card's own remove control in edit mode.
+   *
+   * The only single-widget placement move left. Adding used to have a twin here, back when the
+   * picker added one card per click; the picker applies a whole selection now, so the twin had
+   * no caller and went with it.
+   */
   removeWidget: (id: DashboardWidgetId) => void;
   /**
    * Replaces the whole set of placed widgets — the picker's save.
@@ -93,10 +99,6 @@ export function useDashboardLayout(): DashboardLayoutController {
     availableWidgets,
     isCustomized: storedLayout !== null,
 
-    addWidget: (id) => {
-      const definition = getDashboardWidget(id);
-      if (definition) apply(operations.addWidget(layout, definition));
-    },
     removeWidget: (id) => apply(operations.removeWidget(layout, id)),
     setPlacedWidgets: (ids) => apply(operations.setPlacedWidgets(layout, ids, availableWidgets)),
     resizeWidget: (id, size) => apply(operations.resizeWidget(layout, id, size)),

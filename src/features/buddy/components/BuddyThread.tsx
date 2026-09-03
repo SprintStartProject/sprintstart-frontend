@@ -2,7 +2,6 @@ import { Fragment } from "react";
 import type { ReactNode } from "react";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { NEW_CONVERSATION_CHORD } from "../../../hooks/useNewConversationShortcut";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
@@ -55,6 +54,15 @@ type BuddyThreadProps = {
    * with nothing above it is already the fresh one.
    */
   onStartFreshVisit?: () => void;
+  /**
+   * The keyboard chord for that control, named in its tooltip — when there is one.
+   *
+   * Passed in rather than read from `useNewConversationShortcut`, because whether the chord
+   * does anything depends on who is rendering this thread. `/buddy` binds it and says so; the
+   * dock floats over pages that bind it to their *own* new conversation, or to nothing at all,
+   * and a tooltip promising a key that starts somebody else's chat is worse than no tooltip.
+   */
+  freshVisitShortcut?: string;
 };
 
 /**
@@ -82,6 +90,7 @@ export function BuddyThread({
   openError,
   onRetryOpen,
   onStartFreshVisit,
+  freshVisitShortcut,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens.
@@ -146,7 +155,11 @@ export function BuddyThread({
                       onClick={onStartFreshVisit}
                       data-testid="buddy-clear-previous"
                       aria-label="Clear the earlier conversation"
-                      title={`Clear the earlier conversation (${NEW_CONVERSATION_CHORD})`}
+                      title={
+                        freshVisitShortcut
+                          ? `Clear the earlier conversation (${freshVisitShortcut})`
+                          : "Clear the earlier conversation"
+                      }
                       className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                     >
                       <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />

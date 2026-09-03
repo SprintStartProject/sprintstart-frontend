@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -105,6 +105,42 @@ function renderPage() {
       </BuddyProvider>
     </MemoryRouter>,
   );
+}
+
+/**
+ * Reports a viewport at or above `md`, where the rail is a column beside the conversation
+ * rather than a drawer over it.
+ *
+ * jsdom answers `false` to every media query, so a test that means "on a desktop" is otherwise
+ * quietly running on a phone — and the rail's remembered state is deliberately a desktop-only
+ * thing, so that is the difference between asserting the behaviour and asserting its opposite.
+ * Returns the undo, because the override outlives the test that set it.
+ */
+function reportDesktopViewport(): () => void {
+  const original = window.matchMedia;
+
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: query === "(min-width: 768px)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+
+  return () => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: original,
+    });
+  };
 }
 
 describe("BuddyPage", () => {
@@ -234,11 +270,49 @@ describe("BuddyPage", () => {
 
   /**
    * The same preference the chat's rail keeps, for the same reason: it says how much room this
-   * window has to spare. Until the hire says either way the rail decides for itself — closed
-   * here, because jsdom reports a viewport below `md`, where the rail is a drawer and opening
-   * itself over the conversation would be a takeover rather than a courtesy.
+   * window has to spare. Which is why it is a *column* the page remembers — see the drawer's
+   * own case below.
    */
-  it("remembers the rail being opened", async () => {
+  it("remembers the rail being closed, where it is a column", async () => {
+    const restoreViewport = reportDesktopViewport();
+
+    try {
+      const user = userEvent.setup();
+      const first = renderPage();
+
+      // A column, and there is an answer waiting: the rail opens itself, which is the promise
+      // `FlagToPmButton` makes. Closing it is therefore the choice worth remembering here.
+      const rail = await screen.findByRole("complementary", {
+        name: "What you sent to your PM",
+      });
+      // Scoped to the rail: the drawer backdrop says the same words, and below `md` it is the
+      // one you press. jsdom computes no layout, so both are in the document here.
+      await user.click(within(rail).getByRole("button", { name: "Close the PM replies" }));
+
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
+
+      first.unmount();
+      renderPage();
+
+      // Back to the control that reopens it, rather than to the rail deciding again. The rail
+      // itself stays mounted — that is what keeps its scroll — but out of the tree while shut.
+      expect(await screen.findByTitle("What you sent to your PM")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("complementary", { name: "What you sent to your PM" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  /**
+   * Below `md` the rail is a drawer over the conversation, with a backdrop. Somebody opens one
+   * to read an answer and dismisses it again — that is not a hire saying how they want the page
+   * laid out, and restoring it would land them behind their own PM replies on every visit. So
+   * the preference is neither written nor honoured at this width; jsdom's default viewport is
+   * already below it, which is what makes this the plain case.
+   */
+  it("does not reopen the drawer by itself on a phone", async () => {
     const user = userEvent.setup();
     const first = renderPage();
 
@@ -250,9 +324,12 @@ describe("BuddyPage", () => {
     first.unmount();
     renderPage();
 
+    // Still mounted — the rail never unmounts, so its list keeps its scroll — but shut, and
+    // the control that brings it back is the one on screen.
+    expect(await screen.findByTitle("What you sent to your PM")).toBeInTheDocument();
     expect(
-      await screen.findByRole("complementary", { name: "What you sent to your PM" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("complementary", { name: "What you sent to your PM" }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens the mentor for a hire on a project", async () => {

@@ -14,7 +14,10 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
-import { useNewConversationShortcut } from "../hooks/useNewConversationShortcut";
+import {
+  NEW_CONVERSATION_CHORD,
+  useNewConversationShortcut,
+} from "../hooks/useNewConversationShortcut";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
@@ -167,10 +170,15 @@ function BuddyMentorHome() {
   // there — the auto-open below is a desktop courtesy, not a takeover.
   const isDesktop = useMediaQuery(RAIL_DESKTOP_QUERY);
 
+  // The stored preference is only honoured where the rail is a column beside the conversation.
+  // Restoring it below `md` would put the hire behind their own PM replies on every visit from
+  // a phone — the rail is a drawer over the page there, with a backdrop, and nobody asked for
+  // it. Their choice is still remembered; it just does not reopen an overlay. Same rule, and
+  // the same reason, as `chatSidebarOpen` in `useChat`.
   const [rail, setRail] = useState(() => {
     const stored = readRailOpen();
 
-    return { open: stored ?? false, decided: stored !== null };
+    return { open: (stored ?? false) && isDesktop, decided: stored !== null };
   });
 
   // Open when there is an answer waiting, closed otherwise — but only until the hire says
@@ -187,10 +195,18 @@ function BuddyMentorHome() {
 
   // Their choice is written through as they make it, the way the chat's own rail remembers
   // being collapsed. Not inside the updater: React may run one twice.
-  const setRailOpen = useCallback((open: boolean) => {
-    writeRailOpen(open);
-    setRail({ open, decided: true });
-  }, []);
+  //
+  // Recorded only from the column, which is the same width it is honoured at. Below `md` the
+  // rail is a drawer somebody opens to read one answer and dismisses again — a transient thing,
+  // not a statement about how they want the page laid out — and letting it write through meant
+  // one tap on a phone decided how the next desktop visit opened.
+  const setRailOpen = useCallback(
+    (open: boolean) => {
+      if (isDesktop) writeRailOpen(open);
+      setRail({ open, decided: true });
+    },
+    [isDesktop],
+  );
 
   // Whatever they were typing in the dock when they asked for more room.
   useHandedOffDraft(setDraft);
@@ -276,6 +292,8 @@ function BuddyMentorHome() {
         openError={openError}
         onRetryOpen={() => void retryOpen()}
         onStartFreshVisit={startFresh}
+        // This page is the one that binds it — see `useNewConversationShortcut` above.
+        freshVisitShortcut={NEW_CONVERSATION_CHORD}
         hasFloatingControl={replies.hasAny && !rail.open}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of

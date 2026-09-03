@@ -32,6 +32,8 @@ type BuddyConversationProps = {
   onRetryOpen?: () => void;
   /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
   onStartFreshVisit?: () => void;
+  /** The chord named in that control's tooltip, where the caller has actually bound one. */
+  freshVisitShortcut?: string;
   /**
    * Leaves room at the top of the thread for a control floating over it.
    *
@@ -82,6 +84,7 @@ export function BuddyConversation({
   openError,
   onRetryOpen,
   onStartFreshVisit,
+  freshVisitShortcut,
   hasFloatingControl = false,
   focusComposerOnMount = false,
 }: BuddyConversationProps) {
@@ -113,6 +116,7 @@ export function BuddyConversation({
             openError={openError}
             onRetryOpen={onRetryOpen}
             onStartFreshVisit={onStartFreshVisit}
+            freshVisitShortcut={freshVisitShortcut}
           />
         </div>
       </div>

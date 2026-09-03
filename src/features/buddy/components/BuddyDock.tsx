@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
-import { NEW_CONVERSATION_CHORD } from "../../../hooks/useNewConversationShortcut";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
@@ -231,7 +230,11 @@ export function BuddyDock({
               type="button"
               onClick={() => void startFreshVisit()}
               aria-label="Start a new conversation"
-              title={`Start a new conversation (${NEW_CONVERSATION_CHORD}) — your buddy keeps what it has learned about you`}
+              // No chord named here, deliberately. The window floats over every page, and
+              // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
+              // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
+              // would be promising a key that does somebody else's job.
+              title="Start a new conversation — your buddy keeps what it has learned about you"
               className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
             >
               <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />

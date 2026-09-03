@@ -76,23 +76,14 @@ export function reconcileLayout(
   });
 }
 
-/** Appends a widget at its default size. A widget already on the board is left alone. */
-export function addWidget(
-  layout: DashboardLayout,
-  definition: DashboardWidgetDefinition,
-): DashboardLayout {
-  if (layout.some((item) => item.id === definition.id)) return layout;
-
-  return [...layout, { id: definition.id, size: definition.defaultSize }];
-}
-
 /**
  * Replaces the set of placed widgets in one go, keeping everything the user has already
  * arranged exactly where and how it was.
  *
- * The picker's operation. Adding and removing one at a time already exist and are what the
- * board's own controls use; this is the batch behind a dialog where somebody ticks several
- * boxes and presses save, and the difference matters: a kept widget must not lose its position
+ * The picker's operation, and the only way a widget is placed. Removing one at a time still
+ * exists for the card's own control on the board; this is the batch behind a dialog where
+ * somebody ticks several boxes and presses save, and the difference matters: a kept widget
+ * must not lose its position
  * or the size it was given just because the picker was opened, so the existing layout is
  * filtered rather than rebuilt.
  *

@@ -73,15 +73,25 @@ export function useChat() {
    *
    * The write belongs to the act of opening or closing it, and doing it here keeps the stored
    * value and the state in step even across a render React throws away.
+   *
+   * **Only from the column, never from the drawer**, which is the same width the read is gated
+   * on. Below `md` the rail closes itself every time a chat is picked — that is the drawer
+   * getting out of the way, not somebody saying they want less of it — and letting that write
+   * through meant a routine tap on a phone decided how the next desktop visit opened.
    */
-  const setRailOpen = useCallback((open: boolean) => {
-    setIsRailOpen(open);
-    try {
-      localStorage.setItem(SIDEBAR_OPEN_KEY, String(open));
-    } catch {
-      // Nothing to do: the rail still opens and closes, it just will not be remembered.
-    }
-  }, []);
+  const setRailOpen = useCallback(
+    (open: boolean) => {
+      setIsRailOpen(open);
+      if (isRailOverlay) return;
+
+      try {
+        localStorage.setItem(SIDEBAR_OPEN_KEY, String(open));
+      } catch {
+        // Nothing to do: the rail still opens and closes, it just will not be remembered.
+      }
+    },
+    [isRailOverlay],
+  );
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);

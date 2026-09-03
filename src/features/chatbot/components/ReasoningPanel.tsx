@@ -27,7 +27,7 @@ type ReasoningPanelProps = {
  * reasoning ran long (reported by the customer, who watched one answer become a screenful of
  * thinking):
  *
- * 1. **It is capped.** The body scrolls inside `MAX_BODY` instead of growing without limit, so
+ * 1. **It is capped.** The body scrolls inside its own `max-h-56` instead of growing without limit, so
  *    a long chain of thought never pushes the answer it belongs to off the screen.
  * 2. **It follows itself while it is being written**, but only while the reader has not
  *    scrolled up inside it — the same "stick to the bottom unless you left the bottom" rule
