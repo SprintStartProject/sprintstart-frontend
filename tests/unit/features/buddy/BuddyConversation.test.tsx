@@ -10,7 +10,6 @@ vi.mock("../../../../src/context/useAuth", () => ({
   }),
 }));
 
-
 function renderConversation(overrides: {
   messages?: BuddyMessageView[];
   isThinking?: boolean;
