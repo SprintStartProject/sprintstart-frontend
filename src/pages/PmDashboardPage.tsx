@@ -3,6 +3,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
 import { FaqWidget } from "../features/faq/components/FaqWidget";
 import { KnowledgeGapWidget } from "../features/knowledge-gaps/components/KnowledgeGapWidget";
+import { OnboardingMetricsWidget } from "../features/onboarding-metrics/components/OnboardingMetricsWidget";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TeamManagementWidget } from "../features/team-management/components/TeamManagementWidget";
 import { SpotlightCard } from "../components/ui/SpotlightCard";
@@ -51,13 +52,16 @@ export function PmDashboardPage() {
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-app-text">Insights</h2>
               <p className="text-sm text-app-text-muted">
-                Frequently asked questions and onboarding knowledge gaps.
+                Onboarding health, recurring questions and knowledge gaps.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {/* Two-up. Onboarding metrics sits on its own row at half width;
+                the empty half is reserved for the coming knowledge-requests widget. */}
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
               <FaqWidget />
               <KnowledgeGapWidget />
+              <OnboardingMetricsWidget />
             </div>
           </section>
         </SpotlightCard>

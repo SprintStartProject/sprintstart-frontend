@@ -5,13 +5,14 @@ import { Field } from "../../../../components/ui/Field";
 import { Input } from "../../../../components/ui/Input";
 import { useToast } from "../../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
-import { addJiraCredential } from "../../../../services/sources/jiraService";
+import { addJiraCredential, type JiraCredentialsDto } from "../../../../services/sources/jiraService";
 
 type JiraCredentialAddFormProps = {
   /** Login email used only as the initial Jira account email. */
   defaultUserEmail: string | null;
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  /** Receives the credential just added, for an optimistic list update. */
+  onSaved: (credential: JiraCredentialsDto) => Promise<void>;
   /**
    * When the form is already inside a titled container (the wizard's desktop
    * companion), drop its own card chrome and header so the inputs sit directly
@@ -59,13 +60,16 @@ export function JiraCredentialAddForm({
     event.preventDefault();
     if (savingRef.current) return;
 
+    const trimmedEmail = userEmail.trim();
+    const trimmedName = name.trim();
+
     savingRef.current = true;
     setIsSaving(true);
     try {
       try {
         await addJiraCredential({
-          userEmail: userEmail.trim(),
-          tokenName: name.trim(),
+          userEmail: trimmedEmail,
+          tokenName: trimmedName,
           authToken: token.trim(),
         });
       } catch (mutationError) {
@@ -74,7 +78,7 @@ export function JiraCredentialAddForm({
         return;
       }
       try {
-        await onSaved();
+        await onSaved({ userEmail: trimmedEmail, displayName: trimmedName });
       } catch (refreshError) {
         toast.warning(describeRefreshFailure(refreshError));
         onClose();

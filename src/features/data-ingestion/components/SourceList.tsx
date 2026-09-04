@@ -1,4 +1,12 @@
-import { ArrowUp, ChevronRight, Clock3, Database, Plus, XCircle, type LucideIcon } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronRight,
+  Clock3,
+  Database,
+  Plus,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
 import {
   deriveConnectionStatus,
@@ -76,7 +84,7 @@ export function SourceList({
             className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border p-5 text-left transition-all duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 sm:p-6 ${
               isSelected
                 ? "border-app-brand bg-app-brand-soft sm:bg-app-surface sm:shadow-sm"
-                : "border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg sm:hover:scale-100 sm:hover:-translate-y-0.5"
+                : "border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg sm:hover:-translate-y-0.5 sm:hover:scale-100"
             }`}
           >
             <div className="flex gap-4">
@@ -189,8 +197,12 @@ function Metric({
 }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Icon className={`h-4 w-4 shrink-0 ${danger ? "text-app-danger-text" : "text-app-text-muted"}`} />
-      <span className={`font-semibold tabular-nums ${danger ? "text-app-danger-text" : "text-app-text"}`}>
+      <Icon
+        className={`h-4 w-4 shrink-0 ${danger ? "text-app-danger-text" : "text-app-text-muted"}`}
+      />
+      <span
+        className={`font-semibold tabular-nums ${danger ? "text-app-danger-text" : "text-app-text"}`}
+      >
         {value}
       </span>
       <span className="text-app-text-muted">{label}</span>

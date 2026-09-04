@@ -11,15 +11,9 @@ vi.mock("../../../src/context/useAuth", () => ({
   }),
 }));
 
-vi.mock("../../../src/context/useChatPreferences", () => ({
-  useChatPreferences: vi.fn(),
-}));
-
 vi.mock("../../../src/features/projects/useProjectContext", () => ({
   useProjectContext: () => ({ selectedProjectId: "project1" }),
 }));
-
-import { useChatPreferences } from "../../../src/context/useChatPreferences";
 
 const mockHandleSubmit = vi.fn();
 const mockSetNewRequest = vi.fn();
@@ -90,10 +84,6 @@ describe("ChatPage", () => {
         citations: [{ artifactId: "c1", filename: "readme.md" }],
       },
     ];
-    vi.mocked(useChatPreferences).mockReturnValue({
-      showThoughtProcess: true,
-      setShowThoughtProcess: vi.fn(),
-    });
   });
 
   it("renders the message list with user and assistant messages", () => {
@@ -165,6 +155,16 @@ describe("ChatPage", () => {
     expect(mockHandleSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("does not render Thought Process block when assistant message has no reasoning", () => {
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("Thought Process")).not.toBeInTheDocument();
+  });
+
   it("shows the Thought Process block when an assistant message has reasoning", () => {
     mockChatState.messages = [
       ...mockChatState.messages,
@@ -182,31 +182,7 @@ describe("ChatPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByText("Thought Process").length).toBeGreaterThan(0);
+    expect(screen.getByText("Thought Process")).toBeInTheDocument();
     expect(screen.getByText("Let me think...")).toBeInTheDocument();
-  });
-
-  it("hides the Thought Process block when the preference is off", () => {
-    vi.mocked(useChatPreferences).mockReturnValue({
-      showThoughtProcess: false,
-      setShowThoughtProcess: vi.fn(),
-    });
-    mockChatState.messages = [
-      {
-        id: "m3",
-        role: "ASSISTANT" as const,
-        content: "Final answer",
-        chat: undefined,
-        reasoning: "Let me think...",
-      },
-    ];
-    render(
-      <MemoryRouter>
-        <ChatPage />
-      </MemoryRouter>,
-    );
-
-    expect(screen.queryByText("Thought Process")).not.toBeInTheDocument();
-    expect(screen.queryByText("Let me think...")).not.toBeInTheDocument();
   });
 });

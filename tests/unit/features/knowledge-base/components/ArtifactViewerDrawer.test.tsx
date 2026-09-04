@@ -67,7 +67,11 @@ function createArtifact(overrides: Partial<Artifact> = {}): Artifact {
 
 function renderDrawer(
   artifact: Artifact | null = createArtifact(),
-  overrides: { canDelete?: boolean; onDelete?: (id: string) => void } = {},
+  overrides: {
+    canDelete?: boolean;
+    onDelete?: (id: string) => void;
+    highlightLines?: number[];
+  } = {},
 ) {
   const onDelete = overrides.onDelete ?? vi.fn();
   return {
@@ -78,6 +82,7 @@ function renderDrawer(
         artifact={artifact}
         onClose={() => {}}
         projectId="proj-1"
+        highlightLines={overrides.highlightLines}
         canDelete={overrides.canDelete ?? false}
         onDelete={onDelete}
       />,
@@ -227,6 +232,31 @@ describe("ArtifactViewerDrawer", () => {
     expect(capturedSignal?.aborted).toBe(true);
   });
 
+  it("stops silently when unmounted during a 503 backoff wait (no unhandled rejection)", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.streamArtifactSummary).mockRejectedValueOnce(
+      new ApiError(503, "Service Unavailable"),
+    );
+
+    const { unmount } = renderDrawer();
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    await userEvent.click(summariseBtn);
+
+    // Wait until the first 503 has been handled and the backoff sleep is armed.
+    expect(
+      await screen.findByText("Preparing summary...", {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+
+    // Unmount mid-backoff: the abortable sleep must resolve (not reject), so
+    // `handleSummarize` returns cleanly instead of escaping an AbortError into
+    // a fire-and-forget promise chain.
+    unmount();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // No retry may fire for the stale artifact after the abort.
+    expect(knowledgeService.streamArtifactSummary).toHaveBeenCalledTimes(1);
+  });
+
   describe("Markdown rendering", () => {
     it("renders .md files as markdown even with non-markdown mime types", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
@@ -242,6 +272,48 @@ describe("ArtifactViewerDrawer", () => {
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
     });
 
+    it("renders Pull Request and Issue artifacts as markdown", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## PR Description\n- Added new feature\n- Fixed bugs",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "PR #42: Add feature",
+          artifactType: "PULL_REQUEST",
+          sourceUrl: "https://github.com/org/repo/pull/42",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("PR Description")).toBeInTheDocument();
+    });
+
+    it("renders Jira / GitHub issues as markdown even if artifactType is FILE", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Bug Report\nSteps to reproduce: ...",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Issue #101: Crash on startup",
+          artifactType: "FILE",
+          sourceUrl: "https://github.com/org/repo/issues/101",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Bug Report")).toBeInTheDocument();
+    });
+
     it("gracefully handles KaTeX math parse errors without breaking the drawer", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
@@ -255,6 +327,167 @@ describe("ArtifactViewerDrawer", () => {
       const rawContent = await screen.findByTestId("raw-content");
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
       expect(await screen.findByText(/Inline math/)).toBeInTheDocument();
+    });
+
+    it("highlights markdown elements and shows cited-chunk banner when highlightLines are provided", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "# Heading 1\n\nThis is paragraph one.\n\nThis is paragraph two cited.",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      // Highlight line 5 (paragraph two)
+      renderDrawer(createArtifact({ title: "docs.md" }), { highlightLines: [5] });
+
+      const banner = await screen.findByTestId("cited-chunk-banner");
+      expect(banner).toBeInTheDocument();
+      expect(screen.getByText(/Showing cited chunk \(Line 5\)/)).toBeInTheDocument();
+
+      const highlightedParagraph = screen.getByText("This is paragraph two cited.");
+      expect(highlightedParagraph).toHaveAttribute("data-highlighted", "true");
+      expect(highlightedParagraph).toHaveAttribute("id", "line-5");
+    });
+
+    it("allows switching between Formatted preview and Source view for markdown files", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "# Title\nSome content.",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "readme.md" }));
+
+      const previewBtn = await screen.findByTestId("view-rendered-btn");
+      const sourceBtn = await screen.findByTestId("view-source-btn");
+
+      expect(previewBtn).toBeInTheDocument();
+      expect(sourceBtn).toBeInTheDocument();
+
+      // Click Source
+      await userEvent.click(sourceBtn);
+
+      const rawContent = await screen.findByTestId("raw-content");
+      // Syntax highlighter creates line number spans
+      expect(rawContent.querySelector(".react-syntax-highlighter-line-number")).toBeInTheDocument();
+
+      // Switch back to Formatted
+      await userEvent.click(previewBtn);
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+    });
+
+    it("uses markdown language when switching to source mode for PR and Issue artifacts", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## PR Description",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "PR #42: Add feature",
+          artifactType: "PULL_REQUEST",
+          sourceUrl: "https://github.com/org/repo/pull/42",
+        }),
+      );
+
+      const sourceBtn = await screen.findByTestId("view-source-btn");
+      await userEvent.click(sourceBtn);
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const codeElement = rawContent.querySelector("code[class*='language-markdown']");
+      expect(codeElement).toBeInTheDocument();
+    });
+
+    it("does not generate duplicate line id attributes on inline code elements", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "Here is `inline code` inside a paragraph.",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "doc.md" }), { highlightLines: [1] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const pElement = rawContent.querySelector("p");
+      expect(pElement).toHaveAttribute("id", "line-1");
+
+      const inlineCode = rawContent.querySelector("p code");
+      expect(inlineCode).toBeInTheDocument();
+      expect(inlineCode).not.toHaveAttribute("id");
+    });
+
+    it("does not emit id attributes on li elements to avoid duplicate IDs with nested paragraphs", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "* List item text",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "list.md" }), { highlightLines: [1] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const liElement = rawContent.querySelector("li");
+      expect(liElement).toBeInTheDocument();
+      expect(liElement).not.toHaveAttribute("id");
+      expect(liElement).toHaveAttribute("data-highlighted", "true");
+      expect(liElement).toHaveAttribute("data-line-start", "1");
+    });
+
+    it("does not emit id attributes on blockquote elements to avoid duplicate IDs with nested paragraphs", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "> Quoted text",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "quotes.md" }), { highlightLines: [1] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const blockquote = rawContent.querySelector("blockquote");
+      expect(blockquote).toBeInTheDocument();
+      expect(blockquote).not.toHaveAttribute("id");
+      expect(blockquote).toHaveAttribute("data-highlighted", "true");
+      expect(blockquote).toHaveAttribute("data-line-start", "1");
+    });
+
+    it("does not emit id attributes on table rows to avoid duplicate IDs", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "| Col A | Col B |\n| ----- | ----- |\n| cell 1 | cell 2 |",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(createArtifact({ title: "table.md" }), { highlightLines: [3] });
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const row = rawContent.querySelector("tbody tr");
+      expect(row).toBeInTheDocument();
+      expect(row).not.toHaveAttribute("id");
+      expect(row).toHaveAttribute("data-highlighted", "true");
+      expect(row).toHaveAttribute("data-line-start", "3");
+    });
+
+    it("does not render the cited-chunk banner for PDF or image artifacts", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "blob:http://localhost/pdf-data",
+        mimeType: "application/pdf",
+        isObjectUrl: true,
+      });
+
+      renderDrawer(createArtifact({ title: "document.pdf", mime: "application/pdf" }), {
+        highlightLines: [1, 2, 3],
+      });
+
+      await screen.findByTestId("raw-content");
+      expect(screen.queryByTestId("cited-chunk-banner")).not.toBeInTheDocument();
     });
 
     describe("preprocessMarkdown", () => {

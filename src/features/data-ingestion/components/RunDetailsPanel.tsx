@@ -316,7 +316,7 @@ function Stage({ stage, isLast }: { stage: StageInfo; isLast: boolean }) {
         </span>
         {!isLast && <span className="my-1 w-0.5 flex-1 bg-app-border" />}
       </div>
-      <div className="pb-4 pt-1">
+      <div className="pt-1 pb-4">
         <p className="text-sm font-semibold text-app-text">{stage.title}</p>
         <p className="mt-0.5 text-xs text-app-text-subtle">{stage.meta}</p>
       </div>

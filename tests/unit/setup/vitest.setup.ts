@@ -1,6 +1,13 @@
 import "@testing-library/jest-dom";
+import { configure } from "@testing-library/react";
 import React from "react";
 import { vi, beforeAll, afterAll, afterEach, expect } from "vitest";
+
+// `findBy*` and `waitFor` default to a 1s budget. Most of them wait on a mocked round trip that
+// resolves immediately, so the budget is really a bet on how much CPU the test gets — and a busy
+// runner loses it in whichever file happens to be scheduled alongside the axe scans. Raised so a
+// failure means the thing never arrived, not that the machine was busy.
+configure({ asyncUtilTimeout: 10000 });
 import type { ReactNode } from "react";
 import * as matchers from "vitest-axe/matchers";
 import "vitest-axe/extend-expect";

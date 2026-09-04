@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
-import { ChatPreferencesProvider } from "../../../../src/context/ChatPreferencesProvider";
 import { SettingsPage } from "../../../../src/pages/SettingsPage";
 import { PermissionGroup } from "../../../../src/services/types";
 
@@ -88,16 +87,14 @@ describe("SettingsPage", () => {
     render(
       <MemoryRouter>
         <ThemeProvider>
-          <ChatPreferencesProvider>
-            <SettingsPage />
-          </ChatPreferencesProvider>
+          <SettingsPage />
         </ThemeProvider>
       </MemoryRouter>,
     );
 
     expect(screen.getAllByText("User Profile").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Appearance").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Chat").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Moments").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Access Tokens").length).toBeGreaterThan(0);
   });
 
@@ -106,9 +103,7 @@ describe("SettingsPage", () => {
     render(
       <MemoryRouter>
         <ThemeProvider>
-          <ChatPreferencesProvider>
-            <SettingsPage />
-          </ChatPreferencesProvider>
+          <SettingsPage />
         </ThemeProvider>
       </MemoryRouter>,
     );
@@ -121,9 +116,7 @@ describe("SettingsPage", () => {
     render(
       <MemoryRouter>
         <ThemeProvider>
-          <ChatPreferencesProvider>
-            <SettingsPage />
-          </ChatPreferencesProvider>
+          <SettingsPage />
         </ThemeProvider>
       </MemoryRouter>,
     );

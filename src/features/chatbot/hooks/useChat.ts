@@ -73,6 +73,7 @@ export function useChat() {
     clearFilters,
     sendMessage,
     stopStreaming,
+    deleteChat: ctxDeleteChat,
   } = ctx;
 
   /**
@@ -129,6 +130,8 @@ export function useChat() {
     stopStreaming();
   }, [isActiveChatStreaming, stopStreaming]);
 
+  const deletingChatIdsRef = useRef<Set<string>>(new Set());
+
   /**
    * Loads messages from the backend when a chat is opened for the first time
    * (not yet cached in `messagesByChat`). If the user navigates away and
@@ -136,9 +139,11 @@ export function useChat() {
    */
   useEffect(() => {
     if (!chatId) return;
+    if (deletingChatIdsRef.current.has(chatId)) return;
+    if (chatsProjectId === selectedProjectId && !chats.some((chat) => chat.id === chatId)) return;
     if (messagesByChat[chatId]) return;
     void loadMessages(chatId);
-  }, [chatId, messagesByChat, loadMessages]);
+  }, [chatId, chats, chatsProjectId, selectedProjectId, messagesByChat, loadMessages]);
 
   // A5: Instead of reading scrollHeight/scrollTop on every token (which
   // forces a synchronous layout), an IntersectionObserver watches the bottom
@@ -306,6 +311,25 @@ export function useChat() {
     [newRequest, addMessage, setNewRequest, chatId],
   );
 
+  const deleteChat = useCallback(
+    async (targetChatId: string) => {
+      deletingChatIdsRef.current.add(targetChatId);
+      try {
+        await ctxDeleteChat(targetChatId);
+        // Navigate only once the backend confirmed the delete. Firing first
+        // left the user on the empty /chat state looking at a chat that still
+        // existed whenever the DELETE failed and was rolled back.
+        if (targetChatId === chatId) {
+          void navigate("/chat", { replace: true, state: { newChat: true } });
+        }
+      } catch (err) {
+        deletingChatIdsRef.current.delete(targetChatId);
+        throw err;
+      }
+    },
+    [ctxDeleteChat, chatId, navigate],
+  );
+
   return {
     chats: sortedChats,
     chatId,
@@ -322,6 +346,7 @@ export function useChat() {
     handleSubmit,
     addMessage,
     stopStreaming: stopActiveStream,
+    deleteChat,
 
     newRequest,
     setNewRequest,

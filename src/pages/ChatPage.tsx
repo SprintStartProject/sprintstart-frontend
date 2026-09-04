@@ -1,11 +1,10 @@
 import { MessageSquareText, Sparkles, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
 import { useAvailableSources } from "../features/chatbot/hooks/useAvailableSources.ts";
-import { useChatPreferences } from "../context/useChatPreferences";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
@@ -16,6 +15,7 @@ import { ChatEmptyState } from "../features/chatbot/components/ChatEmptyState.ts
 import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
+import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
 import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
 
@@ -27,6 +27,49 @@ type CitationArtifactOpen = {
   sourceUrl?: string;
   lines: number[];
 };
+
+function deriveArtifactFromCitation(citation: CitationArtifactOpen): Artifact {
+  const url = citation.sourceUrl?.toLowerCase() ?? "";
+  const name = citation.filename.toLowerCase();
+
+  let artifactType: ArtifactType = "FILE";
+  if (url.includes("/pull/") || name.startsWith("pr #") || name.startsWith("pull request")) {
+    artifactType = "PULL_REQUEST";
+  } else if (
+    url.includes("/issues/") ||
+    url.includes("/browse/") ||
+    name.startsWith("issue #") ||
+    name.startsWith("jira #")
+  ) {
+    artifactType = "ISSUE";
+  }
+
+  let sourceSystem: SourceSystem = "GITHUB";
+  if (url.includes("atlassian.net") || url.includes("/browse/") || name.startsWith("jira #")) {
+    sourceSystem = "JIRA";
+  }
+
+  const isMarkdown =
+    artifactType === "ISSUE" ||
+    artifactType === "PULL_REQUEST" ||
+    name.endsWith(".md") ||
+    name.endsWith(".markdown");
+
+  return {
+    id: citation.artifactId,
+    title: citation.filename,
+    artifactType,
+    sourceSystem,
+    sourceId: "",
+    sourceUrl: citation.sourceUrl || null,
+    mime: isMarkdown ? "text/markdown" : "text/plain",
+    language: isMarkdown ? "Markdown" : null,
+    ingestedAt: new Date().toISOString(),
+    lastChangedAt: null,
+    contentHash: null,
+    ingestionRunId: null,
+  };
+}
 
 /**
  * Displays the interface for communication with the chat.
@@ -43,6 +86,7 @@ export function ChatPage() {
     promptHistory,
     handleSubmit,
     stopStreaming,
+    deleteChat,
     isThinking,
     isStreaming,
     thinkingState,
@@ -72,7 +116,6 @@ export function ChatPage() {
     scrollToBottom,
   } = useChat();
 
-  const { showThoughtProcess } = useChatPreferences();
   const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
 
   // Resolved from the chat, not from the switcher: a citation points at an artifact
@@ -82,6 +125,10 @@ export function ChatPage() {
   const projectId = activeChat?.projectId ?? selectedProjectId ?? profile?.projectIds?.[0] ?? null;
   const [viewingCitationArtifact, setViewingCitationArtifact] =
     useState<CitationArtifactOpen | null>(null);
+  const citationArtifact = useMemo(
+    () => (viewingCitationArtifact ? deriveArtifactFromCitation(viewingCitationArtifact) : null),
+    [viewingCitationArtifact],
+  );
 
   // Easter egg states
   const [isBarrelRolling, setIsBarrelRolling] = useState(false);
@@ -303,7 +350,7 @@ export function ChatPage() {
             <X size={24} />
           </button>
         </div>
-        <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
+        <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} onDeleteChat={deleteChat} />
       </aside>
 
       {/* Mobile toggle button — top-right so it doesn't overlap the mobile header burger */}
@@ -337,7 +384,7 @@ export function ChatPage() {
           </button>
         </div>
         <div className="flex flex-1 flex-col overflow-hidden">
-          <ChatSidebar chats={chats} setSidebarOpen={() => {}} />
+          <ChatSidebar chats={chats} setSidebarOpen={() => {}} onDeleteChat={deleteChat} />
         </div>
       </aside>
 
@@ -345,9 +392,9 @@ export function ChatPage() {
       <div
         /* The separating space belongs *before* `${`, never inside the string:
            prettier-plugin-tailwindcss trims class strings when it sorts them,
-           which once silently glued `flex-col` to `chat-sidebar-open` and
+           which once silently glued `flex-col` to the rail class and
            turned the whole page into a flex row. */
-        className={`relative flex min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "chat-sidebar-open" : ""}`}
+        className={`relative flex min-w-0 flex-1 flex-col ${desktopSidebarOpen ? "app-rail-open" : ""}`}
       >
         {/* Header: open-sidebar toggle floats at the far-left edge so it
                     doesn't crowd the page title's icon; title stays aligned with
@@ -402,7 +449,6 @@ export function ChatPage() {
                     isThinking={isThinking}
                     isStreaming={isStreaming}
                     streamingMessageId={streamingMessageId}
-                    showThoughtProcess={showThoughtProcess}
                     profileIcon={profile?.profileIcon ?? undefined}
                     profileFallbackName={profileFallbackName}
                     profileSeed={profile?.id ?? undefined}
@@ -429,7 +475,11 @@ export function ChatPage() {
         </div>
 
         {selectedCitation && (
-          <CitationPopover selected={selectedCitation} onClose={() => setSelectedCitation(null)} />
+          <CitationPopover
+            selected={selectedCitation}
+            onClose={() => setSelectedCitation(null)}
+            onOpenArtifact={handleOpenArtifact}
+          />
         )}
 
         {/* E12: floating "jump to latest" button — shown when the user
@@ -473,25 +523,12 @@ export function ChatPage() {
         />
       </div>
 
-      {viewingCitationArtifact && projectId && (
+      {citationArtifact && projectId && (
         <ArtifactViewerDrawer
-          artifact={{
-            id: viewingCitationArtifact.artifactId,
-            title: viewingCitationArtifact.filename,
-            artifactType: "FILE",
-            sourceSystem: "GITHUB",
-            sourceId: "",
-            sourceUrl: viewingCitationArtifact.sourceUrl || null,
-            mime: "text/plain",
-            language: null,
-            ingestedAt: new Date().toISOString(),
-            lastChangedAt: null,
-            contentHash: null,
-            ingestionRunId: null,
-          }}
+          artifact={citationArtifact}
           onClose={() => setViewingCitationArtifact(null)}
           projectId={projectId}
-          highlightLines={viewingCitationArtifact.lines}
+          highlightLines={viewingCitationArtifact?.lines}
           canDelete={false}
           onDelete={() => {}}
         />

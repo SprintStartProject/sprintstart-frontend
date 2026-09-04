@@ -1,5 +1,5 @@
 import { ArrowLeft, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
@@ -26,6 +26,7 @@ import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
+import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -92,10 +93,9 @@ export function AddSourceModal({
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token; it falls back to the prop until it has loaded so
   // discovery works on the first open without waiting for the refetch.
-  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames } = useGithubTokens();
+  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
+    useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
-  const prevTokenNamesRef = useRef<string[]>([]);
-  const [awaitingNewToken, setAwaitingNewToken] = useState(false);
 
   // Jira detail state.
   const [jiraDisplayName, setJiraDisplayName] = useState("");
@@ -112,9 +112,8 @@ export function AddSourceModal({
     error: jiraCredentialsError,
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
+    addCredentialLocally,
   } = useJiraCredentials(isJiraDetail);
-  const prevCredentialNamesRef = useRef<string[]>([]);
-  const [awaitingNewCredential, setAwaitingNewCredential] = useState(false);
 
   // Adopt the first token as soon as the list arrives (and heal a stale
   // selection) so discovery is usable on the first open.
@@ -127,16 +126,6 @@ export function AddSourceModal({
       );
     });
   }, [effectiveTokenNames]);
-
-  // After an inline "add token" refetch, select the one that is new so the user
-  // does not have to pick it out of the list.
-  useEffect(() => {
-    if (!awaitingNewToken) return;
-
-    const added = effectiveTokenNames.find((name) => !prevTokenNamesRef.current.includes(name));
-    if (added) setGithubTokenName(added);
-    setAwaitingNewToken(false);
-  }, [effectiveTokenNames, awaitingNewToken]);
 
   // Adopt the first stored Jira credential once the list arrives, keeping a
   // still-valid choice.
@@ -152,19 +141,6 @@ export function AddSourceModal({
       });
     });
   }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
-
-  // Counterpart to the token effect: after an inline "add credential" refetch,
-  // select the new credential. Runs after the adopt-first effect so it wins when
-  // both fire on the same credentials change.
-  useEffect(() => {
-    if (!awaitingNewCredential) return;
-
-    const added = jiraCredentials.find(
-      (credential) => !prevCredentialNamesRef.current.includes(credential.displayName),
-    );
-    if (added) setJiraCredentialName(added.displayName);
-    setAwaitingNewCredential(false);
-  }, [jiraCredentials, awaitingNewCredential]);
 
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
@@ -199,17 +175,18 @@ export function AddSourceModal({
     resetSourceDraftFields();
   };
 
-  // Inline credential creation: snapshot the current names, refetch, and let the
-  // paired effect select whichever name is new.
-  const handleTokenSaved = async () => {
-    prevTokenNamesRef.current = effectiveTokenNames;
-    setAwaitingNewToken(true);
+  // Inline credential creation: adopt the new token/credential locally and
+  // select it right away, so a successful add is reflected even if the reload
+  // fails or is aborted; the reload then reconciles with the server.
+  const handleTokenSaved = async (tokenName: string) => {
+    addTokenNameLocally(tokenName);
+    setGithubTokenName(tokenName);
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async () => {
-    prevCredentialNamesRef.current = jiraCredentials.map((credential) => credential.displayName);
-    setAwaitingNewCredential(true);
+  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+    addCredentialLocally(credential);
+    setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();
   };
 
