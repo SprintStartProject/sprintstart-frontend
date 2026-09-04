@@ -3,6 +3,7 @@ import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import { RAIL_TOGGLE_CLEARANCE } from "../../../components/layout/ConversationRail";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
@@ -100,7 +101,7 @@ export function BuddyConversation({
       >
         <div
           className={`app-page-frame flex min-w-0 flex-col gap-4 pb-6 ${
-            hasFloatingControl ? "pt-16" : "pt-6"
+            hasFloatingControl ? RAIL_TOGGLE_CLEARANCE : "pt-8"
           }`}
         >
           <BuddyThread

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChatContext } from "../../../context/ChatContext";
 import { RAIL_DESKTOP_QUERY } from "../../../components/layout/ConversationRail";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
+import { useRailOverlayGuard } from "../../../hooks/useRailOverlayGuard";
 
 /**
  * localStorage key prefix for per-chat draft persistence (E10). Each chat's
@@ -67,6 +68,12 @@ export function useChat() {
   // honoured where the rail is a column: restoring an *overlay* on load would put the app
   // behind its own conversation list on every visit from a phone.
   const [isRailOpen, setIsRailOpen] = useState(() => readSidebarOpen() && !isRailOverlay);
+
+  // The same rule for the window narrowing after load as the one the initial state applies on
+  // the way in. `setIsRailOpen` rather than `setRailOpen`: a rail put away because the column
+  // stopped fitting is not a preference, and writing it through would let one resize decide how
+  // the next desktop visit opened.
+  useRailOverlayGuard(isRailOverlay, () => setIsRailOpen(false));
 
   /**
    * Writes the rail's state through as it changes, rather than in an effect watching it.

@@ -22,3 +22,18 @@ export const ASSISTANT_SURFACE_ROUTES: Record<AssistantSurface, string> = {
   chat: "/chat",
   buddy: "/buddy",
 };
+
+/**
+ * Which half of the assistant a URL is. `/chat/:id` is still the chat.
+ *
+ * A function rather than the expression written out where it is needed, because it is now asked
+ * from two directions: the shell asks it to draw the switch and the subtitle, and each half asks
+ * it whether it is the one on screen. **While the panel slides, both halves are mounted** —
+ * `AnimatePresence` holds the outgoing one for the length of the animation — so anything a page
+ * binds on `window` is live in both of them at once, and one `Alt + N` in that window would
+ * start a new conversation in each. The location is what breaks the tie: it is the router's, not
+ * the outlet's, so the half being left reads the URL of the half being arrived at.
+ */
+export function surfaceFromPathname(pathname: string): AssistantSurface {
+  return pathname.startsWith(ASSISTANT_SURFACE_ROUTES.buddy) ? "buddy" : "chat";
+}

@@ -1,7 +1,7 @@
 import { MessageSquareText, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
 import { useChat } from "../features/chatbot/hooks/useChat.ts";
@@ -17,9 +17,14 @@ import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
-import { ConversationRail, RailToggle } from "../components/layout/ConversationRail.tsx";
+import {
+  ConversationRail,
+  RailToggle,
+  RAIL_TOGGLE_CLEARANCE,
+} from "../components/layout/ConversationRail.tsx";
 import { MatrixRain } from "../features/easter-eggs/components/MatrixRain.tsx";
 import { useNewConversationShortcut } from "../hooks/useNewConversationShortcut.ts";
+import { surfaceFromPathname } from "../components/common/assistantSurfaces.ts";
 
 import "katex/dist/katex.min.css";
 
@@ -340,7 +345,12 @@ export function ChatPage() {
     [navigate],
   );
 
-  useNewConversationShortcut(startNewChat);
+  // Only while this is the half on screen. `AssistantShell` keeps the page being left mounted
+  // for the length of the slide, so without this both halves would answer the one keypress —
+  // see `surfaceFromPathname`.
+  const { pathname } = useLocation();
+
+  useNewConversationShortcut(startNewChat, surfaceFromPathname(pathname) === "chat");
 
   return (
     // No height of its own any more: the page is a panel inside `AssistantShell`, which owns
@@ -401,7 +411,7 @@ export function ChatPage() {
                     rather than sitting in a bar of its own. The page header belongs to
                     `AssistantShell` now, and a strip under it holding nothing but one toggle
                     would be a second header for a single button. The transcript pads itself out
-                    from under it — see `pt-14` below. */}
+                    from under it — see `RAIL_TOGGLE_CLEARANCE` below. */}
         {!isRailOpen && (
           <RailToggle
             label="Show your conversations"
@@ -418,11 +428,15 @@ export function ChatPage() {
                         list `aria-live` made screen readers re-announce the
                         whole answer on every streamed token; the sr-only
                         status node below announces the end of a turn instead. */}
-          {/* `pt-14` on a phone: the conversation-list toggle floats over this column's top
-                        left corner, and the first message used to start underneath it. From `md`
-                        up the page gutter is wide enough that the toggle sits beside the column
-                        rather than over it, so the normal `pt-8` stands. */}
-          <div className="app-page-frame flex w-full flex-col gap-8 pt-14 pb-8 md:pt-8">
+          {/* Room for the floating toggle, and only while there is one to make room for —
+                        see `RAIL_TOGGLE_CLEARANCE`, which the buddy's transcript reads from the
+                        same place. With the rail open on a phone nothing floats over this column
+                        and the page's own padding stands. */}
+          <div
+            className={`app-page-frame flex w-full flex-col gap-8 pb-8 ${
+              isRailOpen ? "pt-8" : RAIL_TOGGLE_CLEARANCE
+            }`}
+          >
             {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
                             switch, new messages). Per AGENTS.md §11. */}

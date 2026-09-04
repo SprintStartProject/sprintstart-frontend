@@ -1,10 +1,11 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { AssistantShell } from "../../../src/components/layout/AssistantShell";
+import { mockResizableViewport } from "../setup/matchMedia";
 
 const projectState = { selectedProjectId: "p1" };
 
@@ -245,6 +246,69 @@ describe("BuddyPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
+  });
+
+  /**
+   * The chord belongs to whichever half is on screen, and while the panel slides *both* are
+   * mounted — `AssistantShell` keeps the page being left there for the length of the animation,
+   * and this listener is on `window`. Without the gate one keypress started a new conversation
+   * in each. Mounted under a catch-all route at the chat's URL, which is that window exactly:
+   * the buddy still rendered, the location already the other half's.
+   */
+  it("ignores Alt+N while the chat is the half on screen", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/chat"]}>
+        <BuddyProvider>
+          <Routes>
+            <Route element={<AssistantShell />}>
+              <Route path="*" element={<BuddyPage />} />
+            </Route>
+          </Routes>
+        </BuddyProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    // Still there: the visit was not restarted under the half the hire is actually looking at.
+    expect(screen.getByText("where do I start?")).toBeInTheDocument();
+  });
+
+  /**
+   * The load path refuses to restore an overlay below `md`; this is the same rule for the window
+   * crossing that breakpoint afterwards. A rail opened as a column used to survive the narrowing
+   * and become a drawer over the conversation, backdrop and all, that nobody had asked for.
+   */
+  it("puts the rail away when the window narrows past the breakpoint", async () => {
+    const viewport = mockResizableViewport();
+
+    try {
+      renderPage();
+
+      // A column, and an answer is waiting, so it opens itself.
+      const rail = await screen.findByRole("complementary", {
+        name: "What you sent to your PM",
+      });
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "false"));
+
+      act(() => viewport.setDesktop(false));
+
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
+
+      // Put away, not taken away: the control that brings it back is on screen, with the count
+      // read from the same list the rail is holding.
+      expect(screen.getByTitle("What you sent to your PM")).toBeInTheDocument();
+    } finally {
+      viewport.restore();
+    }
   });
 
   /**

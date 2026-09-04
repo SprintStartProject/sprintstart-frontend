@@ -176,6 +176,30 @@ describe("ChatPage", () => {
     expect(await screen.findByText("the new chat")).toBeInTheDocument();
   });
 
+  /**
+   * The chord belongs to whichever half of the assistant is on screen, and while the panel
+   * slides *both* are mounted — the shell keeps the page being left there for the length of the
+   * animation, and the listener is on `window`. Without the gate one keypress would start a new
+   * conversation in each. A catch-all route at the buddy's URL is that window exactly: the chat
+   * still rendered, the location already the other half's.
+   */
+  it("ignores Alt+N while the buddy is the half on screen", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/buddy"]}>
+        <Routes>
+          <Route path="*" element={<ChatPage />} />
+          <Route path="/chat" element={<p>the new chat</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    expect(screen.queryByText("the new chat")).not.toBeInTheDocument();
+  });
+
   it("does not render the thought process block when assistant message has no reasoning", () => {
     render(
       <MemoryRouter>

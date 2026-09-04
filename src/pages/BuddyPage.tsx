@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Inbox, Sparkles, Users } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -9,6 +10,7 @@ import {
   RAIL_DESKTOP_QUERY,
 } from "../components/layout/ConversationRail";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
@@ -23,6 +25,7 @@ import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
 import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
+import { surfaceFromPathname } from "../components/common/assistantSurfaces";
 
 /**
  * Names the rail for assistive tech and labels the control that reopens it.
@@ -193,6 +196,13 @@ function BuddyMentorHome() {
     setRail({ open: isDesktop && replies.answered.length > 0, decided: true });
   }
 
+  // The same rule the initial state applies, for the window narrowing after load. Not through
+  // `setRailOpen` below: this is the column no longer fitting, not the hire choosing, so it
+  // neither writes the preference through nor counts as having decided.
+  useRailOverlayGuard(!isDesktop, () =>
+    setRail((current) => (current.open ? { ...current, open: false } : current)),
+  );
+
   // Their choice is written through as they make it, the way the chat's own rail remembers
   // being collapsed. Not inside the updater: React may run one twice.
   //
@@ -219,8 +229,14 @@ function BuddyMentorHome() {
 
   // The keyboard half of the control in the visit divider. Gated the same way that control is:
   // a visit nobody has spoken in is already the fresh one, and re-opening it would only replay
-  // the greeting.
-  useNewConversationShortcut(startFresh, hasUserMessage);
+  // the greeting — and, like the chat's, only while this is the half on screen, since the shell
+  // keeps the page being left mounted for the length of the slide.
+  const { pathname } = useLocation();
+
+  useNewConversationShortcut(
+    startFresh,
+    hasUserMessage && surfaceFromPathname(pathname) === "buddy",
+  );
 
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.

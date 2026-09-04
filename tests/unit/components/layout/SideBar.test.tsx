@@ -248,7 +248,9 @@ describe("SideBar", () => {
       .getAllByText("PM Dashboard")
       .map((label) => label.closest("a"))
       .find((link) => desktopNav.contains(link));
-    expect(pmDashboardEntry?.className).not.toContain("text-white");
+    // The pill is what the sidebar highlights *with* — the same `[data-layout-id]` counted
+    // above — so asserting on it survives any restyling of the entry itself.
+    expect(pmDashboardEntry?.querySelector("[data-layout-id]")).toBeNull();
   });
 
   /**
@@ -344,6 +346,9 @@ describe("SideBar", () => {
     // `/chat` — so this is the forced highlight, asserted the way a user perceives it.
     const chat = screen.getAllByRole("link", { name: /Chat/ })[0];
     expect(chat).not.toHaveAttribute("aria-current", "page");
-    expect(chat.className).toContain("text-white");
+
+    // Asserted through the active pill rather than the entry's classes: the highlight is what
+    // this test is about, and a class list is a styling decision that can change without it.
+    expect(chat.querySelector("[data-layout-id]")).not.toBeNull();
   });
 });

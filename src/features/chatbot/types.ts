@@ -102,9 +102,6 @@ export type ChatSidebarProps = {
   chats: Chat[];
 
   /**
-   * Function that opens or closes the sidebar.
-   */
-  /**
    * Called when the list navigates somewhere — a chat, or a new one.
    *
    * Named for the event rather than for "close the sidebar", because whether it *should* close

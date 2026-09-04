@@ -26,7 +26,10 @@ export const NEW_CONVERSATION_CHORD = "Alt + N";
  * accepting a bare `altKey` would fire this on every AltGr chord a European layout produces.
  *
  * @param enabled Leave false where there is nothing to start — an untouched buddy visit is
- *   already the new conversation, and re-opening it would only replay the greeting.
+ *   already the new conversation, and re-opening it would only replay the greeting. Both halves
+ *   of the assistant also gate it on being the one on screen: the shell keeps the page being
+ *   left mounted for the length of the slide, and this listener is on `window`, so during that
+ *   window one keypress would otherwise be answered twice.
  */
 export function useNewConversationShortcut(onTrigger: () => void, enabled = true): void {
   useEffect(() => {

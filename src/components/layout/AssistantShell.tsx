@@ -8,6 +8,7 @@ import { AssistantSurfaceSwitch } from "../common/AssistantSurfaceSwitch";
 import {
   ASSISTANT_SURFACES,
   ASSISTANT_SURFACE_ROUTES,
+  surfaceFromPathname,
   type AssistantSurface,
 } from "../common/assistantSurfaces";
 
@@ -47,7 +48,7 @@ export function AssistantShell() {
   const { pathname } = useLocation();
 
   // The route is the truth; `/chat/:id` is still the chat.
-  const surface: AssistantSurface = pathname.startsWith("/buddy") ? "buddy" : "chat";
+  const surface: AssistantSurface = surfaceFromPathname(pathname);
 
   const goToSurface = useCallback(
     (next: AssistantSurface) => void navigate(ASSISTANT_SURFACE_ROUTES[next]),
