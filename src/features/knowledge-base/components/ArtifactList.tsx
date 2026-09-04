@@ -79,6 +79,10 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
           </div>
           <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
             <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
+            {/* Only shown once the content actually changed: an artifact that still matches its
+                import has nothing useful to say here, and an always-present date that equals
+                "Ingested" would just be noise. */}
+            {artifact.lastChangedAt && <span>Changed: {formatDate(artifact.lastChangedAt)}</span>}
           </div>
         </div>
         <div className="shrink-0 pt-2">

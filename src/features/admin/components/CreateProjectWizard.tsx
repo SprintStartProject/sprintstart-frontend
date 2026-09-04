@@ -13,6 +13,7 @@ import {
 import {
   addDraftSource,
   connectDraftSources,
+  connectOutcomeDescription,
   createDraftSourceFromDiscovery,
   createJiraDraft,
   createUploadDraft,
@@ -494,7 +495,7 @@ export function CreateProjectWizard({
         });
       } else {
         toast.success("Project created", {
-          description: "Initial ingestion is running in the background.",
+          description: connectOutcomeDescription(connected),
         });
       }
     } catch (error) {
@@ -534,7 +535,9 @@ export function CreateProjectWizard({
       if (hasFailedSources(retried)) {
         toast.error("Couldn't connect the source.");
       } else {
-        toast.success("Source connected");
+        toast.success("Source connected", {
+          description: connectOutcomeDescription(retried),
+        });
       }
     } finally {
       setIsSubmitting(false);

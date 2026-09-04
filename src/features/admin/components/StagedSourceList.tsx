@@ -89,11 +89,20 @@ function sourceDetail(source: DraftSource): string {
 /**
  * The status line under the title. A staged GitHub repository that is already
  * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
- * misdescribe it — it says so instead.
+ * misdescribe it — it says so instead, before and after the run.
+ *
+ * Saying so afterwards matters as much as before: a linked source finishes
+ * instantly and starts no ingestion, so a plain "Connected" leaves the PM
+ * watching for a run that is never coming and wondering whether the connect
+ * worked at all.
  */
 function statusDescription(source: DraftSource): string {
   if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
     return "Already ingested, will be linked";
+  }
+
+  if (source.status === "connected" && source.wasReused) {
+    return "Linked · already available, nothing re-ingested";
   }
 
   return `${statusLabels[source.status]} · ${sourceDetail(source)}`;

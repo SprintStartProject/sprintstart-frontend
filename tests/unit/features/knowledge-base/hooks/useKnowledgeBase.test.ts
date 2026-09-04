@@ -20,8 +20,7 @@ function makeArtifact(id: string, title: string): Artifact {
     mime: "text/markdown",
     language: null,
     ingestedAt: "2024-01-01",
-    createdAtSource: null,
-    updatedAtSource: "2024-01-01",
+    lastChangedAt: "2024-01-01",
     contentHash: null,
     ingestionRunId: null,
   };

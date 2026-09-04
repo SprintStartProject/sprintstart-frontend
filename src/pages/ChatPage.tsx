@@ -72,8 +72,7 @@ function deriveArtifactFromCitation(citation: CitationArtifactOpen): Artifact {
     mime: isMarkdown ? "text/markdown" : "text/plain",
     language: isMarkdown ? "Markdown" : null,
     ingestedAt: new Date().toISOString(),
-    createdAtSource: null,
-    updatedAtSource: null,
+    lastChangedAt: null,
     contentHash: null,
     ingestionRunId: null,
   };

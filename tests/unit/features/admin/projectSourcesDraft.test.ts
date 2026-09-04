@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   addDraftSource,
   connectDraftSources,
+  connectOutcome,
+  connectOutcomeDescription,
   countUnconnectedSources,
   createDraftSource,
   createDraftSourceFromDiscovery,
@@ -259,6 +261,56 @@ describe("connectDraftSources", () => {
     expect(result.every((source) => source.status === "connected")).toBe(true);
   });
 
+  it("records a linked repository as reused, and a fetched one as not", async () => {
+    const result = await connectDraftSources("p1", [
+      createDraftSource("acme", "linked", "pat", "repo-42"),
+      createDraftSource("acme", "fresh", "pat"),
+    ]);
+
+    // Both connected, but only one of them started an ingestion — the run has
+    // to keep them apart so the UI does not promise one for the other.
+    expect(result[0].wasReused).toBe(true);
+    expect(result[1].wasReused).toBe(false);
+  });
+
+  it("records a reuse the backend found on its own", async () => {
+    // Staged as new: discovery did not know the repository was connected, and
+    // the backend is the only one that can tell.
+    connectGithubRepositoryMock.mockResolvedValue({ transactionId: "tx", wasReused: true });
+
+    const result = await connectDraftSources("p1", [createDraftSource("acme", "fresh", "pat")]);
+
+    expect(result[0].wasReused).toBe(true);
+  });
+
+  it("treats a backend without the reuse flag as a fresh connect", async () => {
+    connectGithubRepositoryMock.mockResolvedValue({ transactionId: "tx" });
+
+    const result = await connectDraftSources("p1", [createDraftSource("acme", "fresh", "pat")]);
+
+    expect(result[0].wasReused).toBe(false);
+  });
+
+  it("never calls a Jira instance or an upload a reuse", async () => {
+    const result = await connectDraftSources("p1", [
+      createJiraDraft(jiraDraftParams),
+      createUploadDraft("Docs", [new File(["x"], "a.txt")]),
+    ]);
+
+    expect(result.every((source) => source.wasReused === false)).toBe(true);
+  });
+
+  it("leaves a failed source unmarked", async () => {
+    addRepositoryToProjectMock.mockRejectedValue(new Error("nope"));
+
+    const result = await connectDraftSources("p1", [
+      createDraftSource("acme", "linked", "pat", "repo-42"),
+    ]);
+
+    expect(result[0].status).toBe("failed");
+    expect(result[0].wasReused).toBe(false);
+  });
+
   it("reports progress as the run advances", async () => {
     const onProgress = vi.fn();
 
@@ -316,5 +368,59 @@ describe("connectDraftSources", () => {
     expect(connectJiraInstanceMock).toHaveBeenCalledTimes(1);
     expect(uploadDocumentsMock).toHaveBeenCalledTimes(1);
     expect(result.every((source) => source.status === "connected")).toBe(true);
+  });
+});
+
+describe("connectOutcome / connectOutcomeDescription", () => {
+  const settled = (overrides: Partial<DraftSource>[]): DraftSource[] =>
+    overrides.map(
+      (patch, index) =>
+        ({
+          ...createDraftSource("acme", `repo-${index}`, "pat"),
+          status: "connected",
+          ...patch,
+        }) as DraftSource,
+    );
+
+  it("calls a run of only linked sources a reuse", () => {
+    const sources = settled([{ wasReused: true }, { wasReused: true }]);
+
+    expect(connectOutcome(sources)).toBe("reused");
+    expect(connectOutcomeDescription(sources)).toBe(
+      "Already available in SprintStart and linked to your project. No re-ingestion needed.",
+    );
+  });
+
+  it("promises an ingestion only when something is actually being fetched", () => {
+    const sources = settled([{ wasReused: false }]);
+
+    expect(connectOutcome(sources)).toBe("ingesting");
+    expect(connectOutcomeDescription(sources)).toBe(
+      "Initial ingestion is running in the background.",
+    );
+  });
+
+  it("describes a mixed run as both", () => {
+    const sources = settled([{ wasReused: true }, { wasReused: false }]);
+
+    expect(connectOutcome(sources)).toBe("mixed");
+    expect(connectOutcomeDescription(sources)).toContain("already available");
+    expect(connectOutcomeDescription(sources)).toContain("Initial ingestion is running");
+  });
+
+  it("says nothing when nothing connected", () => {
+    const sources = settled([{ status: "failed" }]);
+
+    expect(connectOutcome(sources)).toBe("none");
+    expect(connectOutcomeDescription(sources)).toBeUndefined();
+  });
+
+  it("never names the projects a source was already connected to", () => {
+    // #257: a PM must not be able to work out which *other* project holds the
+    // source. The description is deliberately count-free and name-free.
+    const description = connectOutcomeDescription(settled([{ wasReused: true }])) ?? "";
+
+    expect(description).not.toMatch(/project [A-Z0-9]/i);
+    expect(description).toContain("your project");
   });
 });
