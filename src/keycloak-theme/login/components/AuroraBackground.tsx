@@ -13,10 +13,15 @@ const AURORA_STORAGE_KEY = "sprintstart:aurora-enabled";
  */
 function readIsEnabled(): boolean {
   try {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const storedMode = window.localStorage.getItem(STYLE_STORAGE_KEY);
+
+    if (storedMode === "classic") {
       return false;
     }
-    if (window.localStorage.getItem(STYLE_STORAGE_KEY) === "classic") {
+    // The stored mode is consulted first, exactly as `getInitialStyleMode` does: a user who
+    // has overruled their OS's reduced-motion preference in Settings has said so, and saying
+    // it again on the login page is not something the app should ask of them.
+    if (storedMode !== "ultra" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return false;
     }
     return window.localStorage.getItem(AURORA_STORAGE_KEY) === "true";

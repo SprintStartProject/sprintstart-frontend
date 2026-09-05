@@ -9,9 +9,11 @@ export type WidgetShellProps = {
   icon: LucideIcon;
   title: string;
   /**
-   * What the card promises when clicked, e.g. "Open team management".
+   * What the card promises when pressed, e.g. "Open team management".
    *
-   * Omitted together with {@link WidgetShellProps.to} for a card with nowhere to go.
+   * Omitted for a card that does nothing when pressed -- which is also how the card is told
+   * that it is not a control at all, since it is the presence of a destination or an
+   * {@link WidgetShellProps.onActivate} that makes it one.
    */
   actionLabel?: string;
   /**
@@ -23,6 +25,22 @@ export type WidgetShellProps = {
    * with the same frame — no pointer, no hover lift, nothing to focus.
    */
   to?: string;
+  /**
+   * Run when the card is activated, on top of following {@link WidgetShellProps.to}.
+   *
+   * Also makes a card *without* a destination clickable, which is the point: a widget can have
+   * something to acknowledge without having anywhere for this user to go, and "pressing it did
+   * nothing visible except clear the marker" is a perfectly good outcome — it is the marker
+   * going away that the press was for.
+   */
+  onActivate?: () => void;
+  /**
+   * A small, non-interactive marker in the header — "there is something new on this card".
+   *
+   * Deliberately not a control of its own: the whole card is the control (see below), so the
+   * thing that clears the marker is a press on the card, not a button sitting inside one.
+   */
+  notice?: ReactNode;
   isLoading?: boolean;
   /** Shown instead of the body when the figures could not be read. */
   errorMessage?: string | null;
@@ -44,11 +62,20 @@ export function WidgetShell({
   title,
   actionLabel,
   to,
+  onActivate,
+  notice,
   isLoading = false,
   errorMessage = null,
   children,
 }: WidgetShellProps) {
   const navigate = useNavigate();
+
+  const isInteractive = to !== undefined || onActivate !== undefined;
+
+  const activate = () => {
+    onActivate?.();
+    if (to !== undefined) void navigate(to);
+  };
 
   const contents = (
     <>
@@ -71,15 +98,19 @@ export function WidgetShell({
                 quarter-row card ran past the edge and was clipped by the card's `overflow-hidden`.
                 A *container* query, not a viewport one: what is short of room is the card, and the
                 same card is roomy at half a row on the same screen. */}
-        {to !== undefined && (
-          <span
-            aria-hidden="true"
-            className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
-          >
-            <span className="hidden @min-[20rem]:inline">{actionLabel}</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {notice}
+
+          {isInteractive && (
+            <span
+              aria-hidden="true"
+              className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
+            >
+              <span className="hidden @min-[20rem]:inline">{actionLabel}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -97,7 +128,7 @@ export function WidgetShell({
     </>
   );
 
-  if (to === undefined) {
+  if (!isInteractive) {
     return (
       // No surface of its own: the card's border, background and shadow come from the
       // `SpotlightCard` the dashboard frame wraps every widget in.
@@ -109,7 +140,7 @@ export function WidgetShell({
 
   return (
     <ClickableCard
-      onClick={() => void navigate(to)}
+      onClick={activate}
       aria-label={actionLabel}
       className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >

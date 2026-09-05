@@ -3,6 +3,7 @@ import {
   connectGithubRepository,
 } from "../../services/sources/githubService";
 import { connectJiraInstance } from "../../services/sources/jiraService";
+import { knowledgeGapService } from "../../services/knowledgeGapService";
 import { knowledgeService } from "../../services/knowledgeService";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
 
@@ -31,6 +32,20 @@ type DraftSourceBase = {
   id: string;
   status: DraftSourceStatus;
   errorMessage: string;
+  /**
+   * Set when the source connected but the owner it was staged with could not be recorded.
+   *
+   * A separate flag rather than a `failed` status, because the two outcomes are not the same
+   * thing and must not be told apart by guesswork: the repository *is* connected and is being
+   * ingested, and calling that a failure would invite a retry of work that already succeeded.
+   * Ownership is also the weaker of the two — only PM/Admin may write it, so an HR user
+   * staging an owner gets a 403 on that call alone — and losing it costs a dropdown on the
+   * knowledge-gaps page, not the source.
+   *
+   * Only GitHub repositories can carry an owner today; it lives on the base so the batch loop
+   * can patch it without narrowing the union.
+   */
+  ownerAssignmentFailed: boolean;
 };
 
 export type GithubDraftSource = DraftSourceBase & {
@@ -38,6 +53,20 @@ export type GithubDraftSource = DraftSourceBase & {
   owner: string;
   name: string;
   tokenName: string;
+  /**
+   * Who owns this repository's documentation, named in the staged source list.
+   *
+   * The knowledge-gaps analysis keys ownership by component name, and a repository's component
+   * is `owner/name` — so naming somebody here is the same assignment the PM would otherwise
+   * have to make afterwards from Knowledge gaps → the repository → Owner.
+   *
+   * Set on the list rather than on the discovery screen, and therefore never at staging time:
+   * discovery is a multi-select, so a control there could only name one person for everything
+   * ticked, which is not how repositories are actually divided up. Applied once the repository
+   * has connected; empty means nobody was named, which is not the same as clearing an existing
+   * owner and never writes anything.
+   */
+  ownerUserId?: string;
   /**
    * Set when the repository is already ingested elsewhere: connecting then only
    * links it to the project (reusing its artifacts) instead of fetching and
@@ -86,6 +115,7 @@ export function createDraftSource(
     tokenName,
     status: "pending",
     errorMessage: "",
+    ownerAssignmentFailed: false,
     repositoryId,
   };
 }
@@ -122,6 +152,7 @@ export function createJiraDraft(params: {
     tokenName: params.tokenName,
     status: "pending",
     errorMessage: "",
+    ownerAssignmentFailed: false,
   };
 }
 
@@ -133,6 +164,7 @@ export function createUploadDraft(displayName: string, files: File[]): UploadDra
     files,
     status: "pending",
     errorMessage: "",
+    ownerAssignmentFailed: false,
   };
 }
 
@@ -172,6 +204,25 @@ export function removeDraftSource(sources: DraftSource[], sourceId: string): Dra
   return sources.filter((source) => source.id !== sourceId);
 }
 
+/**
+ * Names (or unnames) the documentation owner of a staged GitHub repository.
+ *
+ * Per source rather than per batch: a PM adds four repositories in one pass and they belong to
+ * four different people, which is the whole reason the assignment is worth making here instead
+ * of afterwards. An empty `ownerUserId` clears the staged choice.
+ */
+export function setDraftSourceOwner(
+  sources: DraftSource[],
+  sourceId: string,
+  ownerUserId: string,
+): DraftSource[] {
+  return sources.map((source) =>
+    source.id === sourceId && source.type === "GITHUB"
+      ? { ...source, ownerUserId: ownerUserId || undefined }
+      : source,
+  );
+}
+
 function patchDraftSource(
   sources: DraftSource[],
   sourceId: string,
@@ -188,8 +239,49 @@ export function hasFailedSources(sources: DraftSource[]): boolean {
   return sources.some((source) => source.status === "failed");
 }
 
-/** Connects one staged source, dispatching to the right connector by `type`. */
-async function connectOneDraftSource(source: DraftSource, projectId: string): Promise<void> {
+/**
+ * Records the staged owner of a repository against its knowledge-gap component.
+ *
+ * Runs after the connect, and deliberately cannot fail it: the repository is connected and
+ * ingesting by this point, and the ownership write is a different, weaker call — it is
+ * PM/Admin-only, so an HR user who staged an owner is refused here and nowhere else. The
+ * outcome is reported instead, and the row says which of the two happened.
+ *
+ * Safe to run this early, before the gaps analysis has ever seen the component: the backend
+ * keys ownership by component name alone and stores it in its own table, so there is nothing
+ * for an unknown component to fail against.
+ *
+ * Two things it inherits from that endpoint, both of which only ever happen because somebody
+ * deliberately picked a name here. The PUT *replaces* the owner list, so an existing owner is
+ * dropped rather than joined. And ownership is not project-partitioned yet, so a repository
+ * that is also connected to another project changes hands there too. Showing the current
+ * owner before overwriting them would need a read per staged repository; worth doing, but it
+ * is a feature rather than a guard.
+ *
+ * @returns Whether the assignment failed, so the caller can say so.
+ */
+async function assignStagedOwner(source: GithubDraftSource, projectId: string): Promise<boolean> {
+  if (!source.ownerUserId) return false;
+
+  try {
+    await knowledgeGapService.setComponentOwners(projectId, `${source.owner}/${source.name}`, [
+      source.ownerUserId,
+    ]);
+
+    return false;
+  } catch (error) {
+    console.error(`Failed to assign the owner of ${source.owner}/${source.name}`, error);
+
+    return true;
+  }
+}
+
+/**
+ * Connects one staged source, dispatching to the right connector by `type`.
+ *
+ * @returns Whether the source connected but its staged owner could not be recorded.
+ */
+async function connectOneDraftSource(source: DraftSource, projectId: string): Promise<boolean> {
   if (source.type === "GITHUB") {
     if (source.repositoryId) {
       // Already ingested elsewhere: link it to this project, reusing its
@@ -204,7 +296,7 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       });
     }
 
-    return;
+    return await assignStagedOwner(source, projectId);
   }
 
   if (source.type === "JIRA") {
@@ -216,7 +308,7 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       projectId,
     });
 
-    return;
+    return false;
   }
 
   // UPLOAD: files are uploaded now that the project exists. uploadDocuments
@@ -234,6 +326,8 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
         : `${failed.length} of ${source.files.length} files could not be uploaded.`,
     );
   }
+
+  return false;
 }
 
 /**
@@ -267,9 +361,14 @@ export async function connectDraftSources(
     );
 
     try {
-      await connectOneDraftSource(source, projectId);
+      const ownerAssignmentFailed = await connectOneDraftSource(source, projectId);
 
-      publish(patchDraftSource(currentSources, source.id, { status: "connected" }));
+      publish(
+        patchDraftSource(currentSources, source.id, {
+          status: "connected",
+          ownerAssignmentFailed,
+        }),
+      );
     } catch (error) {
       publish(
         patchDraftSource(currentSources, source.id, {

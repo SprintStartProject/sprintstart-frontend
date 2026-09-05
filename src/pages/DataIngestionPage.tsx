@@ -815,6 +815,12 @@ export function DataIngestionPage() {
   const canManageGithubSyncSettings =
     profile?.permissionGroup === "ADMIN" || profile?.permissionGroup === "PM";
 
+  // Naming the documentation owner of a repository writes component ownership, and that
+  // endpoint is PM/Admin only. Same two roles as the sync settings above, but for its own
+  // reason -- kept apart so changing one does not quietly change the other.
+  const canAssignComponentOwners =
+    profile?.permissionGroup === "ADMIN" || profile?.permissionGroup === "PM";
+
   // The `/github/connect` endpoint only checks the global PM/ADMIN role, so the
   // backend accepts an ingest into a project the PM is merely a member of and
   // then fails deep in the pipeline with a 500. Mirror the product rule up front
@@ -1494,6 +1500,7 @@ export function DataIngestionPage() {
           projectName={selectedProject?.name}
           tokenNames={githubTokenNames}
           canIngest={Boolean(selectedProjectId) && canIngestIntoSelectedProject}
+          canAssignOwners={canAssignComponentOwners}
           ingestBlockedReason={
             !selectedProjectId
               ? "Select a project before connecting repositories."

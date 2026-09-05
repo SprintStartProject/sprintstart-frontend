@@ -1,9 +1,13 @@
+import { useMemo, useState } from "react";
 import { Clock, FileWarning, FolderOpen, ShieldCheck } from "lucide-react";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { useFetch } from "../../../hooks/useFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
+import { PanelPresence } from "../../../components/ui/PanelPresence";
+import { MyKnowledgeGapsDrawer } from "../../knowledge-gaps/components/MyKnowledgeGapsDrawer";
+import { useMyKnowledgeGaps } from "../../knowledge-gaps/useMyKnowledgeGaps";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
 import {
   SeverityBar,
@@ -349,6 +353,31 @@ function GapRow({ gap }: { gap: KnowledgeGap }) {
   );
 }
 
+/**
+ * The "there is something new here" marker, and the only thing that clears it.
+ *
+ * Not a button: the whole card is the control (see `WidgetShell`), so pressing anywhere on it
+ * is what acknowledges the marker. That is also why the card is made pressable for a user who
+ * has nowhere to go from here -- clearing the marker is a worthwhile outcome on its own, and
+ * it is the one the sidebar flag is waiting for.
+ *
+ * Purely visual, and it has to be: `ClickableCard` renders the card as `role="button"`, which
+ * ARIA treats as children-presentational, so anything said in here is never reached -- the
+ * card's own `aria-label` is the only text a screen reader gets. The count therefore lives in
+ * that label rather than in an `sr-only` span nobody would hear.
+ */
+function NewOwnershipPill() {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-[10px] font-semibold tracking-wide text-app-warning-text uppercase"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-app-warning-solid" />
+      New
+    </span>
+  );
+}
+
 /** Trailing line for whatever did not fit, so the list never just stops. */
 function HiddenCount({ hidden }: { hidden: number }) {
   if (hidden <= 0) return null;
@@ -376,14 +405,19 @@ function HiddenCount({ hidden }: { hidden: number }) {
  * spread beside the list: at that width the severity mix is worth showing, and it is what
  * separates one urgent gap from four minor ones.
  *
- * Clicking through is offered only to a user who may actually reach the knowledge-gaps page.
- * For everyone else the card is plain content — a member cannot open the detail view (the
- * backend guards it with PM/Admin), and a click that lands on a redirect is worse than no
- * click at all.
+ * Pressing it opens a drawer with the whole of what is in your name, for every role -- built
+ * from the response this card already has, so a member finally has somewhere to read it in
+ * full. A manager gets the way through to the knowledge-gaps page from inside that drawer,
+ * which is where the things only they can do live; sending everybody else there directly would
+ * have been a click that lands on a redirect.
  */
 export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
   const { profile } = useAuth();
   const { selectedProjectId, canManageSelected } = useProjectContext();
+  // Only the unread flag comes from the shared provider; the figures below stay this widget's
+  // own request, so the card still works wherever it is rendered.
+  const { unseenComponents, markAllSeen } = useMyKnowledgeGaps();
+  const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   /*
     The project context starts empty and only fills in once the project list has loaded — and
@@ -405,6 +439,13 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
   const canOpenPage = canAccessRoute(profile, "/insights/knowledge-gaps", canManageSelected);
 
   /*
+    Something has been assigned that the user has not acknowledged. The card then always
+    accepts a press, even for a member who cannot open the knowledge-gaps page: the press is
+    what puts the flag down, here and in the sidebar.
+  */
+  const hasUnseen = unseenComponents.length > 0;
+
+  /*
     The overview is the project's full component roster now, the covered ones included. This
     card is a to-do list — its title, its counts and every chip on it say "missing" — so a
     component with nothing missing is not a smaller item on it, it is not an item at all.
@@ -413,7 +454,12 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
     components are all documented would get cards reading "0 documents missing" instead of
     "Nothing assigned to you", and the summary bar would count them as work.
   */
-  const gaps = worstFirst((data?.gaps ?? []).filter((gap) => gap.severity !== "covered"));
+  // Memoised because `PanelPresence` below compares this by identity to decide when the drawer
+  // has finished closing; a fresh array every render would keep resetting that.
+  const gaps = useMemo(
+    () => worstFirst((data?.gaps ?? []).filter((gap) => gap.severity !== "covered")),
+    [data],
+  );
   const visible = gaps.slice(0, VISIBLE_COUNT[size]);
   const hidden = gaps.length - visible.length;
 
@@ -448,89 +494,126 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
         : "grid-cols-2 grid-rows-2";
   const wideRichCards = wideCells <= 3;
 
+  /*
+    The card opens the drawer for everybody, rather than the knowledge-gaps page for the two
+    roles that may enter it. One card, one behaviour: the drawer shows the whole of what is in
+    your name from the response this widget already has, and a manager reaches their page from
+    inside it, where it sits next to the things only they can do.
+
+    Pressing is also what acknowledges the "New" marker, so a member for whom the drawer is the
+    end of the road still has a reason to have pressed.
+  */
+  const canOpenDrawer = gaps.length > 0;
+
+  /*
+    An unacknowledged marker makes the card pressable on its own, even when this widget's own
+    request failed and there is nothing to open. The marker and the figures come from two
+    different requests -- the shared provider and the one below -- and pressing is the only
+    thing that puts the marker down, here and in the sidebar. Tying it to the figures alone
+    left a card wearing "New" that could not be pressed, with the sidebar flag stuck behind it.
+  */
+  const isPressable = (canOpenDrawer || hasUnseen) && !loading;
+
+  const openDetails = () => {
+    markAllSeen();
+    if (canOpenDrawer) setDrawerOpen(true);
+  };
+
   return (
-    <WidgetShell
-      icon={FileWarning}
-      title="Your knowledge gaps"
-      actionLabel={canOpenPage ? "Open knowledge gaps" : undefined}
-      to={canOpenPage ? "/insights/knowledge-gaps" : undefined}
-      isLoading={loading}
-      // Only a failed request may say this. Owning nothing is a normal, successful answer and
-      // gets the empty state below — the two must never be told apart by guesswork.
-      errorMessage={error ? "Could not load your knowledge gaps." : null}
-    >
-      {!hasProject ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-          <FolderOpen aria-hidden="true" className="h-5 w-5 text-app-text-muted" />
-          <p className="text-sm font-medium text-app-text">No project selected.</p>
-          <p className="text-xs text-app-text-muted">
-            Pick a project to see what is assigned to you.
-          </p>
-        </div>
-      ) : gaps.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-          <ShieldCheck aria-hidden="true" className="h-5 w-5 text-app-success-solid" />
-          <p className="text-sm font-medium text-app-text">Nothing assigned to you.</p>
-          <p className="text-xs text-app-text-muted">
-            No component you own is missing documentation.
-          </p>
-        </div>
-      ) : size === "small" ? (
-        <div className="flex flex-1 flex-col justify-center">
-          <GapSpotlight gap={visible[0]} />
-          <HiddenCount hidden={hidden} />
-        </div>
-      ) : gaps.length === 1 ? (
-        // One gap fills the card on its own rather than sitting in it as a lone row.
-        <GapFeature gap={gaps[0]} split={size === "wide"} currentUserId={profile?.id ?? null} />
-      ) : size === "medium" ? (
-        <div className="flex flex-1 flex-col justify-center">
-          {/*
+    <>
+      <WidgetShell
+        icon={FileWarning}
+        title="Your knowledge gaps"
+        // The card is `role="button"`, so this label is all a screen reader gets of it -- see
+        // `NewOwnershipPill`. Everything the marker means has to be said here.
+        actionLabel={
+          !isPressable
+            ? undefined
+            : !canOpenDrawer
+              ? `Mark ${unseenComponents.length} newly assigned components as read`
+              : hasUnseen
+                ? `Open your knowledge gaps, ${unseenComponents.length} newly assigned`
+                : "Open your knowledge gaps"
+        }
+        onActivate={isPressable ? openDetails : undefined}
+        notice={hasUnseen ? <NewOwnershipPill /> : undefined}
+        isLoading={loading}
+        // Only a failed request may say this. Owning nothing is a normal, successful answer and
+        // gets the empty state below — the two must never be told apart by guesswork.
+        errorMessage={error ? "Could not load your knowledge gaps." : null}
+      >
+        {!hasProject ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+            <FolderOpen aria-hidden="true" className="h-5 w-5 text-app-text-muted" />
+            <p className="text-sm font-medium text-app-text">No project selected.</p>
+            <p className="text-xs text-app-text-muted">
+              Pick a project to see what is assigned to you.
+            </p>
+          </div>
+        ) : gaps.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+            <ShieldCheck aria-hidden="true" className="h-5 w-5 text-app-success-solid" />
+            <p className="text-sm font-medium text-app-text">Nothing assigned to you.</p>
+            <p className="text-xs text-app-text-muted">
+              No component you own is missing documentation.
+            </p>
+          </div>
+        ) : size === "small" ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <GapSpotlight gap={visible[0]} />
+            <HiddenCount hidden={hidden} />
+          </div>
+        ) : gaps.length === 1 ? (
+          // One gap fills the card on its own rather than sitting in it as a lone row.
+          <GapFeature gap={gaps[0]} split={size === "wide"} currentUserId={profile?.id ?? null} />
+        ) : size === "medium" ? (
+          <div className="flex flex-1 flex-col justify-center">
+            {/*
             Two gaps get boxes that share the height between them; three go back to rows,
             which is the point where a list is genuinely a list and boxes would be cramped.
           */}
-          {gaps.length === 2 ? (
-            <ul className="grid flex-1 grid-rows-2 gap-3">
-              {visible.map((gap) => (
-                <GapCard key={gap.id} gap={gap} />
-              ))}
-            </ul>
-          ) : (
-            <>
-              <ul className="space-y-2.5">
+            {gaps.length === 2 ? (
+              <ul className="grid flex-1 grid-rows-2 gap-3">
                 {visible.map((gap) => (
-                  <GapRow key={gap.id} gap={gap} />
+                  <GapCard key={gap.id} gap={gap} />
                 ))}
               </ul>
+            ) : (
+              <>
+                <ul className="space-y-2.5">
+                  {visible.map((gap) => (
+                    <GapRow key={gap.id} gap={gap} />
+                  ))}
+                </ul>
 
-              <HiddenCount hidden={hidden} />
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:gap-8">
-          {/*
+                <HiddenCount hidden={hidden} />
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:gap-8">
+            {/*
             The spread first, because at full width it is the thing the list cannot say: four
             low-severity gaps and one high one are the same number of rows and completely
             different afternoons.
           */}
-          <div className="flex shrink-0 flex-col justify-center sm:w-52">
-            <p className="text-4xl leading-none font-bold text-app-text tabular-nums">
-              {gaps.length}
-            </p>
-            <p className="mt-1 text-xs text-app-text-muted">
-              {gaps.length === 1 ? "component assigned to you" : "components assigned to you"}
-            </p>
-            <p className="text-xs text-app-text-muted">
-              {documentsMissing(gaps) === 1
-                ? "1 document missing in total"
-                : `${documentsMissing(gaps)} documents missing in total`}
-            </p>
+            <div className="flex shrink-0 flex-col justify-center sm:w-52">
+              <p className="text-4xl leading-none font-bold text-app-text tabular-nums">
+                {gaps.length}
+              </p>
+              <p className="mt-1 text-xs text-app-text-muted">
+                {gaps.length === 1 ? "component assigned to you" : "components assigned to you"}
+              </p>
+              <p className="text-xs text-app-text-muted">
+                {documentsMissing(gaps) === 1
+                  ? "1 document missing in total"
+                  : `${documentsMissing(gaps)} documents missing in total`}
+              </p>
 
-            <SeveritySummaryBar gaps={gaps} className="mt-4" />
-          </div>
+              <SeveritySummaryBar gaps={gaps} className="mt-4" />
+            </div>
 
-          {/*
+            {/*
             Boxes in a two-column grid rather than stacked rows: the full-width card gives this
             column more than half the widget, and rows left the right of it blank. Two gaps sit
             side by side and fill it; four make a 2x2 that fills it the same way.
@@ -540,17 +623,33 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
             five. The widget's own title already says what this is, and anything past the four
             cells is reported by the last cell rather than below the grid.
           */}
-          <div className="flex min-w-0 flex-1 flex-col border-t border-app-border-muted pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-8">
-            <ul className={`grid min-h-0 flex-1 gap-3 ${wideGridClass}`}>
-              {celledGaps.map((gap) => (
-                <GapCard key={gap.id} gap={gap} rich={wideRichCards} />
-              ))}
+            <div className="flex min-w-0 flex-1 flex-col border-t border-app-border-muted pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-8">
+              <ul className={`grid min-h-0 flex-1 gap-3 ${wideGridClass}`}>
+                {celledGaps.map((gap) => (
+                  <GapCard key={gap.id} gap={gap} rich={wideRichCards} />
+                ))}
 
-              {remaining > 0 && <MoreTile remaining={remaining} />}
-            </ul>
+                {remaining > 0 && <MoreTile remaining={remaining} />}
+              </ul>
+            </div>
           </div>
-        </div>
-      )}
-    </WidgetShell>
+        )}
+      </WidgetShell>
+
+      {/* Mounted only while it is open, and kept for the length of its slide-out -- the drawer
+          lists every component in full, and a closed copy of that sitting in the DOM behind a
+          dashboard card is a duplicate of everything the card itself says. */}
+      <PanelPresence value={isDrawerOpen ? gaps : null}>
+        {(openGaps) => (
+          <MyKnowledgeGapsDrawer
+            isOpen
+            onClose={() => setDrawerOpen(false)}
+            gaps={openGaps}
+            currentUserId={profile?.id ?? null}
+            canOpenFullPage={canOpenPage}
+          />
+        )}
+      </PanelPresence>
+    </>
   );
 }

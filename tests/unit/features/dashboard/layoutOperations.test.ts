@@ -38,6 +38,36 @@ describe("buildDefaultLayout", () => {
     ]);
   });
 
+  // The swap a user gets the first time somebody puts a component in their name. Work that is
+  // assigned outranks a reading list, and the board is a fixed shape -- a card added here is a
+  // card pushed off the first screen, so the gaps card takes the knowledge base's place.
+  it("puts the gaps card where the knowledge base was for a user who owns something", () => {
+    const layout = buildDefaultLayout([...EVERY_USER_WIDGET, "my-knowledge-gaps"], true);
+
+    expect(ids(layout)).toEqual([
+      "greeting",
+      "recent-chats",
+      "my-knowledge-gaps",
+      "ask-chat",
+      "skills",
+    ]);
+  });
+
+  it("leaves the board alone for a user who owns nothing", () => {
+    const layout = buildDefaultLayout([...EVERY_USER_WIDGET, "my-knowledge-gaps"], false);
+
+    expect(ids(layout)).toContain("knowledge-base");
+    expect(ids(layout)).not.toContain("my-knowledge-gaps");
+  });
+
+  it("does not take a slot that was not being filled anyway", () => {
+    // No knowledge base to stand in for, so there is nothing to swap: the gaps card would
+    // otherwise land in a position the default layout never used.
+    const layout = buildDefaultLayout(["greeting", "ask-chat", "my-knowledge-gaps"], true);
+
+    expect(ids(layout)).toEqual(["greeting", "ask-chat"]);
+  });
+
   it("gives the slot to a running onboarding ahead of everything else", () => {
     const layout = buildDefaultLayout([...EVERY_USER_WIDGET, "onboarding", "team-insights"]);
 

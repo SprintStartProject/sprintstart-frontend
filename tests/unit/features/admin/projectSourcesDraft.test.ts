@@ -10,8 +10,10 @@ import {
   hasFailedSources,
   isSameSource,
   removeDraftSource,
+  setDraftSourceOwner,
   type DraftSource,
 } from "../../../../src/features/admin/projectSourcesDraft";
+import { knowledgeGapService } from "../../../../src/services/knowledgeGapService";
 import {
   addRepositoryToProject,
   connectGithubRepository,
@@ -33,10 +35,15 @@ vi.mock("../../../../src/services/knowledgeService", () => ({
   knowledgeService: { uploadDocuments: vi.fn() },
 }));
 
+vi.mock("../../../../src/services/knowledgeGapService", () => ({
+  knowledgeGapService: { setComponentOwners: vi.fn() },
+}));
+
 const connectGithubRepositoryMock = vi.mocked(connectGithubRepository);
 const addRepositoryToProjectMock = vi.mocked(addRepositoryToProject);
 const connectJiraInstanceMock = vi.mocked(connectJiraInstance);
 const uploadDocumentsMock = vi.mocked(knowledgeService.uploadDocuments);
+const setComponentOwnersMock = vi.mocked(knowledgeGapService.setComponentOwners);
 
 const jiraDraftParams = {
   displayName: "Team board",
@@ -54,6 +61,34 @@ beforeEach(() => {
   connectJiraInstanceMock.mockResolvedValue(undefined);
   uploadDocumentsMock.mockReset();
   uploadDocumentsMock.mockResolvedValue([{ filename: "a.txt", status: "success" }]);
+  setComponentOwnersMock.mockReset();
+  setComponentOwnersMock.mockResolvedValue([]);
+});
+
+describe("setDraftSourceOwner", () => {
+  it("names an owner on one repository and clears it again", () => {
+    const draft = createDraftSource("acme", "widgets", "pat");
+
+    const named = setDraftSourceOwner([draft], draft.id, "u1");
+    expect(named[0]).toMatchObject({ type: "GITHUB", ownerUserId: "u1" });
+
+    // Empty means "nobody", and it has to come back out as `undefined` rather than "" --
+    // that is what `assignStagedOwner` checks before writing anything at all.
+    const cleared = setDraftSourceOwner(named, draft.id, "");
+    expect((cleared[0] as { ownerUserId?: string }).ownerUserId).toBeUndefined();
+  });
+
+  it("leaves the sources it was not asked about alone", () => {
+    const github = createDraftSource("acme", "widgets", "pat");
+    const jira = createJiraDraft(jiraDraftParams);
+
+    // Only GitHub repositories carry an owner; a Jira instance is not a knowledge-gap
+    // component, so pointing this at one must not invent a field on it.
+    const next = setDraftSourceOwner([github, jira], jira.id, "u1");
+
+    expect(next[0]).toBe(github);
+    expect(next[1]).toBe(jira);
+  });
 });
 
 describe("createDraftSource", () => {
@@ -303,6 +338,42 @@ describe("connectDraftSources", () => {
 
     expect(result[0].status).toBe("failed");
     expect(result[0].errorMessage).toContain("1 of 2");
+  });
+
+  // The owner is named per row in the staged list, and applied once the repository is
+  // connected. A repository's knowledge-gap component is `owner/name`, which is what the
+  // ownership endpoint is keyed by.
+  it("records the staged owner against the repository's component", async () => {
+    const draft = createDraftSource("acme", "widgets", "pat");
+    const staged = setDraftSourceOwner([draft], draft.id, "u1");
+
+    const result = await connectDraftSources("p1", staged);
+
+    expect(setComponentOwnersMock).toHaveBeenCalledWith("p1", "acme/widgets", ["u1"]);
+    expect(result[0].status).toBe("connected");
+    expect(result[0].ownerAssignmentFailed).toBe(false);
+  });
+
+  it("writes no ownership at all when nobody was named", async () => {
+    await connectDraftSources("p1", [createDraftSource("acme", "widgets", "pat")]);
+
+    // Empty is "nobody was named", which is not the same as clearing an existing owner --
+    // the PUT replaces the list, so an unasked-for call would wipe one.
+    expect(setComponentOwnersMock).not.toHaveBeenCalled();
+  });
+
+  // The repository is connected and ingesting by the time this runs, and the ownership write
+  // is a weaker, PM/Admin-only call. Calling that a failed source would invite a retry of work
+  // that already succeeded.
+  it("keeps the source connected when the ownership write is refused", async () => {
+    setComponentOwnersMock.mockRejectedValueOnce(new Error("403"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const draft = createDraftSource("acme", "widgets", "pat");
+    const result = await connectDraftSources("p1", setDraftSourceOwner([draft], draft.id, "u1"));
+
+    expect(result[0].status).toBe("connected");
+    expect(result[0].ownerAssignmentFailed).toBe(true);
   });
 
   it("dispatches each source type in one mixed batch", async () => {

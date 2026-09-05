@@ -316,8 +316,14 @@ export function SidebarNavLink({
                                         and movement is invisible to a screen
                                         reader -- and to anyone who has reduced
                                         motion on, which is why the colour
-                                        change is not conditional on it. */}
-                  <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                                        change is not conditional on it.
+                                        Only rendered when there is actually
+                                        something waiting: unconditional, it
+                                        made every entry in the sidebar
+                                        announce itself as needing attention. */}
+                  {hasAttentionMarker && (
+                    <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                  )}
                 </motion.span>
 
                 <span>{label}</span>

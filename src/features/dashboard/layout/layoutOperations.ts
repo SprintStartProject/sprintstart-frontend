@@ -41,18 +41,40 @@ const DEFAULT_SURROUNDINGS: readonly { id: DashboardWidgetId; size: DashboardWid
  *
  * @param availableIds The widget ids {@link DashboardWidgetDefinition.isAvailable} said yes
  *   to. Anything not in here is skipped rather than placed as a card that cannot load.
+ * @param ownsKnowledgeGaps Whether a component has been put in this user's name. When it has,
+ *   the gaps card takes the knowledge base's place rather than being added beside it: work
+ *   that is assigned to you outranks a reading list, and the default board is a fixed shape —
+ *   a card added here is a card pushed off the bottom of the first screen. The knowledge base
+ *   is still one tick away in the widget picker, and the swap only ever affects somebody who
+ *   has never arranged their own dashboard.
  */
-export function buildDefaultLayout(availableIds: readonly DashboardWidgetId[]): DashboardLayout {
+export function buildDefaultLayout(
+  availableIds: readonly DashboardWidgetId[],
+  ownsKnowledgeGaps = false,
+): DashboardLayout {
   const available = new Set(availableIds);
   const slotId = DEFAULT_SLOT_CANDIDATES.find((id) => available.has(id));
 
-  return DEFAULT_SURROUNDINGS.filter((item) => available.has(item.id)).flatMap((item) =>
-    // The slot sits between the greeting and the knowledge base, which is where the
-    // onboarding and conversation cards have always been.
-    item.id === "knowledge-base" && slotId !== undefined
-      ? [{ id: slotId, size: "medium" }, item]
-      : [item],
-  );
+  // Both halves have to be there: something to put in, and something to put it in place of.
+  // Without the second check the gaps card took a slot that was not being filled anyway.
+  const surroundings =
+    ownsKnowledgeGaps && available.has("my-knowledge-gaps") && available.has("knowledge-base")
+      ? DEFAULT_SURROUNDINGS.map((item) =>
+          item.id === "knowledge-base"
+            ? { id: "my-knowledge-gaps" as const, size: item.size }
+            : item,
+        )
+      : DEFAULT_SURROUNDINGS;
+
+  return surroundings
+    .filter((item) => available.has(item.id))
+    .flatMap((item) =>
+      // The slot sits between the greeting and the card in the knowledge base's place, which
+      // is where the onboarding and conversation cards have always been.
+      (item.id === "knowledge-base" || item.id === "my-knowledge-gaps") && slotId !== undefined
+        ? [{ id: slotId, size: "medium" as const }, item]
+        : [item],
+    );
 }
 
 /**
