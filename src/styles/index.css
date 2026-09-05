@@ -77,6 +77,15 @@ body {
   --danger-text: #b91c1c;
   --danger-solid: #dc2626;
 
+  /* Highlighter — the hire's own marker pen on a board card.
+     Its own four colors rather than the semantic ones: success/warning/danger mean something,
+     and a sentence somebody marked green does not mean it went well. These mean nothing at all,
+     which is what lets a person use them for whatever they are sorting by. */
+  --highlight-yellow: #fef08a;
+  --highlight-green: #bbf7d0;
+  --highlight-blue: #bfdbfe;
+  --highlight-pink: #fbcfe8;
+
   /* Severity — a four-step ramp from red to green for documentation coverage.
      Its own scale rather than the status roles: the knowledge-gaps panel needs
      four ordered steps and the status set has three, and stretching Warning to
@@ -195,6 +204,13 @@ body {
   --danger-text: #f87171;
   --danger-solid: #dc2626;
 
+  /* Highlighter — translucent on dark rather than the light theme's pastels, which would put
+     black-on-white text back on a page that is neither. The ink stays the page's own. */
+  --highlight-yellow: rgba(250, 204, 21, 0.3);
+  --highlight-green: rgba(34, 197, 94, 0.28);
+  --highlight-blue: rgba(59, 130, 246, 0.32);
+  --highlight-pink: rgba(236, 72, 153, 0.3);
+
   /* Severity */
   --severity-high-bg: rgba(69, 10, 10, 0.35);
   --severity-high-border: #dc2626;
@@ -282,6 +298,11 @@ body {
   --color-app-danger-border: var(--danger-border);
   --color-app-danger-text: var(--danger-text);
   --color-app-danger-solid: var(--danger-solid);
+
+  --color-app-highlight-yellow: var(--highlight-yellow);
+  --color-app-highlight-green: var(--highlight-green);
+  --color-app-highlight-blue: var(--highlight-blue);
+  --color-app-highlight-pink: var(--highlight-pink);
 
   --color-app-severity-high-bg: var(--severity-high-bg);
   --color-app-severity-high-border: var(--severity-high-border);

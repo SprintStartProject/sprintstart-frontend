@@ -11,6 +11,8 @@ import { ProjectProvider } from "./features/projects/ProjectProvider";
 import { MomentsProvider, RocketPet, useMoments } from "./features/moments";
 import { BuddyWidget } from "./features/buddy/components/BuddyWidget";
 import { BuddyProvider } from "./features/buddy/BuddyProvider";
+import { SelectionActions } from "./features/board/selection/SelectionActions";
+import { CardMarksProvider } from "./features/board/marks/CardMarksProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
 
@@ -107,6 +109,17 @@ function AppContent() {
           where the page already is the buddy. */}
         {showBuddyDock && <BuddyWidget />}
 
+        {/* Offers to keep whatever the hire has highlighted, from any page. Mounted here for the
+          same reason the buddy is: what is worth keeping is almost never found on the board.
+
+          Gated on `signedIn` rather than on `showBuddyDock`, which is the one place this parts
+          company with the dock. The dock goes in focus mode because it hovers over a surface
+          somebody asked to be alone with, and it hovers there whether or not they are doing
+          anything. This toolbar only exists while there is a selection — it is attached to the
+          text the hire just made, not to the corner of the screen — so taking it away in focus
+          mode would remove the answer to a question they had only just asked. */}
+        {signedIn && <SelectionActions />}
+
         {/* Decorative easter egg; only for signed-in users, so it never
           sits on top of the login screen, and off unless turned on in
           Settings (see MomentsSection). */}
@@ -134,7 +147,12 @@ function App() {
                 {/* Inside the router's providers and outside the router itself: the shell has to
                     read the flag a page sets, and both live under this. */}
                 <FocusModeProvider>
-                  <AppContent />
+                  {/* Inside ProjectProvider, which it reads the project id from, and outside the
+                      router, because the toolbar that makes a highlight is mounted out here too —
+                      the board page under it lends its cards in. */}
+                  <CardMarksProvider>
+                    <AppContent />
+                  </CardMarksProvider>
                 </FocusModeProvider>
               </MomentsProvider>
             </ChatProvider>

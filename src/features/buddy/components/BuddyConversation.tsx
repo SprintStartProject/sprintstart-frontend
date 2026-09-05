@@ -3,6 +3,9 @@ import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { SaveReplyToBoard } from "./SaveReplyToBoard";
+import { BookmarkPlus, MessagesSquare } from "lucide-react";
+import { SaveToBoard } from "../../board/save/SaveToBoard";
+import { buddyReplyNote, transcriptNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 
 type BuddyConversationProps = {
@@ -84,8 +87,53 @@ export function BuddyConversation({
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
         <div className="app-page-frame flex min-w-0 flex-col gap-4 py-6">
+          {/* The conversation as a whole, kept as one folded note.
+              Above the thread rather than at the end of it, because the end of a conversation moves
+              every time the buddy answers — an action that walks down the page as you talk is one
+              you have to find again each time you want it.
+
+              Only once the buddy has actually said something. A window holding the hire's question
+              and nothing else is not a conversation worth freezing, and the buddy is often still
+              typing the first answer when the page opens. */}
+          {messages.some((message) => message.role === "ASSISTANT" && message.content !== "") && (
+            <div className="flex justify-end">
+              <SaveToBoard
+                request={() =>
+                  transcriptNote(
+                    messages
+                      .filter((message) => message.content !== "")
+                      .map((message) => ({
+                        speaker: message.role === "USER" ? "You" : "Buddy",
+                        content: message.content,
+                      })),
+                    "You",
+                  )
+                }
+                label="Keep this conversation"
+                savedLabel="On your board"
+                description="The whole thread, as one note you can fold open."
+                icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
+              />
+            </div>
+          )}
+
           <BuddyThread
-            renderReplyAction={(reply) => <SaveReplyToBoard content={reply} />}
+            renderReplyAction={(reply) => (
+              <div className="flex flex-wrap items-center gap-1">
+                {/* Two different things, and the order says which is the better one. A list the
+                    buddy wrote becomes a checklist you can tick; anything else can still be kept,
+                    but only as the words it was. `SaveReplyToBoard` draws nothing when the reply
+                    holds no list, so most replies show one button. */}
+                <SaveReplyToBoard content={reply} />
+                <SaveToBoard
+                  request={() => buddyReplyNote(reply)}
+                  label="Keep this answer"
+                  savedLabel="On your board"
+                  description="The reply, frozen as a note."
+                  icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+                />
+              </div>
+            )}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}

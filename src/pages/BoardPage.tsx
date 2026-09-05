@@ -60,6 +60,10 @@ import {
   type CardSize,
   type CardSizes,
 } from "../features/board/layout/cardSizes";
+import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
+import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
+import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
+import { useMarkableBoard } from "../features/board/marks/useCardMarks";
 import {
   assignToGroup,
   dissolveGroup,
@@ -186,6 +190,20 @@ export function BoardPage() {
     writeError,
   } = useBoard(selectedProjectId);
 
+  /**
+   * Whether to put a spinner where the board is.
+   *
+   * Only while there is no board *for this project* to show. A re-read of a board already on
+   * screen keeps it there: swapping it for a spinner unmounts every card, and the hire comes back
+   * to the top of a board they were working somewhere in the middle of. That is the difference
+   * between "loading" and "reloading", and only the first one is worth hiding the page for.
+   *
+   * Compared against the selected project rather than against `board !== null`, so switching
+   * projects still hides the old one — showing another project's cards under this project's name,
+   * even for a moment, is worse than showing nothing.
+   */
+  const showLoading = loading && board?.projectId !== selectedProjectId;
+
   // A failed write is reported the way every other failed write in the app is: as a toast,
   // rather than as a paragraph this page invented for itself. The card or list it failed on is
   // still on screen and unchanged, so the message is about the attempt, not about the surface.
@@ -208,14 +226,37 @@ export function BoardPage() {
   // Folded cards are a preference, not board state: kept per board in local storage, read once the
   // board arrives and written on every fold. A board that will not load has nothing to fold.
   const boardId = board?.boardId ?? "";
+
+  // Keeps this hire's arrangement on the server rather than only in this browser, and brings it
+  // down on the first load of a visit. See `sync/useBoardStructureSync.ts`.
+  useBoardStructureSync(boardId, selectedProjectId);
+
+  /**
+   * Bumped whenever the stored arrangement is replaced under this page — by the sync above pulling
+   * it down, or by a surface outside the board writing into it.
+   *
+   * Part of the key every local read below is guarded by, so one counter refreshes all of them.
+   * Local storage is not reactive and these are read once into state; without this, an arrangement
+   * that arrived from the server sat on disk until the next navigation.
+   */
+  const [storageRevision, setStorageRevision] = useState(0);
+
+  useEffect(
+    () => subscribeToBoardStorageReplaced(() => setStorageRevision((current) => current + 1)),
+    [],
+  );
+
+  /** What the reads below compare against: this board, at this revision of what is stored for it. */
+  const storedFor = `${boardId}:${storageRevision}`;
+
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [readFor, setReadFor] = useState<string | null>(null);
 
   // Derived during render rather than in an effect, the way `SlidingTabPanel` derives its
   // direction: the fold state has to be right on the render that first shows the board, and
   // reading a key back out of storage is an idempotent read with nothing to synchronise.
-  if (boardId !== readFor) {
-    setReadFor(boardId);
+  if (storedFor !== readFor) {
+    setReadFor(storedFor);
     setCollapsedIds(readCollapsedCards(boardId));
   }
 
@@ -235,16 +276,16 @@ export function BoardPage() {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
 
-  if (boardId !== pinsReadFor) {
-    setPinsReadFor(boardId);
+  if (storedFor !== pinsReadFor) {
+    setPinsReadFor(storedFor);
     setPinnedIds(readPinnedCards(boardId));
   }
 
   const [groups, setGroups] = useState<BoardGroup[]>([]);
   const [groupsReadFor, setGroupsReadFor] = useState<string | null>(null);
 
-  if (boardId !== groupsReadFor) {
-    setGroupsReadFor(boardId);
+  if (storedFor !== groupsReadFor) {
+    setGroupsReadFor(storedFor);
     setGroups(readBoardGroups(boardId));
   }
 
@@ -400,6 +441,13 @@ export function BoardPage() {
   const { states, assignStage, assignGroupStage, toggleDone, setPredecessor, applyPlan } =
     useBoardStructure(boardId, allCards);
 
+  // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer
+  // the marker pen on text that turns out to be on one of them. Taken back when this page leaves.
+  useMarkableBoard({
+    cards: allCards,
+    onEditCard: (cardId, request) => void editCard(cardId, request),
+  });
+
   const sections = useMemo(
     () =>
       summariseSections(allCards, groups, states, {
@@ -506,9 +554,35 @@ export function BoardPage() {
   const [cardSizes, setCardSizes] = useState<CardSizes>({});
   const [sizesReadFor, setSizesReadFor] = useState<string | null>(null);
 
-  if (boardId !== sizesReadFor) {
-    setSizesReadFor(boardId);
+  if (storedFor !== sizesReadFor) {
+    setSizesReadFor(storedFor);
     setCardSizes(readCardSizes(boardId));
+  }
+
+  /**
+   * Where each card was found — see `cardOrigins.ts`.
+   *
+   * Read once when the board arrives and never written here: the origin is recorded by whoever
+   * made the card, which is always somewhere else in the app. The board only reads the trail.
+   *
+   * Keyed by project rather than by board, because the surfaces that write one — the selection
+   * toolbar, a chat, the buddy dock — know the project and not the board.
+   *
+   * Read under `selectedProjectId`, which is the id those surfaces write under, and *not* under the
+   * board's own `projectId`. The two are normally the same and the one time they are not — a board
+   * fetched for one project while the app has moved to another — reading the board's id would look
+   * up trails nobody stored there and show none of them.
+   */
+  const [cardOrigins, setCardOrigins] = useState<CardOrigins>({});
+  const [originsReadFor, setOriginsReadFor] = useState<string | null>(null);
+
+  // Keyed by project *and* revision: the origins follow the hire across a project, and a card
+  // saved from the buddy dock while this page is open writes them without leaving it.
+  const originsStoredFor = `${selectedProjectId}:${storageRevision}`;
+
+  if (originsStoredFor !== originsReadFor) {
+    setOriginsReadFor(originsStoredFor);
+    setCardOrigins(readCardOrigins(selectedProjectId));
   }
 
   /**
@@ -925,7 +999,7 @@ export function BoardPage() {
             You&apos;re not on a project yet, so there&apos;s nothing to put on a board. Whoever set
             up your account can add you to one.
           </EmptyState>
-        ) : loading ? (
+        ) : showLoading ? (
           <div className="flex items-center justify-center py-16">
             <Spinner size="lg" label="Loading your board" />
           </div>
@@ -1067,6 +1141,7 @@ export function BoardPage() {
                   openStages={openStages}
                   onToggleStage={toggleStage}
                   cardSizes={cardSizes}
+                  cardOrigins={cardOrigins}
                   onResizeCard={resizeCard}
                 />
               </SlidingTabPanel>

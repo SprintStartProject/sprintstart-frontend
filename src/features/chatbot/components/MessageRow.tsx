@@ -1,11 +1,13 @@
 import { memo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, BookmarkPlus } from "lucide-react";
 import type { ChatMessage } from "../types";
 import type { SelectedCitation } from "../../../context/ChatContext";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { MessageCitations } from "./MessageCitations";
 import { CopyButton } from "./CopyButton";
+import { SaveToBoard } from "../../board/save/SaveToBoard";
+import { chatMessageNote } from "../../board/generation/chatToCard";
 import { SleepyBot } from "./SleepyBot";
 import { BotGlyph } from "./BotGlyph";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
@@ -197,8 +199,27 @@ function MessageRowImpl({
             </div>
           )}
 
+          {/* Under a finished answer only. A half-streamed reply is not a thing to keep — the
+              card would hold whatever had arrived by the moment somebody pressed it. */}
           {!isRequest && !showStreamingCaret && message.content !== "" && (
-            <CopyButton text={message.content} />
+            <div className="flex items-center gap-1">
+              <CopyButton text={message.content} />
+
+              <SaveToBoard
+                request={() => chatMessageNote(message.content)}
+                // The chat is durable and has a page of its own, so a kept answer can point back at
+                // the conversation it came out of — which is usually the part worth re-reading.
+                origin={() =>
+                  message.chat
+                    ? { url: `/chat/${message.chat.id}`, label: message.chat.title || "this chat" }
+                    : null
+                }
+                label="Keep on my board"
+                savedLabel="On your board"
+                description="The answer, as a note you can edit."
+                icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+              />
+            </div>
           )}
         </div>
       </div>

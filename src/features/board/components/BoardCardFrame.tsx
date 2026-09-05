@@ -21,7 +21,17 @@ import { useBoardCardControls } from "./boardCardControls";
 import type { BoardCard } from "../types";
 
 type BoardCardFrameProps = {
-  title: string;
+  /**
+   * What the card is called, in the header.
+   *
+   * A node rather than a string, because on the two kinds whose title is the hire's own words — a
+   * note's first line, a checklist's name — the title can carry highlights, and a highlight is an
+   * element. Every other kind passes a plain string and nothing changes for it.
+   *
+   * A caller passing anything but a string must also pass `controlLabel`: the accessible names of
+   * this card's controls are built from the title, and they need words.
+   */
+  title: ReactNode;
   /**
    * The card's own glyph, shown in muted ink beside the title.
    *
@@ -38,6 +48,8 @@ type BoardCardFrameProps = {
    * What the card is called in its controls' accessible names, when the visible title is not a
    * name for the card. A note titles itself with its own first line, so "Remove the deploys are on
    * Thursdays card" would be the label; `controlLabel="note"` keeps it "Remove the note card".
+   *
+   * Required in practice whenever `title` is not a string — see there.
    */
   controlLabel?: string;
   onDismiss?: (cardId: string) => void;
@@ -127,7 +139,10 @@ export function BoardCardFrame({
   const placedByBuddy = card.placedAt !== null;
   const blocked = state?.status === "BLOCKED";
   const done = state?.status === "DONE";
-  const label = controlLabel ?? title;
+  // Falls back to the generic word rather than to the title when the title is not text: a
+  // rendered node cannot go inside "Remove the … card", and "Remove the [object Object] card" is
+  // the sort of thing that only ever reaches a screen reader, where nobody sees it to fix it.
+  const label = controlLabel ?? (typeof title === "string" ? title : "card");
   /** The grip's own fade. The rest of the controls travel together — see the cluster below. */
   const reveal = dismissing
     ? ""
@@ -146,6 +161,11 @@ export function BoardCardFrame({
       }`}
     >
       <section
+        // How anything outside the board finds out that a selection landed inside a card — the
+        // selection toolbar reads it off the nearest ancestor. An attribute rather than a context
+        // because the toolbar is mounted in the app shell, above the router, and a DOM node is the
+        // only thing the two of them share.
+        data-card-id={card.id}
         className="relative flex flex-col overflow-hidden p-4 pl-5"
         onPointerEnter={() => collapsed && setPeeking(true)}
         onPointerLeave={() => setPeeking(false)}

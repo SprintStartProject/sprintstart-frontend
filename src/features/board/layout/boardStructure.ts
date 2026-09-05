@@ -1,3 +1,4 @@
+import { notifyBoardStorageWritten } from "./boardStorage";
 import type { BoardCard } from "../types";
 
 /**
@@ -234,6 +235,8 @@ export function writeBoardStructure(boardId: string, structure: BoardStructure):
   } catch {
     // Nothing to do and nothing to say: the structure still holds for this visit.
   }
+
+  notifyBoardStorageWritten();
 }
 
 /**

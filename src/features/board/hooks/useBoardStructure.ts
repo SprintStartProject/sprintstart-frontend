@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BoardCard } from "../types";
+import { subscribeToBoardStorageReplaced } from "../layout/boardStorage";
 import {
   clearHireDependencies,
   deriveCardStates,
@@ -52,8 +53,9 @@ export type UseBoardStructureResult = {
 /**
  * The board's process layer: which stage each card is in, what it waits on, and what that makes it.
  *
- * Read once per board and written on every change, the way the folded and pinned sets are — the
- * structure is a preference about *this* board on *this* machine until there is an endpoint for it.
+ * Read once per board and written on every change, the way the folded and pinned sets are. It is no
+ * longer only local: `sync/useBoardStructureSync.ts` carries it to the server and brings it back,
+ * and the re-read below is how an arrangement that arrived that way reaches the screen.
  *
  * The read is derived during render rather than in an effect, matching `BoardPage`'s handling of
  * the other local layers: the structure has to be right on the render that first shows the board,
@@ -71,6 +73,14 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
     setReadFor(boardId);
     setStructure(readBoardStructure(boardId));
   }
+
+  // And again when the stored arrangement is replaced under us — the sync pulling this hire's
+  // board down on arrival is the case that matters. Only *replaced*, never on an ordinary write:
+  // re-reading after every write of our own would re-seat the state we just set.
+  useEffect(
+    () => subscribeToBoardStorageReplaced(() => setStructure(readBoardStructure(boardId))),
+    [boardId],
+  );
 
   const states = useMemo(() => deriveCardStates(cards, structure), [cards, structure]);
 

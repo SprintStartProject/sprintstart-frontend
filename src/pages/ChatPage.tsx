@@ -1,4 +1,4 @@
-import { MessageSquareText, Sparkles, X } from "lucide-react";
+import { BookmarkPlus, MessageSquareText, Sparkles, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -14,6 +14,8 @@ import { CitationPopover } from "../features/chatbot/components/CitationPopover.
 import { ChatEmptyState } from "../features/chatbot/components/ChatEmptyState.tsx";
 import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { SaveToBoard } from "../features/board/save/SaveToBoard";
+import { chatLink } from "../features/board/generation/chatToCard";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
@@ -417,6 +419,20 @@ export function ChatPage() {
             hideSubtitleBelow="md"
             className="flex-1"
           />
+
+          {/* The whole conversation, kept as a way back to it rather than as a copy of it — see
+              `chatToCard.ts`. Only once there is a chat: on the empty state there is nothing to
+              keep, and a button offering to keep nothing is a button that has to be explained. */}
+          {activeChat && (
+            <SaveToBoard
+              request={() => chatLink(activeChat)}
+              label="Keep this chat"
+              savedLabel="On your board"
+              description="A link back to this conversation."
+              icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+              className="shrink-0"
+            />
+          )}
         </div>
 
         <div ref={scrollContainerRef} className="flex flex-1 flex-col overflow-y-auto">

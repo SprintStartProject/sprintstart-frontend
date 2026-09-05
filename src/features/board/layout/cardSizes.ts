@@ -1,3 +1,5 @@
+import { notifyBoardStorageWritten } from "./boardStorage";
+
 /**
  * The size a hire pulled a card to, between visits.
  *
@@ -112,6 +114,8 @@ export function writeCardSizes(boardId: string, sizes: CardSizes): void {
   } catch {
     // Nothing to do and nothing to say: the sizes still hold for this visit.
   }
+
+  notifyBoardStorageWritten();
 }
 
 export function isDefault(size: CardSize): boolean {

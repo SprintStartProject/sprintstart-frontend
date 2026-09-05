@@ -1,3 +1,4 @@
+import { notifyBoardStorageWritten } from "./boardStorage";
 import { isAreaAccent, type AreaAccent } from "./areaAccents";
 import { BOARD_STAGES, STAGE_LABELS } from "./boardStructure";
 
@@ -152,6 +153,8 @@ export function writeBoardGroups(boardId: string, groups: BoardGroup[]): void {
   } catch {
     // Nothing to do and nothing to say: the grouping still holds for this visit.
   }
+
+  notifyBoardStorageWritten();
 }
 
 /** Which group a card is in, or null. */

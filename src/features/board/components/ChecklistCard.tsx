@@ -7,6 +7,8 @@ import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { readableTitle } from "../generation/pathToCards";
 import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { useCardMarks } from "../marks/useCardMarks";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
 type ChecklistCardProps = {
@@ -61,6 +63,9 @@ export function ChecklistCard({
   dismissing,
   onEdit,
 }: ChecklistCardProps) {
+  // A checklist's lines are written by the generator and read back from the server, so a highlight
+  // on one is kept beside the card rather than inside its text. See `marks/cardMarks.ts`.
+  const marks = useCardMarks().marksFor(card.id);
   const [newItem, setNewItem] = useState("");
   const [showingAll, setShowingAll] = useState(false);
   const done = content.items.filter((item) => item.done).length;
@@ -119,7 +124,16 @@ export function ChecklistCard({
       icon={CheckSquare}
       // Stripped of the marker a generated card carries: it exists so a second generation run can
       // recognise its own work, and it is never something the hire should read.
-      title={content.title ? readableTitle(content.title) : "Checklist"}
+      title={
+        content.title ? (
+          // A checklist's name is written by whoever made the list — the generator, or the hire
+          // editing it — so it is text worth marking, the same as its lines.
+          <Marked text={readableTitle(content.title)} marks={marks} cardId={card.id} />
+        ) : (
+          "Checklist"
+        )
+      }
+      controlLabel="checklist"
       card={card}
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
       onDismiss={onDismiss}
@@ -157,7 +171,7 @@ export function ChecklistCard({
                   item.done ? "text-app-text-muted line-through" : "text-app-text"
                 }`}
               >
-                {item.text}
+                <Marked text={item.text} marks={marks} cardId={card.id} />
                 {!onEdit && (
                   <span className="sr-only">{item.done ? " — done" : " — not done"}</span>
                 )}

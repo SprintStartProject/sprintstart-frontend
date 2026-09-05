@@ -9,6 +9,9 @@ import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
 import { BuddyThread } from "./BuddyThread";
 import { SaveReplyToBoard } from "./SaveReplyToBoard";
+import { BookmarkPlus } from "lucide-react";
+import { SaveToBoard } from "../../board/save/SaveToBoard";
+import { buddyReplyNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 
 /**
@@ -252,7 +255,22 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
-            renderReplyAction={(reply) => <SaveReplyToBoard content={reply} />}
+            renderReplyAction={(reply) => (
+              <div className="flex flex-wrap items-center gap-1">
+                <SaveReplyToBoard content={reply} />
+                {/* Icon-only here and worded on the page. The dock is a narrow column beside
+                    whatever the hire was actually doing, and a second worded button in it wraps to
+                    its own line — the same control, sized for where it is. */}
+                <SaveToBoard
+                  request={() => buddyReplyNote(reply)}
+                  label="Keep this answer on my board"
+                  savedLabel="On your board"
+                  description="The reply, frozen as a note."
+                  icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+                  iconOnly
+                />
+              </div>
+            )}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}

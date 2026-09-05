@@ -22,6 +22,7 @@ import { CompetencyProgressCard } from "./CompetencyProgressCard";
 import { CurrentTaskCard } from "./CurrentTaskCard";
 import { DiagramCard } from "./DiagramCard";
 import { LinkCard } from "./LinkCard";
+import { originOf, type CardOrigin, type CardOrigins } from "../layout/cardOrigins";
 import { MemoryRecapCard } from "./MemoryRecapCard";
 import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
@@ -392,12 +393,21 @@ type BoardGridProps = {
   cardSizes?: CardSizes;
   /** Sets one card's size. Absent on a board that cannot be changed. */
   onResizeCard?: (cardId: string, size: CardSize) => void;
+  /**
+   * Where each card was found, for the ones that were found somewhere.
+   *
+   * Kept beside the cards rather than on them because the card catalog has no field for it — see
+   * `layout/cardOrigins.ts`, including the note about wanting this on the wire instead.
+   */
+  cardOrigins?: CardOrigins;
 };
 
 type SharedProps = {
   card: BoardCard;
   onDismiss?: (cardId: string) => void;
   dismissing: boolean;
+  /** Where this card came from, for the kinds that can have been found somewhere. */
+  origin?: CardOrigin | null;
 };
 
 /**
@@ -410,8 +420,12 @@ type SharedProps = {
 function BoardCardView({
   card,
   onEdit,
+  origin,
   ...shared
 }: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
+  // Only the authored kinds take an origin, so it is unpacked here rather than spread with the
+  // rest: a live card was never found anywhere, and handing it a prop it ignores invites somebody
+  // to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
     case "PATH_TO_FIRST_CONTRIBUTION":
@@ -431,9 +445,9 @@ function BoardCardView({
     case "DIAGRAM":
       return <DiagramCard content={card.content} {...props} />;
     case "NOTE":
-      return <NoteCard content={card.content} onEdit={onEdit} {...props} />;
+      return <NoteCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
     case "LINK":
-      return <LinkCard content={card.content} {...props} />;
+      return <LinkCard content={card.content} origin={origin} {...props} />;
     case "CHECKLIST":
       return <ChecklistCard content={card.content} onEdit={onEdit} {...props} />;
     default:
@@ -501,6 +515,7 @@ export function BoardGrid({
   openStages,
   onToggleStage,
   cardSizes,
+  cardOrigins,
   onResizeCard,
 }: BoardGridProps) {
   const wideEnough = useMediaQuery(TWO_COLUMN_QUERY);
@@ -961,6 +976,7 @@ export function BoardGrid({
           stack && onToggleStack ? (memberId) => revealMember(stack.rootId, memberId) : undefined
         }
         size={sizeOf(cardSizes, card.id)}
+        origin={originOf(cardOrigins, card.id)}
         onResize={onResizeCard ? (next) => onResizeCard(card.id, next) : undefined}
       />
     );
@@ -1287,6 +1303,8 @@ type BoardCardCellProps = {
    * `ExpandedStack` and its cards are ordinary cards, so this being set *is* "the pile is closed".
    */
   stack?: CardStack;
+  /** Where this card came from, passed through to the kinds that show it. */
+  origin?: CardOrigin | null;
   onToggleStack?: (rootId: string) => void;
   /** Opens the pile and brings one member into view. Absent when the pile cannot be opened. */
   onRevealMember?: (cardId: string) => void;
@@ -1339,6 +1357,7 @@ function BoardCardCell({
   onToggleDone,
   onSetPredecessor,
   stack,
+  origin,
   onToggleStack,
   onRevealMember,
   size,
@@ -1398,10 +1417,20 @@ function BoardCardCell({
    *
    * The selection a double click leaves behind is cleared: the gesture was aimed at the card, and
    * a highlighted word left over from it reads as the card having been mis-clicked.
+   *
+   * Unless the double click landed on *words*. Double-clicking a word is how everybody selects one,
+   * and since a card's text can be highlighted, it is now the shortest way to mark a single word —
+   * so the same gesture meant both "select this word" and "fold this card", and did the second
+   * while throwing away the first. Text was always selectable here; nobody had a reason to select
+   * it before, which is why this only became wrong once there was something to do with a selection.
    */
   function handleDoubleClick(event: ReactMouseEvent<HTMLDivElement>) {
     if (isArranging || stack || !onToggleCollapsed) return;
     if ((event.target as HTMLElement).closest(INTERACTIVE_WITHIN_CARD)) return;
+
+    // Read after the browser has made its selection, which it does before the second click's
+    // handlers run — so this is the word the hire just picked, not one left over from earlier.
+    if (window.getSelection()?.isCollapsed === false) return;
 
     window.getSelection()?.removeAllRanges();
     onToggleCollapsed(card.id);
@@ -1697,6 +1726,7 @@ function BoardCardCell({
             onDismiss={onDismiss}
             dismissing={dismissing}
             onEdit={onEdit}
+            origin={origin}
           />
         </BoardCardContext.Provider>
       </motion.div>
