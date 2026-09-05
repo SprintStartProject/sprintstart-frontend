@@ -109,7 +109,9 @@ export function AddSourceModal({
   const canAssignOwners = canIngest && canAssignOwnersProp;
 
   // The project's members, which is who a repository can be handed to. Not requested at all
-  // when the owner control is not going to be shown.
+  // when the owner control is not going to be shown. `getTeamOverview` asks for a hard
+  // `size=100`, so a project past a hundred members would quietly lose the tail of the list —
+  // fine for now, and the reason to reach for a searchable picker when it stops being.
   const { data: teamUsers } = useFetch(
     () =>
       canAssignOwners && projectId

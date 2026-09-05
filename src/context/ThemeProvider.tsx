@@ -213,7 +213,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     const handleChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
-        setStyleModeState("classic");
+        // The stored value is checked on the way in as well as on the way out. Without it an
+        // explicit "Turn animations on" was undone by the OS setting going off and on again,
+        // which is the one gesture that is supposed to outrank it.
+        try {
+          const stored = window.localStorage.getItem(STYLE_STORAGE_KEY);
+          if (stored !== "ultra") {
+            setStyleModeState("classic");
+          }
+        } catch {
+          // localStorage unavailable — no opt-in could have been stored, so honour the OS.
+          setStyleModeState("classic");
+        }
       } else {
         // Only revert to ultra if the user hasn't explicitly toggled.
         try {

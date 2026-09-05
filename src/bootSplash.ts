@@ -35,9 +35,12 @@ function remainingFlightMs(): number {
  * without ever flying is a load that had no round-trip, so the note is stale and the splash
  * would sit on the pad on every boot from here on. Clearing it puts the timer back.
  *
- * Only for the app's own dismissal. The Keycloak login theme boots from the same document on
- * the same origin, and it never flies either — but it is not evidence of anything about the
- * app's own boot.
+ * Gated on `"flight"`, which is the app settling on a signed-in user. The other two modes are
+ * both loads that say nothing about whether the app round-trips, and both would otherwise
+ * clear the note wrongly: `main.tsx` dismisses the Keycloak login theme with `"now"` (it boots
+ * from the same document on the same origin and never flies), and `MomentsProvider` dismisses
+ * a signed-out boot with `"now"` too — that one *did* round-trip, it just came back with
+ * nobody signed in.
  */
 function forgetBootRoundTrip(): void {
   if (window.__bootSplash?.flightMs !== 0) return;

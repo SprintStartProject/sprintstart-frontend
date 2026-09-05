@@ -142,15 +142,23 @@ describe("bootSplash", () => {
     expect(window.localStorage.getItem("sprintstart.boot.roundtrip")).toBeNull();
   });
 
-  it("leaves the note alone for the login theme, which never flies either", () => {
+  it("leaves the note alone on the loads that never fly for a reason of their own", () => {
+    vi.useFakeTimers();
+
+    // `"now"` is what `main.tsx` gives the Keycloak login theme and what `MomentsProvider`
+    // gives a signed-out boot. Neither ever flies, and neither says anything about whether
+    // the *app* round-trips -- the signed-out one demonstrably did, it just came back with
+    // nobody signed in.
     mountSplash();
     window.localStorage.setItem("sprintstart.boot.roundtrip", "1");
+    window.__bootSplash = { start: Date.now(), flightMs: 0 };
+    dismissBootSplash("now");
+    expect(window.localStorage.getItem("sprintstart.boot.roundtrip")).toBe("1");
 
+    document.getElementById("boot-splash")?.remove();
+    mountSplash();
     window.__bootSplash = { start: Date.now(), flightMs: 0 };
     dismissBootSplash("instant");
-
-    // The Keycloak login theme boots from the same document on the same origin. It says
-    // nothing about whether the *app* round-trips, so it must not overwrite what does.
     expect(window.localStorage.getItem("sprintstart.boot.roundtrip")).toBe("1");
   });
 });

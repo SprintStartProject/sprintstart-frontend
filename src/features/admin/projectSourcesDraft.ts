@@ -247,6 +247,17 @@ export function hasFailedSources(sources: DraftSource[]): boolean {
  * PM/Admin-only, so an HR user who staged an owner is refused here and nowhere else. The
  * outcome is reported instead, and the row says which of the two happened.
  *
+ * Safe to run this early, before the gaps analysis has ever seen the component: the backend
+ * keys ownership by component name alone and stores it in its own table, so there is nothing
+ * for an unknown component to fail against.
+ *
+ * Two things it inherits from that endpoint, both of which only ever happen because somebody
+ * deliberately picked a name here. The PUT *replaces* the owner list, so an existing owner is
+ * dropped rather than joined. And ownership is not project-partitioned yet, so a repository
+ * that is also connected to another project changes hands there too. Showing the current
+ * owner before overwriting them would need a read per staged repository; worth doing, but it
+ * is a feature rather than a guard.
+ *
  * @returns Whether the assignment failed, so the caller can say so.
  */
 async function assignStagedOwner(source: GithubDraftSource, projectId: string): Promise<boolean> {

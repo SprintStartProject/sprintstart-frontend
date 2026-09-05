@@ -46,8 +46,15 @@ export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
     components: Set<string>;
   } | null>(null);
 
-  const seen =
-    acknowledged?.userId === userId ? acknowledged.components : readSeenComponents(userId);
+  /*
+    Memoised, not read straight through. `readSeenComponents` parses JSON and returns a fresh
+    `Set` every time, so calling it during render gave the value below a new identity on every
+    render -- for every consumer of this context, which is the whole app. It only has to be
+    read when the user changes; after that this session's own acknowledgement takes over.
+  */
+  const storedSeen = useMemo(() => readSeenComponents(userId), [userId]);
+
+  const seen = acknowledged?.userId === userId ? acknowledged.components : storedSeen;
 
   const gaps = useMemo(
     () => (data?.gaps ?? []).filter((gap) => gap.severity !== "covered"),

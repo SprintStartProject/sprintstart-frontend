@@ -107,13 +107,19 @@ function OwnerAnnouncementDialog({ userId }: { userId: string }) {
   const visibleGaps = newGaps.slice(0, VISIBLE_ROW_COUNT);
   const hiddenCount = newGaps.length - visibleGaps.length;
 
-  const newKey = newGaps.map((gap) => gap.component).join("|");
+  const newComponents = newGaps.map((gap) => gap.component);
+  // Only ever a dependency. Splitting it back apart would have made a component name
+  // containing a "|" into two, and `owner/name` is not a format that forbids one.
+  const newKey = newComponents.join("|");
+
   const isOpen = !isDismissed && newGaps.length > 0;
 
   // Records the interruption in storage, which is an external system rather than state:
   // nothing here re-renders on it, because `alreadyAnnounced` was settled on mount.
   useEffect(() => {
-    if (isOpen) addAnnouncedComponents(userId, newKey.split("|"));
+    if (isOpen) addAnnouncedComponents(userId, newComponents);
+    // `newComponents` is rebuilt every render; `newKey` is what actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, userId, newKey]);
 
   const close = () => setDismissed(true);

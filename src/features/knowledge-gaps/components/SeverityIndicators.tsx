@@ -60,8 +60,10 @@ export function GapTypeChips({
 
   return (
     <div className={`flex flex-wrap gap-1 ${className}`}>
-      {visible.map((type) => (
-        <span key={type} className={chip}>
+      {/* Indexed, because the types are whatever the analysis returned and nothing promises
+          they are distinct -- two identical names would collide on a bare `key={type}`. */}
+      {visible.map((type, index) => (
+        <span key={`${type}-${index}`} className={chip}>
           {type}
         </span>
       ))}

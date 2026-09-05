@@ -360,17 +360,20 @@ function GapRow({ gap }: { gap: KnowledgeGap }) {
  * is what acknowledges the marker. That is also why the card is made pressable for a user who
  * has nowhere to go from here -- clearing the marker is a worthwhile outcome on its own, and
  * it is the one the sidebar flag is waiting for.
+ *
+ * Purely visual, and it has to be: `ClickableCard` renders the card as `role="button"`, which
+ * ARIA treats as children-presentational, so anything said in here is never reached -- the
+ * card's own `aria-label` is the only text a screen reader gets. The count therefore lives in
+ * that label rather than in an `sr-only` span nobody would hear.
  */
-function NewOwnershipPill({ count }: { count: number }) {
+function NewOwnershipPill() {
   return (
-    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-[10px] font-semibold tracking-wide text-app-warning-text uppercase">
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-app-warning-solid" />
+    <span
+      aria-hidden="true"
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-[10px] font-semibold tracking-wide text-app-warning-text uppercase"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-app-warning-solid" />
       New
-      <span className="sr-only">
-        {count === 1
-          ? ": 1 component was assigned to you. Open this card to mark it as read."
-          : `: ${count} components were assigned to you. Open this card to mark them as read.`}
-      </span>
     </span>
   );
 }
@@ -500,11 +503,20 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
     Pressing is also what acknowledges the "New" marker, so a member for whom the drawer is the
     end of the road still has a reason to have pressed.
   */
-  const canOpenDetails = gaps.length > 0 && !loading && !error;
+  const canOpenDrawer = gaps.length > 0;
+
+  /*
+    An unacknowledged marker makes the card pressable on its own, even when this widget's own
+    request failed and there is nothing to open. The marker and the figures come from two
+    different requests -- the shared provider and the one below -- and pressing is the only
+    thing that puts the marker down, here and in the sidebar. Tying it to the figures alone
+    left a card wearing "New" that could not be pressed, with the sidebar flag stuck behind it.
+  */
+  const isPressable = (canOpenDrawer || hasUnseen) && !loading;
 
   const openDetails = () => {
     markAllSeen();
-    setDrawerOpen(true);
+    if (canOpenDrawer) setDrawerOpen(true);
   };
 
   return (
@@ -512,9 +524,19 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
       <WidgetShell
         icon={FileWarning}
         title="Your knowledge gaps"
-        actionLabel={canOpenDetails ? "Open your knowledge gaps" : undefined}
-        onActivate={canOpenDetails ? openDetails : undefined}
-        notice={hasUnseen ? <NewOwnershipPill count={unseenComponents.length} /> : undefined}
+        // The card is `role="button"`, so this label is all a screen reader gets of it -- see
+        // `NewOwnershipPill`. Everything the marker means has to be said here.
+        actionLabel={
+          !isPressable
+            ? undefined
+            : !canOpenDrawer
+              ? `Mark ${unseenComponents.length} newly assigned components as read`
+              : hasUnseen
+                ? `Open your knowledge gaps, ${unseenComponents.length} newly assigned`
+                : "Open your knowledge gaps"
+        }
+        onActivate={isPressable ? openDetails : undefined}
+        notice={hasUnseen ? <NewOwnershipPill /> : undefined}
         isLoading={loading}
         // Only a failed request may say this. Owning nothing is a normal, successful answer and
         // gets the empty state below — the two must never be told apart by guesswork.

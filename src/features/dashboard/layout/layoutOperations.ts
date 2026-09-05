@@ -55,8 +55,10 @@ export function buildDefaultLayout(
   const available = new Set(availableIds);
   const slotId = DEFAULT_SLOT_CANDIDATES.find((id) => available.has(id));
 
+  // Both halves have to be there: something to put in, and something to put it in place of.
+  // Without the second check the gaps card took a slot that was not being filled anyway.
   const surroundings =
-    ownsKnowledgeGaps && available.has("my-knowledge-gaps")
+    ownsKnowledgeGaps && available.has("my-knowledge-gaps") && available.has("knowledge-base")
       ? DEFAULT_SURROUNDINGS.map((item) =>
           item.id === "knowledge-base"
             ? { id: "my-knowledge-gaps" as const, size: item.size }
