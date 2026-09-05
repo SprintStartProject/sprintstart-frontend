@@ -183,7 +183,7 @@ const STACK_SHEETS = [
  * nothing and the last pile in a band still touches the heading below it. So the room is set well
  * clear of anything it might collapse against.
  */
-const FAN_ROOM = ["", "mb-4 motion-safe:hover:mb-12", "mb-6 motion-safe:hover:mb-20"];
+const FAN_ROOM = ["", "pb-4 motion-safe:hover:pb-14", "pb-6 motion-safe:hover:pb-24"];
 
 /**
  * What pointing straight at a strip does, whichever depth it is drawn at.
@@ -1655,44 +1655,62 @@ function BoardCardCell({
     ],
   );
 
+  // The room a fanned pile needs, and where it has to live: *inside* the box the grid measures.
+  //
+  // It used to be a margin on the card itself, and a margin is the one part of a block's size the
+  // grid never sees. `ResizeObserver` reports the border box, so the sheets hanging below a pile
+  // were room the row count had not been told about, and whatever came next was placed straight
+  // through them. Hover made it worse in a way nothing could correct: the fan doubles its reach
+  // there, and changing a margin resizes nothing, so the observer never fired again. As padding on
+  // a wrapper the room is part of the measured height, and the observer follows it as it eases
+  // open.
+  //
+  // `group/stack` moved out here with it, so the hover that fans the sheets and the hover that buys
+  // them the room are one element's: the sheets are drawn in this padding, and pointing at one of
+  // them has to keep the pile open rather than close it under the pointer.
   return (
-    <motion.div
-      ref={(element) => registerElement(card.id, element)}
-      layout="position"
-      transition={centralSpringToken}
-      drag={onMove !== undefined}
-      // Outside arrange mode only the grip starts a drag, so every checkbox, link and button on a
-      // card keeps working without a mode to leave first. Inside it, where the content is inert
-      // anyway, the whole card is the handle — that is what the mode is for.
-      // Never the whole card: the grip is the only thing that starts a drag, in either mode. A
-      // card here is readable content — a checklist to tick, a link to follow — and a press
-      // anywhere on it has to keep meaning what it means.
-      dragListener={false}
-      dragControls={dragControls}
-      dragSnapToOrigin
-      // No elasticity: the card should sit under the pointer, not lag behind it on a spring.
-      dragElastic={0}
-      dragMomentum={false}
-      onDragStart={onDragStart}
-      onDrag={onDrag}
-      onDragEnd={(_event, info) => {
-        onDrop(card.id, info.point);
-        onDragEnd();
-      }}
-      onClick={handleStackClick}
-      onDoubleClick={handleDoubleClick}
-      onPointerEnter={() => onHoverChange(true)}
-      onPointerLeave={() => onHoverChange(false)}
-      className={`group/stack relative ${
+    <div
+      className={
         stack
-          ? `cursor-pointer transition-[margin-bottom] duration-300 ease-out ${FAN_ROOM[behind.length]}`
-          : ""
-      } ${isDragging ? "z-40 cursor-grabbing" : ""}`}
-      // The floor for a tall card lives on the grid block that measures it, not here — see
-      // `GridBlock`. Two floors would be one too many, and this one is inside the measurement.
-      style={isArranging ? { touchAction: "none" } : undefined}
+          ? `group/stack transition-[padding-bottom] duration-300 ease-out ${FAN_ROOM[behind.length]}`
+          : undefined
+      }
     >
-      {/* Deepest first, so the nearer sheet paints over it and the two strips stack rather than
+      <motion.div
+        ref={(element) => registerElement(card.id, element)}
+        layout="position"
+        transition={centralSpringToken}
+        drag={onMove !== undefined}
+        // Outside arrange mode only the grip starts a drag, so every checkbox, link and button on a
+        // card keeps working without a mode to leave first. Inside it, where the content is inert
+        // anyway, the whole card is the handle — that is what the mode is for.
+        // Never the whole card: the grip is the only thing that starts a drag, in either mode. A
+        // card here is readable content — a checklist to tick, a link to follow — and a press
+        // anywhere on it has to keep meaning what it means.
+        dragListener={false}
+        dragControls={dragControls}
+        dragSnapToOrigin
+        // No elasticity: the card should sit under the pointer, not lag behind it on a spring.
+        dragElastic={0}
+        dragMomentum={false}
+        onDragStart={onDragStart}
+        onDrag={onDrag}
+        onDragEnd={(_event, info) => {
+          onDrop(card.id, info.point);
+          onDragEnd();
+        }}
+        onClick={handleStackClick}
+        onDoubleClick={handleDoubleClick}
+        onPointerEnter={() => onHoverChange(true)}
+        onPointerLeave={() => onHoverChange(false)}
+        className={`relative ${stack ? "cursor-pointer" : ""} ${
+          isDragging ? "z-40 cursor-grabbing" : ""
+        }`}
+        // The floor for a tall card lives on the grid block that measures it, not here — see
+        // `GridBlock`. Two floors would be one too many, and this one is inside the measurement.
+        style={isArranging ? { touchAction: "none" } : undefined}
+      >
+        {/* Deepest first, so the nearer sheet paints over it and the two strips stack rather than
           overlap. Only what is still to do is drawn: three of five ticked off leaves one card
           behind this one, and drawing two would be the board overstating what is left.
 
@@ -1700,52 +1718,53 @@ function BoardCardCell({
           shortcut; the chip in the card's header is the control — it says "Step 2 of 5", carries
           `aria-expanded`, and opening the pile puts every one of these cards on the board in full,
           so nothing here is the only way to reach anything. */}
-      {behind
-        .map((member, depth) => ({ member, depth }))
-        .reverse()
-        .map(({ member, depth }) => (
-          <button
-            type="button"
-            key={member.id}
-            aria-hidden="true"
-            tabIndex={-1}
-            onClick={() => onRevealMember?.(member.id)}
-            className={`pointer-events-none absolute flex origin-top items-end overflow-hidden rounded-2xl border border-app-border bg-app-surface pb-1 text-left shadow-sm transition-all duration-300 ease-out group-hover/stack:pointer-events-auto group-hover/stack:shadow-lg ${STACK_SHEETS[depth].tone} ${STACK_SHEETS[depth].box} ${SHEET_HOVERED}`}
-          >
-            {/* Faded in rather than always there: at rest the strip is a few pixels of card edge,
+        {behind
+          .map((member, depth) => ({ member, depth }))
+          .reverse()
+          .map(({ member, depth }) => (
+            <button
+              type="button"
+              key={member.id}
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => onRevealMember?.(member.id)}
+              className={`pointer-events-none absolute flex origin-top items-end overflow-hidden rounded-2xl border border-app-border bg-app-surface pb-1 text-left shadow-sm transition-all duration-300 ease-out group-hover/stack:pointer-events-auto group-hover/stack:shadow-lg ${STACK_SHEETS[depth].tone} ${STACK_SHEETS[depth].box} ${SHEET_HOVERED}`}
+            >
+              {/* Faded in rather than always there: at rest the strip is a few pixels of card edge,
                 and a title clipped to three of its letters is worse than no title. */}
-            <span className="flex w-full min-w-0 items-center gap-1.5 px-4 text-xs font-medium text-app-text-muted opacity-0 transition-opacity duration-200 group-hover/stack:text-app-brand-text group-hover/stack:opacity-100">
-              <member.Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate">{member.name}</span>
-            </span>
-          </button>
-        ))}
+              <span className="flex w-full min-w-0 items-center gap-1.5 px-4 text-xs font-medium text-app-text-muted opacity-0 transition-opacity duration-200 group-hover/stack:text-app-brand-text group-hover/stack:opacity-100">
+                <member.Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{member.name}</span>
+              </span>
+            </button>
+          ))}
 
-      {/* Two nested motion elements, deliberately — the same split the dashboard needs. The outer
+        {/* Two nested motion elements, deliberately — the same split the dashboard needs. The outer
           one does `layout` and `drag`, and Framer measures it; this inner one carries the wiggle's
           rotation, which changes an element's measured box and would poison a layout projection
           measured against it. */}
-      <motion.div
-        // Full height only when the card was pulled tall, so the frame inside can fill the floor
-        // the cell keeps under it.
-        animate={isWiggling ? WIGGLE : { rotate: 0 }}
-        transition={
-          isWiggling
-            ? { duration: 0.6, repeat: Infinity, ease: "easeInOut", delay: (index % 5) * 0.08 }
-            : centralSpringToken
-        }
-      >
-        <BoardCardContext.Provider value={controls}>
-          <BoardCardView
-            card={card}
-            onDismiss={onDismiss}
-            dismissing={dismissing}
-            onEdit={onEdit}
-            origin={origin}
-          />
-        </BoardCardContext.Provider>
+        <motion.div
+          // Full height only when the card was pulled tall, so the frame inside can fill the floor
+          // the cell keeps under it.
+          animate={isWiggling ? WIGGLE : { rotate: 0 }}
+          transition={
+            isWiggling
+              ? { duration: 0.6, repeat: Infinity, ease: "easeInOut", delay: (index % 5) * 0.08 }
+              : centralSpringToken
+          }
+        >
+          <BoardCardContext.Provider value={controls}>
+            <BoardCardView
+              card={card}
+              onDismiss={onDismiss}
+              dismissing={dismissing}
+              onEdit={onEdit}
+              origin={origin}
+            />
+          </BoardCardContext.Provider>
+        </motion.div>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 

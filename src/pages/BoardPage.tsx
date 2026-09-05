@@ -29,7 +29,7 @@ import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
-import { MarkLegend } from "../features/board/components/MarkLegend";
+import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
 import { BoardNextUp } from "../features/board/components/BoardNextUp";
 import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -471,6 +471,17 @@ export function BoardPage() {
   );
 
   /**
+   * The sections, split by what kind of thing they are.
+   *
+   * A colour is not a part of the board the way an area is — it is something the hire drew on a
+   * card while reading it — so it does not belong in the bar that says which part of the board is
+   * open. The colours are switches, and they live in the rail with the other switches; the bar
+   * keeps the areas, the stages and the rest, which are all places a card *is*.
+   */
+  const markSections = useMemo(() => sections.filter((section) => section.mark), [sections]);
+  const tabSections = useMemo(() => sections.filter((section) => !section.mark), [sections]);
+
+  /**
    * The one card to start with — see `layout/nextUp.ts`.
    *
    * Computed over every card rather than over what is currently shown: "where do I start" is a
@@ -495,7 +506,7 @@ export function BoardPage() {
    * One section called "Everything" is a table of contents for a book with one chapter, so an
    * undivided board gets no bar at all, rather than a bar with a single tab in it.
    */
-  const hasSectionTabs = sections.length > 1;
+  const hasSectionTabs = tabSections.length > 1;
 
   /**
    * The sections as the tab machinery sees them: a fixed left-to-right order, and a string for the
@@ -504,7 +515,7 @@ export function BoardPage() {
    * Built from the same array the bar renders, so a swipe and a tap walk the same list — a second
    * order defined anywhere else would drift the first time a card changed area.
    */
-  const sectionOrder = useMemo(() => sectionTabOrder(sections), [sections]);
+  const sectionOrder = useMemo(() => sectionTabOrder(tabSections), [tabSections]);
   const sectionValue = sectionId ?? ALL_SECTIONS;
   const sectionIndex = Math.max(sectionOrder.indexOf(sectionValue), 0);
 
@@ -1001,6 +1012,14 @@ export function BoardPage() {
                 </>
               )}
 
+              {/* Directly under it, because it is the same kind of thing: it narrows what is drawn
+                  and nothing else. Where they came from, then what you marked on them. */}
+              <MarkFilterRail
+                sections={markSections}
+                selectedId={sectionId}
+                onSelect={setSectionId}
+              />
+
               {/* Nothing is added to a board somebody is rearranging: the three forms open over the
                   cards, which is exactly where the arranging is happening. */}
               {!isArranging && (
@@ -1049,8 +1068,12 @@ export function BoardPage() {
               {hasSectionTabs ? (
                 <div className="min-w-0 flex-1">
                   <BoardSectionTabs
-                    sections={sections}
+                    sections={tabSections}
                     selectedId={sectionId}
+                    // A colour is not one of the tabs, but it is still what is being shown, so its
+                    // line of counts is handed over rather than the bar falling back to
+                    // "Everything" and reporting a number that belongs to a different view.
+                    selected={sections.find((section) => section.id === sectionId)}
                     onSelect={setSectionId}
                   />
                 </div>
@@ -1138,11 +1161,6 @@ export function BoardPage() {
                   cuts={activeCuts}
                   onShowEverything={showEverything}
                 />
-
-                {/* Under the status line and above the cards, because it explains what is *in* the
-                    cards rather than what is being shown of them. Draws nothing until something is
-                    highlighted. */}
-                <MarkLegend />
 
                 <BoardGrid
                   board={griddedBoard}

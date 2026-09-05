@@ -1,6 +1,9 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { Trash2 } from "lucide-react";
+import { Check, Pencil, Trash2, X } from "lucide-react";
+
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 
 import { HIGHLIGHT_CLASS, HIGHLIGHT_COLORS, type HighlightColor } from "../marks/highlightColors";
 import { labelFor } from "../marks/markLabels";
@@ -17,7 +20,7 @@ type MarkPopoverProps = {
 };
 
 /** Roughly the bar's own size, used to decide which side of the highlight it fits on. */
-const WIDTH = 190;
+const WIDTH = 220;
 const HEIGHT = 40;
 const GAP = 6;
 const MARGIN = 12;
@@ -65,12 +68,36 @@ function popoverStyle(anchor: DOMRect): CSSProperties {
 export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPopoverProps) {
   // The hire's own word for each colour where they have written one — "ask about" is a better thing
   // for a button to be called than "Green", and it is the only label here that says anything.
-  const { labels } = useCardMarks();
+  const { labels, nameColor } = useCardMarks();
   const bar = useRef<HTMLDivElement>(null);
 
+  // Naming a colour lives here, and only here, because this is the one moment somebody is actually
+  // thinking about what a colour means: they are pointing at a sentence they marked. It used to be
+  // a row of names above the cards, permanently on, where it read as a set of filters, did nothing
+  // when pressed but open a text field, and asked a question nobody had at that moment.
+  const [naming, setNaming] = useState(false);
+  const [draft, setDraft] = useState("");
+  const field = useRef<HTMLInputElement>(null);
+
   // Takes the caret, so somebody who opened this from the keyboard is standing in it rather than
-  // back on the highlight with an invisible menu open somewhere.
-  useEffect(() => bar.current?.querySelector("button")?.focus(), []);
+  // back on the highlight with an invisible menu open somewhere. Follows the field when the bar
+  // turns into one, for the same reason.
+  useEffect(() => {
+    if (naming) field.current?.focus();
+    else bar.current?.querySelector("button")?.focus();
+  }, [naming]);
+
+  const rename = () => {
+    // Seeded with the hire's own word only. Starting from "Green" would make clearing a name mean
+    // typing over a word the app suggested, and the colour's own word is a fallback, not a value.
+    setDraft(labels[color] ?? "");
+    setNaming(true);
+  };
+
+  const commitName = () => {
+    nameColor(color, draft);
+    setNaming(false);
+  };
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -105,35 +132,89 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
       style={popoverStyle(anchor)}
       className="flex items-center gap-1 rounded-lg border border-app-border bg-app-surface p-1 shadow-lg"
     >
-      {HIGHLIGHT_COLORS.map((option) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => onPick(option)}
-          aria-pressed={color === option}
-          aria-label={labelFor(labels, option)}
-          title={labelFor(labels, option)}
-          className={`h-6 w-6 rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-            HIGHLIGHT_CLASS[option]
-          } ${
-            color === option
-              ? "ring-2 ring-app-text ring-offset-1 ring-offset-app-surface"
-              : "border border-app-border"
-          }`}
-        />
-      ))}
+      {naming ? (
+        <>
+          <span
+            aria-hidden="true"
+            className={`ml-1 h-4 w-4 shrink-0 rounded-full border border-app-border ${HIGHLIGHT_CLASS[color]}`}
+          />
 
-      <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
+          <Input
+            ref={field}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitName();
+              if (event.key === "Escape") setNaming(false);
+            }}
+            aria-label={`What ${labelFor(labels, color).toLowerCase()} means`}
+            placeholder="ask about"
+            className="h-7 w-32 text-xs"
+          />
 
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label="Remove this highlight"
-        title="Remove this highlight"
-        className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-      >
-        <Trash2 className="h-4 w-4" aria-hidden="true" />
-      </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={commitName}
+            aria-label="Save this name"
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => setNaming(false)}
+            aria-label="Leave it as it was"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </>
+      ) : (
+        <>
+          {HIGHLIGHT_COLORS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onPick(option)}
+              aria-pressed={color === option}
+              aria-label={labelFor(labels, option)}
+              title={labelFor(labels, option)}
+              className={`h-6 w-6 rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                HIGHLIGHT_CLASS[option]
+              } ${
+                color === option
+                  ? "ring-2 ring-app-text ring-offset-1 ring-offset-app-surface"
+                  : "border border-app-border"
+              }`}
+            />
+          ))}
+
+          <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
+
+          <button
+            type="button"
+            onClick={rename}
+            aria-label={`Rename ${labelFor(labels, color)}`}
+            title={`Rename ${labelFor(labels, color)}`}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove this highlight"
+            title="Remove this highlight"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </>
+      )}
     </div>,
     document.body,
   );

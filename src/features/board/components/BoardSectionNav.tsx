@@ -9,6 +9,14 @@ type BoardSectionTabsProps = {
   sections: SectionSummary[];
   /** The selected section's id; null is "everything". */
   selectedId: string | null;
+  /**
+   * The section whose counts the line underneath should report, when it is not one of the tabs.
+   *
+   * The board can be showing a cut this bar does not offer — a highlight colour, chosen from the
+   * rail. No tab is lit then, which is correct, but the line under the bar still has to describe
+   * what is on screen rather than reporting "Everything" at a board showing eleven cards.
+   */
+  selected?: SectionSummary;
   onSelect: (id: string | null) => void;
 };
 
@@ -33,7 +41,12 @@ type BoardSectionTabsProps = {
  * finished, what is waiting, when it is due — sits on one quiet line underneath, where it can be
  * read without being crammed into a tab.
  */
-export function BoardSectionTabs({ sections, selectedId, onSelect }: BoardSectionTabsProps) {
+export function BoardSectionTabs({
+  sections,
+  selectedId,
+  selected: shown,
+  onSelect,
+}: BoardSectionTabsProps) {
   const options: SegmentedTabOption<string>[] = sections.map((section) => {
     const complete = section.total > 0 && section.done === section.total;
     const Icon = sectionIcon(section);
@@ -48,7 +61,7 @@ export function BoardSectionTabs({ sections, selectedId, onSelect }: BoardSectio
     };
   });
 
-  const selected = sections.find((section) => section.id === selectedId) ?? sections[0];
+  const selected = shown ?? sections.find((section) => section.id === selectedId) ?? sections[0];
 
   return (
     <div className="space-y-2">
