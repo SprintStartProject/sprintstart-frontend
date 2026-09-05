@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ThemeContext, type ThemeContextType } from "./ThemeContext";
+import { GLOW_INTENSITY_DEFAULT, ThemeContext, type ThemeContextType } from "./ThemeContext";
 
 /**
  * Hook to access the global theme context.
@@ -21,6 +21,8 @@ export function useTheme(): ThemeContextType {
       isClassicMode: false,
       isAuroraEnabled: false,
       setIsAuroraEnabled: () => {},
+      glowIntensity: GLOW_INTENSITY_DEFAULT,
+      setGlowIntensity: () => {},
       isTiltEnabled: false,
       setIsTiltEnabled: () => {},
     };

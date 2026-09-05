@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { LayoutGrid } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { getDashboardWidget } from "../layout/catalog";
 import { DASHBOARD_GRID_CLASS } from "../layout/sizes";
 import type { DashboardWidgetId } from "../layout/types";
@@ -58,6 +59,10 @@ export function DashboardGrid({
   const elements = useRef(new Map<DashboardWidgetId, HTMLDivElement>());
   const lastSwapAt = useRef(0);
   const [draggingId, setDraggingId] = useState<DashboardWidgetId | null>(null);
+
+  // Read once here rather than per card: every cell needs the same answer, and one
+  // `matchMedia` subscription for the board beats one per widget.
+  const isNarrow = !useIsSmUp();
 
   const registerElement = useCallback((id: DashboardWidgetId, element: HTMLDivElement | null) => {
     if (element) {
@@ -120,6 +125,7 @@ export function DashboardGrid({
             total={controller.layout.length}
             isEditing={isEditing}
             isDragging={draggingId === item.id}
+            isNarrow={isNarrow}
             onRemove={controller.removeWidget}
             onResize={controller.resizeWidget}
             onMoveBy={controller.moveWidgetBy}

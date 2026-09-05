@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from "react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import type { Artifact } from "../types";
-import type { KnowledgeTab } from "../components/ArtifactFilters";
+import type { KnowledgeTab } from "../tabs";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -106,6 +106,9 @@ export function useKnowledgeBase(projectId: string | null) {
           break;
         case "COMMITS":
           matchesTab = artifact.artifactType === "COMMIT";
+          break;
+        case "ORGANIZATIONS":
+          matchesTab = artifact.artifactType === "ORG_METADATA";
           break;
       }
 

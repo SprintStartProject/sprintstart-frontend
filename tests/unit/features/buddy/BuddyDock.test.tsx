@@ -5,6 +5,12 @@ import { BuddyDock } from "../../../../src/features/buddy/components/BuddyDock";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 import type { BuddySuggestion } from "../../../../src/services/buddyService";
 
+vi.mock("../../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
 // Every question carries the escalation trigger now, and that reads the selected project.
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
@@ -24,13 +30,13 @@ function renderDock(
   {
     suggestions = [],
     setDraft = vi.fn(),
-    onNewConversation,
+    startFreshVisit = vi.fn(async () => {}),
     isThinking = false,
     isStreaming = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
-    onNewConversation?: () => void;
+    startFreshVisit?: () => Promise<void>;
     isThinking?: boolean;
     isStreaming?: boolean;
   } = {},
@@ -47,8 +53,8 @@ function renderDock(
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
       suggestions={suggestions}
+      startFreshVisit={startFreshVisit}
       onClose={vi.fn()}
-      onNewConversation={onNewConversation}
     />,
   );
 }
@@ -189,32 +195,24 @@ describe("BuddyDock suggestion chips", () => {
  */
 describe("BuddyDock new conversation", () => {
   it("offers nothing to restart before the hire has said anything", () => {
-    renderDock([assistant("Hello, welcome aboard.")], { onNewConversation: vi.fn() });
+    renderDock([assistant("Hello, welcome aboard.")]);
 
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
   it("offers to start fresh once there is a conversation to leave behind", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?")], {
-      onNewConversation: vi.fn(),
-    });
+    renderDock([assistant("Hello."), user("How do we deploy?")]);
 
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });
 
-  it("stays out of the header entirely when the widget hands in no handler", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?")]);
-
-    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
-  });
-
-  it("asks the widget to start fresh rather than reaching into the session itself", async () => {
-    const onNewConversation = vi.fn();
-    renderDock([assistant("Hello."), user("How do we deploy?")], { onNewConversation });
+  it("starts the fresh visit once, on the session the dock was handed", async () => {
+    const startFreshVisit = vi.fn(async () => {});
+    renderDock([assistant("Hello."), user("How do we deploy?")], { startFreshVisit });
 
     await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
 
-    expect(onNewConversation).toHaveBeenCalledTimes(1);
+    expect(startFreshVisit).toHaveBeenCalledTimes(1);
   });
 
   // startFreshVisit clears the thread and greets, but cannot call back the request already
@@ -222,7 +220,6 @@ describe("BuddyDock new conversation", () => {
   // events would land under the brand-new greeting.
   it("withdraws while the buddy is still thinking", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
-      onNewConversation: vi.fn(),
       isThinking: true,
     });
 
@@ -231,7 +228,6 @@ describe("BuddyDock new conversation", () => {
 
   it("withdraws while a reply is still arriving", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
-      onNewConversation: vi.fn(),
       isStreaming: true,
     });
 
@@ -239,17 +235,13 @@ describe("BuddyDock new conversation", () => {
   });
 
   it("comes back once the turn is over", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")], {
-      onNewConversation: vi.fn(),
-    });
+    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")]);
 
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });
 
   it("promises a new conversation, never a deletion — nothing is thrown away", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?")], {
-      onNewConversation: vi.fn(),
-    });
+    renderDock([assistant("Hello."), user("How do we deploy?")]);
 
     const control = screen.getByRole("button", { name: "Start a new conversation" });
     expect(control).toHaveAttribute(

@@ -4,6 +4,7 @@ import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
 import { ChatPage } from "../pages/ChatPage";
+import { AssistantShell } from "../components/layout/AssistantShell";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
 import { KnowledgeBasePage } from "../pages/KnowledgeBasePage.tsx";
 import { DataIngestionPage } from "../pages/DataIngestionPage.tsx";
@@ -63,8 +64,14 @@ export function AppRouter() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/skill-wizard" element={<SkillWizardPage />} />
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/chat/:id" element={<ChatPage />} />
+        {/* One layout route for both halves of the assistant, so the shared header survives
+            the crossing and the panel underneath can slide instead of cut. Their URLs are
+            unchanged — `/buddy` is still `/buddy`; only who draws the header moved. */}
+        <Route element={<AssistantShell />}>
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat/:id" element={<ChatPage />} />
+          <Route path="/buddy" element={<BuddyPage />} />
+        </Route>
         <Route path="/onboarding" element={<OnBoardingPage />} />
         <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
         <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
@@ -107,9 +114,9 @@ export function AppRouter() {
             </ManagerAreaGuard>
           }
         />
-        {/* The buddy and the surfaces its tools serve. Added beside the onboarding
-            path above, not in place of it: both ways in stay open. */}
-        <Route path="/buddy" element={<BuddyPage />} />
+        {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
+            in place of it: both ways in stay open. The buddy itself now sits with the chat,
+            under `AssistantShell`. */}
         <Route path="/board" element={<BoardPage />} />
         {/* Guarded, because the access policy says they are PM/HR/ADMIN-only and the sidebar
             merely hides them -- which leaves the URL. Both pages already gate their *actions*

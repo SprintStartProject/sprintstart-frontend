@@ -192,11 +192,11 @@ export function BuddyWidget() {
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             suggestions={suggestions}
+            startFreshVisit={startFreshVisit}
             openError={openError}
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}
             onOpenFull={openFull}
-            onNewConversation={() => void startFreshVisit()}
             suggestionsHidden={suggestionsHidden}
             onHideSuggestions={() => setSuggestionsHidden(true)}
             isExpanding={handoff !== "idle"}

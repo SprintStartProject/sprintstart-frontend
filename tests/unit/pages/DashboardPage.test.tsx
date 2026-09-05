@@ -270,6 +270,13 @@ describe("DashboardPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Edit dashboard" }));
     }
 
+    /** Opens the widget picker and hands back its dialog to scope queries to. */
+    async function openPicker(): Promise<HTMLElement> {
+      await userEvent.click(screen.getByRole("button", { name: "Widgets" }));
+
+      return screen.getByTestId("widget-picker-modal");
+    }
+
     it("keeps the editing controls out of the way until asked for", async () => {
       renderPage();
 
@@ -304,26 +311,91 @@ describe("DashboardPage", () => {
       expect(screen.queryByText("Your conversations")).not.toBeInTheDocument();
     });
 
-    it("offers a removed widget back in the picker", async () => {
+    it("lists every widget, ticked or not, rather than only what is missing", async () => {
       renderPage();
 
       await startEditing();
       await userEvent.click(screen.getByRole("button", { name: "Remove Knowledge base" }));
-      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
 
-      const picker = screen.getByTestId("add-widget-modal");
-      // Only what is missing is offered — a widget already placed would be a no-op.
-      expect(
-        within(picker).getByRole("button", { name: "Add Knowledge base" }),
-      ).toBeInTheDocument();
-      expect(
-        within(picker).queryByRole("button", { name: "Add Greeting" }),
-      ).not.toBeInTheDocument();
+      const picker = await openPicker();
 
-      await userEvent.click(within(picker).getByRole("button", { name: "Add Knowledge base" }));
+      // The old picker hid what was already placed, which left the reader holding their own
+      // dashboard in their head to make sense of the list. Everything is here now, and the
+      // tick is the answer to "have I got that one already?".
+      expect(within(picker).getByRole("button", { name: "Greeting" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(within(picker).getByRole("button", { name: "Knowledge base" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
 
-      expect(screen.queryByTestId("add-widget-modal")).not.toBeInTheDocument();
+    it("applies several ticks in one save", async () => {
+      renderPage();
+
+      await startEditing();
+      const picker = await openPicker();
+
+      await userEvent.click(within(picker).getByRole("button", { name: "Your knowledge gaps" }));
+      await userEvent.click(within(picker).getByRole("button", { name: "Knowledge base" }));
+
+      // Still a draft: the board behind the dialog has not moved.
       expect(placedWidgets()).toContain("Knowledge base");
+      expect(placedWidgets()).not.toContain("Your knowledge gaps");
+
+      await userEvent.click(within(picker).getByRole("button", { name: "Save changes" }));
+
+      expect(screen.queryByTestId("widget-picker-modal")).not.toBeInTheDocument();
+      expect(placedWidgets()).toContain("Your knowledge gaps");
+      expect(placedWidgets()).not.toContain("Knowledge base");
+    });
+
+    it("says what each tick is about to do, and counts it up", async () => {
+      renderPage();
+
+      await startEditing();
+      const picker = await openPicker();
+
+      expect(screen.getByTestId("widget-picker-summary")).toHaveTextContent("Nothing changed yet.");
+
+      await userEvent.click(within(picker).getByRole("button", { name: "Your knowledge gaps" }));
+      await userEvent.click(within(picker).getByRole("button", { name: "Knowledge base" }));
+
+      // Per card, so a ticked widget that has been there for a month cannot be mistaken for
+      // one ticked ten seconds ago.
+      expect(within(picker).getByText("Adding")).toBeInTheDocument();
+      expect(within(picker).getByText("Removing")).toBeInTheDocument();
+      expect(screen.getByTestId("widget-picker-summary")).toHaveTextContent(
+        "Adding 1, removing 1.",
+      );
+    });
+
+    it("changes nothing when the picker is closed without saving", async () => {
+      renderPage();
+
+      await startEditing();
+      const picker = await openPicker();
+
+      await userEvent.click(within(picker).getByRole("button", { name: "Knowledge base" }));
+      await userEvent.click(within(picker).getByRole("button", { name: "Cancel" }));
+
+      expect(placedWidgets()).toContain("Knowledge base");
+    });
+
+    it("keeps a kept widget where it was, at the size it was given", async () => {
+      renderPage();
+
+      await startEditing();
+      const before = placedWidgets();
+
+      const picker = await openPicker();
+      await userEvent.click(within(picker).getByRole("button", { name: "Your knowledge gaps" }));
+      await userEvent.click(within(picker).getByRole("button", { name: "Save changes" }));
+
+      // The new one lands on the end; nothing that was already arranged moves for it.
+      expect(placedWidgets()).toEqual([...before, "Your knowledge gaps"]);
     });
 
     it("offers a widget only the sizes it looks right at", async () => {
@@ -378,27 +450,26 @@ describe("DashboardPage", () => {
       renderPage();
 
       await startEditing();
-      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+      const picker = await openPicker();
 
-      const picker = screen.getByTestId("add-widget-modal");
-      expect(within(picker).getByRole("button", { name: "Add User accounts" })).toBeInTheDocument();
-      expect(within(picker).getByRole("button", { name: "Add Projects" })).toBeInTheDocument();
+      expect(within(picker).getByRole("button", { name: "User accounts" })).toBeInTheDocument();
+      expect(within(picker).getByRole("button", { name: "Projects" })).toBeInTheDocument();
     });
 
     it("offers a plain user the widgets the default layout leaves out", async () => {
       renderPage();
 
       await startEditing();
-      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+      // The knowledge gaps assigned to them are the one thing off the default board: opt-in,
+      // because most people own no component at all.
+      const picker = await openPicker();
 
-      // Everything else a plain user may have is already on the default board; the knowledge
-      // gaps assigned to them are opt-in, because most people own no component at all.
-      const picker = screen.getByTestId("add-widget-modal");
+      expect(within(picker).getByRole("button", { name: "Your knowledge gaps" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
       expect(
-        within(picker).getByRole("button", { name: "Add Your knowledge gaps" }),
-      ).toBeInTheDocument();
-      expect(
-        within(picker).queryByRole("button", { name: "Add User accounts" }),
+        within(picker).queryByRole("button", { name: "User accounts" }),
       ).not.toBeInTheDocument();
     });
 
@@ -408,16 +479,13 @@ describe("DashboardPage", () => {
       renderPage();
 
       await startEditing();
-      await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+      const picker = await openPicker();
 
-      const picker = screen.getByTestId("add-widget-modal");
-      expect(within(picker).getByRole("button", { name: "Add Team overview" })).toBeInTheDocument();
+      expect(within(picker).getByRole("button", { name: "Team overview" })).toBeInTheDocument();
       expect(
-        within(picker).queryByRole("button", { name: "Add User accounts" }),
+        within(picker).queryByRole("button", { name: "User accounts" }),
       ).not.toBeInTheDocument();
-      expect(
-        within(picker).queryByRole("button", { name: "Add Projects" }),
-      ).not.toBeInTheDocument();
+      expect(within(picker).queryByRole("button", { name: "Projects" })).not.toBeInTheDocument();
     });
   });
 });

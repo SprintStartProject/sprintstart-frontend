@@ -44,6 +44,7 @@ type BuddyDockProps = Pick<
   | "confirmAction"
   | "dismissAction"
   | "suggestions"
+  | "startFreshVisit"
 > & {
   onClose: () => void;
   /**
@@ -51,11 +52,6 @@ type BuddyDockProps = Pick<
    * `/buddy` itself, where the control would offer the page the hire is already reading.
    */
   onOpenFull?: () => void;
-  /**
-   * Puts the current conversation behind them and greets afresh. Optional for the same reason
-   * `onOpenFull` is: the control is only handed in where it means something.
-   */
-  onNewConversation?: () => void;
   /**
    * Why the conversation could not be brought on screen at all — see `BuddyThread`. Handed in
    * rather than picked off the session, like every other callback here: the dock stays a
@@ -112,10 +108,10 @@ export function BuddyDock({
   confirmAction,
   dismissAction,
   suggestions,
+  startFreshVisit,
   openError,
   onClose,
   onOpenFull,
-  onNewConversation,
   onRetryOpen,
   suggestionsHidden = false,
   onHideSuggestions,
@@ -229,27 +225,30 @@ export function BuddyDock({
             <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
           </div>
 
-          {/* Offered only once there is a conversation to leave behind. Before that it would
-                    restart a thread that has not started, which is a control the hire can see doing
-                    nothing.
-
-                    Nothing is discarded: the transcript stays in `buddy_messages` and the buddy's
-                    durable memory note is untouched — it is what the next greeting is written from.
-                    Only the scrollback moves on, which is why the wording here is "new
-                    conversation" and never "clear" or "delete".
+          {/* Same control, same words and the same promise as the one on `/buddy`: the window is
+                    a view of that conversation, so anything it can do to the conversation it has to
+                    be able to do here — a hire who had to open the full page to start over would
+                    reasonably conclude the two were different buddies. Offered only once there is
+                    something to leave behind; on an untouched thread it would start the visit that
+                    is already on screen.
 
                     Withdrawn while a turn is in flight. `startFreshVisit` clears the thread and
                     greets, but it cannot call back the request already streaming into it: that
                     stream's callbacks still hold the shared conversation, so its tool events
-                    would land under the new greeting, and its completion would clear the
-                    greeting's own thinking state. Offering the control only between turns is
-                    the cheap half of that fix; aborting the stream is the other half and
-                    belongs in the session, alongside the same gap on `BuddyPage`. */}
-          {onNewConversation && hasUserMessage && !isBusy && (
+                    would land under the new greeting — "Checking your progress…" beneath a fresh
+                    hello — and its completion would clear the greeting's own thinking state.
+                    Offering the control only between turns is the cheap half of that fix;
+                    aborting the stream is the other half and belongs in the session, alongside
+                    the same gap on `BuddyPage`. */}
+          {hasUserMessage && !isBusy && (
             <button
               type="button"
-              onClick={onNewConversation}
+              onClick={() => void startFreshVisit()}
               aria-label="Start a new conversation"
+              // No chord named here, deliberately. The window floats over every page, and
+              // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
+              // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
+              // would be promising a key that does somebody else's job.
               title="Start a new conversation — your buddy keeps what it has learned about you"
               className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
             >
@@ -299,6 +298,7 @@ export function BuddyDock({
             renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            onStartFreshVisit={() => void startFreshVisit()}
           />
         </div>
 
