@@ -1,14 +1,17 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
+import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { useToast } from "../../../context/useToast.ts";
+import { ApiError } from "../../../services/apiClient.ts";
 import { parseApiError } from "../../../services/apiError.ts";
 import {
   confluenceService,
   type ConfluenceConnectionDto,
 } from "../../../services/sources/confluenceService.ts";
+import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
 
 type ConfluenceConnectStepProps = {
   projectId: string;
@@ -20,16 +23,38 @@ const ADD_FALLBACK = "Failed to connect Confluence space.";
 
 /**
  * Inline form for creating a new Confluence Cloud space connection inside
- * the Connectors modal.
+ * the Connectors modal, backed by a stored Atlassian credential instead of a
+ * raw email/token pair.
  */
 export function ConfluenceConnectStep({ projectId, onClose, onSaved }: ConfluenceConnectStepProps) {
   const [baseUrl, setBaseUrl] = useState("");
   const [spaceId, setSpaceId] = useState("");
-  const [email, setEmail] = useState("");
-  const [apiToken, setApiToken] = useState("");
+  const [credentialName, setCredentialName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const toast = useToast();
+
+  const {
+    credentials,
+    loaded: credentialsLoaded,
+    isRefreshing: credentialsLoading,
+  } = useAtlassianCredentials();
+  const hasCredentials = credentials.length > 0;
+
+  // Adopt the first stored credential once the list arrives, keeping a
+  // still-valid choice — there is no host wizard here to do it instead.
+  useEffect(() => {
+    if (!credentialsLoaded || credentialsLoading) return;
+
+    void Promise.resolve().then(() => {
+      setCredentialName((current) => {
+        if (credentials.length === 0) return "";
+        return current && credentials.some((credential) => credential.displayName === current)
+          ? current
+          : credentials[0].displayName;
+      });
+    });
+  }, [credentials, credentialsLoaded, credentialsLoading]);
 
   const handleClose = () => {
     if (savingRef.current) return;
@@ -42,10 +67,8 @@ export function ConfluenceConnectStep({ projectId, onClose, onSaved }: Confluenc
 
     const trimmedBaseUrl = baseUrl.trim();
     const trimmedSpaceId = spaceId.trim();
-    const trimmedEmail = email.trim();
-    const trimmedToken = apiToken.trim();
 
-    if (!trimmedBaseUrl || !trimmedSpaceId || !trimmedEmail || !trimmedToken) {
+    if (!trimmedBaseUrl || !trimmedSpaceId || !credentialName) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -57,19 +80,22 @@ export function ConfluenceConnectStep({ projectId, onClose, onSaved }: Confluenc
       const created = await confluenceService.createConnection(projectId, {
         baseUrl: trimmedBaseUrl,
         spaceId: trimmedSpaceId,
-        email: trimmedEmail,
-        apiToken: trimmedToken,
+        credentialName,
         pageAllowlist: [],
         pageDenylist: [],
       });
 
       toast.success("Confluence space connected", {
-        description: `Connected space key: ${created.spaceKey}`,
+        description: `Connected space: ${created.spaceName ?? created.spaceKey}`,
       });
       onSaved(created);
       onClose();
     } catch (error) {
-      toast.error(parseApiError(error, ADD_FALLBACK));
+      if (error instanceof ApiError && error.status === 404) {
+        toast.error("That credential no longer exists. Pick another one and try again.");
+      } else {
+        toast.error(parseApiError(error, ADD_FALLBACK));
+      }
     } finally {
       savingRef.current = false;
       setIsSaving(false);
@@ -130,34 +156,28 @@ export function ConfluenceConnectStep({ projectId, onClose, onSaved }: Confluenc
           />
         </Field>
 
-        <Field label="Account email" controlId="connectors-confluence-email" disabled={isSaving}>
-          <Input
-            data-testid="connectors-confluence-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            required
-            autoComplete="email"
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-app-text">Credential</span>
+          <DropdownSelect
+            label="Credential"
+            value={credentialName}
+            options={
+              hasCredentials
+                ? credentials.map((credential) => ({
+                    value: credential.displayName,
+                    label: `${credential.displayName} - ${credential.userEmail}`,
+                  }))
+                : [
+                    {
+                      value: "",
+                      label: credentialsLoading ? "Loading credentials..." : "No credentials",
+                    },
+                  ]
+            }
+            onChange={setCredentialName}
+            disabled={isSaving || !hasCredentials}
           />
-        </Field>
-
-        <Field
-          label="API token"
-          controlId="connectors-confluence-token"
-          disabled={isSaving}
-          hint="The token is stored encrypted and cannot be retrieved after saving."
-        >
-          <Input
-            data-testid="connectors-confluence-token"
-            type="password"
-            value={apiToken}
-            onChange={(e) => setApiToken(e.target.value)}
-            placeholder="Atlassian API token"
-            required
-            autoComplete="off"
-          />
-        </Field>
+        </div>
 
         <div className="flex flex-row justify-end gap-2 pt-2">
           <Button variant="secondary" size="sm" onClick={handleClose} disabled={isSaving}>
@@ -169,6 +189,7 @@ export function ConfluenceConnectStep({ projectId, onClose, onSaved }: Confluenc
             type="submit"
             data-testid="connectors-confluence-submit"
             loading={isSaving}
+            disabled={!hasCredentials}
           >
             {isSaving ? "Connecting..." : "Connect space"}
           </Button>

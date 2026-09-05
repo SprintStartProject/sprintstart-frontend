@@ -1,9 +1,12 @@
 import { AlertTriangle } from "lucide-react";
+import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
 
 /**
- * Controlled Confluence connect form for base URL, space ID, and credentials.
+ * Controlled Confluence connect form for a base URL, space ID, and a stored
+ * Atlassian credential.
  *
  * Shared between the Data Ingestion "Add source" wizard and the project-creation
  * wizard so the Confluence connect experience is identical in both places.
@@ -11,32 +14,47 @@ import { Input } from "../../../components/ui/Input.tsx";
 export function ConfluenceConnectStep({
   baseUrl,
   spaceId,
-  email,
-  apiToken,
+  credentialName,
+  credentials,
+  credentialsLoaded,
+  credentialsLoading,
+  credentialsError,
   isBusy = false,
   canIngest = true,
   ingestBlockedReason,
   errorMessage,
   onBaseUrlChange,
   onSpaceIdChange,
-  onEmailChange,
-  onApiTokenChange,
+  onCredentialNameChange,
   onSubmit,
+  suppressMissingCredentialNotice = false,
 }: {
   baseUrl: string;
   spaceId: string;
-  email: string;
-  apiToken: string;
+  credentialName: string;
+  credentials: AtlassianCredentialDto[];
+  credentialsLoaded: boolean;
+  credentialsLoading: boolean;
+  credentialsError: string | null;
   isBusy?: boolean;
   canIngest?: boolean;
   ingestBlockedReason?: string;
   errorMessage?: string | null;
   onBaseUrlChange: (value: string) => void;
   onSpaceIdChange: (value: string) => void;
-  onEmailChange: (value: string) => void;
-  onApiTokenChange: (value: string) => void;
+  onCredentialNameChange: (value: string) => void;
   onSubmit?: () => void;
+  /**
+   * Hides the built-in "no stored credential" banner. Set when the parent shows
+   * its own missing-credential hint (e.g. the wizard's compact notice next to
+   * its inline "Add credential" button) so the message is not duplicated.
+   */
+  suppressMissingCredentialNotice?: boolean;
 }) {
+  const hasCredentials = credentials.length > 0;
+  const showNoCredentials =
+    credentialsLoaded && !credentialsLoading && !hasCredentials && !suppressMissingCredentialNotice;
+
   return (
     <form
       className="space-y-4"
@@ -48,6 +66,13 @@ export function ConfluenceConnectStep({
       {!canIngest && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           {ingestBlockedReason ?? "You can only connect sources to projects you manage."}
+        </div>
+      )}
+
+      {showNoCredentials && (
+        <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+          No Atlassian credentials are stored for your account. Add one under Settings, Access
+          Tokens, Atlassian first, then come back to connect.
         </div>
       )}
 
@@ -80,34 +105,35 @@ export function ConfluenceConnectStep({
         />
       </Field>
 
-      <Field label="Account email" controlId="confluence-email" disabled={isBusy}>
-        <Input
-          data-testid="confluence-email"
-          type="email"
-          value={email}
-          onChange={(event) => onEmailChange(event.target.value)}
-          placeholder="user@example.com"
-          required
-          autoComplete="email"
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-app-text">Credential</span>
+        <DropdownSelect
+          label="Credential"
+          value={credentialName}
+          options={
+            hasCredentials
+              ? credentials.map((credential) => ({
+                  value: credential.displayName,
+                  label: `${credential.displayName} - ${credential.userEmail}`,
+                }))
+              : [
+                  {
+                    value: "",
+                    label: credentialsLoading ? "Loading credentials..." : "No credentials",
+                  },
+                ]
+          }
+          onChange={onCredentialNameChange}
+          disabled={isBusy || !hasCredentials}
         />
-      </Field>
+      </div>
 
-      <Field
-        label="API token"
-        controlId="confluence-api-token"
-        disabled={isBusy}
-        hint="The token is stored encrypted and cannot be retrieved after saving."
-      >
-        <Input
-          data-testid="confluence-api-token"
-          type="password"
-          value={apiToken}
-          onChange={(event) => onApiTokenChange(event.target.value)}
-          placeholder="Atlassian API token"
-          required
-          autoComplete="off"
-        />
-      </Field>
+      {credentialsError && (
+        <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{credentialsError}</span>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="flex items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">

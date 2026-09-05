@@ -3,8 +3,8 @@ import { apiClient } from "../apiClient.ts";
 export type CreateConfluenceConnectionRequest = {
   baseUrl: string;
   spaceId: string;
-  email: string;
-  apiToken: string;
+  /** Name of a stored Atlassian credential, shared with the Jira connector. */
+  credentialName: string;
   pageAllowlist?: string[];
   pageDenylist?: string[];
 };
@@ -83,8 +83,7 @@ export const confluenceService = {
         body: JSON.stringify({
           baseUrl: request.baseUrl.trim(),
           spaceId: request.spaceId.trim(),
-          email: request.email.trim(),
-          apiToken: request.apiToken.trim(),
+          credentialName: request.credentialName.trim(),
           pageAllowlist: request.pageAllowlist ?? [],
           pageDenylist: request.pageDenylist ?? [],
         }),

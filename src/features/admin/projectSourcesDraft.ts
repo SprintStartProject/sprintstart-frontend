@@ -5,6 +5,7 @@ import {
 import { connectJiraInstance } from "../../services/sources/jiraService";
 import { confluenceService } from "../../services/sources/confluenceService";
 import { knowledgeService } from "../../services/knowledgeService";
+import { ApiError } from "../../services/apiClient";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
 
 /**
@@ -68,8 +69,8 @@ export type ConfluenceDraftSource = DraftSourceBase & {
   displayName: string;
   baseUrl: string;
   spaceId: string;
-  email: string;
-  apiToken: string;
+  /** Name of a stored Atlassian credential, shared with the Jira connector. */
+  credentialName: string;
 };
 
 export type DraftSource =
@@ -151,8 +152,7 @@ export function createConfluenceDraft(params: {
   displayName?: string;
   baseUrl: string;
   spaceId: string;
-  email: string;
-  apiToken: string;
+  credentialName: string;
 }): ConfluenceDraftSource {
   return {
     id: nextDraftSourceId(),
@@ -160,8 +160,7 @@ export function createConfluenceDraft(params: {
     displayName: params.displayName || `Confluence Space ${params.spaceId}`,
     baseUrl: params.baseUrl,
     spaceId: params.spaceId,
-    email: params.email,
-    apiToken: params.apiToken,
+    credentialName: params.credentialName,
     status: "pending",
     errorMessage: "",
   };
@@ -258,14 +257,20 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
   }
 
   if (source.type === "CONFLUENCE") {
-    await confluenceService.createConnection(projectId, {
-      baseUrl: source.baseUrl,
-      spaceId: source.spaceId,
-      email: source.email,
-      apiToken: source.apiToken,
-      pageAllowlist: [],
-      pageDenylist: [],
-    });
+    try {
+      await confluenceService.createConnection(projectId, {
+        baseUrl: source.baseUrl,
+        spaceId: source.spaceId,
+        credentialName: source.credentialName,
+        pageAllowlist: [],
+        pageDenylist: [],
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        throw new Error("That Atlassian credential no longer exists. Pick another one and retry.");
+      }
+      throw error;
+    }
 
     return;
   }

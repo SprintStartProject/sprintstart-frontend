@@ -8,6 +8,12 @@ import { ConfluenceConnectStep } from "../../../../src/features/connectors/compo
 
 const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
 
+function atlassianCredentialsHandler(names: string[], email = "user@example.com") {
+  return http.get("/api/v1/atlassian/credentials", () =>
+    HttpResponse.json(names.map((displayName) => ({ userEmail: email, displayName }))),
+  );
+}
+
 describe("ConfluenceConnectStep (connectors)", () => {
   it("submits form and calls onSaved when API succeeds", async () => {
     const user = userEvent.setup();
@@ -15,13 +21,18 @@ describe("ConfluenceConnectStep (connectors)", () => {
     const onClose = vi.fn();
 
     server.use(
-      http.post("/api/v1/confluence/projects/proj-1/connections", () => {
+      atlassianCredentialsHandler(["default"]),
+      http.post("/api/v1/confluence/projects/proj-1/connections", async ({ request }) => {
+        expect(await request.json()).toMatchObject({ credentialName: "default" });
+
         return HttpResponse.json({
           id: "conn-1",
           projectId: "proj-1",
           baseUrl: "https://example.atlassian.net/wiki",
           spaceId: "123456",
           spaceKey: "SP",
+          spaceName: "Sprint Planning",
+          credentialName: "default",
           pageAllowlist: [],
           pageDenylist: [],
           credentialsConfigured: true,
@@ -35,10 +46,11 @@ describe("ConfluenceConnectStep (connectors)", () => {
 
     render(<ConfluenceConnectStep projectId="proj-1" onSaved={onSaved} onClose={onClose} />);
 
+    // The single stored credential is adopted automatically once it loads.
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
+
     await user.type(screen.getByLabelText(/confluence base url/i), "https://example.atlassian.net");
     await user.type(screen.getByLabelText(/space id/i), "123456");
-    await user.type(screen.getByLabelText(/account email/i), "user@example.com");
-    await user.type(screen.getByLabelText(/api token/i), "my-secret-token");
 
     const connectButton = screen.getByRole("button", { name: /^connect space$/i });
     expect(connectButton).not.toBeDisabled();
@@ -49,6 +61,33 @@ describe("ConfluenceConnectStep (connectors)", () => {
       expect(onSaved).toHaveBeenCalledTimes(1);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("disables submit and the picker when no credentials are stored", async () => {
+    render(<ConfluenceConnectStep projectId="proj-1" onSaved={vi.fn()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toBeDisabled());
+    expect(screen.getByRole("button", { name: /^connect space$/i })).toBeDisabled();
+  });
+
+  it("shows a dedicated message when the picked credential no longer exists", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      atlassianCredentialsHandler(["default"]),
+      http.post("/api/v1/confluence/projects/proj-1/connections", () =>
+        HttpResponse.json({ message: "credential not found" }, { status: 404 }),
+      ),
+    );
+
+    render(<ConfluenceConnectStep projectId="proj-1" onSaved={vi.fn()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Credential")).toHaveTextContent("default"));
+    await user.type(screen.getByLabelText(/confluence base url/i), "https://example.atlassian.net");
+    await user.type(screen.getByLabelText(/space id/i), "123456");
+    await user.click(screen.getByRole("button", { name: /^connect space$/i }));
+
+    expect(await screen.findByText(/credential no longer exists/i)).toBeInTheDocument();
   });
 
   it("calls onClose when cancel button is clicked", async () => {

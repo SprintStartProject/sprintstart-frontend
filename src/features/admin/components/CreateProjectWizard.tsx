@@ -142,8 +142,7 @@ export function CreateProjectWizard({
 
   const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
   const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
-  const [confluenceEmail, setConfluenceEmail] = useState("");
-  const [confluenceApiToken, setConfluenceApiToken] = useState("");
+  const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
 
   // Upload files staged in memory; uploaded during provisioning once a project
   // id exists.
@@ -185,6 +184,9 @@ export function CreateProjectWizard({
   };
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
+  const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
+  // Jira and Confluence share the same Atlassian credential store, so one
+  // instance of the hook backs both detail screens' pickers.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
@@ -192,7 +194,7 @@ export function CreateProjectWizard({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useAtlassianCredentials(isOpen && isJiraDetail);
+  } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail));
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -206,13 +208,21 @@ export function CreateProjectWizard({
     });
   }, [effectiveTokenNames]);
 
-  // Same adoption pattern for the Jira credential picker: select the first
-  // stored credential once the list arrives, keeping a still-valid choice.
+  // Same adoption pattern for the Jira and Confluence credential pickers:
+  // select the first stored credential once the list arrives, keeping a
+  // still-valid choice. Both fields share the list, so a credential just added
+  // from either detail screen is adopted here too.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
     void Promise.resolve().then(() => {
       setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+      setConfluenceCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
         return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
@@ -247,8 +257,7 @@ export function CreateProjectWizard({
   const resetConfluenceDraftFields = () => {
     setConfluenceBaseUrl("");
     setConfluenceSpaceId("");
-    setConfluenceEmail("");
-    setConfluenceApiToken("");
+    setConfluenceCredentialName("");
   };
 
   const resetWizard = () => {
@@ -399,8 +408,18 @@ export function CreateProjectWizard({
     await reloadJiraCredentials();
   };
 
+  const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
+    addCredentialLocally(credential);
+    setConfluenceCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
+  );
+
+  const selectedConfluenceCredential = jiraCredentials.find(
+    (credential) => credential.displayName === confluenceCredentialName,
   );
 
   const canAddSource =
@@ -414,8 +433,7 @@ export function CreateProjectWizard({
             ? Boolean(
                 confluenceBaseUrl.trim() &&
                 confluenceSpaceId.trim() &&
-                confluenceEmail.trim() &&
-                confluenceApiToken.trim(),
+                selectedConfluenceCredential,
               )
             : false;
 
@@ -445,15 +463,14 @@ export function CreateProjectWizard({
     } else if (addType === "UPLOAD") {
       const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
       setSources((current) => addDraftSource(current, createUploadDraft(displayName, uploadFiles)));
-    } else if (addType === "CONFLUENCE") {
+    } else if (addType === "CONFLUENCE" && selectedConfluenceCredential) {
       setSources((current) =>
         addDraftSource(
           current,
           createConfluenceDraft({
             baseUrl: confluenceBaseUrl.trim(),
             spaceId: confluenceSpaceId.trim(),
-            email: confluenceEmail.trim(),
-            apiToken: confluenceApiToken.trim(),
+            credentialName: selectedConfluenceCredential.displayName,
           }),
         ),
       );
@@ -822,13 +839,17 @@ export function CreateProjectWizard({
                 confluence={{
                   baseUrl: confluenceBaseUrl,
                   spaceId: confluenceSpaceId,
-                  email: confluenceEmail,
-                  apiToken: confluenceApiToken,
+                  credentialName: confluenceCredentialName,
+                  credentials: jiraCredentials,
+                  credentialsLoaded: jiraCredentialsLoaded,
+                  credentialsLoading: jiraCredentialsLoading,
+                  credentialsError: jiraCredentialsError,
+                  defaultUserEmail: null,
                   onBaseUrlChange: setConfluenceBaseUrl,
                   onSpaceIdChange: setConfluenceSpaceId,
-                  onEmailChange: setConfluenceEmail,
-                  onApiTokenChange: setConfluenceApiToken,
+                  onCredentialNameChange: setConfluenceCredentialName,
                   onSubmit: commitAddSource,
+                  onCredentialSaved: handleConfluenceCredentialSaved,
                 }}
               />
             ) : (

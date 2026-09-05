@@ -34,8 +34,7 @@ describe("confluenceService", () => {
         expect(body).toEqual({
           baseUrl: "https://example.atlassian.net/wiki",
           spaceId: "SPACE-1",
-          email: "user@example.com",
-          apiToken: "secret-token",
+          credentialName: "default",
           pageAllowlist: [],
           pageDenylist: [],
         });
@@ -47,8 +46,7 @@ describe("confluenceService", () => {
     const result = await confluenceService.createConnection("proj-1", {
       baseUrl: "https://example.atlassian.net/wiki",
       spaceId: "SPACE-1",
-      email: "user@example.com",
-      apiToken: "secret-token",
+      credentialName: "default",
     });
 
     expect(result).toEqual(mockConnection);
