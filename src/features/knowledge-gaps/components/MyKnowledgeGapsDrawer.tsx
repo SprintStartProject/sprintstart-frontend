@@ -5,7 +5,7 @@ import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { formatDateTime, formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
-import { SeveritySummaryBar } from "./SeverityIndicators";
+import { GapTypeChips, SeverityPill, SeveritySummaryBar } from "./SeverityIndicators";
 import type { KnowledgeGap } from "../types";
 
 export type MyKnowledgeGapsDrawerProps = {
@@ -44,23 +44,6 @@ function ChipLabel({ children }: { children: string }) {
   );
 }
 
-function TypeChips({ types, tone }: { types: readonly string[]; tone: "missing" | "present" }) {
-  const chip =
-    tone === "present"
-      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-[11px] text-app-success-text"
-      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-[11px] text-app-text-muted";
-
-  return (
-    <div className="flex flex-wrap gap-1">
-      {types.map((type) => (
-        <span key={type} className={chip}>
-          {type}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 /** One `label -- value` line of the source column. */
 function MetaRow({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
@@ -76,7 +59,7 @@ function MetaRow({ label, value, title }: { label: string; value: string; title?
 /** One owned component, spelled out -- nothing here is truncated or collapsed. */
 function GapDetails({ gap, currentUserId }: { gap: KnowledgeGap; currentUserId: string | null }) {
   const present = gap.presentTypes ?? [];
-  const { badge, label, longLabel, ring } = SEVERITY_STYLES[gap.severity];
+  const { longLabel, ring } = SEVERITY_STYLES[gap.severity];
   const firstIngested = gap.firstIngested ?? gap.lastIngested;
 
   // Everyone else on the hook for this component. The reader is in `owners` by definition --
@@ -98,20 +81,18 @@ function GapDetails({ gap, currentUserId }: { gap: KnowledgeGap; currentUserId: 
           </p>
         </div>
 
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${badge}`}>
-          {label}
-        </span>
+        <SeverityPill severity={gap.severity} />
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="min-w-0">
           <ChipLabel>Missing</ChipLabel>
-          <TypeChips types={gap.missingTypes} tone="missing" />
+          <GapTypeChips types={gap.missingTypes} tone="missing" />
 
           {present.length > 0 && (
             <div className="mt-3">
               <ChipLabel>Already documented</ChipLabel>
-              <TypeChips types={present} tone="present" />
+              <GapTypeChips types={present} tone="present" />
             </div>
           )}
         </div>
