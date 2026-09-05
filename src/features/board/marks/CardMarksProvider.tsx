@@ -13,6 +13,7 @@ import {
 } from "./cardMarks";
 import { addMark, enclosingMark, isMarked, unmarkPart } from "./markup";
 import { DEFAULT_HIGHLIGHT, type HighlightColor } from "./highlightColors";
+import { readMarkLabels, setMarkLabel, writeMarkLabels, type MarkLabels } from "./markLabels";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { subscribeToBoardStorageReplaced } from "../layout/boardStorage";
 import type { BoardCard } from "../types";
@@ -41,18 +42,36 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
   const { selectedProjectId } = useProjectContext();
 
   const [marks, setMarks] = useState<CardMarks>({});
+  const [labels, setLabels] = useState<MarkLabels>({});
   const [readFor, setReadFor] = useState<string | null>(null);
 
   if (selectedProjectId !== readFor) {
     setReadFor(selectedProjectId);
     setMarks(readCardMarks(selectedProjectId));
+    setLabels(readMarkLabels(selectedProjectId));
   }
 
   // And again when the stored arrangement is replaced under us — this hire's highlights arriving
   // from the server on the first load of a visit. Only *replaced*: re-reading after our own writes
   // would re-seat state we just set.
   useEffect(
-    () => subscribeToBoardStorageReplaced(() => setMarks(readCardMarks(selectedProjectId))),
+    () =>
+      subscribeToBoardStorageReplaced(() => {
+        setMarks(readCardMarks(selectedProjectId));
+        setLabels(readMarkLabels(selectedProjectId));
+      }),
+    [selectedProjectId],
+  );
+
+  const nameColor = useCallback(
+    (color: HighlightColor, name: string) => {
+      setLabels((current) => {
+        const next = setMarkLabel(current, color, name);
+        writeMarkLabels(selectedProjectId, next);
+
+        return next;
+      });
+    },
     [selectedProjectId],
   );
 
@@ -178,8 +197,32 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ canMark: hasBoard, marksFor, colorAt, enclosingColorAt, mark, unmark, setBoard }),
-    [hasBoard, marksFor, colorAt, enclosingColorAt, mark, unmark, setBoard],
+    () => ({
+      canMark: hasBoard,
+      marksFor,
+      colorAt,
+      enclosingColorAt,
+      mark,
+      unmark,
+      // A note highlighted anywhere always gets a colour entry too, so the map answers this for
+      // every kind without having to walk the cards' text.
+      hasAnyMarks: Object.keys(marks).length > 0,
+      labels,
+      nameColor,
+      setBoard,
+    }),
+    [
+      hasBoard,
+      marksFor,
+      colorAt,
+      enclosingColorAt,
+      mark,
+      unmark,
+      marks,
+      labels,
+      nameColor,
+      setBoard,
+    ],
   );
 
   return <CardMarksContext.Provider value={value}>{children}</CardMarksContext.Provider>;

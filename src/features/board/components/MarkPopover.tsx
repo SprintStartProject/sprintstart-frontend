@@ -2,12 +2,9 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
 
-import {
-  HIGHLIGHT_CLASS,
-  HIGHLIGHT_COLORS,
-  HIGHLIGHT_LABEL,
-  type HighlightColor,
-} from "../marks/highlightColors";
+import { HIGHLIGHT_CLASS, HIGHLIGHT_COLORS, type HighlightColor } from "../marks/highlightColors";
+import { labelFor } from "../marks/markLabels";
+import { useCardMarks } from "../marks/useCardMarks";
 
 type MarkPopoverProps = {
   /** The highlight this belongs to, in viewport coordinates. */
@@ -66,6 +63,9 @@ function popoverStyle(anchor: DOMRect): CSSProperties {
  * moment, and this one is the one that was just asked for.
  */
 export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPopoverProps) {
+  // The hire's own word for each colour where they have written one — "ask about" is a better thing
+  // for a button to be called than "Green", and it is the only label here that says anything.
+  const { labels } = useCardMarks();
   const bar = useRef<HTMLDivElement>(null);
 
   // Takes the caret, so somebody who opened this from the keyboard is standing in it rather than
@@ -111,8 +111,8 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
           type="button"
           onClick={() => onPick(option)}
           aria-pressed={color === option}
-          aria-label={HIGHLIGHT_LABEL[option]}
-          title={HIGHLIGHT_LABEL[option]}
+          aria-label={labelFor(labels, option)}
+          title={labelFor(labels, option)}
           className={`h-6 w-6 rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
             HIGHLIGHT_CLASS[option]
           } ${

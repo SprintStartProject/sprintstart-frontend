@@ -30,6 +30,7 @@ describe("forgetting a card that is really gone", () => {
         c1: [{ text: "gone", color: "yellow" }],
         c2: [{ text: "stays", color: "blue" }],
       },
+      markLabels: { blue: "read it" },
     });
   });
 
@@ -64,6 +65,8 @@ describe("forgetting a card that is really gone", () => {
     expect(after.origins.c2).toEqual(before.origins.c2);
     expect(after.marks.c2).toEqual(before.marks.c2);
     expect(after.groupStages).toEqual(before.groupStages);
+    // The legend belongs to the board, not to any card on it.
+    expect(after.markLabels).toEqual(before.markLabels);
   });
 
   it("does nothing to a card it never knew", () => {

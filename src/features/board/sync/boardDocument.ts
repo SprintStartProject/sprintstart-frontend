@@ -10,6 +10,7 @@ import { readPinnedCards, writePinnedCards } from "../layout/pinnedCards";
 import { readCardSizes, writeCardSizes, type CardSizes, type CardWidth } from "../layout/cardSizes";
 import { readCardOrigins, writeCardOrigins, type CardOrigins } from "../layout/cardOrigins";
 import { readCardMarks, writeCardMarks, type CardMarks } from "../marks/cardMarks";
+import { readMarkLabels, writeMarkLabels, type MarkLabels } from "../marks/markLabels";
 import { toHighlightColor, type HighlightColor } from "../marks/highlightColors";
 import { notifyBoardStorageReplaced, whileApplying } from "../layout/boardStorage";
 
@@ -35,6 +36,8 @@ export type BoardDocument = {
   sizes: CardSizes;
   origins: CardOrigins;
   marks: CardMarks;
+  /** What the hire calls each highlight colour. See `marks/markLabels.ts`. */
+  markLabels: MarkLabels;
 };
 
 /**
@@ -55,6 +58,7 @@ export type BoardDocumentWire = {
   sizes: Record<string, { width: "NARROW" | "NORMAL" | "WIDE" }>;
   origins: CardOrigins;
   marks: Record<string, { text: string; color: "YELLOW" | "GREEN" | "BLUE" | "PINK" }[]>;
+  markLabels: Record<string, string>;
 };
 
 const WIDTH_UP: Record<CardWidth, BoardDocumentWire["sizes"][string]["width"]> = {
@@ -83,6 +87,7 @@ export function readBoardDocument(boardId: string, projectId: string): BoardDocu
     sizes: readCardSizes(boardId),
     origins: readCardOrigins(projectId),
     marks: readCardMarks(projectId),
+    markLabels: readMarkLabels(projectId),
   };
 }
 
@@ -111,6 +116,7 @@ export function applyBoardDocument(
     writeCardSizes(boardId, document.sizes);
     writeCardOrigins(projectId, document.origins);
     writeCardMarks(projectId, document.marks);
+    writeMarkLabels(projectId, document.markLabels);
   });
 
   notifyBoardStorageReplaced();
@@ -133,7 +139,8 @@ export function isEmptyDocument(document: BoardDocument): boolean {
     document.pinnedCardIds.length === 0 &&
     Object.keys(document.sizes).length === 0 &&
     Object.keys(document.origins).length === 0 &&
-    Object.keys(document.marks).length === 0
+    Object.keys(document.marks).length === 0 &&
+    Object.keys(document.markLabels).length === 0
   );
 }
 
@@ -147,6 +154,14 @@ export function toWire(document: BoardDocument): BoardDocumentWire {
       Object.entries(document.marks).map(([id, marks]) => [
         id,
         marks.map((mark) => ({ text: mark.text, color: COLOR_UP[mark.color] })),
+      ]),
+    ),
+    // Keyed by the colour in the server's spelling, so the legend survives the same round trip its
+    // colours do.
+    markLabels: Object.fromEntries(
+      Object.entries(document.markLabels).map(([color, name]) => [
+        COLOR_UP[color as HighlightColor],
+        name,
       ]),
     ),
   };
@@ -179,6 +194,14 @@ export function fromWire(wire: Partial<BoardDocumentWire> | null | undefined): B
           color: toHighlightColor(String(mark.color).toLowerCase()),
         })),
       ]),
+    ),
+    markLabels: Object.fromEntries(
+      Object.entries(wire?.markLabels ?? {})
+        .filter(([, name]) => typeof name === "string" && name.trim().length > 0)
+        .map(([color, name]): [HighlightColor, string] => [
+          toHighlightColor(color.toLowerCase()),
+          name,
+        ]),
     ),
   };
 }

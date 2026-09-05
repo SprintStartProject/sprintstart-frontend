@@ -29,6 +29,7 @@ import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
+import { MarkLegend } from "../features/board/components/MarkLegend";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
@@ -1112,6 +1113,11 @@ export function BoardPage() {
                   cuts={activeCuts}
                   onShowEverything={showEverything}
                 />
+
+                {/* Under the status line and above the cards, because it explains what is *in* the
+                    cards rather than what is being shown of them. Draws nothing until something is
+                    highlighted. */}
+                <MarkLegend />
 
                 <BoardGrid
                   board={griddedBoard}

@@ -3,6 +3,7 @@ import { createContext } from "react";
 import type { AuthoredCardRequest, BoardCard } from "../types";
 import type { CardMark } from "./cardMarks";
 import type { HighlightColor } from "./highlightColors";
+import type { MarkLabels } from "./markLabels";
 
 /**
  * The board, as far as the highlighter is concerned: some cards, and a way to rewrite one.
@@ -57,6 +58,12 @@ export type CardMarksContextType = {
   mark: (cardId: string, selected: string, color: HighlightColor) => void;
   /** Takes the highlight off the selected words, keeping whatever was marked around them. */
   unmark: (cardId: string, selected: string) => void;
+  /** Whether anything on this board is highlighted — what decides if a legend is worth drawing. */
+  hasAnyMarks: boolean;
+  /** What this hire calls each colour. See `markLabels.ts`. */
+  labels: MarkLabels;
+  /** Names a colour, or clears the name when given nothing. */
+  nameColor: (color: HighlightColor, name: string) => void;
   /** How a page showing cards hands them over. Null on the way out. See {@link MarkableBoard}. */
   setBoard: (board: MarkableBoard | null) => void;
 };

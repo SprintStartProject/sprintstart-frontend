@@ -23,6 +23,7 @@ const arranged: BoardDocument = {
   sizes: { c1: { width: "wide" } },
   origins: { c1: { url: "/knowledge-base?artifact=a1", label: "Deployment" } },
   marks: { c1: [{ text: "on Thursdays", color: "green" }] },
+  markLabels: { green: "ask about" },
 };
 
 describe("the board's arrangement as one document", () => {
@@ -68,6 +69,11 @@ describe("the board's arrangement as one document", () => {
       expect(fromWire(toWire(arranged))).toEqual(arranged);
     });
 
+    it("carries the legend through the same spelling change its colours do", () => {
+      expect(toWire(arranged).markLabels).toEqual({ GREEN: "ask about" });
+      expect(fromWire(toWire(arranged)).markLabels).toEqual({ green: "ask about" });
+    });
+
     it("falls back rather than losing the entry that carries an unknown value", () => {
       const wire = toWire(arranged);
       const odd = {
@@ -98,5 +104,6 @@ function emptyDocument(): BoardDocument {
     sizes: {},
     origins: {},
     marks: {},
+    markLabels: {},
   };
 }
