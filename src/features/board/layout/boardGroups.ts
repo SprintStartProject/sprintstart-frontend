@@ -94,14 +94,25 @@ const TEAM_AREA = "From your team";
  * three the generator made and leaves the rest alone.
  */
 function unsplitTeamArea(name: string): string {
-  // Only the three names the generator could actually produce. "From your team — my copy" is a
-  // hire naming their own area, and renaming that would be this function editing somebody's words.
-  const split = BOARD_STAGES.some(
-    (stage) => name === `${TEAM_AREA} \u2014 ${STAGE_LABELS[stage].title}`,
-  );
+  // Only the names the generator could actually produce. "From your team — my copy" is a hire
+  // naming their own area, and renaming that would be this function editing somebody's words.
+  const split = SPLIT_TEAM_AREA_TITLES.some((title) => name === `${TEAM_AREA} \u2014 ${title}`);
 
   return split ? TEAM_AREA : name;
 }
+
+/**
+ * The stage words that could be on the end of a generated area's name.
+ *
+ * Read from the stages *plus* the one the board no longer has. Deriving this from `BOARD_STAGES`
+ * alone looked right and was wrong the moment `NEXT` was removed: the boards this function exists
+ * for are exactly the ones generated while there were three stages, so dropping "Next" from the
+ * list left them with the extra tab stop it was written to take away.
+ */
+const SPLIT_TEAM_AREA_TITLES: readonly string[] = [
+  ...BOARD_STAGES.map((stage) => STAGE_LABELS[stage].title),
+  "Next",
+];
 
 /**
  * Areas sharing a name folded into one, keeping the first one's place and id.
@@ -151,21 +162,46 @@ export function groupOf(groups: BoardGroup[], cardId: string): BoardGroup | null
 /**
  * Puts a card in a group, taking it out of whatever group it was in.
  *
- * `groupId` of null means "no group". A group left with nothing in it is dropped rather than kept
- * as an empty box: the name was for the cards, and there are none.
+ * `groupId` of null means "no group".
+ *
+ * **An area left with nothing in it survives.** It used to be dropped — the name was for the cards,
+ * and there were none — which was right while the only way to make an area was to put a card in
+ * one. Now that an area can be made empty and named first, "empty" can no longer mean "delete me":
+ * a hire who drags the last card out of *Paperwork* to look at it somewhere else would come back to
+ * find the area gone and its name with it. Removing an area is {@link dissolveGroup}'s job, which
+ * is the only place a person actually asks for it.
  */
 export function assignToGroup(
   groups: BoardGroup[],
   cardId: string,
   groupId: string | null,
 ): BoardGroup[] {
-  return groups
-    .map((group) => ({
-      ...group,
-      cardIds:
-        group.id === groupId
-          ? [...group.cardIds.filter((id) => id !== cardId), cardId]
-          : group.cardIds.filter((id) => id !== cardId),
-    }))
-    .filter((group) => group.cardIds.length > 0);
+  return groups.map((group) => ({
+    ...group,
+    cardIds:
+      group.id === groupId
+        ? [...group.cardIds.filter((id) => id !== cardId), cardId]
+        : group.cardIds.filter((id) => id !== cardId),
+  }));
+}
+
+/** Takes an area away. Its cards keep their place on the board; only the grouping goes. */
+export function dissolveGroup(groups: BoardGroup[], groupId: string): BoardGroup[] {
+  return groups.filter((group) => group.id !== groupId);
+}
+
+/**
+ * A new, empty area, named after the ones already there.
+ *
+ * The name is a placeholder and is expected to be replaced immediately — every caller opens it for
+ * editing — but it is a real name rather than an empty string, so an area whose naming was
+ * abandoned is still something a person can point at and rename later.
+ */
+export function newBoardGroup(groups: BoardGroup[]): BoardGroup {
+  return {
+    id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name: `Area ${groups.length + 1}`,
+    cardIds: [],
+    collapsed: false,
+  };
 }

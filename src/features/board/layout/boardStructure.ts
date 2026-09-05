@@ -76,6 +76,30 @@ export function stageOrder(stage: BoardStage): number {
  * Everything is optional because a board with no structure at all is the honest starting state —
  * an entry only exists once somebody has said something about that card.
  */
+/**
+ * Who put a card behind another one.
+ *
+ * Two different claims used to be written into the same list. "The team says you cannot touch
+ * deploys before you have read the runbook" is a rule about the work; "I want to do these three in
+ * this order" is one person's plan for their afternoon. Stored as bare ids they were
+ * indistinguishable, so the hire's picker could quietly clear a rule the PM had written into a
+ * blueprint, and nobody — not the PM, not the buddy — would ever know it had gone.
+ *
+ * - `TEAM` — from a card blueprint. The PM's, and the hire may not take it off.
+ * - `BUDDY` — from a generated path. Named on the card so it does not look like the hire's own
+ *   doing, but still theirs to clear: the buddy is an assistant, not an authority.
+ * - `HIRE` — theirs, and the only kind their own controls write.
+ */
+export type DependencySource = "TEAM" | "BUDDY" | "HIRE";
+
+/** One "comes after", and who said so. */
+export type CardDependency = { id: string; source: DependencySource };
+
+/** Whether the hire's own controls may take this dependency off again. */
+export function isRemovableByHire(dependency: CardDependency): boolean {
+  return dependency.source !== "TEAM";
+}
+
 export type CardStructure = {
   stage?: BoardStage;
   /**
@@ -85,7 +109,7 @@ export type CardStructure = {
    * about two particular cards and not about two categories. A dependency on a card that has since
    * been dismissed is dropped on read rather than blocking forever.
    */
-  dependsOn?: string[];
+  dependsOn?: CardDependency[];
   /**
    * Ticked off by hand, for the kinds whose completion nothing can observe.
    *
@@ -118,6 +142,29 @@ function isStage(value: unknown): value is BoardStage {
   return typeof value === "string" && (BOARD_STAGES as readonly string[]).includes(value);
 }
 
+/**
+ * One stored dependency, in either shape it has been written in.
+ *
+ * A bare string is what every board written before dependencies had a source holds. It reads as the
+ * hire's own — never as the team's. Guessing the other way would retroactively lock every sequence
+ * a hire ever dragged together, on boards where nobody can say where those sequences came from, and
+ * leave them with no way out.
+ *
+ * A read rather than a version bump, for the reason the storage's own note gives: bumping discards
+ * everything the old version wrote, which here is every stage and every hand-set tick as well.
+ */
+function toDependency(value: unknown): CardDependency | null {
+  if (typeof value === "string") return { id: value, source: "HIRE" };
+  if (typeof value !== "object" || value === null) return null;
+
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.id !== "string") return null;
+  const source =
+    raw.source === "TEAM" || raw.source === "BUDDY" || raw.source === "HIRE" ? raw.source : "HIRE";
+
+  return { id: raw.id, source };
+}
+
 /** One stored card entry, with anything unrecognised dropped rather than trusted. */
 function toCardStructure(value: unknown): CardStructure | null {
   if (typeof value !== "object" || value === null) return null;
@@ -127,7 +174,9 @@ function toCardStructure(value: unknown): CardStructure | null {
   const stage = toStage(raw.stage);
   if (stage) entry.stage = stage;
   if (Array.isArray(raw.dependsOn)) {
-    entry.dependsOn = raw.dependsOn.filter((id): id is string => typeof id === "string");
+    entry.dependsOn = raw.dependsOn
+      .map(toDependency)
+      .filter((dependency): dependency is CardDependency => dependency !== null);
   }
   if (raw.markedDone === true) entry.markedDone = true;
 
@@ -268,6 +317,8 @@ export type CardState = {
    * arranged rather than watch the picker forget it.
    */
   predecessorId: string | null;
+  /** Who put that card in front of this one, or null when nothing is. */
+  predecessorSource: DependencySource | null;
   progress: { done: number; total: number } | null;
 };
 
@@ -296,15 +347,26 @@ export function deriveCardStates(
     const progress = cardProgress(card);
     // Dependencies on cards that have left the board are dropped: a hire who dismissed the runbook
     // card is not thereby blocked forever on a card nobody can see.
-    const predecessorId = (entry?.dependsOn ?? []).find((id) => byId.has(id)) ?? null;
+    const predecessor = (entry?.dependsOn ?? []).find((dependency) => byId.has(dependency.id));
+    const predecessorId = predecessor?.id ?? null;
+    // Carried out with the id so the control can ask "may I offer to change this" without going
+    // back to the structure — the same reason every other question about a card is answered here.
+    const predecessorSource = predecessor?.source ?? null;
 
     if (done.get(card.id)) {
-      states.set(card.id, { status: "DONE", stage, blockedBy: [], predecessorId, progress });
+      states.set(card.id, {
+        status: "DONE",
+        stage,
+        blockedBy: [],
+        predecessorId,
+        predecessorSource,
+        progress,
+      });
       continue;
     }
 
     const blockedBy = (entry?.dependsOn ?? [])
-      .map((id) => byId.get(id))
+      .map((dependency) => byId.get(dependency.id))
       .filter((blocker): blocker is BoardCard => blocker !== undefined && !done.get(blocker.id));
 
     states.set(card.id, {
@@ -312,6 +374,7 @@ export function deriveCardStates(
       stage,
       blockedBy,
       predecessorId,
+      predecessorSource,
       progress,
     });
   }
@@ -382,12 +445,16 @@ export function setMarkedDone(
  * Cycles are refused rather than stored: two cards that block each other block forever, and the
  * hire has no way to see why. The check walks the existing edges from the proposed blocker — if it
  * can already reach the card being blocked, adding this edge would close a loop.
+ *
+ * `source` says who is claiming it, and only matters on the way out: a `TEAM` edge is not removed
+ * by asking. See {@link DependencySource}.
  */
 export function setDependency(
   structure: BoardStructure,
   cardId: string,
   blockerId: string,
   depends: boolean,
+  source: DependencySource = "HIRE",
 ): BoardStructure {
   const existing = structure.cards[cardId]?.dependsOn ?? [];
 
@@ -398,21 +465,52 @@ export function setDependency(
         ...structure.cards,
         [cardId]: {
           ...structure.cards[cardId],
-          dependsOn: existing.filter((id) => id !== blockerId),
+          // A rule the team wrote survives being asked to go. The hire's controls never ask —
+          // they offer no way to — but the generator re-running is another matter, and a rule
+          // that could be cleared by anything that happened to call this would not be one.
+          dependsOn: existing.filter(
+            (dependency) => dependency.id !== blockerId || !isRemovableByHire(dependency),
+          ),
         },
       },
     };
   }
 
-  if (cardId === blockerId || existing.includes(blockerId)) return structure;
+  if (cardId === blockerId || existing.some((dependency) => dependency.id === blockerId)) {
+    return structure;
+  }
   if (reaches(structure, blockerId, cardId)) return structure;
 
   return {
     ...structure,
     cards: {
       ...structure.cards,
-      [cardId]: { ...structure.cards[cardId], dependsOn: [...existing, blockerId] },
+      [cardId]: {
+        ...structure.cards[cardId],
+        dependsOn: [...existing, { id: blockerId, source }],
+      },
     },
+  };
+}
+
+/**
+ * Takes off every dependency the hire's own controls are allowed to take off.
+ *
+ * The picker offers one predecessor at a time, so choosing a new one means dropping the last — and
+ * "the last" has to mean the last *they* set. A rule the team wrote into a blueprint is not that
+ * control's to drop, and one card can carry both.
+ *
+ * Here rather than in the hook that calls it because it is the same rule {@link setDependency}
+ * applies on removal, and a rule about who may unsay what belongs with the thing being said.
+ */
+export function clearHireDependencies(structure: BoardStructure, cardId: string): BoardStructure {
+  const kept = (structure.cards[cardId]?.dependsOn ?? []).filter(
+    (dependency) => !isRemovableByHire(dependency),
+  );
+
+  return {
+    ...structure,
+    cards: { ...structure.cards, [cardId]: { ...structure.cards[cardId], dependsOn: kept } },
   };
 }
 
@@ -426,7 +524,7 @@ function reaches(structure: BoardStructure, from: string, target: string): boole
     if (current === target) return true;
     if (seen.has(current)) continue;
     seen.add(current);
-    queue.push(...(structure.cards[current]?.dependsOn ?? []));
+    queue.push(...(structure.cards[current]?.dependsOn ?? []).map((dependency) => dependency.id));
   }
 
   return false;
@@ -439,7 +537,7 @@ export function pruneStructure(structure: BoardStructure, cardIds: Set<string>):
     if (!cardIds.has(cardId)) continue;
     cards[cardId] = {
       ...entry,
-      dependsOn: entry.dependsOn?.filter((id) => cardIds.has(id)),
+      dependsOn: entry.dependsOn?.filter((dependency) => cardIds.has(dependency.id)),
     };
   }
 

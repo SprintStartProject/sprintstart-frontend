@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { BoardCard } from "../types";
 import {
+  clearHireDependencies,
   deriveCardStates,
   EMPTY_STRUCTURE,
   pruneStructure,
@@ -13,6 +14,7 @@ import {
   type BoardStage,
   type BoardStructure,
   type CardState,
+  type DependencySource,
 } from "../layout/boardStructure";
 
 export type UseBoardStructureResult = {
@@ -41,7 +43,10 @@ export type UseBoardStructureResult = {
    * iteration overwrite the last and leave only the final card sequenced — the kind of bug that
    * looks like "the generator only did the last phase" and is nothing of the sort.
    */
-  applyPlan: (stages: Record<string, BoardStage>, chain: Record<string, string>) => void;
+  applyPlan: (
+    stages: Record<string, BoardStage>,
+    chain: Record<string, { id: string; source: DependencySource }>,
+  ) => void;
 };
 
 /**
@@ -100,19 +105,19 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
     toggleDependency: (cardId, blockerId, depends) =>
       save(setDependency(structure, cardId, blockerId, depends)),
     setPredecessor: (cardId, blockerId) => {
-      const cleared: BoardStructure = {
-        ...structure,
-        cards: { ...structure.cards, [cardId]: { ...structure.cards[cardId], dependsOn: [] } },
-      };
-      save(blockerId ? setDependency(cleared, cardId, blockerId, true) : cleared);
+      // Only the hire's own edges go: the control offers one predecessor at a time, so choosing
+      // a new one drops the last one *they* set and leaves a rule the team wrote where it is.
+      const cleared = clearHireDependencies(structure, cardId);
+
+      save(blockerId ? setDependency(cleared, cardId, blockerId, true, "HIRE") : cleared);
     },
     applyPlan: (stages, chain) => {
       let next = structure;
       for (const [cardId, stage] of Object.entries(stages)) {
         next = setCardStage(next, cardId, stage);
       }
-      for (const [cardId, blockerId] of Object.entries(chain)) {
-        next = setDependency(next, cardId, blockerId, true);
+      for (const [cardId, predecessor] of Object.entries(chain)) {
+        next = setDependency(next, cardId, predecessor.id, true, predecessor.source);
       }
       save(next, Object.keys(stages));
     },

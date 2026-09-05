@@ -256,7 +256,14 @@ describe("the stage bands", () => {
     return new Map(
       stages.map((stage, index) => [
         `c${index}`,
-        { status: "OPEN", stage, blockedBy: [], predecessorId: null, progress: null },
+        {
+          status: "OPEN",
+          stage,
+          blockedBy: [],
+          predecessorId: null,
+          predecessorSource: null,
+          progress: null,
+        },
       ]),
     );
   }

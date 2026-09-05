@@ -1,6 +1,6 @@
 import type { OnboardingPathEndpoint, OnboardingStepEndpoint } from "../../onboarding/types";
 import type { AuthoredCardRequest } from "../types";
-import type { BoardStage } from "../layout/boardStructure";
+import type { BoardStage, DependencySource } from "../layout/boardStructure";
 
 /**
  * Turning the hire's personalised onboarding path into cards on their board.
@@ -66,6 +66,16 @@ export type PlannedCard = {
 export type PlannedArea = {
   name: string;
   cards: PlannedCard[];
+  /**
+   * Who is claiming the chains in this area — the team, through a blueprint, or the buddy, through
+   * a generated path.
+   *
+   * Carried on the area rather than on each card because it is a property of where the plan came
+   * from, and one plan's areas never mix the two. It ends up on the board as the source of every
+   * dependency the area writes, which is what stops a hire from clearing a rule their PM wrote and
+   * what lets a buddy's suggestion say whose it was.
+   */
+  source: DependencySource;
 };
 
 export type CardPlan = {
@@ -190,7 +200,7 @@ export function planCardsFromPath(path: OnboardingPathEndpoint): CardPlan {
       afterKey: stepIndex === 0 ? null : steps[stepIndex - 1].id,
     }));
 
-    if (cards.length > 0) areas.push({ name: phase.title, cards });
+    if (cards.length > 0) areas.push({ name: phase.title, cards, source: "BUDDY" });
   });
 
   return { areas, cardCount: areas.reduce((total, area) => total + area.cards.length, 0) };

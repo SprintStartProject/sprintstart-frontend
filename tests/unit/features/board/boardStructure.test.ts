@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  clearHireDependencies,
   currentStage,
   deriveCardStates,
   isCardDone,
@@ -38,6 +39,9 @@ function structure(cards: BoardStructure["cards"]): BoardStructure {
   return { cards, groupStages: {} };
 }
 
+/** Dependencies as the hire's own controls write them. */
+const after = (...ids: string[]) => ids.map((id) => ({ id, source: "HIRE" as const }));
+
 describe("isCardDone", () => {
   it("counts a fully ticked checklist as done", () => {
     const card = checklist("a", [{ text: "one", done: true }]);
@@ -69,7 +73,7 @@ describe("deriveCardStates", () => {
 
     const states = deriveCardStates(
       [first, second],
-      structure({ second: { dependsOn: ["first"] } }),
+      structure({ second: { dependsOn: after("first") } }),
     );
 
     expect(states.get("second")?.status).toBe("BLOCKED");
@@ -82,7 +86,7 @@ describe("deriveCardStates", () => {
 
     const states = deriveCardStates(
       [first, second],
-      structure({ second: { dependsOn: ["first"] } }),
+      structure({ second: { dependsOn: after("first") } }),
     );
 
     expect(states.get("second")?.status).toBe("OPEN");
@@ -93,7 +97,7 @@ describe("deriveCardStates", () => {
   it("ignores a dependency on a card that has left the board", () => {
     const only = checklist("only", [{ text: "one", done: false }]);
 
-    const states = deriveCardStates([only], structure({ only: { dependsOn: ["dismissed"] } }));
+    const states = deriveCardStates([only], structure({ only: { dependsOn: after("dismissed") } }));
 
     expect(states.get("only")?.status).toBe("OPEN");
   });
@@ -127,7 +131,7 @@ describe("currentStage", () => {
       [first, second],
       structure({
         first: { stage: "NOW" },
-        second: { stage: "NOW", dependsOn: ["first"] },
+        second: { stage: "NOW", dependsOn: after("first") },
       }),
     );
 
@@ -157,7 +161,7 @@ describe("setDependency", () => {
 describe("pruneStructure", () => {
   it("forgets cards that are gone, and edges pointing at them", () => {
     const stored = structure({
-      kept: { stage: "LATER", dependsOn: ["gone"] },
+      kept: { stage: "LATER", dependsOn: after("gone") },
       gone: { stage: "NOW" },
     });
 
@@ -170,7 +174,7 @@ describe("pruneStructure", () => {
 
 describe("storage", () => {
   it("round-trips a structure", () => {
-    const stored = structure({ a: { stage: "LATER", dependsOn: ["b"], markedDone: true } });
+    const stored = structure({ a: { stage: "LATER", dependsOn: after("b"), markedDone: true } });
     writeBoardStructure("board-1", stored);
 
     expect(readBoardStructure("board-1")).toEqual(stored);
@@ -209,5 +213,78 @@ describe("storage", () => {
     );
 
     expect(readBoardStructure("board-3")).toEqual(structure({ a: { dependsOn: [] } }));
+  });
+});
+
+describe("who put a card behind another one", () => {
+  it("reads a dependency written before there were sources as the hire's own", () => {
+    window.localStorage.setItem(
+      "sprintstart:board-structure:board-5",
+      JSON.stringify({
+        version: 1,
+        structure: { cards: { b: { dependsOn: ["a"] } }, groupStages: {} },
+      }),
+    );
+
+    // Never as the team's: guessing that way would retroactively lock every sequence a hire ever
+    // dragged together, on boards where nobody can say where those sequences came from.
+    expect(readBoardStructure("board-5")).toEqual(structure({ b: { dependsOn: after("a") } }));
+  });
+
+  it("round-trips a source it does know", () => {
+    const stored = structure({ b: { dependsOn: [{ id: "a", source: "TEAM" }] } });
+    writeBoardStructure("board-6", stored);
+
+    expect(readBoardStructure("board-6")).toEqual(stored);
+  });
+
+  it("reads a source it does not know as the hire's own", () => {
+    window.localStorage.setItem(
+      "sprintstart:board-structure:board-7",
+      JSON.stringify({
+        version: 1,
+        structure: { cards: { b: { dependsOn: [{ id: "a", source: "MANAGEMENT" }] } } },
+      }),
+    );
+
+    expect(readBoardStructure("board-7")).toEqual(structure({ b: { dependsOn: after("a") } }));
+  });
+
+  it("says who set the predecessor it reports", () => {
+    const first = note("first");
+    const second = note("second");
+
+    const states = deriveCardStates(
+      [first, second],
+      structure({ second: { dependsOn: [{ id: "first", source: "TEAM" }] } }),
+    );
+
+    expect(states.get("second")?.predecessorSource).toBe("TEAM");
+    expect(states.get("first")?.predecessorSource).toBeNull();
+  });
+
+  it("keeps a rule the team wrote when something asks to remove it", () => {
+    const ruled = structure({ b: { dependsOn: [{ id: "a", source: "TEAM" }] } });
+
+    expect(setDependency(ruled, "b", "a", false).cards.b?.dependsOn).toEqual([
+      { id: "a", source: "TEAM" },
+    ]);
+  });
+
+  it("clears the hire's own edges and leaves the team's", () => {
+    const both = structure({
+      b: { dependsOn: [{ id: "a", source: "TEAM" }, ...after("c")] },
+    });
+
+    expect(clearHireDependencies(both, "b").cards.b?.dependsOn).toEqual([
+      { id: "a", source: "TEAM" },
+    ]);
+  });
+
+  it("lets a buddy's link go, because a suggestion is not a rule", () => {
+    const suggested = structure({ b: { dependsOn: [{ id: "a", source: "BUDDY" }] } });
+
+    expect(clearHireDependencies(suggested, "b").cards.b?.dependsOn).toEqual([]);
+    expect(setDependency(suggested, "b", "a", false).cards.b?.dependsOn).toEqual([]);
   });
 });

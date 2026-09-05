@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, X } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, Lock, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
@@ -32,8 +32,8 @@ import { BoardCardContext } from "./boardCardControls";
 import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
 import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents";
-import type { BoardDensity } from "../layout/boardPreferences";
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
+import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
@@ -77,15 +77,6 @@ const MOVE_COOLDOWN_MS = 160;
  * have reached it. Lifted from the dashboard, down to the numbers.
  */
 const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
-
-/**
- * The picker's "make a new one" option.
- *
- * A sentinel in the same select rather than a separate button, because creating an area and
- * putting the first card in it are the same intention — a button that made an empty area would
- * leave the hire with a named box and a second step to find.
- */
-export const NEW_GROUP = "__new__";
 
 /**
  * Everything on a card that already does something when it is clicked.
@@ -228,8 +219,8 @@ type Block =
  */
 const ROW_UNIT = 8;
 
-/** The gap between cards, per density. In JS because the row maths has to use the same number. */
-const GRID_GAP = { cozy: 16, compact: 10 } as const;
+/** The gap between cards. In JS because the row maths has to use the same number. */
+const GRID_GAP = 16;
 
 /** One stage of the board, with everything filed under it. */
 type Band = { stage: BoardStage; blocks: Block[]; total: number; remaining: number };
@@ -325,19 +316,6 @@ function toViewport(point: { x: number; y: number }): { x: number; y: number } {
   return { x: point.x - window.scrollX, y: point.y - window.scrollY };
 }
 
-/** The order that results from putting `movedId` where `targetId` currently is. */
-function moveTo(ids: string[], movedId: string, targetId: string): string[] {
-  const from = ids.indexOf(movedId);
-  const to = ids.indexOf(targetId);
-  if (from === -1 || to === -1 || from === to) return ids;
-
-  const next = [...ids];
-  next.splice(from, 1);
-  next.splice(to, 0, movedId);
-
-  return next;
-}
-
 type BoardGridProps = {
   board: Board;
   onDismiss?: (cardId: string) => void;
@@ -345,6 +323,14 @@ type BoardGridProps = {
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
   /** Applies a whole new order. Absent when the board is not arrangeable. */
   onReorder?: (cardIds: string[]) => void;
+  /**
+   * The board's whole order, filtered cards included, as the caller holds it.
+   *
+   * A reorder replaces the order outright; expressed over only what is drawn, it would drop every
+   * card the current view is hiding. Falls back to the drawn cards for a caller that never narrows
+   * what it passes.
+   */
+  boardOrder?: string[];
   /** Arrange mode: every control is on show and the card content stops taking clicks. */
   isArranging?: boolean;
   collapsedIds?: Set<string>;
@@ -354,24 +340,11 @@ type BoardGridProps = {
   groups?: BoardGroup[];
   onAssignGroup?: (cardId: string, groupId: string | null) => void;
   onRenameGroup?: (groupId: string, name: string) => void;
-  /** An area that was just created, whose name should open for editing straight away. */
-  renamingGroupId?: string | null;
-  onRenameGroupDone?: () => void;
   onToggleGroup?: (groupId: string) => void;
   /** Takes the area away and leaves its cards on the board, where they already are. */
   onDissolveGroup?: (groupId: string) => void;
   /** Paints an area. Absent on a board that cannot be changed. */
   onRecolourGroup?: (groupId: string, accent: AreaAccent) => void;
-  /**
-   * How much room the board gives each card.
-   *
-   * Applied as a `data-density` attribute on the grid's root rather than threaded through every
-   * card: the cards that respond to it are ten components deep and belong to eleven different
-   * files, and the two places it actually changes anything — a card's padding and the gaps between
-   * them — are better read as two rules next to the values they override than as a prop that
-   * arrives everywhere and is used twice. Same mechanism as `data-arranging`.
-   */
-  density?: BoardDensity;
   /**
    * Every card's derived place in the process, keyed by id.
    *
@@ -505,6 +478,7 @@ export function BoardGrid({
   dismissingId = null,
   onEdit,
   onReorder,
+  boardOrder,
   isArranging = false,
   collapsedIds,
   onToggleCollapsed,
@@ -513,12 +487,9 @@ export function BoardGrid({
   groups = [],
   onAssignGroup,
   onRenameGroup,
-  renamingGroupId,
-  onRenameGroupDone,
   onToggleGroup,
   onDissolveGroup,
   onRecolourGroup,
-  density,
   states,
   onAssignStage,
   onAssignGroupStage,
@@ -546,7 +517,7 @@ export function BoardGrid({
   const columns = wideEnough ? GRID_COLUMNS : 1;
 
   /** The gap between blocks, which the row maths has to agree with — see {@link GridBlock}. */
-  const gap = GRID_GAP[density ?? "cozy"];
+  const gap = GRID_GAP;
   const elements = useRef(new Map<string, HTMLDivElement>());
   const groupElements = useRef(new Map<string, HTMLElement>());
   const lastMoveAt = useRef(0);
@@ -561,16 +532,35 @@ export function BoardGrid({
   const revealId = useRef<string | null>(null);
   const reduceMotion = useReducedMotion();
 
-  const ids = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
+  /** The cards on screen, in the order they are drawn. */
+  const shownIds = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
+
+  /**
+   * The whole board's order, filtered cards included.
+   *
+   * A reorder replaces the board's order outright, so it has to be expressed over *all* of it. It
+   * used to be built from what was on screen, which is why arranging began by clearing the filter
+   * and the section: a drag on a narrowed board would have told the server about a fraction of it
+   * and let the rest fall to the end.
+   *
+   * The narrowing was never the problem, though — computing a *position* from a narrowed list was.
+   * Every move here is expressed as "put this card where that one is", and the card it names is one
+   * the hire can see and point at. {@link moveTo} then does the insertion in the full order, so
+   * twenty hidden cards between the two change nothing about where the moved one lands.
+   */
+  const ids = useMemo(() => boardOrder ?? shownIds, [boardOrder, shownIds]);
 
   const move = onReorder
     ? (cardId: string, direction: "up" | "down") => {
-        const from = ids.indexOf(cardId);
+        // Stepped through what is *shown*: the neighbour a hire means by "up" is the card above
+        // this one on their screen, not whichever card the full order happens to have next.
+        const from = shownIds.indexOf(cardId);
         const to = direction === "up" ? from - 1 : from + 1;
-        if (from === -1 || to < 0 || to >= ids.length) return;
-        const next = [...ids];
-        [next[from], next[to]] = [next[to], next[from]];
-        onReorder(next);
+        if (from === -1 || to < 0 || to >= shownIds.length) return;
+
+        // Anchored on that neighbour rather than swapped by index, so the step means the same
+        // thing whether or not there are hidden cards between the two.
+        onReorder(moveTo(ids, cardId, shownIds[to]));
       }
     : undefined;
 
@@ -799,6 +789,22 @@ export function BoardGrid({
    * They lead, above the bands. An area is a decision somebody made about what belongs together,
    * and the bands are the board's own answer to when; the named thing goes first.
    */
+  /**
+   * The areas with nothing drawn in them.
+   *
+   * They have no box in the grid — the grid is built by walking the cards — which used to be fine,
+   * because an area could not exist without one. It can now: the tool rail makes an empty one on
+   * purpose. So while the board is being arranged they are given a box of their own to be dropped
+   * into, which is the only way a first card gets into one now that the per-card picker is gone.
+   */
+  const emptyGroups = useMemo(
+    () =>
+      (groups ?? []).filter(
+        (group) => !board.cards.some((card) => group.cardIds.includes(card.id)),
+      ),
+    [board.cards, groups],
+  );
+
   const spanningGroups = useMemo<Block[]>(() => {
     if (!banding) return [];
 
@@ -929,8 +935,6 @@ export function BoardGrid({
         pinned={pinnedIds?.has(card.id) ?? false}
         onToggleCollapsed={onToggleCollapsed}
         onTogglePinned={onTogglePinned}
-        groups={groups}
-        onAssignGroup={onAssignGroup}
         allCards={board.cards}
         state={states?.get(card.id)}
         onAssignStage={isArranging ? onAssignStage : undefined}
@@ -1020,8 +1024,6 @@ export function BoardGrid({
           onMoveStep={(direction) => moveBlock(blockIndex, direction)}
           onDragMove={(element) => handleGroupDrag(blockIndex, element)}
           onRename={onRenameGroup}
-          autoEditName={block.group.id === renamingGroupId}
-          onNameEditDone={onRenameGroupDone}
           onToggle={onToggleGroup}
           onDissolve={onDissolveGroup}
           onRecolour={onRecolourGroup}
@@ -1047,8 +1049,6 @@ export function BoardGrid({
         onMoveStep={(direction) => moveBlock(blockIndex, direction)}
         onDragMove={(element) => handleGroupDrag(blockIndex, element)}
         onRename={onRenameGroup}
-        autoEditName={block.group.id === renamingGroupId}
-        onNameEditDone={onRenameGroupDone}
         onToggle={onToggleGroup}
         onDissolve={onDissolveGroup}
         onRecolour={onRecolourGroup}
@@ -1122,11 +1122,34 @@ export function BoardGrid({
     // same 24px as everything else, "Later" read as one more thing in the list above rather than as
     // the start of the next one. It is also the room a fanned pile in the last row needs, so the
     // sheets of a card at the bottom of "Now" do not reach into the heading under it.
-    <div
-      className="space-y-12"
-      data-arranging={isArranging || undefined}
-      data-density={density ?? undefined}
-    >
+    <div className="space-y-12" data-arranging={isArranging || undefined}>
+      {/* Only while arranging: an empty area is a destination, and a row of empty boxes over a
+          board somebody is only reading would be the page advertising work to do. */}
+      {isArranging && emptyGroups.length > 0 && onAssignGroup && (
+        <section className="space-y-2" aria-label="Areas with nothing in them">
+          <p className="px-1 text-xs text-app-text-muted">
+            Drop a card into one of these to file it.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            {emptyGroups.map((group) => (
+              <div
+                key={group.id}
+                ref={(element) => {
+                  registerGroupElement(group.id, element);
+                }}
+                className="flex min-h-20 min-w-48 flex-1 flex-col justify-center rounded-2xl border border-dashed border-app-border bg-app-surface-muted/40 px-4 py-3"
+              >
+                <p className="truncate text-sm font-medium text-app-text" title={group.name}>
+                  {group.name}
+                </p>
+                <p className="text-xs text-app-text-subtle">Empty</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {spanningGroups.map((block) => (
         <div key={block.key}>{renderBlock(block, indexOfBlock(block), columns)}</div>
       ))}
@@ -1251,8 +1274,6 @@ type BoardCardCellProps = {
   pinned: boolean;
   onToggleCollapsed?: (cardId: string) => void;
   onTogglePinned?: (cardId: string) => void;
-  groups: BoardGroup[];
-  onAssignGroup?: (cardId: string, groupId: string | null) => void;
   /** Every card on the board, so this one can offer them as things to wait on. */
   allCards: BoardCard[];
   state?: CardState;
@@ -1312,8 +1333,6 @@ function BoardCardCell({
   pinned,
   onToggleCollapsed,
   onTogglePinned,
-  groups,
-  onAssignGroup,
   allCards,
   state,
   onAssignStage,
@@ -1347,6 +1366,9 @@ function BoardCardCell({
    * put in front of this one, or the picker would silently forget the sequence they arranged.
    */
   const predecessorId = state?.predecessorId ?? null;
+  const predecessorName = predecessorId
+    ? (allCards.find((other) => other.id === predecessorId) ?? null)
+    : null;
 
   /**
    * Opens the pile when the card itself is clicked.
@@ -1431,25 +1453,6 @@ function BoardCardCell({
       collapsed,
       pinned,
       accent: cardAccent(card.content.kind),
-      groupPicker: onAssignGroup ? (
-        <Select
-          size="sm"
-          value={groupOf(groups, card.id)?.id ?? ""}
-          aria-label={`Area for the ${label} card`}
-          // Narrow, because it now sits in every card's header rather than only in arrange mode,
-          // and the control cluster does not shrink — every pixel it takes comes off the title.
-          className="max-w-32"
-          onChange={(event) => onAssignGroup(card.id, event.target.value || null)}
-        >
-          <option value="">No area</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.id}>
-              {group.name}
-            </option>
-          ))}
-          <option value={NEW_GROUP}>New area…</option>
-        </Select>
-      ) : undefined,
       state,
       // Only for the kinds nothing can observe. A checklist reports its own progress, and a
       // hand-set "done" beside three outstanding items is the board contradicting itself.
@@ -1472,12 +1475,33 @@ function BoardCardCell({
           ))}
         </Select>
       ) : undefined,
-      dependencyPicker: onSetPredecessor ? (
+      dependencyPicker: !onSetPredecessor ? undefined : state?.predecessorSource === "TEAM" ? (
+        // A rule the team wrote, shown rather than offered. The alternative was a select that
+        // silently refused what it let somebody choose — an affordance that lies is worse than a
+        // sentence that explains, and the sentence also answers the question the select could not:
+        // why this card is behind that one when the hire never put it there.
+        <span
+          className="flex max-w-40 items-center gap-1 text-xs text-app-text-muted"
+          title={`Your team put this after ${predecessorName ? cardName(predecessorName) : "another card"}.`}
+        >
+          <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 truncate">
+            After: {predecessorName ? cardName(predecessorName) : "another card"}
+          </span>
+        </span>
+      ) : (
         <Select
           size="sm"
           value={state?.blockedBy[0]?.id ?? predecessorId ?? ""}
           aria-label={`What the ${label} card waits on`}
           className="max-w-40"
+          // A buddy's link is the hire's to change — it is a suggestion, not a rule — but it should
+          // not look like something they set themselves and forgot.
+          title={
+            state?.predecessorSource === "BUDDY" && predecessorName
+              ? `Your buddy put this after ${cardName(predecessorName)}. You can change it.`
+              : undefined
+          }
           onChange={(event) => onSetPredecessor(card.id, event.target.value || null)}
         >
           <option value="">Waits on nothing</option>
@@ -1489,7 +1513,7 @@ function BoardCardCell({
               </option>
             ))}
         </Select>
-      ) : undefined,
+      ),
       stack:
         stack && onToggleStack
           ? {
@@ -1566,14 +1590,13 @@ function BoardCardCell({
       card,
       collapsed,
       dragControls,
-      groups,
       index,
       label,
-      onAssignGroup,
       onAssignStage,
       onMove,
       onSetPredecessor,
       onToggleStack,
+      predecessorName,
       isArranging,
       onResize,
       onToggleCollapsed,
@@ -1597,7 +1620,10 @@ function BoardCardCell({
       // Outside arrange mode only the grip starts a drag, so every checkbox, link and button on a
       // card keeps working without a mode to leave first. Inside it, where the content is inert
       // anyway, the whole card is the handle — that is what the mode is for.
-      dragListener={isArranging}
+      // Never the whole card: the grip is the only thing that starts a drag, in either mode. A
+      // card here is readable content — a checklist to tick, a link to follow — and a press
+      // anywhere on it has to keep meaning what it means.
+      dragListener={false}
       dragControls={dragControls}
       dragSnapToOrigin
       // No elasticity: the card should sit under the pointer, not lag behind it on a spring.
@@ -1685,10 +1711,6 @@ type BoardGroupSectionProps = {
   onMoveStep: (direction: "up" | "down") => void;
   onDragMove: (element: HTMLElement) => void;
   onRename?: (groupId: string, name: string) => void;
-  /** Opens the name for editing straight away — set on an area that was just created. */
-  autoEditName?: boolean;
-  /** Told when the name editor closes, so the caller can stop asking for it. */
-  onNameEditDone?: () => void;
   onToggle?: (groupId: string) => void;
   onDissolve?: (groupId: string) => void;
   /** Paints the area. Absent on a board that cannot be changed. */
@@ -1720,8 +1742,6 @@ function BoardGroupSection({
   onMoveStep,
   onDragMove,
   onRename,
-  autoEditName = false,
-  onNameEditDone,
   onToggle,
   onDissolve,
   onRecolour,
@@ -1750,18 +1770,8 @@ function BoardGroupSection({
     nameInput.current?.select();
   }, [editing]);
 
-  // Derived during render rather than in an effect, the way the board's other read-once state is:
-  // a just-created area has to open its editor on the render that first shows it, or the focus
-  // lands after the hire has already looked away.
-  const [autoOpened, setAutoOpened] = useState(false);
-  if (autoEditName && !autoOpened) {
-    setAutoOpened(true);
-    setDraft(group.name);
-  }
-
   function closeName() {
     setDraft(null);
-    onNameEditDone?.();
   }
 
   function commitName() {

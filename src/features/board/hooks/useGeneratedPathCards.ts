@@ -10,7 +10,7 @@ import {
   titleKey,
   type PlannedArea,
 } from "../generation/pathToCards";
-import { type BoardStage } from "../layout/boardStructure";
+import { type BoardStage, type DependencySource } from "../layout/boardStructure";
 
 /** Why a generation run produced nothing, in words a page can put in a toast. */
 export type GenerationRefusal =
@@ -29,7 +29,8 @@ export type GenerationResult = {
   /** Card id to the stage it belongs in. */
   stages: Record<string, BoardStage>;
   /** Card id to the id of the card that must be finished first. */
-  chain: Record<string, string>;
+  /** Each chained card's predecessor, and who is claiming the link. */
+  chain: Record<string, { id: string; source: DependencySource }>;
 };
 
 type UseGeneratedPathCardsResult = {
@@ -101,7 +102,7 @@ export function useGeneratedPathCards(): UseGeneratedPathCardsResult {
 
       const areas: GenerationResult["areas"] = [];
       const stages: Record<string, BoardStage> = {};
-      const chain: Record<string, string> = {};
+      const chain: GenerationResult["chain"] = {};
       // Kept across every area rather than per area, because a blueprint may say it comes after one
       // in a different stage — and a chain that silently dropped at an area boundary would look
       // exactly like the PM never having set it.
@@ -131,7 +132,7 @@ export function useGeneratedPathCards(): UseGeneratedPathCardsResult {
           // A predecessor that was skipped as already-present has no minted id, so this card simply
           // waits on nothing rather than on a card that was never created.
           const afterId = plannedCard.afterKey ? mintedByKey.get(plannedCard.afterKey) : undefined;
-          if (afterId) chain[card.id] = afterId;
+          if (afterId) chain[card.id] = { id: afterId, source: area.source };
         }
 
         if (cardIds.length > 0) areas.push({ name: area.name, cardIds });
@@ -193,6 +194,7 @@ async function blueprintAreas(
   return [
     {
       name: "From your team",
+      source: "TEAM",
       cards: blueprints.map((blueprint) => ({
         key: blueprint.id,
         request: {

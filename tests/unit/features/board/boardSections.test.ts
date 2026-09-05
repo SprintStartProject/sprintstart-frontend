@@ -81,3 +81,36 @@ describe("the sections a board offers", () => {
     expect(shown.map((shownCard) => shownCard.id)).toEqual(["a", "c"]);
   });
 });
+
+describe("an area with nothing in it", () => {
+  const cards = [card("a"), card("b")];
+  const states = () => deriveCardStates(cards, structure({ a: "NOW", b: "NOW" }));
+
+  it("gets a row, so it can be opened and sent cards", () => {
+    const sections = summariseSections(cards, [group("g1", "Paperwork", [])], states());
+
+    expect(sections.map((section) => section.name)).toContain("Paperwork");
+  });
+
+  it("counts nothing", () => {
+    const [, paperwork] = summariseSections(cards, [group("g1", "Paperwork", [])], states());
+
+    expect([paperwork.total, paperwork.done, paperwork.blocked]).toEqual([0, 0, 0]);
+  });
+
+  it("trails the areas that hold something", () => {
+    const sections = summariseSections(
+      cards,
+      [group("g1", "Paperwork", []), group("g2", "Week one", ["a"])],
+      states(),
+    );
+
+    // An empty row is a destination, not a part of the board anybody is reading.
+    expect(sections.map((section) => section.name)).toEqual([
+      "All sections",
+      "Week one",
+      "Paperwork",
+      "Not in an area",
+    ]);
+  });
+});

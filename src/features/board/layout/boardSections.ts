@@ -76,6 +76,17 @@ export function summariseSections(
     areas.push(count(group.id, group.name, members, states));
   }
 
+  // An area with nothing in it is still an area somebody made and named. It gets a row so it can
+  // be opened, so cards can be sent to it, and so that making one is not an act with no visible
+  // result — the alternative is a name stored in a place nothing on the page draws. They trail the
+  // areas that hold something, in the order they were made: an empty row is a destination, not a
+  // part of the board anybody is reading.
+  for (const group of groups) {
+    if (seen.has(group.id)) continue;
+    seen.add(group.id);
+    areas.push(count(group.id, group.name, [], states));
+  }
+
   const loose = cards.filter((card) => groupOf(groups, card.id) === null);
   // Only worth a row once there is something for it to be the opposite of. On a board with no
   // areas, "Not in an area" is every card, under a name that describes what it is not.

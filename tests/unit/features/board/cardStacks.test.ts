@@ -7,6 +7,9 @@ import {
 } from "../../../../src/features/board/layout/boardStructure";
 import type { BoardCard } from "../../../../src/features/board/types";
 
+/** Dependencies as the hire's own controls write them. */
+const after = (...ids: string[]) => ids.map((id) => ({ id, source: "HIRE" as const }));
+
 function card(id: string, done = false): BoardCard {
   return {
     id,
@@ -26,7 +29,7 @@ function card(id: string, done = false): BoardCard {
 function chain(...ids: string[]): BoardStructure {
   const cards: Record<string, CardStructure> = {};
   ids.forEach((id, index) => {
-    if (index > 0) cards[id] = { dependsOn: [ids[index - 1]] };
+    if (index > 0) cards[id] = { dependsOn: after(ids[index - 1]) };
   });
 
   return { cards, groupStages: {} };
@@ -81,7 +84,7 @@ describe("buildStacks", () => {
     // Two cards waiting on the same one is parallel work sharing a prerequisite, not a sequence.
     const cards = [card("a"), card("b"), card("c")];
     const structure: BoardStructure = {
-      cards: { b: { dependsOn: ["a"] }, c: { dependsOn: ["a"] } },
+      cards: { b: { dependsOn: after("a") }, c: { dependsOn: after("a") } },
       groupStages: {},
     };
 
@@ -92,9 +95,9 @@ describe("buildStacks", () => {
     const cards = [card("a"), card("b"), card("c"), card("d")];
     const structure: BoardStructure = {
       cards: {
-        b: { dependsOn: ["a"] },
-        c: { dependsOn: ["b"] },
-        d: { dependsOn: ["b"] },
+        b: { dependsOn: after("a") },
+        c: { dependsOn: after("b") },
+        d: { dependsOn: after("b") },
       },
       groupStages: {},
     };

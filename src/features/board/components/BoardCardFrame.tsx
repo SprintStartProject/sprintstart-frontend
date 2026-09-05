@@ -109,7 +109,6 @@ export function BoardCardFrame({
     onToggleCollapsed,
     onTogglePinned,
     dragHandle,
-    groupPicker,
     state,
     onToggleDone,
     stagePicker,
@@ -147,9 +146,7 @@ export function BoardCardFrame({
       }`}
     >
       <section
-        // The board's density setting, read off the grid root rather than passed in — a card should
-        // not have to be told how much padding the board is in the mood for.
-        className="relative flex flex-col overflow-hidden p-4 pl-5 [[data-density=compact]_&]:p-2.5 [[data-density=compact]_&]:pl-4"
+        className="relative flex flex-col overflow-hidden p-4 pl-5"
         onPointerEnter={() => collapsed && setPeeking(true)}
         onPointerLeave={() => setPeeking(false)}
         onFocusCapture={() => collapsed && setPeeking(true)}
@@ -348,8 +345,6 @@ export function BoardCardFrame({
             )}
 
             <span className="flex items-center gap-1">
-              {groupPicker}
-
               {onToggleCollapsed && (
                 <Button
                   variant="ghost"

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  assignToGroup,
+  dissolveGroup,
+  newBoardGroup,
   readBoardGroups,
   writeBoardGroups,
   type BoardGroup,
@@ -56,5 +59,37 @@ describe("the areas a board remembers", () => {
     // Only the three names the generator could have written are folded. Anything else is somebody
     // naming their own area, and renaming that would be the board editing their words.
     expect(readBoardGroups("b1")[0].name).toBe("From your team — my copy");
+  });
+});
+
+describe("moving a card between areas", () => {
+  it("keeps an area that has just lost its last card", () => {
+    const kept = assignToGroup([group("g1", "Paperwork", ["a"])], "a", null);
+
+    // It used to be dropped, which was right while the only way to make an area was to put a card
+    // in one. Now that an area can be made empty and named first, "empty" cannot mean "delete me":
+    // dragging the last card out to look at it elsewhere would take the name with it.
+    expect(kept).toEqual([group("g1", "Paperwork", [])]);
+  });
+
+  it("takes a card out of the area it was in", () => {
+    const moved = assignToGroup(
+      [group("g1", "Week one", ["a"]), group("g2", "Week two", [])],
+      "a",
+      "g2",
+    );
+
+    expect(moved.map((area) => area.cardIds)).toEqual([[], ["a"]]);
+  });
+
+  it("removes an area only when somebody dissolves it", () => {
+    expect(dissolveGroup([group("g1", "Paperwork", [])], "g1")).toEqual([]);
+  });
+
+  it("makes a new area empty, and named after the ones already there", () => {
+    const created = newBoardGroup([group("g1", "Week one", ["a"])]);
+
+    expect(created.cardIds).toEqual([]);
+    expect(created.name).toBe("Area 2");
   });
 });

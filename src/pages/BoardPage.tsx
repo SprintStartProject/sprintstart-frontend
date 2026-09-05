@@ -4,19 +4,17 @@ import {
   AlertCircle,
   Bot,
   Check,
+  FolderPlus,
   LayoutDashboard,
-  Move,
-  PanelTopClose,
-  PanelTopOpen,
+  ListTree,
+  Maximize2,
+  Minimize2,
   RefreshCw,
-  Rows2,
-  Rows3,
   Sparkles,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
-import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
@@ -24,14 +22,17 @@ import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathCards";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
-import type { AuthoredCardKind, BoardCard } from "../features/board/types";
+import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
 import { BoardPathRail } from "../features/board/components/BoardPathRail";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
+import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
+import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
+import { useFocusMode } from "../context/useFocusMode";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
@@ -46,14 +47,12 @@ import {
   type BoardStage,
 } from "../features/board/layout/boardStructure";
 import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
-import { sourceOfTitle } from "../features/board/generation/pathToCards";
-import type { AreaAccent } from "../features/board/layout/areaAccents";
 import {
-  DEFAULT_PREFERENCES,
-  readBoardPreferences,
-  writeBoardPreferences,
-  type BoardPreferences,
-} from "../features/board/layout/boardPreferences";
+  filterLabel,
+  matchesFilter,
+  type BoardFilter,
+} from "../features/board/layout/boardFilters";
+import type { AreaAccent } from "../features/board/layout/areaAccents";
 import {
   isDefault,
   readCardSizes,
@@ -63,12 +62,13 @@ import {
 } from "../features/board/layout/cardSizes";
 import {
   assignToGroup,
+  dissolveGroup,
   groupOf,
+  newBoardGroup,
   readBoardGroups,
   writeBoardGroups,
   type BoardGroup,
 } from "../features/board/layout/boardGroups";
-import { NEW_GROUP } from "../features/board/components/BoardGrid";
 
 /**
  * The board: the hire's persistent working surface.
@@ -141,30 +141,30 @@ const FOLD_THRESHOLD = 8;
  * Where a card sits in the process is a separate question, and the stages, the focus view and the
  * section tabs answer that one.
  */
-type BoardFilter = "all" | "buddy" | "team" | "mine";
-
-/**
- * Whether a card came from the project's blueprints rather than from the hire or their buddy.
- *
- * Read off the invisible marker its title carries — see `generation/pathToCards.ts`, which explains
- * why provenance is smuggled through a text field and what should replace it.
- */
-function isFromTeam(card: BoardCard): boolean {
-  return card.content.kind === "CHECKLIST" && sourceOfTitle(card.content.title) === "TEAM";
-}
-
-function matchesFilter(card: BoardCard, filter: BoardFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "buddy") return card.owner === "AI";
-  if (filter === "team") return isFromTeam(card);
-
-  return card.owner === "HIRE" && !isFromTeam(card);
-}
-
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
   const { profile } = useAuth();
   const toast = useToast();
+  const { isFocused, setFocused } = useFocusMode();
+
+  /**
+   * Focus mode is this page's posture, not the app's, so it is given up on the way out — a hire who
+   * clicks through to their buddy must not find the app's own navigation missing there.
+   */
+  useEffect(() => () => setFocused(false), [setFocused]);
+
+  /** Escape is how every mode that took the furniture away gives it back, so it is how this does. */
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFocused(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFocused, setFocused]);
 
   /** The hire's roles on this project, which decide which of the team's blueprints reach them. */
   const roleIds = useMemo(() => (profile?.projectRoles ?? []).map((role) => role.id), [profile]);
@@ -248,8 +248,8 @@ export function BoardPage() {
     setGroups(readBoardGroups(boardId));
   }
 
-  /** The area whose name is open for editing, because it was just created. */
-  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  /** Whether the "name your area" form is open over the board. */
+  const [namingArea, setNamingArea] = useState(false);
 
   function saveGroups(next: BoardGroup[]) {
     setGroups(next);
@@ -259,26 +259,12 @@ export function BoardPage() {
   /**
    * Puts a card in an area, or takes it out of one.
    *
-   * The picker's "New area…" is handled here rather than in the grid: creating the area and
-   * putting the first card in it are one action, so a card is never dropped into a box that does
-   * not exist yet, and an area never exists with nothing in it.
+   * One caller now: letting a card go while arranging. The picker that used to sit in every card's
+   * header is gone — an area is made from the tool rail and filled by dropping cards into it, and
+   * a select repeating that on forty cards was forty copies of a decision that is better made by
+   * putting the card where it goes.
    */
   function handleAssignGroup(cardId: string, groupId: string | null) {
-    if (groupId === NEW_GROUP) {
-      const created: BoardGroup = {
-        id: `group-${Date.now()}`,
-        name: `Area ${groups.length + 1}`,
-        cardIds: [],
-        collapsed: false,
-      };
-      saveGroups(assignToGroup([...groups, created], cardId, created.id));
-      // Naming it is the other half of creating it, so the name opens focused and selected rather
-      // than leaving the hire with a box called "Area 3" and a rename control to go and find.
-      setRenamingGroupId(created.id);
-
-      return;
-    }
-
     saveGroups(assignToGroup(groups, cardId, groupId));
   }
 
@@ -286,9 +272,28 @@ export function BoardPage() {
     saveGroups(groups.map((group) => (group.id === groupId ? { ...group, name } : group)));
   }
 
+  /**
+   * Makes an empty area under the name it was given, and opens it.
+   *
+   * Empty is the point: an area made from the tool rail is a box somebody wants *before* they have
+   * decided what goes in it — "Paperwork", "Week two" — and making them find a card to hang it off
+   * first is the reason areas were only ever made by accident.
+   *
+   * Named in the same breath, in a form over the board, the way a note or a link is written. The
+   * alternative was making it first and renaming it in place, which needs a name that can be
+   * edited where the area is drawn — and an empty area is drawn nowhere except in a tab, which is
+   * not a place to type.
+   */
+  function handleNewArea(name: string) {
+    const created = { ...newBoardGroup(groups), name };
+    saveGroups([...groups, created]);
+    setNamingArea(false);
+    setSectionId(created.id);
+  }
+
   /** Takes the area away and leaves its cards exactly where they are on the board. */
   function handleDissolveGroup(groupId: string) {
-    saveGroups(groups.filter((group) => group.id !== groupId));
+    saveGroups(dissolveGroup(groups, groupId));
     // A rail pointed at an area that no longer exists would show an empty pane, so the view falls
     // back to the whole board rather than to nothing.
     if (sectionId === groupId) setSectionId(null);
@@ -414,17 +419,6 @@ export function BoardPage() {
    * can only ever come back empty is a promise the board cannot keep, and on an installation where
    * nobody has written a blueprint that is every board.
    */
-  const filterOptions = useMemo<FilterSelectOption<BoardFilter>[]>(() => {
-    const options: FilterSelectOption<BoardFilter>[] = [
-      { value: "all", label: "All cards" },
-      { value: "buddy", label: "From your buddy" },
-    ];
-    if (allCards.some(isFromTeam)) options.push({ value: "team", label: "From your team" });
-    options.push({ value: "mine", label: "Yours" });
-
-    return options;
-  }, [allCards]);
-
   /**
    * Whether the board has been divided into anything worth navigating.
    *
@@ -504,26 +498,6 @@ export function BoardPage() {
     [allCards, groups, states],
   );
   const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
-
-  /**
-   * How this hire wants their board to look: how much room the cards get, and whether the tools
-   * above them are on screen at all.
-   *
-   * Read once per board, the way the folds, the pins and the areas are — see `boardPreferences.ts`
-   * for the storage bargain and for why this one wants a server more than the others do.
-   */
-  const [preferences, setPreferences] = useState<BoardPreferences>(DEFAULT_PREFERENCES);
-  const [preferencesReadFor, setPreferencesReadFor] = useState<string | null>(null);
-
-  if (boardId !== preferencesReadFor) {
-    setPreferencesReadFor(boardId);
-    setPreferences(readBoardPreferences(boardId));
-  }
-
-  function savePreferences(next: BoardPreferences) {
-    setPreferences(next);
-    writeBoardPreferences(boardId, next);
-  }
 
   /** The kind of card being written, or null when nothing is being added. */
   const [addingKind, setAddingKind] = useState<AuthoredCardKind | null>(null);
@@ -637,10 +611,8 @@ export function BoardPage() {
     const foldedAway = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
     if (foldedAway > 0) cuts.push(`${foldedAway} folded into sequences`);
 
-    if (filter !== "all") {
-      const option = filterOptions.find((candidate) => candidate.value === filter);
-      if (option) cuts.push(option.label);
-    }
+    const cut = filterLabel(filter);
+    if (cut) cuts.push(cut);
 
     if (sectionId !== null) {
       const section = sections.find((candidate) => candidate.id === sectionId);
@@ -651,7 +623,7 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [allCards, filter, filterOptions, openStackIds, sectionId, sections, stacks]);
+  }, [allCards, filter, openStackIds, sectionId, sections, stacks]);
 
   const handleReorder = (cardIds: string[]) => {
     if (!pathCard || pathIndex === -1) return void reorder(cardIds);
@@ -661,23 +633,21 @@ export function BoardPage() {
   };
 
   /**
-   * Enters arrange mode with every card on screen.
+   * Opens the planning mode, with nothing folded away.
    *
-   * A reorder sends the whole order of what is *shown*, so arranging a filtered board would tell
-   * the server about a fraction of it and let the rest fall to the end. Rather than teaching the
-   * reorder to reconstruct the hidden cards' positions — which is the kind of thing that works
-   * until two of them are adjacent — arranging simply means looking at all of it.
+   * **It no longer clears the filter and the section.** It used to have to: a reorder replaces the
+   * board's order outright, and the grid built that order from what was on screen, so a drag on a
+   * narrowed board told the server about a fraction of it. The narrowing was never the problem —
+   * computing a *position* from a narrowed list was. The grid is now given the whole order and
+   * every move names the card it is going next to, so a hire can plan one area without the board
+   * jumping to everything first.
+   *
+   * What is still opened is what is *folded*: planning is about what comes after what, and a
+   * dependency you cannot see is one you cannot set. Stacks spread out too, for as long as the
+   * mode lasts — see `openStackIds`, which derives that rather than snapshotting it.
    */
   function startArranging() {
-    setFilter("all");
-    setSectionId(null);
-    // Every band opens with them: arranging is about the board's whole order, and a fold that hid
-    // a third of it while somebody dragged a card through would be the surface arguing with the
-    // gesture. The grid draws no bands at all while the board is being arranged.
     setOpenStages(new Set(BOARD_STAGES));
-    // Stacks spread out too — see `openStackIds`, which does that for as long as the mode lasts
-    // rather than once on the way in. A reorder sends the order of what is *shown*, so arranging a
-    // board with four cards folded away would tell the server about a fraction of it.
     setIsArranging(true);
   }
 
@@ -757,189 +727,192 @@ export function BoardPage() {
     });
   }
 
+  /**
+   * The gutters the page draws in.
+   *
+   * Focus mode trades the 10rem page gutter for a margin wide enough to keep the tool rail off the
+   * cards and no wider — the whole reason somebody expands the board is that the gutters were space
+   * they were not using, and giving them back at the same width would be the button doing nothing.
+   */
+  const frameClass = isFocused ? "px-4 sm:px-6 lg:pr-20 lg:pl-6" : "app-page-frame";
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={LayoutDashboard}
-            title="Board"
-            subtitle={
-              isArranging
-                ? "Drag a card to move it, set when it's due, or say what it waits on."
-                : "Where your onboarding stays put between conversations."
-            }
-            actions={
-              isArranging ? (
-                <Button
-                  variant="primary"
-                  onClick={() => setIsArranging(false)}
-                  icon={<Check className="h-4 w-4" aria-hidden="true" />}
-                >
-                  Done
-                </Button>
-              ) : (
-                <>
+      {/* Gone in focus mode, with everything on it either in the tool rail already or one Escape
+          away. */}
+      {!isFocused && (
+        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+          <div className={`${frameClass} py-6`}>
+            <PageHeader
+              icon={LayoutDashboard}
+              title="Board"
+              subtitle={
+                isArranging
+                  ? "Say when each card is due and what it waits on."
+                  : "Where your onboarding stays put between conversations."
+              }
+              actions={
+                isArranging ? (
                   <Button
-                    variant="secondary"
-                    onClick={() => void handleGenerate()}
-                    disabled={!selectedProjectId}
-                    loading={generating}
-                    icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
-                    title="Turn your personalised onboarding path into checklists here"
+                    variant="primary"
+                    onClick={() => setIsArranging(false)}
+                    icon={<Check className="h-4 w-4" aria-hidden="true" />}
                   >
-                    Build my path
+                    Done
                   </Button>
-                  {/* The same two switches the rail carries, for the widths where there is no
-                      margin to put a rail in. `lg:hidden` rather than a second implementation:
-                      one state, two places it can be reached from. */}
-                  <Button
-                    variant="secondary"
-                    iconOnly
-                    className="lg:hidden"
-                    onClick={() =>
-                      savePreferences({
-                        ...preferences,
-                        density: preferences.density === "cozy" ? "compact" : "cozy",
-                      })
-                    }
-                    disabled={!board}
-                    aria-pressed={preferences.density === "compact"}
-                    title={
-                      preferences.density === "compact"
-                        ? "Give the cards more room"
-                        : "Fit more on screen"
-                    }
-                    aria-label={
-                      preferences.density === "compact"
-                        ? "Give the cards more room"
-                        : "Fit more on screen"
-                    }
-                  >
-                    {preferences.density === "compact" ? (
-                      <Rows2 className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <Rows3 className="h-4 w-4" aria-hidden="true" />
-                    )}
-                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="secondary"
+                      onClick={() => void handleGenerate()}
+                      disabled={!selectedProjectId}
+                      loading={generating}
+                      icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                      title="Turn your personalised onboarding path into checklists here"
+                    >
+                      Build my path
+                    </Button>
+                    {/* The one switch from the rail worth a copy here, for the widths where
+                        there is no margin to put a rail in. `lg:hidden` rather than a second
+                        implementation: one state, two places it can be reached from. */}
+                    <Button
+                      variant="secondary"
+                      iconOnly
+                      className="lg:hidden"
+                      onClick={startArranging}
+                      disabled={!board}
+                      title="Plan the board"
+                      aria-label="Plan the board"
+                    >
+                      <ListTree className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={refresh}
+                      disabled={!selectedProjectId}
+                      loading={loading}
+                      icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                    >
+                      Refresh
+                    </Button>
+                  </>
+                )
+              }
+            />
 
-                  <Button
-                    variant="secondary"
-                    iconOnly
-                    className="lg:hidden"
-                    onClick={() =>
-                      savePreferences({ ...preferences, toolsHidden: !preferences.toolsHidden })
-                    }
-                    disabled={!board}
-                    aria-pressed={preferences.toolsHidden}
-                    title={preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"}
-                    aria-label={
-                      preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"
-                    }
-                  >
-                    {preferences.toolsHidden ? (
-                      <PanelTopOpen className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <PanelTopClose className="h-4 w-4" aria-hidden="true" />
-                    )}
-                  </Button>
+            {pathCard && pathCard.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
+              <BoardPathRail content={pathCard.content} />
+            )}
+          </div>
+        </header>
+      )}
 
-                  <Button
-                    variant="secondary"
-                    iconOnly
-                    onClick={startArranging}
-                    disabled={!board}
-                    title="Arrange the board"
-                    aria-label="Arrange the board"
-                  >
-                    <Move className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={refresh}
-                    disabled={!selectedProjectId}
-                    loading={loading}
-                    icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
-                  >
-                    Refresh
-                  </Button>
-                </>
-              )
-            }
-          />
-
-          {pathCard && pathCard.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
-            <BoardPathRail content={pathCard.content} />
-          )}
-        </div>
-      </header>
-
-      <main ref={swipeRef} className="app-page-frame relative space-y-5 py-6 lg:py-8">
+      <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
         {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
-            three offers live there — always in reach, never in the way, and out of the row above
-            the board where they were competing with the controls that decide what is *shown*.
+            offers live there — always in reach, never in the way, and out of the row above the
+            board where they were competing with the controls that decide what is *shown*.
             Absolute rather than a column of its own, so nothing about the board's own width or its
-            two-column packing changes; hidden below `lg`, where there is no margin to sit in. */}
-        {selectedProjectId && !isArranging && (
-          <div className="absolute top-6 right-3 z-20 hidden lg:top-8 lg:block">
-            <div className="sticky top-6 flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur">
-              {/* The two view switches lead, because they are about the board as a whole and the
-                  three below them are about adding one thing to it. Hiding the tools is the
-                  topmost: it is the one control that has to stay reachable *after* it has taken
-                  the others off the screen. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() =>
-                  savePreferences({ ...preferences, toolsHidden: !preferences.toolsHidden })
-                }
-                disabled={!board}
-                aria-pressed={preferences.toolsHidden}
-                title={preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"}
-                aria-label={preferences.toolsHidden ? "Show the board's tools" : "Hide the tools"}
-              >
-                {preferences.toolsHidden ? (
-                  <PanelTopOpen className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <PanelTopClose className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
+            two-column packing changes; hidden below `lg`, where there is no margin to sit in.
 
+            It stays up while the board is being arranged, which it did not use to: arranging is now
+            one of the switches on it, and a switch that takes its own rail off the screen leaves
+            nothing to switch back with — in focus mode, where the header's "Done" is gone too,
+            nothing at all. */}
+        {selectedProjectId && (
+          <div
+            className={
+              // Centred on the viewport once the page is the whole screen. With the header gone
+              // there is nothing at the top for it to hang under, and a rail pinned to a corner of
+              // a screen this wide is a long way from wherever the pointer is.
+              isFocused
+                ? "fixed top-1/2 right-3 z-20 hidden -translate-y-1/2 lg:block"
+                : "absolute top-6 right-3 z-20 hidden lg:top-8 lg:block"
+            }
+          >
+            <div
+              className={[
+                "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
+                // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
+                // itself on a short screen rather than losing its last buttons off the bottom.
+                isFocused ? "max-h-[calc(100vh-2rem)] overflow-y-auto" : "sticky top-6",
+              ].join(" ")}
+            >
+              {/* Widest change first: expanding takes the app's own navigation and this page's
+                  header off the screen, so it is the one switch that has to be found before any of
+                  the others are worth reaching for — and the one that has to stay put afterwards,
+                  because it is the way back. */}
               <Button
                 variant="ghost"
                 size="sm"
                 iconOnly
-                onClick={() =>
-                  savePreferences({
-                    ...preferences,
-                    density: preferences.density === "cozy" ? "compact" : "cozy",
-                  })
-                }
-                disabled={!board}
-                aria-pressed={preferences.density === "compact"}
-                title={
-                  preferences.density === "compact"
-                    ? "Give the cards more room"
-                    : "Fit more on screen"
-                }
-                aria-label={
-                  preferences.density === "compact"
-                    ? "Give the cards more room"
-                    : "Fit more on screen"
-                }
+                onClick={() => setFocused(!isFocused)}
+                aria-pressed={isFocused}
+                title={isFocused ? "Back to the app (Esc)" : "Expand the board"}
+                aria-label={isFocused ? "Back to the app" : "Expand the board"}
               >
-                {preferences.density === "compact" ? (
-                  <Rows2 className="h-4 w-4" aria-hidden="true" />
+                {isFocused ? (
+                  <Minimize2 className="h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <Rows3 className="h-4 w-4" aria-hidden="true" />
+                  <Maximize2 className="h-4 w-4" aria-hidden="true" />
                 )}
               </Button>
 
               <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
 
-              <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
+              {/* Planning and making an area are the two ways of changing the board's *shape*,
+                  which is why they sit together and away from the three that add something to it.
+                  It is a toggle rather than a door: the way out has to be where the way in was,
+                  especially with the header's "Done" gone in focus mode. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
+                disabled={!board}
+                aria-pressed={isArranging}
+                title={isArranging ? "Done planning" : "Plan the board"}
+                aria-label={isArranging ? "Done planning" : "Plan the board"}
+              >
+                {isArranging ? (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <ListTree className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => setNamingArea(true)}
+                disabled={!board}
+                aria-pressed={namingArea}
+                title="New area"
+                aria-label="New area"
+              >
+                <FolderPlus className="h-4 w-4" aria-hidden="true" />
+              </Button>
+
+              {/* Which cards, by where they came from. It sits below the switches that change the
+                  board's shape because it changes neither the board nor its shape — it only
+                  narrows what is drawn, and it is the one control here that is undone by pressing
+                  a different button in the same group rather than the same one again. */}
+              {allCards.length > 2 && (
+                <>
+                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+                  <BoardFilterTriggers value={filter} onChange={setFilter} compact vertical />
+                </>
+              )}
+
+              {/* Nothing is added to a board somebody is rearranging: the three forms open over the
+                  cards, which is exactly where the arranging is happening. */}
+              {!isArranging && (
+                <>
+                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+                  <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
+                </>
+              )}
             </div>
           </div>
         )}
@@ -976,47 +949,39 @@ export function BoardPage() {
                 navigation for the same board — they are two halves of "what am I looking at", and
                 they belong side by side. `items-start` so the tab bar's own status line hangs
                 under the tabs rather than dragging the controls down with it. */}
-            {!preferences.toolsHidden && (
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                {hasSectionTabs ? (
-                  <div className="min-w-0 flex-1">
-                    <BoardSectionTabs
-                      sections={sections}
-                      selectedId={sectionId}
-                      onSelect={setSectionId}
-                    />
-                  </div>
-                ) : (
-                  <span />
-                )}
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Only offered once there is something to cut: a filter over three cards is a
-                      control that costs more attention than it saves. */}
-                  {allCards.length > 2 && (
-                    <FilterSelect
-                      label="Which cards to show"
-                      value={filter}
-                      options={filterOptions}
-                      onChange={setFilter}
-                    />
-                  )}
-
-                  {/* The rail in the margin takes over from `lg` up, where there is a margin to
-                      put it in. Below that these are the only three offers on the page. */}
-                  <AddCardTriggers
-                    onPick={setAddingKind}
-                    active={addingKind}
-                    className="lg:hidden"
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              {hasSectionTabs ? (
+                <div className="min-w-0 flex-1">
+                  <BoardSectionTabs
+                    sections={sections}
+                    selectedId={sectionId}
+                    onSelect={setSectionId}
                   />
                 </div>
+              ) : (
+                <span />
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* The rail in the margin takes over from `lg` up, where there is a margin to
+                      put it in. Below that these are the only offers on the page — and there is
+                      room for the words, which the rail's glyphs do without. */}
+                {allCards.length > 2 && (
+                  <BoardFilterTriggers value={filter} onChange={setFilter} className="lg:hidden" />
+                )}
+
+                <AddCardTriggers onPick={setAddingKind} active={addingKind} className="lg:hidden" />
               </div>
-            )}
+            </div>
 
             {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
-                room for three glyphs and not for a form. */}
+                room for a few glyphs and not for a form. */}
             {addingKind && (
               <AddCardForm kind={addingKind} onAdd={addCard} onClose={() => setAddingKind(null)} />
+            )}
+
+            {namingArea && (
+              <NewAreaForm onCreate={handleNewArea} onClose={() => setNamingArea(false)} />
             )}
 
             <div className="min-w-0 space-y-4">
@@ -1079,6 +1044,7 @@ export function BoardPage() {
                   dismissingId={dismissingId}
                   onEdit={(cardId, request) => void editCard(cardId, request)}
                   onReorder={handleReorder}
+                  boardOrder={allCards.map((card) => card.id)}
                   isArranging={isArranging}
                   collapsedIds={collapsedIds}
                   onToggleCollapsed={toggleCollapsed}
@@ -1087,8 +1053,6 @@ export function BoardPage() {
                   groups={groups}
                   onAssignGroup={handleAssignGroup}
                   onRenameGroup={handleRenameGroup}
-                  renamingGroupId={renamingGroupId}
-                  onRenameGroupDone={() => setRenamingGroupId(null)}
                   onToggleGroup={handleToggleGroup}
                   onDissolveGroup={handleDissolveGroup}
                   onRecolourGroup={handleRecolourGroup}
@@ -1102,7 +1066,6 @@ export function BoardPage() {
                   onToggleStack={toggleStack}
                   openStages={openStages}
                   onToggleStage={toggleStage}
-                  density={preferences.density}
                   cardSizes={cardSizes}
                   onResizeCard={resizeCard}
                 />

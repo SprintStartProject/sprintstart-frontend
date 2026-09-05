@@ -12,10 +12,12 @@
  * had two widths, because the board packed cards into two columns by flow: a card was either one
  * column or the whole row, so narrow had nowhere to go. The grid is what makes it real.
  *
- * Local storage, per board, the way the folds, the pins, the areas and the preferences are.
+ * Local storage, per board, the way the folds, the pins and the areas are.
  *
- * TODO(backend): belongs with the rest of the personalisation on `POST /me/board/preferences` —
- * see `boardPreferences.ts` for why local hurts more here than it does for the process layer.
+ * TODO(backend): belongs with the rest of the personalisation on `POST /me/board/preferences`, and
+ * local hurts more here than it does for the process layer — the whole point of a size somebody
+ * chose is that it is theirs, and a hire who set their board up and then opened it on a laptop
+ * would find none of it, which reads as the app having forgotten them.
  */
 const STORAGE_VERSION = 1;
 

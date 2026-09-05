@@ -29,15 +29,6 @@ export type BoardCardControls = {
   /** The size this card was pulled to, so the card can show more of itself when there is room. */
   size?: CardSize;
   /**
-   * The area picker for this card.
-   *
-   * Offered at all times, in the hover-revealed cluster with the fold and dismiss controls. It used
-   * to be arrange-mode only, on the reasoning that filing a card is a rearrangement — which put the
-   * one gesture people reach for most behind an unlabelled button they had to find first. Filing a
-   * card is not rearranging the board; it is saying what the card is about.
-   */
-  groupPicker?: ReactNode;
-  /**
    * Where this card sits in the process, and what that makes it.
    *
    * Absent on a board with no process layer — a card rendered on its own, or a board shown

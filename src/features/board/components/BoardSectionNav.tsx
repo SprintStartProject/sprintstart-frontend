@@ -1,13 +1,9 @@
-import { CircleCheckBig, CircleSlash, FolderOpen, Layers, ListChecks, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
-import {
-  ALL_SECTIONS,
-  FOCUS_SECTION,
-  LOOSE_SECTION,
-  type SectionSummary,
-} from "../layout/boardSections";
+import { ALL_SECTIONS, type SectionSummary } from "../layout/boardSections";
 import { STAGE_LABELS } from "../layout/boardStructure";
+import { sectionIcon } from "../layout/sectionIcons";
 
 type BoardSectionTabsProps = {
   sections: SectionSummary[];
@@ -24,10 +20,12 @@ type BoardSectionTabsProps = {
  * Naming the parts and showing one at a time turns "forty things" into "six things, and five more
  * sets I know are there" — the same amount of work, a completely different amount of dread.
  *
- * **A bar rather than a side rail.** A rail meant a second navigation column beside the app's own,
- * and on this page it had to fight the 10rem page gutter for its place; more to the point, the app
- * already has one control for switching between named sections, and every other view uses it. The
- * bar scrolls sideways when the sections outgrow it, which is also what makes it right on a phone
+ * **A bar rather than a side rail.** It was a rail in the page's left gutter for a while, mirroring
+ * the tool rail opposite it — and the symmetry was the only argument for it. The two gutters are
+ * not two of the same thing: the right one holds switches, which are glyphs and stay glyphs, while
+ * a section is chosen by its *name*, and names in a 9rem column truncate. The bar gives them the
+ * width of the page, uses the control every other view in the app switches sections with, and
+ * scrolls sideways when the sections outgrow it — which is also what makes it right on a phone,
  * without a second component for the purpose.
  *
  * Each tab carries the number of cards **still to do** in that section, because that is the number
@@ -38,15 +36,7 @@ type BoardSectionTabsProps = {
 export function BoardSectionTabs({ sections, selectedId, onSelect }: BoardSectionTabsProps) {
   const options: SegmentedTabOption<string>[] = sections.map((section) => {
     const complete = section.total > 0 && section.done === section.total;
-    const Icon = complete
-      ? CircleCheckBig
-      : section.id === null
-        ? Layers
-        : section.id === FOCUS_SECTION
-          ? ListChecks
-          : section.id === LOOSE_SECTION
-            ? CircleSlash
-            : FolderOpen;
+    const Icon = sectionIcon(section);
 
     return {
       value: section.id ?? ALL_SECTIONS,
