@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -146,6 +147,32 @@ export function CardBlueprintsPage() {
     setDraft(EMPTY_DRAFT);
     setIsOpen(true);
   }
+
+  /**
+   * A blueprint drafted somewhere else, opened here for the PM to finish.
+   *
+   * The selection toolbar sends one when a manager highlights something in the knowledge base — the
+   * paragraph is the card, and everything a *person* has to decide about it (which stage, which
+   * roles, what it comes after) is still empty and still in front of them. Deliberately never
+   * saved on arrival: a blueprint applies to every hire its roles match.
+   *
+   * Consumed once and then cleared out of the history entry, so that going back to this page later,
+   * or reloading it, does not reopen an editor over a draft somebody already dealt with.
+   */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handedOver = (location.state as { draft?: CardBlueprintDraft } | null)?.draft;
+  const consumed = useRef(false);
+
+  useEffect(() => {
+    if (!handedOver || consumed.current) return;
+    consumed.current = true;
+
+    setEditing(null);
+    setDraft(handedOver);
+    setIsOpen(true);
+    void navigate(location.pathname, { replace: true, state: null });
+  }, [handedOver, location.pathname, navigate]);
 
   const openEdit = useCallback((blueprint: CardBlueprint) => {
     setEditing(blueprint);

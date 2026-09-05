@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookmarkPlus, Eraser, Highlighter } from "lucide-react";
+import { BookmarkPlus, Eraser, Highlighter, LayoutTemplate } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -10,6 +10,9 @@ import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
 import { cardFor } from "./selectionCapture";
 import { useTextSelection } from "./useTextSelection";
+import { useAuth } from "../../../context/useAuth";
+import { canAccessRoute } from "../../../auth/accessPolicy";
+import { blueprintFromSelection } from "../../card-blueprints/generation/blueprintFromSelection";
 
 /** How far above the selection the toolbar floats, in pixels. */
 const OFFSET = 8;
@@ -30,7 +33,8 @@ const TOOLBAR_HEIGHT = 44;
  */
 export function SelectionActions() {
   const { selection, clear } = useTextSelection();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, canManageSelected } = useProjectContext();
+  const { profile } = useAuth();
   const { canMark, colorAt, enclosingColorAt, mark, unmark } = useCardMarks();
   const [saving, setSaving] = useState(false);
   const toast = useToast();
@@ -78,6 +82,18 @@ export function SelectionActions() {
    * copy nobody asked for. What a hire wants there is the marker pen.
    */
   const marking = canMark && selection.cardId !== null;
+
+  /**
+   * Whether this person could turn what they highlighted into a card every new hire starts with.
+   *
+   * Asked as "may they open the blueprints page", through the same policy the router guards it
+   * with, rather than by checking a permission group here. Two places deciding who is a manager is
+   * how one of them ends up offering an action the other refuses.
+   *
+   * Never inside a card: a blueprint is written from what the *project* knows, and a card on
+   * somebody's own board is the output of that, not an input to it.
+   */
+  const canBlueprint = !marking && canAccessRoute(profile, "/card-blueprints", canManageSelected);
 
   /**
    * The colour these words already carry, or null when they carry none.
@@ -172,15 +188,39 @@ export function SelectionActions() {
           )}
         </div>
       ) : (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => void add()}
-          loading={saving}
-          icon={<BookmarkPlus className="h-4 w-4" />}
-        >
-          Add to board
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void add()}
+            loading={saving}
+            icon={<BookmarkPlus className="h-4 w-4" />}
+          >
+            Add to board
+          </Button>
+
+          {canBlueprint && (
+            <>
+              <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  // Opened for editing, never saved from here. A blueprint applies to every hire
+                  // its roles match, and minting one from a highlight would be the app deciding
+                  // something about people who are not here yet — see `blueprintFromSelection`.
+                  void navigate("/card-blueprints", {
+                    state: { draft: blueprintFromSelection(selection.text, selection.source) },
+                  });
+                  clear();
+                }}
+                icon={<LayoutTemplate className="h-4 w-4" />}
+              >
+                Make a blueprint
+              </Button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
