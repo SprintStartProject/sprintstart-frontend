@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Bot, Layers, User } from "lucide-react";
+import { Bot, User } from "lucide-react";
 
 import { sourceOfTitle } from "../generation/pathToCards";
 import type { BoardCard } from "../types";
@@ -21,22 +21,29 @@ import type { BoardCard } from "../types";
 export type BoardFilter = "all" | "buddy" | "mine";
 
 /**
- * The three cuts, in the order they are offered.
+ * The cuts, in the order they are offered — and there is no option here for *not* cutting.
  *
- * Fixed rather than built from what is on the board. They used to be conditional — "From your team"
+ * There used to be one, "All cards", and it was a button whose whole job was to undo the two beside
+ * it: a board with nothing pressed already shows every card, so the switch was lit by default and
+ * did nothing when pressed. Now the two that cut something are toggles — pressing the lit one puts
+ * the board back — which is how every other switch in this rail behaves, the colour dots included.
+ *
+ * The way back is also written out where the result of the cut is: `BoardViewStatus` names the cut
+ * above the board and offers "Show everything", which clears this and the section and the focus
+ * view together. Two ways back for a state somebody set on purpose is enough; a third that is on
+ * screen permanently is a control paying rent for a job the other two already do.
+ *
+ * A fixed list rather than one built from the board. They used to be conditional — "From your team"
  * only appeared once a team card existed — which made sense for a value that could apply to
- * nothing. These three always can: "From anyone" is every board, and a hire with no buddy cards
- * learns something true from an empty result. A control that grows an option the first time the
- * generator runs is a control that moves under the pointer.
- *
- * The first one is "From anyone" rather than "All cards" because the bar a few pixels away already
- * opens with "All sections". Two controls whose off switches were both called "All …" read as one
- * control shown twice, and the question they answer is not the same one: the bar asks *which part
- * of the board*, this asks *who put it there*. Naming the cut after what the other two are cuts of
- * makes them a set of three answers to one question, which is what they are.
+ * nothing. These two always can: a hire with no buddy cards learns something true from an empty
+ * result, and a control that grows an option the first time the generator runs is a control that
+ * moves under the pointer.
  */
-export const FILTER_OPTIONS: { value: BoardFilter; label: string; icon: LucideIcon }[] = [
-  { value: "all", label: "From anyone", icon: Layers },
+export const FILTER_OPTIONS: {
+  value: Exclude<BoardFilter, "all">;
+  label: string;
+  icon: LucideIcon;
+}[] = [
   { value: "buddy", label: "From your buddy", icon: Bot },
   { value: "mine", label: "Yours", icon: User },
 ];

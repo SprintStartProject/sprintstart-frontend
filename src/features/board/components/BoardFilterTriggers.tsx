@@ -12,7 +12,7 @@ type BoardFilterTriggersProps = {
 };
 
 /**
- * Which cards to show, as three switches rather than a dropdown.
+ * Which cards to show, as two switches rather than a dropdown.
  *
  * Split out the way {@link AddCardTriggers} was, and for the same reason: from `lg` up it lives in
  * the page's right margin beside the other switches, and below that width there is no margin, so it
@@ -22,6 +22,10 @@ type BoardFilterTriggersProps = {
  * Toggle buttons with `aria-pressed` rather than a radio group, which is what `SegmentedTabs` does
  * a few lines away and for the same reason: a real radio group promises arrow-key navigation, and
  * announcing one without implementing it sets an expectation the control then fails.
+ *
+ * Toggles in the full sense: the lit one turns itself off. There is no "all cards" button to press
+ * afterwards, because a board with neither of these on is already showing every card — see
+ * {@link FILTER_OPTIONS}.
  *
  * In the rail the words are gone, which a cut like "Yours" cannot carry on a glyph alone. It does
  * not have to: `BoardViewStatus` names the cut in words directly above the board whenever one is
@@ -46,7 +50,7 @@ export function BoardFilterTriggers({
           variant={value === option ? "secondary" : "ghost"}
           size="sm"
           iconOnly={compact}
-          onClick={() => onChange(option)}
+          onClick={() => onChange(value === option ? "all" : option)}
           aria-pressed={value === option}
           aria-label={compact ? label : undefined}
           title={label}
