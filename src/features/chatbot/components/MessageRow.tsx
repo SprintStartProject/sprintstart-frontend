@@ -128,7 +128,7 @@ function MessageRowImpl({
             <ReasoningPanel
               reasoning={message.reasoning ?? ""}
               isStreaming={message.id === streamingMessageId}
-              hasAnswer={message.content !== ""}
+              answerLength={message.content.length}
             />
           )}
 
