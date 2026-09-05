@@ -5,6 +5,12 @@ import { BuddyDock } from "../../../../src/features/buddy/components/BuddyDock";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 import type { BuddySuggestion } from "../../../../src/services/buddyService";
 
+vi.mock("../../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
 // Every question carries the escalation trigger now, and that reads the selected project.
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
@@ -37,6 +43,7 @@ function renderDock(
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
       suggestions={suggestions}
+      startFreshVisit={vi.fn()}
       onClose={vi.fn()}
     />,
   );

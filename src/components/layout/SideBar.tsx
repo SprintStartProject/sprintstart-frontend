@@ -169,6 +169,13 @@ function SidebarContent({
   // `/insights/knowledge-requests` is deliberately absent: it has its own
   // sidebar entry, so listing it here would leave two entries active at once
   // -- including two active pills sharing one Framer Motion `layoutId`.
+  /**
+   * The buddy is the other half of the chat's page, not a page of its own: one header, one
+   * switch, two conversations. So the entry that leads there lights up for both — without it
+   * the sidebar claimed the hire was nowhere at all while they were looking at half of Chat.
+   */
+  const isAssistantSectionActive = location.pathname.startsWith("/buddy");
+
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
     location.pathname.startsWith("/insights/faq") ||
@@ -243,7 +250,10 @@ function SidebarContent({
                   label={item.label}
                   icon={item.icon}
                   end={item.path === "/"}
-                  forceActive={item.path === "/pm-dashboard" && isPmSectionActive}
+                  forceActive={
+                    (item.path === "/pm-dashboard" && isPmSectionActive) ||
+                    (item.path === "/chat" && isAssistantSectionActive)
+                  }
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
                   hasAttentionMarker={item.path === "/pm-dashboard" && hasPmAttentionItems}

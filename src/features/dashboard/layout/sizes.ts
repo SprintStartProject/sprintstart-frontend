@@ -5,7 +5,7 @@
 // however they are ordered.
 // ============================================================
 
-import type { DashboardWidgetSize } from "./types";
+import type { DashboardWidgetDefinition, DashboardWidgetSize } from "./types";
 
 /**
  * The grid the widgets are laid on.
@@ -45,11 +45,17 @@ export const DASHBOARD_GRID_CLASS =
  * scans source text — a template literal would leave the classes out of the stylesheet.
  * Every size collapses to a single column on a phone, so a layout built on a desktop still
  * reads top to bottom on a small screen.
+ *
+ * **Below `sm` every card is the full-height cell**, whatever the reduced band its wide form
+ * gets on a wider screen. The bands are shallow because they are wide: 136px is a comfortable
+ * strip across four columns and a clipped box in one. Paired with
+ * {@link dashboardRenderSize}, which stops the wide *content* being rendered into that one
+ * column in the first place.
  */
 const SIZE_CLASSES: Record<DashboardWidgetSize, string> = {
   small: "col-span-1 row-span-6",
   medium: "col-span-1 row-span-6 sm:col-span-2",
-  wide: "col-span-1 row-span-3 sm:col-span-2 lg:col-span-4",
+  wide: "col-span-1 row-span-6 sm:col-span-2 sm:row-span-3 lg:col-span-4",
 };
 
 /**
@@ -65,9 +71,10 @@ const TALL_WIDE_CLASS = "col-span-1 row-span-6 sm:col-span-2 lg:col-span-4";
  *
  * The default band is right for a card that fills it. `skills` does not: at full width it is
  * one row of pills, so more than half the band was empty and the default dashboard paid for
- * that emptiness with a scrollbar.
+ * that emptiness with a scrollbar. Only from `sm` up: 84px is one line of pills across four
+ * columns and about a third of what the same pills need stacked in one.
  */
-const SHORT_WIDE_CLASS = "col-span-1 row-span-2 sm:col-span-2 lg:col-span-4";
+const SHORT_WIDE_CLASS = "col-span-1 row-span-6 sm:col-span-2 sm:row-span-2 lg:col-span-4";
 
 /**
  * The grid-placement classes for one placed widget.
@@ -84,6 +91,31 @@ export function dashboardCellClass(
   if (isTallWhenWide) return TALL_WIDE_CLASS;
 
   return isShortWhenWide ? SHORT_WIDE_CLASS : SIZE_CLASSES.wide;
+}
+
+/**
+ * The size a widget should actually *render* at, which is not always the size it was given.
+ *
+ * The board runs as a single column below `sm`, so the three sizes stop meaning three widths:
+ * a card given `wide` and a card given `small` are both exactly the width of the page. Handing
+ * the placed size to `render` there is what produced the reported breakage — a `wide` form
+ * laid out for a four-column band, squeezed into a phone-width column and cut off by the
+ * fixed-height cell.
+ *
+ * The answer is the widget's own smallest form: `sizes` is ordered smallest first, and the
+ * compact form is the one written for a narrow column. A widget that offers no small form
+ * (`ask-chat`, `team-insights`) falls back to its narrowest anyway, because that is what
+ * `sizes[0]` is. The placed size is untouched — it is still what the user picked, and it is
+ * what the board goes back to at `sm` and above.
+ */
+export function dashboardRenderSize(
+  definition: Pick<DashboardWidgetDefinition, "sizes">,
+  size: DashboardWidgetSize,
+  isNarrowViewport: boolean,
+): DashboardWidgetSize {
+  if (!isNarrowViewport) return size;
+
+  return definition.sizes[0] ?? size;
 }
 
 /** Names shown on the size control, in the order the sizes grow. */
