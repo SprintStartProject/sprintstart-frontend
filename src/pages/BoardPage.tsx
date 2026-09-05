@@ -30,6 +30,8 @@ import { BoardFilterTriggers } from "../features/board/components/BoardFilterTri
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkLegend } from "../features/board/components/MarkLegend";
+import { BoardNextUp } from "../features/board/components/BoardNextUp";
+import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
@@ -460,6 +462,18 @@ export function BoardPage() {
         pinnedIds,
       }),
     [allCards, groups, pinnedIds, states],
+  );
+
+  /**
+   * The one card to start with — see `layout/nextUp.ts`.
+   *
+   * Computed over every card rather than over what is currently shown: "where do I start" is a
+   * question about the board, and answering it from inside a filter would point at the best thing
+   * *in this view*, which is a different and much less useful answer.
+   */
+  const startHere = useMemo(
+    () => nextUp(allCards, states, { crowded: allCards.length > FOLD_THRESHOLD }),
+    [allCards, states],
   );
 
   /**
@@ -1106,6 +1120,11 @@ export function BoardPage() {
                     )}
                   </EmptyState>
                 )}
+
+                {/* First, above the status line: "showing 6 of 34" is about the view, and this is
+                    about the work. The one line on this page that answers with a thing to do rather
+                    than with a smaller list to choose from. */}
+                <BoardNextUp next={startHere} />
 
                 <BoardViewStatus
                   shown={shownCards.length}
