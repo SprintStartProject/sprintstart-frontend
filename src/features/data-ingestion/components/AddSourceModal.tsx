@@ -100,11 +100,9 @@ export function AddSourceModal({
   // slides left to make room for it beside itself.
   const [companionOpen, setCompanionOpen] = useState(false);
 
-  // GitHub detail state. `githubOwnerUserId` is the owner every repository staged from the
-  // current detail screen starts with; the staged list then edits them one by one.
+  // GitHub detail state.
   const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
   const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
-  const [githubOwnerUserId, setGithubOwnerUserId] = useState("");
 
   // Naming an owner is part of connecting a source, so it follows `canIngest` on top of the
   // role the page has already checked.
@@ -189,7 +187,6 @@ export function AddSourceModal({
 
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
-    setGithubOwnerUserId("");
     setJiraDisplayName("");
     setJiraUrl("");
     setJiraCredentialName("");
@@ -259,7 +256,7 @@ export function AddSourceModal({
 
     if (addType === "GITHUB") {
       return githubSelection.map((selection) =>
-        createDraftSourceFromDiscovery(selection, githubTokenName, githubOwnerUserId),
+        createDraftSourceFromDiscovery(selection, githubTokenName),
       );
     }
 
@@ -525,9 +522,6 @@ export function AddSourceModal({
                 onTokenSaved: handleTokenSaved,
                 projectId,
                 projectName,
-                ownerOptions: canAssignOwners ? ownerOptions : undefined,
-                ownerUserId: githubOwnerUserId,
-                onOwnerUserIdChange: canAssignOwners ? setGithubOwnerUserId : undefined,
               }}
               jira={{
                 displayName: jiraDisplayName,

@@ -13,8 +13,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, ArrowLeft, ChevronsLeft, FileText, KeyRound, X } from "lucide-react";
 import { SOURCE_META } from "../../../../data-ingestion/data";
 import { Button } from "../../../../../components/ui/Button";
-import { FilterSelect } from "../../../../../components/ui/FilterSelect";
-import { NO_OWNER_OPTION, type SourceOwnerOption } from "../../../sourceOwners";
 import { useMediaQuery } from "../../../../../hooks/useMediaQuery";
 import {
   GithubRepositoryDiscovery,
@@ -54,18 +52,6 @@ type GithubDetailProps = {
    */
   projectId?: string | null;
   projectName?: string;
-  /**
-   * People the repositories picked here can be handed to, as their documentation owner.
-   *
-   * Omitted (with {@link GithubDetailProps.onOwnerUserIdChange}) leaves the control out, which
-   * is what a surface with no member list to offer wants. One control for the whole selection
-   * on purpose: the picker is a multi-select, and asking per repository before they are even
-   * staged would be a form that grows as you tick. Each staged repository can still be given
-   * its own owner afterwards, in the list.
-   */
-  ownerOptions?: readonly SourceOwnerOption[];
-  ownerUserId?: string;
-  onOwnerUserIdChange?: (ownerUserId: string) => void;
 };
 
 /** Jira detail — a staged form; nothing connects until provisioning. */
@@ -357,7 +343,6 @@ function GithubDetail({
   onCompanionOpenChange?: (open: boolean) => void;
 }) {
   const hasTokens = github.tokenNames.length > 0;
-  const { ownerOptions, onOwnerUserIdChange } = github;
 
   return (
     <div className="space-y-4">
@@ -381,30 +366,6 @@ function GithubDetail({
         isConnecting={isBusy}
         suppressMissingTokenNotice
       />
-
-      {/* Under the picker, not over it: the repositories are what this screen is for, and the
-          owner is a decision about what has just been picked. */}
-      {ownerOptions && onOwnerUserIdChange && (
-        <div className="flex flex-col gap-3 rounded-xl border border-app-border bg-app-bg px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-app-text">Documentation owner</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-app-text-muted">
-              Who is on the hook for the docs of the repositories picked above. They show up on that
-              person&rsquo;s dashboard as a knowledge gap; each one can be reassigned in the source
-              list afterwards.
-            </p>
-          </div>
-
-          <FilterSelect
-            label="Documentation owner for the repositories added here"
-            value={github.ownerUserId ?? ""}
-            options={[NO_OWNER_OPTION, ...ownerOptions]}
-            onChange={onOwnerUserIdChange}
-            disabled={isBusy}
-            className="w-full shrink-0 sm:w-56"
-          />
-        </div>
-      )}
     </div>
   );
 }

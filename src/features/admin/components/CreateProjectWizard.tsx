@@ -125,9 +125,6 @@ export function CreateProjectWizard({
   const [addFlowKey, setAddFlowKey] = useState(0);
   const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
   const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
-  // The owner every repository staged from the current detail screen starts with; the staged
-  // list then edits them one by one.
-  const [githubOwnerUserId, setGithubOwnerUserId] = useState("");
 
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token. It falls back to the prop until it has loaded so
@@ -257,7 +254,6 @@ export function CreateProjectWizard({
     setAddStep("type");
     setAddType("GITHUB");
     setGithubSelection([]);
-    setGithubOwnerUserId("");
     resetJiraDraftFields();
     setUploadFiles([]);
     setCreatedProjectId("");
@@ -271,7 +267,6 @@ export function CreateProjectWizard({
 
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
-    setGithubOwnerUserId("");
     resetJiraDraftFields();
     setUploadFiles([]);
   };
@@ -428,10 +423,7 @@ export function CreateProjectWizard({
       setSources((current) =>
         githubSelection.reduce(
           (accumulated, selection) =>
-            addDraftSource(
-              accumulated,
-              createDraftSourceFromDiscovery(selection, githubTokenName, githubOwnerUserId),
-            ),
+            addDraftSource(accumulated, createDraftSourceFromDiscovery(selection, githubTokenName)),
           current,
         ),
       );
@@ -788,9 +780,6 @@ export function CreateProjectWizard({
                   onTokenNameChange: setGithubTokenName,
                   onSelectionChange: setGithubSelection,
                   onTokenSaved: handleTokenSaved,
-                  ownerOptions,
-                  ownerUserId: githubOwnerUserId,
-                  onOwnerUserIdChange: setGithubOwnerUserId,
                 }}
                 jira={{
                   displayName: jiraDisplayName,

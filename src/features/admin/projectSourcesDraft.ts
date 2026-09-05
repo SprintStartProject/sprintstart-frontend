@@ -54,13 +54,17 @@ export type GithubDraftSource = DraftSourceBase & {
   name: string;
   tokenName: string;
   /**
-   * Who owns this repository's documentation, set while the source is being staged.
+   * Who owns this repository's documentation, named in the staged source list.
    *
    * The knowledge-gaps analysis keys ownership by component name, and a repository's component
    * is `owner/name` — so naming somebody here is the same assignment the PM would otherwise
-   * have to make afterwards from Knowledge gaps → the repository → Owner. Applied once the
-   * repository has connected; empty means nobody was named, which is not the same as clearing
-   * an existing owner and never writes anything.
+   * have to make afterwards from Knowledge gaps → the repository → Owner.
+   *
+   * Set on the list rather than on the discovery screen, and therefore never at staging time:
+   * discovery is a multi-select, so a control there could only name one person for everything
+   * ticked, which is not how repositories are actually divided up. Applied once the repository
+   * has connected; empty means nobody was named, which is not the same as clearing an existing
+   * owner and never writes anything.
    */
   ownerUserId?: string;
   /**
@@ -102,7 +106,6 @@ export function createDraftSource(
   name: string,
   tokenName: string,
   repositoryId?: string,
-  ownerUserId?: string,
 ): GithubDraftSource {
   return {
     id: nextDraftSourceId(),
@@ -114,7 +117,6 @@ export function createDraftSource(
     errorMessage: "",
     ownerAssignmentFailed: false,
     repositoryId,
-    ownerUserId: ownerUserId || undefined,
   };
 }
 
@@ -126,14 +128,12 @@ export function createDraftSource(
 export function createDraftSourceFromDiscovery(
   selection: DiscoverySelection,
   tokenName: string,
-  ownerUserId?: string,
 ): GithubDraftSource {
   return createDraftSource(
     selection.owner,
     selection.name,
     tokenName,
     selection.linkState === "linkable" ? selection.repositoryId : undefined,
-    ownerUserId,
   );
 }
 
