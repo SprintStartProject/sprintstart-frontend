@@ -2,7 +2,13 @@ import { useContext } from "react";
 import { MyKnowledgeGapsContext, type MyKnowledgeGapsValue } from "./MyKnowledgeGapsContext";
 
 /** What a caller outside the provider sees: nothing owned, nothing loading, nothing broken. */
-const NONE: MyKnowledgeGapsValue = { gaps: [], isLoading: false, hasFailed: false };
+const NONE: MyKnowledgeGapsValue = {
+  gaps: [],
+  unseenComponents: [],
+  markAllSeen: () => {},
+  isLoading: false,
+  hasFailed: false,
+};
 
 /**
  * The gaps assigned to the signed-in user.

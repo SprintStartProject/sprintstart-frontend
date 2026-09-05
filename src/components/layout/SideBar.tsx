@@ -8,6 +8,7 @@ import { canAccessRoute, type AppRoute } from "../../auth/accessPolicy";
 import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitcher";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
+import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import {
   AdminIcon,
@@ -139,6 +140,14 @@ function SidebarContent({
   const { canManageSelected } = useProjectContext();
   const isOnboardingAvailable = useOnboardingAvailable();
   const location = useLocation();
+  /*
+    Components put in this user's name that they have not acknowledged yet. Read straight from
+    the shared provider rather than passed down like `hasPmAttentionItems`: that one is passed
+    because owning the request here would fire it twice over (this renders once for desktop and
+    once for the mobile drawer), and the provider already solves exactly that.
+  */
+  const { unseenComponents } = useMyKnowledgeGaps();
+  const hasUnseenKnowledgeGaps = unseenComponents.length > 0;
   /**
    * Viewport y of the pointer while it is over the nav, `-Infinity` when it
    * is not. A motion value rather than state: it changes on every pointer
@@ -265,8 +274,15 @@ function SidebarContent({
                   }
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
-                  hasAttentionMarker={item.path === "/pm-dashboard" && hasPmAttentionItems}
-                  attentionLabel="Open skip requests or unread feedback"
+                  hasAttentionMarker={
+                    (item.path === "/pm-dashboard" && hasPmAttentionItems) ||
+                    (item.path === "/" && hasUnseenKnowledgeGaps)
+                  }
+                  attentionLabel={
+                    item.path === "/"
+                      ? "A component has been assigned to you"
+                      : "Open skip requests or unread feedback"
+                  }
                   onNavigate={onNavigate}
                 />
               ))}

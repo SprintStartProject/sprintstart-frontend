@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { useAuth } from "../../../context/useAuth";
-import { readAnnouncedComponents, storeAnnouncedComponents } from "../ownerAnnouncement";
+import { addAnnouncedComponents, readAnnouncedComponents } from "../ownerAnnouncement";
 import { useMyKnowledgeGaps } from "../useMyKnowledgeGaps";
 
 /** How many component names are spelled out before the rest become a count. */
@@ -27,73 +27,76 @@ function describeComponents(components: readonly string[]): string {
  * anywhere that said so. The gap simply appeared on a dashboard card the user may not even
  * have placed, which is not a way to hand somebody work.
  *
- * Mounted app-wide rather than on the dashboard, because the point is to reach the user
- * wherever they are; "Show me" then takes them to the dashboard, where the card lives. What
- * has already been said is remembered per user, so this is a notification and not a nag —
- * see `ownerAnnouncement.ts` for why that memory is local to the browser.
+ * **Once per component, ever, and closing it acknowledges nothing.** The dialog is the
+ * introduction, not the reminder: after it has been shown, the marker on the widget and the
+ * one in the sidebar are what carry the news, and they stay until the card is pressed.
+ * Neither button here clears them — "Show me" navigates, "Later" closes, and a dialog that
+ * Escape can dismiss is not evidence that anybody read it.
+ *
+ * Mounted app-wide rather than on the dashboard, because being handed work should reach you
+ * where you are.
  */
 export function KnowledgeGapOwnerAnnouncement() {
   const { profile } = useAuth();
+
+  // Remounted per user, so the dialog below can read what has already been announced once, on
+  // mount, against a user id that is certain to be there.
+  if (!profile) return null;
+
+  return <OwnerAnnouncementDialog key={profile.id} userId={profile.id} />;
+}
+
+function OwnerAnnouncementDialog({ userId }: { userId: string }) {
   const navigate = useNavigate();
-  const { gaps, isLoading, hasFailed } = useMyKnowledgeGaps();
+  const { unseenComponents } = useMyKnowledgeGaps();
 
-  const userId = profile?.id ?? "";
-  const components = gaps.map((gap) => gap.component);
-  const componentKey = components.join("|");
+  /*
+    Read once, on mount. Re-reading it on every render would only ever tell this component
+    about the write it made itself, and would close the dialog in the frame after it opened —
+    an assignment that arrives later in the session is simply not in it yet, which is exactly
+    when the dialog should still appear.
+  */
+  const [alreadyAnnounced] = useState(() => readAnnouncedComponents(userId));
+  const [isDismissed, setDismissed] = useState(false);
 
-  // What this render would announce, or `null` for nothing new. Held in state rather than
-  // derived, so the dialog keeps saying the same thing while it is open even if the gaps
-  // reload underneath it — and so dismissing it is what closes it, not a changed answer.
-  const [pending, setPending] = useState<string[]>([]);
+  const newComponents = unseenComponents.filter((component) => !alreadyAnnounced.has(component));
+  const newKey = newComponents.join("|");
 
+  const isOpen = !isDismissed && newComponents.length > 0;
+
+  // Records the interruption in storage, which is an external system rather than state:
+  // nothing here re-renders on it, because `alreadyAnnounced` was settled on mount.
   useEffect(() => {
-    if (!userId || isLoading || hasFailed || components.length === 0) return;
+    if (isOpen) addAnnouncedComponents(userId, newKey.split("|"));
+  }, [isOpen, userId, newKey]);
 
-    const announced = readAnnouncedComponents(userId);
-    const unannounced = components.filter((component) => !announced.has(component));
-
-    if (unannounced.length === 0) {
-      // Nothing new, but the record still has to follow a component the user has stopped
-      // owning out of the set — otherwise getting it back later would say nothing.
-      storeAnnouncedComponents(userId, components);
-      return;
-    }
-
-    setPending(unannounced);
-    // `componentKey` is the dependency that matters: the array itself is rebuilt every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isLoading, hasFailed, componentKey]);
-
-  const dismiss = () => {
-    storeAnnouncedComponents(userId, components);
-    setPending([]);
-  };
-
-  const isOpen = pending.length > 0;
+  const isPlural = newComponents.length !== 1;
 
   return (
     <AlertDialog
       isOpen={isOpen}
-      title={pending.length === 1 ? "You own a component now" : "You own new components now"}
+      title={isPlural ? "You own new components now" : "You own a component now"}
       description={
         <>
           <p className="text-sm leading-relaxed text-app-text-muted">
-            {pending.length === 1
-              ? `${describeComponents(pending)} has been put in your name. Its missing documentation is yours to write.`
-              : `${describeComponents(pending)} have been put in your name. Their missing documentation is yours to write.`}
+            {describeComponents(newComponents)}{" "}
+            {isPlural
+              ? "have been put in your name. Their missing documentation is yours to write."
+              : "has been put in your name. Its missing documentation is yours to write."}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-app-text-muted">
-            Your dashboard keeps track of what is still missing.
+            Your dashboard keeps track of what is still missing, and will keep flagging it until you
+            have looked.
           </p>
         </>
       }
       confirmLabel="Show me"
       cancelLabel="Later"
       onConfirm={() => {
-        dismiss();
+        setDismissed(true);
         void navigate("/");
       }}
-      onClose={dismiss}
+      onClose={() => setDismissed(true)}
     />
   );
 }

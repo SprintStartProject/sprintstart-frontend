@@ -4,6 +4,7 @@ import { useAuth } from "../../../context/useAuth";
 import { useFetch } from "../../../hooks/useFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
+import { useMyKnowledgeGaps } from "../../knowledge-gaps/useMyKnowledgeGaps";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
 import {
   SeverityBar,
@@ -349,6 +350,28 @@ function GapRow({ gap }: { gap: KnowledgeGap }) {
   );
 }
 
+/**
+ * The "there is something new here" marker, and the only thing that clears it.
+ *
+ * Not a button: the whole card is the control (see `WidgetShell`), so pressing anywhere on it
+ * is what acknowledges the marker. That is also why the card is made pressable for a user who
+ * has nowhere to go from here -- clearing the marker is a worthwhile outcome on its own, and
+ * it is the one the sidebar flag is waiting for.
+ */
+function NewOwnershipPill({ count }: { count: number }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-[10px] font-semibold tracking-wide text-app-warning-text uppercase">
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-app-warning-solid" />
+      New
+      <span className="sr-only">
+        {count === 1
+          ? ": 1 component was assigned to you. Open this card to mark it as read."
+          : `: ${count} components were assigned to you. Open this card to mark them as read.`}
+      </span>
+    </span>
+  );
+}
+
 /** Trailing line for whatever did not fit, so the list never just stops. */
 function HiddenCount({ hidden }: { hidden: number }) {
   if (hidden <= 0) return null;
@@ -384,6 +407,9 @@ function HiddenCount({ hidden }: { hidden: number }) {
 export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
   const { profile } = useAuth();
   const { selectedProjectId, canManageSelected } = useProjectContext();
+  // Only the unread flag comes from the shared provider; the figures below stay this widget's
+  // own request, so the card still works wherever it is rendered.
+  const { unseenComponents, markAllSeen } = useMyKnowledgeGaps();
 
   /*
     The project context starts empty and only fills in once the project list has loaded — and
@@ -403,6 +429,13 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
   );
 
   const canOpenPage = canAccessRoute(profile, "/insights/knowledge-gaps", canManageSelected);
+
+  /*
+    Something has been assigned that the user has not acknowledged. The card then always
+    accepts a press, even for a member who cannot open the knowledge-gaps page: the press is
+    what puts the flag down, here and in the sidebar.
+  */
+  const hasUnseen = unseenComponents.length > 0;
 
   /*
     The overview is the project's full component roster now, the covered ones included. This
@@ -452,8 +485,16 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
     <WidgetShell
       icon={FileWarning}
       title="Your knowledge gaps"
-      actionLabel={canOpenPage ? "Open knowledge gaps" : undefined}
+      actionLabel={
+        canOpenPage
+          ? "Open knowledge gaps"
+          : hasUnseen
+            ? "Mark the components assigned to you as read"
+            : undefined
+      }
       to={canOpenPage ? "/insights/knowledge-gaps" : undefined}
+      onActivate={hasUnseen ? markAllSeen : undefined}
+      notice={hasUnseen ? <NewOwnershipPill count={unseenComponents.length} /> : undefined}
       isLoading={loading}
       // Only a failed request may say this. Owning nothing is a normal, successful answer and
       // gets the empty state below — the two must never be told apart by guesswork.
