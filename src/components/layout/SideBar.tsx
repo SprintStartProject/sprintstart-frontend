@@ -226,8 +226,8 @@ function SidebarContent({
     .join("|")}`;
 
   return (
-    <div className="flex h-full flex-col bg-app-bg text-app-text">
-      <div className="flex items-center gap-3 px-[24px] py-[24px]">
+    <div className="flex h-full min-h-0 flex-col bg-app-bg text-app-text">
+      <div className="flex shrink-0 items-center gap-3 px-[24px] py-[24px]">
         <SidebarLogo />
 
         <h1 className="text-lg leading-none font-bold tracking-tight text-app-text">SprintStart</h1>
@@ -235,6 +235,9 @@ function SidebarContent({
 
       <nav
         aria-label={ariaLabel}
+        // Marks this element as the scroll container the nav rows re-measure
+        // against — see the scroll listener in `SidebarNavLink`.
+        data-sidebar-scroll="true"
         // Tracked on the nav, not per entry: pointer enter/leave on the
         // individual rows is skipped outright when the mouse crosses
         // several of them inside one frame.
@@ -247,7 +250,7 @@ function SidebarContent({
         // further left again would need a smaller scale to keep that
         // gap. Header and footer share the inset, so everything lines
         // up on one left edge.
-        className="flex-1 space-y-[5px] px-[24px] py-[20px]"
+        className="app-scrollbar min-h-0 flex-1 space-y-[5px] overflow-x-hidden overflow-y-auto px-[24px] py-[20px]"
       >
         {sections.map((section, sectionIndex) => (
           <div
@@ -294,7 +297,7 @@ function SidebarContent({
       {/* Floating glass card instead of a full-bleed bar. The 12px outer
                 gutter plus 12px inner padding lines its content up with the
                 24px inset used by the nav items above. */}
-      <div className="px-[12px] pt-[8px] pb-[16px]">
+      <div className="shrink-0 px-[12px] pt-[8px] pb-[16px]">
         <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           {profile && (
             <div className="flex items-center justify-between gap-2 py-[2px]">

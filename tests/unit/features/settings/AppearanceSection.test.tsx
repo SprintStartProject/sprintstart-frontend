@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
@@ -80,5 +80,35 @@ describe("AppearanceSection", () => {
 
     expect(window.localStorage.getItem("theme")).toBe("system");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
+  });
+
+  it("hides the glow intensity slider while aurora is off", () => {
+    renderWithProviders();
+
+    expect(screen.queryByLabelText("Glow intensity")).not.toBeInTheDocument();
+  });
+
+  it("shows the glow intensity slider at its default of 50 once aurora is on", async () => {
+    const user = userEvent.setup();
+    renderWithProviders();
+
+    await user.click(screen.getByRole("switch", { name: "Aurora Background" }));
+
+    const slider = screen.getByLabelText("Glow intensity");
+    expect(slider).toHaveValue("50");
+    expect(screen.getByText("50%")).toBeInTheDocument();
+  });
+
+  it("persists a changed glow intensity, clamped into the 10–100 range", () => {
+    window.localStorage.setItem("sprintstart:aurora-enabled", "true");
+    renderWithProviders();
+
+    const slider = screen.getByLabelText("Glow intensity");
+    // Fire the change event directly: jsdom doesn't lay out range inputs,
+    // so pointer-drag simulation can't move the thumb.
+    fireEvent.change(slider, { target: { value: "70" } });
+
+    expect(window.localStorage.getItem("sprintstart:glow-intensity")).toBe("70");
+    expect(screen.getByText("70%")).toBeInTheDocument();
   });
 });
