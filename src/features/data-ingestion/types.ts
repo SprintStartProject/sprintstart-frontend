@@ -197,6 +197,8 @@ export type ConfluenceSpaceSourceDetails = {
   baseUrl: string;
   spaceId: string;
   spaceKey: string;
+  spaceName?: string | null;
+  credentialName?: string;
 };
 
 export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";

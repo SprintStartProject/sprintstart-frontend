@@ -530,6 +530,8 @@ export const handlers = [
       baseUrl: "https://example.atlassian.net/wiki",
       spaceId: "123456",
       spaceKey: "EX",
+      spaceName: "Example Space",
+      credentialName: "default",
       pageAllowlist: [],
       pageDenylist: [],
       credentialsConfigured: true,

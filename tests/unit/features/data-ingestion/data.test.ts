@@ -390,6 +390,8 @@ describe("data-ingestion data helpers", () => {
       baseUrl: "https://myteam.atlassian.net",
       spaceId: "123456",
       spaceKey: "DOCS",
+      spaceName: null,
+      credentialName: "default",
       pageAllowlist: [],
       pageDenylist: [],
       credentialsConfigured: true,
@@ -455,6 +457,26 @@ describe("data-ingestion data helpers", () => {
       const source = createConfluenceSourceFromConnection(confluenceConn, [run]);
       expect(source.ingestionStatusLabel).toBe("Synced");
       expect(source.artifacts).toBe(6);
+    });
+
+    it("names the card from spaceName, falling back to spaceKey when there is none", () => {
+      expect(
+        createConfluenceSourceFromConnection({ ...confluenceConn, spaceName: "Docs Space" }).name,
+      ).toBe("Docs Space");
+      expect(
+        createConfluenceSourceFromConnection({ ...confluenceConn, spaceName: null }).name,
+      ).toBe("DOCS");
+    });
+
+    it("carries spaceName and credentialName onto the source's confluenceSpace details", () => {
+      const source = createConfluenceSourceFromConnection({
+        ...confluenceConn,
+        spaceName: "Docs Space",
+        credentialName: "team-cred",
+      });
+
+      expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
+      expect(source.confluenceSpace?.credentialName).toBe("team-cred");
     });
 
     it("creates Confluence source from status instance", () => {

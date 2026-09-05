@@ -13,6 +13,8 @@ const mockConnection: ConfluenceConnectionDto = {
   baseUrl: "https://example.atlassian.net/wiki",
   spaceId: "SPACE-1",
   spaceKey: "SP",
+  spaceName: "Sprint Planning",
+  credentialName: "default",
   pageAllowlist: [],
   pageDenylist: [],
   credentialsConfigured: true,

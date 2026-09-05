@@ -25,6 +25,8 @@ export type ConfluenceConnectionDto = {
   baseUrl: string;
   spaceId: string;
   spaceKey: string;
+  spaceName: string | null;
+  credentialName: string;
   pageAllowlist: string[];
   pageDenylist: string[];
   credentialsConfigured: boolean;

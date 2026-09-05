@@ -332,7 +332,7 @@ export function createConfluenceSourceFromConnection(
   return {
     sourceId: connection.id,
     sourceSystem: "CONFLUENCE",
-    name: connection.spaceKey || connection.spaceId,
+    name: connection.spaceName ?? connection.spaceKey ?? connection.spaceId,
     type: meta.type,
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
@@ -369,6 +369,8 @@ export function createConfluenceSourceFromConnection(
       baseUrl: connection.baseUrl,
       spaceId: connection.spaceId,
       spaceKey: connection.spaceKey,
+      spaceName: connection.spaceName,
+      credentialName: connection.credentialName,
     },
     lastCommitsSyncAt: null,
     lastIssuesSyncAt: null,

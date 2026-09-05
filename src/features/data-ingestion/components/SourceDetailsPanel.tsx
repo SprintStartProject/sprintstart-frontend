@@ -418,6 +418,9 @@ export function SourceDetailsPanel({
             {confluence?.spaceKey && <InfoRow label="Space key" value={confluence.spaceKey} />}
             {confluence?.baseUrl && <InfoLinkRow label="Base URL" value={confluence.baseUrl} />}
             <InfoRow label="Space ID" value={confluence?.spaceId ?? source.sourceId} mono />
+            {confluence?.credentialName && (
+              <InfoRow label="Credential" value={confluence.credentialName} />
+            )}
           </dl>
         </DrawerCard>
       )}
