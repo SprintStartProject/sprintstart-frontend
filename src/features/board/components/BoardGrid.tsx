@@ -260,8 +260,23 @@ function GridBlock({ span, gap, reduceMotion, children }: GridBlockProps) {
 
     // No first measurement of our own: `ResizeObserver` reports the initial size as soon as it
     // observes, so calling it here as well would be a second render for the same number.
-    const observer = new ResizeObserver(() => {
-      const height = element.getBoundingClientRect().height;
+    const observer = new ResizeObserver(([entry]) => {
+      // The *layout* height, never `getBoundingClientRect()`.
+      //
+      // This block is a motion element that arrives at `scale: 0.97` and animates to 1, and a
+      // bounding rect is the drawn size — so a first measurement that lands while that animation is
+      // still running reports the block three percent short. Nothing corrects it afterwards either:
+      // a transform does not change the border box, so the observer never fires again, and the
+      // block keeps a row count taken from a frame it was mid-animation in.
+      //
+      // Which is exactly the shape of the bug people saw — cards overlapping *sometimes*, depending
+      // on how wide the board was and how much else was arriving at the same moment. `borderBoxSize`
+      // is the geometry the grid actually places against, and it is blind to transforms.
+      const height =
+        entry?.borderBoxSize?.[0]?.blockSize ??
+        (element as HTMLElement).offsetHeight ??
+        element.getBoundingClientRect().height;
+
       setRows(Math.max(1, Math.ceil((height + gap) / (ROW_UNIT + gap))));
     });
 
