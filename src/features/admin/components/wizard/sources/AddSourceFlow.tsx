@@ -23,9 +23,9 @@ import { ConfluenceConnectStep } from "../../../../data-ingestion/components/Con
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
 import { FileUploadZone } from "../../../../knowledge-base/components/FileUploadZone";
 import { TokenAddForm } from "../../../../settings/components/TokenAddForm";
-import { JiraCredentialAddForm } from "../../../../settings/components/jira/JiraCredentialAddForm";
+import { AtlassianCredentialAddForm } from "../../../../settings/components/atlassian/AtlassianCredentialAddForm";
 import type { SourceSystem } from "../../../../data-ingestion/types";
-import type { JiraCredentialsDto } from "../../../../../services/sources/jiraService";
+import type { AtlassianCredentialDto } from "../../../../../services/sources/atlassianService";
 
 /**
  * Below this width the credential form stays inline (phone/tablet); at or above
@@ -60,7 +60,7 @@ type JiraDetailProps = {
   displayName: string;
   url: string;
   credentialName: string;
-  credentials: JiraCredentialsDto[];
+  credentials: AtlassianCredentialDto[];
   credentialsLoaded: boolean;
   credentialsLoading: boolean;
   credentialsError: string | null;
@@ -72,7 +72,7 @@ type JiraDetailProps = {
   /** Enter in a field stages the source (guarded), matching "Add to list". */
   onSubmit: () => void;
   /** Adds the new credential to the list, selects it, and reconciles with the server. */
-  onCredentialSaved: (credential: JiraCredentialsDto) => Promise<void>;
+  onCredentialSaved: (credential: AtlassianCredentialDto) => Promise<void>;
 };
 
 /** Upload detail — files are staged in memory and uploaded during provisioning. */
@@ -403,12 +403,12 @@ function JiraDetail({
   return (
     <div className="space-y-4">
       <CredentialSlot
-        buttonLabel="Add Jira credential"
-        panelTitle="New Jira credential"
+        buttonLabel="Add Atlassian credential"
+        panelTitle="New Atlassian credential"
         onCompanionOpenChange={onCompanionOpenChange}
         missingLabel={missingCredential ? "No credential yet" : undefined}
         renderForm={(close, embedded) => (
-          <JiraCredentialAddForm
+          <AtlassianCredentialAddForm
             defaultUserEmail={jira.defaultUserEmail}
             onClose={close}
             onSaved={jira.onCredentialSaved}

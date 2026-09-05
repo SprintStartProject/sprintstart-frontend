@@ -8,27 +8,28 @@ import { useToast } from "../../../../context/useToast";
 import { centralSpringToken } from "../../../../styles/tokens";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
 import {
-  changeJiraCredentialName,
-  changeJiraCredentialToken,
-  deleteJiraCredential,
-} from "../../../../services/sources/jiraService";
-import type { JiraCredentialsDto } from "../../../../services/sources/jiraService";
+  changeAtlassianCredentialName,
+  changeAtlassianCredentialToken,
+  deleteAtlassianCredential,
+} from "../../../../services/sources/atlassianService";
+import type { AtlassianCredentialDto } from "../../../../services/sources/atlassianService";
 
-type JiraCredentialRowProps = {
-  credential: JiraCredentialsDto;
+type AtlassianCredentialRowProps = {
+  credential: AtlassianCredentialDto;
   onSaved: () => Promise<void>;
 };
 
 type Panel = "none" | "rename" | "rotate" | "delete";
 
 /**
- * One row in the Jira credential list. Only one inline panel (rename, rotate or
- * delete) is open at a time; they share a single input/error/busy state since
- * they are mutually exclusive. Rename and rotate reuse the same text field
- * (rename prefilled with the current name, rotate empty and masked). The
- * credential is identified by `(userEmail, displayName)` for every mutation.
+ * One row in the Atlassian credential list. Only one inline panel (rename,
+ * rotate or delete) is open at a time; they share a single input/error/busy
+ * state since they are mutually exclusive. Rename and rotate reuse the same
+ * text field (rename prefilled with the current name, rotate empty and
+ * masked). The credential is identified by `(userEmail, displayName)` for
+ * every mutation.
  */
-export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProps) {
+export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredentialRowProps) {
   const { userEmail, displayName } = credential;
 
   const [panel, setPanel] = useState<Panel>("none");
@@ -92,7 +93,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
   const submitRename = () =>
     void runMutation(
       () =>
-        changeJiraCredentialName({
+        changeAtlassianCredentialName({
           userEmail,
           oldName: displayName,
           newName: value.trim(),
@@ -104,18 +105,18 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
   const submitRotate = () =>
     void runMutation(
       () =>
-        changeJiraCredentialToken({
+        changeAtlassianCredentialToken({
           userEmail,
           tokenName: displayName,
           newToken: value.trim(),
         }),
       "Couldn't rotate the token.",
-      "Jira token rotated",
+      "Atlassian token rotated",
     );
 
   const confirmDelete = () =>
     void runMutation(
-      () => deleteJiraCredential({ userEmail, tokenName: displayName }),
+      () => deleteAtlassianCredential({ userEmail, tokenName: displayName }),
       "Couldn't delete the credential.",
       "Credential deleted",
     );
@@ -145,7 +146,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               variant="secondary"
               size="sm"
               onClick={openRename}
-              data-testid={`settings-jira-rename-open-${displayName}`}
+              data-testid={`settings-atlassian-rename-open-${displayName}`}
               icon={<Pencil className="h-3.5 w-3.5" />}
               aria-label={`Rename credential ${displayName}`}
               className="flex-1 sm:flex-none"
@@ -156,7 +157,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               variant="secondary"
               size="sm"
               onClick={openRotate}
-              data-testid={`settings-jira-rotate-open-${displayName}`}
+              data-testid={`settings-atlassian-rotate-open-${displayName}`}
               icon={<RefreshCw className="h-3.5 w-3.5" />}
               aria-label={`Rotate token ${displayName}`}
               className="flex-1 sm:flex-none"
@@ -167,7 +168,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
               variant="dangerSoft"
               size="sm"
               onClick={openDelete}
-              data-testid={`settings-jira-delete-open-${displayName}`}
+              data-testid={`settings-atlassian-delete-open-${displayName}`}
               icon={<Trash2 className="h-3.5 w-3.5" />}
               aria-label={`Delete credential ${displayName}`}
               className="flex-1 sm:flex-none"
@@ -197,12 +198,12 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
               <Field
                 label="New name"
-                controlId={`settings-jira-rename-${displayName}`}
+                controlId={`settings-atlassian-rename-${displayName}`}
                 disabled={isBusy}
                 className="min-w-0 flex-1"
               >
                 <Input
-                  data-testid={`settings-jira-rename-input-${displayName}`}
+                  data-testid={`settings-atlassian-rename-input-${displayName}`}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder="e.g. default"
@@ -214,7 +215,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
                 <Button
                   variant="primary"
                   type="submit"
-                  data-testid={`settings-jira-rename-submit-${displayName}`}
+                  data-testid={`settings-atlassian-rename-submit-${displayName}`}
                   loading={isBusy}
                   icon={<Pencil className="h-4 w-4" />}
                 >
@@ -246,16 +247,16 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
               <Field
                 label="New API token"
-                controlId={`settings-jira-rotate-${displayName}`}
+                controlId={`settings-atlassian-rotate-${displayName}`}
                 disabled={isBusy}
                 className="min-w-0 flex-1"
               >
                 <Input
-                  data-testid={`settings-jira-rotate-input-${displayName}`}
+                  data-testid={`settings-atlassian-rotate-input-${displayName}`}
                   type="password"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  placeholder="New Jira API token"
+                  placeholder="New Atlassian API token"
                   required
                   autoComplete="off"
                   icon={<KeyRound className="h-4 w-4" />}
@@ -265,7 +266,7 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
                 <Button
                   variant="primary"
                   type="submit"
-                  data-testid={`settings-jira-rotate-submit-${displayName}`}
+                  data-testid={`settings-atlassian-rotate-submit-${displayName}`}
                   loading={isBusy}
                   icon={<RefreshCw className="h-4 w-4" />}
                 >
@@ -290,14 +291,14 @@ export function JiraCredentialRow({ credential, onSaved }: JiraCredentialRowProp
           >
             <p className="mb-3 text-sm text-app-danger-text">
               Delete <strong>{displayName}</strong>? This cannot be undone and may break connected
-              Jira instances.
+              Jira instances and Confluence spaces.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 variant="danger"
                 size="sm"
                 onClick={confirmDelete}
-                data-testid={`settings-jira-delete-confirm-${displayName}`}
+                data-testid={`settings-atlassian-delete-confirm-${displayName}`}
                 loading={isBusy}
               >
                 {isBusy ? "Deleting..." : "Delete"}

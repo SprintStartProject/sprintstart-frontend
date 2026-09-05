@@ -117,7 +117,7 @@ export const handlers = [
   // management view mounts every connector at once, so both are needed even in
   // tests that are not about credentials at all.
   http.get("/api/v1/github/pat", () => HttpResponse.json([])),
-  http.get("/api/v1/jira/credentials", () => HttpResponse.json([])),
+  http.get("/api/v1/atlassian/credentials", () => HttpResponse.json([])),
 
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({

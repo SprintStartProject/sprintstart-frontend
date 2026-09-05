@@ -23,8 +23,8 @@ import {
 } from "../projectSourcesDraft";
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
-import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
+import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -192,7 +192,7 @@ export function CreateProjectWizard({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useJiraCredentials(isOpen && isJiraDetail);
+  } = useAtlassianCredentials(isOpen && isJiraDetail);
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -393,7 +393,7 @@ export function CreateProjectWizard({
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
     addCredentialLocally(credential);
     setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();

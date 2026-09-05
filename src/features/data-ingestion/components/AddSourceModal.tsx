@@ -23,11 +23,11 @@ import {
   type AddSourceStep,
 } from "../../admin/components/wizard/sources/AddSourceFlow.tsx";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens.ts";
-import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
+import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -124,7 +124,7 @@ export function AddSourceModal({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useJiraCredentials(isJiraDetail);
+  } = useAtlassianCredentials(isJiraDetail);
 
   // Adopt the first token as soon as the list arrives (and heal a stale
   // selection) so discovery is usable on the first open.
@@ -199,7 +199,7 @@ export function AddSourceModal({
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
     addCredentialLocally(credential);
     setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();

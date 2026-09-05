@@ -6,16 +6,16 @@ import { Input } from "../../../../components/ui/Input";
 import { useToast } from "../../../../context/useToast";
 import { parseApiError, describeRefreshFailure } from "../../../../services/apiError";
 import {
-  addJiraCredential,
-  type JiraCredentialsDto,
-} from "../../../../services/sources/jiraService";
+  addAtlassianCredential,
+  type AtlassianCredentialDto,
+} from "../../../../services/sources/atlassianService";
 
-type JiraCredentialAddFormProps = {
-  /** Login email used only as the initial Jira account email. */
+type AtlassianCredentialAddFormProps = {
+  /** Login email used only as the initial Atlassian account email. */
   defaultUserEmail: string | null;
   onClose: () => void;
   /** Receives the credential just added, for an optimistic list update. */
-  onSaved: (credential: JiraCredentialsDto) => Promise<void>;
+  onSaved: (credential: AtlassianCredentialDto) => Promise<void>;
   /**
    * When the form is already inside a titled container (the wizard's desktop
    * companion), drop its own card chrome and header so the inputs sit directly
@@ -24,19 +24,20 @@ type JiraCredentialAddFormProps = {
   embedded?: boolean;
 };
 
-const ADD_FALLBACK = "Failed to add Jira credential.";
+const ADD_FALLBACK = "Failed to add Atlassian credential.";
 
 /**
- * Inline form for storing a Jira account email and API token for the
- * authenticated user. The login email is only a convenience default because
- * the Jira account may use a different address.
+ * Inline form for storing an Atlassian account email and API token for the
+ * authenticated user, shared by the Jira and Confluence connectors. The login
+ * email is only a convenience default because the Atlassian account may use a
+ * different address.
  */
-export function JiraCredentialAddForm({
+export function AtlassianCredentialAddForm({
   defaultUserEmail,
   onClose,
   onSaved,
   embedded = false,
-}: JiraCredentialAddFormProps) {
+}: AtlassianCredentialAddFormProps) {
   const [userEmail, setUserEmail] = useState(defaultUserEmail ?? "");
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
@@ -70,7 +71,7 @@ export function JiraCredentialAddForm({
     setIsSaving(true);
     try {
       try {
-        await addJiraCredential({
+        await addAtlassianCredential({
           userEmail: trimmedEmail,
           tokenName: trimmedName,
           authToken: token.trim(),
@@ -87,7 +88,7 @@ export function JiraCredentialAddForm({
         onClose();
         return;
       }
-      toast.success("Jira credential added");
+      toast.success("Atlassian credential added");
       onClose();
     } finally {
       savingRef.current = false;
@@ -98,7 +99,7 @@ export function JiraCredentialAddForm({
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      aria-label="Add Jira credential"
+      aria-label="Add Atlassian credential"
       className={
         embedded
           ? ""
@@ -107,7 +108,7 @@ export function JiraCredentialAddForm({
     >
       {!embedded && (
         <div className="mb-4 flex items-start justify-between gap-3">
-          <span className="text-sm font-semibold text-app-text">New Jira credential</span>
+          <span className="text-sm font-semibold text-app-text">New Atlassian credential</span>
           <Button
             variant="ghost"
             size="sm"
@@ -122,23 +123,27 @@ export function JiraCredentialAddForm({
       )}
 
       <div className="space-y-3">
-        <Field label="Jira account email" controlId="settings-jira-add-email" disabled={isSaving}>
+        <Field
+          label="Atlassian account email"
+          controlId="settings-atlassian-add-email"
+          disabled={isSaving}
+        >
           <Input
             ref={emailInputRef}
-            data-testid="settings-jira-add-email"
+            data-testid="settings-atlassian-add-email"
             type="email"
             value={userEmail}
             onChange={(e) => setUserEmail(e.target.value)}
-            placeholder="jira-account@example.com"
+            placeholder="atlassian-account@example.com"
             required
             autoComplete="email"
           />
         </Field>
 
-        <Field label="Credential name" controlId="settings-jira-add-name" disabled={isSaving}>
+        <Field label="Credential name" controlId="settings-atlassian-add-name" disabled={isSaving}>
           <Input
             ref={nameInputRef}
-            data-testid="settings-jira-add-name"
+            data-testid="settings-atlassian-add-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. default"
@@ -149,16 +154,16 @@ export function JiraCredentialAddForm({
 
         <Field
           label="API token"
-          controlId="settings-jira-add-token"
+          controlId="settings-atlassian-add-token"
           disabled={isSaving}
           hint="The token is stored encrypted and cannot be retrieved after saving."
         >
           <Input
-            data-testid="settings-jira-add-token"
+            data-testid="settings-atlassian-add-token"
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="Jira API token"
+            placeholder="Atlassian API token"
             required
             autoComplete="off"
           />
@@ -171,7 +176,7 @@ export function JiraCredentialAddForm({
           <Button
             variant="primary"
             type="submit"
-            data-testid="settings-jira-add-submit"
+            data-testid="settings-atlassian-add-submit"
             loading={isSaving}
           >
             {isSaving ? "Adding..." : "Add credential"}
