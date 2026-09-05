@@ -3,11 +3,14 @@ import {
   cardsInSection,
   FOCUS_SECTION,
   LOOSE_SECTION,
+  markSection,
+  markSectionColor,
   summariseSections,
 } from "../../../../src/features/board/layout/boardSections";
 import {
   deriveCardStates,
   type BoardStructure,
+  type CardState,
 } from "../../../../src/features/board/layout/boardStructure";
 import type { BoardGroup } from "../../../../src/features/board/layout/boardGroups";
 import type { BoardCard } from "../../../../src/features/board/types";
@@ -114,3 +117,86 @@ describe("an area with nothing in it", () => {
     ]);
   });
 });
+
+describe("cutting the board by what was highlighted", () => {
+  const cards = [note("c1"), note("c2"), note("c3")];
+  const states = new Map(cards.map((card) => [card.id, openState()]));
+  const marks = {
+    c1: [{ text: "ask about this", color: "green" as const }],
+    c2: [
+      { text: "and this", color: "green" as const },
+      { text: "something else", color: "yellow" as const },
+    ],
+  };
+
+  it("offers a row only for the colours actually used", () => {
+    const rows = summariseSections(cards, [], states, { marks });
+
+    // Four rows for three green marks would be three empty promises and a bar mostly about a
+    // feature nobody used.
+    expect(rows.filter((row) => row.mark).map((row) => row.mark)).toEqual(["yellow", "green"]);
+  });
+
+  it("calls a colour what the hire calls it", () => {
+    const rows = summariseSections(cards, [], states, {
+      marks,
+      markLabels: { green: "ask about" },
+    });
+
+    expect(rows.find((row) => row.mark === "green")?.name).toBe("ask about");
+    // A colour they have not named keeps the colour's own word rather than going blank.
+    expect(rows.find((row) => row.mark === "yellow")?.name).toBe("Yellow");
+  });
+
+  it("counts the cards carrying that colour, not the marks", () => {
+    const rows = summariseSections(cards, [], states, { marks });
+
+    expect(rows.find((row) => row.mark === "green")?.total).toBe(2);
+    expect(rows.find((row) => row.mark === "yellow")?.total).toBe(1);
+  });
+
+  it("says nothing about highlights when it was not given any", () => {
+    expect(summariseSections(cards, [], states, {}).some((row) => row.mark)).toBe(false);
+  });
+
+  it("narrows to the cards carrying that colour", () => {
+    const shown = cardsInSection(cards, [], markSection("green"), undefined, marks);
+
+    expect(shown.map((card) => card.id)).toEqual(["c1", "c2"]);
+  });
+
+  it("shows nothing rather than everything when the marks are missing", () => {
+    // Showing everything would be the bar claiming to have narrowed to a colour and then not
+    // doing it.
+    expect(cardsInSection(cards, [], markSection("green"))).toEqual([]);
+  });
+
+  it("reads a colour back out of a section id, and refuses one it does not know", () => {
+    expect(markSectionColor(markSection("pink"))).toBe("pink");
+    expect(markSectionColor("__mark__:chartreuse")).toBeNull();
+    expect(markSectionColor(LOOSE_SECTION)).toBeNull();
+    expect(markSectionColor(null)).toBeNull();
+  });
+});
+
+function note(id: string): BoardCard {
+  return {
+    id,
+    kind: "NOTE",
+    owner: "HIRE",
+    position: 0,
+    placedAt: null,
+    content: { kind: "NOTE", text: id },
+  };
+}
+
+function openState(): CardState {
+  return {
+    status: "OPEN",
+    stage: "NOW",
+    blockedBy: [],
+    predecessorId: null,
+    predecessorSource: null,
+    progress: null,
+  };
+}

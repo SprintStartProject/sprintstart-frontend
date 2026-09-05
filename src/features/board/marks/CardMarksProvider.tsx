@@ -207,6 +207,7 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
       // A note highlighted anywhere always gets a colour entry too, so the map answers this for
       // every kind without having to walk the cards' text.
       hasAnyMarks: Object.keys(marks).length > 0,
+      marks,
       labels,
       nameColor,
       setBoard,

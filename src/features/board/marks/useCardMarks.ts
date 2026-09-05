@@ -15,6 +15,7 @@ const INERT: CardMarksContextType = {
   mark: () => {},
   unmark: () => {},
   hasAnyMarks: false,
+  marks: {},
   labels: {},
   nameColor: () => {},
   setBoard: () => {},

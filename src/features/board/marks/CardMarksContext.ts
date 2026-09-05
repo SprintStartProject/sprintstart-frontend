@@ -1,7 +1,7 @@
 import { createContext } from "react";
 
 import type { AuthoredCardRequest, BoardCard } from "../types";
-import type { CardMark } from "./cardMarks";
+import type { CardMark, CardMarks } from "./cardMarks";
 import type { HighlightColor } from "./highlightColors";
 import type { MarkLabels } from "./markLabels";
 
@@ -60,6 +60,13 @@ export type CardMarksContextType = {
   unmark: (cardId: string, selected: string) => void;
   /** Whether anything on this board is highlighted — what decides if a legend is worth drawing. */
   hasAnyMarks: boolean;
+  /**
+   * Every highlight on the board, by card id.
+   *
+   * Handed over whole because the section bar cuts by colour, which is a question about the board
+   * rather than about one card — `marksFor` would mean asking it forty times to answer it once.
+   */
+  marks: CardMarks;
   /** What this hire calls each colour. See `markLabels.ts`. */
   labels: MarkLabels;
   /** Names a colour, or clears the name when given nothing. */

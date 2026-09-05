@@ -1,6 +1,9 @@
 import type { BoardCard } from "../types";
 import { groupOf, type BoardGroup } from "./boardGroups";
 import { currentStage, stageOrder, type BoardStage, type CardState } from "./boardStructure";
+import type { CardMarks } from "../marks/cardMarks";
+import { HIGHLIGHT_COLORS, type HighlightColor } from "../marks/highlightColors";
+import { labelFor, type MarkLabels } from "../marks/markLabels";
 
 /**
  * The sentinel for "no area", so a section list can offer loose cards without inventing an id that
@@ -30,11 +33,42 @@ export const FOCUS_SECTION = "__focus__";
  */
 export const ALL_SECTIONS = "__all__";
 
+/**
+ * The prefix for "everything I marked in this colour".
+ *
+ * The one cut on this bar that is not a *place*. An area is where a card sits and the focus section
+ * is when it is due; a highlight is the hire having said, inside a card, that this bit is the point
+ * — which is a sharper statement than either, and until now it was one the board stored and never
+ * used. Naming a colour meant nothing while nothing could be done with the name; this is the thing
+ * that can be done with it.
+ */
+const MARK_PREFIX = "__mark__:";
+
+/** The section id for one highlight colour. */
+export function markSection(color: HighlightColor): string {
+  return `${MARK_PREFIX}${color}`;
+}
+
+/** The colour a section id names, or null when it names something else. */
+export function markSectionColor(sectionId: string | null): HighlightColor | null {
+  if (!sectionId?.startsWith(MARK_PREFIX)) return null;
+  const color = sectionId.slice(MARK_PREFIX.length);
+
+  return HIGHLIGHT_COLORS.find((known) => known === color) ?? null;
+}
+
+/** The cards carrying at least one highlight in this colour. */
+function markedIn(cards: BoardCard[], marks: CardMarks, color: HighlightColor): BoardCard[] {
+  return cards.filter((card) => (marks[card.id] ?? []).some((mark) => mark.color === color));
+}
+
 /** One section: an area, the loose cards, or the whole board. */
 export type SectionSummary = {
-  /** A group id, {@link LOOSE_SECTION}, or null for "everything". */
+  /** A group id, a sentinel, a `markSection` id, or null for "everything". */
   id: string | null;
   name: string;
+  /** Set only on a highlight row, so the bar can draw it as a colour rather than as a place. */
+  mark?: HighlightColor;
   /** The stage its cards sit in, or null when they disagree or there is no structure yet. */
   stage: BoardStage | null;
   total: number;
@@ -62,7 +96,14 @@ export function summariseSections(
   cards: BoardCard[],
   groups: BoardGroup[],
   states: Map<string, CardState>,
-  options: { focus?: boolean; pinnedIds?: ReadonlySet<string> } = {},
+  options: {
+    focus?: boolean;
+    pinnedIds?: ReadonlySet<string>;
+    /** The hire's highlights, which add one row per colour they have actually used. */
+    marks?: CardMarks;
+    /** What they call each colour. A colour they have not named keeps the colour's own word. */
+    markLabels?: MarkLabels;
+  } = {},
 ): SectionSummary[] {
   const areas: SectionSummary[] = [];
 
@@ -94,10 +135,30 @@ export function summariseSections(
     areas.push(count(LOOSE_SECTION, "Not in an area", loose, states));
   }
 
+  // One row per colour the hire has actually marked something in, trailing the places. Only the
+  // colours in use: four rows on a board with three yellow marks would be three empty promises and
+  // a tab bar that is mostly about a feature nobody used.
+  const marked: SectionSummary[] = [];
+  if (options.marks) {
+    for (const color of HIGHLIGHT_COLORS) {
+      const members = markedIn(cards, options.marks, color);
+      if (members.length === 0) continue;
+
+      marked.push({
+        ...count(markSection(color), labelFor(options.markLabels ?? {}, color), members, states),
+        mark: color,
+      });
+    }
+  }
+
   // "All sections", not "Everything": the row this bar sits in also carries the control that
   // decides how much of a section is shown, and two neighbouring controls both offering
   // "Everything" for two different things is the board asking to be misread.
-  const summaries: SectionSummary[] = [count(null, "All sections", cards, states), ...areas];
+  const summaries: SectionSummary[] = [
+    count(null, "All sections", cards, states),
+    ...areas,
+    ...marked,
+  ];
 
   if (!options.focus) return summaries;
 
@@ -166,11 +227,17 @@ export function cardsInSection(
   groups: BoardGroup[],
   sectionId: string | null,
   focus?: { states: Map<string, CardState>; pinnedIds: ReadonlySet<string> },
+  marks?: CardMarks,
 ): BoardCard[] {
   if (sectionId === null) return cards;
   if (sectionId === FOCUS_SECTION) {
     return focus ? focusCards(cards, focus.states, focus.pinnedIds) : cards;
   }
+
+  const color = markSectionColor(sectionId);
+  // Without the marks this cut cannot be made, and showing everything would be the bar claiming to
+  // have narrowed to a colour and then not doing it. Nothing is the honest answer.
+  if (color) return marks ? markedIn(cards, marks, color) : [];
   if (sectionId === LOOSE_SECTION) return cards.filter((card) => groupOf(groups, card.id) === null);
 
   return cards.filter((card) => groupOf(groups, card.id)?.id === sectionId);

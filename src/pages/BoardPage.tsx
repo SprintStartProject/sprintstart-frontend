@@ -67,7 +67,7 @@ import { readCardOrigins, type CardOrigins } from "../features/board/layout/card
 import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
 import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
-import { useMarkableBoard } from "../features/board/marks/useCardMarks";
+import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
 import {
   assignToGroup,
   dissolveGroup,
@@ -452,6 +452,10 @@ export function BoardPage() {
     onEditCard: (cardId, request) => void editCard(cardId, request),
   });
 
+  // The highlights, for the section bar's colour cuts. Read from the same provider the cards
+  // themselves draw from, so a row's count and the cards behind it cannot disagree.
+  const { marks: cardMarks, labels: markLabels } = useCardMarks();
+
   const sections = useMemo(
     () =>
       summariseSections(allCards, groups, states, {
@@ -460,8 +464,10 @@ export function BoardPage() {
         // for its own sake.
         focus: allCards.length > FOLD_THRESHOLD,
         pinnedIds,
+        marks: cardMarks,
+        markLabels,
       }),
-    [allCards, groups, pinnedIds, states],
+    [allCards, groups, pinnedIds, states, cardMarks, markLabels],
   );
 
   /**
@@ -679,10 +685,10 @@ export function BoardPage() {
     const folded = collapseStacks(allCards, stacks, openStackIds);
 
     const bySource = folded.filter((card) => matchesFilter(card, filter));
-    const visible = cardsInSection(bySource, groups, sectionId, { states, pinnedIds });
+    const visible = cardsInSection(bySource, groups, sectionId, { states, pinnedIds }, cardMarks);
 
     return [...visible].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)));
-  }, [allCards, filter, groups, openStackIds, pinnedIds, sectionId, stacks, states]);
+  }, [allCards, cardMarks, filter, groups, openStackIds, pinnedIds, sectionId, stacks, states]);
 
   const griddedBoard = board ? { ...board, cards: shownCards } : null;
   const hiddenCount = allCards.length - shownCards.length;

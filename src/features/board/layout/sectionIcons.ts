@@ -1,5 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { CircleCheckBig, CircleSlash, FolderOpen, Layers, ListChecks } from "lucide-react";
+import {
+  CircleCheckBig,
+  CircleSlash,
+  FolderOpen,
+  Highlighter,
+  Layers,
+  ListChecks,
+} from "lucide-react";
 
 import { FOCUS_SECTION, LOOSE_SECTION, type SectionSummary } from "./boardSections";
 
@@ -16,6 +23,10 @@ import { FOCUS_SECTION, LOOSE_SECTION, type SectionSummary } from "./boardSectio
  * is the more useful fact at a glance; the name beside it still says which section it is.
  */
 export function sectionIcon(section: SectionSummary): LucideIcon {
+  // Before the finished check, and deliberately: a highlight row is *what the cut is*, and a row of
+  // marked cards that happen to all be ticked off is still the highlight row. Losing the pen for a
+  // tick would make the one cut on this bar that is not a place look like one that is.
+  if (section.mark) return Highlighter;
   if (section.total > 0 && section.done === section.total) return CircleCheckBig;
   if (section.id === null) return Layers;
   if (section.id === FOCUS_SECTION) return ListChecks;
