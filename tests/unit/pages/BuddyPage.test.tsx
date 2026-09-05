@@ -227,6 +227,94 @@ describe("BuddyPage", () => {
   });
 
   /**
+   * The third way to start over, and the only one that is simply visible. The divider carries
+   * the same action but is only drawn once there is a previous conversation above the line, and
+   * `Alt+N` is invisible to anybody who was never told about it — so a hire looking for "start
+   * again" on a first visit had nothing on screen to find.
+   */
+  it("offers a standing control once there is a conversation to leave behind", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", { name: "Start a new conversation" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps it off a visit nobody has spoken in — that visit is already the fresh one", async () => {
+    vi.mocked(getMessages).mockResolvedValue([]);
+
+    renderPage();
+
+    expect(await screen.findByText("Welcome back!")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("starts the fresh visit from it, and says which chord does the same", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    const control = await screen.findByRole("button", { name: "Start a new conversation" });
+    expect(control).toHaveAttribute(
+      "title",
+      "Start a new conversation (Alt + N) — your buddy keeps what it has learned about you",
+    );
+
+    await user.click(control);
+
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
+    expect(streamOpenBuddy).toHaveBeenCalled();
+  });
+
+  /**
+   * All three routes withdraw together while a reply is in flight, and they have to: they call
+   * one function. `startFreshVisit` clears the thread and greets, but cannot call back the
+   * request already streaming into it — that stream's callbacks hold the shared session, so its
+   * tool events land under the brand-new greeting and its completion clears the greeting's own
+   * thinking state. Leaving any one of the three live mid-turn would be a door onto that bug.
+   */
+  it("withdraws every way of starting over while a reply is still arriving", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
+    // A turn that starts and never finishes: `isThinking` stays true for the rest of the test.
+    vi.mocked(streamMessage).mockReturnValue(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
+    expect(await screen.findByTestId("buddy-clear-previous")).toBeVisible();
+
+    await user.type(screen.getByLabelText("Message"), "and after that?");
+    await user.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+    });
+    expect(screen.queryByTestId("buddy-clear-previous")).toBeNull();
+
+    // The chord is gated on the same condition, so it is not a way around the other two.
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    expect(screen.getByText("where do I start?")).toBeInTheDocument();
+  });
+
+  /**
    * `Alt+N` rather than `Ctrl+N`, which every desktop browser owns. It fires while the composer
    * has focus on purpose — halfway through typing into the wrong conversation is exactly when
    * somebody reaches for it.

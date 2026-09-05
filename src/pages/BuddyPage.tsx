@@ -21,6 +21,7 @@ import {
   useNewConversationShortcut,
 } from "../hooks/useNewConversationShortcut";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
+import { BuddyFreshVisitButton } from "../features/buddy/components/BuddyFreshVisitButton";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
@@ -98,6 +99,7 @@ function writeRailOpen(open: boolean): void {
 function BuddyPageShell({
   rail,
   railToggle,
+  freshVisitControl,
   isRailOpen = false,
   children,
 }: {
@@ -105,6 +107,12 @@ function BuddyPageShell({
   rail?: ReactNode;
   /** What brings it back when it is closed. Positioned by the rail's own control. */
   railToggle?: ReactNode;
+  /**
+   * "Start a new conversation", floating over the top of the transcript. Here rather than in
+   * the page header for the reason `921cf26` took it out of that header: the header is shared
+   * with Chat, and only this half has visits to start.
+   */
+  freshVisitControl?: ReactNode;
   /** Whether that column is currently taking width, which decides this column's left gutter. */
   isRailOpen?: boolean;
   children: ReactNode;
@@ -130,6 +138,7 @@ function BuddyPageShell({
         className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${isRailOpen ? "app-rail-open" : ""}`}
       >
         {railToggle}
+        {freshVisitControl}
 
         {children}
       </div>
@@ -145,6 +154,7 @@ function BuddyMentorHome() {
   const {
     messages,
     isThinking,
+    isStreaming,
     isOpening,
     activeTool,
     openerAction,
@@ -223,6 +233,26 @@ function BuddyMentorHome() {
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
 
+  /**
+   * Whether starting over is something that can be offered at all, right now.
+   *
+   * Two conditions, and one gate for all three ways of doing it — the button, the chord and the
+   * control on the divider — because they run the same function and a hire who found the one
+   * that is still live mid-answer would hit exactly the bug the other two are avoiding.
+   *
+   * `hasUserMessage`: a visit nobody has spoken in is already the fresh one, so re-opening it
+   * would only replay the greeting.
+   *
+   * `!isBusy`: `startFreshVisit` clears the thread and greets, but it cannot call back a request
+   * already streaming into it. That stream's callbacks hold the shared session rather than the
+   * thread they started in, so its tool events land under the brand-new greeting and its
+   * completion clears the greeting's own thinking state. Aborting the stream is the durable fix
+   * and belongs in the session; not offering the control mid-turn is the reachable half, and
+   * the same half `BuddyDock` applies to its own copy.
+   */
+  const isBusy = isThinking || isStreaming;
+  const canStartFresh = hasUserMessage && !isBusy;
+
   // Memoised so the listener is bound once rather than torn down and rebuilt on every token
   // that arrives while the buddy is answering.
   const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
@@ -235,7 +265,7 @@ function BuddyMentorHome() {
 
   useNewConversationShortcut(
     startFresh,
-    hasUserMessage && surfaceFromPathname(pathname) === "buddy",
+    canStartFresh && surfaceFromPathname(pathname) === "buddy",
   );
 
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
@@ -261,6 +291,11 @@ function BuddyMentorHome() {
           >
             <BuddyPmReplies {...replies} onClose={() => setRailOpen(false)} />
           </ConversationRail>
+        ) : undefined
+      }
+      freshVisitControl={
+        canStartFresh ? (
+          <BuddyFreshVisitButton onClick={startFresh} shortcut={NEW_CONVERSATION_CHORD} />
         ) : undefined
       }
       railToggle={
@@ -307,10 +342,10 @@ function BuddyMentorHome() {
         renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
         openError={openError}
         onRetryOpen={() => void retryOpen()}
-        onStartFreshVisit={startFresh}
+        onStartFreshVisit={canStartFresh ? startFresh : undefined}
         // This page is the one that binds it — see `useNewConversationShortcut` above.
         freshVisitShortcut={NEW_CONVERSATION_CHORD}
-        hasFloatingControl={replies.hasAny && !rail.open}
+        hasFloatingControl={(replies.hasAny && !rail.open) || canStartFresh}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question
