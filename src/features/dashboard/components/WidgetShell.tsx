@@ -9,9 +9,11 @@ export type WidgetShellProps = {
   icon: LucideIcon;
   title: string;
   /**
-   * What the card promises when clicked, e.g. "Open team management".
+   * What the card promises when pressed, e.g. "Open team management".
    *
-   * Omitted together with {@link WidgetShellProps.to} for a card with nowhere to go.
+   * Omitted for a card that does nothing when pressed -- which is also how the card is told
+   * that it is not a control at all, since it is the presence of a destination or an
+   * {@link WidgetShellProps.onActivate} that makes it one.
    */
   actionLabel?: string;
   /**
@@ -99,7 +101,7 @@ export function WidgetShell({
         <div className="flex shrink-0 items-center gap-2">
           {notice}
 
-          {to !== undefined && (
+          {isInteractive && (
             <span
               aria-hidden="true"
               className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"

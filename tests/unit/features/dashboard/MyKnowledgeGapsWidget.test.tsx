@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { MyKnowledgeGapsWidget } from "../../../../src/features/dashboard/components/MyKnowledgeGapsWidget";
@@ -281,18 +281,38 @@ describe("MyKnowledgeGapsWidget", () => {
     expect(screen.getByText("3 documents missing in total")).toBeInTheDocument();
   });
 
-  it("offers no click-through to a user who cannot open the knowledge-gaps page", async () => {
+  it("has nothing to press when nothing is assigned", async () => {
     renderWidget();
 
     await settled();
-    expect(screen.queryByRole("button", { name: "Open knowledge gaps" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Open your knowledge gaps" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("leads a manager of the selected project to the knowledge-gaps page", async () => {
-    signIn(PermissionGroup.PM, true);
+  // The card leads to the drawer for every role -- which is the whole reason it exists, since
+  // the knowledge-gaps page behind it is PM/Admin only and a member had nowhere to read this.
+  it("opens the drawer for a member who cannot reach the knowledge-gaps page", async () => {
+    mocks.fetchMyKnowledgeGaps.mockResolvedValue({
+      gaps: [createGap("auth-service", "high", ["runbook"])],
+    });
 
     renderWidget();
+    fireEvent.click(await screen.findByRole("button", { name: "Open your knowledge gaps" }));
 
-    expect(await screen.findByRole("button", { name: "Open knowledge gaps" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Your knowledge gaps" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All knowledge gaps" })).not.toBeInTheDocument();
+  });
+
+  it("offers the knowledge-gaps page from inside the drawer, to a manager", async () => {
+    signIn(PermissionGroup.PM, true);
+    mocks.fetchMyKnowledgeGaps.mockResolvedValue({
+      gaps: [createGap("auth-service", "high", ["runbook"])],
+    });
+
+    renderWidget();
+    fireEvent.click(await screen.findByRole("button", { name: "Open your knowledge gaps" }));
+
+    expect(await screen.findByRole("button", { name: "All knowledge gaps" })).toBeInTheDocument();
   });
 });
