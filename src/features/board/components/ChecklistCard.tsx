@@ -8,6 +8,8 @@ import { readableTitle } from "../generation/pathToCards";
 import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
+import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { questionAboutChecklist } from "../generation/cardQuestion";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
@@ -237,6 +239,16 @@ export function ChecklistCard({
           </Button>
         </div>
       )}
+
+      {/* What the hire marked in the list seeds the question ahead of the list itself: somebody who
+          highlighted two lines has already said which part they are stuck on. */}
+      <AskTheBuddy
+        question={questionAboutChecklist(
+          content.title,
+          content.items.filter((item) => !item.done).length,
+          marks.map((mark) => mark.text),
+        )}
+      />
     </BoardCardFrame>
   );
 }

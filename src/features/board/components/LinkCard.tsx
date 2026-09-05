@@ -1,6 +1,8 @@
 import { ExternalLink, Link2 } from "lucide-react";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
+import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { questionAboutLink } from "../generation/cardQuestion";
 import type { CardOrigin } from "../layout/cardOrigins";
 import type { BoardCard, LinkContent } from "../types";
 
@@ -49,6 +51,7 @@ export function LinkCard({ content, card, onDismiss, dismissing, origin }: LinkC
       </a>
       {content.label && <p className="mt-1 text-xs break-all text-app-text-muted">{content.url}</p>}
       <CardOriginLink origin={origin ?? null} />
+      <AskTheBuddy question={questionAboutLink(content.label, content.url)} />
     </BoardCardFrame>
   );
 }

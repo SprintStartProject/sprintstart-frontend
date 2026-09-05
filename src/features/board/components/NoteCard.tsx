@@ -6,6 +6,8 @@ import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
+import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
@@ -156,6 +158,15 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
         <>
           {body && <NoteBody body={body} marks={marks} cardId={card.id} />}
           <CardOriginLink origin={origin ?? null} />
+          {/* A note kept from a paragraph somebody did not follow is precisely the thing they want
+              to ask about, and it was the one kind of card with no way to. What they highlighted in
+              it seeds the question ahead of the note itself — see `generation/cardQuestion.ts`. */}
+          <AskTheBuddy
+            question={questionAboutNote(
+              content.text,
+              marks.map((mark) => mark.text),
+            )}
+          />
         </>
       )}
     </BoardCardFrame>
