@@ -792,3 +792,36 @@ body {
 .react-flow .react-flow__controls-button svg {
   fill: var(--color-app-text);
 }
+
+/* The "you can move me" tilt on a dashboard widget while the board is being
+   edited.
+
+   A CSS animation rather than a Framer Motion keyframe loop, because stopping
+   it has to be unconditional. The loop was an `animate` target with
+   `repeat: Infinity` that was swapped for `{ rotate: 0 }` when edit mode ended,
+   and a card whose swap landed mid-cycle kept turning until it was remounted --
+   reproducibly the team-insights card, which is what the reload "fixed".
+   A class that is removed cannot get stuck.
+
+   The amplitude is deliberately tiny: 0.3deg is under 2px at the corner of a
+   half-row card, so the board shimmers rather than shakes. Cards stagger via an
+   inline `animation-delay`, so they never tilt in lockstep. */
+@keyframes app-widget-wiggle {
+  0%,
+  100% {
+    transform: rotate(-0.3deg);
+  }
+  50% {
+    transform: rotate(0.3deg);
+  }
+}
+
+.app-widget-wiggle {
+  animation: app-widget-wiggle 1.15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-widget-wiggle {
+    animation: none;
+  }
+}

@@ -1,21 +1,67 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { motion, useReducedMotion } from "framer-motion";
-import { Inbox, LayoutDashboard, MessageSquarePlus, Sparkles, Users, X } from "lucide-react";
-import { SleepyBot } from "../features/chatbot/components/SleepyBot";
+import { useLocation } from "react-router-dom";
+import { Inbox, Sparkles, Users } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
+import {
+  ConversationRail,
+  RailToggle,
+  RAIL_DESKTOP_QUERY,
+} from "../components/layout/ConversationRail";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
+import {
+  NEW_CONVERSATION_CHORD,
+  useNewConversationShortcut,
+} from "../hooks/useNewConversationShortcut";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
 import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
+import { surfaceFromPathname } from "../components/common/assistantSurfaces";
+
+/**
+ * Names the rail for assistive tech and labels the control that reopens it.
+ *
+ * One constant, because those two have to say the same thing: `aria-controls` points the
+ * second at the first, and a screen reader that announced two different names for one region
+ * would be describing two things that do not exist.
+ */
+const PM_REPLIES_LABEL = "What you sent to your PM";
+
+/**
+ * Where the rail's collapsed state lives between visits, next to the chat's own
+ * (`chatSidebarOpen`) and for the same reason: it is a statement about how much room this
+ * window has to spare, not about a conversation or a user.
+ */
+const RAIL_OPEN_KEY = "buddyPmRepliesOpen";
+
+/** `null` when the hire has never said either way — see the auto-open in `BuddyMentorHome`. */
+function readRailOpen(): boolean | null {
+  try {
+    const stored = localStorage.getItem(RAIL_OPEN_KEY);
+
+    return stored === null ? null : stored === "true";
+  } catch {
+    // Private modes can refuse storage outright. Not a reason to fail to render a rail.
+    return null;
+  }
+}
+
+function writeRailOpen(open: boolean): void {
+  try {
+    localStorage.setItem(RAIL_OPEN_KEY, String(open));
+  } catch {
+    // Nothing to do: the rail still opens and closes, it just will not be remembered.
+  }
+}
 
 /**
  * The buddy's home: the hire's onboarding front door, as one conversation.
@@ -40,40 +86,29 @@ import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestion
  * The page's shape, shared by the mentor and the no-project state so nothing moves between
  * them.
  *
- * Fixed height rather than the `min-h-screen` its sibling pages use, for one reason: the
- * composer has to stay on screen. A conversation whose input scrolls away is one you have to
- * scroll back to in order to answer.
+ * It fills the panel `AssistantShell` gives it rather than claiming a height of its own — the
+ * shell owns the viewport, the page header and the switch. What is left here is the
+ * conversation, the rail beside it, and the handful of controls that only mean anything on
+ * this half of the assistant.
+ *
+ * It still never grows past that panel, for the reason it used to set its own fixed height:
+ * the composer has to stay on screen. A conversation whose input scrolls away is one you have
+ * to scroll back to in order to answer.
  */
 function BuddyPageShell({
-  subtitle,
-  actions,
   rail,
+  railToggle,
+  isRailOpen = false,
   children,
 }: {
-  subtitle: string;
-  /** Controls that only make sense once there is a conversation — a fresh start, mainly. */
-  actions?: ReactNode;
-  /** The left column, when the page has one open. */
+  /** The standing column beside the conversation — see `ConversationRail`. */
   rail?: ReactNode;
+  /** What brings it back when it is closed. Positioned by the rail's own control. */
+  railToggle?: ReactNode;
+  /** Whether that column is currently taking width, which decides this column's left gutter. */
+  isRailOpen?: boolean;
   children: ReactNode;
 }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const prefersReducedMotion = useReducedMotion();
-
-  /**
-   * Leaves the conversation the way you came into it.
-   *
-   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload
-   * straight onto `/buddy`, or a link from outside. There is no history to step back through
-   * there, so going back would leave the app entirely; the board is where a hire belongs
-   * instead, and it is the durable half of this same conversation.
-   */
-  const close = useCallback(() => {
-    if (location.key !== "default") void navigate(-1);
-    else void navigate("/board");
-  }, [location.key, navigate]);
-
   // Tells the dock's hand-off that the page is really on screen, so it can stop standing in
   // for it. No entrance animation of its own any more: arriving from the dock, the page is
   // revealed by that window fading away, and a second fade underneath it only ever showed the
@@ -83,83 +118,18 @@ function BuddyPageShell({
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col bg-app-bg lg:h-screen xl:flex-row">
-      {/* A column beside the conversation where there is room for one, a band above it where
-                there is not — one element either way, laid out by the parent's direction.
-                Rendering it twice and hiding one per breakpoint would put the same answers in the
-                document twice, which is a duplicate to anything that reads the page rather than
-                looks at it.
-
-                Deliberately not hidden below `xl`: this is where a hire reads the answer their PM
-                sent, and putting it out of reach on a laptop would quietly break the promise
-                `FlagToPmButton` makes. */}
-      {rail && (
-        <aside
-          aria-label="Questions you sent to your PM"
-          className="max-h-[45vh] shrink-0 overflow-y-auto border-b border-app-border bg-app-bg-soft xl:max-h-none xl:w-80 xl:border-r xl:border-b-0"
-        >
-          {rail}
-        </aside>
-      )}
+    <div className="flex min-h-0 flex-1 bg-app-bg">
+      {rail}
 
       {/* `app-rail-open` collapses this column's left gutter, so the rail opens *into* the empty
                 gutter instead of shoving the conversation right. The separating space belongs
                 before the `${'{'}` — prettier-plugin-tailwindcss trims class strings when it sorts
                 them, and gluing two classes together here once turned a whole page into a flex
                 row (see ChatPage). */}
-      <div className={`flex min-w-0 flex-1 flex-col ${rail ? "app-rail-open" : ""}`}>
-        <motion.header
-          {...(prefersReducedMotion
-            ? {}
-            : {
-                initial: { opacity: 0, y: -8 },
-                animate: { opacity: 1, y: 0 },
-                transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const },
-              })}
-          className="shrink-0 border-b border-app-border bg-app-bg/85 backdrop-blur-md"
-        >
-          {/* The same `app-page-frame` gutters the header band of every other page uses, so the
-                    buddy's name starts on the line the PM dashboard's and the knowledge base's
-                    titles start on. */}
-          <div className="app-page-frame flex items-center gap-3 py-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
-              <SleepyBot size={32} canSleep={false} tracksPointer className="text-app-brand-text" />
-            </span>
-
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base leading-tight font-semibold text-app-text">Buddy</h1>
-              <p className="truncate text-xs text-app-text-muted">{subtitle}</p>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1.5">
-              {actions}
-
-              {/* The thread starts fresh every visit, so anything worth keeping lives on the
-                            board — the link is what stops that being a page nobody finds. A `Link`
-                            styled to sit level with the buttons beside it: a control that changes
-                            the URL is an anchor, and dressing one as a `Button` does not make it
-                            keyboard- or screen-reader-correct. */}
-              <Link
-                to="/board"
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-              >
-                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                Board
-              </Link>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                aria-label="Close the conversation"
-                title="Close"
-                onClick={close}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
-        </motion.header>
+      <div
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${isRailOpen ? "app-rail-open" : ""}`}
+      >
+        {railToggle}
 
         {children}
       </div>
@@ -199,24 +169,74 @@ function BuddyMentorHome() {
   const suggestions = useBuddySuggestions();
   const replies = usePmReplies();
 
-  // Open when there is an answer waiting, closed otherwise. `FlagToPmButton` promises the hire
-  // that the answer "will show up here", and a reply sitting behind a control they have to find
-  // does not keep that promise. A rail holding nothing but "still waiting" has nothing to say
-  // that the toggle's own count does not, so it stays out of the way.
-  const [isRailOpen, setIsRailOpen] = useState(false);
-  const [railDecided, setRailDecided] = useState(false);
-  if (!railDecided && replies.hasAny) {
+  // Below `md` the rail is a drawer over the conversation, so it must never open by itself
+  // there — the auto-open below is a desktop courtesy, not a takeover.
+  const isDesktop = useMediaQuery(RAIL_DESKTOP_QUERY);
+
+  // The stored preference is only honoured where the rail is a column beside the conversation.
+  // Restoring it below `md` would put the hire behind their own PM replies on every visit from
+  // a phone — the rail is a drawer over the page there, with a backdrop, and nobody asked for
+  // it. Their choice is still remembered; it just does not reopen an overlay. Same rule, and
+  // the same reason, as `chatSidebarOpen` in `useChat`.
+  const [rail, setRail] = useState(() => {
+    const stored = readRailOpen();
+
+    return { open: (stored ?? false) && isDesktop, decided: stored !== null };
+  });
+
+  // Open when there is an answer waiting, closed otherwise — but only until the hire says
+  // otherwise, and never again after that. `FlagToPmButton` promises them the answer "will show
+  // up here", and a reply sitting behind a control they have to find does not keep that
+  // promise; a rail holding nothing but "still waiting" has nothing to say that the toggle's
+  // own count does not.
+  if (!rail.decided && replies.hasAny) {
     // React's documented "adjust state when a prop changes" pattern — a guarded setState during
     // render rather than an effect, so the first paint already has the right layout instead of
     // showing the closed one and shifting.
-    setRailDecided(true);
-    setIsRailOpen(replies.answered.length > 0);
+    setRail({ open: isDesktop && replies.answered.length > 0, decided: true });
   }
+
+  // The same rule the initial state applies, for the window narrowing after load. Not through
+  // `setRailOpen` below: this is the column no longer fitting, not the hire choosing, so it
+  // neither writes the preference through nor counts as having decided.
+  useRailOverlayGuard(!isDesktop, () =>
+    setRail((current) => (current.open ? { ...current, open: false } : current)),
+  );
+
+  // Their choice is written through as they make it, the way the chat's own rail remembers
+  // being collapsed. Not inside the updater: React may run one twice.
+  //
+  // Recorded only from the column, which is the same width it is honoured at. Below `md` the
+  // rail is a drawer somebody opens to read one answer and dismisses again — a transient thing,
+  // not a statement about how they want the page laid out — and letting it write through meant
+  // one tap on a phone decided how the next desktop visit opened.
+  const setRailOpen = useCallback(
+    (open: boolean) => {
+      if (isDesktop) writeRailOpen(open);
+      setRail({ open, decided: true });
+    },
+    [isDesktop],
+  );
 
   // Whatever they were typing in the dock when they asked for more room.
   useHandedOffDraft(setDraft);
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
+
+  // Memoised so the listener is bound once rather than torn down and rebuilt on every token
+  // that arrives while the buddy is answering.
+  const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
+
+  // The keyboard half of the control in the visit divider. Gated the same way that control is:
+  // a visit nobody has spoken in is already the fresh one, and re-opening it would only replay
+  // the greeting — and, like the chat's, only while this is the half on screen, since the shell
+  // keeps the page being left mounted for the length of the slide.
+  const { pathname } = useLocation();
+
+  useNewConversationShortcut(
+    startFresh,
+    hasUserMessage && surfaceFromPathname(pathname) === "buddy",
+  );
 
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
@@ -225,47 +245,36 @@ function BuddyMentorHome() {
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
     <BuddyPageShell
-      subtitle="Your onboarding mentor — here whenever you're stuck."
+      isRailOpen={rail.open}
       rail={
-        isRailOpen ? (
-          <BuddyPmReplies {...replies} onClose={() => setIsRailOpen(false)} />
+        // Mounted whenever the hire has ever escalated something, open or not: the count on the
+        // control that reopens it is read from the same list the rail is showing, and a rail
+        // that unmounted would lose its scroll position every time it was put away.
+        replies.hasAny ? (
+          <ConversationRail
+            id="buddy-pm-replies"
+            isOpen={rail.open}
+            label={PM_REPLIES_LABEL}
+            onDismiss={() => setRailOpen(false)}
+            // The same words the cross inside `BuddyPmReplies` uses.
+            dismissLabel="Close the PM replies"
+          >
+            <BuddyPmReplies {...replies} onClose={() => setRailOpen(false)} />
+          </ConversationRail>
         ) : undefined
       }
-      actions={
-        // Not a delete. The transcript stays on the server and the buddy's durable memory note
-        // is untouched — it is what the next greeting is written from, which is why starting
-        // fresh does not mean starting over. Only the scrollback moves on.
-        <>
-          {/* Only offered when there is something behind it: a toggle that opens an empty
-                        panel is worse than no toggle. */}
-          {replies.hasAny && (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-expanded={isRailOpen}
-              icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
-              title="What you sent to your PM"
-              onClick={() => setIsRailOpen((open) => !open)}
-            >
-              PM replies
-              <span className="ml-1 rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text">
-                {replies.answered.length + replies.waiting.length + replies.dismissed.length}
-              </span>
-            </Button>
-          )}
-
-          {hasUserMessage && (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
-              title="Start a new conversation — your buddy keeps what it has learned about you"
-              onClick={() => void startFreshVisit()}
-            >
-              New chat
-            </Button>
-          )}
-        </>
+      railToggle={
+        // Only offered when there is something behind it: a control that opens an empty panel
+        // is worse than no control.
+        replies.hasAny && !rail.open ? (
+          <RailToggle
+            label={PM_REPLIES_LABEL}
+            controls="buddy-pm-replies"
+            icon={<Inbox className="h-4 w-4" aria-hidden="true" />}
+            count={replies.answered.length + replies.waiting.length + replies.dismissed.length}
+            onClick={() => setRailOpen(true)}
+          />
+        ) : undefined
       }
     >
       <BuddyConversation
@@ -298,6 +307,10 @@ function BuddyMentorHome() {
         renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
         openError={openError}
         onRetryOpen={() => void retryOpen()}
+        onStartFreshVisit={startFresh}
+        // This page is the one that binds it — see `useNewConversationShortcut` above.
+        freshVisitShortcut={NEW_CONVERSATION_CHORD}
+        hasFloatingControl={replies.hasAny && !rail.open}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question
@@ -323,7 +336,7 @@ export function BuddyPage() {
 
   if (!isLoading && !selectedProjectId) {
     return (
-      <BuddyPageShell subtitle="Your onboarding buddy, once you're on a project.">
+      <BuddyPageShell>
         <div className="app-page-frame flex flex-1 items-center justify-center py-8">
           <EmptyState
             icon={<Users className="h-8 w-8" aria-hidden="true" />}
