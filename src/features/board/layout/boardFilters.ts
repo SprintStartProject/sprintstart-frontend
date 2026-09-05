@@ -25,12 +25,18 @@ export type BoardFilter = "all" | "buddy" | "mine";
  *
  * Fixed rather than built from what is on the board. They used to be conditional — "From your team"
  * only appeared once a team card existed — which made sense for a value that could apply to
- * nothing. These three always can: "All cards" is every board, and a hire with no buddy cards
+ * nothing. These three always can: "From anyone" is every board, and a hire with no buddy cards
  * learns something true from an empty result. A control that grows an option the first time the
  * generator runs is a control that moves under the pointer.
+ *
+ * The first one is "From anyone" rather than "All cards" because the bar a few pixels away already
+ * opens with "All sections". Two controls whose off switches were both called "All …" read as one
+ * control shown twice, and the question they answer is not the same one: the bar asks *which part
+ * of the board*, this asks *who put it there*. Naming the cut after what the other two are cuts of
+ * makes them a set of three answers to one question, which is what they are.
  */
 export const FILTER_OPTIONS: { value: BoardFilter; label: string; icon: LucideIcon }[] = [
-  { value: "all", label: "All cards", icon: Layers },
+  { value: "all", label: "From anyone", icon: Layers },
   { value: "buddy", label: "From your buddy", icon: Bot },
   { value: "mine", label: "Yours", icon: User },
 ];

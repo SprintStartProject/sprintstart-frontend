@@ -1478,6 +1478,10 @@ function BoardCardCell({
           id: memberId,
           name: member?.name ?? "The next card",
           Icon: cardIcon(member?.kind ?? "NOTE"),
+          // The kind's own ink, the same as the card would wear if it were open. A closed pile is
+          // the one place the board says what is underneath without drawing it, and in one grey it
+          // said "two more cards" where it can just as easily say which two.
+          accent: cardAccent(member?.kind ?? "NOTE"),
         };
       });
   }, [stack]);
@@ -1733,7 +1737,10 @@ function BoardCardCell({
               {/* Faded in rather than always there: at rest the strip is a few pixels of card edge,
                 and a title clipped to three of its letters is worse than no title. */}
               <span className="flex w-full min-w-0 items-center gap-1.5 px-4 text-xs font-medium text-app-text-muted opacity-0 transition-opacity duration-200 group-hover/stack:text-app-brand-text group-hover/stack:opacity-100">
-                <member.Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <member.Icon
+                  className={`h-3.5 w-3.5 shrink-0 ${member.accent.icon}`}
+                  aria-hidden="true"
+                />
                 <span className="truncate">{member.name}</span>
               </span>
             </button>

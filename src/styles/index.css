@@ -124,6 +124,23 @@ body {
   --purple-border: rgba(147, 51, 234, 0.35);
   --purple-text: #7e22ce;
 
+  /* Cyan, Indigo, Pink — three more decorative accents, added for the board's
+     card kinds and usable anywhere an accent is wanted for its own sake. Like
+     Orange and Purple above they carry no meaning: green, amber and red are
+     left out of this group on purpose, because those three already say
+     something in this app and would say it wherever they were borrowed. */
+  --cyan-bg: rgba(6, 182, 212, 0.12);
+  --cyan-border: rgba(6, 182, 212, 0.35);
+  --cyan-text: #0e7490;
+
+  --indigo-bg: rgba(99, 102, 241, 0.12);
+  --indigo-border: rgba(99, 102, 241, 0.35);
+  --indigo-text: #4338ca;
+
+  --pink-bg: rgba(236, 72, 153, 0.12);
+  --pink-border: rgba(236, 72, 153, 0.35);
+  --pink-text: #be185d;
+
   /* Neutral */
   --neutral-bg: #f3f4f6;
   --neutral-border: #e5e7eb;
@@ -242,6 +259,19 @@ body {
   --purple-border: rgba(168, 85, 247, 0.4);
   --purple-text: #d8b4fe;
 
+  /* Cyan / Indigo / Pink */
+  --cyan-bg: rgba(6, 182, 212, 0.15);
+  --cyan-border: rgba(6, 182, 212, 0.4);
+  --cyan-text: #67e8f9;
+
+  --indigo-bg: rgba(99, 102, 241, 0.15);
+  --indigo-border: rgba(99, 102, 241, 0.4);
+  --indigo-text: #a5b4fc;
+
+  --pink-bg: rgba(236, 72, 153, 0.15);
+  --pink-border: rgba(236, 72, 153, 0.4);
+  --pink-text: #f9a8d4;
+
   /* Neutral */
   --neutral-bg: #1f2937;
   --neutral-border: #374151;
@@ -331,6 +361,18 @@ body {
   --color-app-purple-bg: var(--purple-bg);
   --color-app-purple-border: var(--purple-border);
   --color-app-purple-text: var(--purple-text);
+
+  --color-app-cyan-bg: var(--cyan-bg);
+  --color-app-cyan-border: var(--cyan-border);
+  --color-app-cyan-text: var(--cyan-text);
+
+  --color-app-indigo-bg: var(--indigo-bg);
+  --color-app-indigo-border: var(--indigo-border);
+  --color-app-indigo-text: var(--indigo-text);
+
+  --color-app-pink-bg: var(--pink-bg);
+  --color-app-pink-border: var(--pink-border);
+  --color-app-pink-text: var(--pink-text);
 
   --color-app-neutral-bg: var(--neutral-bg);
   --color-app-neutral-border: var(--neutral-border);
