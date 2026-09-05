@@ -7,7 +7,7 @@ import type { KnowledgeGap } from "../../../../src/features/knowledge-gaps/types
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
-    status: "authenticated" as string,
+    status: "authenticated",
     projectId: "p1",
     fetchMyKnowledgeGaps: vi.fn(),
   },
