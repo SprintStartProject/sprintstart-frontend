@@ -55,11 +55,31 @@ export function truncateAtWord(text: string, limit: number): string {
  */
 export function composeNote(content: string, attribution: string | null): string {
   const text = content.trim();
-  const heading = truncateAtWord(normalise(text.split("\n")[0] || text), HEADING_LIMIT);
+  const newline = text.indexOf("\n");
+  const opening = newline === -1 ? text : text.slice(0, newline);
+  const heading = truncateAtWord(normalise(opening), HEADING_LIMIT);
 
-  // The body is dropped only when the heading is the whole note — not merely when it starts it.
-  const body = normalise(text) === heading ? null : text;
-  const from = attribution ? `From ${attribution}` : null;
+  return [heading, bodyUnder(text, opening, heading), attribution && `From ${attribution}`]
+    .filter(Boolean)
+    .join("\n\n");
+}
 
-  return [heading, body, from].filter(Boolean).join("\n\n");
+/**
+ * What goes under the heading, which depends on what the heading turned out to be.
+ *
+ * Two cases, and conflating them was a real bug rather than a hypothetical one. When the content
+ * has its own first line and that line fits, the heading *is* that line — so the body is everything
+ * after it, and repeating the line would make a card that says the same thing twice. When the
+ * heading had to be cut, it is a *lead* into text that has no line of its own — a paragraph
+ * somebody highlighted — and then the body is the whole thing, because the lead is not a line that
+ * was taken out of it.
+ *
+ * Nothing at all when the heading already is the whole note.
+ */
+function bodyUnder(text: string, opening: string, heading: string): string | null {
+  if (normalise(text) === heading) return null;
+
+  const rest = text.slice(opening.length).replace(/^\n+/, "");
+
+  return heading === normalise(opening) ? rest || null : text;
 }

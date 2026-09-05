@@ -12,9 +12,20 @@ vi.mock("react-router-dom", async () => {
 });
 
 let selectedProjectId = "p1";
+/**
+ * `canManageSelected` rides along because the toolbar offers a manager one extra action — turning
+ * the selection into a card blueprint. False here, so these tests stay about the thing every hire
+ * sees; the blueprint half is covered in `blueprintFromSelection.test.ts`.
+ */
+let canManageSelected = false;
 vi.mock("../../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => ({ selectedProjectId }),
+  useProjectContext: () => ({ selectedProjectId, canManageSelected }),
 }));
+
+// The toolbar asks who is looking in order to decide whether to offer the blueprint action. Mocked
+// rather than wrapped in a real AuthProvider: this is a unit test of a toolbar, and standing up an
+// auth context to render two buttons is more setup than the thing being tested.
+vi.mock("../../../../src/context/useAuth", () => ({ useAuth: () => ({ profile: null }) }));
 
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("../../../../src/context/useToast", () => ({ useToast: () => toast }));
@@ -28,6 +39,7 @@ describe("SelectionActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     selectedProjectId = "p1";
+    canManageSelected = false;
     document.body.innerHTML = "";
   });
 

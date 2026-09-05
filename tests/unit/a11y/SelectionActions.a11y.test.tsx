@@ -5,8 +5,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SelectionActions } from "../../../src/features/board/selection/SelectionActions";
 
 vi.mock("../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => ({ selectedProjectId: "p1" }),
+  useProjectContext: () => ({ selectedProjectId: "p1", canManageSelected: false }),
 }));
+
+// The toolbar asks who is looking, because a manager is offered one extra action. Mocked as a hire:
+// what this file is about is that the toolbar every hire meets is reachable and named.
+vi.mock("../../../src/context/useAuth", () => ({ useAuth: () => ({ profile: null }) }));
 
 /**
  * A toolbar that appears from a mouse gesture is the easiest kind to leave unreachable, so the

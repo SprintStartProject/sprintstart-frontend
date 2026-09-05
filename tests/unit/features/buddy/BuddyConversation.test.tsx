@@ -4,6 +4,24 @@ import { describe, it, expect, vi } from "vitest";
 import { BuddyConversation } from "../../../../src/features/buddy/components/BuddyConversation";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 
+/**
+ * The thread carries controls that put things on the board — a list the buddy wrote, a reply frozen
+ * as a note, the whole conversation — and each of those asks which project it is talking about and
+ * needs somewhere to put a toast. Mocked rather than wrapped in the real providers: this file is
+ * about how a conversation *reads*, and standing up a project context to render three bubbles is
+ * more setup than the thing being tested. What those controls do is covered in `chatToCard.test.ts`.
+ *
+ * Without these the three tests with an assistant turn in them threw on the first hook — which they
+ * did before any of this was added, because `SaveReplyToBoard` has always asked the same question.
+ */
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "p1", canManageSelected: false }),
+}));
+
+vi.mock("../../../../src/context/useToast", () => ({
+  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }),
+}));
+
 function renderConversation(overrides: {
   messages?: BuddyMessageView[];
   isThinking?: boolean;
