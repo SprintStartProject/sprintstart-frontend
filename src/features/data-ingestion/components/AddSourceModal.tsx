@@ -7,6 +7,7 @@ import { useToast } from "../../../context/useToast.ts";
 import {
   addDraftSource,
   connectDraftSources,
+  createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
   createUploadDraft,
@@ -93,14 +94,24 @@ export function AddSourceModal({
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token; it falls back to the prop until it has loaded so
   // discovery works on the first open without waiting for the refetch.
-  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
-    useGithubTokens();
+  const {
+    tokenNames: loadedTokenNames,
+    tokensLoaded,
+    loadTokenNames,
+    addTokenNameLocally,
+  } = useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
   // Jira detail state.
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
+
+  // Confluence detail state.
+  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
+  const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
+  const [confluenceEmail, setConfluenceEmail] = useState("");
+  const [confluenceApiToken, setConfluenceApiToken] = useState("");
 
   // Upload detail state — files staged in memory until the list is connected.
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -148,6 +159,10 @@ export function AddSourceModal({
     setJiraUrl("");
     setJiraCredentialName("");
     setUploadFiles([]);
+    setConfluenceBaseUrl("");
+    setConfluenceSpaceId("");
+    setConfluenceEmail("");
+    setConfluenceApiToken("");
   };
 
   // --- Add-source sub-flow ---
@@ -201,11 +216,18 @@ export function AddSourceModal({
         ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
         : addType === "UPLOAD"
           ? uploadFiles.length > 0
-          : false;
+          : addType === "CONFLUENCE"
+            ? Boolean(
+                confluenceBaseUrl.trim() &&
+                confluenceSpaceId.trim() &&
+                confluenceEmail.trim() &&
+                confluenceApiToken.trim(),
+              )
+            : false;
 
   /**
    * The draft(s) captured on the current detail screen — several at once for the
-   * GitHub multi-select, one for Jira/Upload. Empty when the detail isn't
+   * GitHub multi-select, one for Jira/Upload/Confluence. Empty when the detail isn't
    * complete enough to stage.
    */
   const buildDetailDrafts = (): DraftSource[] => {
@@ -231,6 +253,17 @@ export function AddSourceModal({
     if (addType === "UPLOAD") {
       const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
       return [createUploadDraft(displayName, uploadFiles)];
+    }
+
+    if (addType === "CONFLUENCE") {
+      return [
+        createConfluenceDraft({
+          baseUrl: confluenceBaseUrl.trim(),
+          spaceId: confluenceSpaceId.trim(),
+          email: confluenceEmail.trim(),
+          apiToken: confluenceApiToken.trim(),
+        }),
+      ];
     }
 
     return [];
@@ -500,6 +533,17 @@ export function AddSourceModal({
                 onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
                 onRemoveFile: (index) =>
                   setUploadFiles((current) => current.filter((_, position) => position !== index)),
+              }}
+              confluence={{
+                baseUrl: confluenceBaseUrl,
+                spaceId: confluenceSpaceId,
+                email: confluenceEmail,
+                apiToken: confluenceApiToken,
+                onBaseUrlChange: setConfluenceBaseUrl,
+                onSpaceIdChange: setConfluenceSpaceId,
+                onEmailChange: setConfluenceEmail,
+                onApiTokenChange: setConfluenceApiToken,
+                onSubmit: commitAddSource,
               }}
             />
           </div>

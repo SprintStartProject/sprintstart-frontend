@@ -35,7 +35,7 @@ export function WizardSourcesStep({
         sources={sources}
         disabled={disabled}
         onRemove={onRemove}
-        emptyMessage="No sources yet. Add a GitHub repo, Jira project, or files to start."
+        emptyMessage="No sources yet. Add a GitHub repo, Jira project, Confluence space, or files to start."
       />
 
       <Button

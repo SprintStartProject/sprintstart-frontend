@@ -5,6 +5,10 @@ import {
   INGESTION_RUN_LIMIT,
   DETAILS_RUN_LIMIT,
   createJiraSourceFromInstance,
+  createConfluenceSourceFromConnection,
+  createConfluenceSourceFromInstance,
+  buildRunSourceLabels,
+  getRunSourceLabel,
   deriveConnectionStatus,
   deriveSyncStatus,
   getSourceStatus,
@@ -19,15 +23,17 @@ import {
 } from "../../../../src/features/data-ingestion/data";
 import type {
   ConnectionStatus,
+  IngestionRun,
   IngestionRunStatus,
   SourceInstanceIngestionStatus,
 } from "../../../../src/features/data-ingestion/types";
 import type { JiraInstanceDto } from "../../../../src/services/sources/jiraService";
+import type { ConfluenceConnectionDto } from "../../../../src/services/sources/confluenceService";
 
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
     it("lists all known source systems", () => {
-      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD"]);
+      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"]);
     });
 
     it("provides meta for every source system", () => {
@@ -374,6 +380,112 @@ describe("data-ingestion data helpers", () => {
 
       expect(deriveConnectionStatus(source).label).toBe("Connected");
       expect(deriveSyncStatus(source).label).toBe("Not synced");
+    });
+  });
+
+  describe("buildRunSourceLabels and getRunSourceLabel with Confluence", () => {
+    const confluenceConn: ConfluenceConnectionDto = {
+      id: "conn-uuid-1",
+      projectId: "proj-1",
+      baseUrl: "https://myteam.atlassian.net",
+      spaceId: "123456",
+      spaceKey: "DOCS",
+      pageAllowlist: [],
+      pageDenylist: [],
+      credentialsConfigured: true,
+      createdAt: "2026-08-28T10:00:00Z",
+      updatedAt: "2026-08-28T10:00:00Z",
+      version: 1,
+      sourceEnabled: true,
+    };
+
+    it("resolves Confluence runs by composite baseUrl|spaceId, spaceKey, and connectionId", () => {
+      const source = createConfluenceSourceFromConnection(confluenceConn);
+      const labels = buildRunSourceLabels([source]);
+
+      expect(labels.get("conn-uuid-1")).toBe("DOCS");
+      expect(labels.get("https://myteam.atlassian.net|123456")).toBe("DOCS");
+      expect(labels.get("https://myteam.atlassian.net|123456".toLowerCase())).toBe("DOCS");
+      expect(labels.get("DOCS")).toBe("DOCS");
+
+      const runWithCompositeRef: IngestionRun = {
+        runId: "run-1",
+        sourceSystem: "CONFLUENCE",
+        sourceId: "https://myteam.atlassian.net|123456",
+        owner: null,
+        name: null,
+        repositoryId: "conn-uuid-1",
+        startedAt: "2026-08-28T10:00:00Z",
+        finishedAt: "2026-08-28T10:05:00Z",
+        ingestedCount: 10,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        status: "COMPLETED",
+        failedItems: [],
+        failureReason: null,
+        aiSyncStatus: "SUCCEEDED",
+        aiSyncFailureReason: null,
+      };
+
+      expect(getRunSourceLabel(runWithCompositeRef, labels)).toBe("DOCS");
+    });
+
+    it("matches Confluence runs in createConfluenceSourceFromConnection using repositoryId", () => {
+      const run: IngestionRun = {
+        runId: "run-2",
+        sourceSystem: "CONFLUENCE",
+        sourceId: "https://different-ref|9999",
+        owner: null,
+        name: null,
+        repositoryId: "conn-uuid-1",
+        startedAt: "2026-08-28T10:00:00Z",
+        finishedAt: "2026-08-28T10:05:00Z",
+        ingestedCount: 5,
+        updatedCount: 1,
+        deletedCount: 0,
+        failedCount: 0,
+        status: "COMPLETED",
+        failedItems: [],
+        failureReason: null,
+        aiSyncStatus: "SUCCEEDED",
+        aiSyncFailureReason: null,
+      };
+
+      const source = createConfluenceSourceFromConnection(confluenceConn, [run]);
+      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(source.artifacts).toBe(6);
+    });
+
+    it("creates Confluence source from status instance", () => {
+      const status: SourceInstanceIngestionStatus = {
+        sourceSystem: "CONFLUENCE",
+        sourceId: "https://myteam.atlassian.net|123456",
+        displayName: "DOCS",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://myteam.atlassian.net/wiki/spaces/DOCS",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-08-28T10:00:00Z",
+        ingestedCount: 10,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 12,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      };
+
+      const source = createConfluenceSourceFromInstance(status, confluenceConn);
+      expect(source.sourceId).toBe("conn-uuid-1");
+      expect(source.sourceSystem).toBe("CONFLUENCE");
+      expect(source.name).toBe("DOCS");
+      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(source.artifacts).toBe(12);
     });
   });
 });

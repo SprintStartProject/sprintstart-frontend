@@ -1,8 +1,9 @@
 import { useId, useState } from "react";
 import { BookCheck, Pencil } from "lucide-react";
+import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
+import { Button } from "../../../components/ui/Button";
 import type { CanonicalAnswer } from "../types";
 import { formatDateTime } from "../format";
-import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
 
 type CanonicalAnswerCardProps = {
   answer: CanonicalAnswer;
@@ -85,22 +86,18 @@ export function CanonicalAnswerCard({
             <p className="text-xs text-app-danger-text">Couldn&apos;t save that — try again.</p>
           )}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
+              loading={status === "saving"}
+              disabled={!question.trim() || !body.trim()}
               onClick={() => void save()}
-              disabled={!question.trim() || !body.trim() || status === "saving"}
-              className="rounded-lg bg-app-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {status === "saving" ? "Saving…" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={status === "saving"}
-              className="rounded-lg px-3 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
-            >
+              Save
+            </Button>
+            <Button variant="secondary" size="sm" disabled={status === "saving"} onClick={cancel}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -114,14 +111,14 @@ export function CanonicalAnswerCard({
               <p className="text-sm font-medium text-app-text">{answer.question}</p>
             </div>
             {!readOnly && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Pencil className="h-3.5 w-3.5" aria-hidden="true" />}
                 onClick={() => setEditing(true)}
-                className="flex shrink-0 items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
               >
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 Edit
-              </button>
+              </Button>
             )}
           </div>
           <p className="mt-2 pl-6 text-sm whitespace-pre-wrap text-app-text-muted">

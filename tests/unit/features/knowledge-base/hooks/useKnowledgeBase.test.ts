@@ -9,11 +9,16 @@ vi.mock("../../../../../src/services/knowledgeService", () => ({
   },
 }));
 
-function makeArtifact(id: string, title: string): Artifact {
+function makeArtifact(
+  id: string,
+  title: string,
+  artifactType: Artifact["artifactType"] = "FILE",
+  metadata?: string,
+): Artifact {
   return {
     id,
     title,
-    artifactType: "FILE",
+    artifactType,
     sourceSystem: "GITHUB",
     sourceId: "src",
     sourceUrl: null,
@@ -24,6 +29,7 @@ function makeArtifact(id: string, title: string): Artifact {
     updatedAtSource: "2024-01-01",
     contentHash: null,
     ingestionRunId: null,
+    ...(metadata !== undefined ? { metadata } : {}),
   };
 }
 
@@ -163,6 +169,76 @@ describe("useKnowledgeBase", () => {
 
     expect(result.current.filteredArtifacts).toHaveLength(1);
     expect(result.current.filteredArtifacts[0].sourceSystem).toBe("UPLOAD");
+  });
+
+  it("filters by tab (ORGANIZATIONS)", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+      makeArtifact("a1", "readme.md"),
+      makeArtifact("a2", "SprintStart", "ORG_METADATA", JSON.stringify({ login: "SprintStart" })),
+    ]);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.handleTabChange("ORGANIZATIONS");
+    });
+
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].artifactType).toBe("ORG_METADATA");
+  });
+
+  it("combines the ORGANIZATIONS tab with a search query", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+      makeArtifact("a1", "readme.md"),
+      makeArtifact("a2", "SprintStart", "ORG_METADATA"),
+      makeArtifact("a3", "Acme Corp", "ORG_METADATA"),
+    ]);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(3);
+    });
+
+    act(() => {
+      result.current.handleTabChange("ORGANIZATIONS");
+      result.current.handleSearchChange("sprintstart");
+    });
+
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].title).toBe("SprintStart");
+  });
+
+  it("resets to page 1 when switching to the ORGANIZATIONS tab", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const artifacts: Artifact[] = Array.from({ length: 30 }, (_, i) =>
+      makeArtifact(`o${i}`, `org-${i}`, "ORG_METADATA"),
+    );
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(30);
+    });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    expect(result.current.currentPage).toBe(2);
+
+    act(() => {
+      result.current.handleTabChange("ORGANIZATIONS");
+    });
+
+    expect(result.current.currentPage).toBe(1);
+    expect(result.current.filteredArtifacts).toHaveLength(30);
   });
 
   it("clears filters", async () => {

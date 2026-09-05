@@ -24,10 +24,13 @@ import { SourceList } from "../features/data-ingestion/components/SourceList.tsx
 import { ConnectorList } from "../features/connectors/components/ConnectorList.tsx";
 import { ConnectorsLoadingState } from "../features/connectors/components/ConnectorsLoadingState.tsx";
 import { toConnectorListItems } from "../features/connectors/data.ts";
+import { useConfluenceSync } from "../features/connectors/components/useConfluenceSync.ts";
 import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
+  createConfluenceSourceFromConnection,
+  createConfluenceSourceFromInstance,
   createJiraSourceFromInstance,
   createUploadSourceFromInstance,
   deriveSourceStatus,
@@ -78,6 +81,10 @@ import {
   type ConfigureJiraInstanceRequest,
   type JiraInstanceDto,
 } from "../services/sources/jiraService.ts";
+import {
+  confluenceService,
+  type ConfluenceConnectionDto,
+} from "../services/sources/confluenceService.ts";
 import { projectService, type ProjectSource } from "../services/projectService.ts";
 import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
@@ -104,11 +111,11 @@ const RUN_PAGE_SIZE = 10;
 
 type RunFilterState = {
   status: RunStatusFilter;
-  /** The selected source's `value` (GitHub repo id or Jira instance URL), or `"ALL"`. */
+  /** The selected source's `value` (GitHub repo id, Jira instance URL, or Confluence ID), or `"ALL"`. */
   sourceValue: string;
   /**
    * How to translate `sourceValue` into a query param: GitHub filters by
-   * `repositoryId`, Jira by the connector-neutral `sourceRef`. Null while no
+   * `repositoryId`, Jira/Confluence by the connector-neutral `sourceRef`. Null while no
    * specific source is selected.
    */
   sourceSystem: SourceSystem | null;
@@ -122,8 +129,8 @@ const DEFAULT_RUN_FILTER: RunFilterState = {
 
 /**
  * A source offered in the run-history filter. `value` is the GitHub repository
- * id or Jira instance URL; `sourceSystem` decides which query param it maps to
- * (repositoryId vs. sourceRef).
+ * id, Jira instance URL, or Confluence space id; `sourceSystem` decides which
+ * query param it maps to (repositoryId vs. sourceRef).
  */
 type RunSourceFilterOption = {
   value: string;
@@ -134,7 +141,12 @@ type RunSourceFilterOption = {
 function toSourceSystem(value: string): SourceSystem | null {
   const normalized = value.toUpperCase();
 
-  if (normalized === "GITHUB" || normalized === "JIRA" || normalized === "UPLOAD") {
+  if (
+    normalized === "GITHUB" ||
+    normalized === "JIRA" ||
+    normalized === "UPLOAD" ||
+    normalized === "CONFLUENCE"
+  ) {
     return normalized;
   }
 
@@ -240,8 +252,8 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira cards are built solely from the connector-neutral status rows.
-    if (sourceSystem === "JIRA") return [];
+    // Jira and Confluence cards are built solely from the connector-neutral status rows.
+    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE") return [];
     // Skip UPLOAD only when an authoritative status row already exists so the card
     // does not vanish when artifact count is 0 or when run status fallback is needed.
     if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
@@ -440,6 +452,7 @@ export function DataIngestionPage() {
   // ProjectSourceProvider on the backend, so its instances never appear in
   // `projectSources`/`sourceInstances` and are loaded separately here.
   const [jiraInstances, setJiraInstances] = useState<JiraInstanceDto[]>([]);
+  const [confluenceConnections, setConfluenceConnections] = useState<ConfluenceConnectionDto[]>([]);
   const [projectDataVersion, setProjectDataVersion] = useState(0);
   const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<string | null>(null);
   const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<string | null>(null);
@@ -471,6 +484,8 @@ export function DataIngestionPage() {
   // the right project — it writes into the global selection below.
   const { selectedProject, selectedProjectId, setSelectedProjectId, reloadProjects } =
     useProjectContext();
+
+  const { syncConnection: syncConfluenceConnection } = useConfluenceSync(selectedProjectId);
 
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
@@ -528,6 +543,7 @@ export function DataIngestionPage() {
         setProjectSources([]);
         setSourceInstances([]);
         setJiraInstances([]);
+        setConfluenceConnections([]);
       }
       setProjectSourcesErrorMessage(null);
       setSourceStatusErrorMessage(null);
@@ -541,11 +557,13 @@ export function DataIngestionPage() {
         setIsProjectDataLoading(true);
       }
 
-      const [projectResult, sourceStatusResult, jiraResult] = await Promise.allSettled([
-        projectService.getAccessibleProject(selectedProjectId),
-        getIngestionSourceStatuses(selectedProjectId),
-        getJiraInstances(selectedProjectId),
-      ]);
+      const [projectResult, sourceStatusResult, jiraResult, confluenceResult] =
+        await Promise.allSettled([
+          projectService.getAccessibleProject(selectedProjectId),
+          getIngestionSourceStatuses(selectedProjectId),
+          getJiraInstances(selectedProjectId),
+          confluenceService.listConnections(selectedProjectId),
+        ]);
 
       if (!isMounted) return;
 
@@ -569,10 +587,13 @@ export function DataIngestionPage() {
         );
       }
 
-      // Jira instances degrade quietly: a load failure (e.g. an HR user without
+      // Jira and Confluence degrade quietly: a load failure (e.g. an HR user without
       // the PM/ADMIN role the endpoint requires) must not blank the page or
-      // surface an error banner — it just means no Jira cards.
+      // surface an error banner.
       setJiraInstances(jiraResult.status === "fulfilled" ? jiraResult.value : []);
+      setConfluenceConnections(
+        confluenceResult.status === "fulfilled" ? confluenceResult.value : [],
+      );
 
       setIsProjectDataLoading(false);
     });
@@ -593,10 +614,13 @@ export function DataIngestionPage() {
         page,
         size: RUN_PAGE_SIZE,
         projectId: selectedProjectId || undefined,
-        // GitHub scopes by repositoryId; Jira (and any connector-neutral source)
-        // scopes by the run's sourceInstanceRef via sourceRef.
+        // GitHub and Confluence scope by repositoryId (filtering on backend sourceInstanceId UUID);
+        // Jira scopes by the run's sourceInstanceRef via sourceRef (instance URL).
         repositoryId:
-          hasSource && runFilter.sourceSystem === "GITHUB" ? runFilter.sourceValue : undefined,
+          hasSource &&
+          (runFilter.sourceSystem === "GITHUB" || runFilter.sourceSystem === "CONFLUENCE")
+            ? runFilter.sourceValue
+            : undefined,
         sourceRef:
           hasSource && runFilter.sourceSystem === "JIRA" ? runFilter.sourceValue : undefined,
         status: runFilter.status !== "ALL" ? runFilter.status : undefined,
@@ -672,12 +696,18 @@ export function DataIngestionPage() {
       // the cards.
     }
 
-    // Independent of the GitHub status refresh: a Jira failure must not stop the
-    // GitHub statuses from updating, and vice versa.
+    // Independent of the GitHub status refresh: a Jira/Confluence failure must not stop other
+    // statuses from updating.
     try {
       setJiraInstances(await getJiraInstances(selectedProjectId));
     } catch {
       // Keep the last-known Jira instances on a failed in-place refresh.
+    }
+
+    try {
+      setConfluenceConnections(await confluenceService.listConnections(selectedProjectId));
+    } catch {
+      // Keep the last-known Confluence connections on a failed in-place refresh.
     }
   }, [selectedProjectId]);
 
@@ -748,12 +778,41 @@ export function DataIngestionPage() {
         ),
       );
 
+    const confluenceSources = confluenceConnections.map((conn) => {
+      const status = sourceInstances.find(
+        (s) =>
+          s.sourceSystem === "CONFLUENCE" &&
+          (s.sourceId.toLowerCase() === `${conn.baseUrl}|${conn.spaceId}`.toLowerCase() ||
+            s.sourceId.toLowerCase() === conn.spaceId.toLowerCase() ||
+            s.sourceId.toLowerCase() === conn.id.toLowerCase()),
+      );
+      if (status) {
+        return createConfluenceSourceFromInstance(
+          status,
+          conn,
+          connectorEnabledById.get("confluence"),
+        );
+      }
+      return createConfluenceSourceFromConnection(
+        conn,
+        runs,
+        connectorEnabledById.get("confluence"),
+      );
+    });
+
     const uploadSources = sourceInstances
       .filter((status) => status.sourceSystem === "UPLOAD")
       .map((status) => createUploadSourceFromInstance(status));
 
-    return [...githubAndUpload, ...jiraSources, ...uploadSources];
-  }, [connectorEnabledById, jiraInstances, projectSources, runs, sourceInstances]);
+    return [...githubAndUpload, ...jiraSources, ...confluenceSources, ...uploadSources];
+  }, [
+    confluenceConnections,
+    connectorEnabledById,
+    jiraInstances,
+    projectSources,
+    runs,
+    sourceInstances,
+  ]);
 
   const totalArtifactCount = useMemo(
     () => sourceInstances.reduce((sum, s) => sum + s.artifactCount, 0),
@@ -847,6 +906,16 @@ export function DataIngestionPage() {
               value: source.sourceId,
               label: source.name,
               sourceSystem: "JIRA",
+            },
+          ];
+        }
+
+        if (source.sourceSystem === "CONFLUENCE" && source.confluenceSpace?.connectionId) {
+          return [
+            {
+              value: source.confluenceSpace.connectionId,
+              label: source.name,
+              sourceSystem: "CONFLUENCE",
             },
           ];
         }
@@ -1010,6 +1079,17 @@ export function DataIngestionPage() {
         return;
       }
 
+      if (source.sourceSystem === "CONFLUENCE") {
+        // Use confluenceSpace.connectionId (the connection UUID) rather than
+        // source.sourceId which may hold a raw status-row ref string.
+        const connectionId = source.confluenceSpace?.connectionId;
+        if (!connectionId) {
+          throw new Error("Confluence connection ID is not available for this source.");
+        }
+        await syncConfluenceConnection(connectionId, () => refreshAfterUpdate());
+        return;
+      }
+
       if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
         throw new Error("Repository details are not available for this source.");
       }
@@ -1017,7 +1097,7 @@ export function DataIngestionPage() {
       await updateGithubRepository(source.githubRepository);
       refreshAfterUpdate();
     },
-    [refreshAfterUpdate],
+    [refreshAfterUpdate, syncConfluenceConnection],
   );
 
   const handleSaveGlobalGithubConfig = useCallback(

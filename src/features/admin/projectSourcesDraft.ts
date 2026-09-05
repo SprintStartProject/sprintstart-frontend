@@ -3,6 +3,7 @@ import {
   connectGithubRepository,
 } from "../../services/sources/githubService";
 import { connectJiraInstance } from "../../services/sources/jiraService";
+import { confluenceService } from "../../services/sources/confluenceService";
 import { knowledgeService } from "../../services/knowledgeService";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
 
@@ -14,16 +15,16 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
  * outcome so a partial failure can be shown and retried per source instead of
  * failing the whole batch.
  *
- * A source can be one of three kinds — a GitHub repository, a Jira instance, or
- * an in-memory file upload — modelled as a discriminated union on `type` so a
- * single list can hold a mix of all three. Nothing here touches the backend
- * until {@link connectDraftSources} runs during provisioning; uploads in
- * particular hold their `File[]` in memory until then.
+ * A source can be one of four kinds — a GitHub repository, a Jira instance,
+ * an in-memory file upload, or a Confluence space — modelled as a discriminated
+ * union on `type` so a single list can hold a mix of all four. Nothing here
+ * touches the backend until {@link connectDraftSources} runs during
+ * provisioning; uploads in particular hold their `File[]` in memory until then.
  */
 
 export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
-export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD";
+export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
 
 /** Fields every staged source carries regardless of its type. */
 type DraftSourceBase = {
@@ -62,7 +63,17 @@ export type UploadDraftSource = DraftSourceBase & {
   files: File[];
 };
 
-export type DraftSource = GithubDraftSource | JiraDraftSource | UploadDraftSource;
+export type ConfluenceDraftSource = DraftSourceBase & {
+  type: "CONFLUENCE";
+  displayName: string;
+  baseUrl: string;
+  spaceId: string;
+  email: string;
+  apiToken: string;
+};
+
+export type DraftSource =
+  GithubDraftSource | JiraDraftSource | UploadDraftSource | ConfluenceDraftSource;
 
 let draftSourceCounter = 0;
 
@@ -136,6 +147,26 @@ export function createUploadDraft(displayName: string, files: File[]): UploadDra
   };
 }
 
+export function createConfluenceDraft(params: {
+  displayName?: string;
+  baseUrl: string;
+  spaceId: string;
+  email: string;
+  apiToken: string;
+}): ConfluenceDraftSource {
+  return {
+    id: nextDraftSourceId(),
+    type: "CONFLUENCE",
+    displayName: params.displayName || `Confluence Space ${params.spaceId}`,
+    baseUrl: params.baseUrl,
+    spaceId: params.spaceId,
+    email: params.email,
+    apiToken: params.apiToken,
+    status: "pending",
+    errorMessage: "",
+  };
+}
+
 /**
  * Whether two drafts point at the same underlying source, used to dedupe on
  * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL; two
@@ -154,6 +185,13 @@ export function isSameSource(left: DraftSource, right: DraftSource): boolean {
 
   if (left.type === "JIRA" && right.type === "JIRA") {
     return left.url.trim().toLowerCase() === right.url.trim().toLowerCase();
+  }
+
+  if (left.type === "CONFLUENCE" && right.type === "CONFLUENCE") {
+    return (
+      left.baseUrl.trim().toLowerCase() === right.baseUrl.trim().toLowerCase() &&
+      left.spaceId.trim().toLowerCase() === right.spaceId.trim().toLowerCase()
+    );
   }
 
   return false;
@@ -214,6 +252,19 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       userEmail: source.userEmail,
       tokenName: source.tokenName,
       projectId,
+    });
+
+    return;
+  }
+
+  if (source.type === "CONFLUENCE") {
+    await confluenceService.createConnection(projectId, {
+      baseUrl: source.baseUrl,
+      spaceId: source.spaceId,
+      email: source.email,
+      apiToken: source.apiToken,
+      pageAllowlist: [],
+      pageDenylist: [],
     });
 
     return;

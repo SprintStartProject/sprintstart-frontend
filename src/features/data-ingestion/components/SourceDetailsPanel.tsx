@@ -1,5 +1,6 @@
 import {
   ArrowUp,
+  BookOpen,
   CalendarClock,
   Clock3,
   Database,
@@ -99,14 +100,18 @@ export function SourceDetailsPanel({
   const Icon = SOURCE_META[source.sourceSystem].icon;
   const repository = source.githubRepository;
   const jira = source.jiraInstance ?? null;
+  const confluence = source.confluenceSpace ?? null;
   const isJira = source.sourceSystem === "JIRA";
+  const isConfluence = source.sourceSystem === "CONFLUENCE";
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
-  // Update is available for a GitHub repo (needs owner/name) or a Jira instance
-  // (needs its URL); enable/disable and unlink stay GitHub-only for now.
+  // Update is available for a GitHub repo (needs owner/name), a Jira instance
+  // (needs its URL), or a Confluence space (needs its ID).
   const canUpdate =
     onUpdateSource !== undefined &&
-    ((source.sourceSystem === "GITHUB" && repository !== null) || (isJira && jira !== null));
+    ((source.sourceSystem === "GITHUB" && repository !== null) ||
+      (isJira && jira !== null) ||
+      (isConfluence && Boolean(confluence?.connectionId)));
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -308,16 +313,26 @@ export function SourceDetailsPanel({
             }}
             disabled={!canUpdate || isRefreshing}
             loading={isUpdating}
-            icon={isJira ? <Ticket className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+            icon={
+              isJira ? (
+                <Ticket className="h-4 w-4" />
+              ) : isConfluence ? (
+                <BookOpen className="h-4 w-4" />
+              ) : (
+                <GitBranch className="h-4 w-4" />
+              )
+            }
             title={
               canUpdate
                 ? undefined
                 : isJira
                   ? "Instance updates need the Jira instance URL."
-                  : "Repository updates need GitHub owner and repository name."
+                  : isConfluence
+                    ? "Space updates need the Confluence space ID."
+                    : "Repository updates need GitHub owner and repository name."
             }
           >
-            {isJira ? "Update instance" : "Update repo"}
+            {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
           </Button>
 
           <Button
@@ -396,7 +411,18 @@ export function SourceDetailsPanel({
         </DrawerCard>
       )}
 
-      {!isJira && (
+      {isConfluence && (
+        <DrawerCard label="Space" icon={Icon} index={1} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
+            <InfoRow label="Space name" value={source.name} />
+            {confluence?.spaceKey && <InfoRow label="Space key" value={confluence.spaceKey} />}
+            {confluence?.baseUrl && <InfoLinkRow label="Base URL" value={confluence.baseUrl} />}
+            <InfoRow label="Space ID" value={confluence?.spaceId ?? source.sourceId} mono />
+          </dl>
+        </DrawerCard>
+      )}
+
+      {source.sourceSystem === "GITHUB" && (
         <DrawerCard label="Repository" icon={GitBranch} index={1} className="mt-4 sm:mt-5">
           <dl className="-my-1">
             <InfoRow label="Full name" value={repository?.fullName} />

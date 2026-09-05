@@ -521,4 +521,40 @@ export const handlers = [
   }),
 
   http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
+
+  http.get("/api/v1/confluence/projects/:projectId/connections", () => HttpResponse.json([])),
+  http.post("/api/v1/confluence/projects/:projectId/connections", () =>
+    HttpResponse.json({
+      id: "conn-default",
+      projectId: "proj-1",
+      baseUrl: "https://example.atlassian.net/wiki",
+      spaceId: "123456",
+      spaceKey: "EX",
+      pageAllowlist: [],
+      pageDenylist: [],
+      credentialsConfigured: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1,
+      sourceEnabled: true,
+    }),
+  ),
+  http.post("/api/v1/confluence/projects/:projectId/connections/:connectionId/update", () =>
+    HttpResponse.json({
+      runId: "run-default",
+      connectionId: "conn-default",
+      discovered: 0,
+      eligible: 0,
+      filtered: 0,
+      created: 0,
+      updated: 0,
+      unchanged: 0,
+      failed: 0,
+      failures: [],
+      status: "COMPLETED",
+    }),
+  ),
+  http.get("/api/v1/connectors/confluence/sources", () =>
+    HttpResponse.json({ connectorId: "confluence", sources: [] }),
+  ),
 ];

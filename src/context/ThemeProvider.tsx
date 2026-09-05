@@ -6,6 +6,7 @@ import { ThemeContext } from "./ThemeContext";
 const STORAGE_KEY = "theme";
 const STYLE_STORAGE_KEY = "style-mode";
 const AURORA_STORAGE_KEY = "sprintstart:aurora-enabled";
+const GLOW_INTENSITY_STORAGE_KEY = "sprintstart:glow-intensity";
 const TILT_STORAGE_KEY = "sprintstart:tilt-enabled";
 
 /**
@@ -130,6 +131,30 @@ function getInitialTiltEnabled(): boolean {
   return false;
 }
 
+/** Bounds and default for the cursor-glow intensity slider. */
+export const GLOW_INTENSITY_MIN = 10;
+export const GLOW_INTENSITY_MAX = 100;
+export const GLOW_INTENSITY_DEFAULT = 50;
+
+/**
+ * Reads the user's stored cursor-glow intensity, clamped into 10–100.
+ * Anything missing or unparseable falls back to the default — a hand-edited
+ * localStorage value must not be able to break the effect.
+ */
+function getInitialGlowIntensity(): number {
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(GLOW_INTENSITY_STORAGE_KEY);
+  } catch {
+    // localStorage unavailable.
+  }
+  const parsed = Number.parseInt(stored ?? "", 10);
+  if (Number.isNaN(parsed)) {
+    return GLOW_INTENSITY_DEFAULT;
+  }
+  return Math.min(GLOW_INTENSITY_MAX, Math.max(GLOW_INTENSITY_MIN, parsed));
+}
+
 /**
  * Provider component that manages the application's visual theme.
  *
@@ -155,6 +180,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() =>
     getInitialAuroraEnabled(),
   );
+  const [glowIntensity, setGlowIntensityState] = useState<number>(() => getInitialGlowIntensity());
   const [isTiltEnabled, setIsTiltEnabledState] = useState<boolean>(() => getInitialTiltEnabled());
 
   // Sync before paint to avoid a FOUC of the default light palette.
@@ -240,6 +266,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setGlowIntensity = (value: number) => {
+    const clamped = Math.min(GLOW_INTENSITY_MAX, Math.max(GLOW_INTENSITY_MIN, value));
+    setGlowIntensityState(clamped);
+    try {
+      window.localStorage.setItem(GLOW_INTENSITY_STORAGE_KEY, String(clamped));
+    } catch {
+      // localStorage unavailable.
+    }
+  };
+
   const setIsTiltEnabled = (enabled: boolean) => {
     setIsTiltEnabledState(enabled);
     try {
@@ -262,6 +298,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         isClassicMode,
         isAuroraEnabled,
         setIsAuroraEnabled,
+        glowIntensity,
+        setGlowIntensity,
         isTiltEnabled,
         setIsTiltEnabled,
       }}
