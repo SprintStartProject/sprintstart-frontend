@@ -62,6 +62,7 @@ import {
 } from "../features/board/layout/cardSizes";
 import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
 import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
+import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
 import { useMarkableBoard } from "../features/board/marks/useCardMarks";
 import {
@@ -400,7 +401,7 @@ export function BoardPage() {
 
     const timer = window.setTimeout(() => {
       removalTimers.current.delete(cardId);
-      void dismiss(cardId);
+      void dismiss(cardId).then(() => forgetCard(boardId, selectedProjectId, cardId));
       keepCard(cardId);
     }, UNDO_WINDOW_MS);
     removalTimers.current.set(cardId, timer);
