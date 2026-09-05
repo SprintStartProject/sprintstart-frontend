@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { isOnboardingAccessible } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
+import { useMyKnowledgeGaps } from "../../knowledge-gaps/useMyKnowledgeGaps";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { DASHBOARD_WIDGET_IDS, getAvailableWidgets } from "./catalog";
 import * as operations from "./layoutOperations";
@@ -63,6 +64,14 @@ export type DashboardLayoutController = {
 export function useDashboardLayout(): DashboardLayoutController {
   const { profile } = useAuth();
   const { canManageSelected } = useProjectContext();
+  /*
+    Whether a component has been put in this user's name, which decides what the *default*
+    board opens on. Shared with the owner announcement through the provider rather than
+    fetched here, and it arrives after the first render — that is fine, because the layout is
+    derived rather than stored: the answer changing simply produces a different board, and it
+    only ever changes one for a user who has never arranged their own.
+  */
+  const { gaps: myKnowledgeGaps } = useMyKnowledgeGaps();
 
   const userId = profile?.id ?? "";
 
@@ -80,7 +89,7 @@ export function useDashboardLayout(): DashboardLayoutController {
   const storedLayout = arrangedLayout ?? readStoredLayout(userId, DASHBOARD_WIDGET_IDS);
 
   const layout = operations.reconcileLayout(
-    storedLayout ?? operations.buildDefaultLayout(availableIds),
+    storedLayout ?? operations.buildDefaultLayout(availableIds, myKnowledgeGaps.length > 0),
     availableIds,
   );
 

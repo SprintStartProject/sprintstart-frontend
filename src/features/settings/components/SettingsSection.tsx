@@ -12,6 +12,11 @@ type SettingsSectionProps = {
 /**
  * A titled, anchorable block within the single-scroll settings page.
  * The `id` is used by the section nav for jump-to-anchor navigation.
+ *
+ * `tabIndex={-1}` is not for tabbing -- it is what lets the nav move focus here after it has
+ * scrolled, so a keyboard user carries on inside the section they asked for instead of from
+ * the nav. Programmatic focus should not paint a ring, hence `focus:outline-none`; the
+ * section is not a control and nothing about it is reachable by Tab.
  */
 export function SettingsSection({
   id,
@@ -21,7 +26,12 @@ export function SettingsSection({
   children,
 }: SettingsSectionProps) {
   return (
-    <section id={id} className="scroll-mt-24" aria-labelledby={`${id}-title`}>
+    <section
+      id={id}
+      tabIndex={-1}
+      className="scroll-mt-24 focus:outline-none"
+      aria-labelledby={`${id}-title`}
+    >
       <div className="mb-4 flex items-start gap-3">
         <Icon className="mt-0.5 h-5 w-5 shrink-0 text-app-brand-text" aria-hidden />
         <div className="min-w-0">

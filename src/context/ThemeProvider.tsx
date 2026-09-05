@@ -78,17 +78,19 @@ function getInitialStyleMode(): StyleMode {
 }
 
 /**
- * Applies (or removes) the `.style-classic` class on `<html>` and persists the
+ * Applies the `.style-classic` / `.style-ultra` classes on `<html>` and persists the
  * preference. Persistence failures are warned and swallowed — the in-memory
  * mode still applies for the current session.
+ *
+ * Both classes are written, not just the one: `.style-classic` is what the flat-look overrides
+ * key off, while `.style-ultra` is what lifts the global reduced-motion suppression in
+ * `index.css`. That one has to be an opt-in marker rather than the absence of `.style-classic`
+ * so a surface with no provider on it — the Keycloak login theme — stays suppressed.
  */
 function applyStyleMode(mode: StyleMode) {
   const root = window.document.documentElement;
-  if (mode === "classic") {
-    root.classList.add("style-classic");
-  } else {
-    root.classList.remove("style-classic");
-  }
+  root.classList.toggle("style-classic", mode === "classic");
+  root.classList.toggle("style-ultra", mode === "ultra");
   try {
     window.localStorage.setItem(STYLE_STORAGE_KEY, mode);
   } catch (error) {

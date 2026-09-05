@@ -176,8 +176,17 @@ function SidebarContent({
    */
   const isAssistantSectionActive = location.pathname.startsWith("/buddy");
 
+  /**
+   * Team management and a member's detail page are reached from the PM dashboard and have no
+   * entry of their own, so the dashboard's entry stands in for them the same way it does for
+   * the insights pages -- otherwise the sidebar claims the PM is nowhere while they are
+   * looking at their own team. `/team/` is the member detail route, which `accessPolicy`
+   * already treats as a prefix of `/team-management`.
+   */
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
+    location.pathname.startsWith("/team-management") ||
+    location.pathname.startsWith("/team/") ||
     location.pathname.startsWith("/insights/faq") ||
     location.pathname.startsWith("/insights/knowledge-gaps") ||
     location.pathname.startsWith("/insights/onboarding");

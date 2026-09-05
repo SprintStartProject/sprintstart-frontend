@@ -10,6 +10,8 @@ import { BuddyWidget } from "./features/buddy/components/BuddyWidget";
 import { BuddyProvider } from "./features/buddy/BuddyProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
+import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 
 function AppContent() {
   const { status } = useAuth();
@@ -41,6 +43,11 @@ function AppContent() {
           where the page already is the buddy. */}
         {showSidebar && <BuddyWidget />}
 
+        {/* Says so, once, when a component has been put in this user's name. App-wide rather
+          than on the dashboard: being handed work should reach you where you are, not wait
+          until you happen to go and look. */}
+        {showSidebar && <KnowledgeGapOwnerAnnouncement />}
+
         {/* Decorative easter egg; only for signed-in users, so it never
           sits on top of the login screen, and off unless turned on in
           Settings (see MomentsSection). */}
@@ -62,11 +69,15 @@ function App() {
         <AuthProvider>
           <ProjectProvider>
             <ChatProvider>
-              {/* Inside AuthProvider: the launch sequence is triggered
+              {/* Inside ProjectProvider: what a user owns is asked per selected project, and
+                  above the router so the owner announcement can appear on any page. */}
+              <MyKnowledgeGapsProvider>
+                {/* Inside AuthProvider: the launch sequence is triggered
                               by the user becoming authenticated. */}
-              <MomentsProvider>
-                <AppContent />
-              </MomentsProvider>
+                <MomentsProvider>
+                  <AppContent />
+                </MomentsProvider>
+              </MyKnowledgeGapsProvider>
             </ChatProvider>
           </ProjectProvider>
         </AuthProvider>

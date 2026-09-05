@@ -1,4 +1,5 @@
-import { Monitor, Moon, Pointer, Sparkles, Sun } from "lucide-react";
+import { Gauge, Monitor, Moon, Pointer, Sparkles, Sun } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { useTheme } from "../../../context/useTheme";
 import type { Theme } from "../../../context/ThemeContext";
 
@@ -15,10 +16,23 @@ const OPTIONS: ReadonlyArray<{ value: Theme; label: string; icon: typeof Sun }> 
  * Bound to the global {@link ThemeContext}; selecting an option persists it
  * via the provider. Each option shows an icon and a text label (AGENTS.md §7 —
  * meaning never conveyed by colour alone).
+ *
+ * The classic-mode notice is the only way out of `style-classic` in the whole app. The mode
+ * turns itself on when the OS asks for reduced motion and CSS then hides the aurora layer
+ * outright, so without this the Aurora Background switch below was a dead control: it flipped,
+ * it persisted, and nothing ever appeared — with nothing on screen saying why.
  */
 export function AppearanceSection() {
-  const { theme, setTheme, isAuroraEnabled, setIsAuroraEnabled, isTiltEnabled, setIsTiltEnabled } =
-    useTheme();
+  const {
+    theme,
+    setTheme,
+    isAuroraEnabled,
+    setIsAuroraEnabled,
+    isTiltEnabled,
+    setIsTiltEnabled,
+    isClassicMode,
+    setStyleMode,
+  } = useTheme();
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,6 +65,30 @@ export function AppearanceSection() {
         })}
       </div>
 
+      {isClassicMode && (
+        <div className="flex flex-col gap-3 rounded-xl border border-app-warning-border bg-app-warning-bg p-4 text-app-warning-text sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Gauge className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <div>
+              <p className="text-sm font-medium">Animations are turned off</p>
+              <p className="mt-1 text-xs leading-relaxed">
+                Your system asks for reduced motion, so SprintStart is running in its calm style and
+                the animated background below stays hidden whichever way its switch is set.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setStyleMode("ultra")}
+            className="shrink-0"
+          >
+            Turn animations on
+          </Button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between rounded-xl border border-app-border bg-app-bg p-4">
         <div className="flex items-center gap-3">
           <Sparkles className="h-4 w-4 shrink-0 text-app-brand" />
@@ -60,6 +98,7 @@ export function AppearanceSection() {
             </div>
             <div className="text-xs text-app-text-muted">
               Animated ambient glow and cursor spotlight on page backgrounds.
+              {isClassicMode && " Currently hidden — reduced motion is on."}
             </div>
           </div>
         </div>

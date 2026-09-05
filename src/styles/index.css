@@ -712,15 +712,27 @@ body {
   z-index: 0;
 }
 
-/* Respect users who prefer reduced motion: collapse ALL decorative animation. */
+/* Respect users who prefer reduced motion: collapse ALL decorative animation.
+
+   Lifted only by `.style-ultra`, which ThemeProvider puts on <html> when the user has asked
+   for full motion — and which they can only do deliberately, from Settings → Appearance,
+   since a reduced-motion OS starts everyone in classic mode. Without this escape hatch the
+   Aurora Background switch could not work at all: the blobs are CSS keyframes, so these rules
+   stopped them whatever the switch said, and the control did nothing with nothing on screen
+   explaining why. An explicit opt-in is allowed to win over the OS default.
+
+   Written as `:not(.style-ultra)` rather than as a rule on classic mode on purpose — a page
+   with no ThemeProvider on it at all (the Keycloak login theme, which has none) keeps the
+   full suppression instead of quietly losing it. */
 @media (prefers-reduced-motion: reduce) {
-  .app-spotlight {
+  :root:not(.style-ultra) .app-spotlight {
     display: none;
   }
 
-  *,
-  *::before,
-  *::after {
+  :root:not(.style-ultra),
+  :root:not(.style-ultra) *,
+  :root:not(.style-ultra) *::before,
+  :root:not(.style-ultra) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -728,7 +740,7 @@ body {
 
   /* Loading spinners are essential feedback, not decoration — keep them
      turning even under reduced-motion (WCAG allows essential animation). */
-  .animate-spin {
+  :root:not(.style-ultra) .animate-spin {
     animation-duration: 1s !important;
     animation-iteration-count: infinite !important;
   }
