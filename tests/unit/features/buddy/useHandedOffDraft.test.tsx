@@ -128,6 +128,7 @@ describe("the dock’s hand-off control", () => {
       <BuddyDock
         messages={[]}
         isThinking={false}
+        isStreaming={false}
         activeTool={null}
         draft=""
         setDraft={vi.fn()}
@@ -152,6 +153,7 @@ describe("the dock’s hand-off control", () => {
       <BuddyDock
         messages={[]}
         isThinking={false}
+        isStreaming={false}
         activeTool={null}
         draft="half a question"
         setDraft={vi.fn()}

@@ -30,12 +30,22 @@ function renderDock(
   {
     suggestions = [],
     setDraft = vi.fn(),
-  }: { suggestions?: BuddySuggestion[]; setDraft?: () => void } = {},
+    startFreshVisit = vi.fn(async () => {}),
+    isThinking = false,
+    isStreaming = false,
+  }: {
+    suggestions?: BuddySuggestion[];
+    setDraft?: () => void;
+    startFreshVisit?: () => Promise<void>;
+    isThinking?: boolean;
+    isStreaming?: boolean;
+  } = {},
 ) {
   return render(
     <BuddyDock
       messages={messages}
-      isThinking={false}
+      isThinking={isThinking}
+      isStreaming={isStreaming}
       activeTool={null}
       draft=""
       setDraft={setDraft}
@@ -43,7 +53,7 @@ function renderDock(
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
       suggestions={suggestions}
-      startFreshVisit={vi.fn()}
+      startFreshVisit={startFreshVisit}
       onClose={vi.fn()}
     />,
   );
@@ -175,5 +185,68 @@ describe("BuddyDock suggestion chips", () => {
 
     expect(screen.queryByTestId("buddy-suggestions")).not.toBeInTheDocument();
     expect(screen.queryByText("Try asking")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The control the tutor asked for: a new conversation without leaving the page you are on. The
+ * full page has had one since the buddy integration landed; the window reachable from everywhere
+ * had only minimise and maximise.
+ */
+describe("BuddyDock new conversation", () => {
+  it("offers nothing to restart before the hire has said anything", () => {
+    renderDock([assistant("Hello, welcome aboard.")]);
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("offers to start fresh once there is a conversation to leave behind", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")]);
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  it("starts the fresh visit once, on the session the dock was handed", async () => {
+    const startFreshVisit = vi.fn(async () => {});
+    renderDock([assistant("Hello."), user("How do we deploy?")], { startFreshVisit });
+
+    await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
+
+    expect(startFreshVisit).toHaveBeenCalledTimes(1);
+  });
+
+  // startFreshVisit clears the thread and greets, but cannot call back the request already
+  // streaming into it: that stream's callbacks still hold the shared conversation, so its tool
+  // events would land under the brand-new greeting.
+  it("withdraws while the buddy is still thinking", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isThinking: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("withdraws while a reply is still arriving", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isStreaming: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("comes back once the turn is over", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")]);
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  it("promises a new conversation, never a deletion — nothing is thrown away", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")]);
+
+    const control = screen.getByRole("button", { name: "Start a new conversation" });
+    expect(control).toHaveAttribute(
+      "title",
+      "Start a new conversation — your buddy keeps what it has learned about you",
+    );
   });
 });

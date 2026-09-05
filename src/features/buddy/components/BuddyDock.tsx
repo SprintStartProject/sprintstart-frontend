@@ -36,6 +36,7 @@ type BuddyDockProps = Pick<
   ReturnType<typeof useBuddy>,
   | "messages"
   | "isThinking"
+  | "isStreaming"
   | "activeTool"
   | "draft"
   | "setDraft"
@@ -99,6 +100,7 @@ type BuddyDockProps = Pick<
 export function BuddyDock({
   messages,
   isThinking,
+  isStreaming,
   activeTool,
   draft,
   setDraft,
@@ -131,6 +133,10 @@ export function BuddyDock({
   }, [onClose]);
 
   const hasUserMessage = messages.some((message) => message.role === "USER");
+  // Mid-turn: the buddy is deciding, running a tool, or writing. Not a spinner's worth of
+  // state -- it gates the one control that would pull the thread out from under a reply
+  // that is still arriving.
+  const isBusy = isThinking || isStreaming;
 
   const resting = {
     width: DOCK_WIDTH,
@@ -224,8 +230,17 @@ export function BuddyDock({
                     be able to do here — a hire who had to open the full page to start over would
                     reasonably conclude the two were different buddies. Offered only once there is
                     something to leave behind; on an untouched thread it would start the visit that
-                    is already on screen. */}
-          {hasUserMessage && (
+                    is already on screen.
+
+                    Withdrawn while a turn is in flight. `startFreshVisit` clears the thread and
+                    greets, but it cannot call back the request already streaming into it: that
+                    stream's callbacks still hold the shared conversation, so its tool events
+                    would land under the new greeting — "Checking your progress…" beneath a fresh
+                    hello — and its completion would clear the greeting's own thinking state.
+                    Offering the control only between turns is the cheap half of that fix;
+                    aborting the stream is the other half and belongs in the session, alongside
+                    the same gap on `BuddyPage`. */}
+          {hasUserMessage && !isBusy && (
             <button
               type="button"
               onClick={() => void startFreshVisit()}
