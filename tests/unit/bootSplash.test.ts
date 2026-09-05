@@ -113,4 +113,44 @@ describe("bootSplash", () => {
     rememberBootGreeting(null);
     expect(window.localStorage.getItem("sprintstart.boot.greeting")).toBeNull();
   });
+
+  // The note is what stops the outbound leg flying into a redirect and the launch playing
+  // twice on every reload. It is written by the leg that comes back from the identity
+  // provider; this is the half that takes it back when that stops happening.
+  it("keeps the round-trip note when the leg that stayed is the one that flew", () => {
+    vi.useFakeTimers();
+    mountSplash();
+    window.localStorage.setItem("sprintstart.boot.roundtrip", "1");
+
+    // A return leg: it flew, which is exactly the round-trip the note records.
+    window.__bootSplash = { start: Date.now(), flightMs: 2000 };
+    dismissBootSplash();
+
+    expect(window.localStorage.getItem("sprintstart.boot.roundtrip")).toBe("1");
+  });
+
+  it("forgets the round-trip note when a boot stays without ever flying", () => {
+    vi.useFakeTimers();
+    mountSplash();
+    window.localStorage.setItem("sprintstart.boot.roundtrip", "1");
+
+    // `flightMs: 0` is the outbound leg, and this one was not navigated away from -- so this
+    // app no longer redirects on boot, and the outbound leg has to start flying again.
+    window.__bootSplash = { start: Date.now(), flightMs: 0 };
+    dismissBootSplash();
+
+    expect(window.localStorage.getItem("sprintstart.boot.roundtrip")).toBeNull();
+  });
+
+  it("leaves the note alone for the login theme, which never flies either", () => {
+    mountSplash();
+    window.localStorage.setItem("sprintstart.boot.roundtrip", "1");
+
+    window.__bootSplash = { start: Date.now(), flightMs: 0 };
+    dismissBootSplash("instant");
+
+    // The Keycloak login theme boots from the same document on the same origin. It says
+    // nothing about whether the *app* round-trips, so it must not overwrite what does.
+    expect(window.localStorage.getItem("sprintstart.boot.roundtrip")).toBe("1");
+  });
 });

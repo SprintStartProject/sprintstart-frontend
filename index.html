@@ -620,6 +620,7 @@
 
         var NAME_KEY = "sprintstart.boot.greeting";
         var SIGNOUT_KEY = "sprintstart.boot.signout";
+        var ROUNDTRIP_KEY = "sprintstart.boot.roundtrip";
 
         // Resolves the stored theme onto <html> before the first paint, so the
         // splash (and the app behind it) never flashes the wrong palette.
@@ -683,6 +684,28 @@
         // and it only holds the rocket on the pad.
         var isReturnLeg = /[?&#]state=/.test(url) && /[?&#]code=/.test(url);
 
+        // Whether this browser has already been round-tripped through the identity provider
+        // on a previous boot, written by the return leg below.
+        //
+        // Without it the outbound leg had to guess, and it guessed on a timer: fly after
+        // NO_REDIRECT_MS on the assumption that no redirect was coming. A cold dev server
+        // takes longer than that to get keycloak-js as far as the redirect, so the outbound
+        // leg flew, the page was navigated away mid-flight, and the return leg flew the whole
+        // thing again -- the launch playing twice on every reload.
+        //
+        // A browser that has come back from the identity provider once has *proof* that this
+        // app redirects on boot, which is the thing the timer was trying to estimate. So the
+        // timer is only for the browser that has no proof yet, which is the case it was
+        // written for: a setup that boots without a round-trip, where the flight would
+        // otherwise never play at all. `dismissBootSplash` clears the note if that stops
+        // being true, so a changed auth setup heals on the next load.
+        var expectsRedirect = false;
+        try {
+          expectsRedirect = window.localStorage.getItem(ROUNDTRIP_KEY) === "1";
+        } catch (error) {
+          // No storage: fall back to the timer, which is what this replaced.
+        }
+
         function fly() {
           if (!splash.isConnected || splash.dataset.exiting === "true") return;
           splash.dataset.leg = "return";
@@ -693,8 +716,16 @@
         splash.dataset.leg = "outbound";
         window.__bootSplash = { start: Date.now(), flightMs: 0 };
 
-        if (isReturnLeg) fly();
-        else window.setTimeout(fly, NO_REDIRECT_MS);
+        if (isReturnLeg) {
+          try {
+            window.localStorage.setItem(ROUNDTRIP_KEY, "1");
+          } catch (error) {
+            // The next boot falls back to the timer. One flight too many, not a broken splash.
+          }
+          fly();
+        } else if (!expectsRedirect) {
+          window.setTimeout(fly, NO_REDIRECT_MS);
+        }
 
         // Skipping is immediate and unconditional: someone who wants the real
         // screen has said so, and making them watch the rest of a launch first
