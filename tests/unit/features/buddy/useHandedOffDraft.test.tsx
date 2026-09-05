@@ -5,6 +5,12 @@ import { useState } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { useHandedOffDraft } from "../../../../src/features/buddy/useHandedOffDraft";
 
+vi.mock("../../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
 /** A page whose composer is seeded by whatever the panel handed over. */
 function Destination() {
   const [draft, setDraft] = useState("already here");
@@ -129,6 +135,7 @@ describe("the dock’s hand-off control", () => {
         confirmAction={vi.fn()}
         dismissAction={vi.fn()}
         suggestions={[]}
+        startFreshVisit={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -152,6 +159,7 @@ describe("the dock’s hand-off control", () => {
         confirmAction={vi.fn()}
         dismissAction={vi.fn()}
         suggestions={[]}
+        startFreshVisit={vi.fn()}
         onClose={vi.fn()}
         onOpenFull={onOpenFull}
       />,

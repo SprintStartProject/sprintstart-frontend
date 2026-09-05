@@ -47,6 +47,7 @@ export function BuddyWidget() {
     openError,
     retryOpen,
     closeDock,
+    startFreshVisit,
   } = useBuddy();
 
   /**
@@ -189,6 +190,7 @@ export function BuddyWidget() {
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             suggestions={suggestions}
+            startFreshVisit={startFreshVisit}
             openError={openError}
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}

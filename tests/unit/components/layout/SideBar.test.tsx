@@ -48,9 +48,9 @@ const mockProfile = {
   hasCompletedOnboarding: true,
 };
 
-function renderWithProviders(ui: React.ReactElement) {
+function renderWithProviders(ui: React.ReactElement, at = "/") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
       <ThemeProvider>{ui}</ThemeProvider>
     </MemoryRouter>,
   );
@@ -248,7 +248,9 @@ describe("SideBar", () => {
       .getAllByText("PM Dashboard")
       .map((label) => label.closest("a"))
       .find((link) => desktopNav.contains(link));
-    expect(pmDashboardEntry?.className).not.toContain("text-white");
+    // The pill is what the sidebar highlights *with* — the same `[data-layout-id]` counted
+    // above — so asserting on it survives any restyling of the entry itself.
+    expect(pmDashboardEntry?.querySelector("[data-layout-id]")).toBeNull();
   });
 
   /**
@@ -327,5 +329,26 @@ describe("SideBar", () => {
 
     expect(screen.getByLabelText("Close sidebar")).toBeInTheDocument();
     expect(screen.getByLabelText("Close sidebar overlay")).toBeInTheDocument();
+  });
+  /**
+   * The buddy is the other half of the chat's page, not a page of its own — one header, one
+   * switch, two conversations. Before this the sidebar highlighted nothing at all on `/buddy`,
+   * so the app claimed the hire was nowhere while they were looking at half of Chat.
+   */
+  it("keeps the Chat entry lit while the buddy half is open", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      profile: mockProfile,
+    } as unknown as ReturnType<typeof useAuthHook.useAuth>);
+
+    renderWithProviders(<SideBar />, "/buddy");
+
+    // `aria-current` is `NavLink`'s own "this is the page you are on", and `/buddy` is not
+    // `/chat` — so this is the forced highlight, asserted the way a user perceives it.
+    const chat = screen.getAllByRole("link", { name: /Chat/ })[0];
+    expect(chat).not.toHaveAttribute("aria-current", "page");
+
+    // Asserted through the active pill rather than the entry's classes: the highlight is what
+    // this test is about, and a class list is a styling decision that can change without it.
+    expect(chat.querySelector("[data-layout-id]")).not.toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { isOnboardingAccessible } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { useProjectContext } from "../../projects/useProjectContext";
-import { DASHBOARD_WIDGET_IDS, getAvailableWidgets, getDashboardWidget } from "./catalog";
+import { DASHBOARD_WIDGET_IDS, getAvailableWidgets } from "./catalog";
 import * as operations from "./layoutOperations";
 import { clearStoredLayout, readStoredLayout, storeLayout } from "./storage";
 import type {
@@ -14,14 +14,30 @@ import type {
 
 export type DashboardLayoutController = {
   layout: DashboardLayout;
-  /** Everything this user may place, in catalog order — the picker's source. */
+  /**
+   * Everything this user may place, in catalog order — the picker's source.
+   *
+   * The whole catalog, not just what is missing: the picker ticks what is already on the board
+   * rather than hiding it, so "have I got that one already?" is answered by the list itself.
+   */
   availableWidgets: DashboardWidgetDefinition[];
-  /** Widgets not currently on the board, which is what the picker actually offers. */
-  addableWidgets: DashboardWidgetDefinition[];
   /** Whether the user has arranged anything, so "reset" is only offered when it does something. */
   isCustomized: boolean;
-  addWidget: (id: DashboardWidgetId) => void;
+  /**
+   * Takes one widget off the board — the card's own remove control in edit mode.
+   *
+   * The only single-widget placement move left. Adding used to have a twin here, back when the
+   * picker added one card per click; the picker applies a whole selection now, so the twin had
+   * no caller and went with it.
+   */
   removeWidget: (id: DashboardWidgetId) => void;
+  /**
+   * Replaces the whole set of placed widgets — the picker's save.
+   *
+   * Everything still selected keeps its place and its size; see
+   * {@link operations.setPlacedWidgets}.
+   */
+  setPlacedWidgets: (ids: ReadonlySet<DashboardWidgetId>) => void;
   resizeWidget: (id: DashboardWidgetId, size: DashboardWidgetSize) => void;
   /** Drops `id` where `targetId` currently sits. The pointer drag's only move. */
   moveWidgetTo: (id: DashboardWidgetId, targetId: DashboardWidgetId) => void;
@@ -78,19 +94,13 @@ export function useDashboardLayout(): DashboardLayoutController {
     if (next !== layout) apply(next);
   }
 
-  const placedIds = new Set(layout.map((item) => item.id));
-
   return {
     layout,
     availableWidgets,
-    addableWidgets: availableWidgets.filter((widget) => !placedIds.has(widget.id)),
     isCustomized: storedLayout !== null,
 
-    addWidget: (id) => {
-      const definition = getDashboardWidget(id);
-      if (definition) apply(operations.addWidget(layout, definition));
-    },
     removeWidget: (id) => apply(operations.removeWidget(layout, id)),
+    setPlacedWidgets: (ids) => apply(operations.setPlacedWidgets(layout, ids, availableWidgets)),
     resizeWidget: (id, size) => apply(operations.resizeWidget(layout, id, size)),
     moveWidgetTo: (id, targetId) => applyIfChanged(operations.moveWidgetTo(layout, id, targetId)),
     moveWidgetBy: (id, offset) => applyIfChanged(operations.moveWidgetBy(layout, id, offset)),

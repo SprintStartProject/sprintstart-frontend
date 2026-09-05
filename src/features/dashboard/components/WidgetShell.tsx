@@ -58,19 +58,25 @@ export function WidgetShell({
       />
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
             <Icon className="h-3.5 w-3.5" />
           </span>
-          <span className="text-sm font-semibold text-app-text">{title}</span>
+          <span className="truncate text-sm font-semibold text-app-text">{title}</span>
         </div>
 
+        {/* The action label steps aside on a narrow card. It is `aria-hidden` and the card's own
+                `aria-label` carries the same words, so dropping it costs nothing but the pixels
+                — and keeping it cost the whole row: "Open team management" beside a title in a
+                quarter-row card ran past the edge and was clipped by the card's `overflow-hidden`.
+                A *container* query, not a viewport one: what is short of room is the card, and the
+                same card is roomy at half a row on the same screen. */}
         {to !== undefined && (
           <span
             aria-hidden="true"
             className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
           >
-            {actionLabel}
+            <span className="hidden @min-[20rem]:inline">{actionLabel}</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </span>
         )}
@@ -95,7 +101,7 @@ export function WidgetShell({
     return (
       // No surface of its own: the card's border, background and shadow come from the
       // `SpotlightCard` the dashboard frame wraps every widget in.
-      <article className="relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
+      <article className="@container relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
         {contents}
       </article>
     );
@@ -105,7 +111,7 @@ export function WidgetShell({
     <ClickableCard
       onClick={() => void navigate(to)}
       aria-label={actionLabel}
-      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       {contents}
     </ClickableCard>
