@@ -673,11 +673,13 @@ export function getSourceLabel(sourceSystem: SourceSystem) {
 }
 
 /**
- * The host of a Jira instance URL without the scheme, e.g.
+ * The host of an instance URL without the scheme, e.g.
  * `"acme.atlassian.net"` for `"https://acme.atlassian.net"`. Falls back to
  * stripping the scheme/trailing slash by hand if the value is not a valid URL.
+ *
+ * Used for the Jira instance and the Confluence base URL alike.
  */
-export function formatJiraInstanceDomain(instanceUrl: string): string {
+export function formatInstanceDomain(instanceUrl: string): string {
   try {
     return new URL(instanceUrl).host;
   } catch {
