@@ -35,6 +35,7 @@ export function BuddyWidget() {
   const {
     messages,
     isThinking,
+    isStreaming,
     activeTool,
     isOpen,
     toggleOpen,
@@ -47,6 +48,7 @@ export function BuddyWidget() {
     openError,
     retryOpen,
     closeDock,
+    startFreshVisit,
   } = useBuddy();
 
   /**
@@ -182,6 +184,7 @@ export function BuddyWidget() {
             key="buddy-dock"
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             draft={draft}
             setDraft={setDraft}
@@ -189,6 +192,7 @@ export function BuddyWidget() {
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             suggestions={suggestions}
+            startFreshVisit={startFreshVisit}
             openError={openError}
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}

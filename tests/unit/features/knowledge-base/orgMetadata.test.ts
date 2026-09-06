@@ -92,6 +92,31 @@ describe("parseOrgMetadata", () => {
     expect(parseOrgMetadata("[]")).toBeNull();
   });
 
+  it("returns null when a team is missing its members array", () => {
+    // The viewer maps over `team.members` for every team it renders, so a team
+    // without one is the same TypeError the top-level `members` guard prevents.
+    expect(
+      parseOrgMetadata(
+        JSON.stringify({
+          login: "org",
+          members: [],
+          teams: [{ name: "Platform", slug: "platform", orgLogin: "org", orgName: null }],
+        }),
+      ),
+    ).toBeNull();
+
+    expect(
+      parseOrgMetadata(JSON.stringify({ login: "org", members: [], teams: "Platform" })),
+    ).toBeNull();
+  });
+
+  it("accepts a payload whose teams are absent or explicitly null", () => {
+    expect(parseOrgMetadata(JSON.stringify({ login: "org", members: [] }))?.login).toBe("org");
+    expect(
+      parseOrgMetadata(JSON.stringify({ login: "org", members: [], teams: null }))?.login,
+    ).toBe("org");
+  });
+
   it("returns null when required fields are missing or the wrong type", () => {
     // members is declared non-nullable — a null value must be rejected before the cast
     // to prevent a TypeError when the viewer calls members.length / members.map().

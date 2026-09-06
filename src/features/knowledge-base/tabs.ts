@@ -18,7 +18,7 @@ export const TABS: { id: KnowledgeTab; label: string }[] = [
   { id: "ISSUES", label: "Issues" },
   { id: "FILES", label: "Files" },
   { id: "COMMITS", label: "Commits" },
-  { id: "ORGANIZATIONS", label: "Organization" },
+  { id: "ORGANIZATIONS", label: "Organizations" },
 ];
 
 /**

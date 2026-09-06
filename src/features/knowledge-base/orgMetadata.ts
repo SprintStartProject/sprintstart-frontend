@@ -84,5 +84,23 @@ export function parseOrgMetadata(
     return null;
   }
 
+  // Same guard one level down: `teams` is optional, but the viewer dereferences
+  // `team.members.length` / `.map()` on every entry it does get, so a team
+  // without a members array is the identical TypeError the check above prevents.
+  // Rejecting the whole payload (rather than the one team) keeps the contract
+  // the callers already rely on: unusable metadata means the quiet empty state.
+  const teams = p["teams"];
+  if (teams !== null && teams !== undefined) {
+    if (!Array.isArray(teams)) return null;
+
+    const everyTeamUsable = teams.every(
+      (team) =>
+        typeof team === "object" &&
+        team !== null &&
+        Array.isArray((team as Record<string, unknown>)["members"]),
+    );
+    if (!everyTeamUsable) return null;
+  }
+
   return parsed as OrgMetadataArtifactMetadata;
 }

@@ -31,7 +31,9 @@ describe("ChatPage Accessibility", () => {
     );
 
     expect(screen.getByRole("textbox", { name: "Message" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Toggle sidebar" })).toHaveAttribute(
+    // jsdom reports the narrowest viewport, so the rail is the drawer and starts closed —
+    // which is exactly when the control that reopens it is on screen.
+    expect(screen.getByRole("button", { name: "Show your conversations" })).toHaveAttribute(
       "aria-expanded",
       "false",
     );

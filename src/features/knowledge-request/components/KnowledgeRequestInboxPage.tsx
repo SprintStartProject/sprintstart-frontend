@@ -99,20 +99,23 @@ export function KnowledgeRequestInboxPage() {
   const answeredCount = orderedAnswers.length;
 
   // Counts stay undefined while their list is loading, so the pill doesn't flash a stale "0".
-  const TAB_OPTIONS: SegmentedTabOption<Tab>[] = [
-    {
-      value: "open",
-      label: "Open",
-      icon: <Inbox className="h-4 w-4" aria-hidden="true" />,
-      count: openLoading ? undefined : openCount,
-    },
-    {
-      value: "answered",
-      label: "Durable answers",
-      icon: <BookCheck className="h-4 w-4" aria-hidden="true" />,
-      count: answersLoading ? undefined : answeredCount,
-    },
-  ];
+  const tabOptions: SegmentedTabOption<Tab>[] = useMemo(
+    () => [
+      {
+        value: "open",
+        label: "Open",
+        icon: <Inbox className="h-4 w-4" aria-hidden="true" />,
+        count: openLoading ? undefined : openCount,
+      },
+      {
+        value: "answered",
+        label: "Durable answers",
+        icon: <BookCheck className="h-4 w-4" aria-hidden="true" />,
+        count: answersLoading ? undefined : answeredCount,
+      },
+    ],
+    [openLoading, openCount, answersLoading, answeredCount],
+  );
 
   return (
     // No root background: the app-wide aurora and cursor-glow canvas sit behind
@@ -145,7 +148,7 @@ export function KnowledgeRequestInboxPage() {
                 house look for switching sections, so the inbox shouldn't grow a second one. */}
             <SegmentedTabs
               value={tab}
-              options={TAB_OPTIONS}
+              options={tabOptions}
               onChange={setTab}
               layoutId="knowledge-request-inbox-tab-pill"
               ariaLabel="Inbox views"
@@ -159,6 +162,7 @@ export function KnowledgeRequestInboxPage() {
               {tab === "open" ? (
                 <View
                   loading={openLoading}
+                  loadingLabel="Loading open escalations"
                   error={openError}
                   isEmpty={openCount === 0}
                   empty={
@@ -185,6 +189,7 @@ export function KnowledgeRequestInboxPage() {
               ) : (
                 <View
                   loading={answersLoading}
+                  loadingLabel="Loading durable answers"
                   error={answersError}
                   isEmpty={answeredCount === 0}
                   empty={
@@ -224,12 +229,16 @@ export function KnowledgeRequestInboxPage() {
 
 function View({
   loading,
+  loadingLabel,
   error,
   isEmpty,
   empty,
   children,
 }: {
   loading: boolean;
+  /** What the spinner announces — both tabs share this helper, so naming the
+   *  list being fetched is the caller's job. */
+  loadingLabel: string;
   error: boolean;
   isEmpty: boolean;
   empty: React.ReactNode;
@@ -240,7 +249,7 @@ function View({
     // this replaces left screen readers silent while the page waited.
     return (
       <div className="flex justify-center py-20">
-        <Spinner size="lg" label="Loading escalations" />
+        <Spinner size="lg" label={loadingLabel} />
       </div>
     );
   }

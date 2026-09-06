@@ -19,8 +19,10 @@ import {
   createUploadDraft,
   hasFailedSources,
   removeDraftSource,
+  setDraftSourceOwner,
   type DraftSource,
 } from "../projectSourcesDraft";
+import { sortOwnerOptions } from "../sourceOwners";
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
 import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials";
@@ -364,6 +366,23 @@ export function CreateProjectWizard({
   );
 
   const memberCount = selectedUserIds.size + (managerId && !selectedUserIds.has(managerId) ? 1 : 0);
+
+  /*
+    Who a staged repository can be handed to: the people this project is being created with.
+    The whole directory would be the wrong list — an owner who is not on the project cannot be
+    told about the gap, and the Members step is right behind this one, so a missing name is a
+    step back rather than a dead end. The manager is included even when they were not ticked as
+    a member, because setting them as manager makes them one.
+  */
+  const ownerOptions = useMemo(
+    () =>
+      sortOwnerOptions(
+        users
+          .filter((user) => selectedUserIds.has(user.id) || user.id === managerId)
+          .map((user) => ({ value: user.id, label: getDisplayName(user) })),
+      ),
+    [users, selectedUserIds, managerId],
+  );
 
   // --- Add-source sub-flow ---
 
@@ -857,6 +876,10 @@ export function CreateProjectWizard({
                 sources={sources}
                 onRemove={(sourceId) =>
                   setSources((current) => removeDraftSource(current, sourceId))
+                }
+                ownerOptions={ownerOptions}
+                onOwnerChange={(sourceId, ownerUserId) =>
+                  setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
                 }
                 onAddSource={openAddSource}
               />

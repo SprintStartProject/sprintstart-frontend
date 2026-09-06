@@ -3,6 +3,7 @@ const SPLASH_ID = "boot-splash";
 const READY_CLASS = "is-ready";
 const GREETING_KEY = "sprintstart.boot.greeting";
 const SIGNOUT_KEY = "sprintstart.boot.signout";
+const ROUNDTRIP_KEY = "sprintstart.boot.roundtrip";
 
 /**
  * How long the exit runs before the node is taken out of the DOM.
@@ -24,6 +25,31 @@ function remainingFlightMs(): number {
   const boot = window.__bootSplash;
   if (!boot) return 0;
   return Math.max(0, boot.start + boot.flightMs - Date.now());
+}
+
+/**
+ * Forgets that this app redirects through the identity provider on boot.
+ *
+ * The note is what stops the outbound leg from flying (see `index.html`), and it is written
+ * by the leg that comes back from the provider. This is the other half: a load that *stayed*
+ * without ever flying is a load that had no round-trip, so the note is stale and the splash
+ * would sit on the pad on every boot from here on. Clearing it puts the timer back.
+ *
+ * Gated on `"flight"`, which is the app settling on a signed-in user. The other two modes are
+ * both loads that say nothing about whether the app round-trips, and both would otherwise
+ * clear the note wrongly: `main.tsx` dismisses the Keycloak login theme with `"now"` (it boots
+ * from the same document on the same origin and never flies), and `MomentsProvider` dismisses
+ * a signed-out boot with `"now"` too — that one *did* round-trip, it just came back with
+ * nobody signed in.
+ */
+function forgetBootRoundTrip(): void {
+  if (window.__bootSplash?.flightMs !== 0) return;
+
+  try {
+    window.localStorage.removeItem(ROUNDTRIP_KEY);
+  } catch {
+    // Worst case the splash holds the pad for a boot that no longer redirects.
+  }
 }
 
 /**
@@ -96,6 +122,8 @@ export function markSigningOut(): void {
 export function dismissBootSplash(mode: "flight" | "now" | "instant" = "flight"): void {
   const splash = document.getElementById(SPLASH_ID);
   if (!splash || splash.dataset.exiting === "true") return;
+
+  if (mode === "flight") forgetBootRoundTrip();
 
   // "instant" is for the entries that were never being loaded *into* — the
   // Keycloak login theme boots from the same `index.html`, and holding a
