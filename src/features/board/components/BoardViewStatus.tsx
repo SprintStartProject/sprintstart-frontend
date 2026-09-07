@@ -45,8 +45,10 @@ export function BoardViewStatus({ shown, total, cuts, onShowEverything }: BoardV
       {/* The reasons, not just the number. "6 of 34" tells a hire that something is missing; naming
           the cuts tells them which control to reach for — or, more often, that they never meant to
           set one of them at all. */}
-      {cuts.map((cut) => (
-        <span key={cut} className="before:mr-2 before:content-['·']">
+      {/* Keyed by position, not by the words. A cut can be a colour the hire named themselves, and
+          somebody who calls a colour "Yours" has two cuts on this line with the same text. */}
+      {cuts.map((cut, index) => (
+        <span key={index} className="before:mr-2 before:content-['·']">
           {cut}
         </span>
       ))}

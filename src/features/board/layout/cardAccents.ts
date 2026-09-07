@@ -42,22 +42,51 @@ export type CardAccent = {
   bloom: string;
 };
 
-/** One accent from one token, so a hue is named once and cannot drift between its four places. */
-function accent(token: string): CardAccent {
-  return {
-    icon: `text-app-${token}-text`,
-    chip: `bg-app-${token}-text/10`,
-    edge: `bg-app-${token}-text`,
-    bloom: `bg-app-${token}-text/10`,
-  };
-}
-
-const BRAND = accent("brand");
-const CYAN = accent("cyan");
-const INDIGO = accent("indigo");
-const PURPLE = accent("purple");
-const PINK = accent("pink");
-const ORANGE = accent("orange");
+/**
+ * The six hues, written out.
+ *
+ * Every class is a whole string, and it has to stay one. Tailwind finds classes by scanning the
+ * source for complete candidates, so a name built as `text-app-${token}-text` is a name it never
+ * sees and a rule it never emits — the tidier version of this file compiled to four undefined
+ * utilities per accent and took the colour off every card, including the three that had worked for
+ * months. Repetition is the price of a build step that reads source text.
+ */
+const BRAND: CardAccent = {
+  icon: "text-app-brand-text",
+  chip: "bg-app-brand-text/10",
+  edge: "bg-app-brand-text",
+  bloom: "bg-app-brand-text/10",
+};
+const CYAN: CardAccent = {
+  icon: "text-app-cyan-text",
+  chip: "bg-app-cyan-text/10",
+  edge: "bg-app-cyan-text",
+  bloom: "bg-app-cyan-text/10",
+};
+const INDIGO: CardAccent = {
+  icon: "text-app-indigo-text",
+  chip: "bg-app-indigo-text/10",
+  edge: "bg-app-indigo-text",
+  bloom: "bg-app-indigo-text/10",
+};
+const PURPLE: CardAccent = {
+  icon: "text-app-purple-text",
+  chip: "bg-app-purple-text/10",
+  edge: "bg-app-purple-text",
+  bloom: "bg-app-purple-text/10",
+};
+const PINK: CardAccent = {
+  icon: "text-app-pink-text",
+  chip: "bg-app-pink-text/10",
+  edge: "bg-app-pink-text",
+  bloom: "bg-app-pink-text/10",
+};
+const ORANGE: CardAccent = {
+  icon: "text-app-orange-text",
+  chip: "bg-app-orange-text/10",
+  edge: "bg-app-orange-text",
+  bloom: "bg-app-orange-text/10",
+};
 
 const ACCENTS: Record<BoardCardKind, CardAccent> = {
   // What the board is steering by: where you are going, and what you are on right now.

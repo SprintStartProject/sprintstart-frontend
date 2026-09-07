@@ -510,6 +510,26 @@ export function BoardPage() {
   const hasSectionTabs = tabSections.length > 1;
 
   /**
+   * The section actually being shown, which is not always the one that was chosen.
+   *
+   * A colour row exists only while something is marked in that colour, so rubbing out the last
+   * green highlight takes the green dot off the rail — and the board would go on filtering by a
+   * colour with no control left to switch it off, no tab lit, and nothing on the status line
+   * naming the cut, because the cut it names no longer exists to be looked up. An area behaves the
+   * same way when it is dissolved from somewhere other than this page.
+   *
+   * A section id that no longer names a section means everything, which is what the board would be
+   * showing anyway if it agreed with itself.
+   */
+  const shownSectionId = useMemo(
+    () =>
+      sectionId !== null && !sections.some((section) => section.id === sectionId)
+        ? null
+        : sectionId,
+    [sectionId, sections],
+  );
+
+  /**
    * The sections as the tab machinery sees them: a fixed left-to-right order, and a string for the
    * current one.
    *
@@ -517,18 +537,24 @@ export function BoardPage() {
    * order defined anywhere else would drift the first time a card changed area.
    */
   const sectionOrder = useMemo(() => sectionTabOrder(tabSections), [tabSections]);
-  const sectionValue = sectionId ?? ALL_SECTIONS;
+  const sectionValue = shownSectionId ?? ALL_SECTIONS;
   const sectionIndex = Math.max(sectionOrder.indexOf(sectionValue), 0);
 
   /**
    * Two-finger swipe between the sections, the same gesture every other tabbed page in the app
    * answers to. Off on an undivided board, where there is nothing to swipe between.
+   *
+   * Off as well while a colour is being shown. The colours are not in this order — they are
+   * switches in the rail, not tabs — so a swipe from one would be asked to step from an index this
+   * list does not contain, and would land on whichever tab happens to be first rather than on the
+   * next one. Pressing the colour again is the way back, which is where a swipe would have to
+   * start anyway.
    */
   const swipeRef = useSwipeableTabs<string, HTMLElement>({
     order: sectionOrder,
     value: sectionValue,
     onChange: (value) => setSectionId(value === ALL_SECTIONS ? null : value),
-    enabled: hasSectionTabs,
+    enabled: hasSectionTabs && sectionOrder.includes(sectionValue),
   });
 
   /**
@@ -697,10 +723,26 @@ export function BoardPage() {
     const folded = collapseStacks(allCards, stacks, openStackIds);
 
     const bySource = folded.filter((card) => matchesFilter(card, filter));
-    const visible = cardsInSection(bySource, groups, sectionId, { states, pinnedIds }, cardMarks);
+    const visible = cardsInSection(
+      bySource,
+      groups,
+      shownSectionId,
+      { states, pinnedIds },
+      cardMarks,
+    );
 
     return [...visible].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)));
-  }, [allCards, cardMarks, filter, groups, openStackIds, pinnedIds, sectionId, stacks, states]);
+  }, [
+    allCards,
+    cardMarks,
+    filter,
+    groups,
+    openStackIds,
+    pinnedIds,
+    shownSectionId,
+    stacks,
+    states,
+  ]);
 
   const griddedBoard = board ? { ...board, cards: shownCards } : null;
   const hiddenCount = allCards.length - shownCards.length;
@@ -722,8 +764,8 @@ export function BoardPage() {
     const cut = filterLabel(filter);
     if (cut) cuts.push(cut);
 
-    if (sectionId !== null) {
-      const section = sections.find((candidate) => candidate.id === sectionId);
+    if (shownSectionId !== null) {
+      const section = sections.find((candidate) => candidate.id === shownSectionId);
       if (section) cuts.push(section.name);
     }
 
@@ -731,7 +773,7 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [allCards, filter, openStackIds, sectionId, sections, stacks]);
+  }, [allCards, filter, openStackIds, shownSectionId, sections, stacks]);
 
   const handleReorder = (cardIds: string[]) => {
     if (!pathCard || pathIndex === -1) return void reorder(cardIds);
@@ -1017,7 +1059,7 @@ export function BoardPage() {
                   and nothing else. Where they came from, then what you marked on them. */}
               <MarkFilterRail
                 sections={markSections}
-                selectedId={sectionId}
+                selectedId={shownSectionId}
                 onSelect={setSectionId}
                 vertical
               />
@@ -1071,11 +1113,11 @@ export function BoardPage() {
                 <div className="min-w-0 flex-1">
                   <BoardSectionTabs
                     sections={tabSections}
-                    selectedId={sectionId}
+                    selectedId={shownSectionId}
                     // A colour is not one of the tabs, but it is still what is being shown, so its
                     // line of counts is handed over rather than the bar falling back to
                     // "Everything" and reporting a number that belongs to a different view.
-                    selected={sections.find((section) => section.id === sectionId)}
+                    selected={sections.find((section) => section.id === shownSectionId)}
                     onSelect={setSectionId}
                   />
                 </div>
@@ -1096,7 +1138,7 @@ export function BoardPage() {
                     board's readers do not have. */}
                 <MarkFilterRail
                   sections={markSections}
-                  selectedId={sectionId}
+                  selectedId={shownSectionId}
                   onSelect={setSectionId}
                   className="lg:hidden"
                 />

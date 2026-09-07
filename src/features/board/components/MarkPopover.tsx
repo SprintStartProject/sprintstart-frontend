@@ -20,8 +20,8 @@ type MarkPopoverProps = {
 };
 
 /** Roughly the bar's own size, used to decide which side of the highlight it fits on. */
-const WIDTH = 220;
-const HEIGHT = 40;
+const WIDTH = 240;
+const HEIGHT = 44;
 const GAP = 6;
 const MARGIN = 12;
 
@@ -145,11 +145,20 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") commitName();
-              if (event.key === "Escape") setNaming(false);
+              if (event.key !== "Escape") return;
+              // Escape here means "back to the swatches", not "shut the whole bar" — which is what
+              // it would mean if this reached the document listener that closes the popover. The
+              // field is the innermost thing the key applies to, so it is the one that answers it.
+              event.stopPropagation();
+              setNaming(false);
             }}
             aria-label={`What ${labelFor(labels, color).toLowerCase()} means`}
             placeholder="ask about"
-            className="h-7 w-32 text-xs"
+            // The component's own small size rather than a height class of my own: nothing merges
+            // Tailwind classes at this call site, so `h-7` beside the preset's `h-11` is two height
+            // utilities on one element and the taller one wins.
+            size="sm"
+            className="w-32"
           />
 
           <Button

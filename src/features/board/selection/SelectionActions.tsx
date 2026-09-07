@@ -81,11 +81,7 @@ export function SelectionActions() {
    * *keeping*; text on a card is already kept, and making a second card out of the first one is a
    * copy nobody asked for. What a hire wants there is the marker pen.
    */
-  // Not on a link. The words in one are the link's own label, and a highlight there would have to
-  // be pressable to be changed or removed — inside an anchor that is either a second control on
-  // top of the first or a press that navigates away instead. A link is kept by saving it, which
-  // this toolbar already offers.
-  const marking = canMark && selection.cardId !== null && !selection.inLink;
+  const marking = canMark && selection.cardId !== null;
 
   /**
    * Whether this person could turn what they highlighted into a card every new hire starts with.
@@ -121,6 +117,26 @@ export function SelectionActions() {
       ? enclosingColorAt(selection.cardId, selection.text) !== null
       : false;
 
+  /**
+   * Whether the marker pen is offered — everywhere on a card except inside a link.
+   *
+   * A highlight has to be pressable to be recoloured or rubbed out, and a pressable highlight
+   * inside an anchor is either a second control on top of the first or a press that navigates away
+   * instead of doing what it says. So the pen is not offered there.
+   *
+   * Separate from {@link marking}, and that separation is the whole care here: `marking` answers
+   * "is this text on a card", which decides between the two halves of this toolbar. Folding the
+   * link case into it sent a selection on a card down the *other* branch, where the board offered
+   * to keep a link it was already holding, and offered to write a blueprint from a card.
+   */
+  const highlighting = marking && !selection.inLink;
+  const offersPen = highlighting && marked === null;
+
+  // A selection in a link on a card, with no highlight under it to rub out, leaves this toolbar
+  // with nothing true to say: the pen is not on offer here, and neither half of the other branch
+  // applies to text the board is already holding.
+  if (marking && !offersPen && !erasable) return null;
+
   const { rect } = selection;
   const fitsAbove = rect.top > TOOLBAR_HEIGHT + OFFSET;
   const top = fitsAbove ? rect.top - OFFSET : rect.bottom + OFFSET;
@@ -155,7 +171,7 @@ export function SelectionActions() {
           {/* Not offered on something that is already exactly a highlight: there is nothing for it
               to do there but reset a colour somebody chose, and the way to change that colour is to
               click the highlight. Selecting *part* of one still offers it — that marks the part. */}
-          {marked === null && (
+          {offersPen && (
             <Button
               size="sm"
               variant="ghost"
@@ -172,9 +188,7 @@ export function SelectionActions() {
 
           {erasable && (
             <>
-              {marked === null && (
-                <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
-              )}
+              {offersPen && <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />}
               <Button
                 size="sm"
                 variant="ghost"

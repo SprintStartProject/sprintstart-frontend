@@ -1674,11 +1674,14 @@ function BoardCardCell({
   // them has to keep the pile open rather than close it under the pointer.
   return (
     <div
-      className={
-        stack
-          ? `group/stack transition-[padding-bottom] duration-300 ease-out ${FAN_ROOM[behind.length]}`
-          : undefined
-      }
+      // `group/stack` on every cell, stacked or not: the resize grip in the card's corner is drawn
+      // by `group-hover/stack:opacity-100`, so a card without the group is a card whose grip never
+      // appears — and, because it is still laid out, an invisible one sitting in the corner
+      // catching presses. It named the fan long before the grip borrowed it, which is why moving
+      // it out here for the fan's sake quietly took the grip with it.
+      className={`group/stack ${
+        stack ? `transition-[padding-bottom] duration-300 ease-out ${FAN_ROOM[behind.length]}` : ""
+      }`}
     >
       <motion.div
         ref={(element) => registerElement(card.id, element)}

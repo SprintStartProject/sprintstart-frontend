@@ -111,6 +111,10 @@ export function useBoardStructureSync(boardId: string, projectId: string): boole
   useEffect(() => {
     if (!boardId || !projectId) return;
 
+    // A request already in flight when the hire switches project would otherwise report its result
+    // against the board they moved to — "saved on this device" about a board that never failed.
+    let live = true;
+
     const push = () => {
       // Never before the first read has settled: pushing first would send this browser's copy over
       // an arrangement the server already has, which is the one thing the migration above exists to
@@ -121,14 +125,15 @@ export function useBoardStructureSync(boardId: string, projectId: string): boole
       timer.current = setTimeout(() => {
         void boardService
           .saveStructure(projectId, toWire(readBoardDocument(boardId, projectId)))
-          .then(() => settled(true))
-          .catch(() => settled(false));
+          .then(() => live && settled(true))
+          .catch(() => live && settled(false));
       }, QUIET_MS);
     };
 
     const stop = subscribeToBoardStorageWritten(push);
 
     return () => {
+      live = false;
       stop();
       if (timer.current) clearTimeout(timer.current);
     };
