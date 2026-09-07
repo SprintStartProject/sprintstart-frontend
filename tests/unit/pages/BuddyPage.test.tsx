@@ -9,6 +9,13 @@ import { mockResizableViewport } from "../setup/matchMedia";
 
 const projectState = { selectedProjectId: "p1" };
 
+/**
+ * Whether this hire has ever escalated anything. Mutable, because the two branches lead to
+ * different layouts: with replies the rail toggle reserves the floating control's room on its
+ * own, and without them the buddy's own control is the only thing that ever asks for it.
+ */
+const pmRepliesState = { hasAny: true };
+
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({
     profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
@@ -57,7 +64,7 @@ vi.mock("../../../src/features/buddy/hooks/usePmReplies", () => ({
     ],
     waiting: [],
     dismissed: [],
-    hasAny: true,
+    hasAny: pmRepliesState.hasAny,
   }),
 }));
 
@@ -147,6 +154,7 @@ function reportDesktopViewport(): () => void {
 describe("BuddyPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pmRepliesState.hasAny = true;
     // The rail's collapsed state is remembered per browser, so one test's choice would
     // otherwise decide the next one's starting layout.
     window.localStorage.clear();
@@ -273,6 +281,42 @@ describe("BuddyPage", () => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
     expect(streamOpenBuddy).toHaveBeenCalled();
+  });
+
+  /**
+   * The button withdraws mid-turn; the room it withdraws from must not.
+   *
+   * Below `md` the two clearances differ by 24px, and a hire with no PM replies has no other
+   * reason to reserve any — so tying the space to the button meant the whole transcript slid
+   * down and back on every turn. Visible precisely while the transcript is shorter than the
+   * viewport, which is the first few turns this control exists for.
+   */
+  it("keeps the room the floating control needs, even while the control is withdrawn", async () => {
+    // No PM replies, so the rail toggle is not there to reserve the room on the button's
+    // behalf — which is the ordinary hire, and the only configuration where this can be seen.
+    pmRepliesState.hasAny = false;
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+    vi.mocked(streamMessage).mockReturnValue(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    renderPage();
+
+    const framed = () =>
+      screen.getByTestId("buddy-transcript").querySelector(".app-page-frame") as HTMLElement;
+
+    expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
+    expect(framed().className).toContain("pt-14");
+
+    await user.type(screen.getByLabelText("Message"), "and after that?");
+    await user.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+    });
+    // The control is gone and the padding it stands in has not moved.
+    expect(framed().className).toContain("pt-14");
   });
 
   /**

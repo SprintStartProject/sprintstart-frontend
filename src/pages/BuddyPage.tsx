@@ -345,7 +345,13 @@ function BuddyMentorHome() {
         onStartFreshVisit={canStartFresh ? startFresh : undefined}
         // This page is the one that binds it — see `useNewConversationShortcut` above.
         freshVisitShortcut={NEW_CONVERSATION_CHORD}
-        hasFloatingControl={(replies.hasAny && !rail.open) || canStartFresh}
+        // `hasUserMessage`, not `canStartFresh`: the button withdraws mid-turn, the room it
+        // withdraws from must not. Below `md` the two clearances differ by 24px, and for a hire
+        // with no PM replies this is the only term that is ever true — so tying the space to the
+        // button shunted the whole transcript down and back on every single turn. Visible while
+        // the transcript is shorter than the viewport, which is exactly the first few turns this
+        // control exists for.
+        hasFloatingControl={(replies.hasAny && !rail.open) || hasUserMessage}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question
