@@ -81,7 +81,11 @@ export function SelectionActions() {
    * *keeping*; text on a card is already kept, and making a second card out of the first one is a
    * copy nobody asked for. What a hire wants there is the marker pen.
    */
-  const marking = canMark && selection.cardId !== null;
+  // Not on a link. The words in one are the link's own label, and a highlight there would have to
+  // be pressable to be changed or removed — inside an anchor that is either a second control on
+  // top of the first or a press that navigates away instead. A link is kept by saving it, which
+  // this toolbar already offers.
+  const marking = canMark && selection.cardId !== null && !selection.inLink;
 
   /**
    * Whether this person could turn what they highlighted into a card every new hire starts with.

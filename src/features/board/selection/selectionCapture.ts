@@ -34,6 +34,16 @@ export type CapturedSelection = {
    * pen there and the "keep this" everywhere else.
    */
   cardId: string | null;
+  /**
+   * Whether the selected words are inside a link.
+   *
+   * Separate from [url], which is also set for a bare address selected out of ordinary prose. This
+   * one is about the element the words live in, and it exists so that nothing offers to highlight
+   * them: a highlight has to be clickable to be changed or removed, and a clickable highlight
+   * inside a link is either two controls in one place or a control that follows a link instead of
+   * doing what it says.
+   */
+  inLink: boolean;
   /** Where the toolbar should sit, in viewport coordinates. */
   rect: DOMRect;
 };
@@ -64,6 +74,7 @@ export function captureSelection(selection: Selection | null): CapturedSelection
     source: sourceFor(anchor),
     origin: originUrl(window.location, text),
     cardId: elementOf(anchor)?.closest("[data-card-id]")?.getAttribute("data-card-id") ?? null,
+    inLink: Boolean(elementOf(anchor)?.closest("a")),
     rect: range.getBoundingClientRect(),
   };
 }
