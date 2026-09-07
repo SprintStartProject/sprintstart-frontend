@@ -87,17 +87,20 @@ export function ConversationRail({
 }
 
 /**
- * The top padding a conversation has to carry while a {@link RailToggle} floats over it.
+ * The top padding a conversation has to carry while a control floats over it.
  *
- * The toggle sits at `top-3` and is about 40px tall, so on a phone — where the conversation runs
- * to both page edges — the first message would start underneath it. From `md` up the page gutter
- * is wide enough that the toggle sits beside the column rather than over it, and the page's own
- * `pt-8` stands.
+ * Two of them do, one per corner and both to the same measurements: {@link RailToggle} on the
+ * left, and the buddy page's `BuddyFreshVisitButton` on the right. Either sits at `top-3` and is
+ * about 40px tall, so on a phone — where the conversation runs to both page edges — the first
+ * message would start underneath it. From `md` up the page gutter is wide enough that a control
+ * sits beside the column rather than over it, and the page's own `pt-8` stands. One number
+ * covers both because the geometry is identical; a control of a different height would need its
+ * own, not a bigger shared one.
  *
- * One exported string rather than a rule per page. It is one piece of geometry — the toggle's —
- * and the chat and the buddy had drifted to two different answers for it: the buddy reserved the
- * room at every width, so on a desktop with the rail closed it carried ~40px the chat did not.
- * Written out literally, because Tailwind reads the classes it generates out of the source.
+ * One exported string rather than a rule per page. The chat and the buddy had drifted to two
+ * different answers for it: the buddy reserved the room at every width, so on a desktop with the
+ * rail closed it carried ~40px the chat did not. Written out literally, because Tailwind reads
+ * the classes it generates out of the source.
  */
 export const RAIL_TOGGLE_CLEARANCE = "pt-14 md:pt-8";
 
