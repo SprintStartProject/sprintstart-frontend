@@ -14,7 +14,6 @@ import { AuthGuard } from "./AuthGuard";
 import { SkillWizardPage } from "../pages/SkillWizardPage";
 import { TeamManagementPage } from "../pages/TeamManagementPage.tsx";
 import { TeamMemberDetailPage } from "../pages/TeamMemberDetailPage.tsx";
-import { CardBlueprintsPage } from "../pages/CardBlueprintsPage";
 import { PmDashboardPage } from "../pages/PmDashboardPage.tsx";
 import { AdminPage } from "../pages/AdminPage.tsx";
 import { SettingsPage } from "../pages/SettingsPage.tsx";
@@ -84,14 +83,6 @@ export function AppRouter() {
           element={
             <ManagerAreaGuard route="/pm-dashboard">
               <PmDashboardPage />
-            </ManagerAreaGuard>
-          }
-        />
-        <Route
-          path="/card-blueprints"
-          element={
-            <ManagerAreaGuard route="/card-blueprints">
-              <CardBlueprintsPage />
             </ManagerAreaGuard>
           }
         />

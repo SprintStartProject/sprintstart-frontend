@@ -5,9 +5,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SelectionActions } from "../../../../src/features/board/selection/SelectionActions";
 
 vi.mock("../../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => ({ selectedProjectId: "p1", canManageSelected: false }),
+  useProjectContext: () => ({ selectedProjectId: "p1" }),
 }));
-vi.mock("../../../../src/context/useAuth", () => ({ useAuth: () => ({ profile: null }) }));
 vi.mock("../../../../src/context/useToast", () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
