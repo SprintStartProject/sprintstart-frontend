@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { boardService } from "../../../services/boardService";
 import { subscribeToBoardStorageWritten } from "../layout/boardStorage";
@@ -44,15 +44,36 @@ const QUIET_MS = 1200;
  *
  * ### What it does afterwards
  *
- * Sends the whole arrangement up whenever something writes, debounced. Failures are swallowed on
- * purpose: the arrangement is already on screen and already in local storage, so a request that did
+ * Sends the whole arrangement up whenever something writes, debounced. A failure interrupts
+ * nothing: the arrangement is already on screen and already in local storage, so a request that did
  * not go through costs the hire nothing today and is corrected by the next change. A toast for
  * every failed sync of a fold would be the app complaining about its own bookkeeping.
+ *
+ * It is still *said*, once, quietly — which is what this returns. Silence was right about the
+ * interruption and wrong about the fact: a hire who arranges their board on a laptop and opens it
+ * on a phone the next morning has been told nothing about why none of it is there. What they need
+ * is not an error, it is the word "here" — this is kept on this device, and the reason is that the
+ * server could not be reached.
+ *
+ * @returns whether the arrangement is only in this browser, as far as the last attempt could tell.
  */
-export function useBoardStructureSync(boardId: string, projectId: string): void {
+export function useBoardStructureSync(boardId: string, projectId: string): boolean {
   /** Set once the first read has settled, so nothing is pushed before the server has been asked. */
   const pulledFor = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [localOnly, setLocalOnly] = useState(false);
+
+  /**
+   * What the last exchange with the server showed.
+   *
+   * Latched on failure and cleared on the next success, rather than counting attempts: the question
+   * a hire is asking is "is my board up there", and the last answer is the only one that bears on
+   * it. A request that fails and is followed by one that works has cost them nothing to know about.
+   */
+  const settled = useCallback((reached: boolean) => setLocalOnly(!reached), []);
+  // Switching projects does not clear it here: the read below settles it either way, a moment
+  // later, and clearing it from the effect body is a synchronous setState inside an effect — which
+  // this codebase rejects, rightly, for the cascading render it causes.
 
   useEffect(() => {
     if (!boardId || !projectId) return;
@@ -71,9 +92,12 @@ export function useBoardStructureSync(boardId: string, projectId: string): void 
         } else {
           applyBoardDocument(boardId, projectId, server);
         }
+        if (active) settled(true);
       } catch {
         // Offline, or the endpoint is not deployed yet. The board works exactly as it did before
-        // any of this existed, which is the correct amount of noise to make about it.
+        // any of this existed, which is the correct amount of noise to make about it — beyond the
+        // one line that says where the arrangement is being kept.
+        if (active) settled(false);
       } finally {
         if (active) pulledFor.current = projectId;
       }
@@ -82,7 +106,7 @@ export function useBoardStructureSync(boardId: string, projectId: string): void 
     return () => {
       active = false;
     };
-  }, [boardId, projectId]);
+  }, [boardId, projectId, settled]);
 
   useEffect(() => {
     if (!boardId || !projectId) return;
@@ -97,7 +121,8 @@ export function useBoardStructureSync(boardId: string, projectId: string): void 
       timer.current = setTimeout(() => {
         void boardService
           .saveStructure(projectId, toWire(readBoardDocument(boardId, projectId)))
-          .catch(() => {});
+          .then(() => settled(true))
+          .catch(() => settled(false));
       }, QUIET_MS);
     };
 
@@ -107,5 +132,7 @@ export function useBoardStructureSync(boardId: string, projectId: string): void 
       stop();
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [boardId, projectId]);
+  }, [boardId, projectId, settled]);
+
+  return localOnly;
 }

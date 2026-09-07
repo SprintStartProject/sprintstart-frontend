@@ -20,7 +20,14 @@ import { DEFAULT_HIGHLIGHT, toHighlightColor, type HighlightColor } from "./high
  * highlight over the middle of an unrelated word. A string either still appears in the card or it
  * does not, and when it does not, nothing lights up — the correct answer rather than a wrong one.
  *
- * TODO(backend): the same field this board keeps asking for, next to `sourceUrl`/`sourceLabel`.
+ * Synced with the rest of the arrangement — see `sync/useBoardStructureSync.ts`. A highlight that
+ * did not follow the hire to another machine would be the most personal thing on the board and the
+ * first thing lost.
+ *
+ * TODO(backend): like an origin, this would rather be a field on the card than an entry in the
+ * arrangement, next to `sourceUrl`/`sourceLabel`. What somebody marked on a card belongs to that
+ * card, and filing it in the layer that describes the arrangement means a rewrite of the
+ * arrangement can take it with it.
  */
 const STORAGE_VERSION = 2;
 

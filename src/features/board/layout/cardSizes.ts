@@ -14,12 +14,11 @@ import { notifyBoardStorageWritten } from "./boardStorage";
  * had two widths, because the board packed cards into two columns by flow: a card was either one
  * column or the whole row, so narrow had nowhere to go. The grid is what makes it real.
  *
- * Local storage, per board, the way the folds, the pins and the areas are.
- *
- * TODO(backend): belongs with the rest of the personalisation on `POST /me/board/preferences`, and
- * local hurts more here than it does for the process layer — the whole point of a size somebody
- * chose is that it is theirs, and a hire who set their board up and then opened it on a laptop
- * would find none of it, which reads as the app having forgotten them.
+ * Local storage, per board, the way the folds, the pins and the areas are — and synced with them,
+ * which matters more here than almost anywhere else on the board: the whole point of a size
+ * somebody chose is that it is theirs, and a hire who set their board up and then opened it on a
+ * laptop to find none of it would read that as the app having forgotten them. See
+ * `sync/useBoardStructureSync.ts`.
  */
 const STORAGE_VERSION = 1;
 

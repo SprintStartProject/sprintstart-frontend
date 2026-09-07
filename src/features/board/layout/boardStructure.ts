@@ -14,15 +14,16 @@ import type { BoardCard } from "../types";
  * both are *display* facts — like folding, pinning and areas, they never touch the board's own
  * order, so turning the structure off puts every card back exactly where it was.
  *
- * Local storage, the same bargain the folded, pinned and grouped cards make: there is no endpoint
- * for it yet, and a structure that follows the machine is closer to right than one that does not
- * exist.
+ * Local storage, and no longer only local storage: `sync/useBoardStructureSync.ts` sends this layer
+ * and the other five up to `PUT /me/board/structure` after every change and reads them back on
+ * arrival, so a hire who opens their board on a second machine does not find their process
+ * flattened. This is still where the client writes first and reads from — the sync is a copy that
+ * follows the hire, not a round trip in the way of a fold — which is what keeps every gesture on
+ * this page instant and keeps a failed request from costing anybody anything.
  *
- * TODO(backend): stage, dependencies and the done-marks belong on the board row once
- * `POST /me/board/structure` exists — a hire who opens their board on a second machine should not
- * find their process flattened. Moving it means replacing {@link readBoardStructure} and
- * {@link writeBoardStructure} and nothing else; every consumer reads the derived
- * {@link BoardCardStatus}, never the storage.
+ * That the local shape and the wire shape are two different things is deliberate: `sync/` owns the
+ * translation, so nothing here has to know a wire format and the readers below stay defensive about
+ * a document written by an older version of the app.
  */
 const STORAGE_VERSION = 1;
 

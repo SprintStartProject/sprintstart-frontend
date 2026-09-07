@@ -10,13 +10,14 @@
  * one field: its text. Putting a URL in that text would make the note say something the hire did
  * not write, in a card kind whose whole promise is that its contents are theirs.
  *
- * Local storage, per project, the way the folds, the pins, the areas and the card sizes are.
+ * Local storage, per project, the way the folds, the pins, the areas and the card sizes are — and
+ * carried to the server with them, so a hire who opens their board on a different machine keeps the
+ * trail back as well as the card. See `sync/useBoardStructureSync.ts`.
  *
- * TODO(backend): this wants to be a real field — `sourceUrl` and `sourceLabel` on the authored-card
- * request, carried on `POST /me/board/cards` and returned with the card. It is the one piece of
- * personalisation here that is not a preference but a *fact about where something came from*: a
- * hire who opens their board on a different machine keeps every card and loses every trail back,
- * which is worse than never having offered the trail. Until then, this.
+ * TODO(backend): it still wants to be a field on the card rather than an entry in the arrangement —
+ * `sourceUrl` and `sourceLabel` on `POST /me/board/cards`, returned with the card. Where a card came
+ * from is not a preference about the board, it is a fact about that card, and a fact filed in the
+ * layer that describes the *arrangement* is one an unrelated rewrite of the arrangement can drop.
  *
  * Keyed by project rather than by board, because everything that writes an origin — the selection
  * toolbar, the chat, the buddy dock — knows which project it is in and none of them knows the

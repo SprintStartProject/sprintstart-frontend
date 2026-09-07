@@ -7,6 +7,9 @@ type MarkFilterRailProps = {
   /** The section being shown; null is "everything". */
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Stacks them under a divider, for the rail in the page's margin. */
+  vertical?: boolean;
+  className?: string;
 };
 
 /**
@@ -24,18 +27,31 @@ type MarkFilterRailProps = {
  * is the button's label for a pointer and for a screen reader: the one place a name is genuinely
  * useful, and the one place it costs no room.
  *
+ * **Twice on the page, and that is the point.** The rail lives in the page's right margin from `lg`
+ * up, and below that width there is no margin — so this also renders in the row above the board,
+ * exactly as the provenance filter does. Moving out of the section bar took the colours off every
+ * narrow screen for a while, which is a filter that exists on a laptop and not on a phone.
+ *
  * Draws nothing until something is highlighted. Four dots over a board with no marks would be a
  * control for something that has not happened yet.
  */
-export function MarkFilterRail({ sections, selectedId, onSelect }: MarkFilterRailProps) {
+export function MarkFilterRail({
+  sections,
+  selectedId,
+  onSelect,
+  vertical = false,
+  className = "",
+}: MarkFilterRailProps) {
   if (sections.length === 0) return null;
 
   return (
     <>
-      <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+      {/* Only in the rail, where it separates two groups of switches. In the row above the board
+          this sits beside the other controls with the row's own gap between them. */}
+      {vertical && <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />}
 
       <div
-        className="flex flex-col items-center gap-1"
+        className={`flex items-center gap-1 ${vertical ? "flex-col" : ""} ${className}`}
         role="group"
         aria-label="Show what you highlighted"
       >

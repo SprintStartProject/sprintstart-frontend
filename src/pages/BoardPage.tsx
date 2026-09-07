@@ -31,6 +31,7 @@ import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
 import { BoardNextUp } from "../features/board/components/BoardNextUp";
+import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
 import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useAuth } from "../context/useAuth";
@@ -233,7 +234,7 @@ export function BoardPage() {
 
   // Keeps this hire's arrangement on the server rather than only in this browser, and brings it
   // down on the first load of a visit. See `sync/useBoardStructureSync.ts`.
-  useBoardStructureSync(boardId, selectedProjectId);
+  const localOnly = useBoardStructureSync(boardId, selectedProjectId);
 
   /**
    * Bumped whenever the stored arrangement is replaced under this page — by the sync above pulling
@@ -1018,6 +1019,7 @@ export function BoardPage() {
                 sections={markSections}
                 selectedId={sectionId}
                 onSelect={setSectionId}
+                vertical
               />
 
               {/* Nothing is added to a board somebody is rearranging: the three forms open over the
@@ -1088,6 +1090,16 @@ export function BoardPage() {
                 {allCards.length > 2 && (
                   <BoardFilterTriggers value={filter} onChange={setFilter} className="lg:hidden" />
                 )}
+
+                {/* Same reason as the filter beside it: the rail these live in only exists from
+                    `lg` up, and a colour you can only filter by on a laptop is a colour half the
+                    board's readers do not have. */}
+                <MarkFilterRail
+                  sections={markSections}
+                  selectedId={sectionId}
+                  onSelect={setSectionId}
+                  className="lg:hidden"
+                />
 
                 <AddCardTriggers onPick={setAddingKind} active={addingKind} className="lg:hidden" />
               </div>
@@ -1161,6 +1173,11 @@ export function BoardPage() {
                   cuts={activeCuts}
                   onShowEverything={showEverything}
                 />
+
+                {/* Under the line about what is shown, because it is the same kind of fact about
+                    the board rather than about the work: that one says how much of it you are
+                    looking at, this one says where the arrangement is being kept. */}
+                <BoardLocalOnlyNotice localOnly={localOnly} />
 
                 <BoardGrid
                   board={griddedBoard}
