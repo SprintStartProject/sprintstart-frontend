@@ -108,7 +108,10 @@ function HireIdentity({ hire }: { hire: EscalationHire }) {
       <div className="min-w-0">
         <Link
           to={`/team/${hire.userId}`}
-          className="truncate rounded text-sm font-semibold text-app-text transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          // `block` so `truncate` has something to work on: ellipsis needs a block box, and an
+          // anchor is inline -- a long name would otherwise push the wait time sideways instead
+          // of ending in an ellipsis the way the line below it does.
+          className="block truncate rounded text-sm font-semibold text-app-text transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
         >
           {hire.displayName}
         </Link>
