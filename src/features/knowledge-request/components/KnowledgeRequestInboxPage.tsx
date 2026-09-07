@@ -7,6 +7,7 @@ import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
 import { useFetch } from "../../../hooks/useFetch";
+import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -117,6 +118,14 @@ export function KnowledgeRequestInboxPage() {
     [openLoading, openCount, answersLoading, answeredCount],
   );
 
+  // A two-finger swipe moves between the tabs, the same gesture the other tabbed pages take.
+  // Aiming at the pill is still there for anybody who prefers it; this is the trackpad way in.
+  const swipeRef = useSwipeableTabs<Tab, HTMLElement>({
+    order: TAB_ORDER,
+    value: tab,
+    onChange: setTab,
+  });
+
   return (
     // No root background: the app-wide aurora and cursor-glow canvas sit behind
     // every route, and painting `bg-app-bg` here would hide them — the same
@@ -128,12 +137,15 @@ export function KnowledgeRequestInboxPage() {
           <PageHeader
             icon={Inbox}
             title="Escalation inbox"
-            subtitle="Questions the buddy could not answer, sent to a person. Answer one once and it becomes durable knowledge the buddy serves to everyone after."
+            // Kept to the length the other pages' subtitles run to: `max-w-2xl` wraps anything
+            // longer onto a third line, and the header band -- and the rule under it -- then
+            // sits lower here than on every page a PM switches between.
+            subtitle="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
           />
         </div>
       </header>
 
-      <main className="app-page-frame space-y-6 py-6 lg:py-8">
+      <main ref={swipeRef} className="app-page-frame space-y-6 py-6 lg:py-8">
         {!projectsLoading && projects.length === 0 ? (
           <EmptyState
             icon={<FolderKanban className="h-8 w-8 text-app-text-disabled" />}

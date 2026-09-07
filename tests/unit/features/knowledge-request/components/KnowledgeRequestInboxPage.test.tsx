@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { KnowledgeRequestInboxPage } from "../../../../../src/features/knowledge-request/components/KnowledgeRequestInboxPage";
@@ -125,6 +125,35 @@ describe("KnowledgeRequestInboxPage", () => {
 
     expect(await screen.findByRole("button", { name: "Answer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
+  });
+
+  it("moves between the tabs on a two-finger swipe, like the other tabbed pages", async () => {
+    mockedService.listOpen.mockResolvedValue([]);
+    mockedService.listAnswers.mockResolvedValue([]);
+
+    render(<KnowledgeRequestInboxPage />);
+    await screen.findByText(/No open escalations/i);
+
+    // Rightwards past the hook's threshold: on to the tab after this one.
+    fireEvent.wheel(screen.getByRole("main"), { deltaX: 60, deltaY: 0 });
+
+    expect(await screen.findByText(/No durable answers yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /durable answers/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("leaves a vertical scroll alone", async () => {
+    mockedService.listOpen.mockResolvedValue([]);
+    mockedService.listAnswers.mockResolvedValue([]);
+
+    render(<KnowledgeRequestInboxPage />);
+    await screen.findByText(/No open escalations/i);
+
+    fireEvent.wheel(screen.getByRole("main"), { deltaX: 4, deltaY: 80 });
+
+    expect(screen.getByText(/No open escalations/i)).toBeInTheDocument();
   });
 
   describe("when the user is HR (read-only)", () => {
