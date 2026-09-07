@@ -134,8 +134,11 @@ describe("KnowledgeRequestInboxPage", () => {
     render(<KnowledgeRequestInboxPage />);
     await screen.findByText(/No open escalations/i);
 
-    // Rightwards past the hook's threshold: on to the tab after this one.
-    fireEvent.wheel(screen.getByRole("main"), { deltaX: 60, deltaY: 0 });
+    // Fired on the header, not on `<main>`: the gesture belongs to the whole page, and a short
+    // queue leaves half the viewport outside `<main>`. jsdom has no layout, so that empty band
+    // below the content cannot be aimed at -- the header is the same case, outside `<main>` and
+    // inside the page, and it fails the same way if the listener sits on the panel again.
+    fireEvent.wheel(screen.getByRole("banner"), { deltaX: 60, deltaY: 0 });
 
     expect(await screen.findByText(/No durable answers yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /durable answers/i })).toHaveAttribute(

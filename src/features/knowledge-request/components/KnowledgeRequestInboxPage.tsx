@@ -120,6 +120,9 @@ export function KnowledgeRequestInboxPage() {
 
   // A two-finger swipe moves between the tabs, the same gesture the other tabbed pages take.
   // Aiming at the pill is still there for anybody who prefers it; this is the trackpad way in.
+  // The ref goes on the page rather than on `<main>` -- AdminPage's reasoning: `<main>` is only
+  // as tall as its content, so a short queue leaves the bottom half of the viewport dead and the
+  // gesture reads as broken rather than as absent.
   const swipeRef = useSwipeableTabs<Tab, HTMLElement>({
     order: TAB_ORDER,
     value: tab,
@@ -131,7 +134,7 @@ export function KnowledgeRequestInboxPage() {
     // every route, and painting `bg-app-bg` here would hide them — the same
     // choice the dashboard and PM dashboard make. Only the header band and the
     // cards carry their own surfaces.
-    <div className="min-h-screen">
+    <div ref={swipeRef} className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader
@@ -145,7 +148,7 @@ export function KnowledgeRequestInboxPage() {
         </div>
       </header>
 
-      <main ref={swipeRef} className="app-page-frame space-y-6 py-6 lg:py-8">
+      <main className="app-page-frame space-y-6 py-6 lg:py-8">
         {!projectsLoading && projects.length === 0 ? (
           <EmptyState
             icon={<FolderKanban className="h-8 w-8 text-app-text-disabled" />}
