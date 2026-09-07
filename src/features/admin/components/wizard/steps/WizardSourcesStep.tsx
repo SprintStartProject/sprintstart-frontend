@@ -1,12 +1,16 @@
 import { Plus } from "lucide-react";
 import { Button } from "../../../../../components/ui/Button";
 import { StagedSourceList } from "../../StagedSourceList";
+import type { SourceOwnerOption } from "../../../sourceOwners";
 import type { DraftSource } from "../../../projectSourcesDraft";
 
 type WizardSourcesStepProps = {
   sources: DraftSource[];
   disabled?: boolean;
   onRemove: (sourceId: string) => void;
+  /** The people staged on the Members step — who a repository can be handed to. */
+  ownerOptions?: readonly SourceOwnerOption[];
+  onOwnerChange?: (sourceId: string, ownerUserId: string) => void;
   onAddSource: () => void;
 };
 
@@ -20,6 +24,8 @@ export function WizardSourcesStep({
   sources,
   disabled = false,
   onRemove,
+  ownerOptions,
+  onOwnerChange,
   onAddSource,
 }: WizardSourcesStepProps) {
   return (
@@ -35,6 +41,8 @@ export function WizardSourcesStep({
         sources={sources}
         disabled={disabled}
         onRemove={onRemove}
+        ownerOptions={ownerOptions}
+        onOwnerChange={onOwnerChange}
         emptyMessage="No sources yet. Add a GitHub repo, Jira project, or files to start."
       />
 

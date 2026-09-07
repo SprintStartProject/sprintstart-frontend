@@ -60,6 +60,19 @@ export function Template(props: {
 
     document.documentElement.classList.remove("light", "dark");
     document.documentElement.classList.add(theme);
+
+    // The same two classes `ThemeProvider` puts on <html> in the app, read from the same key.
+    // There is no provider on this page, and `index.css` ships with it: its reduced-motion
+    // suppression is lifted by `.style-ultra`, so without this a user who had overruled their
+    // OS setting in Settings got the aurora's blobs on the login screen but frozen in place,
+    // with the cursor glow hidden outright.
+    const storedMode = localStorage.getItem("style-mode");
+    const isClassic =
+      storedMode === "classic" ||
+      (storedMode !== "ultra" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+    document.documentElement.classList.toggle("style-classic", isClassic);
+    document.documentElement.classList.toggle("style-ultra", !isClassic);
   }, []);
 
   useSetClassName({

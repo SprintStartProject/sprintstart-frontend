@@ -11,6 +11,17 @@ export type Theme = "light" | "dark" | "system";
 export type StyleMode = "ultra" | "classic";
 
 /**
+ * Bounds and default for the cursor-glow intensity setting.
+ *
+ * Beside the context type rather than in `ThemeProvider`: the settings slider
+ * and the `useTheme` fallback both need the numbers, and neither should have to
+ * import the provider module to get them.
+ */
+export const GLOW_INTENSITY_MIN = 10;
+export const GLOW_INTENSITY_MAX = 100;
+export const GLOW_INTENSITY_DEFAULT = 50;
+
+/**
  * Shape of the theme context.
  */
 export interface ThemeContextType {
@@ -34,6 +45,10 @@ export interface ThemeContextType {
   isAuroraEnabled: boolean;
   /** Enables or disables the aurora background effect (persisted to localStorage). */
   setIsAuroraEnabled: (enabled: boolean) => void;
+  /** Cursor-glow intensity of the aurora spotlight, 10–100 (percent). */
+  glowIntensity: number;
+  /** Sets the cursor-glow intensity, clamped to 10–100 and persisted to localStorage. */
+  setGlowIntensity: (value: number) => void;
   /** Whether the 3D tilt / spotlight hover effect on cards is enabled. */
   isTiltEnabled: boolean;
   /** Enables or disables the card tilt effect (persisted to localStorage). */

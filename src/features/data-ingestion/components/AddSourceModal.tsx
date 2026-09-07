@@ -1,9 +1,11 @@
 import { ArrowLeft, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { useToast } from "../../../context/useToast.ts";
+import { useFetch } from "../../../hooks/useFetch.ts";
+import { getTeamOverview } from "../../../services/teamManagementService.ts";
 import {
   addDraftSource,
   connectDraftSources,
@@ -12,8 +14,10 @@ import {
   createUploadDraft,
   hasFailedSources,
   removeDraftSource,
+  setDraftSourceOwner,
   type DraftSource,
 } from "../../admin/projectSourcesDraft.ts";
+import { sortOwnerOptions } from "../../admin/sourceOwners.ts";
 import { StagedSourceList } from "../../admin/components/StagedSourceList.tsx";
 import {
   AddSourceFlow,
@@ -36,6 +40,15 @@ type AddSourceModalProps = {
   canIngest: boolean;
   /** Human-readable reason shown when `canIngest` is false. */
   ingestBlockedReason?: string;
+  /**
+   * Whether this user may name the documentation owner of a repository as they stage it.
+   *
+   * Narrower than {@link AddSourceModalProps.canIngest}: component ownership is written by a
+   * PM/Admin-only endpoint, so HR can connect sources perfectly well and would be refused
+   * here alone. Decided by the page, which already holds the profile, rather than read from
+   * auth here — the modal has no other reason to know who is signed in.
+   */
+  canAssignOwners?: boolean;
   onClose: () => void;
   /** Called after a connect run so the page can refresh and start polling. */
   onConnected: () => void;
@@ -65,6 +78,7 @@ export function AddSourceModal({
   tokenNames,
   canIngest,
   ingestBlockedReason,
+  canAssignOwners: canAssignOwnersProp = false,
   onClose,
   onConnected,
 }: AddSourceModalProps) {
@@ -90,11 +104,42 @@ export function AddSourceModal({
   const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
   const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
 
+  // Naming an owner is part of connecting a source, so it follows `canIngest` on top of the
+  // role the page has already checked.
+  const canAssignOwners = canIngest && canAssignOwnersProp;
+
+  // The project's members, which is who a repository can be handed to. Not requested at all
+  // when the owner control is not going to be shown. `getTeamOverview` asks for a hard
+  // `size=100`, so a project past a hundred members would quietly lose the tail of the list —
+  // fine for now, and the reason to reach for a searchable picker when it stops being.
+  const { data: teamUsers } = useFetch(
+    () =>
+      canAssignOwners && projectId
+        ? getTeamOverview(undefined, undefined, [projectId])
+        : Promise.resolve([]),
+    [canAssignOwners, projectId],
+  );
+
+  const ownerOptions = useMemo(
+    () =>
+      sortOwnerOptions(
+        (teamUsers ?? []).map((user) => ({
+          value: user.userId,
+          label: `${user.firstname} ${user.lastname}`.trim() || user.userId,
+        })),
+      ),
+    [teamUsers],
+  );
+
   // The token list is owned here so an inline "add token" can refresh it and
   // auto-select the new token; it falls back to the prop until it has loaded so
   // discovery works on the first open without waiting for the refetch.
-  const { tokenNames: loadedTokenNames, tokensLoaded, loadTokenNames, addTokenNameLocally } =
-    useGithubTokens();
+  const {
+    tokenNames: loadedTokenNames,
+    tokensLoaded,
+    loadTokenNames,
+    addTokenNameLocally,
+  } = useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
   // Jira detail state.
@@ -518,6 +563,13 @@ export function AddSourceModal({
               sources={sources}
               disabled={isSubmitting}
               onRemove={(sourceId) => setSources((current) => removeDraftSource(current, sourceId))}
+              ownerOptions={canAssignOwners ? ownerOptions : undefined}
+              onOwnerChange={
+                canAssignOwners
+                  ? (sourceId, ownerUserId) =>
+                      setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
+                  : undefined
+              }
               emptyMessage="No sources yet. Add a GitHub repo, Jira instance, or files to start."
             />
 

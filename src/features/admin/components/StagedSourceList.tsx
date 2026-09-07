@@ -9,6 +9,8 @@ import {
   Ticket,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
+import { NO_OWNER_OPTION, type SourceOwnerOption } from "../sourceOwners";
 import type { DraftSource, DraftSourceStatus } from "../projectSourcesDraft";
 
 type StagedSourceListProps = {
@@ -22,6 +24,16 @@ type StagedSourceListProps = {
   onRemove?: (sourceId: string) => void;
   /** Omitted where retrying makes no sense, e.g. before anything ran. */
   onRetry?: (sourceId: string) => void;
+  /**
+   * The people a repository's documentation can be handed to — the project's members here,
+   * the staged ones in the create-project wizard. Just the people: "No owner" is prepended.
+   *
+   * Omitted (together with {@link StagedSourceListProps.onOwnerChange}) leaves the picker off
+   * entirely, which is what the provisioning screen wants — by then the assignment has either
+   * been made or has failed, and there is nothing left to choose.
+   */
+  ownerOptions?: readonly SourceOwnerOption[];
+  onOwnerChange?: (sourceId: string, ownerUserId: string) => void;
   /** Shown in place of the list when there are no staged sources. */
   emptyMessage?: string;
 };
@@ -96,6 +108,12 @@ function statusDescription(source: DraftSource): string {
     return "Already ingested, will be linked";
   }
 
+  // The connect worked and the ownership write did not; see `ownerAssignmentFailed`. Said on
+  // the row rather than in a toast because it is true of this repository and no other.
+  if (source.status === "connected" && source.ownerAssignmentFailed) {
+    return "Connected · the owner could not be assigned";
+  }
+
   return `${statusLabels[source.status]} · ${sourceDetail(source)}`;
 }
 
@@ -110,8 +128,13 @@ export function StagedSourceList({
   disabled = false,
   onRemove,
   onRetry,
+  ownerOptions,
+  onOwnerChange,
   emptyMessage,
 }: StagedSourceListProps) {
+  const canPickOwner = ownerOptions !== undefined && onOwnerChange !== undefined;
+  const ownerChoices = ownerOptions ? [NO_OWNER_OPTION, ...ownerOptions] : [];
+
   if (sources.length === 0) {
     if (!emptyMessage) return null;
 
@@ -148,7 +171,21 @@ export function StagedSourceList({
             </div>
           </div>
 
-          <div className="flex shrink-0 gap-2 sm:justify-end">
+          <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+            {/* Only while the source is still staged: once it has connected the assignment has
+                already been written, and a control that no longer changes anything is worse
+                than none. The owner is then changed from the knowledge-gaps page. */}
+            {canPickOwner && source.type === "GITHUB" && source.status !== "connected" && (
+              <FilterSelect
+                label={`Owner of ${source.owner}/${source.name}`}
+                value={source.ownerUserId ?? ""}
+                options={ownerChoices}
+                onChange={(ownerUserId) => onOwnerChange?.(source.id, ownerUserId)}
+                disabled={disabled}
+                className="w-44"
+              />
+            )}
+
             {source.status === "failed" && onRetry && (
               <Button
                 variant="secondary"

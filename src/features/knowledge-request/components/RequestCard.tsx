@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Clock, MessageSquareText } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { Button } from "../../../components/ui/Button";
 import type { EscalationHire, KnowledgeRequest } from "../types";
 import { formatWaiting, hasWaitedADay } from "../format";
 import { AnswerForm } from "./AnswerForm";
@@ -64,24 +65,24 @@ export function RequestCard({ request, onAnswer, onDismiss }: RequestCardProps) 
         />
       ) : (
         <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="rounded-lg bg-app-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover"
-          >
+          {/* The shared Button brings the focus ring, press motion and disabled
+              treatment these actions previously lacked. */}
+          <Button variant="primary" size="sm" onClick={() => setComposing(true)}>
             Answer
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={dismissing}
             onClick={() => {
               setDismissing(true);
-              void onDismiss(request.id).catch(() => setDismissing(false));
+              void onDismiss(request.id)
+                .then(() => setDismissing(false))
+                .catch(() => setDismissing(false));
             }}
-            disabled={dismissing}
-            className="rounded-lg px-3 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50"
           >
-            {dismissing ? "Dismissing…" : "Dismiss"}
-          </button>
+            Dismiss
+          </Button>
         </div>
       )}
     </li>

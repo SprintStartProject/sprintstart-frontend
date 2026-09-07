@@ -1,4 +1,5 @@
-export type KnowledgeTab = "ALL" | "UPLOADS" | "PR" | "ISSUES" | "FILES" | "COMMITS";
+export type KnowledgeTab =
+  "ALL" | "UPLOADS" | "PR" | "ISSUES" | "FILES" | "COMMITS" | "ORGANIZATIONS";
 
 /**
  * Left-to-right order of the artifact type tabs.
@@ -17,6 +18,7 @@ export const TABS: { id: KnowledgeTab; label: string }[] = [
   { id: "ISSUES", label: "Issues" },
   { id: "FILES", label: "Files" },
   { id: "COMMITS", label: "Commits" },
+  { id: "ORGANIZATIONS", label: "Organizations" },
 ];
 
 /**

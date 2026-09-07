@@ -1,11 +1,17 @@
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import type { StyleMode, Theme } from "./ThemeContext";
-import { ThemeContext } from "./ThemeContext";
+import {
+  GLOW_INTENSITY_DEFAULT,
+  GLOW_INTENSITY_MAX,
+  GLOW_INTENSITY_MIN,
+  ThemeContext,
+} from "./ThemeContext";
 
 const STORAGE_KEY = "theme";
 const STYLE_STORAGE_KEY = "style-mode";
 const AURORA_STORAGE_KEY = "sprintstart:aurora-enabled";
+const GLOW_INTENSITY_STORAGE_KEY = "sprintstart:glow-intensity";
 const TILT_STORAGE_KEY = "sprintstart:tilt-enabled";
 
 /**
@@ -78,17 +84,19 @@ function getInitialStyleMode(): StyleMode {
 }
 
 /**
- * Applies (or removes) the `.style-classic` class on `<html>` and persists the
+ * Applies the `.style-classic` / `.style-ultra` classes on `<html>` and persists the
  * preference. Persistence failures are warned and swallowed — the in-memory
  * mode still applies for the current session.
+ *
+ * Both classes are written, not just the one: `.style-classic` is what the flat-look overrides
+ * key off, while `.style-ultra` is what lifts the global reduced-motion suppression in
+ * `index.css`. That one has to be an opt-in marker rather than the absence of `.style-classic`
+ * so a surface with no provider on it — the Keycloak login theme — stays suppressed.
  */
 function applyStyleMode(mode: StyleMode) {
   const root = window.document.documentElement;
-  if (mode === "classic") {
-    root.classList.add("style-classic");
-  } else {
-    root.classList.remove("style-classic");
-  }
+  root.classList.toggle("style-classic", mode === "classic");
+  root.classList.toggle("style-ultra", mode === "ultra");
   try {
     window.localStorage.setItem(STYLE_STORAGE_KEY, mode);
   } catch (error) {
@@ -131,6 +139,25 @@ function getInitialTiltEnabled(): boolean {
 }
 
 /**
+ * Reads the user's stored cursor-glow intensity, clamped into 10–100.
+ * Anything missing or unparseable falls back to the default — a hand-edited
+ * localStorage value must not be able to break the effect.
+ */
+function getInitialGlowIntensity(): number {
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(GLOW_INTENSITY_STORAGE_KEY);
+  } catch {
+    // localStorage unavailable.
+  }
+  const parsed = Number.parseInt(stored ?? "", 10);
+  if (Number.isNaN(parsed)) {
+    return GLOW_INTENSITY_DEFAULT;
+  }
+  return Math.min(GLOW_INTENSITY_MAX, Math.max(GLOW_INTENSITY_MIN, parsed));
+}
+
+/**
  * Provider component that manages the application's visual theme.
  *
  * Supports an explicit 'system' preference that follows the OS
@@ -155,6 +182,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [isAuroraEnabled, setIsAuroraEnabledState] = useState<boolean>(() =>
     getInitialAuroraEnabled(),
   );
+  const [glowIntensity, setGlowIntensityState] = useState<number>(() => getInitialGlowIntensity());
   const [isTiltEnabled, setIsTiltEnabledState] = useState<boolean>(() => getInitialTiltEnabled());
 
   // Sync before paint to avoid a FOUC of the default light palette.
@@ -185,7 +213,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     const handleChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
-        setStyleModeState("classic");
+        // The stored value is checked on the way in as well as on the way out. Without it an
+        // explicit "Turn animations on" was undone by the OS setting going off and on again,
+        // which is the one gesture that is supposed to outrank it.
+        try {
+          const stored = window.localStorage.getItem(STYLE_STORAGE_KEY);
+          if (stored !== "ultra") {
+            setStyleModeState("classic");
+          }
+        } catch {
+          // localStorage unavailable — no opt-in could have been stored, so honour the OS.
+          setStyleModeState("classic");
+        }
       } else {
         // Only revert to ultra if the user hasn't explicitly toggled.
         try {
@@ -240,6 +279,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setGlowIntensity = (value: number) => {
+    const clamped = Math.min(GLOW_INTENSITY_MAX, Math.max(GLOW_INTENSITY_MIN, value));
+    setGlowIntensityState(clamped);
+    try {
+      window.localStorage.setItem(GLOW_INTENSITY_STORAGE_KEY, String(clamped));
+    } catch {
+      // localStorage unavailable.
+    }
+  };
+
   const setIsTiltEnabled = (enabled: boolean) => {
     setIsTiltEnabledState(enabled);
     try {
@@ -262,6 +311,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         isClassicMode,
         isAuroraEnabled,
         setIsAuroraEnabled,
+        glowIntensity,
+        setGlowIntensity,
         isTiltEnabled,
         setIsTiltEnabled,
       }}
