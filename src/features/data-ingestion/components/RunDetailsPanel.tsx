@@ -14,7 +14,7 @@ import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer"
 import { DrawerCard } from "../../admin/components/DrawerCard";
 import {
   formatDateTime,
-  formatJiraInstanceDomain,
+  formatInstanceDomain,
   formatNumber,
   getAiSyncStatusLabel,
   getRunStatusLabel,
@@ -181,12 +181,16 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
  */
 function buildOriginRow(run: IngestionRun): { label: string; value: string } | null {
   if (run.sourceSystem === "JIRA") {
-    return run.sourceId ? { label: "Domain", value: formatJiraInstanceDomain(run.sourceId) } : null;
+    return run.sourceId ? { label: "Domain", value: formatInstanceDomain(run.sourceId) } : null;
   }
 
   if (run.sourceSystem === "GITHUB") {
     const owner = run.owner ?? run.sourceId?.split("/")[0] ?? null;
     return owner ? { label: "Owner", value: owner } : null;
+  }
+
+  if (run.sourceSystem === "CONFLUENCE") {
+    return run.sourceId ? { label: "Space", value: run.sourceId } : null;
   }
 
   return null;

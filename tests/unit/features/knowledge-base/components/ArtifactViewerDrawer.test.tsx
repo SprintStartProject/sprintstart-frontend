@@ -315,6 +315,50 @@ describe("ArtifactViewerDrawer", () => {
       expect(await screen.findByText("Bug Report")).toBeInTheDocument();
     });
 
+    it("renders Confluence page artifacts as markdown even with text/plain mime type", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Meeting Notes\n- Attendees\n- Goals",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Vorlage: Besprechungsnotizen",
+          artifactType: "PAGE",
+          sourceSystem: "CONFLUENCE",
+          sourceUrl: "https://company.atlassian.net/wiki/spaces/SPACE/pages/123",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Meeting Notes")).toBeInTheDocument();
+    });
+
+    it("does not render a PAGE artifact from a non-Confluence source as markdown", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Should NOT be markdown",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Some Page",
+          artifactType: "PAGE",
+          sourceSystem: "GITHUB", // not CONFLUENCE, not a /wiki/spaces/ URL
+          sourceUrl: "https://github.com/org/repo/blob/main/page.txt",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      // Should be rendered in the syntax highlighter, not in the .prose markdown container.
+      expect(rawContent.querySelector(".prose")).not.toBeInTheDocument();
+    });
+
     it("gracefully handles KaTeX math parse errors without breaking the drawer", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
@@ -391,6 +435,31 @@ describe("ArtifactViewerDrawer", () => {
           title: "PR #42: Add feature",
           artifactType: "PULL_REQUEST",
           sourceUrl: "https://github.com/org/repo/pull/42",
+        }),
+      );
+
+      const sourceBtn = await screen.findByTestId("view-source-btn");
+      await userEvent.click(sourceBtn);
+
+      const rawContent = await screen.findByTestId("raw-content");
+      const codeElement = rawContent.querySelector("code[class*='language-markdown']");
+      expect(codeElement).toBeInTheDocument();
+    });
+
+    it("uses markdown language when switching to source mode for Confluence page artifacts", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Meeting Notes",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Meeting Notes",
+          artifactType: "PAGE",
+          sourceSystem: "CONFLUENCE",
+          sourceUrl: "https://company.atlassian.net/wiki/spaces/SPACE/pages/123",
         }),
       );
 

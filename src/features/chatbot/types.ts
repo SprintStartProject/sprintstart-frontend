@@ -148,6 +148,6 @@ export type StreamHandlers = {
   onError?: (message: string) => void;
 };
 
-export const SOURCE_SYSTEMS = ["GITHUB", "UPLOAD", "JIRA"] as const;
+export const SOURCE_SYSTEMS = ["GITHUB", "UPLOAD", "JIRA", "CONFLUENCE"] as const;
 
 export type SourceSystem = (typeof SOURCE_SYSTEMS)[number];

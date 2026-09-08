@@ -9,10 +9,12 @@ import { getTeamOverview } from "../../../services/teamManagementService.ts";
 import {
   addDraftSource,
   connectDraftSources,
+  createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
   createUploadDraft,
   hasFailedSources,
+  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
@@ -26,11 +28,11 @@ import {
   type AddSourceStep,
 } from "../../admin/components/wizard/sources/AddSourceFlow.tsx";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens.ts";
-import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials.ts";
+import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -147,10 +149,18 @@ export function AddSourceModal({
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
 
+  // Confluence detail state.
+  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
+  const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
+  const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
+
   // Upload detail state — files staged in memory until the list is connected.
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
+  const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
+  // Jira and Confluence share the same Atlassian credential store, so one
+  // instance of the hook backs both detail screens' pickers.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
@@ -158,7 +168,7 @@ export function AddSourceModal({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useJiraCredentials(isJiraDetail);
+  } = useAtlassianCredentials(isJiraDetail || isConfluenceDetail);
 
   // Adopt the first token as soon as the list arrives (and heal a stale
   // selection) so discovery is usable on the first open.
@@ -172,13 +182,19 @@ export function AddSourceModal({
     });
   }, [effectiveTokenNames]);
 
-  // Adopt the first stored Jira credential once the list arrives, keeping a
-  // still-valid choice.
+  // Adopt the first stored Atlassian credential once the list arrives, keeping
+  // a still-valid choice — shared by the Jira and Confluence pickers.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
     void Promise.resolve().then(() => {
       setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+      setConfluenceCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
         return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
@@ -193,6 +209,9 @@ export function AddSourceModal({
     setJiraUrl("");
     setJiraCredentialName("");
     setUploadFiles([]);
+    setConfluenceBaseUrl("");
+    setConfluenceSpaceId("");
+    setConfluenceCredentialName("");
   };
 
   // --- Add-source sub-flow ---
@@ -229,14 +248,24 @@ export function AddSourceModal({
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
     addCredentialLocally(credential);
     setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();
   };
 
+  const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
+    addCredentialLocally(credential);
+    setConfluenceCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
+  );
+
+  const selectedConfluenceCredential = jiraCredentials.find(
+    (credential) => credential.displayName === confluenceCredentialName,
   );
 
   const canAddSource =
@@ -246,11 +275,17 @@ export function AddSourceModal({
         ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
         : addType === "UPLOAD"
           ? uploadFiles.length > 0
-          : false;
+          : addType === "CONFLUENCE"
+            ? Boolean(
+                confluenceBaseUrl.trim() &&
+                isValidConfluenceSpaceId(confluenceSpaceId) &&
+                selectedConfluenceCredential,
+              )
+            : false;
 
   /**
    * The draft(s) captured on the current detail screen — several at once for the
-   * GitHub multi-select, one for Jira/Upload. Empty when the detail isn't
+   * GitHub multi-select, one for Jira/Upload/Confluence. Empty when the detail isn't
    * complete enough to stage.
    */
   const buildDetailDrafts = (): DraftSource[] => {
@@ -276,6 +311,16 @@ export function AddSourceModal({
     if (addType === "UPLOAD") {
       const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
       return [createUploadDraft(displayName, uploadFiles)];
+    }
+
+    if (addType === "CONFLUENCE" && selectedConfluenceCredential) {
+      return [
+        createConfluenceDraft({
+          baseUrl: confluenceBaseUrl.trim(),
+          spaceId: confluenceSpaceId.trim(),
+          credentialName: selectedConfluenceCredential.displayName,
+        }),
+      ];
     }
 
     return [];
@@ -545,6 +590,21 @@ export function AddSourceModal({
                 onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
                 onRemoveFile: (index) =>
                   setUploadFiles((current) => current.filter((_, position) => position !== index)),
+              }}
+              confluence={{
+                baseUrl: confluenceBaseUrl,
+                spaceId: confluenceSpaceId,
+                credentialName: confluenceCredentialName,
+                credentials: jiraCredentials,
+                credentialsLoaded: jiraCredentialsLoaded,
+                credentialsLoading: jiraCredentialsLoading,
+                credentialsError: jiraCredentialsError,
+                defaultUserEmail: null,
+                onBaseUrlChange: setConfluenceBaseUrl,
+                onSpaceIdChange: setConfluenceSpaceId,
+                onCredentialNameChange: setConfluenceCredentialName,
+                onSubmit: commitAddSource,
+                onCredentialSaved: handleConfluenceCredentialSaved,
               }}
             />
           </div>

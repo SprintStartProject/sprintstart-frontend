@@ -30,12 +30,21 @@ vi.mock("../../../../../src/services/ingestionService", () => ({
 
 vi.mock("../../../../../src/services/sources/jiraService", () => ({
   connectJiraInstance: vi.fn(),
-  getMyJiraCredentials: vi.fn(),
-  addJiraCredential: vi.fn(),
+}));
+
+vi.mock("../../../../../src/services/sources/atlassianService", () => ({
+  getMyAtlassianCredentials: vi.fn(),
+  addAtlassianCredential: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: { uploadDocuments: vi.fn() },
+}));
+
+vi.mock("../../../../../src/services/sources/confluenceService", () => ({
+  confluenceService: {
+    createConnection: vi.fn(),
+  },
 }));
 
 import { projectService } from "../../../../../src/services/projectService";
@@ -46,11 +55,12 @@ import {
   discoverRepositories,
   getGithubPatNames,
 } from "../../../../../src/services/sources/githubService";
+import { connectJiraInstance } from "../../../../../src/services/sources/jiraService";
 import {
-  addJiraCredential,
-  connectJiraInstance,
-  getMyJiraCredentials,
-} from "../../../../../src/services/sources/jiraService";
+  addAtlassianCredential,
+  getMyAtlassianCredentials,
+} from "../../../../../src/services/sources/atlassianService";
+import { confluenceService } from "../../../../../src/services/sources/confluenceService";
 import { knowledgeService } from "../../../../../src/services/knowledgeService";
 import { getIngestionSourceStatuses } from "../../../../../src/services/ingestionService";
 
@@ -189,15 +199,31 @@ describe("CreateProjectWizard", () => {
     vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
     vi.mocked(getGithubPatNames).mockResolvedValue(["team-pat"]);
     vi.mocked(addGithubPat).mockResolvedValue(undefined);
-    vi.mocked(addJiraCredential).mockResolvedValue(undefined);
+    vi.mocked(addAtlassianCredential).mockResolvedValue(undefined);
     vi.mocked(projectService.assignUsersToProject).mockResolvedValue([]);
     vi.mocked(connectJiraInstance).mockResolvedValue(undefined);
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([
       { userEmail: "me@example.com", displayName: "Team token" },
     ]);
     vi.mocked(knowledgeService.uploadDocuments).mockResolvedValue([
       { filename: "spec.md", status: "success" },
     ]);
+    vi.mocked(confluenceService.createConnection).mockResolvedValue({
+      id: "conn-1",
+      projectId: "proj-new",
+      baseUrl: "https://acme.atlassian.net/wiki",
+      spaceId: "123456",
+      spaceKey: "DOCS",
+      spaceName: "Docs",
+      credentialName: "Team token",
+      pageAllowlist: [],
+      pageDenylist: [],
+      credentialsConfigured: true,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      version: 1,
+      sourceEnabled: true,
+    });
   });
 
   /** From the sources step, stage a Jira board through the add-source sub-flow. */
@@ -211,6 +237,24 @@ describe("CreateProjectWizard", () => {
 
     await user.type(screen.getByLabelText("Display name"), "Team board");
     await user.type(screen.getByLabelText("Instance URL"), "https://acme.atlassian.net");
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+  }
+
+  /** From the sources step, stage a Confluence space through the add-source sub-flow. */
+  async function stageConfluenceSpace(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(
+      screen.getByRole("button", { name: /indexes pages, hierarchical documents/i }),
+    );
+
+    // The stored credential is shared with Jira and adopted automatically.
+    await screen.findByText(/Team token - me@example.com/i);
+
+    await user.type(
+      screen.getByLabelText("Confluence base URL"),
+      "https://acme.atlassian.net/wiki",
+    );
+    await user.type(screen.getByLabelText("Space ID"), "123456");
     await user.click(screen.getByRole("button", { name: /add to list/i }));
   }
 
@@ -535,6 +579,85 @@ describe("CreateProjectWizard", () => {
     );
   });
 
+  it("stages a Confluence space and connects it against the new project on Create", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageConfluenceSpace(user);
+
+    // Back on the sources list, the space is staged under its space ID (the
+    // draft has no readable name yet — that only exists after the backend
+    // resolves the connection).
+    expect(screen.getByText("Confluence Space 123456")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(confluenceService.createConnection)).toHaveBeenCalledWith("proj-new", {
+        baseUrl: "https://acme.atlassian.net/wiki",
+        spaceId: "123456",
+        credentialName: "Team token",
+        pageAllowlist: [],
+        pageDenylist: [],
+      }),
+    );
+  });
+
+  it("refuses to stage a Confluence space key, which is not the numeric space ID", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(
+      screen.getByRole("button", { name: /indexes pages, hierarchical documents/i }),
+    );
+    await screen.findByText(/Team token - me@example.com/i);
+
+    await user.type(
+      screen.getByLabelText("Confluence base URL"),
+      "https://acme.atlassian.net/wiki",
+    );
+    // "DOCS" is what Confluence's own UI shows, so it is the obvious thing to
+    // paste — and the backend would only reject it at provisioning time.
+    await user.type(screen.getByLabelText("Space ID"), "DOCS");
+
+    expect(screen.getByRole("button", { name: /add to list/i })).toBeDisabled();
+  });
+
+  it("adds an Atlassian credential inline while staging a Confluence space and selects the new one", async () => {
+    vi.mocked(getMyAtlassianCredentials)
+      .mockResolvedValueOnce([]) // initial load: none stored
+      .mockResolvedValue([{ userEmail: "new@example.com", displayName: "Fresh cred" }]);
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(
+      screen.getByRole("button", { name: /indexes pages, hierarchical documents/i }),
+    );
+
+    await user.click(screen.getByRole("button", { name: /add atlassian credential/i }));
+    await user.type(screen.getByTestId("settings-atlassian-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-atlassian-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-atlassian-add-token"), "confluence-token");
+    await user.click(screen.getByTestId("settings-atlassian-add-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addAtlassianCredential)).toHaveBeenCalledWith({
+        userEmail: "new@example.com",
+        tokenName: "Fresh cred",
+        authToken: "confluence-token",
+      }),
+    );
+    // The refreshed credential is adopted and shown as the picker's label.
+    await screen.findByText(/Fresh cred - new@example.com/i);
+    expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
+  });
+
   it("stages uploaded files and uploads them against the new project on Create", async () => {
     const user = userEvent.setup();
     renderWizard();
@@ -587,7 +710,7 @@ describe("CreateProjectWizard", () => {
   });
 
   it("adds a Jira credential inline and selects the new one", async () => {
-    vi.mocked(getMyJiraCredentials)
+    vi.mocked(getMyAtlassianCredentials)
       .mockResolvedValueOnce([]) // initial load: none stored
       .mockResolvedValue([{ userEmail: "new@example.com", displayName: "Fresh cred" }]);
     const user = userEvent.setup();
@@ -597,14 +720,14 @@ describe("CreateProjectWizard", () => {
     await user.click(screen.getByRole("button", { name: /add source/i }));
     await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
 
-    await user.click(screen.getByRole("button", { name: /add jira credential/i }));
-    await user.type(screen.getByTestId("settings-jira-add-email"), "new@example.com");
-    await user.type(screen.getByTestId("settings-jira-add-name"), "Fresh cred");
-    await user.type(screen.getByTestId("settings-jira-add-token"), "jira-token");
-    await user.click(screen.getByTestId("settings-jira-add-submit"));
+    await user.click(screen.getByRole("button", { name: /add atlassian credential/i }));
+    await user.type(screen.getByTestId("settings-atlassian-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-atlassian-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-atlassian-add-token"), "jira-token");
+    await user.click(screen.getByTestId("settings-atlassian-add-submit"));
 
     await waitFor(() =>
-      expect(vi.mocked(addJiraCredential)).toHaveBeenCalledWith({
+      expect(vi.mocked(addAtlassianCredential)).toHaveBeenCalledWith({
         userEmail: "new@example.com",
         tokenName: "Fresh cred",
         authToken: "jira-token",
@@ -651,11 +774,11 @@ describe("CreateProjectWizard", () => {
 
   it("keeps the new Jira credential visible and selected when the post-add refetch fails", async () => {
     let added = false;
-    vi.mocked(addJiraCredential).mockImplementation(() => {
+    vi.mocked(addAtlassianCredential).mockImplementation(() => {
       added = true;
       return Promise.resolve();
     });
-    vi.mocked(getMyJiraCredentials).mockImplementation(() =>
+    vi.mocked(getMyAtlassianCredentials).mockImplementation(() =>
       added ? Promise.reject(new Error("Network error")) : Promise.resolve([]),
     );
     const user = userEvent.setup();
@@ -665,16 +788,16 @@ describe("CreateProjectWizard", () => {
     await user.click(screen.getByRole("button", { name: /add source/i }));
     await user.click(screen.getByRole("button", { name: /indexes jira issues/i }));
 
-    await user.click(screen.getByRole("button", { name: /add jira credential/i }));
-    await user.type(screen.getByTestId("settings-jira-add-email"), "new@example.com");
-    await user.type(screen.getByTestId("settings-jira-add-name"), "Fresh cred");
-    await user.type(screen.getByTestId("settings-jira-add-token"), "jira-token");
-    await user.click(screen.getByTestId("settings-jira-add-submit"));
+    await user.click(screen.getByRole("button", { name: /add atlassian credential/i }));
+    await user.type(screen.getByTestId("settings-atlassian-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-atlassian-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-atlassian-add-token"), "jira-token");
+    await user.click(screen.getByTestId("settings-atlassian-add-submit"));
 
-    await waitFor(() => expect(vi.mocked(addJiraCredential)).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(vi.mocked(addAtlassianCredential)).toHaveBeenCalledTimes(1));
     await screen.findByText(/Fresh cred - new@example.com/i);
     expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
-    expect(vi.mocked(addJiraCredential)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(addAtlassianCredential)).toHaveBeenCalledTimes(1);
   });
 
   it("does not create the project when cancelled on the first step", async () => {

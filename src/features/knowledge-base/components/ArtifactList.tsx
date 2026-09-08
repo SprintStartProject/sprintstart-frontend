@@ -1,12 +1,13 @@
 import { memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  FileText,
-  FileCode,
-  CircleDot,
-  GitPullRequest,
+  BookOpen,
   Building2,
   ChevronRight,
+  CircleDot,
+  FileCode,
+  FileText,
+  GitPullRequest,
 } from "lucide-react";
 import type { Artifact, ArtifactType } from "../types";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
@@ -31,6 +32,8 @@ const getIcon = (type: ArtifactType) => {
       return <CircleDot className="h-5 w-5 text-app-warning-text" />;
     case "PULL_REQUEST":
       return <GitPullRequest className="h-5 w-5 text-app-success-text" />;
+    case "PAGE":
+      return <BookOpen className="h-5 w-5 text-app-brand" />;
     case "ORG_METADATA":
       // Neutral like COMMIT so it never reads as a status; organizations are
       // a distinct shape, not a success/warning condition.

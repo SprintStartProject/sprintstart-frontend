@@ -3,6 +3,7 @@ import {
   connectGithubRepository,
 } from "../../services/sources/githubService";
 import { connectJiraInstance } from "../../services/sources/jiraService";
+import { confluenceService } from "../../services/sources/confluenceService";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
 import { knowledgeService } from "../../services/knowledgeService";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
@@ -15,16 +16,16 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
  * outcome so a partial failure can be shown and retried per source instead of
  * failing the whole batch.
  *
- * A source can be one of three kinds — a GitHub repository, a Jira instance, or
- * an in-memory file upload — modelled as a discriminated union on `type` so a
- * single list can hold a mix of all three. Nothing here touches the backend
- * until {@link connectDraftSources} runs during provisioning; uploads in
- * particular hold their `File[]` in memory until then.
+ * A source can be one of four kinds — a GitHub repository, a Jira instance,
+ * an in-memory file upload, or a Confluence space — modelled as a discriminated
+ * union on `type` so a single list can hold a mix of all four. Nothing here
+ * touches the backend until {@link connectDraftSources} runs during
+ * provisioning; uploads in particular hold their `File[]` in memory until then.
  */
 
 export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
-export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD";
+export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
 
 /** Fields every staged source carries regardless of its type. */
 type DraftSourceBase = {
@@ -91,7 +92,17 @@ export type UploadDraftSource = DraftSourceBase & {
   files: File[];
 };
 
-export type DraftSource = GithubDraftSource | JiraDraftSource | UploadDraftSource;
+export type ConfluenceDraftSource = DraftSourceBase & {
+  type: "CONFLUENCE";
+  displayName: string;
+  baseUrl: string;
+  spaceId: string;
+  /** Name of a stored Atlassian credential, shared with the Jira connector. */
+  credentialName: string;
+};
+
+export type DraftSource =
+  GithubDraftSource | JiraDraftSource | UploadDraftSource | ConfluenceDraftSource;
 
 let draftSourceCounter = 0;
 
@@ -169,6 +180,35 @@ export function createUploadDraft(displayName: string, files: File[]): UploadDra
 }
 
 /**
+ * Whether a Confluence space ID is well-formed. Only the numeric space ID is
+ * accepted, so the space *key* ("ENG") — the value actually visible in
+ * Confluence's own UI, and the obvious thing to paste — has to be caught while
+ * the source is being staged rather than at provisioning time.
+ */
+export function isValidConfluenceSpaceId(spaceId: string): boolean {
+  return /^\d+$/.test(spaceId.trim());
+}
+
+export function createConfluenceDraft(params: {
+  displayName?: string;
+  baseUrl: string;
+  spaceId: string;
+  credentialName: string;
+}): ConfluenceDraftSource {
+  return {
+    id: nextDraftSourceId(),
+    type: "CONFLUENCE",
+    displayName: params.displayName || `Confluence Space ${params.spaceId}`,
+    baseUrl: params.baseUrl,
+    spaceId: params.spaceId,
+    credentialName: params.credentialName,
+    status: "pending",
+    errorMessage: "",
+    ownerAssignmentFailed: false,
+  };
+}
+
+/**
  * Whether two drafts point at the same underlying source, used to dedupe on
  * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL; two
  * uploads are always distinct (the same file can legitimately be staged twice).
@@ -186,6 +226,13 @@ export function isSameSource(left: DraftSource, right: DraftSource): boolean {
 
   if (left.type === "JIRA" && right.type === "JIRA") {
     return left.url.trim().toLowerCase() === right.url.trim().toLowerCase();
+  }
+
+  if (left.type === "CONFLUENCE" && right.type === "CONFLUENCE") {
+    return (
+      left.baseUrl.trim().toLowerCase() === right.baseUrl.trim().toLowerCase() &&
+      left.spaceId.trim().toLowerCase() === right.spaceId.trim().toLowerCase()
+    );
   }
 
   return false;
@@ -306,6 +353,22 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       userEmail: source.userEmail,
       tokenName: source.tokenName,
       projectId,
+    });
+
+    return false;
+  }
+
+  if (source.type === "CONFLUENCE") {
+    // No error remapping here: a failed connect comes back with a precise
+    // message ("Confluence space 123 was not found", "Atlassian credential 'x'
+    // was not found"), and 404 covers both cases — the backend's own message is
+    // more useful than anything this layer could guess from the status alone.
+    await confluenceService.createConnection(projectId, {
+      baseUrl: source.baseUrl,
+      spaceId: source.spaceId,
+      credentialName: source.credentialName,
+      pageAllowlist: [],
+      pageDenylist: [],
     });
 
     return false;

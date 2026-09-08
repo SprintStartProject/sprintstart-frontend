@@ -43,7 +43,7 @@ export function WizardSourcesStep({
         onRemove={onRemove}
         ownerOptions={ownerOptions}
         onOwnerChange={onOwnerChange}
-        emptyMessage="No sources yet. Add a GitHub repo, Jira project, or files to start."
+        emptyMessage="No sources yet. Add a GitHub repo, Jira project, Confluence space, or files to start."
       />
 
       <Button

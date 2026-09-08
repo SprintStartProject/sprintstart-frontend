@@ -1,50 +1,49 @@
 import { AlertTriangle } from "lucide-react";
-
 import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
 
 /**
- * Jira connect form for an instance URL and a credential owned by the
- * authenticated user. The selected credential supplies its Jira account email.
+ * Controlled Confluence connect form for a base URL, space ID, and a stored
+ * Atlassian credential.
  *
  * Shared between the Data Ingestion "Add source" wizard and the project-creation
- * wizard so the Jira connect experience is identical in both places.
+ * wizard so the Confluence connect experience is identical in both places.
  */
-export function JiraConnectStep({
-  displayName,
-  url,
+export function ConfluenceConnectStep({
+  baseUrl,
+  spaceId,
   credentialName,
   credentials,
   credentialsLoaded,
   credentialsLoading,
   credentialsError,
-  isBusy,
-  canIngest,
+  isBusy = false,
+  canIngest = true,
   ingestBlockedReason,
   errorMessage,
-  onDisplayNameChange,
-  onUrlChange,
+  onBaseUrlChange,
+  onSpaceIdChange,
   onCredentialNameChange,
   onSubmit,
   suppressMissingCredentialNotice = false,
 }: {
-  displayName: string;
-  url: string;
+  baseUrl: string;
+  spaceId: string;
   credentialName: string;
   credentials: AtlassianCredentialDto[];
   credentialsLoaded: boolean;
   credentialsLoading: boolean;
   credentialsError: string | null;
-  isBusy: boolean;
-  canIngest: boolean;
+  isBusy?: boolean;
+  canIngest?: boolean;
   ingestBlockedReason?: string;
-  errorMessage: string | null;
-  onDisplayNameChange: (value: string) => void;
-  onUrlChange: (value: string) => void;
+  errorMessage?: string | null;
+  onBaseUrlChange: (value: string) => void;
+  onSpaceIdChange: (value: string) => void;
   onCredentialNameChange: (value: string) => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   /**
    * Hides the built-in "no stored credential" banner. Set when the parent shows
    * its own missing-credential hint (e.g. the wizard's compact notice next to
@@ -58,10 +57,10 @@ export function JiraConnectStep({
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit();
+        onSubmit?.();
       }}
     >
       {!canIngest && (
@@ -72,26 +71,37 @@ export function JiraConnectStep({
 
       {showNoCredentials && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-          No Jira credentials are stored for your account. Add one under Settings, Access Tokens,
-          Atlassian first, then come back to connect.
+          No Atlassian credentials are stored for your account. Add one under Settings, Access
+          Tokens, Atlassian first, then come back to connect.
         </div>
       )}
-      <Field label="Display name" controlId="jira-display-name" disabled={isBusy}>
+
+      <Field label="Confluence base URL" controlId="confluence-base-url" disabled={isBusy}>
         <Input
-          data-testid="jira-display-name"
-          value={displayName}
-          onChange={(event) => onDisplayNameChange(event.target.value)}
-          placeholder="e.g. Team board"
+          data-testid="confluence-base-url"
+          type="url"
+          value={baseUrl}
+          onChange={(event) => onBaseUrlChange(event.target.value)}
+          placeholder="https://your-domain.atlassian.net"
+          required
         />
       </Field>
 
-      <Field label="Instance URL" controlId="jira-instance-url" disabled={isBusy}>
+      <Field
+        label="Space ID"
+        controlId="confluence-space-id"
+        disabled={isBusy}
+        hint="Numeric ID of the space in Confluence Cloud."
+      >
         <Input
-          data-testid="jira-instance-url"
-          type="url"
-          value={url}
-          onChange={(event) => onUrlChange(event.target.value)}
-          placeholder="https://your-domain.atlassian.net"
+          data-testid="confluence-space-id"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]+"
+          value={spaceId}
+          onChange={(event) => onSpaceIdChange(event.target.value)}
+          placeholder="e.g. 123456"
+          required
         />
       </Field>
 
@@ -117,10 +127,7 @@ export function JiraConnectStep({
           disabled={isBusy || !hasCredentials}
         />
       </div>
-      <p className="text-xs text-app-text-subtle">
-        Jira account emails are stored with each credential. Manage them under Settings, Access
-        Tokens, Atlassian.
-      </p>
+
       {credentialsError && (
         <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

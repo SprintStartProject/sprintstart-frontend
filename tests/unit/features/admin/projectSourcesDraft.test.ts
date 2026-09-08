@@ -9,6 +9,7 @@ import {
   createUploadDraft,
   hasFailedSources,
   isSameSource,
+  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
@@ -127,6 +128,20 @@ describe("createJiraDraft / createUploadDraft", () => {
     expect(draft.status).toBe("pending");
     expect(draft.displayName).toBe("Docs");
     expect(draft.files).toBe(files);
+  });
+});
+
+describe("isValidConfluenceSpaceId", () => {
+  it("accepts a numeric space id, ignoring surrounding whitespace", () => {
+    expect(isValidConfluenceSpaceId("123456")).toBe(true);
+    expect(isValidConfluenceSpaceId("  123456 ")).toBe(true);
+  });
+
+  it("rejects a space key and anything else non-numeric", () => {
+    expect(isValidConfluenceSpaceId("ENG")).toBe(false);
+    expect(isValidConfluenceSpaceId("")).toBe(false);
+    expect(isValidConfluenceSpaceId("12a")).toBe(false);
+    expect(isValidConfluenceSpaceId("~123456")).toBe(false);
   });
 });
 

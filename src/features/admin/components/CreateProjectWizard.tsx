@@ -13,10 +13,12 @@ import {
 import {
   addDraftSource,
   connectDraftSources,
+  createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
   createUploadDraft,
   hasFailedSources,
+  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
@@ -24,8 +26,8 @@ import {
 import { sortOwnerOptions } from "../sourceOwners";
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
-import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
+import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -72,8 +74,8 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   review: 3,
 };
 
-// All three connectors can now be staged from the add-source sub-flow.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD"];
+// All four connectors can now be staged from the add-source sub-flow.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -141,6 +143,10 @@ export function CreateProjectWizard({
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
 
+  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
+  const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
+  const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
+
   // Upload files staged in memory; uploaded during provisioning once a project
   // id exists.
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -181,6 +187,9 @@ export function CreateProjectWizard({
   };
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
+  const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
+  // Jira and Confluence share the same Atlassian credential store, so one
+  // instance of the hook backs both detail screens' pickers.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
@@ -188,7 +197,7 @@ export function CreateProjectWizard({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useJiraCredentials(isOpen && isJiraDetail);
+  } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail));
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -202,13 +211,21 @@ export function CreateProjectWizard({
     });
   }, [effectiveTokenNames]);
 
-  // Same adoption pattern for the Jira credential picker: select the first
-  // stored credential once the list arrives, keeping a still-valid choice.
+  // Same adoption pattern for the Jira and Confluence credential pickers:
+  // select the first stored credential once the list arrives, keeping a
+  // still-valid choice. Both fields share the list, so a credential just added
+  // from either detail screen is adopted here too.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
     void Promise.resolve().then(() => {
       setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+      setConfluenceCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
         return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
@@ -240,6 +257,12 @@ export function CreateProjectWizard({
     void Promise.resolve().then(loadManagerCandidates);
   }, [isOpen, loadManagerCandidates]);
 
+  const resetConfluenceDraftFields = () => {
+    setConfluenceBaseUrl("");
+    setConfluenceSpaceId("");
+    setConfluenceCredentialName("");
+  };
+
   const resetWizard = () => {
     setPhase("details");
     setName("");
@@ -255,6 +278,7 @@ export function CreateProjectWizard({
     setAddType("GITHUB");
     setGithubSelection([]);
     resetJiraDraftFields();
+    resetConfluenceDraftFields();
     setUploadFiles([]);
     setCreatedProjectId("");
   };
@@ -268,6 +292,7 @@ export function CreateProjectWizard({
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
     resetJiraDraftFields();
+    resetConfluenceDraftFields();
     setUploadFiles([]);
   };
 
@@ -397,14 +422,24 @@ export function CreateProjectWizard({
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
     addCredentialLocally(credential);
     setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();
   };
 
+  const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
+    addCredentialLocally(credential);
+    setConfluenceCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
+  );
+
+  const selectedConfluenceCredential = jiraCredentials.find(
+    (credential) => credential.displayName === confluenceCredentialName,
   );
 
   const canAddSource =
@@ -414,7 +449,13 @@ export function CreateProjectWizard({
         ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
         : addType === "UPLOAD"
           ? uploadFiles.length > 0
-          : false;
+          : addType === "CONFLUENCE"
+            ? Boolean(
+                confluenceBaseUrl.trim() &&
+                isValidConfluenceSpaceId(confluenceSpaceId) &&
+                selectedConfluenceCredential,
+              )
+            : false;
 
   const commitAddSource = () => {
     if (!canAddSource) return;
@@ -442,6 +483,17 @@ export function CreateProjectWizard({
     } else if (addType === "UPLOAD") {
       const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
       setSources((current) => addDraftSource(current, createUploadDraft(displayName, uploadFiles)));
+    } else if (addType === "CONFLUENCE" && selectedConfluenceCredential) {
+      setSources((current) =>
+        addDraftSource(
+          current,
+          createConfluenceDraft({
+            baseUrl: confluenceBaseUrl.trim(),
+            spaceId: confluenceSpaceId.trim(),
+            credentialName: selectedConfluenceCredential.displayName,
+          }),
+        ),
+      );
     }
 
     closeAddSource();
@@ -803,6 +855,21 @@ export function CreateProjectWizard({
                     setUploadFiles((current) =>
                       current.filter((_, position) => position !== index),
                     ),
+                }}
+                confluence={{
+                  baseUrl: confluenceBaseUrl,
+                  spaceId: confluenceSpaceId,
+                  credentialName: confluenceCredentialName,
+                  credentials: jiraCredentials,
+                  credentialsLoaded: jiraCredentialsLoaded,
+                  credentialsLoading: jiraCredentialsLoading,
+                  credentialsError: jiraCredentialsError,
+                  defaultUserEmail: null,
+                  onBaseUrlChange: setConfluenceBaseUrl,
+                  onSpaceIdChange: setConfluenceSpaceId,
+                  onCredentialNameChange: setConfluenceCredentialName,
+                  onSubmit: commitAddSource,
+                  onCredentialSaved: handleConfluenceCredentialSaved,
                 }}
               />
             ) : (
