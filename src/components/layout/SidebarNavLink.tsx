@@ -25,6 +25,46 @@ const DOCK_HOVER_SCALE = 1.06;
 const DOCK_INFLUENCE_RADIUS_PX = 96;
 
 /**
+ * Radius of the *tint* falloff: exactly one row pitch, 40px of row plus the
+ * 5px gap the nav puts between them.
+ *
+ * Deliberately far tighter than the lift radius above, and the split is the
+ * point. Movement and colour were answering two different questions on one
+ * number: the lift says "the pointer is near", which is worth saying across
+ * several rows, while the fill says "this is the row you would click", which
+ * is only true of one. Run at 96px the fill lit five rows at once, and five
+ * lit rows beside one brand-filled one is six things claiming to be the
+ * highlight -- the ambiguity the feedback reported. The dock wave is untouched
+ * here; only the colour was pulled in.
+ *
+ * One pitch specifically, because of the identity `cos²x + sin²x = 1`. A row
+ * at distance `d` shows `cos²(d/P · π/2)`; its neighbour, being `P - d` away,
+ * shows `sin²(d/P · π/2)`, and the two always sum to exactly 1. So within a
+ * section the sidebar carries precisely one row's worth of tint, split between
+ * at most two adjacent rows, and the highlight travels from one to the next
+ * without the total ever dipping. Tightening it further overcorrects: at 30px
+ * both rows sit at 0.15 midway between them, and the highlight visibly blinks
+ * out in the gap.
+ *
+ * Between sections the partition does not hold, and should not. `SideBar` puts
+ * 20px of padding plus a heading there, so the rows either side are far more
+ * than one pitch apart and the tint drops to nothing in between. That is the
+ * honest answer: the pointer is over a heading, and no row is the one you
+ * would click. The lift still spans the gap on its wider radius, so the sweep
+ * itself stays continuous -- it is only the claim about *which row* that goes
+ * quiet, which is the one claim that has nothing to say there.
+ */
+const NAV_ROW_PITCH_PX = 45;
+
+/**
+ * Squaring the cosine is what makes the handoff exact rather than approximate
+ * -- see the identity in {@link NAV_ROW_PITCH_PX}. It is not a shoulder tweak,
+ * and changing it breaks the constant-total property that keeps the tint from
+ * dipping between rows.
+ */
+const DOCK_TINT_FALLOFF_EXPONENT = 2;
+
+/**
  * Spring for the magnification.
  *
  * Far stiffer and lighter than the app's usual hover spring. This one is not
@@ -48,10 +88,28 @@ const DOCK_TRACKING_SPRING = {
 const DOCK_NUDGE_PX = 4;
 
 /**
- * How much of the row's hover tint is showing, at full influence. Short of 1,
- * so the row the pointer is actually on still reads as the brightest one.
+ * How much of the row's hover tint is showing, at full influence.
+ *
+ * Full strength, because the curve above already guarantees the sidebar shows
+ * one row's worth of tint in total. It used to be held back to 0.9 so the row
+ * under the pointer could stay brighter than the four others the wide radius
+ * lit up; with the tint spanning two adjacent rows that share a single row's
+ * worth between them, there is nothing left to out-rank, and holding it back
+ * would only mean the highlight is never quite fully on.
  */
-const DOCK_TINT_OPACITY = 0.9;
+const DOCK_TINT_OPACITY = 1;
+
+/**
+ * How much faster the hover ring fades than the fill it sits in.
+ *
+ * The fill is deliberately spread across two rows so the highlight never dips
+ * while travelling, but an *outline* smeared across two rows is a different
+ * thing entirely -- it reads as two boxes rather than one moving one. Raising
+ * the ring to a power collapses it towards whichever row the pointer has
+ * actually settled on, so the edge only exists once there is a single row for
+ * it to be an edge of.
+ */
+const DOCK_RING_SHARPNESS_EXPONENT = 2;
 
 /**
  * How strongly this item is affected by the pointer, from 0 to 1.
@@ -60,17 +118,19 @@ const DOCK_TINT_OPACITY = 0.9;
  * where the influence starts, and the corner is what makes a slow pass feel
  * mechanical.
  *
- * One number for every effect on the row -- lift, nudge and tint all read from
- * it -- so they cannot drift apart and the whole row moves as one thing.
+ * Takes its radius and shoulder from the caller so the lift and the tint can
+ * run the same curve at two different widths -- one number per effect, but the
+ * same shape, so the tint stays centred on the row the lift peaks at and the
+ * row still moves as one thing.
  */
-function getInfluence(pointerY: number, centerY: number) {
+function getInfluence(pointerY: number, centerY: number, radiusPx: number, exponent = 1) {
   const distance = Math.abs(pointerY - centerY);
 
-  if (!Number.isFinite(distance) || distance >= DOCK_INFLUENCE_RADIUS_PX) {
+  if (!Number.isFinite(distance) || distance >= radiusPx) {
     return 0;
   }
 
-  return Math.cos((distance / DOCK_INFLUENCE_RADIUS_PX) * (Math.PI / 2));
+  return Math.cos((distance / radiusPx) * (Math.PI / 2)) ** exponent;
 }
 
 type SidebarNavLinkProps = {
@@ -223,13 +283,37 @@ export function SidebarNavLink({
     if (prefersReducedMotion) return 0;
     if (isFocused) return 1;
 
-    return getInfluence(y, centerYRef.current);
+    return getInfluence(y, centerYRef.current, DOCK_INFLUENCE_RADIUS_PX);
+  });
+
+  // Kept as its own value rather than scaled down from the lift, because the
+  // two answer different questions: the lift says "the pointer is near", the
+  // tint says "this is the row you would click". They therefore run different
+  // radii, which is the whole reason this is a second value and not a factor
+  // applied to the first.
+  //
+  // Gated on reduced motion like the lift, because both render paths hand the
+  // job to a plain CSS `group-hover` there -- the colour still happens, it is
+  // just not driven by proximity to the pointer.
+  const targetTint = useTransform(pointerY, (y) => {
+    if (prefersReducedMotion) return 0;
+    if (isFocused) return 1;
+
+    return getInfluence(y, centerYRef.current, NAV_ROW_PITCH_PX, DOCK_TINT_FALLOFF_EXPONENT);
   });
 
   const influence = useSpring(targetInfluence, DOCK_TRACKING_SPRING);
+  const tint = useSpring(targetTint, DOCK_TRACKING_SPRING);
   const scale = useTransform(influence, (value) => 1 + (DOCK_HOVER_SCALE - 1) * value);
   const x = useTransform(influence, (value) => value * DOCK_NUDGE_PX);
-  const tintOpacity = useTransform(influence, (value) => value * DOCK_TINT_OPACITY);
+  const tintOpacity = useTransform(tint, (value) => value * DOCK_TINT_OPACITY);
+  // Nested inside the fill, so this multiplies with the value above rather
+  // than replacing it: the ring effectively runs the tint cubed. Mid-handoff
+  // that puts it at an eighth while the fill sits at a half, so crossing
+  // between rows is a single patch of light moving, not two outlined boxes
+  // fading past each other. It arrives once the pointer has settled on a row,
+  // which is the only moment an edge is worth drawing.
+  const ringOpacity = useTransform(tint, (value) => value ** DOCK_RING_SHARPNESS_EXPONENT);
 
   return (
     <motion.div
@@ -278,12 +362,58 @@ export function SidebarNavLink({
                   layoutId={indicatorLayoutId}
                   transition={indicatorTransition}
                   className="absolute inset-0 rounded-[10px] bg-app-brand shadow-[0_6px_20px_-8px_var(--color-app-brand)]"
-                />
+                >
+                  {/* The selected row's share of the hover tint.
+                                    It exists because this row was otherwise a hole in
+                                    the falloff. Every other entry hands its tint to
+                                    its neighbour so the two always sum to one row's
+                                    worth, but this one rendered the pill *instead of*
+                                    a tint: it contributed nothing and took its
+                                    neighbour's half down with it. Sweeping past the
+                                    current page therefore had the highlight dissolve
+                                    on approach and reappear out of nothing on the far
+                                    side.
+
+                                    It runs `tintOpacity` -- the very same value every
+                                    other row fades its fill in on -- so the partition
+                                    is exact again; only the paint differs, because the
+                                    muted surface colour the others use would just be
+                                    mud over brand blue. `brand-border-strong` is the
+                                    step the rest of the app already moves brand to on
+                                    hover, so the pill lightens into a colour the
+                                    palette has rather than an ad-hoc wash, and the
+                                    entry stays unmistakably the selected one while
+                                    still answering the pointer. No ring on this one:
+                                    the pill is already a solid shape with its own
+                                    edge, and outlining it would say "hovered" in the
+                                    same breath as "selected".
+
+                                    Falls back to the same binary `group-hover` its
+                                    neighbours use under reduced motion, rather than
+                                    riding the pointer spring. Without the fallback
+                                    this row was the odd one out in exactly the
+                                    setting that asks for less: every other entry lit
+                                    only while actually hovered, while the selected
+                                    one brightened and dimmed continuously as the
+                                    pointer merely passed within a row of it. */}
+                  {prefersReducedMotion ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-[10px] bg-app-brand-border-strong opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
+                    />
+                  ) : (
+                    <motion.span
+                      aria-hidden="true"
+                      style={{ opacity: tintOpacity }}
+                      className="absolute inset-0 rounded-[10px] bg-app-brand-border-strong"
+                    />
+                  )}
+                </motion.span>
               ) : prefersReducedMotion ? (
                 <span
                   key="hover-tint-static"
                   aria-hidden="true"
-                  className="absolute inset-0 rounded-[10px] bg-app-surface-hover opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
+                  className="absolute inset-0 rounded-[10px] bg-app-surface-hover opacity-0 ring-1 ring-app-border-muted transition-opacity duration-300 ease-out ring-inset group-hover:opacity-100"
                 />
               ) : (
                 // Tied to the same influence as the lift rather
@@ -291,12 +421,29 @@ export function SidebarNavLink({
                 // and off one row at a time, which is what made
                 // the magnification look like it jumped between
                 // neighbours instead of travelling through them.
+                //
+                // Runs the tint curve at one row pitch, not the
+                // wide lift radius, so the sidebar carries a
+                // single row's worth of fill in total and it
+                // never competes with the brand pill for the
+                // reading of "selected".
+                //
+                // The inset ring nested inside is the other half
+                // of that: a soft fill shades off gradually at
+                // its edges, and a hard 1px border is what turns
+                // "roughly around here" into a stated target the
+                // eye can land on.
                 <motion.span
                   key="hover-tint"
                   aria-hidden="true"
                   style={{ opacity: tintOpacity }}
                   className="absolute inset-0 rounded-[10px] bg-app-surface-hover"
-                />
+                >
+                  <motion.span
+                    style={{ opacity: ringOpacity }}
+                    className="absolute inset-0 rounded-[10px] ring-1 ring-app-border-muted ring-inset"
+                  />
+                </motion.span>
               )}
 
               <span className="relative z-10 flex w-full items-center gap-[12px]">
