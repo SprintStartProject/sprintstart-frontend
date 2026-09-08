@@ -89,9 +89,7 @@ describe("CorpusIssueBrowser", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
 
-    expect(
-      await screen.findByText(/a second way in besides mining/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/a second way in besides mining/i)).toBeInTheDocument();
   });
 
   it("hides issues somebody is on by default, and counts them rather than swallowing them", async () => {

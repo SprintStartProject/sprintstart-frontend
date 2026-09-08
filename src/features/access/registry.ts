@@ -1,10 +1,14 @@
 import { useMemo } from "react";
 import { GitBranch, Ticket } from "lucide-react";
 import { useGithubTokens } from "../settings/hooks/useGithubTokens";
-import { useJiraCredentials } from "../settings/hooks/useJiraCredentials";
+import { useAtlassianCredentials } from "../settings/hooks/useAtlassianCredentials";
 import { TokenAddForm } from "../settings/components/TokenAddForm";
-import { GithubTokenRow, JiraAccessAddForm, JiraAccessRow } from "./components/connectorAdapters";
-import type { JiraCredentialsDto } from "../../services/sources/jiraService";
+import {
+  GithubTokenRow,
+  AtlassianAccessAddForm,
+  AtlassianAccessRow,
+} from "./components/connectorAdapters";
+import type { AtlassianCredentialDto } from "../../services/sources/atlassianService";
 import type { AccessConnector } from "./types";
 
 /**
@@ -48,19 +52,19 @@ export const githubConnector = defineAccessConnector<string>({
   Row: GithubTokenRow,
 });
 
-export const jiraConnector = defineAccessConnector<JiraCredentialsDto>({
-  id: "jira",
-  label: "Jira",
+export const atlassianConnector = defineAccessConnector<AtlassianCredentialDto>({
+  id: "atlassian",
+  label: "Atlassian",
   icon: Ticket,
   noun: { one: "credential", many: "credentials" },
   addLabel: "Add credential",
   emptyTitle: "No credentials yet",
-  emptyDescription: "Add a Jira API token to connect and ingest Jira instances.",
+  emptyDescription: "Add an Atlassian API token to connect Jira instances and Confluence spaces.",
   useEntries: () => {
-    const { credentials, loaded, error, isRefreshing, reload } = useJiraCredentials();
+    const { credentials, loaded, error, isRefreshing, reload } = useAtlassianCredentials();
 
     // Credentials are keyed by `(userEmail, tokenName)` server-side; the same
-    // name may exist for two Jira accounts, so the key needs both.
+    // name may exist for two Atlassian accounts, so the key needs both.
     const entries = useMemo(
       () =>
         credentials.map((credential) => ({
@@ -72,8 +76,8 @@ export const jiraConnector = defineAccessConnector<JiraCredentialsDto>({
 
     return { entries, loaded, error, isRefreshing, reload };
   },
-  AddForm: JiraAccessAddForm,
-  Row: JiraAccessRow,
+  AddForm: AtlassianAccessAddForm,
+  Row: AtlassianAccessRow,
 });
 
 /**
@@ -83,4 +87,4 @@ export const jiraConnector = defineAccessConnector<JiraCredentialsDto>({
  * form — no new tab, no page change, no layout change. Keep the list short
  * enough that the source filter stays useful.
  */
-export const ACCESS_CONNECTORS: AccessConnector[] = [githubConnector, jiraConnector];
+export const ACCESS_CONNECTORS: AccessConnector[] = [githubConnector, atlassianConnector];

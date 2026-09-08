@@ -5,32 +5,32 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { AccessConnectorGroup } from "../../../../src/features/access/components/AccessConnectorGroup";
-import { jiraConnector } from "../../../../src/features/access/registry";
-import type { JiraCredentialsDto } from "../../../../src/services/sources/jiraService";
+import { atlassianConnector } from "../../../../src/features/access/registry";
+import type { AtlassianCredentialDto } from "../../../../src/services/sources/atlassianService";
 
 vi.mock("../../../../src/context/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock("../../../../src/services/sources/jiraService", () => ({
-  getMyJiraCredentials: vi.fn(),
-  addJiraCredential: vi.fn(),
-  changeJiraCredentialName: vi.fn(),
-  changeJiraCredentialToken: vi.fn(),
-  deleteJiraCredential: vi.fn(),
+vi.mock("../../../../src/services/sources/atlassianService", () => ({
+  getMyAtlassianCredentials: vi.fn(),
+  addAtlassianCredential: vi.fn(),
+  changeAtlassianCredentialName: vi.fn(),
+  changeAtlassianCredentialToken: vi.fn(),
+  deleteAtlassianCredential: vi.fn(),
 }));
 
 import { useAuth } from "../../../../src/context/useAuth";
 import {
-  getMyJiraCredentials,
-  addJiraCredential,
-  changeJiraCredentialName,
-  changeJiraCredentialToken,
-  deleteJiraCredential,
-} from "../../../../src/services/sources/jiraService";
+  getMyAtlassianCredentials,
+  addAtlassianCredential,
+  changeAtlassianCredentialName,
+  changeAtlassianCredentialToken,
+  deleteAtlassianCredential,
+} from "../../../../src/services/sources/atlassianService";
 
 const EMAIL = "user@corp.com";
-const cred = (displayName: string, userEmail = EMAIL): JiraCredentialsDto => ({
+const cred = (displayName: string, userEmail = EMAIL): AtlassianCredentialDto => ({
   userEmail,
   displayName,
 });
@@ -79,7 +79,7 @@ function GroupHarness() {
         open add form
       </button>
       <AccessConnectorGroup
-        connector={jiraConnector}
+        connector={atlassianConnector}
         isHidden={false}
         isAddOpen={isAddOpen}
         onAddClose={() => setIsAddOpen(false)}
@@ -99,19 +99,19 @@ function renderGroup() {
   );
 }
 
-describe("AccessConnectorGroup — Jira", () => {
+describe("AccessConnectorGroup — Atlassian", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthEmail(EMAIL);
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([cred("default")]);
-    vi.mocked(addJiraCredential).mockResolvedValue(undefined);
-    vi.mocked(changeJiraCredentialName).mockResolvedValue(cred("renamed"));
-    vi.mocked(changeJiraCredentialToken).mockResolvedValue(cred("default"));
-    vi.mocked(deleteJiraCredential).mockResolvedValue(undefined);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([cred("default")]);
+    vi.mocked(addAtlassianCredential).mockResolvedValue(undefined);
+    vi.mocked(changeAtlassianCredentialName).mockResolvedValue(cred("renamed"));
+    vi.mocked(changeAtlassianCredentialToken).mockResolvedValue(cred("default"));
+    vi.mocked(deleteAtlassianCredential).mockResolvedValue(undefined);
   });
 
-  it("renders all credentials with their Jira account emails", async () => {
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([
+  it("renders all credentials with their Atlassian account emails", async () => {
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([
       cred("default"),
       cred("support", "support@corp.com"),
     ]);
@@ -123,11 +123,11 @@ describe("AccessConnectorGroup — Jira", () => {
     expect(screen.getByText(EMAIL)).toBeInTheDocument();
     expect(screen.getByText("support@corp.com")).toBeInTheDocument();
     expect(screen.getByText("2 credentials")).toBeInTheDocument();
-    expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(getMyAtlassianCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
-  it("keeps two credentials of the same name apart by Jira account", async () => {
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([
+  it("keeps two credentials of the same name apart by Atlassian account", async () => {
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([
       cred("default"),
       cred("default", "other@corp.com"),
     ]);
@@ -143,23 +143,23 @@ describe("AccessConnectorGroup — Jira", () => {
     renderGroup();
 
     expect(await screen.findByText("default")).toBeInTheDocument();
-    expect(getMyJiraCredentials).toHaveBeenCalled();
+    expect(getMyAtlassianCredentials).toHaveBeenCalled();
 
     await userEvent.setup().click(screen.getByRole("button", { name: "open add form" }));
-    expect(screen.getByTestId("settings-jira-add-email")).toHaveValue("");
+    expect(screen.getByTestId("settings-atlassian-add-email")).toHaveValue("");
   });
 
   it("shows the empty state when there are no credentials", async () => {
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     renderGroup();
 
     expect(await screen.findByText("No credentials yet")).toBeInTheDocument();
   });
 
-  it("prefills the Jira email and adds a credential", async () => {
+  it("prefills the Atlassian email and adds a credential", async () => {
     const user = userEvent.setup();
-    vi.mocked(getMyJiraCredentials)
+    vi.mocked(getMyAtlassianCredentials)
       .mockResolvedValueOnce([cred("default")])
       .mockResolvedValueOnce([cred("default"), cred("ci")]);
 
@@ -167,13 +167,13 @@ describe("AccessConnectorGroup — Jira", () => {
     await screen.findByText("default");
 
     await user.click(screen.getByRole("button", { name: "open add form" }));
-    expect(screen.getByTestId("settings-jira-add-email")).toHaveValue(EMAIL);
-    await user.type(screen.getByTestId("settings-jira-add-name"), "ci");
-    await user.type(screen.getByTestId("settings-jira-add-token"), "secret-token");
-    await user.click(screen.getByTestId("settings-jira-add-submit"));
+    expect(screen.getByTestId("settings-atlassian-add-email")).toHaveValue(EMAIL);
+    await user.type(screen.getByTestId("settings-atlassian-add-name"), "ci");
+    await user.type(screen.getByTestId("settings-atlassian-add-token"), "secret-token");
+    await user.click(screen.getByTestId("settings-atlassian-add-submit"));
 
     await waitFor(() =>
-      expect(addJiraCredential).toHaveBeenCalledWith({
+      expect(addAtlassianCredential).toHaveBeenCalledWith({
         userEmail: EMAIL,
         tokenName: "ci",
         authToken: "secret-token",
@@ -182,21 +182,21 @@ describe("AccessConnectorGroup — Jira", () => {
     expect(await screen.findByText("2 credentials")).toBeInTheDocument();
   });
 
-  it("allows a Jira email different from the login email", async () => {
+  it("allows an Atlassian email different from the login email", async () => {
     const user = userEvent.setup();
     renderGroup();
     await screen.findByText("default");
 
     await user.click(screen.getByRole("button", { name: "open add form" }));
-    const emailInput = screen.getByTestId("settings-jira-add-email");
+    const emailInput = screen.getByTestId("settings-atlassian-add-email");
     await user.clear(emailInput);
     await user.type(emailInput, "jira-account@atlassian.com");
-    await user.type(screen.getByTestId("settings-jira-add-name"), "work");
-    await user.type(screen.getByTestId("settings-jira-add-token"), "tok");
-    await user.click(screen.getByTestId("settings-jira-add-submit"));
+    await user.type(screen.getByTestId("settings-atlassian-add-name"), "work");
+    await user.type(screen.getByTestId("settings-atlassian-add-token"), "tok");
+    await user.click(screen.getByTestId("settings-atlassian-add-submit"));
 
     await waitFor(() =>
-      expect(addJiraCredential).toHaveBeenCalledWith({
+      expect(addAtlassianCredential).toHaveBeenCalledWith({
         userEmail: "jira-account@atlassian.com",
         tokenName: "work",
         authToken: "tok",
@@ -204,19 +204,19 @@ describe("AccessConnectorGroup — Jira", () => {
     );
   });
 
-  it("renames a credential using its stored Jira email", async () => {
+  it("renames a credential using its stored Atlassian email", async () => {
     const user = userEvent.setup();
     renderGroup();
     await screen.findByText("default");
 
-    await user.click(screen.getByTestId("settings-jira-rename-open-default"));
-    const input = screen.getByTestId("settings-jira-rename-input-default");
+    await user.click(screen.getByTestId("settings-atlassian-rename-open-default"));
+    const input = screen.getByTestId("settings-atlassian-rename-input-default");
     await user.clear(input);
     await user.type(input, "renamed");
-    await user.click(screen.getByTestId("settings-jira-rename-submit-default"));
+    await user.click(screen.getByTestId("settings-atlassian-rename-submit-default"));
 
     await waitFor(() =>
-      expect(changeJiraCredentialName).toHaveBeenCalledWith({
+      expect(changeAtlassianCredentialName).toHaveBeenCalledWith({
         userEmail: EMAIL,
         oldName: "default",
         newName: "renamed",
@@ -224,17 +224,17 @@ describe("AccessConnectorGroup — Jira", () => {
     );
   });
 
-  it("rotates a credential token using its stored Jira email", async () => {
+  it("rotates a credential token using its stored Atlassian email", async () => {
     const user = userEvent.setup();
     renderGroup();
     await screen.findByText("default");
 
-    await user.click(screen.getByTestId("settings-jira-rotate-open-default"));
-    await user.type(screen.getByTestId("settings-jira-rotate-input-default"), "new-token");
-    await user.click(screen.getByTestId("settings-jira-rotate-submit-default"));
+    await user.click(screen.getByTestId("settings-atlassian-rotate-open-default"));
+    await user.type(screen.getByTestId("settings-atlassian-rotate-input-default"), "new-token");
+    await user.click(screen.getByTestId("settings-atlassian-rotate-submit-default"));
 
     await waitFor(() =>
-      expect(changeJiraCredentialToken).toHaveBeenCalledWith({
+      expect(changeAtlassianCredentialToken).toHaveBeenCalledWith({
         userEmail: EMAIL,
         tokenName: "default",
         newToken: "new-token",
@@ -242,20 +242,20 @@ describe("AccessConnectorGroup — Jira", () => {
     );
   });
 
-  it("deletes a credential using its stored Jira email and refreshes", async () => {
+  it("deletes a credential using its stored Atlassian email and refreshes", async () => {
     const user = userEvent.setup();
-    vi.mocked(getMyJiraCredentials)
+    vi.mocked(getMyAtlassianCredentials)
       .mockResolvedValueOnce([cred("default")])
       .mockResolvedValueOnce([]);
 
     renderGroup();
     await screen.findByText("default");
 
-    await user.click(screen.getByTestId("settings-jira-delete-open-default"));
-    await user.click(screen.getByTestId("settings-jira-delete-confirm-default"));
+    await user.click(screen.getByTestId("settings-atlassian-delete-open-default"));
+    await user.click(screen.getByTestId("settings-atlassian-delete-confirm-default"));
 
     await waitFor(() =>
-      expect(deleteJiraCredential).toHaveBeenCalledWith({
+      expect(deleteAtlassianCredential).toHaveBeenCalledWith({
         userEmail: EMAIL,
         tokenName: "default",
       }),

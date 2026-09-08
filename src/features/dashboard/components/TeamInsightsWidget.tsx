@@ -285,7 +285,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
     <ClickableCard
       onClick={() => void navigate("/pm-dashboard")}
       aria-label="Open the PM Dashboard for the full team insights"
-      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       <div
         aria-hidden="true"
@@ -293,18 +293,21 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
       />
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
             <ShieldAlert className="h-3.5 w-3.5" />
           </span>
-          <span className="text-sm font-semibold text-app-text">Team insights</span>
+          <span className="truncate text-sm font-semibold text-app-text">Team insights</span>
         </div>
 
+        {/* Steps aside on a narrow card, exactly as `WidgetShell` does it — this card draws its
+                    own frame rather than using the shell, so the rule has to be written twice. The
+                    `aria-label` on the card carries the same words either way. */}
         <span
           aria-hidden="true"
           className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
         >
-          Open PM Dashboard
+          <span className="hidden @min-[20rem]:inline">Open PM Dashboard</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>

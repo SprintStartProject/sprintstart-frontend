@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
 import { KnowledgeRequestInboxPage } from "../../../src/features/knowledge-request/components/KnowledgeRequestInboxPage";
@@ -55,6 +56,14 @@ const request: KnowledgeRequest = {
   createdAt: "2026-07-03T00:00:00.000Z",
   answeredAt: null,
   answer: null,
+  hire: {
+    userId: "u2",
+    displayName: "Sam Hire",
+    profileIcon: null,
+    currentPhase: "Getting started",
+    currentStep: "Set up your machine",
+    progressPercentage: 0.25,
+  },
 };
 
 /**
@@ -71,7 +80,12 @@ describe("KnowledgeRequestInboxPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     // The page brings its own landmarks; see `StarterWorkPage.a11y` for why the scan is scoped
     // to the rendered container.
-    const { container } = render(<KnowledgeRequestInboxPage />);
+    // A router, because each request card now links to the asker's member page.
+    const { container } = render(
+      <MemoryRouter>
+        <KnowledgeRequestInboxPage />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(request.question)).toBeInTheDocument();

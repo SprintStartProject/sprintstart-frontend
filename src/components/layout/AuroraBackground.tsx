@@ -89,6 +89,12 @@ const variantBlobs: Record<AuroraVariant, BlobConfig> = {
  * Reads `isAuroraEnabled` from ThemeContext for reactive toggling
  * via Settings → Appearance — no page reload needed.
  */
+
+/** Extra pixels the canvas extends beyond the viewport on each side so the
+ *  interactive glow trail isn't clipped at the screen edges.
+ *  Half the maximum trail line width (90 px) is enough. */
+const OVERSCAN = 45;
+
 export function AuroraBackground({
   variant = "default",
   showGrid,
@@ -99,17 +105,24 @@ export function AuroraBackground({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { isClassicMode: classic, isAuroraEnabled } = useTheme();
+  const { isClassicMode: classic, isAuroraEnabled, glowIntensity } = useTheme();
 
   const enabled = !classic && isAuroraEnabled;
   const effectiveInteractive = interactive && enabled;
   const effectiveGrid = (showGrid ?? variant !== "login") && enabled;
   const blobs = enabled ? variantBlobs[variant] : [];
 
-  // How many extra pixels to extend the canvas beyond the viewport on each
-  // side, so the interactive glow trail isn't clipped at the screen edges.
-  // Half the maximum line width (60px) is enough.
-  const OVERSCAN = 30;
+  // The glow's radius and opacity both scale with the user's intensity setting
+  // (Settings → Appearance). Held in a ref rather than an effect dependency so
+  // dragging the slider doesn't tear down the pointer listener mid-gesture —
+  // the running rAF loop simply reads the latest value each frame.
+  const glowIntensityRef = useRef(glowIntensity);
+  useEffect(() => {
+    glowIntensityRef.current = glowIntensity;
+  }, [glowIntensity]);
+
+  // OVERSCAN is module-scoped (see below the component) — not reactive,
+  // so it is not in the useEffect dependency array.
 
   useEffect(() => {
     if (!effectiveInteractive) return;
@@ -124,6 +137,17 @@ export function AuroraBackground({
     let rafId = 0;
     let lastTime = performance.now();
     let isRunning = false;
+
+    // Normalized progress across the 10–100 slider range (0.0 at 10%, 1.0 at 100%).
+    const sliderProgress = () => Math.max(0, Math.min(1, (glowIntensityRef.current - 10) / 90));
+
+    // Peak stroke width of the trail, in px.
+    // 6px at 10% (keeping the original fine cursor size), scaling up to 90px at 100% (expanded atmospheric aura).
+    const maxLineWidth = () => 6 + sliderProgress() * 84;
+
+    // Alpha multiplier.
+    // 0.28 at 10% (2x higher color saturation and density vs previous 0.12), scaling up to 0.70 at 100% (bright, radiant intensity).
+    const maxAlpha = () => 0.28 + sliderProgress() * 0.42;
 
     const resize = () => {
       canvas.width = window.innerWidth + OVERSCAN * 2;
@@ -169,8 +193,8 @@ export function AuroraBackground({
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
-          ctx.strokeStyle = `rgba(${getColor(life)}, ${life * 0.36})`;
-          ctx.lineWidth = 60 * life; // tapers from 60px down to 0
+          ctx.strokeStyle = `rgba(${getColor(life)}, ${life * maxAlpha()})`;
+          ctx.lineWidth = maxLineWidth() * life; // tapers from the peak width down to 0
           ctx.stroke();
         }
       }
@@ -206,7 +230,7 @@ export function AuroraBackground({
       window.removeEventListener("pointermove", handlePointerMove);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [effectiveInteractive, OVERSCAN]);
+  }, [effectiveInteractive]);
 
   return (
     <motion.div

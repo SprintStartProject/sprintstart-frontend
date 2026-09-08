@@ -22,6 +22,12 @@ vi.mock("../../../../src/context/useToast", () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }),
 }));
 
+vi.mock("../../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
 function renderConversation(overrides: {
   messages?: BuddyMessageView[];
   isThinking?: boolean;

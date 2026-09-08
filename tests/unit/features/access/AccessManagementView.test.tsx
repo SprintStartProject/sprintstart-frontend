@@ -21,17 +21,17 @@ vi.mock("../../../../src/services/sources/githubService", () => ({
   deleteGithubPat: vi.fn(),
 }));
 
-vi.mock("../../../../src/services/sources/jiraService", () => ({
-  getMyJiraCredentials: vi.fn(),
-  addJiraCredential: vi.fn(),
-  changeJiraCredentialName: vi.fn(),
-  changeJiraCredentialToken: vi.fn(),
-  deleteJiraCredential: vi.fn(),
+vi.mock("../../../../src/services/sources/atlassianService", () => ({
+  getMyAtlassianCredentials: vi.fn(),
+  addAtlassianCredential: vi.fn(),
+  changeAtlassianCredentialName: vi.fn(),
+  changeAtlassianCredentialToken: vi.fn(),
+  deleteAtlassianCredential: vi.fn(),
 }));
 
 import { useAuth } from "../../../../src/context/useAuth";
 import { getGithubPatNames } from "../../../../src/services/sources/githubService";
-import { getMyJiraCredentials } from "../../../../src/services/sources/jiraService";
+import { getMyAtlassianCredentials } from "../../../../src/services/sources/atlassianService";
 
 /**
  * The filter is owned by whoever hosts the view, so that it survives the admin
@@ -68,8 +68,8 @@ describe("AccessManagementView", () => {
       status: "authenticated",
     } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(getGithubPatNames).mockResolvedValue(["gh-default"]);
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([
-      { userEmail: "user@corp.com", displayName: "jira-default" },
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([
+      { userEmail: "user@corp.com", displayName: "atlassian-default" },
     ]);
   });
 
@@ -79,13 +79,13 @@ describe("AccessManagementView", () => {
     // Visibility rather than presence: a filtered-out source stays mounted, so
     // its rows are in the DOM either way.
     await waitFor(() => expect(screen.getByTestId("access-group-github")).toBeVisible());
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).toBeVisible());
     expect(screen.getByText("gh-default")).toBeInTheDocument();
-    expect(screen.getByText("jira-default")).toBeInTheDocument();
+    expect(screen.getByText("atlassian-default")).toBeInTheDocument();
 
     // Both sources fetched without anyone switching to them.
     expect(getGithubPatNames).toHaveBeenCalled();
-    expect(getMyJiraCredentials).toHaveBeenCalled();
+    expect(getMyAtlassianCredentials).toHaveBeenCalled();
   });
 
   it("renders one group per registered connector, in registry order", async () => {
@@ -115,27 +115,27 @@ describe("AccessManagementView", () => {
 
   it("hides a source with no credentials by default and reveals it under All sources", async () => {
     const user = userEvent.setup();
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     renderView();
 
     await waitFor(() => expect(screen.getByTestId("access-group-github")).toBeVisible());
-    expect(screen.getByTestId("access-group-jira")).not.toBeVisible();
+    expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible();
 
     await selectSource(user, "All sources");
 
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).toBeVisible());
     expect(screen.getByText("No credentials yet")).toBeVisible();
   });
 
   it("keeps loading every source while unused ones are hidden", async () => {
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     renderView();
 
     // The filter can only know which sources are in use because the hidden
     // ones are still mounted and still fetch.
-    await waitFor(() => expect(getMyJiraCredentials).toHaveBeenCalled());
+    await waitFor(() => expect(getMyAtlassianCredentials).toHaveBeenCalled());
   });
 
   it("narrows the list to a single source and back", async () => {
@@ -144,30 +144,30 @@ describe("AccessManagementView", () => {
 
     await waitFor(() => expect(screen.getByText("gh-default")).toBeInTheDocument());
 
-    await selectSource(user, "Jira");
+    await selectSource(user, "Atlassian");
     await waitFor(() => expect(screen.getByTestId("access-group-github")).not.toBeVisible());
-    expect(screen.getByTestId("access-group-jira")).toBeVisible();
+    expect(screen.getByTestId("access-group-atlassian")).toBeVisible();
 
     await selectSource(user, "All sources");
     await waitFor(() => expect(screen.getByTestId("access-group-github")).toBeVisible());
-    expect(screen.getByTestId("access-group-jira")).toBeVisible();
+    expect(screen.getByTestId("access-group-atlassian")).toBeVisible();
   });
 
   it("adds to a hidden source through the global add button", async () => {
     const user = userEvent.setup();
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     renderView();
 
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).not.toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible());
 
     await user.click(screen.getByTestId("access-add-open"));
-    await user.click(await screen.findByTestId("access-add-source-jira"));
+    await user.click(await screen.findByTestId("access-add-source-atlassian"));
 
     // Choosing a source reveals it and opens its form, even though it holds
     // nothing and the default filter had hidden it.
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).toBeVisible());
-    expect(screen.getByTestId("settings-jira-add-email")).toBeVisible();
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).toBeVisible());
+    expect(screen.getByTestId("settings-atlassian-add-email")).toBeVisible();
   });
 
   it("takes the filter from its host instead of owning it", async () => {
@@ -186,27 +186,27 @@ describe("AccessManagementView", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).not.toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible());
     expect(screen.getByTestId("access-group-github")).toBeVisible();
 
     await user.click(screen.getByRole("combobox", { name: "Filter access by source" }));
-    await user.click(await screen.findByRole("option", { name: "Jira" }));
+    await user.click(await screen.findByRole("option", { name: "Atlassian" }));
 
-    expect(onSourceFilterChange).toHaveBeenCalledWith("jira");
-    expect(screen.getByTestId("access-group-jira")).not.toBeVisible();
+    expect(onSourceFilterChange).toHaveBeenCalledWith("atlassian");
+    expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible();
   });
 
   it("leaves the filter where the user put it and hides the source again on cancel", async () => {
     const user = userEvent.setup();
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     renderView();
 
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).not.toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible());
 
     await user.click(screen.getByTestId("access-add-open"));
-    await user.click(await screen.findByTestId("access-add-source-jira"));
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).toBeVisible());
+    await user.click(await screen.findByTestId("access-add-source-atlassian"));
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).toBeVisible());
 
     // Revealing a source for the add form must not rewrite the filter.
     expect(screen.getByRole("combobox", { name: "Filter access by source" })).toHaveTextContent(
@@ -215,7 +215,7 @@ describe("AccessManagementView", () => {
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-    await waitFor(() => expect(screen.getByTestId("access-group-jira")).not.toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible());
     expect(screen.getByRole("combobox", { name: "Filter access by source" })).toHaveTextContent(
       "In use",
     );
@@ -226,23 +226,23 @@ describe("AccessManagementView", () => {
     renderView();
 
     await user.click(screen.getByTestId("access-add-open"));
-    expect(await screen.findByTestId("access-add-source-jira")).toBeInTheDocument();
+    expect(await screen.findByTestId("access-add-source-atlassian")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
     await waitFor(() =>
-      expect(screen.queryByTestId("access-add-source-jira")).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("access-add-source-atlassian")).not.toBeInTheDocument(),
     );
   });
 
   it("explains the empty view when no source is set up at all", async () => {
     vi.mocked(getGithubPatNames).mockResolvedValue([]);
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     renderView();
 
     expect(await screen.findByText("No source is set up yet")).toBeVisible();
     expect(screen.getByTestId("access-group-github")).not.toBeVisible();
-    expect(screen.getByTestId("access-group-jira")).not.toBeVisible();
+    expect(screen.getByTestId("access-group-atlassian")).not.toBeVisible();
   });
 });

@@ -15,6 +15,8 @@ import { SelectionActions } from "./features/board/selection/SelectionActions";
 import { CardMarksProvider } from "./features/board/marks/CardMarksProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
+import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 
 function AppContent() {
   const { status } = useAuth();
@@ -120,6 +122,11 @@ function AppContent() {
           mode would remove the answer to a question they had only just asked. */}
         {signedIn && <SelectionActions />}
 
+        {/* Says so, once, when a component has been put in this user's name. App-wide rather
+          than on the dashboard: being handed work should reach you where you are, not wait
+          until you happen to go and look. */}
+        {signedIn && <KnowledgeGapOwnerAnnouncement />}
+
         {/* Decorative easter egg; only for signed-in users, so it never
           sits on top of the login screen, and off unless turned on in
           Settings (see MomentsSection). */}
@@ -141,20 +148,24 @@ function App() {
         <AuthProvider>
           <ProjectProvider>
             <ChatProvider>
-              {/* Inside AuthProvider: the launch sequence is triggered
+              {/* Inside ProjectProvider: what a user owns is asked per selected project, and
+                  above the router so the owner announcement can appear on any page. */}
+              <MyKnowledgeGapsProvider>
+                {/* Inside AuthProvider: the launch sequence is triggered
                               by the user becoming authenticated. */}
-              <MomentsProvider>
-                {/* Inside the router's providers and outside the router itself: the shell has to
-                    read the flag a page sets, and both live under this. */}
-                <FocusModeProvider>
-                  {/* Inside ProjectProvider, which it reads the project id from, and outside the
-                      router, because the toolbar that makes a highlight is mounted out here too —
-                      the board page under it lends its cards in. */}
-                  <CardMarksProvider>
-                    <AppContent />
-                  </CardMarksProvider>
-                </FocusModeProvider>
-              </MomentsProvider>
+                <MomentsProvider>
+                  {/* Inside the router's providers and outside the router itself: the shell has to
+                      read the flag a page sets, and both live under this. */}
+                  <FocusModeProvider>
+                    {/* Inside ProjectProvider, which it reads the project id from, and outside the
+                        router, because the toolbar that makes a highlight is mounted out here too —
+                        the board page under it lends its cards in. */}
+                    <CardMarksProvider>
+                      <AppContent />
+                    </CardMarksProvider>
+                  </FocusModeProvider>
+                </MomentsProvider>
+              </MyKnowledgeGapsProvider>
             </ChatProvider>
           </ProjectProvider>
         </AuthProvider>

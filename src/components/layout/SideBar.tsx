@@ -8,6 +8,7 @@ import { canAccessRoute, type AppRoute } from "../../auth/accessPolicy";
 import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitcher";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
+import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import {
   AdminIcon,
@@ -139,6 +140,14 @@ function SidebarContent({
   const { canManageSelected } = useProjectContext();
   const isOnboardingAvailable = useOnboardingAvailable();
   const location = useLocation();
+  /*
+    Components put in this user's name that they have not acknowledged yet. Read straight from
+    the shared provider rather than passed down like `hasPmAttentionItems`: that one is passed
+    because owning the request here would fire it twice over (this renders once for desktop and
+    once for the mobile drawer), and the provider already solves exactly that.
+  */
+  const { unseenComponents } = useMyKnowledgeGaps();
+  const hasUnseenKnowledgeGaps = unseenComponents.length > 0;
   /**
    * Viewport y of the pointer while it is over the nav, `-Infinity` when it
    * is not. A motion value rather than state: it changes on every pointer
@@ -169,8 +178,24 @@ function SidebarContent({
   // `/insights/knowledge-requests` is deliberately absent: it has its own
   // sidebar entry, so listing it here would leave two entries active at once
   // -- including two active pills sharing one Framer Motion `layoutId`.
+  /**
+   * The buddy is the other half of the chat's page, not a page of its own: one header, one
+   * switch, two conversations. So the entry that leads there lights up for both — without it
+   * the sidebar claimed the hire was nowhere at all while they were looking at half of Chat.
+   */
+  const isAssistantSectionActive = location.pathname.startsWith("/buddy");
+
+  /**
+   * Team management and a member's detail page are reached from the PM dashboard and have no
+   * entry of their own, so the dashboard's entry stands in for them the same way it does for
+   * the insights pages -- otherwise the sidebar claims the PM is nowhere while they are
+   * looking at their own team. `/team/` is the member detail route, which `accessPolicy`
+   * already treats as a prefix of `/team-management`.
+   */
   const isPmSectionActive =
     location.pathname.startsWith("/pm-dashboard") ||
+    location.pathname.startsWith("/team-management") ||
+    location.pathname.startsWith("/team/") ||
     location.pathname.startsWith("/insights/faq") ||
     location.pathname.startsWith("/insights/knowledge-gaps") ||
     location.pathname.startsWith("/insights/onboarding");
@@ -201,8 +226,8 @@ function SidebarContent({
     .join("|")}`;
 
   return (
-    <div className="flex h-full flex-col bg-app-bg text-app-text">
-      <div className="flex items-center gap-3 px-[24px] py-[24px]">
+    <div className="flex h-full min-h-0 flex-col bg-app-bg text-app-text">
+      <div className="flex shrink-0 items-center gap-3 px-[24px] py-[24px]">
         <SidebarLogo />
 
         <h1 className="text-lg leading-none font-bold tracking-tight text-app-text">SprintStart</h1>
@@ -210,6 +235,9 @@ function SidebarContent({
 
       <nav
         aria-label={ariaLabel}
+        // Marks this element as the scroll container the nav rows re-measure
+        // against — see the scroll listener in `SidebarNavLink`.
+        data-sidebar-scroll="true"
         // Tracked on the nav, not per entry: pointer enter/leave on the
         // individual rows is skipped outright when the mouse crosses
         // several of them inside one frame.
@@ -222,7 +250,7 @@ function SidebarContent({
         // further left again would need a smaller scale to keep that
         // gap. Header and footer share the inset, so everything lines
         // up on one left edge.
-        className="flex-1 space-y-[5px] px-[24px] py-[20px]"
+        className="app-scrollbar min-h-0 flex-1 space-y-[5px] overflow-x-hidden overflow-y-auto px-[24px] py-[20px]"
       >
         {sections.map((section, sectionIndex) => (
           <div
@@ -243,11 +271,21 @@ function SidebarContent({
                   label={item.label}
                   icon={item.icon}
                   end={item.path === "/"}
-                  forceActive={item.path === "/pm-dashboard" && isPmSectionActive}
+                  forceActive={
+                    (item.path === "/pm-dashboard" && isPmSectionActive) ||
+                    (item.path === "/chat" && isAssistantSectionActive)
+                  }
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
-                  hasAttentionMarker={item.path === "/pm-dashboard" && hasPmAttentionItems}
-                  attentionLabel="Open skip requests or unread feedback"
+                  hasAttentionMarker={
+                    (item.path === "/pm-dashboard" && hasPmAttentionItems) ||
+                    (item.path === "/" && hasUnseenKnowledgeGaps)
+                  }
+                  attentionLabel={
+                    item.path === "/"
+                      ? "A component has been assigned to you"
+                      : "Open skip requests or unread feedback"
+                  }
                   onNavigate={onNavigate}
                 />
               ))}
@@ -259,7 +297,7 @@ function SidebarContent({
       {/* Floating glass card instead of a full-bleed bar. The 12px outer
                 gutter plus 12px inner padding lines its content up with the
                 24px inset used by the nav items above. */}
-      <div className="px-[12px] pt-[8px] pb-[16px]">
+      <div className="shrink-0 px-[12px] pt-[8px] pb-[16px]">
         <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           {profile && (
             <div className="flex items-center justify-between gap-2 py-[2px]">

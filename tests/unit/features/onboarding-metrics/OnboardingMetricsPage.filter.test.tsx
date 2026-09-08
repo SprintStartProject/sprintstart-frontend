@@ -53,7 +53,13 @@ const metrics = {
   stalledCount: 1,
   waitingOnResponseCount: 0,
   hires: [
-    hire({ userId: "a", displayName: "Ada", githubLogin: "ada", stalled: true, stalledReason: "x" }),
+    hire({
+      userId: "a",
+      displayName: "Ada",
+      githubLogin: "ada",
+      stalled: true,
+      stalledReason: "x",
+    }),
     hire({ userId: "b", displayName: "Bob", githubLogin: "bob" }),
     // Healthy active contributor: has open work in flight but already gets
     // responses. Must NOT count as needing attention (the old criterion wrongly

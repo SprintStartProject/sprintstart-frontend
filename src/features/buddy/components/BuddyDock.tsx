@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Maximize2, Minus, X } from "lucide-react";
+import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
@@ -40,6 +40,7 @@ type BuddyDockProps = Pick<
   ReturnType<typeof useBuddy>,
   | "messages"
   | "isThinking"
+  | "isStreaming"
   | "activeTool"
   | "draft"
   | "setDraft"
@@ -47,6 +48,7 @@ type BuddyDockProps = Pick<
   | "confirmAction"
   | "dismissAction"
   | "suggestions"
+  | "startFreshVisit"
 > & {
   onClose: () => void;
   /**
@@ -102,6 +104,7 @@ type BuddyDockProps = Pick<
 export function BuddyDock({
   messages,
   isThinking,
+  isStreaming,
   activeTool,
   draft,
   setDraft,
@@ -109,6 +112,7 @@ export function BuddyDock({
   confirmAction,
   dismissAction,
   suggestions,
+  startFreshVisit,
   openError,
   onClose,
   onOpenFull,
@@ -133,6 +137,10 @@ export function BuddyDock({
   }, [onClose]);
 
   const hasUserMessage = messages.some((message) => message.role === "USER");
+  // Mid-turn: the buddy is deciding, running a tool, or writing. Not a spinner's worth of
+  // state -- it gates the one control that would pull the thread out from under a reply
+  // that is still arriving.
+  const isBusy = isThinking || isStreaming;
 
   const resting = {
     width: DOCK_WIDTH,
@@ -221,6 +229,37 @@ export function BuddyDock({
             <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
           </div>
 
+          {/* Same control, same words and the same promise as the one on `/buddy`: the window is
+                    a view of that conversation, so anything it can do to the conversation it has to
+                    be able to do here — a hire who had to open the full page to start over would
+                    reasonably conclude the two were different buddies. Offered only once there is
+                    something to leave behind; on an untouched thread it would start the visit that
+                    is already on screen.
+
+                    Withdrawn while a turn is in flight. `startFreshVisit` clears the thread and
+                    greets, but it cannot call back the request already streaming into it: that
+                    stream's callbacks still hold the shared conversation, so its tool events
+                    would land under the new greeting — "Checking your progress…" beneath a fresh
+                    hello — and its completion would clear the greeting's own thinking state.
+                    Offering the control only between turns is the cheap half of that fix;
+                    aborting the stream is the other half and belongs in the session, alongside
+                    the same gap on `BuddyPage`. */}
+          {hasUserMessage && !isBusy && (
+            <button
+              type="button"
+              onClick={() => void startFreshVisit()}
+              aria-label="Start a new conversation"
+              // No chord named here, deliberately. The window floats over every page, and
+              // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
+              // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
+              // would be promising a key that does somebody else's job.
+              title="Start a new conversation — your buddy keeps what it has learned about you"
+              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            >
+              <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+
           {/* The answer to "this is too small" is the page that already exists, rather than a
                     resizable window: `/buddy` renders the same conversation through the same
                     components with room to spare. The draft goes with it — a control that
@@ -279,6 +318,7 @@ export function BuddyDock({
             renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            onStartFreshVisit={() => void startFreshVisit()}
           />
         </div>
 

@@ -7,6 +7,7 @@ import { BookmarkPlus, MessagesSquare } from "lucide-react";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
 import { buddyReplyNote, transcriptNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import { RAIL_TOGGLE_CLEARANCE } from "../../../components/layout/ConversationRail";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
@@ -34,6 +35,19 @@ type BuddyConversationProps = {
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
+  /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
+  onStartFreshVisit?: () => void;
+  /** The chord named in that control's tooltip, where the caller has actually bound one. */
+  freshVisitShortcut?: string;
+  /**
+   * Leaves room at the top of the thread for a control floating over it.
+   *
+   * The rail's reopen button hangs in that corner rather than sitting in a bar of its own, so
+   * without this the first message starts underneath it. Only when there is one: 40px of empty
+   * page above every conversation to make room for a button most hires never see would be the
+   * wrong way round.
+   */
+  hasFloatingControl?: boolean;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
 };
@@ -74,6 +88,9 @@ export function BuddyConversation({
   aboveComposer,
   openError,
   onRetryOpen,
+  onStartFreshVisit,
+  freshVisitShortcut,
+  hasFloatingControl = false,
   focusComposerOnMount = false,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
@@ -86,7 +103,11 @@ export function BuddyConversation({
         data-testid="buddy-transcript"
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
-        <div className="app-page-frame flex min-w-0 flex-col gap-4 py-6">
+        <div
+          className={`app-page-frame flex min-w-0 flex-col gap-4 pb-6 ${
+            hasFloatingControl ? RAIL_TOGGLE_CLEARANCE : "pt-8"
+          }`}
+        >
           {/* The conversation as a whole, kept as one folded note.
               Above the thread rather than at the end of it, because the end of a conversation moves
               every time the buddy answers — an action that walks down the page as you talk is one
@@ -145,6 +166,8 @@ export function BuddyConversation({
             renderQuestionAction={renderQuestionAction}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            onStartFreshVisit={onStartFreshVisit}
+            freshVisitShortcut={freshVisitShortcut}
           />
         </div>
       </div>

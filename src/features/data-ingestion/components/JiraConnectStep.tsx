@@ -3,7 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService.ts";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
 
 /**
  * Jira connect form for an instance URL and a credential owned by the
@@ -33,7 +33,7 @@ export function JiraConnectStep({
   displayName: string;
   url: string;
   credentialName: string;
-  credentials: JiraCredentialsDto[];
+  credentials: AtlassianCredentialDto[];
   credentialsLoaded: boolean;
   credentialsLoading: boolean;
   credentialsError: string | null;
@@ -73,7 +73,7 @@ export function JiraConnectStep({
       {showNoCredentials && (
         <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
           No Jira credentials are stored for your account. Add one under Settings, Access Tokens,
-          Jira first, then come back to connect.
+          Atlassian first, then come back to connect.
         </div>
       )}
       <Field label="Display name" controlId="jira-display-name" disabled={isBusy}>
@@ -119,7 +119,7 @@ export function JiraConnectStep({
       </div>
       <p className="text-xs text-app-text-subtle">
         Jira account emails are stored with each credential. Manage them under Settings, Access
-        Tokens, Jira.
+        Tokens, Atlassian.
       </p>
       {credentialsError && (
         <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">

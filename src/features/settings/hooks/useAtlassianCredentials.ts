@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getMyJiraCredentials } from "../../../services/sources/jiraService";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
+import { getMyAtlassianCredentials } from "../../../services/sources/atlassianService";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 
-type UseJiraCredentialsResult = {
-  credentials: JiraCredentialsDto[];
+type UseAtlassianCredentialsResult = {
+  credentials: AtlassianCredentialDto[];
   loaded: boolean;
   error: string | null;
   isRefreshing: boolean;
@@ -14,17 +14,18 @@ type UseJiraCredentialsResult = {
    * successful add is reflected immediately even if the follow-up reload fails
    * or is aborted. A later `reload` reconciles with the server.
    */
-  addCredentialLocally: (credential: JiraCredentialsDto) => void;
+  addCredentialLocally: (credential: AtlassianCredentialDto) => void;
 };
 
 /**
- * Loads the Jira credentials owned by the authenticated user.
+ * Loads the Atlassian credentials owned by the authenticated user, shared by
+ * the Jira and Confluence connectors.
  *
  * When disabled, the hook settles into a loaded-empty state without fetching.
  * Reloads abort any in-flight request so stale data cannot win a race.
  */
-export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
-  const [credentials, setCredentials] = useState<JiraCredentialsDto[]>([]);
+export function useAtlassianCredentials(enabled = true): UseAtlassianCredentialsResult {
+  const [credentials, setCredentials] = useState<AtlassianCredentialDto[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -60,7 +61,7 @@ export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
 
     setIsRefreshing(true);
     try {
-      const list = await getMyJiraCredentials(controller.signal);
+      const list = await getMyAtlassianCredentials(controller.signal);
       if (id === requestIdRef.current && mountedRef.current) {
         setCredentials(list);
         setLoaded(true);
@@ -71,7 +72,7 @@ export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
       if (id === requestIdRef.current && mountedRef.current) {
         setLoaded(true);
         setError(
-          loadError instanceof Error ? loadError.message : "Failed to load Jira credentials.",
+          loadError instanceof Error ? loadError.message : "Failed to load Atlassian credentials.",
         );
       }
     } finally {
@@ -81,7 +82,7 @@ export function useJiraCredentials(enabled = true): UseJiraCredentialsResult {
     }
   }, [enabled]);
 
-  const addCredentialLocally = useCallback((credential: JiraCredentialsDto) => {
+  const addCredentialLocally = useCallback((credential: AtlassianCredentialDto) => {
     setCredentials((prev) =>
       prev.some((existing) => existing.displayName === credential.displayName)
         ? prev
