@@ -403,3 +403,53 @@ describe("a closed pile", () => {
     expect(onToggleStack).toHaveBeenCalledWith("c0");
   });
 });
+
+describe("moving a named area", () => {
+  /**
+   * The grid is handed the cards the current view is showing and the *whole* order separately, and
+   * a move has to be expressed over the second one: a reorder replaces the board's order outright,
+   * so one computed from what is on screen drops every card the view is hiding.
+   *
+   * The card moves already worked this way. Moving a whole area did not — it rebuilt the order by
+   * splicing the drawn blocks — which is exactly the bug that used to force arranging to clear the
+   * filter first.
+   */
+  it("keeps the cards the view is hiding when an area is stepped past its neighbour", () => {
+    const onReorder = vi.fn();
+
+    render(
+      <BoardGrid
+        board={board([currentTaskContent(), suggestedTasksContent()])}
+        groups={[{ id: "g1", name: "Paperwork", cardIds: ["c0"], collapsed: false }]}
+        // "c0" is in the area, "c1" is loose, and "hidden" is a card this view is not drawing.
+        boardOrder={["c0", "hidden", "c1"]}
+        onReorder={onReorder}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /move the paperwork area/i }), {
+      key: "ArrowDown",
+    });
+
+    expect(onReorder).toHaveBeenCalledWith(["hidden", "c1", "c0"]);
+  });
+
+  it("puts an area in front of the block it was stepped back past", () => {
+    const onReorder = vi.fn();
+
+    render(
+      <BoardGrid
+        board={board([currentTaskContent(), suggestedTasksContent()])}
+        groups={[{ id: "g1", name: "Paperwork", cardIds: ["c1"], collapsed: false }]}
+        boardOrder={["c0", "hidden", "c1"]}
+        onReorder={onReorder}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /move the paperwork area/i }), {
+      key: "ArrowUp",
+    });
+
+    expect(onReorder).toHaveBeenCalledWith(["c1", "c0", "hidden"]);
+  });
+});

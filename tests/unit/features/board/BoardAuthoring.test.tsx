@@ -75,6 +75,27 @@ describe("the cards the hire writes", () => {
     });
   });
 
+  it("opens the editor on the note as it is now, not as it was when the card mounted", () => {
+    const onEdit = vi.fn();
+    const { rerender } = render(
+      <BoardGrid board={board([note("Deploys\nare on Thursdays")])} onEdit={onEdit} />,
+    );
+
+    // What highlighting does to a note: the `==` live in its own text, so marking a sentence
+    // rewrites the card under an editor nobody has opened yet.
+    rerender(<BoardGrid board={board([note("Deploys\nare on ==Thursdays==")])} onEdit={onEdit} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /edit this note/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // Drafts seeded once, at mount, would put the pre-highlight version back here — the mark
+    // would disappear on the next edit, and nothing would say why.
+    expect(onEdit).toHaveBeenCalledWith("c0", {
+      kind: "NOTE",
+      text: "Deploys\nare on ==Thursdays==",
+    });
+  });
+
   it("keeps a note that is only a title", () => {
     const onEdit = vi.fn();
     render(<BoardGrid board={board([note("Deploys\nare on Thursdays")])} onEdit={onEdit} />);
