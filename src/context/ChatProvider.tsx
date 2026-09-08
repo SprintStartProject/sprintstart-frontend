@@ -100,6 +100,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // token re-sets `isStreaming`/`isThinking`/`streamingMessageId` even
   // though they only need to change once at the start of the stream.
   const streamingStartedRef = useRef(false);
+  // Set when a `tool_use` event lands mid-stream. Answer tokens that arrive
+  // after tool activity need a paragraph break before them, otherwise the
+  // first token of the post-tool answer glues onto pre-tool preamble text
+  // ("Let me search…Searching knowledge base…") inside the same bubble.
+  const sawToolUseRef = useRef(false);
 
   // Monotonic id per `sendMessage` call. Each handler captures the streamId
   // it was created for and no-ops if it doesn't match the current value —
@@ -224,6 +229,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       abortControllerRef.current = null;
       clearStreamTimeout();
       streamingStartedRef.current = false;
+      sawToolUseRef.current = false;
       streamIdRef.current += 1;
       latestLoadRef.current = null;
       if (draftRef.current && draftRef.current.rafId !== null) {
@@ -406,6 +412,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setThinkingState(null);
       setStreamingChatId(currentChatId);
       streamingStartedRef.current = false;
+      sawToolUseRef.current = false;
 
       // Initialize the rAF-batched draft so token/reasoning/citation events
       // append to a mutable buffer instead of triggering a state update each.
@@ -465,6 +472,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const resetStreamingState = () => {
         if (!isCurrentStream()) return;
         streamingStartedRef.current = false;
+        sawToolUseRef.current = false;
         abortControllerRef.current = null;
         setIsStreaming(false);
         setIsThinking(false);
@@ -488,6 +496,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             onToolUse: (tool) => {
               if (!isCurrentStream()) return;
               armStreamTimeout();
+              sawToolUseRef.current = true;
               setThinkingState(tool);
             },
 
@@ -521,6 +530,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
               const draft = draftRef.current;
               if (draft) {
+                // Paragraph break between any pre-tool preamble and the
+                // post-tool answer — at the first token after tool activity,
+                // and only when there is preamble to separate. Re-arms on
+                // every `tool_use`, so a multi-tool turn separates each round.
+                // trimEnd first: a preamble that already ends in a space or a
+                // newline would otherwise leave a trailing space before the
+                // break, or stack three-plus newlines, purely depending on how
+                // the model happened to chunk it.
+                if (sawToolUseRef.current && draft.content.trim() !== "") {
+                  draft.content = `${draft.content.trimEnd()}\n\n`;
+                  sawToolUseRef.current = false;
+                }
                 draft.content += token;
                 scheduleDraftFlush();
               }
@@ -632,6 +653,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     streamingStartedRef.current = false;
+    sawToolUseRef.current = false;
     setIsStreaming(false);
     setIsThinking(false);
     setStreamingMessageId(null);

@@ -2,6 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { http, HttpResponse } from "msw";
+import { server } from "../setup/vitest.setup";
 import { DataIngestionPage } from "../../../src/pages/DataIngestionPage";
 import { createProjectContextValue, createSelectableProject } from "../setup/projectContext";
 
@@ -993,6 +995,76 @@ describe("DataIngestionPage", () => {
       });
     });
     expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
+  });
+
+  it("applies the global sync schedule to every Confluence connection", async () => {
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+    });
+
+    const scheduleRequests: unknown[] = [];
+    server.use(
+      http.get("/api/v1/confluence/projects/:projectId/connections", () =>
+        HttpResponse.json([
+          {
+            id: "conn-1",
+            projectId: "proj1",
+            baseUrl: "https://acme.atlassian.net",
+            spaceId: "123456",
+            spaceKey: "ENG",
+            spaceName: "Engineering",
+            credentialName: "default",
+            pageAllowlist: [],
+            pageDenylist: [],
+            credentialsConfigured: true,
+            createdAt: "2026-07-01T00:00:00Z",
+            updatedAt: "2026-07-01T00:00:00Z",
+            version: 1,
+            sourceEnabled: true,
+            autoUpdate: true,
+            spec: { type: "INTERVAL", everyMinutes: 60 },
+            schedule: "every 60m",
+            nextSyncAt: null,
+          },
+        ]),
+      ),
+      http.put(
+        "/api/v1/confluence/projects/:projectId/connections/:connectionId/schedule",
+        async ({ request, params }) => {
+          scheduleRequests.push({ connectionId: params.connectionId, body: await request.json() });
+          return HttpResponse.json({});
+        },
+      ),
+    );
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const manageButton = await screen.findByRole("button", { name: /manage sync settings/i });
+    await user.click(manageButton);
+
+    expect(await screen.findByText("Confluence Sync Settings")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: /toggle global confluence auto update/i }));
+    await user.click(screen.getByRole("button", { name: /apply globally/i }));
+
+    await waitFor(() => {
+      expect(scheduleRequests).toEqual([
+        {
+          connectionId: "conn-1",
+          body: { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
+        },
+      ]);
+    });
   });
 
   it("opens the connectors modal from Manage connectors", async () => {

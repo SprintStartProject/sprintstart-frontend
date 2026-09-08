@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
+import { useReducedMotion } from "framer-motion";
 import { Key, Palette, Rocket, Settings, User } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
@@ -82,6 +83,43 @@ export function SettingsPage() {
     [canManagePats],
   );
 
+  const prefersReducedMotion = useReducedMotion();
+
+  /**
+   * Scrolls to a section instead of letting the browser jump to the anchor.
+   *
+   * The entries stay real links -- the href is what makes them shareable, middle-clickable and
+   * announced as navigation -- and this only replaces how the page gets there. `scroll-mt-24`
+   * on the section (see `SettingsSection`) is what keeps the heading clear of the mobile top
+   * bar, at either speed.
+   *
+   * The hash is written with `replaceState` rather than by the default action, because
+   * assigning it is itself what makes the browser jump. Focus then moves to the section so a
+   * keyboard user carries on from where they were sent rather than from the nav -- with
+   * `preventScroll`, otherwise focusing would undo the smooth scroll with a jump of its own.
+   */
+  const scrollToSection = (event: MouseEvent<HTMLAnchorElement>, id: SectionId) => {
+    // Let the browser handle a modified click (new tab, new window) as a link.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return;
+    }
+
+    const target = document.getElementById(id);
+    // Nothing to scroll to -- fall back to the default anchor behaviour.
+    if (!target) return;
+
+    event.preventDefault();
+
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+
+    window.history.replaceState(null, "", `#${id}`);
+
+    target.focus({ preventScroll: true });
+  };
+
   return (
     <div className="h-full min-h-screen w-full">
       <header className="border-b border-app-border bg-app-bg">
@@ -104,6 +142,7 @@ export function SettingsPage() {
               <a
                 key={id}
                 href={`#${id}`}
+                onClick={(event) => scrollToSection(event, id)}
                 className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
               >
                 <Icon className="h-4 w-4" aria-hidden />

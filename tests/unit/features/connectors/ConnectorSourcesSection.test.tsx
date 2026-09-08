@@ -160,4 +160,61 @@ describe("ConnectorSourcesSection", () => {
 
     expect(screen.getByRole("button", { name: /save 1 change/i })).toBeInTheDocument();
   });
+
+  it("offers a Confluence space the same include/exclude toggle as any other source", async () => {
+    const user = userEvent.setup();
+    const confluenceConnector: ConnectorListItem = {
+      ...connector,
+      id: "confluence",
+      name: "Confluence Cloud Connector",
+      meta: {
+        label: "Confluence Cloud Connector",
+        description: "Pages and spaces from connected Confluence Cloud tenants.",
+        icon: GitBranch,
+      },
+    };
+
+    const space = {
+      id: "11111111-1111-1111-1111-111111111111",
+      name: "Engineering",
+      url: "https://acme.atlassian.net/wiki/spaces/ENG",
+      enabled: true,
+    };
+    let patchUrl: string | null = null;
+
+    server.use(
+      http.get("/api/v1/connectors/confluence/sources", () =>
+        HttpResponse.json({ connectorId: "confluence", sources: [space] }),
+      ),
+      http.patch("/api/v1/connectors/confluence/sources/status", ({ request }) => {
+        patchUrl = request.url;
+
+        return HttpResponse.json({
+          connectorId: "confluence",
+          sources: [{ ...space, enabled: false }],
+        });
+      }),
+    );
+
+    render(<ConnectorSourcesSection connector={confluenceConnector} projectId="proj-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Engineering")).toBeInTheDocument();
+    });
+
+    // Enabling and disabling is all this modal does — no connecting, no syncing.
+    expect(screen.queryByRole("button", { name: /add space/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /exclude engineering/i }));
+    await user.click(screen.getByRole("button", { name: /save 1 change/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /include engineering/i })).toBeInTheDocument();
+    });
+
+    // Confluence sources belong to one project, so the backend rejects a patch
+    // that does not name it.
+    expect(patchUrl).toContain("projectId=proj-1");
+  });
 });

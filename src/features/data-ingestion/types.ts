@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD";
+export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
 
 export type BackendProjectSourceStatus =
   | "CONNECTED"
@@ -189,6 +189,18 @@ export type JiraInstanceSourceDetails = {
   credentialUserEmail: string;
 };
 
+/**
+ * Confluence-specific identity for a source card.
+ */
+export type ConfluenceSpaceSourceDetails = {
+  connectionId: string;
+  baseUrl: string;
+  spaceId: string;
+  spaceKey: string;
+  spaceName?: string | null;
+  credentialName?: string;
+};
+
 export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
 
 /**
@@ -266,6 +278,8 @@ export type SourceDetailsSource = {
   githubRepository?: GithubRepositoryDetails | null;
   /** Jira instance identity; null/absent for non-Jira sources. */
   jiraInstance?: JiraInstanceSourceDetails | null;
+  /** Confluence space identity; null/absent for non-Confluence sources. */
+  confluenceSpace?: ConfluenceSpaceSourceDetails | null;
   description?: string;
   nextSync?: string;
 };
@@ -287,6 +301,7 @@ export type DataSource = SourceDetailsSource & {
   sharesSourceSystem: boolean;
   failedItems: FailedArtifact[];
   githubRepository: GithubRepositoryDetails | null;
+  confluenceSpace?: ConfluenceSpaceSourceDetails | null;
   /** Per-artifact-type last-sync timestamps (GitHub, from endpoint #5). */
   lastCommitsSyncAt: string | null;
   lastIssuesSyncAt: string | null;

@@ -157,6 +157,8 @@ export function SidebarNavLink({
   const centerYRef = useRef(0);
 
   useLayoutEffect(() => {
+    let frame = 0;
+
     function measure() {
       const element = elementRef.current;
       if (!element) return;
@@ -165,10 +167,36 @@ export function SidebarNavLink({
       centerYRef.current = rect.top + rect.height / 2;
     }
 
-    measure();
-    window.addEventListener("resize", measure);
+    // Scroll and resize both fire far faster than the layout they invalidate,
+    // and every row runs its own handler — so coalesce into one measurement
+    // per frame instead of one per event.
+    function scheduleMeasure() {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    }
 
-    return () => window.removeEventListener("resize", measure);
+    measure();
+    window.addEventListener("resize", scheduleMeasure);
+    // Bubble phase, so this only fires for the document scroller.
+    window.addEventListener("scroll", scheduleMeasure, { passive: true });
+
+    // The sidebar's own scroll container is the other thing that moves these
+    // rows. Listening on `window` in the *capture* phase would catch it, but
+    // would also re-measure every row on every scroll anywhere in the app —
+    // main content, drawers, tables — which is exactly the per-entry
+    // `getBoundingClientRect` cost `centerYRef` exists to avoid.
+    const scroller = elementRef.current?.closest("[data-sidebar-scroll]");
+    scroller?.addEventListener("scroll", scheduleMeasure, { passive: true });
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure);
+      scroller?.removeEventListener("scroll", scheduleMeasure);
+    };
   });
 
   // Derived from the pointer rather than from `pointerenter` on this element.
@@ -301,13 +329,10 @@ export function SidebarNavLink({
                                         reader -- and to anyone who has reduced
                                         motion on, which is why the colour
                                         change is not conditional on it.
-
-                                        Conditional on the marker, which it was
-                                        not: rendered unconditionally, every
-                                        entry in the sidebar announced "Needs
-                                        attention", so the one entry that really
-                                        did said nothing a screen reader could
-                                        distinguish. */}
+                                        Only rendered when there is actually
+                                        something waiting: unconditional, it
+                                        made every entry in the sidebar
+                                        announce itself as needing attention. */}
                   {hasAttentionMarker && (
                     <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
                   )}

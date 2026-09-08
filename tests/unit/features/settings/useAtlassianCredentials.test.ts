@@ -1,47 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useJiraCredentials } from "../../../../src/features/settings/hooks/useJiraCredentials";
-import type { JiraCredentialsDto } from "../../../../src/services/sources/jiraService";
+import { useAtlassianCredentials } from "../../../../src/features/settings/hooks/useAtlassianCredentials";
+import type { AtlassianCredentialDto } from "../../../../src/services/sources/atlassianService";
 
-vi.mock("../../../../src/services/sources/jiraService", () => ({
-  getMyJiraCredentials: vi.fn(),
+vi.mock("../../../../src/services/sources/atlassianService", () => ({
+  getMyAtlassianCredentials: vi.fn(),
 }));
 
-import { getMyJiraCredentials } from "../../../../src/services/sources/jiraService";
+import { getMyAtlassianCredentials } from "../../../../src/services/sources/atlassianService";
 
-const cred = (displayName: string): JiraCredentialsDto => ({
+const cred = (displayName: string): AtlassianCredentialDto => ({
   userEmail: "a@b.com",
   displayName,
 });
 
-describe("useJiraCredentials", () => {
+describe("useAtlassianCredentials", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("loads the authenticated user's credentials on mount", async () => {
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([cred("default"), cred("ci")]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([cred("default"), cred("ci")]);
 
-    const { result } = renderHook(() => useJiraCredentials());
+    const { result } = renderHook(() => useAtlassianCredentials());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.credentials.map((c) => c.displayName)).toEqual(["default", "ci"]);
     expect(result.current.error).toBeNull();
-    expect(getMyJiraCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(getMyAtlassianCredentials).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
   it("settles into a loaded-empty state without fetching when disabled", async () => {
-    const { result } = renderHook(() => useJiraCredentials(false));
+    const { result } = renderHook(() => useAtlassianCredentials(false));
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.credentials).toEqual([]);
-    expect(getMyJiraCredentials).not.toHaveBeenCalled();
+    expect(getMyAtlassianCredentials).not.toHaveBeenCalled();
   });
 
   it("surfaces an error message when loading fails", async () => {
-    vi.mocked(getMyJiraCredentials).mockRejectedValue(new Error("Network down"));
+    vi.mocked(getMyAtlassianCredentials).mockRejectedValue(new Error("Network down"));
 
-    const { result } = renderHook(() => useJiraCredentials());
+    const { result } = renderHook(() => useAtlassianCredentials());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.error).toBe("Network down");
@@ -49,11 +49,11 @@ describe("useJiraCredentials", () => {
   });
 
   it("reloads credentials via reload", async () => {
-    vi.mocked(getMyJiraCredentials)
+    vi.mocked(getMyAtlassianCredentials)
       .mockResolvedValueOnce([cred("a")])
       .mockResolvedValueOnce([cred("a"), cred("b")]);
 
-    const { result } = renderHook(() => useJiraCredentials());
+    const { result } = renderHook(() => useAtlassianCredentials());
 
     await waitFor(() =>
       expect(result.current.credentials.map((c) => c.displayName)).toEqual(["a"]),
@@ -69,15 +69,15 @@ describe("useJiraCredentials", () => {
   });
 
   it("a slow stale fetch does not overwrite a newer one", async () => {
-    let resolveSlow: (list: JiraCredentialsDto[]) => void = () => {};
-    const slow = new Promise<JiraCredentialsDto[]>((resolve) => {
+    let resolveSlow: (list: AtlassianCredentialDto[]) => void = () => {};
+    const slow = new Promise<AtlassianCredentialDto[]>((resolve) => {
       resolveSlow = resolve;
     });
-    vi.mocked(getMyJiraCredentials)
+    vi.mocked(getMyAtlassianCredentials)
       .mockReturnValueOnce(slow)
       .mockResolvedValueOnce([cred("fresh")]);
 
-    const { result } = renderHook(() => useJiraCredentials());
+    const { result } = renderHook(() => useAtlassianCredentials());
 
     await waitFor(() => expect(result.current.isRefreshing).toBe(true));
     await act(async () => {
