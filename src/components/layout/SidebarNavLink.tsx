@@ -99,6 +99,9 @@ type SidebarNavLinkProps = {
   /**
    * How many things are waiting behind this entry. Shown as a pill when above
    * zero; a count of nothing is not news, so zero renders nothing at all.
+   *
+   * A count above zero *is* an attention marker, and raises one on its own --
+   * see {@link needsAttention}. Callers pass the number, not the marker.
    */
   count?: number;
   /**
@@ -144,6 +147,19 @@ export function SidebarNavLink({
 }: SidebarNavLinkProps) {
   const prefersReducedMotion = useReducedMotion();
   const indicatorTransition = prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken;
+
+  /**
+   * One marker language for the whole sidebar: an entry with work waiting
+   * behind it has an amber icon that stirs every few seconds, whether what is
+   * waiting is countable or not.
+   *
+   * Derived here rather than asked of the caller so the two cannot come apart.
+   * A number in the trailing slot already means "there is something here" --
+   * an entry that shows one and stays grey is the same entry disagreeing with
+   * itself, and every caller passing a count would otherwise have to remember
+   * to raise the flag as well.
+   */
+  const needsAttention = hasAttentionMarker || count > 0;
 
   const elementRef = useRef<HTMLDivElement>(null);
   // Keyboard users get no pointer, so focus stands in for it and asks for the
@@ -293,7 +309,7 @@ export function SidebarNavLink({
                                     specific arbitrary variants. */}
                 <motion.span
                   animate={
-                    hasAttentionMarker && !prefersReducedMotion
+                    needsAttention && !prefersReducedMotion
                       ? {
                           y: [0, -4, 0, -2, 0],
                           rotate: [0, -10, 8, -4, 0],
@@ -301,7 +317,7 @@ export function SidebarNavLink({
                       : { y: 0, rotate: 0 }
                   }
                   transition={
-                    hasAttentionMarker
+                    needsAttention
                       ? {
                           duration: 0.9,
                           // Long pause between bursts:
@@ -315,7 +331,7 @@ export function SidebarNavLink({
                       : { duration: 0.2 }
                   }
                   className={`flex shrink-0 transition-colors ${
-                    hasAttentionMarker
+                    needsAttention
                       ? "text-app-warning-solid"
                       : isHighlighted
                         ? "text-white"
@@ -332,8 +348,13 @@ export function SidebarNavLink({
                                         Only rendered when there is actually
                                         something waiting: unconditional, it
                                         made every entry in the sidebar
-                                        announce itself as needing attention. */}
-                  {hasAttentionMarker && (
+                                        announce itself as needing attention.
+
+                                        Stands down for a count, which says the
+                                        same thing and says how many -- both
+                                        would read out "Escalation Inbox, open
+                                        escalations, 3 open escalations". */}
+                  {needsAttention && count === 0 && (
                     <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
                   )}
                 </motion.span>
@@ -347,13 +368,16 @@ export function SidebarNavLink({
                                     with work waiting behind it. */}
                 {count > 0 ? (
                   <span className="ml-auto flex items-center">
+                    {/* The same amber as the icon beside it, and the same
+                                            amber on the active row as off it. This is the
+                                            second half of one signal, not a badge of its
+                                            own: in brand blue it read as a different kind
+                                            of thing from the marker the Dashboard and PM
+                                            Dashboard entries show, when it is the same
+                                            kind of thing carrying a number. */}
                     <span
                       aria-hidden="true"
-                      className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold ${
-                        isHighlighted
-                          ? "bg-white/20 text-white"
-                          : "bg-app-brand-soft text-app-brand-text"
-                      }`}
+                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-[11px] font-semibold text-app-warning-text"
                     >
                       {count}
                     </span>
