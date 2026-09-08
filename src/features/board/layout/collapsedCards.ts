@@ -1,3 +1,5 @@
+import { notifyBoardStorageWritten } from "./boardStorage";
+
 /**
  * Which of a board's cards the hire has folded shut, between visits.
  *
@@ -55,4 +57,6 @@ export function writeCollapsedCards(boardId: string, ids: Set<string>): void {
   } catch {
     // Nothing to do and nothing to say: the fold still holds for this visit.
   }
+
+  notifyBoardStorageWritten();
 }

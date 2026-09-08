@@ -1,4 +1,4 @@
-import { MessageSquareText, X } from "lucide-react";
+import { BookmarkPlus, MessageSquareText, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -14,6 +14,8 @@ import { ThinkingIndicator } from "../features/chatbot/components/ThinkingIndica
 import { CitationPopover } from "../features/chatbot/components/CitationPopover.tsx";
 import { ChatEmptyState } from "../features/chatbot/components/ChatEmptyState.tsx";
 import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
+import { SaveToBoard } from "../features/board/save/SaveToBoard";
+import { chatLink } from "../features/board/generation/chatToCard";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
 import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
 import type { SelectedCitation } from "../context/ChatContext.ts";
@@ -437,6 +439,27 @@ export function ChatPage() {
               isRailOpen ? "pt-8" : RAIL_TOGGLE_CLEARANCE
             }`}
           >
+            {/* The whole conversation, kept as a way back to it rather than as a copy of it — see
+                `chatToCard.ts`. Only once there is a chat: on the empty state there is nothing to
+                keep, and a button offering to keep nothing is a button that has to be explained.
+
+                At the head of the transcript rather than in the page header, which the chat now
+                shares with the buddy and which carries the surface control and nothing else — and
+                at the head rather than the foot, because the end of a conversation moves every
+                time the assistant answers. The buddy's own "keep this" sits in the same place. */}
+            {activeChat && (
+              <div className="flex justify-end">
+                <SaveToBoard
+                  request={() => chatLink(activeChat)}
+                  label="Keep this chat"
+                  savedLabel="On your board"
+                  description="A link back to this conversation."
+                  icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+                  className="shrink-0"
+                />
+              </div>
+            )}
+
             {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
                             switch, new messages). Per AGENTS.md §11. */}
