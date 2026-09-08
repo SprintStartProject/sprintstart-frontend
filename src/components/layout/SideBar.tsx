@@ -61,6 +61,16 @@ type SidebarContentProps = {
  */
 const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
+/**
+ * What the number on the inbox entry counts, for a screen reader.
+ *
+ * Handed only to that entry rather than to every one of them: the wording is
+ * this entry's, and a future counted entry inheriting it would quietly announce
+ * its own total as escalations.
+ */
+const describeOpenEscalations = (open: number) =>
+  `${open} open ${open === 1 ? "escalation" : "escalations"}`;
+
 const navItems: SidebarNavItem[] = [
   {
     label: "Dashboard",
@@ -301,7 +311,9 @@ function SidebarContent({
                       : "Open skip requests or unread feedback"
                   }
                   count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
-                  countLabel={(open) => `${open} open ${open === 1 ? "escalation" : "escalations"}`}
+                  countLabel={
+                    item.path === ESCALATION_INBOX_PATH ? describeOpenEscalations : undefined
+                  }
                   onNavigate={onNavigate}
                 />
               ))}

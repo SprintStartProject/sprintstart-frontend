@@ -91,7 +91,7 @@ describe("SidebarNavLink marker consistency", () => {
   });
 
   it("wears the marker's amber rather than a palette of its own", () => {
-    const { container } = render(<Harness count={3} />);
+    render(<Harness count={3} />);
 
     const pill = screen.getByText("3");
     expect(pill).toHaveClass("bg-app-warning-bg", "text-app-warning-text");
