@@ -39,12 +39,20 @@ const DOCK_INFLUENCE_RADIUS_PX = 96;
  *
  * One pitch specifically, because of the identity `cos²x + sin²x = 1`. A row
  * at distance `d` shows `cos²(d/P · π/2)`; its neighbour, being `P - d` away,
- * shows `sin²(d/P · π/2)`, and the two always sum to exactly 1. So the sidebar
- * carries precisely one row's worth of tint at every pointer position, split
- * between at most two adjacent rows, and the highlight travels from one to the
- * next without the total ever dipping. Tightening it further overcorrects: at
- * 30px both rows sit at 0.15 midway between them, and the highlight visibly
- * blinks out in the gap.
+ * shows `sin²(d/P · π/2)`, and the two always sum to exactly 1. So within a
+ * section the sidebar carries precisely one row's worth of tint, split between
+ * at most two adjacent rows, and the highlight travels from one to the next
+ * without the total ever dipping. Tightening it further overcorrects: at 30px
+ * both rows sit at 0.15 midway between them, and the highlight visibly blinks
+ * out in the gap.
+ *
+ * Between sections the partition does not hold, and should not. `SideBar` puts
+ * 20px of padding plus a heading there, so the rows either side are far more
+ * than one pitch apart and the tint drops to nothing in between. That is the
+ * honest answer: the pointer is over a heading, and no row is the one you
+ * would click. The lift still spans the gap on its wider radius, so the sweep
+ * itself stays continuous -- it is only the claim about *which row* that goes
+ * quiet, which is the one claim that has nothing to say there.
  */
 const NAV_ROW_PITCH_PX = 45;
 
@@ -284,9 +292,11 @@ export function SidebarNavLink({
   // radii, which is the whole reason this is a second value and not a factor
   // applied to the first.
   //
-  // Not gated on reduced motion: this is a colour, and someone who has asked
-  // for less movement still needs to see which row they are on.
+  // Gated on reduced motion like the lift, because both render paths hand the
+  // job to a plain CSS `group-hover` there -- the colour still happens, it is
+  // just not driven by proximity to the pointer.
   const targetTint = useTransform(pointerY, (y) => {
+    if (prefersReducedMotion) return 0;
     if (isFocused) return 1;
 
     return getInfluence(y, centerYRef.current, NAV_ROW_PITCH_PX, DOCK_TINT_FALLOFF_EXPONENT);
@@ -299,7 +309,7 @@ export function SidebarNavLink({
   const tintOpacity = useTransform(tint, (value) => value * DOCK_TINT_OPACITY);
   // Nested inside the fill, so this multiplies with the value above rather
   // than replacing it: the ring effectively runs the tint cubed. Mid-handoff
-  // that puts it near a sixteenth while the fill sits at a half, so crossing
+  // that puts it at an eighth while the fill sits at a half, so crossing
   // between rows is a single patch of light moving, not two outlined boxes
   // fading past each other. It arrives once the pointer has settled on a row,
   // which is the only moment an edge is worth drawing.
@@ -376,12 +386,28 @@ export function SidebarNavLink({
                                     still answering the pointer. No ring on this one:
                                     the pill is already a solid shape with its own
                                     edge, and outlining it would say "hovered" in the
-                                    same breath as "selected". */}
-                  <motion.span
-                    aria-hidden="true"
-                    style={{ opacity: tintOpacity }}
-                    className="absolute inset-0 rounded-[10px] bg-app-brand-border-strong"
-                  />
+                                    same breath as "selected".
+
+                                    Falls back to the same binary `group-hover` its
+                                    neighbours use under reduced motion, rather than
+                                    riding the pointer spring. Without the fallback
+                                    this row was the odd one out in exactly the
+                                    setting that asks for less: every other entry lit
+                                    only while actually hovered, while the selected
+                                    one brightened and dimmed continuously as the
+                                    pointer merely passed within a row of it. */}
+                  {prefersReducedMotion ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-[10px] bg-app-brand-border-strong opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
+                    />
+                  ) : (
+                    <motion.span
+                      aria-hidden="true"
+                      style={{ opacity: tintOpacity }}
+                      className="absolute inset-0 rounded-[10px] bg-app-brand-border-strong"
+                    />
+                  )}
                 </motion.span>
               ) : prefersReducedMotion ? (
                 <span
