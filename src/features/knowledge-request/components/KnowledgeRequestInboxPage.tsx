@@ -7,6 +7,7 @@ import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
 import { useFetch } from "../../../hooks/useFetch";
+import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -117,18 +118,32 @@ export function KnowledgeRequestInboxPage() {
     [openLoading, openCount, answersLoading, answeredCount],
   );
 
+  // A two-finger swipe moves between the tabs, the same gesture the other tabbed pages take.
+  // Aiming at the pill is still there for anybody who prefers it; this is the trackpad way in.
+  // The ref goes on the page rather than on `<main>` -- AdminPage's reasoning: `<main>` is only
+  // as tall as its content, so a short queue leaves the bottom half of the viewport dead and the
+  // gesture reads as broken rather than as absent.
+  const swipeRef = useSwipeableTabs<Tab, HTMLElement>({
+    order: TAB_ORDER,
+    value: tab,
+    onChange: setTab,
+  });
+
   return (
     // No root background: the app-wide aurora and cursor-glow canvas sit behind
     // every route, and painting `bg-app-bg` here would hide them — the same
     // choice the dashboard and PM dashboard make. Only the header band and the
     // cards carry their own surfaces.
-    <div className="min-h-screen">
+    <div ref={swipeRef} className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader
             icon={Inbox}
             title="Escalation inbox"
-            subtitle="Questions the buddy could not answer, sent to a person. Answer one once and it becomes durable knowledge the buddy serves to everyone after."
+            // Kept to the length the other pages' subtitles run to: `max-w-2xl` wraps anything
+            // longer onto a third line, and the header band -- and the rule under it -- then
+            // sits lower here than on every page a PM switches between.
+            subtitle="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
           />
         </div>
       </header>
