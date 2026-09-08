@@ -189,10 +189,16 @@ export function fromWire(wire: Partial<BoardDocumentWire> | null | undefined): B
     marks: Object.fromEntries(
       Object.entries(wire?.marks ?? {}).map(([id, marks]) => [
         id,
-        (marks ?? []).map((mark) => ({
-          text: mark.text,
-          color: toHighlightColor(String(mark.color).toLowerCase()),
-        })),
+        (marks ?? [])
+          // Blank ones dropped, exactly as `cardMarks.ts` drops them on the way out of storage. A
+          // mark is matched by its text, and empty text matches at every position: `Marked` walks
+          // the card looking for the next occurrence, and one that is always at the front and
+          // consumes nothing is a loop that never ends.
+          .filter((mark) => typeof mark?.text === "string" && mark.text.trim().length > 0)
+          .map((mark) => ({
+            text: mark.text,
+            color: toHighlightColor(String(mark.color).toLowerCase()),
+          })),
       ]),
     ),
     markLabels: Object.fromEntries(

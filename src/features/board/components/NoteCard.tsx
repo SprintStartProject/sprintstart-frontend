@@ -81,6 +81,20 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
     setEditing(false);
   };
 
+  /**
+   * Opens the editor on the note as it is *now*, not as it was when this card mounted.
+   *
+   * The drafts are seeded once, at mount, and the note's text moves underneath them: highlighting a
+   * sentence rewrites it (the `==` live in the text — see `marks/markup.ts`), and so does an edit
+   * made anywhere else. Without this, opening the editor showed the version from before the
+   * highlight and saving put it back — the mark disappeared, and nothing said why.
+   */
+  const startEditing = () => {
+    setTitleDraft(heading);
+    setBodyDraft(body);
+    setEditing(true);
+  };
+
   return (
     <BoardCardFrame
       icon={PenLine}
@@ -104,7 +118,7 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
             variant="ghost"
             size="sm"
             iconOnly
-            onClick={() => setEditing(true)}
+            onClick={startEditing}
             aria-label="Edit this note"
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />

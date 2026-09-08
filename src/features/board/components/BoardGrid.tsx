@@ -877,12 +877,32 @@ export function BoardGrid({
     (from: number, to: number) => {
       if (!onReorder || from === to || to < 0 || to >= blocks.length) return;
 
-      const next = [...blocks];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      onReorder(next.flatMap((block) => block.cards.map((card) => card.id)));
+      // Expressed over the *whole* order, the way {@link moveTo} is, and never over the blocks on
+      // screen. Rebuilding the order from the blocks was right only while arranging began by
+      // clearing every cut — narrowed, it dropped every card the view was hiding, which is the one
+      // thing a reorder must never do.
+      //
+      // A block is a set of cards that need not be contiguous in the board's own order: an area
+      // gathers its members from wherever they sit. So the move is "take these out, and put them
+      // back beside the block they were aimed at" rather than a splice of one element.
+      const moved = blocks[from].cards.map((card) => card.id);
+      if (moved.length === 0) return;
+
+      const movedIds = new Set(moved);
+      const rest = ids.filter((id) => !movedIds.has(id));
+
+      // Past the target's far edge going down, in front of its near edge going up — which is what
+      // stepping a block past its neighbour has always meant.
+      const targetAt = blocks[to].cards
+        .map((card) => rest.indexOf(card.id))
+        .filter((index) => index !== -1);
+      if (targetAt.length === 0) return;
+
+      const at = from < to ? Math.max(...targetAt) + 1 : Math.min(...targetAt);
+
+      onReorder([...rest.slice(0, at), ...moved, ...rest.slice(at)]);
     },
-    [blocks, onReorder],
+    [blocks, ids, onReorder],
   );
 
   /** A dragged area lands on whatever block its middle is over, the way a dragged card does. */

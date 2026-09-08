@@ -244,7 +244,10 @@ export function ChecklistCard({
           highlighted two lines has already said which part they are stuck on. */}
       <AskTheBuddy
         question={questionAboutChecklist(
-          content.title,
+          // The readable title, for the same reason the header shows it: the marker is there so a
+          // generation run can recognise its own work, and it has no business in a sentence the
+          // hire is about to send.
+          content.title === null ? null : readableTitle(content.title),
           content.items.filter((item) => !item.done).length,
           marks.map((mark) => mark.text),
         )}
