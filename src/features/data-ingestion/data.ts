@@ -289,12 +289,17 @@ export function createConfluenceSourceFromInstance(
     failedItems: status.failedItems,
     githubRepository: null,
     jiraInstance: null,
+    // Same shape as the connection-built card below: the details drawer only
+    // renders the space name and credential rows when they are present, and a
+    // card must not lose them just because a status row exists for it.
     confluenceSpace: connection
       ? {
           connectionId: connection.id,
           baseUrl: connection.baseUrl,
           spaceId: connection.spaceId,
           spaceKey: connection.spaceKey,
+          spaceName: connection.spaceName,
+          credentialName: connection.credentialName,
         }
       : null,
     lastCommitsSyncAt: null,

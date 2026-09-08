@@ -14,6 +14,7 @@ import {
   createJiraDraft,
   createUploadDraft,
   hasFailedSources,
+  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
@@ -277,7 +278,7 @@ export function AddSourceModal({
           : addType === "CONFLUENCE"
             ? Boolean(
                 confluenceBaseUrl.trim() &&
-                confluenceSpaceId.trim() &&
+                isValidConfluenceSpaceId(confluenceSpaceId) &&
                 selectedConfluenceCredential,
               )
             : false;

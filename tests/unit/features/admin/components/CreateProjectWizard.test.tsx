@@ -605,6 +605,28 @@ describe("CreateProjectWizard", () => {
     );
   });
 
+  it("refuses to stage a Confluence space key, which is not the numeric space ID", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(
+      screen.getByRole("button", { name: /indexes pages, hierarchical documents/i }),
+    );
+    await screen.findByText(/Team token - me@example.com/i);
+
+    await user.type(
+      screen.getByLabelText("Confluence base URL"),
+      "https://acme.atlassian.net/wiki",
+    );
+    // "DOCS" is what Confluence's own UI shows, so it is the obvious thing to
+    // paste — and the backend would only reject it at provisioning time.
+    await user.type(screen.getByLabelText("Space ID"), "DOCS");
+
+    expect(screen.getByRole("button", { name: /add to list/i })).toBeDisabled();
+  });
+
   it("adds an Atlassian credential inline while staging a Confluence space and selects the new one", async () => {
     vi.mocked(getMyAtlassianCredentials)
       .mockResolvedValueOnce([]) // initial load: none stored

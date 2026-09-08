@@ -509,5 +509,38 @@ describe("data-ingestion data helpers", () => {
       expect(source.ingestionStatusLabel).toBe("Synced");
       expect(source.artifacts).toBe(12);
     });
+
+    it("keeps spaceName and credentialName once a status row takes over the card", () => {
+      const status: SourceInstanceIngestionStatus = {
+        sourceSystem: "CONFLUENCE",
+        sourceId: "https://myteam.atlassian.net|123456",
+        displayName: "Docs Space",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://myteam.atlassian.net/wiki/spaces/DOCS",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-08-28T10:00:00Z",
+        ingestedCount: 10,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 12,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      };
+
+      const source = createConfluenceSourceFromInstance(status, {
+        ...confluenceConn,
+        spaceName: "Docs Space",
+        credentialName: "team-cred",
+      });
+
+      expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
+      expect(source.confluenceSpace?.credentialName).toBe("team-cred");
+    });
   });
 });

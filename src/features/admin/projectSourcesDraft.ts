@@ -6,7 +6,6 @@ import { connectJiraInstance } from "../../services/sources/jiraService";
 import { confluenceService } from "../../services/sources/confluenceService";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
 import { knowledgeService } from "../../services/knowledgeService";
-import { ApiError } from "../../services/apiClient";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
 
 /**
@@ -180,6 +179,16 @@ export function createUploadDraft(displayName: string, files: File[]): UploadDra
   };
 }
 
+/**
+ * Whether a Confluence space ID is well-formed. Only the numeric space ID is
+ * accepted, so the space *key* ("ENG") — the value actually visible in
+ * Confluence's own UI, and the obvious thing to paste — has to be caught while
+ * the source is being staged rather than at provisioning time.
+ */
+export function isValidConfluenceSpaceId(spaceId: string): boolean {
+  return /^\d+$/.test(spaceId.trim());
+}
+
 export function createConfluenceDraft(params: {
   displayName?: string;
   baseUrl: string;
@@ -350,20 +359,17 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
   }
 
   if (source.type === "CONFLUENCE") {
-    try {
-      await confluenceService.createConnection(projectId, {
-        baseUrl: source.baseUrl,
-        spaceId: source.spaceId,
-        credentialName: source.credentialName,
-        pageAllowlist: [],
-        pageDenylist: [],
-      });
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        throw new Error("That Atlassian credential no longer exists. Pick another one and retry.");
-      }
-      throw error;
-    }
+    // No error remapping here: a failed connect comes back with a precise
+    // message ("Confluence space 123 was not found", "Atlassian credential 'x'
+    // was not found"), and 404 covers both cases — the backend's own message is
+    // more useful than anything this layer could guess from the status alone.
+    await confluenceService.createConnection(projectId, {
+      baseUrl: source.baseUrl,
+      spaceId: source.spaceId,
+      credentialName: source.credentialName,
+      pageAllowlist: [],
+      pageDenylist: [],
+    });
 
     return false;
   }

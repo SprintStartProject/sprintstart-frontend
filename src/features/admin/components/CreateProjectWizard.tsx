@@ -18,6 +18,7 @@ import {
   createJiraDraft,
   createUploadDraft,
   hasFailedSources,
+  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
@@ -451,7 +452,7 @@ export function CreateProjectWizard({
           : addType === "CONFLUENCE"
             ? Boolean(
                 confluenceBaseUrl.trim() &&
-                confluenceSpaceId.trim() &&
+                isValidConfluenceSpaceId(confluenceSpaceId) &&
                 selectedConfluenceCredential,
               )
             : false;
