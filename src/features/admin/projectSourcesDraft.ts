@@ -308,18 +308,16 @@ export function hasFailedSources(sources: DraftSource[]): boolean {
  *
  * A reused source starts no ingestion at all: promising one would have the PM
  * waiting for a run that never appears, and saying nothing leaves an instant
- * "Connected" looking like the connect did not take. Deliberately counts only —
- * naming the projects a source was already connected to would tell a PM about
- * projects that are not theirs.
+ * "Connected" looking like the connect did not take. The shape is deliberately
+ * coarse: naming — or even counting — the projects a source was already
+ * connected to would tell a PM about projects that are not theirs.
  *
  * @param sources The settled run.
  * @returns `"none"` when nothing connected, `"reused"` when everything that
  * connected was linked, `"ingesting"` when everything is being fetched, and
  * `"mixed"` for a run with both.
  */
-export function connectOutcome(
-  sources: DraftSource[],
-): "none" | "reused" | "ingesting" | "mixed" {
+export function connectOutcome(sources: DraftSource[]): "none" | "reused" | "ingesting" | "mixed" {
   const connected = sources.filter((source) => source.status === "connected");
   if (connected.length === 0) return "none";
 
