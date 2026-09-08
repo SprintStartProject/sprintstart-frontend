@@ -124,13 +124,21 @@ export const connectorService = {
    *
    * @param connectorId - Lowercase connector id, e.g. "github".
    * @param sources - The sources to patch; must be non-empty.
+   * @param projectId - Scopes the patch to that project (the backend
+   *   `projectId` query param). Required for project-scoped connectors such as
+   *   Confluence, whose sources belong to exactly one project; connectors with
+   *   globally shared sources ignore it. Pass it wherever the sources were
+   *   loaded project-scoped.
    */
   async patchConnectorSources(
     connectorId: string,
     sources: PatchSourceRequest[],
+    projectId?: string,
   ): Promise<PatchSourcesOfConnectorResponse> {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+
     return apiClient.fetch<PatchSourcesOfConnectorResponse>(
-      `/api/v1/connectors/${connectorId}/sources/status`,
+      `/api/v1/connectors/${connectorId}/sources/status${query}`,
       {
         method: "PATCH",
         body: JSON.stringify({ sources } satisfies PatchSourcesRequest),

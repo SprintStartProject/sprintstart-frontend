@@ -3,6 +3,8 @@ import {
   connectGithubRepository,
 } from "../../services/sources/githubService";
 import { connectJiraInstance } from "../../services/sources/jiraService";
+import { confluenceService } from "../../services/sources/confluenceService";
+import { knowledgeGapService } from "../../services/knowledgeGapService";
 import { knowledgeService } from "../../services/knowledgeService";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
 
@@ -14,16 +16,16 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
  * outcome so a partial failure can be shown and retried per source instead of
  * failing the whole batch.
  *
- * A source can be one of three kinds — a GitHub repository, a Jira instance, or
- * an in-memory file upload — modelled as a discriminated union on `type` so a
- * single list can hold a mix of all three. Nothing here touches the backend
- * until {@link connectDraftSources} runs during provisioning; uploads in
- * particular hold their `File[]` in memory until then.
+ * A source can be one of four kinds — a GitHub repository, a Jira instance,
+ * an in-memory file upload, or a Confluence space — modelled as a discriminated
+ * union on `type` so a single list can hold a mix of all four. Nothing here
+ * touches the backend until {@link connectDraftSources} runs during
+ * provisioning; uploads in particular hold their `File[]` in memory until then.
  */
 
 export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
-export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD";
+export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
 
 /** Fields every staged source carries regardless of its type. */
 type DraftSourceBase = {
@@ -31,6 +33,20 @@ type DraftSourceBase = {
   id: string;
   status: DraftSourceStatus;
   errorMessage: string;
+  /**
+   * Set when the source connected but the owner it was staged with could not be recorded.
+   *
+   * A separate flag rather than a `failed` status, because the two outcomes are not the same
+   * thing and must not be told apart by guesswork: the repository *is* connected and is being
+   * ingested, and calling that a failure would invite a retry of work that already succeeded.
+   * Ownership is also the weaker of the two — only PM/Admin may write it, so an HR user
+   * staging an owner gets a 403 on that call alone — and losing it costs a dropdown on the
+   * knowledge-gaps page, not the source.
+   *
+   * Only GitHub repositories can carry an owner today; it lives on the base so the batch loop
+   * can patch it without narrowing the union.
+   */
+  ownerAssignmentFailed: boolean;
   /**
    * Set once the source connected, when it was linked to an existing connection
    * rather than fetched. Such a source starts no ingestion, so the usual
@@ -50,6 +66,20 @@ export type GithubDraftSource = DraftSourceBase & {
   owner: string;
   name: string;
   tokenName: string;
+  /**
+   * Who owns this repository's documentation, named in the staged source list.
+   *
+   * The knowledge-gaps analysis keys ownership by component name, and a repository's component
+   * is `owner/name` — so naming somebody here is the same assignment the PM would otherwise
+   * have to make afterwards from Knowledge gaps → the repository → Owner.
+   *
+   * Set on the list rather than on the discovery screen, and therefore never at staging time:
+   * discovery is a multi-select, so a control there could only name one person for everything
+   * ticked, which is not how repositories are actually divided up. Applied once the repository
+   * has connected; empty means nobody was named, which is not the same as clearing an existing
+   * owner and never writes anything.
+   */
+  ownerUserId?: string;
   /**
    * Set when the repository is already ingested elsewhere: connecting then only
    * links it to the project (reusing its artifacts) instead of fetching and
@@ -74,7 +104,17 @@ export type UploadDraftSource = DraftSourceBase & {
   files: File[];
 };
 
-export type DraftSource = GithubDraftSource | JiraDraftSource | UploadDraftSource;
+export type ConfluenceDraftSource = DraftSourceBase & {
+  type: "CONFLUENCE";
+  displayName: string;
+  baseUrl: string;
+  spaceId: string;
+  /** Name of a stored Atlassian credential, shared with the Jira connector. */
+  credentialName: string;
+};
+
+export type DraftSource =
+  GithubDraftSource | JiraDraftSource | UploadDraftSource | ConfluenceDraftSource;
 
 let draftSourceCounter = 0;
 
@@ -98,6 +138,7 @@ export function createDraftSource(
     tokenName,
     status: "pending",
     errorMessage: "",
+    ownerAssignmentFailed: false,
     wasReused: false,
     repositoryId,
   };
@@ -135,6 +176,7 @@ export function createJiraDraft(params: {
     tokenName: params.tokenName,
     status: "pending",
     errorMessage: "",
+    ownerAssignmentFailed: false,
     wasReused: false,
   };
 }
@@ -147,6 +189,37 @@ export function createUploadDraft(displayName: string, files: File[]): UploadDra
     files,
     status: "pending",
     errorMessage: "",
+    ownerAssignmentFailed: false,
+    wasReused: false,
+  };
+}
+
+/**
+ * Whether a Confluence space ID is well-formed. Only the numeric space ID is
+ * accepted, so the space *key* ("ENG") — the value actually visible in
+ * Confluence's own UI, and the obvious thing to paste — has to be caught while
+ * the source is being staged rather than at provisioning time.
+ */
+export function isValidConfluenceSpaceId(spaceId: string): boolean {
+  return /^\d+$/.test(spaceId.trim());
+}
+
+export function createConfluenceDraft(params: {
+  displayName?: string;
+  baseUrl: string;
+  spaceId: string;
+  credentialName: string;
+}): ConfluenceDraftSource {
+  return {
+    id: nextDraftSourceId(),
+    type: "CONFLUENCE",
+    displayName: params.displayName || `Confluence Space ${params.spaceId}`,
+    baseUrl: params.baseUrl,
+    spaceId: params.spaceId,
+    credentialName: params.credentialName,
+    status: "pending",
+    errorMessage: "",
+    ownerAssignmentFailed: false,
     wasReused: false,
   };
 }
@@ -171,6 +244,13 @@ export function isSameSource(left: DraftSource, right: DraftSource): boolean {
     return left.url.trim().toLowerCase() === right.url.trim().toLowerCase();
   }
 
+  if (left.type === "CONFLUENCE" && right.type === "CONFLUENCE") {
+    return (
+      left.baseUrl.trim().toLowerCase() === right.baseUrl.trim().toLowerCase() &&
+      left.spaceId.trim().toLowerCase() === right.spaceId.trim().toLowerCase()
+    );
+  }
+
   return false;
 }
 
@@ -185,6 +265,25 @@ export function addDraftSource(sources: DraftSource[], source: DraftSource): Dra
 
 export function removeDraftSource(sources: DraftSource[], sourceId: string): DraftSource[] {
   return sources.filter((source) => source.id !== sourceId);
+}
+
+/**
+ * Names (or unnames) the documentation owner of a staged GitHub repository.
+ *
+ * Per source rather than per batch: a PM adds four repositories in one pass and they belong to
+ * four different people, which is the whole reason the assignment is worth making here instead
+ * of afterwards. An empty `ownerUserId` clears the staged choice.
+ */
+export function setDraftSourceOwner(
+  sources: DraftSource[],
+  sourceId: string,
+  ownerUserId: string,
+): DraftSource[] {
+  return sources.map((source) =>
+    source.id === sourceId && source.type === "GITHUB"
+      ? { ...source, ownerUserId: ownerUserId || undefined }
+      : source,
+  );
 }
 
 function patchDraftSource(
@@ -252,37 +351,89 @@ export function connectOutcomeDescription(sources: DraftSource[]): string | unde
 }
 
 /**
+ * Records the staged owner of a repository against its knowledge-gap component.
+ *
+ * Runs after the connect, and deliberately cannot fail it: the repository is connected and
+ * ingesting by this point, and the ownership write is a different, weaker call — it is
+ * PM/Admin-only, so an HR user who staged an owner is refused here and nowhere else. The
+ * outcome is reported instead, and the row says which of the two happened.
+ *
+ * Safe to run this early, before the gaps analysis has ever seen the component: the backend
+ * keys ownership by component name alone and stores it in its own table, so there is nothing
+ * for an unknown component to fail against.
+ *
+ * Two things it inherits from that endpoint, both of which only ever happen because somebody
+ * deliberately picked a name here. The PUT *replaces* the owner list, so an existing owner is
+ * dropped rather than joined. And ownership is not project-partitioned yet, so a repository
+ * that is also connected to another project changes hands there too. Showing the current
+ * owner before overwriting them would need a read per staged repository; worth doing, but it
+ * is a feature rather than a guard.
+ *
+ * @returns Whether the assignment failed, so the caller can say so.
+ */
+async function assignStagedOwner(source: GithubDraftSource, projectId: string): Promise<boolean> {
+  if (!source.ownerUserId) return false;
+
+  try {
+    await knowledgeGapService.setComponentOwners(projectId, `${source.owner}/${source.name}`, [
+      source.ownerUserId,
+    ]);
+
+    return false;
+  } catch (error) {
+    console.error(`Failed to assign the owner of ${source.owner}/${source.name}`, error);
+
+    return true;
+  }
+}
+
+/** Neither reused nor owner-carrying: everything that is not a GitHub repository. */
+const NOTHING_EXTRA = { wasReused: false, ownerAssignmentFailed: false } as const;
+
+/** What connecting one staged source actually did, beyond succeeding. */
+type DraftConnectOutcome = {
+  /** Whether an existing connection was linked instead of the source being fetched. */
+  wasReused: boolean;
+  /** Whether the source connected but its staged owner could not be recorded. */
+  ownerAssignmentFailed: boolean;
+};
+
+/**
  * Connects one staged source, dispatching to the right connector by `type`.
  *
- * @returns Whether an existing connection was linked instead of the source
- * being fetched, so the caller can say so rather than promising an ingestion
- * that is not coming.
+ * @returns What happened beyond the connect itself, see {@link DraftConnectOutcome}.
  */
-async function connectOneDraftSource(source: DraftSource, projectId: string): Promise<boolean> {
+async function connectOneDraftSource(
+  source: DraftSource,
+  projectId: string,
+): Promise<DraftConnectOutcome> {
   if (source.type === "GITHUB") {
+    let wasReused: boolean;
+
     if (source.repositoryId) {
       // Already ingested elsewhere: link it to this project, reusing its
       // artifacts instead of fetching and ingesting the repository again.
       await addRepositoryToProject(source.repositoryId, projectId);
-
-      return true;
+      wasReused = true;
+    } else {
+      // Staged as new, but the backend is the one that knows: it reuses a
+      // connection this UI never saw, and reports that as `wasReused`.
+      const outcome = await connectGithubRepository({
+        owner: source.owner,
+        name: source.name,
+        tokenName: source.tokenName,
+        projectId,
+      });
+      wasReused = outcome.wasReused === true;
     }
 
-    // Staged as new, but the backend is the one that knows: it reuses a
-    // connection this UI never saw, and reports that as `wasReused`.
-    const outcome = await connectGithubRepository({
-      owner: source.owner,
-      name: source.name,
-      tokenName: source.tokenName,
-      projectId,
-    });
-
-    return outcome.wasReused === true;
+    return {
+      wasReused,
+      ownerAssignmentFailed: await assignStagedOwner(source, projectId),
+    };
   }
 
   if (source.type === "JIRA") {
-    // The Jira connector reuses an already-connected instance too, but reports
-    // nothing about it, so a Jira link cannot be described as a reuse yet.
     await connectJiraInstance({
       displayName: source.displayName,
       url: source.url,
@@ -291,7 +442,26 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       projectId,
     });
 
-    return false;
+    // The Jira connector reuses an already-connected instance too, but reports
+    // nothing about it, so a Jira link cannot be described as a reuse yet.
+    return NOTHING_EXTRA;
+  }
+
+  if (source.type === "CONFLUENCE") {
+    // No error remapping here: a failed connect comes back with a precise
+    // message ("Confluence space 123 was not found", "Atlassian credential 'x'
+    // was not found"), and 404 covers both cases — the backend's own message is
+    // more useful than anything this layer could guess from the status alone.
+    await confluenceService.createConnection(projectId, {
+      baseUrl: source.baseUrl,
+      spaceId: source.spaceId,
+      credentialName: source.credentialName,
+      pageAllowlist: [],
+      pageDenylist: [],
+    });
+
+    // A Confluence space belongs to exactly one project, so it is never reused.
+    return NOTHING_EXTRA;
   }
 
   // UPLOAD: files are uploaded now that the project exists. uploadDocuments
@@ -310,7 +480,7 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
     );
   }
 
-  return false;
+  return NOTHING_EXTRA;
 }
 
 /**
@@ -344,9 +514,15 @@ export async function connectDraftSources(
     );
 
     try {
-      const wasReused = await connectOneDraftSource(source, projectId);
+      const outcome = await connectOneDraftSource(source, projectId);
 
-      publish(patchDraftSource(currentSources, source.id, { status: "connected", wasReused }));
+      publish(
+        patchDraftSource(currentSources, source.id, {
+          status: "connected",
+          ownerAssignmentFailed: outcome.ownerAssignmentFailed,
+          wasReused: outcome.wasReused,
+        }),
+      );
     } catch (error) {
       publish(
         patchDraftSource(currentSources, source.id, {

@@ -1,8 +1,8 @@
 import { useAuth } from "../../../context/useAuth";
 import { TokenRow } from "../../settings/components/TokenRow";
-import { JiraCredentialAddForm } from "../../settings/components/jira/JiraCredentialAddForm";
-import { JiraCredentialRow } from "../../settings/components/jira/JiraCredentialRow";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
+import { AtlassianCredentialAddForm } from "../../settings/components/atlassian/AtlassianCredentialAddForm";
+import { AtlassianCredentialRow } from "../../settings/components/atlassian/AtlassianCredentialRow";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 import type { AccessAddFormProps, AccessRowProps } from "../types";
 
 /**
@@ -18,20 +18,20 @@ export function GithubTokenRow({ entry, onSaved }: AccessRowProps<string>) {
   return <TokenRow name={entry.payload} onSaved={onSaved} />;
 }
 
-export function JiraAccessRow({ entry, onSaved }: AccessRowProps<JiraCredentialsDto>) {
-  return <JiraCredentialRow credential={entry.payload} onSaved={onSaved} />;
+export function AtlassianAccessRow({ entry, onSaved }: AccessRowProps<AtlassianCredentialDto>) {
+  return <AtlassianCredentialRow credential={entry.payload} onSaved={onSaved} />;
 }
 
 /**
- * The Jira form needs a default account email, which every other connector's
- * form does not — so the profile is read here rather than threaded through the
- * view and the registry.
+ * The Atlassian form needs a default account email, which every other
+ * connector's form does not — so the profile is read here rather than
+ * threaded through the view and the registry.
  */
-export function JiraAccessAddForm({ onClose, onSaved }: AccessAddFormProps) {
+export function AtlassianAccessAddForm({ onClose, onSaved }: AccessAddFormProps) {
   const { profile } = useAuth();
 
   return (
-    <JiraCredentialAddForm
+    <AtlassianCredentialAddForm
       defaultUserEmail={profile?.email ?? null}
       onClose={onClose}
       onSaved={onSaved}

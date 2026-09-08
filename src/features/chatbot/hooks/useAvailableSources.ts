@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { connectorService } from "../../../services/connectorService";
-import type { SourceSystem } from "../types";
+import { SOURCE_SYSTEMS, type SourceSystem } from "../types";
 
 /**
  * Uploads are not a connector: there is nothing to configure or enable, and the backend
@@ -10,13 +10,11 @@ const ALWAYS_AVAILABLE: readonly SourceSystem[] = ["UPLOAD"];
 
 /**
  * Maps a backend connector id onto the source system the chat filters by. Connector ids are
- * lowercase (`github`, `jira`); the filter values are the uppercase enum constants.
+ * lowercase (`github`, `jira`, `confluence`); the filter values are the uppercase enum constants.
  */
 function toSourceSystem(connectorId: string): SourceSystem | null {
   const candidate = connectorId.toUpperCase();
-  return candidate === "GITHUB" || candidate === "JIRA" || candidate === "UPLOAD"
-    ? candidate
-    : null;
+  return SOURCE_SYSTEMS.includes(candidate as SourceSystem) ? (candidate as SourceSystem) : null;
 }
 
 /**

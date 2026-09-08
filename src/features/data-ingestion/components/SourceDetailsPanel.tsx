@@ -1,5 +1,6 @@
 import {
   ArrowUp,
+  BookOpen,
   CalendarClock,
   Clock3,
   Database,
@@ -34,7 +35,10 @@ import {
   SOURCE_META,
 } from "../data.ts";
 import type { DataSource, LoadingState } from "../types.ts";
-import { GithubRepositorySyncSettings } from "./GithubRepositorySyncSettings.tsx";
+import {
+  GithubRepositorySyncSettings,
+  type SyncScheduleConfig,
+} from "./GithubRepositorySyncSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
@@ -56,6 +60,13 @@ type SourceDetailsPanelProps = {
   onSaveJiraConfig?: (
     instanceUrl: string,
     request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
+  ) => Promise<void>;
+  /** Loads the sync schedule of a Confluence space (by connection id). */
+  onLoadConfluenceConfig?: (connectionId: string) => Promise<SyncScheduleConfig>;
+  /** Saves the sync schedule of a Confluence space (by connection id). */
+  onSaveConfluenceConfig?: (
+    connectionId: string,
+    request: ConfigureGithubRepositoryRequest,
   ) => Promise<void>;
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
   onSetSourceEnabled?: (
@@ -85,6 +96,8 @@ export function SourceDetailsPanel({
   onSaveRepositoryConfig,
   onLoadJiraConfig,
   onSaveJiraConfig,
+  onLoadConfluenceConfig,
+  onSaveConfluenceConfig,
   onSetSourceEnabled,
   onSetJiraSourceEnabled,
   onUnlinkSource,
@@ -99,14 +112,23 @@ export function SourceDetailsPanel({
   const Icon = SOURCE_META[source.sourceSystem].icon;
   const repository = source.githubRepository;
   const jira = source.jiraInstance ?? null;
+  const confluence = source.confluenceSpace ?? null;
   const isJira = source.sourceSystem === "JIRA";
+  const isConfluence = source.sourceSystem === "CONFLUENCE";
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
-  // Update is available for a GitHub repo (needs owner/name) or a Jira instance
-  // (needs its URL); enable/disable and unlink stay GitHub-only for now.
+  // Update is available for a GitHub repo (needs owner/name), a Jira instance
+  // (needs its URL), or a Confluence space (needs its ID).
   const canUpdate =
     onUpdateSource !== undefined &&
-    ((source.sourceSystem === "GITHUB" && repository !== null) || (isJira && jira !== null));
+    ((source.sourceSystem === "GITHUB" && repository !== null) ||
+      (isJira && jira !== null) ||
+      (isConfluence && Boolean(confluence?.connectionId)));
+  // GitHub and Jira start an asynchronous run, so "Update started" is the whole
+  // story here. Confluence ingests synchronously and its caller already reports
+  // the outcome (completed, partial or failed) — a second toast from here would
+  // duplicate it and, on a failed run, contradict it.
+  const reportsUpdateItself = isConfluence;
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -119,6 +141,12 @@ export function SourceDetailsPanel({
     jira !== null &&
     onLoadJiraConfig !== undefined &&
     onSaveJiraConfig !== undefined;
+  const canManageConfluenceConfig =
+    canManageSyncSettings &&
+    isConfluence &&
+    Boolean(confluence?.connectionId) &&
+    onLoadConfluenceConfig !== undefined &&
+    onSaveConfluenceConfig !== undefined;
   const canToggleEnabled =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -132,17 +160,28 @@ export function SourceDetailsPanel({
   const isTogglingEnabled = enabledState === "loading";
   // Authorization is presence-based — the parent only passes onUnlinkSource when
   // the caller may manage the project's sources. GitHub needs the connection's
-  // repositoryId; Jira is identified by its instance URL.
+  // repositoryId; Jira is identified by its instance URL, Confluence by its
+  // connection id.
   const canUnlinkSource =
     onUnlinkSource !== undefined &&
     ((source.sourceSystem === "GITHUB" &&
       repository !== null &&
       repository.repositoryId !== null) ||
-      (isJira && jira !== null));
+      (isJira && jira !== null) ||
+      (isConfluence && Boolean(confluence?.connectionId)));
   const isUnlinking = unlinkState === "loading";
   // Noun for the unlink copy: GitHub sources are repositories, Jira sources are
-  // instances. Keeps each connector's wording accurate.
-  const removableNoun = isJira ? "instance" : "repository";
+  // instances, Confluence sources are spaces. Keeps each connector's wording
+  // accurate.
+  const removableNoun = isJira ? "instance" : isConfluence ? "space" : "repository";
+  // What removal actually costs, per connector. A GitHub repository and a Jira
+  // instance are shared between projects and only lose the project association,
+  // so re-linking restores the source as it was. A Confluence connection belongs
+  // to a single project, so removing it deletes the connection itself — the
+  // pages already ingested stay, but the space has to be set up again.
+  const removalHint = isConfluence
+    ? "The pages it already ingested are kept. Connecting the space again sets it up from scratch."
+    : `The ${removableNoun} and its artifacts are kept. You can re-link it later.`;
   // GitHub exposes one timestamp per resource type; Jira refreshes issue data
   // (including comments and change history) as one combined resource.
   const hasResourceSyncTimes =
@@ -217,14 +256,18 @@ export function SourceDetailsPanel({
     try {
       await onUpdateSource(source);
       setUpdateState("success");
-      toast.success("Update started", {
-        description: "Details refresh while ingestion runs.",
-      });
+      if (!reportsUpdateItself) {
+        toast.success("Update started", {
+          description: "Details refresh while ingestion runs.",
+        });
+      }
     } catch (error) {
       setUpdateState("error");
-      toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
+      if (!reportsUpdateItself) {
+        toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
+      }
     }
-  }, [canUpdate, onUpdateSource, source, toast]);
+  }, [canUpdate, onUpdateSource, reportsUpdateItself, source, toast]);
 
   const handleConfirmUnlink = useCallback(async () => {
     if (!onUnlinkSource) return;
@@ -308,16 +351,26 @@ export function SourceDetailsPanel({
             }}
             disabled={!canUpdate || isRefreshing}
             loading={isUpdating}
-            icon={isJira ? <Ticket className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+            icon={
+              isJira ? (
+                <Ticket className="h-4 w-4" />
+              ) : isConfluence ? (
+                <BookOpen className="h-4 w-4" />
+              ) : (
+                <GitBranch className="h-4 w-4" />
+              )
+            }
             title={
               canUpdate
                 ? undefined
                 : isJira
                   ? "Instance updates need the Jira instance URL."
-                  : "Repository updates need GitHub owner and repository name."
+                  : isConfluence
+                    ? "Space updates need the Confluence space ID."
+                    : "Repository updates need GitHub owner and repository name."
             }
           >
-            {isJira ? "Update instance" : "Update repo"}
+            {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
           </Button>
 
           <Button
@@ -396,7 +449,21 @@ export function SourceDetailsPanel({
         </DrawerCard>
       )}
 
-      {!isJira && (
+      {isConfluence && (
+        <DrawerCard label="Space" icon={Icon} index={1} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
+            <InfoRow label="Space name" value={source.name} />
+            {confluence?.spaceKey && <InfoRow label="Space key" value={confluence.spaceKey} />}
+            {confluence?.baseUrl && <InfoLinkRow label="Base URL" value={confluence.baseUrl} />}
+            <InfoRow label="Space ID" value={confluence?.spaceId ?? source.sourceId} mono />
+            {confluence?.credentialName && (
+              <InfoRow label="Credential" value={confluence.credentialName} />
+            )}
+          </dl>
+        </DrawerCard>
+      )}
+
+      {source.sourceSystem === "GITHUB" && (
         <DrawerCard label="Repository" icon={GitBranch} index={1} className="mt-4 sm:mt-5">
           <dl className="-my-1">
             <InfoRow label="Full name" value={repository?.fullName} />
@@ -478,6 +545,24 @@ export function SourceDetailsPanel({
         </DrawerCard>
       )}
 
+      {canManageConfluenceConfig &&
+        confluence?.connectionId &&
+        onLoadConfluenceConfig &&
+        onSaveConfluenceConfig && (
+          <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
+            {/* Same control again: Confluence connections carry the identical
+                schedule contract, only the load/save endpoints differ. */}
+            <GithubRepositorySyncSettings
+              loadKey={confluence.connectionId}
+              loadConfig={() => onLoadConfluenceConfig(confluence.connectionId)}
+              onSave={(request) => onSaveConfluenceConfig(confluence.connectionId, request)}
+              autoUpdateOnText="Due checks update this Confluence space."
+              autoUpdateOffText="Due checks only mark this Confluence space out of date."
+              toggleAriaLabel="Toggle Confluence space auto update"
+            />
+          </DrawerCard>
+        )}
+
       {source.failedItems.length > 0 && (
         <DrawerCard label="Failed Items" icon={XCircle} index={4} className="mt-4 sm:mt-5">
           <div className="space-y-3">
@@ -505,8 +590,7 @@ export function SourceDetailsPanel({
           className="mt-4 sm:mt-5"
         >
           <p className="text-sm text-app-danger-text">
-            Remove this {removableNoun} from the current project. The {removableNoun} and its
-            artifacts are kept. You can re-link it later.
+            Remove this {removableNoun} from the current project. {removalHint}
           </p>
           <Button
             variant="dangerSoft"
@@ -523,7 +607,7 @@ export function SourceDetailsPanel({
       <AlertDialog
         isOpen={isUnlinkDialogOpen}
         title={`Remove ${removableNoun} from project?`}
-        description={`"${source.name}" will no longer feed this project's knowledge base. The ${removableNoun} and its artifacts are kept, and you can re-link it later.`}
+        description={`"${source.name}" will no longer feed this project's knowledge base. ${removalHint}`}
         confirmLabel="Remove"
         loadingLabel="Removing…"
         variant="danger"

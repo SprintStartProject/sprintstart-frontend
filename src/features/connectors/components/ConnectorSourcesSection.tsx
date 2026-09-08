@@ -137,7 +137,14 @@ export function ConnectorSourcesSection({
       .map((source) => ({ sourceId: source.id, enabled: source.enabled }));
 
     try {
-      const response = await connectorService.patchConnectorSources(connector.id, patches);
+      // The same project scope the sources were loaded with: a project-scoped
+      // connector (Confluence) rejects a patch without it, and the others
+      // ignore it.
+      const response = await connectorService.patchConnectorSources(
+        connector.id,
+        patches,
+        projectId ?? undefined,
+      );
 
       setSources(response.sources);
       setDraft(EMPTY_DRAFT);

@@ -1,11 +1,9 @@
-import { GitBranch, Plug } from "lucide-react";
+import { BookOpen, GitBranch, Plug } from "lucide-react";
 import type { ConnectorDto } from "../../services/connectorService.ts";
 import type { ConnectorListItem, ConnectorMeta } from "./types.ts";
 
 /**
  * Presentation metadata for connectors known to the frontend today.
- * Only "github" is implemented; any other connector id the backend returns
- * (e.g. a future Jira connector) falls back to `getConnectorMeta` below.
  */
 const CONNECTOR_META: Record<string, ConnectorMeta> = {
   github: {
@@ -13,6 +11,11 @@ const CONNECTOR_META: Record<string, ConnectorMeta> = {
     description:
       "Commits, files, issues and pull request metadata from connected GitHub repositories.",
     icon: GitBranch,
+  },
+  confluence: {
+    label: "Confluence Cloud Connector",
+    description: "Pages and spaces from connected Confluence Cloud tenants.",
+    icon: BookOpen,
   },
 };
 

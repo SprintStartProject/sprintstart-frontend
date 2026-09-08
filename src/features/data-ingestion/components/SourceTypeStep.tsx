@@ -7,8 +7,9 @@ import type { SourceSystem } from "../types.ts";
  * wizard. Each card carries its own description so the differences between the
  * options -- the actual decision being made here -- are visible. Which
  * connectors count as available depends on the context (`availableTypes`): both
- * wizards now wire GitHub, Jira and Upload, but any connector left out of
- * `availableTypes` still renders with a "Soon" badge instead of being hidden.
+ * wizards now wire GitHub, Jira, Upload and Confluence, but any connector left
+ * out of `availableTypes` still renders with a "Soon" badge instead of being
+ * hidden.
  */
 export function SourceTypeStep({
   selectedType,
@@ -38,7 +39,10 @@ export function SourceTypeStep({
           <p className="mt-1 text-sm leading-relaxed text-app-text-muted">{description}</p>
         )}
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {/* Two columns from `sm` up rather than one row per connector: with four
+            source types a three-column grid leaves a single card stranded on the
+            second row, and the cards carry a description each. */}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {SOURCE_SYSTEMS.map((sourceSystem) => {
             const meta = SOURCE_META[sourceSystem];
             const Icon = meta.icon;

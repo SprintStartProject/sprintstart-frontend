@@ -73,41 +73,6 @@ export type JiraInstanceDto = {
   updateCredentialUserEmail: string;
 };
 
-// ---- Credentials ----
-
-export type AddCredentialRequest = {
-  userEmail: string;
-  tokenName: string;
-  /** The actual Jira API token. */
-  authToken: string;
-};
-
-export type DeleteJiraCredentialRequest = {
-  userEmail: string;
-  tokenName: string;
-};
-
-export type ChangeJiraCredentialNameRequest = {
-  userEmail: string;
-  oldName: string;
-  newName: string;
-};
-
-export type ChangeJiraCredentialTokenRequest = {
-  userEmail: string;
-  tokenName: string;
-  newToken: string;
-};
-
-/**
- * A stored credential as returned by the backend: only `userEmail` plus the
- * credential/token name (`displayName`). The token secret is never returned.
- */
-export type JiraCredentialsDto = {
-  userEmail: string;
-  displayName: string;
-};
-
 // ---- Config ----
 
 export type ConfigureAllJiraInstancesRequest = {
@@ -211,77 +176,6 @@ export async function updateJiraInstance(
 export async function updateAllJiraInstances(): Promise<UpdateJiraInstanceResponse[]> {
   return apiClient.fetch<UpdateJiraInstanceResponse[]>("/api/v1/jira/update-all", {
     method: "POST",
-  });
-}
-
-// ---- Credentials ----
-
-/**
- * Stores a new Jira credential for a user. Credentials are keyed by the
- * `(userEmail, tokenName)` pair.
- *
- * @throws ApiError — 400 when a credential with that name already exists,
- *   403 for an insufficient role.
- */
-export async function addJiraCredential(request: AddCredentialRequest): Promise<void> {
-  await apiClient.fetch<void>("/api/v1/jira/credentials", {
-    method: "POST",
-    body: JSON.stringify(request),
-  });
-}
-
-/**
- * Lists the Jira credentials owned by the authenticated user. Token secrets
- * are never returned.
- *
- * @param signal - Optional AbortSignal for cancelling an in-flight request.
- * @throws ApiError when the request fails.
- */
-export async function getMyJiraCredentials(signal?: AbortSignal): Promise<JiraCredentialsDto[]> {
-  return apiClient.fetch<JiraCredentialsDto[]>("/api/v1/jira/credentials", {
-    signal,
-  });
-}
-
-/**
- * Deletes a stored Jira credential identified by its `(userEmail, tokenName)`.
- *
- * @throws ApiError — 404 when the credential is unknown, 403 for an insufficient role.
- */
-export async function deleteJiraCredential(request: DeleteJiraCredentialRequest): Promise<void> {
-  await apiClient.fetch<void>("/api/v1/jira/credentials", {
-    method: "DELETE",
-    body: JSON.stringify(request),
-  });
-}
-
-/**
- * Renames a stored Jira credential.
- *
- * @returns The credential in its renamed state.
- * @throws ApiError — 404 when the credential is unknown, 403 for an insufficient role.
- */
-export async function changeJiraCredentialName(
-  request: ChangeJiraCredentialNameRequest,
-): Promise<JiraCredentialsDto> {
-  return apiClient.fetch<JiraCredentialsDto>("/api/v1/jira/credentials/patch/name", {
-    method: "PATCH",
-    body: JSON.stringify(request),
-  });
-}
-
-/**
- * Replaces the token secret of a stored Jira credential.
- *
- * @returns The (unchanged) credential metadata.
- * @throws ApiError — 404 when the credential is unknown, 403 for an insufficient role.
- */
-export async function changeJiraCredentialToken(
-  request: ChangeJiraCredentialTokenRequest,
-): Promise<JiraCredentialsDto> {
-  return apiClient.fetch<JiraCredentialsDto>("/api/v1/jira/credentials/patch/token", {
-    method: "PATCH",
-    body: JSON.stringify(request),
   });
 }
 

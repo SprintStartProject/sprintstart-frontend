@@ -70,8 +70,8 @@ function sourceStatusHandler({ inThisProject = [] as string[] } = {}) {
   });
 }
 
-function jiraCredentialsHandler(names: string[], email = "me@corp.com") {
-  return http.get("/api/v1/jira/credentials", () =>
+function atlassianCredentialsHandler(names: string[], email = "me@corp.com") {
+  return http.get("/api/v1/atlassian/credentials", () =>
     HttpResponse.json(names.map((displayName) => ({ userEmail: email, displayName }))),
   );
 }
@@ -109,7 +109,7 @@ describe("AddSourceModal", () => {
   });
 
   it("offers both 'Add to list' and 'Connect now' on a detail screen", async () => {
-    server.use(jiraCredentialsHandler(["default"]));
+    server.use(atlassianCredentialsHandler(["default"]));
     const user = userEvent.setup();
     renderModal();
 
@@ -127,7 +127,7 @@ describe("AddSourceModal", () => {
   it("stages a Jira instance and connects the list", async () => {
     let capturedBody: unknown = null;
     server.use(
-      jiraCredentialsHandler(["default"]),
+      atlassianCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", async ({ request }) => {
         capturedBody = await request.json();
         return new HttpResponse(null, { status: 202 });
@@ -163,7 +163,7 @@ describe("AddSourceModal", () => {
   it("connects a source immediately with 'Connect now'", async () => {
     let capturedBody: unknown = null;
     server.use(
-      jiraCredentialsHandler(["default"]),
+      atlassianCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", async ({ request }) => {
         capturedBody = await request.json();
         return new HttpResponse(null, { status: 202 });
@@ -192,7 +192,7 @@ describe("AddSourceModal", () => {
 
   it("surfaces a failed connect on the connecting screen with a retry", async () => {
     server.use(
-      jiraCredentialsHandler(["default"]),
+      atlassianCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", () =>
         HttpResponse.json({ message: "bad gateway" }, { status: 502 }),
       ),
@@ -427,7 +427,7 @@ describe("AddSourceModal", () => {
   });
 
   it("keeps building the list across source types before connecting", async () => {
-    server.use(discoveryHandler, jiraCredentialsHandler(["default"]));
+    server.use(discoveryHandler, atlassianCredentialsHandler(["default"]));
     const user = userEvent.setup();
     renderModal();
 
