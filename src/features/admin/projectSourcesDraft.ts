@@ -47,6 +47,18 @@ type DraftSourceBase = {
    * can patch it without narrowing the union.
    */
   ownerAssignmentFailed: boolean;
+  /**
+   * Set once the source connected, when it was linked to an existing connection
+   * rather than fetched. Such a source starts no ingestion, so the usual
+   * "ingestion is running" reassurance would be wrong for it, and its instant
+   * completion would otherwise look like nothing happened.
+   *
+   * Two things can put this here: a repository staged from discovery as
+   * already-ingested (the draft carries its `repositoryId`), or the backend
+   * reporting `wasReused` because it found a connection the UI did not know
+   * about — someone else's connect landing between discovery and this one.
+   */
+  wasReused: boolean;
 };
 
 export type GithubDraftSource = DraftSourceBase & {
@@ -127,6 +139,7 @@ export function createDraftSource(
     status: "pending",
     errorMessage: "",
     ownerAssignmentFailed: false,
+    wasReused: false,
     repositoryId,
   };
 }
@@ -164,6 +177,7 @@ export function createJiraDraft(params: {
     status: "pending",
     errorMessage: "",
     ownerAssignmentFailed: false,
+    wasReused: false,
   };
 }
 
@@ -176,6 +190,7 @@ export function createUploadDraft(displayName: string, files: File[]): UploadDra
     status: "pending",
     errorMessage: "",
     ownerAssignmentFailed: false,
+    wasReused: false,
   };
 }
 
@@ -205,6 +220,7 @@ export function createConfluenceDraft(params: {
     status: "pending",
     errorMessage: "",
     ownerAssignmentFailed: false,
+    wasReused: false,
   };
 }
 
@@ -287,6 +303,52 @@ export function hasFailedSources(sources: DraftSource[]): boolean {
 }
 
 /**
+ * How a finished run should be described, so the reassurance matches what
+ * actually happened.
+ *
+ * A reused source starts no ingestion at all: promising one would have the PM
+ * waiting for a run that never appears, and saying nothing leaves an instant
+ * "Connected" looking like the connect did not take. The shape is deliberately
+ * coarse: naming — or even counting — the projects a source was already
+ * connected to would tell a PM about projects that are not theirs.
+ *
+ * @param sources The settled run.
+ * @returns `"none"` when nothing connected, `"reused"` when everything that
+ * connected was linked, `"ingesting"` when everything is being fetched, and
+ * `"mixed"` for a run with both.
+ */
+export function connectOutcome(sources: DraftSource[]): "none" | "reused" | "ingesting" | "mixed" {
+  const connected = sources.filter((source) => source.status === "connected");
+  if (connected.length === 0) return "none";
+
+  const reused = connected.filter((source) => source.wasReused).length;
+
+  if (reused === 0) return "ingesting";
+  if (reused === connected.length) return "reused";
+
+  return "mixed";
+}
+
+/**
+ * The line under a success toast, matching {@link connectOutcome}.
+ *
+ * @param sources The settled run.
+ * @returns The description, or `undefined` when there is nothing to add.
+ */
+export function connectOutcomeDescription(sources: DraftSource[]): string | undefined {
+  switch (connectOutcome(sources)) {
+    case "reused":
+      return "Already available in SprintStart and linked to your project. No re-ingestion needed.";
+    case "mixed":
+      return "Initial ingestion is running for the new sources. The rest were already available and were linked.";
+    case "ingesting":
+      return "Initial ingestion is running in the background.";
+    case "none":
+      return undefined;
+  }
+}
+
+/**
  * Records the staged owner of a repository against its knowledge-gap component.
  *
  * Runs after the connect, and deliberately cannot fail it: the repository is connected and
@@ -323,27 +385,50 @@ async function assignStagedOwner(source: GithubDraftSource, projectId: string): 
   }
 }
 
+/** Neither reused nor owner-carrying: everything that is not a GitHub repository. */
+const NOTHING_EXTRA = { wasReused: false, ownerAssignmentFailed: false } as const;
+
+/** What connecting one staged source actually did, beyond succeeding. */
+type DraftConnectOutcome = {
+  /** Whether an existing connection was linked instead of the source being fetched. */
+  wasReused: boolean;
+  /** Whether the source connected but its staged owner could not be recorded. */
+  ownerAssignmentFailed: boolean;
+};
+
 /**
  * Connects one staged source, dispatching to the right connector by `type`.
  *
- * @returns Whether the source connected but its staged owner could not be recorded.
+ * @returns What happened beyond the connect itself, see {@link DraftConnectOutcome}.
  */
-async function connectOneDraftSource(source: DraftSource, projectId: string): Promise<boolean> {
+async function connectOneDraftSource(
+  source: DraftSource,
+  projectId: string,
+): Promise<DraftConnectOutcome> {
   if (source.type === "GITHUB") {
+    let wasReused: boolean;
+
     if (source.repositoryId) {
       // Already ingested elsewhere: link it to this project, reusing its
       // artifacts instead of fetching and ingesting the repository again.
       await addRepositoryToProject(source.repositoryId, projectId);
+      wasReused = true;
     } else {
-      await connectGithubRepository({
+      // Staged as new, but the backend is the one that knows: it reuses a
+      // connection this UI never saw, and reports that as `wasReused`.
+      const outcome = await connectGithubRepository({
         owner: source.owner,
         name: source.name,
         tokenName: source.tokenName,
         projectId,
       });
+      wasReused = outcome.wasReused === true;
     }
 
-    return await assignStagedOwner(source, projectId);
+    return {
+      wasReused,
+      ownerAssignmentFailed: await assignStagedOwner(source, projectId),
+    };
   }
 
   if (source.type === "JIRA") {
@@ -355,7 +440,9 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       projectId,
     });
 
-    return false;
+    // The Jira connector reuses an already-connected instance too, but reports
+    // nothing about it, so a Jira link cannot be described as a reuse yet.
+    return NOTHING_EXTRA;
   }
 
   if (source.type === "CONFLUENCE") {
@@ -371,7 +458,8 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
       pageDenylist: [],
     });
 
-    return false;
+    // A Confluence space belongs to exactly one project, so it is never reused.
+    return NOTHING_EXTRA;
   }
 
   // UPLOAD: files are uploaded now that the project exists. uploadDocuments
@@ -390,7 +478,7 @@ async function connectOneDraftSource(source: DraftSource, projectId: string): Pr
     );
   }
 
-  return false;
+  return NOTHING_EXTRA;
 }
 
 /**
@@ -424,12 +512,13 @@ export async function connectDraftSources(
     );
 
     try {
-      const ownerAssignmentFailed = await connectOneDraftSource(source, projectId);
+      const outcome = await connectOneDraftSource(source, projectId);
 
       publish(
         patchDraftSource(currentSources, source.id, {
           status: "connected",
-          ownerAssignmentFailed,
+          ownerAssignmentFailed: outcome.ownerAssignmentFailed,
+          wasReused: outcome.wasReused,
         }),
       );
     } catch (error) {

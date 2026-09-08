@@ -9,6 +9,16 @@ export type ConnectGithubRepositoryRequest = {
 
 export type ConnectGithubRepositoryResponse = {
   transactionId: string;
+  /**
+   * Whether the backend linked an existing connection instead of fetching the
+   * repository again. A bare flag on purpose: a PM only sees their own
+   * projects, and this must not let them work out which *other* project the
+   * repository was already connected to.
+   *
+   * Defaulted rather than required, so a backend that predates the flag reads
+   * as "newly connected" instead of breaking the connect flow.
+   */
+  wasReused?: boolean;
 };
 
 /**
@@ -54,6 +64,12 @@ export type DiscoverRepositoriesResult = {
 export type ConnectRepositoriesResult = {
   /** Maps `"owner/name"` to the accepted ingestion transaction id. */
   transactionIdsByRepositoryId: Record<string, string>;
+  /**
+   * The `"owner/name"` entries that reused an existing connection, so nothing
+   * was fetched for them. Carries no information about the projects those
+   * connections already belong to; see `ConnectGithubRepositoryResponse.wasReused`.
+   */
+  reusedRepositoryIds?: string[];
 };
 
 export type UpdateGithubRepositoryResponse = {
