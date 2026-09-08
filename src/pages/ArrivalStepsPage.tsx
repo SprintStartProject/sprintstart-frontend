@@ -47,6 +47,10 @@ export function ArrivalStepsPage() {
     label: value === COMPANY ? "Everyone" : (projects.find((p) => p.id === value)?.name ?? value),
   }));
 
+  // The ref goes on the page rather than on `<main>` -- AdminPage's reasoning, and the escalation
+  // inbox's: `<main>` is only as tall as its content, so a short list leaves the bottom of the
+  // viewport dead, and a gesture that works two centimetres higher up reads as broken rather
+  // than as absent.
   const swipeRef = useSwipeableTabs<string, HTMLElement>({
     order: scopeOrder,
     value: scope,
@@ -54,18 +58,18 @@ export function ArrivalStepsPage() {
   });
 
   return (
-    <div className="min-h-screen">
+    <div ref={swipeRef} className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-frame py-6">
           <PageHeader
             icon={PlaneLanding}
             title="Arrival"
-            subtitle="What somebody needs before they can start. Shown on every new joiner's board and raised by their buddy — never enforced."
+            subtitle="What somebody needs before they can start. Raised by their buddy on their board, never enforced."
           />
         </div>
       </header>
 
-      <main ref={swipeRef} className="app-page-frame space-y-5 py-6 lg:py-8">
+      <main className="app-page-frame space-y-5 py-6 lg:py-8">
         {/*
               Rendered only when there is a second scope to switch to. A lone "Everyone" tab on an
               installation with no projects is a control that cannot do anything.
