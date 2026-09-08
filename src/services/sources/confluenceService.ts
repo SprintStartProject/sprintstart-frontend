@@ -1,4 +1,5 @@
 import { apiClient } from "../apiClient.ts";
+import type { GithubScheduleSpec } from "./githubService.ts";
 
 export type CreateConfluenceConnectionRequest = {
   baseUrl: string;
@@ -9,10 +10,12 @@ export type CreateConfluenceConnectionRequest = {
   pageDenylist?: string[];
 };
 
-export type ScheduleSpec = {
-  type: "INTERVAL";
-  everyMinutes: number;
-};
+/**
+ * Confluence connections are scheduled through the same shared spec as GitHub
+ * repositories and Jira instances (interval, daily, weekly, monthly or cron),
+ * so the schedule form is shared with them as well.
+ */
+export type ScheduleSpec = GithubScheduleSpec;
 
 export type ConfigureConfluenceScheduleRequest = {
   schedule: ScheduleSpec;
@@ -35,7 +38,7 @@ export type ConfluenceConnectionDto = {
   version: number;
   sourceEnabled: boolean;
   autoUpdate?: boolean;
-  spec?: ScheduleSpec;
+  spec?: ScheduleSpec | null;
   schedule?: string;
   nextSyncAt?: string | null;
 };
@@ -120,6 +123,20 @@ export const confluenceService = {
       `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}/update`,
       {
         method: "POST",
+      },
+    );
+  },
+
+  /**
+   * Removes one Confluence space connection from a project. The pages already
+   * ingested stay in the knowledge base; only this project stops syncing the
+   * space.
+   */
+  async deleteConnection(projectId: string, connectionId: string): Promise<void> {
+    await apiClient.fetch<void>(
+      `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}`,
+      {
+        method: "DELETE",
       },
     );
   },

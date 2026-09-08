@@ -9,6 +9,11 @@ import {
 /**
  * Hook to trigger a manual sync for a Confluence space connection and surface
  * result toasts based on the ingestion status.
+ *
+ * The sync endpoint runs synchronously, so the toasts raised here are the final
+ * word on the outcome. Failures are reported *and* rethrown: the caller still
+ * needs to know that the run failed (to set its own error state), but it must
+ * not report the failure a second time.
  */
 export function useConfluenceSync(projectId?: string | null) {
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -17,10 +22,11 @@ export function useConfluenceSync(projectId?: string | null) {
   const syncConnection = async (
     connectionId: string,
     onSuccess?: (result: ConfluenceIngestionResult) => void,
-  ) => {
+  ): Promise<ConfluenceIngestionResult> => {
     if (!projectId) {
-      toast.error("Project ID is required to sync Confluence spaces.");
-      return;
+      const error = new Error("Project ID is required to sync Confluence spaces.");
+      toast.error(error.message);
+      throw error;
     }
 
     setSyncingId(connectionId);
@@ -42,8 +48,10 @@ export function useConfluenceSync(projectId?: string | null) {
       }
 
       onSuccess?.(result);
+      return result;
     } catch (error) {
       toast.error(parseApiError(error, "Failed to synchronize Confluence space."));
+      throw error;
     } finally {
       setSyncingId(null);
     }

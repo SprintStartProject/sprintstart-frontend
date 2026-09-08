@@ -108,6 +108,20 @@ describe("confluenceService", () => {
     expect(result.created).toBe(10);
   });
 
+  it("deleteConnection calls DELETE /api/v1/confluence/projects/:projectId/connections/:connectionId", async () => {
+    expect.assertions(1);
+
+    server.use(
+      http.delete("/api/v1/confluence/projects/proj-1/connections/conn-123", ({ request }) => {
+        expect(request.method).toBe("DELETE");
+
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await confluenceService.deleteConnection("proj-1", "conn-123");
+  });
+
   it("configureSchedule calls PUT /api/v1/confluence/projects/:projectId/connections/:connectionId/schedule", async () => {
     expect.assertions(2);
 

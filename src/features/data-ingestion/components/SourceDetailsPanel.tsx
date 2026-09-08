@@ -35,7 +35,10 @@ import {
   SOURCE_META,
 } from "../data.ts";
 import type { DataSource, LoadingState } from "../types.ts";
-import { GithubRepositorySyncSettings } from "./GithubRepositorySyncSettings.tsx";
+import {
+  GithubRepositorySyncSettings,
+  type SyncScheduleConfig,
+} from "./GithubRepositorySyncSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
@@ -57,6 +60,13 @@ type SourceDetailsPanelProps = {
   onSaveJiraConfig?: (
     instanceUrl: string,
     request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
+  ) => Promise<void>;
+  /** Loads the sync schedule of a Confluence space (by connection id). */
+  onLoadConfluenceConfig?: (connectionId: string) => Promise<SyncScheduleConfig>;
+  /** Saves the sync schedule of a Confluence space (by connection id). */
+  onSaveConfluenceConfig?: (
+    connectionId: string,
+    request: ConfigureGithubRepositoryRequest,
   ) => Promise<void>;
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
   onSetSourceEnabled?: (
@@ -86,6 +96,8 @@ export function SourceDetailsPanel({
   onSaveRepositoryConfig,
   onLoadJiraConfig,
   onSaveJiraConfig,
+  onLoadConfluenceConfig,
+  onSaveConfluenceConfig,
   onSetSourceEnabled,
   onSetJiraSourceEnabled,
   onUnlinkSource,
@@ -112,6 +124,11 @@ export function SourceDetailsPanel({
     ((source.sourceSystem === "GITHUB" && repository !== null) ||
       (isJira && jira !== null) ||
       (isConfluence && Boolean(confluence?.connectionId)));
+  // GitHub and Jira start an asynchronous run, so "Update started" is the whole
+  // story here. Confluence ingests synchronously and its caller already reports
+  // the outcome (completed, partial or failed) — a second toast from here would
+  // duplicate it and, on a failed run, contradict it.
+  const reportsUpdateItself = isConfluence;
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -124,6 +141,12 @@ export function SourceDetailsPanel({
     jira !== null &&
     onLoadJiraConfig !== undefined &&
     onSaveJiraConfig !== undefined;
+  const canManageConfluenceConfig =
+    canManageSyncSettings &&
+    isConfluence &&
+    Boolean(confluence?.connectionId) &&
+    onLoadConfluenceConfig !== undefined &&
+    onSaveConfluenceConfig !== undefined;
   const canToggleEnabled =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -137,17 +160,28 @@ export function SourceDetailsPanel({
   const isTogglingEnabled = enabledState === "loading";
   // Authorization is presence-based — the parent only passes onUnlinkSource when
   // the caller may manage the project's sources. GitHub needs the connection's
-  // repositoryId; Jira is identified by its instance URL.
+  // repositoryId; Jira is identified by its instance URL, Confluence by its
+  // connection id.
   const canUnlinkSource =
     onUnlinkSource !== undefined &&
     ((source.sourceSystem === "GITHUB" &&
       repository !== null &&
       repository.repositoryId !== null) ||
-      (isJira && jira !== null));
+      (isJira && jira !== null) ||
+      (isConfluence && Boolean(confluence?.connectionId)));
   const isUnlinking = unlinkState === "loading";
   // Noun for the unlink copy: GitHub sources are repositories, Jira sources are
-  // instances. Keeps each connector's wording accurate.
-  const removableNoun = isJira ? "instance" : "repository";
+  // instances, Confluence sources are spaces. Keeps each connector's wording
+  // accurate.
+  const removableNoun = isJira ? "instance" : isConfluence ? "space" : "repository";
+  // What removal actually costs, per connector. A GitHub repository and a Jira
+  // instance are shared between projects and only lose the project association,
+  // so re-linking restores the source as it was. A Confluence connection belongs
+  // to a single project, so removing it deletes the connection itself — the
+  // pages already ingested stay, but the space has to be set up again.
+  const removalHint = isConfluence
+    ? "The pages it already ingested are kept. Connecting the space again sets it up from scratch."
+    : `The ${removableNoun} and its artifacts are kept. You can re-link it later.`;
   // GitHub exposes one timestamp per resource type; Jira refreshes issue data
   // (including comments and change history) as one combined resource.
   const hasResourceSyncTimes =
@@ -222,14 +256,18 @@ export function SourceDetailsPanel({
     try {
       await onUpdateSource(source);
       setUpdateState("success");
-      toast.success("Update started", {
-        description: "Details refresh while ingestion runs.",
-      });
+      if (!reportsUpdateItself) {
+        toast.success("Update started", {
+          description: "Details refresh while ingestion runs.",
+        });
+      }
     } catch (error) {
       setUpdateState("error");
-      toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
+      if (!reportsUpdateItself) {
+        toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
+      }
     }
-  }, [canUpdate, onUpdateSource, source, toast]);
+  }, [canUpdate, onUpdateSource, reportsUpdateItself, source, toast]);
 
   const handleConfirmUnlink = useCallback(async () => {
     if (!onUnlinkSource) return;
@@ -507,6 +545,24 @@ export function SourceDetailsPanel({
         </DrawerCard>
       )}
 
+      {canManageConfluenceConfig &&
+        confluence?.connectionId &&
+        onLoadConfluenceConfig &&
+        onSaveConfluenceConfig && (
+          <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
+            {/* Same control again: Confluence connections carry the identical
+                schedule contract, only the load/save endpoints differ. */}
+            <GithubRepositorySyncSettings
+              loadKey={confluence.connectionId}
+              loadConfig={() => onLoadConfluenceConfig(confluence.connectionId)}
+              onSave={(request) => onSaveConfluenceConfig(confluence.connectionId, request)}
+              autoUpdateOnText="Due checks update this Confluence space."
+              autoUpdateOffText="Due checks only mark this Confluence space out of date."
+              toggleAriaLabel="Toggle Confluence space auto update"
+            />
+          </DrawerCard>
+        )}
+
       {source.failedItems.length > 0 && (
         <DrawerCard label="Failed Items" icon={XCircle} index={4} className="mt-4 sm:mt-5">
           <div className="space-y-3">
@@ -534,8 +590,7 @@ export function SourceDetailsPanel({
           className="mt-4 sm:mt-5"
         >
           <p className="text-sm text-app-danger-text">
-            Remove this {removableNoun} from the current project. The {removableNoun} and its
-            artifacts are kept. You can re-link it later.
+            Remove this {removableNoun} from the current project. {removalHint}
           </p>
           <Button
             variant="dangerSoft"
@@ -552,7 +607,7 @@ export function SourceDetailsPanel({
       <AlertDialog
         isOpen={isUnlinkDialogOpen}
         title={`Remove ${removableNoun} from project?`}
-        description={`"${source.name}" will no longer feed this project's knowledge base. The ${removableNoun} and its artifacts are kept, and you can re-link it later.`}
+        description={`"${source.name}" will no longer feed this project's knowledge base. ${removalHint}`}
         confirmLabel="Remove"
         loadingLabel="Removing…"
         variant="danger"
