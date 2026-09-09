@@ -81,6 +81,11 @@ const navItems: SidebarNavItem[] = [
 
 const projectManagerNavItems: SidebarNavItem[] = [
   {
+    label: "Blueprints",
+    path: "/blueprints",
+    icon: OnboardingIcon,
+  },
+  {
     label: "PM Dashboard",
     path: "/pm-dashboard",
     icon: PmDashboardIcon,
@@ -163,9 +168,8 @@ function SidebarContent({
   const visibleNavItems = navItems.filter(
     (item) =>
       canAccessRoute(profile, item.path, canManageSelected) &&
-      // Onboarding only appears while a path can actually exist: after a
-      // role is assigned, before the journey is completed, and once the
-      // project has something to build the path from.
+      // Path existence is handled on the page itself. The profile completion
+      // flag alone decides whether this one-time journey remains in navigation.
       (item.path !== "/onboarding" || isOnboardingAvailable),
   );
   const visibleProjectManagerNavItems = projectManagerNavItems.filter((item) =>

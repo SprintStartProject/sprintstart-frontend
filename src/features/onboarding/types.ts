@@ -60,6 +60,11 @@ export interface OnboardingStepEndpoint {
   completedAt: string | null;
   feedback: OnboardingStepFeedback | null;
   skip: OnboardingStepSkip | null;
+  /** Persisted position copied from the blueprint phase subgraph. */
+  graphX?: number | null;
+  graphY?: number | null;
+  /** IDs of prerequisite steps or knowledge-check questions in the same phase. */
+  blockerIds?: string[];
 }
 
 // Why the backend considers a phase locked (see OnboardingPhaseEndpoint.unlockReason)
@@ -84,6 +89,11 @@ export interface OnboardingPhaseEndpoint {
   unlockReason: PhaseUnlockReason | null;
   checkSummary: PhaseCheckSummaryEndpoint;
   steps: OnboardingStepEndpoint[];
+  /** Persisted position copied from the blueprint path graph. */
+  graphX?: number | null;
+  graphY?: number | null;
+  /** IDs of prerequisite phases in this onboarding path. */
+  blockerIds?: string[];
 }
 
 export interface OnboardingPathEndpoint {
@@ -91,6 +101,7 @@ export interface OnboardingPathEndpoint {
   userId: string;
   createdAt: string;
   phases: OnboardingPhaseEndpoint[];
+  blueprintId?: string | null;
 }
 
 // ─── Step Detail (GET /onboarding/steps/{stepId}) ────────────────────────────
@@ -149,6 +160,11 @@ export interface PhaseCheckQuestionEndpoint {
   // only appear in the standalone review check (see ReviewCheckEndpoint).
   review?: boolean;
   reviewSourcePhaseTitle?: string | null;
+  /** Display title and graph metadata copied from the blueprint question. */
+  title?: string;
+  graphX?: number | null;
+  graphY?: number | null;
+  blockerIds?: string[];
 }
 
 // GET /onboarding/me/phases/{phaseId}/checks — never contains correct answers

@@ -29,6 +29,9 @@ import onboardingStepMock from "../mocks/onboardingStepMock.json";
 export const onboardingService = {
   // ── PATH ─────────────────────────────────────────────────
 
+  /**
+   * Fetches the personalized onboarding path for the current authenticated user from the backend.
+   */
   async fetchPath(): Promise<OnboardingPathEndpoint> {
     return await apiClient.fetch<OnboardingPathEndpoint>(`/api/v1/onboarding/me/path`);
   },
@@ -36,8 +39,13 @@ export const onboardingService = {
   /**
    * Triggers AI generation of the current user's onboarding path and streams
    * progress over SSE. Replaces any existing path once the `path` event arrives.
+   *
+   * `projectId` is interpolated into the URL because path generation is
+   * project-scoped: the path is copied from the active blueprint of the project
+   * the user has selected. Hook it to the selected project so the generated
+   * path matches the project the user is looking at.
    */
-  async personalizePath(handlers: OnboardingPersonalizeHandlers): Promise<void> {
+  async personalizePath(projectId: string, handlers: OnboardingPersonalizeHandlers): Promise<void> {
     try {
       if (keycloak.authenticated) {
         await keycloak.updateToken(30);
@@ -48,7 +56,7 @@ export const onboardingService = {
       return;
     }
 
-    const res = await fetch(`/api/v1/onboarding/me/path/personalize`, {
+    const res = await fetch(`/api/v1/projects/${projectId}/onboarding/me/path/personalize`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${keycloak.token}`,

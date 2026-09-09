@@ -60,8 +60,10 @@ describe("onboardingService", () => {
       },
     });
 
+    const requestedUrls: string[] = [];
     server.use(
-      http.post("/api/v1/onboarding/me/path/personalize", () => {
+      http.post("/api/v1/projects/proj-sel/onboarding/me/path/personalize", ({ request }) => {
+        requestedUrls.push(request.url);
         return new HttpResponse(stream, {
           headers: { "Content-Type": "text/event-stream" },
         });
@@ -75,8 +77,11 @@ describe("onboardingService", () => {
       onError: vi.fn(),
     };
 
-    await onboardingService.personalizePath(handlers);
+    await onboardingService.personalizePath("proj-sel", handlers);
 
+    // The selected project must be scoped into the request URL, since path
+    // generation is project-scoped.
+    expect(requestedUrls[0]).toContain("/api/v1/projects/proj-sel/onboarding/me/path/personalize");
     expect(handlers.onStage).toHaveBeenCalledWith("Analyzing skills", "Checking JS");
     expect(handlers.onPath).toHaveBeenCalledWith(expect.objectContaining({ id: "path2" }));
     expect(handlers.onDone).toHaveBeenCalled();
