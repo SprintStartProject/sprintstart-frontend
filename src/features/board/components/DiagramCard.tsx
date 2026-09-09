@@ -7,6 +7,8 @@ import { type GraphShape } from "../../competency-graph/layout";
 import { DiagramCanvas, type DiagramCanvasEdge } from "../../graph-diagram/DiagramCanvas";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { useCardMarks } from "../marks/useCardMarks";
 import { DiagramCardNode } from "./DiagramCardNode";
 import { EDGE_KIND_WORDS, ariaLabelFor, isSoftEdge } from "../diagramWords";
 import type { BoardCard, DiagramContent } from "../types";
@@ -44,6 +46,10 @@ export function DiagramCard({ content, card, onDismiss, dismissing }: DiagramCar
   const [asList, setAsList] = useState(false);
 
   const current = redrawn ?? content;
+  // The one part of a diagram that is prose. The boxes are not marked: a highlight on a canvas
+  // node would have to survive the picture being redrawn with different boxes, and a mark nobody
+  // can find again is worse than no mark.
+  const marks = useCardMarks().marksFor(card.id);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +140,11 @@ export function DiagramCard({ content, card, onDismiss, dismissing }: DiagramCar
         ) : undefined
       }
     >
-      {current.summary && <p className="mb-3 text-sm text-app-text-muted">{current.summary}</p>}
+      {current.summary && (
+        <p className="mb-3 text-sm text-app-text-muted">
+          <Marked text={current.summary} marks={marks} cardId={card.id} />
+        </p>
+      )}
 
       {hasPicture ? (
         asList ? (

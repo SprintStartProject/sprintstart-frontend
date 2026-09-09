@@ -70,8 +70,8 @@ function sourceStatusHandler({ inThisProject = [] as string[] } = {}) {
   });
 }
 
-function jiraCredentialsHandler(names: string[], email = "me@corp.com") {
-  return http.get("/api/v1/jira/credentials", () =>
+function atlassianCredentialsHandler(names: string[], email = "me@corp.com") {
+  return http.get("/api/v1/atlassian/credentials", () =>
     HttpResponse.json(names.map((displayName) => ({ userEmail: email, displayName }))),
   );
 }
@@ -109,7 +109,7 @@ describe("AddSourceModal", () => {
   });
 
   it("offers both 'Add to list' and 'Connect now' on a detail screen", async () => {
-    server.use(jiraCredentialsHandler(["default"]));
+    server.use(atlassianCredentialsHandler(["default"]));
     const user = userEvent.setup();
     renderModal();
 
@@ -127,7 +127,7 @@ describe("AddSourceModal", () => {
   it("stages a Jira instance and connects the list", async () => {
     let capturedBody: unknown = null;
     server.use(
-      jiraCredentialsHandler(["default"]),
+      atlassianCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", async ({ request }) => {
         capturedBody = await request.json();
         return new HttpResponse(null, { status: 202 });
@@ -163,7 +163,7 @@ describe("AddSourceModal", () => {
   it("connects a source immediately with 'Connect now'", async () => {
     let capturedBody: unknown = null;
     server.use(
-      jiraCredentialsHandler(["default"]),
+      atlassianCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", async ({ request }) => {
         capturedBody = await request.json();
         return new HttpResponse(null, { status: 202 });
@@ -192,7 +192,7 @@ describe("AddSourceModal", () => {
 
   it("surfaces a failed connect on the connecting screen with a retry", async () => {
     server.use(
-      jiraCredentialsHandler(["default"]),
+      atlassianCredentialsHandler(["default"]),
       http.post("/api/v1/jira/connect", () =>
         HttpResponse.json({ message: "bad gateway" }, { status: 502 }),
       ),
@@ -290,6 +290,83 @@ describe("AddSourceModal", () => {
     expect(singleConnectCalled).toBe(false);
   });
 
+  it("tells the PM a linked repository was reused instead of promising an ingestion", async () => {
+    server.use(
+      discoveryHandler,
+      sourceStatusHandler(),
+      http.post("/api/v1/github/connections/:repositoryId/projects/:projectId", () =>
+        HttpResponse.json({
+          repositoryId: "id-acme/repo-connected",
+          projectIds: ["project-1"],
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    const props = renderModal();
+    await gotoGithubStep(user);
+
+    await user.type(screen.getByLabelText("Organization, user, or URL"), "acme");
+    await user.click(screen.getByRole("button", { name: "Discover" }));
+    await screen.findByText("repo-a");
+
+    const connectedRow = screen.getByText("repo-connected").closest("label") as HTMLElement;
+    await waitFor(() => expect(within(connectedRow).getByRole("checkbox")).toBeEnabled());
+    await user.click(within(connectedRow).getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /connect now/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+
+    // Nothing is being fetched, so the usual reassurance would have the PM
+    // waiting for a run that never starts.
+    expect(await screen.findByText(/no re-ingestion needed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/initial ingestion is running/i)).not.toBeInTheDocument();
+    // ...and the row says the same, so the instant completion is not mistaken
+    // for the connect having done nothing.
+    expect(await screen.findByText(/already available, nothing re-ingested/i)).toBeInTheDocument();
+  });
+
+  it("still promises an ingestion for a repository that is genuinely new", async () => {
+    server.use(
+      discoveryHandler,
+      http.post("/api/v1/github/connect", () =>
+        HttpResponse.json({ transactionId: "txn-a", wasReused: false }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    const props = renderModal();
+    await gotoGithubStep(user);
+    await stageRepoA(user);
+    await user.click(screen.getByRole("button", { name: /connect 1 source/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+
+    expect(await screen.findByText(/initial ingestion is running/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no re-ingestion needed/i)).not.toBeInTheDocument();
+  });
+
+  it("reports a reuse the backend found for a repository staged as new", async () => {
+    // Discovery saw nothing, because the repository was connected by somebody
+    // else between the discovery call and this connect.
+    server.use(
+      discoveryHandler,
+      http.post("/api/v1/github/connect", () =>
+        HttpResponse.json({ transactionId: "txn-a", wasReused: true }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    const props = renderModal();
+    await gotoGithubStep(user);
+    await stageRepoA(user);
+    await user.click(screen.getByRole("button", { name: /connect 1 source/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+
+    expect(await screen.findByText(/no re-ingestion needed/i)).toBeInTheDocument();
+  });
+
   it("stages and connects a newly discovered repository with the right body", async () => {
     let capturedBody: unknown = null;
     server.use(
@@ -350,7 +427,7 @@ describe("AddSourceModal", () => {
   });
 
   it("keeps building the list across source types before connecting", async () => {
-    server.use(discoveryHandler, jiraCredentialsHandler(["default"]));
+    server.use(discoveryHandler, atlassianCredentialsHandler(["default"]));
     const user = userEvent.setup();
     renderModal();
 

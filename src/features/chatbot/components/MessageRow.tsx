@@ -1,21 +1,15 @@
-import { memo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { memo } from "react";
+import { AlertCircle, BookmarkPlus } from "lucide-react";
 import type { ChatMessage } from "../types";
 import type { SelectedCitation } from "../../../context/ChatContext";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { MessageCitations } from "./MessageCitations";
 import { CopyButton } from "./CopyButton";
+import { ReasoningPanel } from "./ReasoningPanel";
+import { SaveToBoard } from "../../board/save/SaveToBoard";
+import { chatMessageNote } from "../../board/generation/chatToCard";
 import { SleepyBot } from "./SleepyBot";
-import { BotGlyph } from "./BotGlyph";
-import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-
-// Hoisted to module scope (A4) — stable identity across renders.
-const REMARK_PLUGINS = [remarkGfm, remarkMath];
-const REHYPE_PLUGINS: ReactMarkdownOptions["rehypePlugins"] = [[rehypeKatex, { strict: "ignore" }]];
 
 type ArtifactOpenPayload = {
   artifactId: string;
@@ -66,17 +60,6 @@ function MessageRowImpl({
   onOpenArtifact,
 }: MessageRowProps) {
   const isRequest = message.role === "USER";
-
-  // E19: The reasoning <details> should auto-open when reasoning first
-  // arrives, but not re-open on every token if the user manually collapsed
-  // it. We track "has reasoning ever appeared" via a state that only flips
-  // from false → true (never back), and let the user toggle freely after.
-  const [reasoningOpen, setReasoningOpen] = useState(false);
-  const [reasoningSeen, setReasoningSeen] = useState(false);
-  if (!reasoningSeen && !!message.reasoning) {
-    setReasoningSeen(true);
-    setReasoningOpen(true);
-  }
 
   // Suppress the empty assistant placeholder while the assistant is still
   // thinking (no tokens yet) — the ThinkingIndicator renders instead. A
@@ -131,27 +114,24 @@ function MessageRowImpl({
           )}
         </div>
 
+        {/* The assistant's column takes its full width instead of hugging its contents.
+                    That is what stops the streamed answer twitching: a hugging bubble is
+                    re-measured on every token, so it widened word by word and jumped back
+                    whenever a re-parse changed what the markdown rendered to. A fixed box that
+                    only grows downwards can be read while it is still being written, which is
+                    what the customer actually asked for. The user's own messages still hug —
+                    they arrive whole, so there is nothing to settle. */}
         <div
           className={`flex flex-col ${
-            isRequest ? "max-w-[70%] items-end" : "max-w-[85%] items-start"
+            isRequest ? "max-w-[70%] items-end" : "w-full max-w-[85%] items-start"
           }`}
         >
           {!isRequest && Boolean(message.reasoning) && (
-            <details
-              open={reasoningOpen}
-              onToggle={(e) => setReasoningOpen(e.currentTarget.open)}
-              className="mb-2 w-full rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted/50 text-sm shadow-sm"
-            >
-              <summary className="flex cursor-pointer items-center gap-2 px-4 py-2 font-medium text-app-text-muted transition-colors select-none hover:text-app-text">
-                <BotGlyph size={16} state="awake" />
-                Thought Process
-              </summary>
-              <div className="chat-md px-4 pb-3 text-app-text-muted opacity-80">
-                <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
-                  {message.reasoning}
-                </ReactMarkdown>
-              </div>
-            </details>
+            <ReasoningPanel
+              reasoning={message.reasoning ?? ""}
+              isStreaming={message.id === streamingMessageId}
+              answerLength={message.content.length}
+            />
           )}
 
           {/* A turn that produced no text at all — stopped, interrupted, or failed
@@ -166,7 +146,7 @@ function MessageRowImpl({
               className={`chat-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                 isRequest
                   ? "chat-md-user rounded-tr-sm bg-app-brand text-white"
-                  : "rounded-tl-sm border border-app-border-muted bg-app-surface-muted text-app-text"
+                  : "w-full rounded-tl-sm border border-app-border-muted bg-app-surface-muted text-app-text"
               }`}
             >
               <MessageMarkdown
@@ -197,8 +177,27 @@ function MessageRowImpl({
             </div>
           )}
 
+          {/* Under a finished answer only. A half-streamed reply is not a thing to keep — the
+              card would hold whatever had arrived by the moment somebody pressed it. */}
           {!isRequest && !showStreamingCaret && message.content !== "" && (
-            <CopyButton text={message.content} />
+            <div className="flex items-center gap-1">
+              <CopyButton text={message.content} />
+
+              <SaveToBoard
+                request={() => chatMessageNote(message.content)}
+                // The chat is durable and has a page of its own, so a kept answer can point back at
+                // the conversation it came out of — which is usually the part worth re-reading.
+                origin={() =>
+                  message.chat
+                    ? { url: `/chat/${message.chat.id}`, label: message.chat.title || "this chat" }
+                    : null
+                }
+                label="Keep on my board"
+                savedLabel="On your board"
+                description="The answer, as a note you can edit."
+                icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+              />
+            </div>
           )}
         </div>
       </div>

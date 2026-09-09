@@ -102,9 +102,13 @@ export type ChatSidebarProps = {
   chats: Chat[];
 
   /**
-   * Function that opens or closes the sidebar.
+   * Called when the list navigates somewhere — a chat, or a new one.
+   *
+   * Named for the event rather than for "close the sidebar", because whether it *should* close
+   * depends on which of its two shapes the rail is in: a drawer over the conversation has to
+   * get out of the way, a column beside it has no reason to. The page owns that decision.
    */
-  setSidebarOpen: (open: boolean) => void;
+  onNavigate?: () => void;
 
   /**
    * Optional callback to delete a chat conversation.
@@ -144,6 +148,6 @@ export type StreamHandlers = {
   onError?: (message: string) => void;
 };
 
-export const SOURCE_SYSTEMS = ["GITHUB", "UPLOAD", "JIRA"] as const;
+export const SOURCE_SYSTEMS = ["GITHUB", "UPLOAD", "JIRA", "CONFLUENCE"] as const;
 
 export type SourceSystem = (typeof SOURCE_SYSTEMS)[number];

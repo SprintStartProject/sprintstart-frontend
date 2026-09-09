@@ -9,11 +9,19 @@ function heightOf(rowSpan: number, trackPx = 32, gapPx = 20): number {
   return rowSpan * trackPx + (rowSpan - 1) * gapPx;
 }
 
+/** The span a cell has before any breakpoint applies — i.e. on a phone. */
 function rowSpanOf(className: string): number {
-  const match = /row-span-(\d+)/.exec(className);
-  if (!match) throw new Error(`no row span in "${className}"`);
+  const match = /(?:^|\s)row-span-(\d+)/.exec(className);
+  if (!match) throw new Error(`no base row span in "${className}"`);
 
   return Number(match[1]);
+}
+
+/** The span from `sm` up, which is the same as the base one unless the cell overrides it. */
+function smRowSpanOf(className: string): number {
+  const match = /sm:row-span-(\d+)/.exec(className);
+
+  return match ? Number(match[1]) : rowSpanOf(className);
 }
 
 /**
@@ -39,15 +47,28 @@ describe("dashboard grid sizes", () => {
   });
 
   it("keeps both wide forms at the heights they had", () => {
-    expect(heightOf(rowSpanOf(dashboardCellClass("wide", false)))).toBe(136);
-    expect(heightOf(rowSpanOf(dashboardCellClass("wide", true)))).toBe(2 * 136 + 20);
+    expect(heightOf(smRowSpanOf(dashboardCellClass("wide", false)))).toBe(136);
+    expect(heightOf(smRowSpanOf(dashboardCellClass("wide", true)))).toBe(2 * 136 + 20);
   });
 
   it("gives a single-line wide card a shorter band", () => {
-    const short = heightOf(rowSpanOf(dashboardCellClass("wide", false, true)));
+    const short = heightOf(smRowSpanOf(dashboardCellClass("wide", false, true)));
 
     expect(short).toBe(84);
-    expect(short).toBeLessThan(heightOf(rowSpanOf(dashboardCellClass("wide", false))));
+    expect(short).toBeLessThan(heightOf(smRowSpanOf(dashboardCellClass("wide", false))));
+  });
+
+  /**
+   * The shallow bands are shallow *because* they are wide. Below `sm` the board is one column,
+   * so a band is no longer a strip across four columns — it is a phone-width box, and 136px or
+   * 84px of it cut the card's content off. Every cell is the full height there.
+   */
+  it("gives every wide form the full height on a phone", () => {
+    const full = 2 * 136 + 20;
+
+    expect(heightOf(rowSpanOf(dashboardCellClass("wide", false)))).toBe(full);
+    expect(heightOf(rowSpanOf(dashboardCellClass("wide", true)))).toBe(full);
+    expect(heightOf(rowSpanOf(dashboardCellClass("wide", false, true)))).toBe(full);
   });
 
   it("prefers the roomier height when a widget claims both", () => {

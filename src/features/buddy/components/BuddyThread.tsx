@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import type { ReactNode } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
@@ -35,6 +35,14 @@ type BuddyThreadProps = {
    */
   renderQuestionAction?: (question: string) => ReactNode;
   /**
+   * Rendered under each of the buddy's *replies*, handed that reply's Markdown.
+   *
+   * Where keeping something from the conversation belongs. The thread does not know what is worth
+   * keeping or how — it hands over the text and lets the caller decide, which is what stops this
+   * component from growing a dependency on the board.
+   */
+  renderReplyAction?: (reply: string) => ReactNode;
+  /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
    * Distinct from a turn that failed, which carries its own reason: this one has no turn to hang
@@ -44,6 +52,25 @@ type BuddyThreadProps = {
   openError?: string | null;
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
+  /**
+   * Clears the conversation above the visit divider and opens a clean one.
+   *
+   * Offered from the divider itself rather than from a button in the page header, because the
+   * divider is the one place on screen that already means "everything above here is the last
+   * conversation" — a control that tidies exactly that belongs on the line that says so, and
+   * nowhere else. Which is also why it is only ever drawn when there *is* a divider: a visit
+   * with nothing above it is already the fresh one.
+   */
+  onStartFreshVisit?: () => void;
+  /**
+   * The keyboard chord for that control, named in its tooltip — when there is one.
+   *
+   * Passed in rather than read from `useNewConversationShortcut`, because whether the chord
+   * does anything depends on who is rendering this thread. `/buddy` binds it and says so; the
+   * dock floats over pages that bind it to their *own* new conversation, or to nothing at all,
+   * and a tooltip promising a key that starts somebody else's chat is worse than no tooltip.
+   */
+  freshVisitShortcut?: string;
 };
 
 /**
@@ -68,8 +95,11 @@ export function BuddyThread({
   before,
   lastMessageFooter,
   renderQuestionAction,
+  renderReplyAction,
   openError,
   onRetryOpen,
+  onStartFreshVisit,
+  freshVisitShortcut,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens.
@@ -124,7 +154,28 @@ export function BuddyThread({
             {message.startsVisit && (
               <div className="flex items-center gap-3 py-1">
                 <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-                <span className="text-xs font-medium text-app-text-muted">New conversation</span>
+
+                <span className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-app-text-muted">New conversation</span>
+
+                  {onStartFreshVisit && (
+                    <button
+                      type="button"
+                      onClick={onStartFreshVisit}
+                      data-testid="buddy-clear-previous"
+                      aria-label="Clear the earlier conversation"
+                      title={
+                        freshVisitShortcut
+                          ? `Clear the earlier conversation (${freshVisitShortcut})`
+                          : "Clear the earlier conversation"
+                      }
+                      className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
+
                 <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
               </div>
             )}
@@ -137,6 +188,7 @@ export function BuddyThread({
               footer={
                 <>
                   {isUser && renderQuestionAction?.(message.content)}
+                  {!isUser && hasText && renderReplyAction?.(message.content)}
                   {!isUser && hasActions && (
                     <BuddyActionProposals
                       messageId={message.id}

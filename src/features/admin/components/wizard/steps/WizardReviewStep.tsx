@@ -1,4 +1,4 @@
-import { GitBranch, Ticket, FileText } from "lucide-react";
+import { GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
@@ -28,12 +28,14 @@ const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> 
   GITHUB: GitBranch,
   JIRA: Ticket,
   UPLOAD: FileText,
+  CONFLUENCE: BookOpen,
 };
 
 const typeLabels: Record<DraftSourceType, string> = {
   GITHUB: "GitHub",
   JIRA: "Jira",
   UPLOAD: "Upload",
+  CONFLUENCE: "Confluence",
 };
 
 function sourceTitle(source: DraftSource): string {

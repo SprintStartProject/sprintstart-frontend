@@ -50,6 +50,8 @@ function request(overrides: Partial<KnowledgeRequest> = {}): KnowledgeRequest {
     createdAt: "2026-07-27T09:00:00Z",
     answeredAt: null,
     answer: null,
+    // A hire reading their own escalations is never told who they are.
+    hire: null,
     ...overrides,
   };
 }

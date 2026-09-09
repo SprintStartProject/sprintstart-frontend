@@ -41,18 +41,40 @@ const DEFAULT_SURROUNDINGS: readonly { id: DashboardWidgetId; size: DashboardWid
  *
  * @param availableIds The widget ids {@link DashboardWidgetDefinition.isAvailable} said yes
  *   to. Anything not in here is skipped rather than placed as a card that cannot load.
+ * @param ownsKnowledgeGaps Whether a component has been put in this user's name. When it has,
+ *   the gaps card takes the knowledge base's place rather than being added beside it: work
+ *   that is assigned to you outranks a reading list, and the default board is a fixed shape —
+ *   a card added here is a card pushed off the bottom of the first screen. The knowledge base
+ *   is still one tick away in the widget picker, and the swap only ever affects somebody who
+ *   has never arranged their own dashboard.
  */
-export function buildDefaultLayout(availableIds: readonly DashboardWidgetId[]): DashboardLayout {
+export function buildDefaultLayout(
+  availableIds: readonly DashboardWidgetId[],
+  ownsKnowledgeGaps = false,
+): DashboardLayout {
   const available = new Set(availableIds);
   const slotId = DEFAULT_SLOT_CANDIDATES.find((id) => available.has(id));
 
-  return DEFAULT_SURROUNDINGS.filter((item) => available.has(item.id)).flatMap((item) =>
-    // The slot sits between the greeting and the knowledge base, which is where the
-    // onboarding and conversation cards have always been.
-    item.id === "knowledge-base" && slotId !== undefined
-      ? [{ id: slotId, size: "medium" }, item]
-      : [item],
-  );
+  // Both halves have to be there: something to put in, and something to put it in place of.
+  // Without the second check the gaps card took a slot that was not being filled anyway.
+  const surroundings =
+    ownsKnowledgeGaps && available.has("my-knowledge-gaps") && available.has("knowledge-base")
+      ? DEFAULT_SURROUNDINGS.map((item) =>
+          item.id === "knowledge-base"
+            ? { id: "my-knowledge-gaps" as const, size: item.size }
+            : item,
+        )
+      : DEFAULT_SURROUNDINGS;
+
+  return surroundings
+    .filter((item) => available.has(item.id))
+    .flatMap((item) =>
+      // The slot sits between the greeting and the card in the knowledge base's place, which
+      // is where the onboarding and conversation cards have always been.
+      (item.id === "knowledge-base" || item.id === "my-knowledge-gaps") && slotId !== undefined
+        ? [{ id: slotId, size: "medium" as const }, item]
+        : [item],
+    );
 }
 
 /**
@@ -76,14 +98,33 @@ export function reconcileLayout(
   });
 }
 
-/** Appends a widget at its default size. A widget already on the board is left alone. */
-export function addWidget(
+/**
+ * Replaces the set of placed widgets in one go, keeping everything the user has already
+ * arranged exactly where and how it was.
+ *
+ * The picker's operation, and the only way a widget is placed. Removing one at a time still
+ * exists for the card's own control on the board; this is the batch behind a dialog where
+ * somebody ticks several boxes and presses save, and the difference matters: a kept widget
+ * must not lose its position
+ * or the size it was given just because the picker was opened, so the existing layout is
+ * filtered rather than rebuilt.
+ *
+ * Newly ticked widgets go on the end, in catalog order, at their default size — the same
+ * place and shape a single "add" would have put them.
+ */
+export function setPlacedWidgets(
   layout: DashboardLayout,
-  definition: DashboardWidgetDefinition,
+  selectedIds: ReadonlySet<DashboardWidgetId>,
+  available: readonly DashboardWidgetDefinition[],
 ): DashboardLayout {
-  if (layout.some((item) => item.id === definition.id)) return layout;
+  const kept = layout.filter((item) => selectedIds.has(item.id));
+  const alreadyPlaced = new Set(kept.map((item) => item.id));
 
-  return [...layout, { id: definition.id, size: definition.defaultSize }];
+  const added = available
+    .filter((widget) => selectedIds.has(widget.id) && !alreadyPlaced.has(widget.id))
+    .map((widget) => ({ id: widget.id, size: widget.defaultSize }));
+
+  return [...kept, ...added];
 }
 
 export function removeWidget(layout: DashboardLayout, id: DashboardWidgetId): DashboardLayout {

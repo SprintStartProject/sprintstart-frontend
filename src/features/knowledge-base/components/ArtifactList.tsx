@@ -1,6 +1,14 @@
 import { memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, FileCode, CircleDot, GitPullRequest, ChevronRight } from "lucide-react";
+import {
+  BookOpen,
+  Building2,
+  ChevronRight,
+  CircleDot,
+  FileCode,
+  FileText,
+  GitPullRequest,
+} from "lucide-react";
 import type { Artifact, ArtifactType } from "../types";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -24,10 +32,25 @@ const getIcon = (type: ArtifactType) => {
       return <CircleDot className="h-5 w-5 text-app-warning-text" />;
     case "PULL_REQUEST":
       return <GitPullRequest className="h-5 w-5 text-app-success-text" />;
+    case "PAGE":
+      return <BookOpen className="h-5 w-5 text-app-brand" />;
+    case "ORG_METADATA":
+      // Neutral like COMMIT so it never reads as a status; organizations are
+      // a distinct shape, not a success/warning condition.
+      return <Building2 className="h-5 w-5 text-app-text-muted" />;
     default:
       return <FileText className="h-5 w-5 text-app-text-muted" />;
   }
 };
+
+/**
+ * Human-readable label for the artifact-type chip. The chip shows the raw
+ * artifact type for every other kind, which reads fine ("COMMIT", "ISSUE");
+ * `ORG_METADATA` is the one value that names its storage shape rather than the
+ * thing itself, so it gets a word a reader would actually use.
+ */
+const getTypeLabel = (type: ArtifactType): string =>
+  type === "ORG_METADATA" ? "Organization" : type;
 
 const formatDate = (iso: string): string => {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -71,7 +94,7 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
           <div className="mb-1 flex items-center gap-2">
             <h3 className="truncate font-semibold text-app-text">{artifact.title ?? "Untitled"}</h3>
             <span className="rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
-              {artifact.artifactType}
+              {getTypeLabel(artifact.artifactType)}
             </span>
             <span className="rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
               {artifact.sourceSystem}
@@ -79,6 +102,10 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
           </div>
           <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
             <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
+            {/* Only shown once the content actually changed: an artifact that still matches its
+                import has nothing useful to say here, and an always-present date that equals
+                "Ingested" would just be noise. */}
+            {artifact.lastChangedAt && <span>Changed: {formatDate(artifact.lastChangedAt)}</span>}
           </div>
         </div>
         <div className="shrink-0 pt-2">

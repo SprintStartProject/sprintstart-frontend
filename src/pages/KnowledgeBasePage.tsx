@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
@@ -66,13 +66,22 @@ export function KnowledgeBasePage() {
   const isLoading = isProjectLoading || isArtifactsLoading;
 
   /*
-    `?artifact=<id>` opens a document straight away, which is what the dashboard's knowledge-base
-    card links to — before this, every row on that card landed on the bare page and the reader
-    had to find the document again themselves.
+    `?artifact=<id>` says which document is open, and it is in the URL the whole time one is.
 
-    It is a hand-off rather than a permanent part of the URL: the id seeds the state once and the
-    parameter is then stripped, so the drawer state stays local (as it already was) and coming
-    back to the page later does not reopen a document the user has since closed.
+    It began as a one-way hand-off: the dashboard's knowledge-base card linked to it, the id seeded
+    the drawer once, and the parameter was then stripped again so the drawer state stayed local.
+    That was fine while the only thing that ever *sent* somebody here was a link somebody else had
+    built — and wrong as soon as something wanted to describe where a reader currently *is*.
+
+    The board's cards do. A note kept from a paragraph in a document records the page it came from
+    so it can offer the way back, and with the parameter stripped every one of those trails pointed
+    at `/knowledge-base` — the list, not the document, with the highlighted paragraph three clicks
+    further in. The reader was returned to the room and left to find the page again.
+
+    So the parameter now follows the drawer in both directions: opening a document puts it there,
+    closing one takes it away. `replace` throughout, so reading four documents does not leave four
+    entries in the back button. The original intent survives it — a URL captured after the drawer is
+    closed carries no id, so coming back later still does not reopen a document somebody shut.
   */
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(() =>
@@ -80,18 +89,17 @@ export function KnowledgeBasePage() {
   );
   const [prevProjectId, setPrevProjectId] = useState(projectId);
 
-  const artifactParamConsumed = useRef(false);
-
   useEffect(() => {
-    if (artifactParamConsumed.current) return;
-    artifactParamConsumed.current = true;
-
-    if (!searchParams.has("artifact")) return;
+    // Compared before writing, because this effect's own write comes back to it as a new
+    // `searchParams`: without the guard that is a loop rather than a synchronisation.
+    if ((searchParams.get("artifact") ?? null) === selectedArtifactId) return;
 
     const next = new URLSearchParams(searchParams);
-    next.delete("artifact");
+    if (selectedArtifactId) next.set("artifact", selectedArtifactId);
+    else next.delete("artifact");
+
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [selectedArtifactId, searchParams, setSearchParams]);
 
   // Reset active drawer selection whenever the project scope changes.
   if (prevProjectId !== projectId) {

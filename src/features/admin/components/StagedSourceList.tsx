@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  BookOpen,
   Check,
   FileText,
   GitBranch,
@@ -9,6 +10,8 @@ import {
   Ticket,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
+import { NO_OWNER_OPTION, type SourceOwnerOption } from "../sourceOwners";
 import type { DraftSource, DraftSourceStatus } from "../projectSourcesDraft";
 
 type StagedSourceListProps = {
@@ -22,6 +25,16 @@ type StagedSourceListProps = {
   onRemove?: (sourceId: string) => void;
   /** Omitted where retrying makes no sense, e.g. before anything ran. */
   onRetry?: (sourceId: string) => void;
+  /**
+   * The people a repository's documentation can be handed to — the project's members here,
+   * the staged ones in the create-project wizard. Just the people: "No owner" is prepended.
+   *
+   * Omitted (together with {@link StagedSourceListProps.onOwnerChange}) leaves the picker off
+   * entirely, which is what the provisioning screen wants — by then the assignment has either
+   * been made or has failed, and there is nothing left to choose.
+   */
+  ownerOptions?: readonly SourceOwnerOption[];
+  onOwnerChange?: (sourceId: string, ownerUserId: string) => void;
   /** Shown in place of the list when there are no staged sources. */
   emptyMessage?: string;
 };
@@ -41,6 +54,10 @@ function TypeIcon({ source }: { source: DraftSource }) {
 
   if (source.type === "UPLOAD") {
     return <FileText className="h-4 w-4 text-app-text-muted" />;
+  }
+
+  if (source.type === "CONFLUENCE") {
+    return <BookOpen className="h-4 w-4 text-app-text-muted" />;
   }
 
   return <GitBranch className="h-4 w-4 text-app-text-muted" />;
@@ -83,17 +100,40 @@ function sourceDetail(source: DraftSource): string {
     return source.url;
   }
 
+  if (source.type === "CONFLUENCE") {
+    return `${source.baseUrl} (${source.spaceId})`;
+  }
+
   return source.tokenName;
 }
 
 /**
  * The status line under the title. A staged GitHub repository that is already
  * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
- * misdescribe it — it says so instead.
+ * misdescribe it — it says so instead, before and after the run.
+ *
+ * Saying so afterwards matters as much as before: a linked source finishes
+ * instantly and starts no ingestion, so a plain "Connected" leaves the PM
+ * watching for a run that is never coming and wondering whether the connect
+ * worked at all.
  */
 function statusDescription(source: DraftSource): string {
   if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
     return "Already ingested, will be linked";
+  }
+
+  // The connect worked and the ownership write did not; see `ownerAssignmentFailed`. Said on
+  // the row rather than in a toast because it is true of this repository and no other, and it
+  // wins over the reuse line below because it is the half the PM may want to put right. It
+  // still may not imply an ingestion a linked source never started.
+  if (source.status === "connected" && source.ownerAssignmentFailed) {
+    return source.wasReused
+      ? "Linked · the owner could not be assigned"
+      : "Connected · the owner could not be assigned";
+  }
+
+  if (source.status === "connected" && source.wasReused) {
+    return "Linked · already available, nothing re-ingested";
   }
 
   return `${statusLabels[source.status]} · ${sourceDetail(source)}`;
@@ -110,8 +150,13 @@ export function StagedSourceList({
   disabled = false,
   onRemove,
   onRetry,
+  ownerOptions,
+  onOwnerChange,
   emptyMessage,
 }: StagedSourceListProps) {
+  const canPickOwner = ownerOptions !== undefined && onOwnerChange !== undefined;
+  const ownerChoices = ownerOptions ? [NO_OWNER_OPTION, ...ownerOptions] : [];
+
   if (sources.length === 0) {
     if (!emptyMessage) return null;
 
@@ -148,7 +193,21 @@ export function StagedSourceList({
             </div>
           </div>
 
-          <div className="flex shrink-0 gap-2 sm:justify-end">
+          <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+            {/* Only while the source is still staged: once it has connected the assignment has
+                already been written, and a control that no longer changes anything is worse
+                than none. The owner is then changed from the knowledge-gaps page. */}
+            {canPickOwner && source.type === "GITHUB" && source.status !== "connected" && (
+              <FilterSelect
+                label={`Owner of ${source.owner}/${source.name}`}
+                value={source.ownerUserId ?? ""}
+                options={ownerChoices}
+                onChange={(ownerUserId) => onOwnerChange?.(source.id, ownerUserId)}
+                disabled={disabled}
+                className="w-44"
+              />
+            )}
+
             {source.status === "failed" && onRetry && (
               <Button
                 variant="secondary"
