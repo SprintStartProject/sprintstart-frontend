@@ -1,6 +1,6 @@
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, Brain, ClipboardCheck, Rocket } from "lucide-react";
+import { AlertCircle, ArrowRight, CircleHelp, Rocket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import type { MyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
@@ -93,12 +93,8 @@ type CardContent = {
    * Handed to the onboarding page through the router, which uses it to put the thing the
    * user came for in front of them instead of dropping them at the top of the page.
    */
-  navigationState?: { focusCheckPhaseId?: string; openReviewCheck?: boolean };
+  navigationState?: { focusQuestionId?: string };
 };
-
-function pluralize(count: number, singular: string): string {
-  return `${count} ${count === 1 ? singular : `${singular}s`}`;
-}
 
 function describeNextAction(action: Exclude<OnboardingNextAction, { kind: "done" }>): CardContent {
   switch (action.kind) {
@@ -115,30 +111,19 @@ function describeNextAction(action: Exclude<OnboardingNextAction, { kind: "done"
         to: `/onboarding/${action.step.id}`,
       };
 
-    case "check":
+    case "question":
       return {
-        icon: ClipboardCheck,
-        eyebrow: "Knowledge check",
-        title: `${action.phase.title} check`,
-        subtitle: action.isFinalPhase
-          ? "Every step done — pass it to finish your onboarding"
-          : "Every step done — pass it to unlock the next phase",
-        cta: "Open check",
-        ariaLabel: `Open the knowledge check for ${action.phase.title}`,
+        icon: CircleHelp,
+        eyebrow: "Knowledge question",
+        title: action.question.question,
+        subtitle:
+          action.question.status === "RETRY"
+            ? "Answer it correctly to move on in your onboarding"
+            : action.phase.title,
+        cta: action.question.status === "RETRY" ? "Try again" : "Answer",
+        ariaLabel: `Answer the knowledge question for ${action.phase.title}`,
         to: "/onboarding",
-        navigationState: { focusCheckPhaseId: action.phase.id },
-      };
-
-    case "review":
-      return {
-        icon: Brain,
-        eyebrow: "Review questions",
-        title: `${pluralize(action.openCount, "question")} to answer again`,
-        subtitle: "Answer them correctly once to finish your onboarding",
-        cta: "Test your knowledge",
-        ariaLabel: "Answer your open review questions",
-        to: "/onboarding",
-        navigationState: { openReviewCheck: true },
+        navigationState: { focusQuestionId: action.question.id },
       };
   }
 }

@@ -2,23 +2,20 @@
 // CheckQuestionCard.tsx
 // ============================================================
 // Renders a single knowledge-check question in both of its
-// states: fillable while unanswered, and graded once a result
-// exists. Shared by the phase check and the review check so
-// questions look and behave identically in both.
+// states: fillable while unanswered, and graded once an attempt
+// result exists. Used inside the per-question answer modal.
 // ============================================================
 
-import type { PhaseCheckQuestionEndpoint, PhaseCheckAnswerResult } from "../types";
+import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../types";
 import type { DraftAnswer } from "../checkAnswers";
-import { CheckCircle2, XCircle, RotateCcw } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 interface CheckQuestionCardProps {
-  question: PhaseCheckQuestionEndpoint;
+  question: OnboardingQuestionEndpoint;
   index: number;
   draft: DraftAnswer;
-  /** Grading result for this question; null while the question has not been submitted. */
-  result: PhaseCheckAnswerResult | null;
-  /** Hides the "from <phase>" badge where every question is a review question anyway. */
-  hideReviewBadge?: boolean;
+  /** Grading result for this question; null while it has not been submitted. */
+  result: QuestionAttemptResult | null;
   onToggleOption: (optionId: string) => void;
   onTextChange: (text: string) => void;
 }
@@ -28,7 +25,6 @@ export function CheckQuestionCard({
   index,
   draft,
   result,
-  hideReviewBadge = false,
   onToggleOption,
   onTextChange,
 }: CheckQuestionCardProps) {
@@ -49,15 +45,6 @@ export function CheckQuestionCard({
           {index + 1}
         </span>
         <div className="min-w-0 flex-1">
-          {/* Where a review-pool question originally came from */}
-          {question.review && !hideReviewBadge && (
-            <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-app-surface-muted px-2 py-0.5 text-[11px] font-medium text-app-text-muted">
-              <RotateCcw className="h-3 w-3" />
-              {question.reviewSourcePhaseTitle
-                ? `From ${question.reviewSourcePhaseTitle}`
-                : "Review question"}
-            </div>
-          )}
           <div className="flex items-start justify-between gap-3">
             <h3 className="text-sm font-semibold text-app-text">{question.question}</h3>
             {graded &&

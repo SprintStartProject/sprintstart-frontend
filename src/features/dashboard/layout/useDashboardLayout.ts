@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { isOnboardingAccessible } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { useMyKnowledgeGaps } from "../../knowledge-gaps/useMyKnowledgeGaps";
+import { useMyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { DASHBOARD_WIDGET_IDS, getAvailableWidgets } from "./catalog";
 import * as operations from "./layoutOperations";
@@ -72,6 +72,19 @@ export function useDashboardLayout(): DashboardLayoutController {
     only ever changes one for a user who has never arranged their own.
   */
   const { gaps: myKnowledgeGaps } = useMyKnowledgeGaps();
+  /*
+    Whether the user's own onboarding is still running, which decides whether the onboarding
+    card takes the default board's flexible slot — it outranks team insights and
+    conversations. The status is the one the card renders, so the slot goes to onboarding
+    only while there really is a journey: "has not completed onboarding" is a weaker claim
+    than that, and reading the flag on its own gave everybody who never started one a card
+    with nothing in it. A failed read is not a journey either — showing one anyway is the bug
+    the hook keeps `error` apart from `absent` for.
+
+    It arrives after the first render, like the gaps above, and for the same reason that is
+    fine.
+  */
+  const onboarding = useMyOnboardingStatus();
 
   const userId = profile?.id ?? "";
 
@@ -80,8 +93,7 @@ export function useDashboardLayout(): DashboardLayoutController {
   const availableWidgets = getAvailableWidgets({
     profile,
     canManageSelectedProject: canManageSelected,
-    // Profile-only, so deciding whether to offer the onboarding card costs no request.
-    hasLiveOnboarding: isOnboardingAccessible(profile),
+    hasLiveOnboarding: onboarding.state === "loading" || onboarding.state === "ready",
   });
 
   const availableIds = availableWidgets.map((widget) => widget.id);

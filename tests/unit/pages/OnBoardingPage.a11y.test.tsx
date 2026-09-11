@@ -39,6 +39,10 @@ vi.mock("../../../src/services/userService", () => ({
   },
 }));
 
+vi.mock("../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "proj1" }),
+}));
+
 vi.mock("../../../src/services/onboardingService", () => ({
   onboardingService: {
     fetchPath: vi.fn().mockResolvedValue({
@@ -71,6 +75,7 @@ vi.mock("../../../src/services/onboardingService", () => ({
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     }),

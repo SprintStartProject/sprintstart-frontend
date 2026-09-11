@@ -68,6 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isLoginRequired) {
           console.error("Keycloak initialization failed", error);
         }
+
+        // A failed init leaves a spent authorization code sitting in the URL hash. Keycloak
+        // only strips it on success, so a stray reload here would resend the same dead code
+        // and fail identically, forever. Clearing it lets the next load start a clean flow.
+        if (window.location.hash) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+
         setStatus("unauthenticated");
       }
     };

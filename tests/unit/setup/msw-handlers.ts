@@ -288,13 +288,14 @@ export const handlers = [
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     }),
   ),
 
   http.post(
-    "/api/v1/onboarding/me/path/personalize",
+    "/api/v1/projects/:projectId/onboarding/me/path/personalize",
     () =>
       new HttpResponse(
         sseStream(
@@ -335,6 +336,7 @@ export const handlers = [
                       skip: null,
                     },
                   ],
+                  questions: [],
                 },
               ],
             },

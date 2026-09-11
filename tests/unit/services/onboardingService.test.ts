@@ -60,8 +60,10 @@ describe("onboardingService", () => {
       },
     });
 
+    const requestedUrls: string[] = [];
     server.use(
-      http.post("/api/v1/onboarding/me/path/personalize", () => {
+      http.post("/api/v1/projects/proj-sel/onboarding/me/path/personalize", ({ request }) => {
+        requestedUrls.push(request.url);
         return new HttpResponse(stream, {
           headers: { "Content-Type": "text/event-stream" },
         });
@@ -75,8 +77,11 @@ describe("onboardingService", () => {
       onError: vi.fn(),
     };
 
-    await onboardingService.personalizePath(handlers);
+    await onboardingService.personalizePath("proj-sel", handlers);
 
+    // The selected project must be scoped into the request URL, since path
+    // generation is project-scoped.
+    expect(requestedUrls[0]).toContain("/api/v1/projects/proj-sel/onboarding/me/path/personalize");
     expect(handlers.onStage).toHaveBeenCalledWith("Analyzing skills", "Checking JS");
     expect(handlers.onPath).toHaveBeenCalledWith(expect.objectContaining({ id: "path2" }));
     expect(handlers.onDone).toHaveBeenCalled();
@@ -148,198 +153,47 @@ describe("onboardingService", () => {
     });
   });
 
-  it("fetchPhaseCheck loads the check without correct answers", async () => {
-    server.use(
-      http.get("/api/v1/onboarding/me/phases/phase1/checks", () =>
-        HttpResponse.json({
-          phaseId: "phase1",
-          required: true,
-          passed: false,
-          latestAttemptId: null,
-          questions: [
-            {
-              id: "q1",
-              position: 0,
-              type: "MULTIPLE_CHOICE",
-              question: "Which one?",
-              options: [{ id: "o1", position: 0, label: "A" }],
-            },
-          ],
-        }),
-      ),
-    );
-
-    const check = await onboardingService.fetchPhaseCheck("phase1");
-
-    expect(check.phaseId).toBe("phase1");
-    expect(check.questions[0].options?.[0].label).toBe("A");
-    // Options must not leak a `correct` flag to the user-facing endpoint.
-    expect(check.questions[0].options?.[0]).not.toHaveProperty("correct");
-  });
-
-  it("submitPhaseCheck posts answers and returns the grading result", async () => {
+  it("submitQuestionAttempt posts a single answer and returns the grading result", async () => {
     let capturedBody: unknown = null;
     server.use(
-      http.post("/api/v1/onboarding/me/phases/phase1/checks/attempts", async ({ request }) => {
+      http.post("/api/v1/onboarding/me/questions/q1/attempts", async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json({
           attemptId: "attempt1",
-          phaseId: "phase1",
-          passed: false,
+          questionId: "q1",
+          correct: true,
           createdAt: new Date().toISOString(),
-          correctCount: 1,
-          questionCount: 2,
-          requiredPercent: 80,
-          phaseCheckSummary: {
-            required: true,
-            questionCount: 2,
-            passed: false,
-            latestAttemptId: "attempt1",
-            latestAttemptAt: new Date().toISOString(),
-          },
-          nextPhaseUnlocked: false,
-          results: [
-            {
-              questionId: "q1",
-              correct: false,
-              correctOptionIds: ["o2"],
-              correctAnswer: null,
-              explanation: "Nope.",
-              feedback: null,
-            },
-            {
-              questionId: "q2",
-              correct: true,
-              correctOptionIds: [],
-              correctAnswer: "gradlew bootRun",
-              explanation: null,
-              feedback: "Right idea.",
-            },
-          ],
+          correctOptionIds: ["o1"],
+          correctAnswer: null,
+          explanation: "Right.",
+          feedback: null,
+          status: "PASSED",
+          onboardingCompleted: false,
         });
       }),
     );
 
-    const result = await onboardingService.submitPhaseCheck("phase1", [
-      { questionId: "q1", selectedOptionIds: ["o1"] },
-      { questionId: "q2", textAnswer: "run the wrapper" },
-    ]);
-
-    expect(capturedBody).toEqual({
-      answers: [
-        { questionId: "q1", selectedOptionIds: ["o1"] },
-        { questionId: "q2", textAnswer: "run the wrapper" },
-      ],
+    const result = await onboardingService.submitQuestionAttempt("q1", {
+      selectedOptionIds: ["o1"],
     });
-    expect(result.passed).toBe(false);
-    expect(result.requiredPercent).toBe(80);
-    expect(result.results[0].correctOptionIds).toEqual(["o2"]);
-    // AI feedback on the short-text answer is surfaced through the service.
-    expect(result.results[1].feedback).toBe("Right idea.");
+
+    expect(capturedBody).toEqual({ selectedOptionIds: ["o1"] });
+    expect(result.correct).toBe(true);
+    expect(result.status).toBe("PASSED");
+    // Correct answers are revealed in the submit result.
+    expect(result.correctOptionIds).toEqual(["o1"]);
   });
 
-  it("fetchReviewCheck loads the open pool with its source phases", async () => {
-    server.use(
-      http.get("/api/v1/onboarding/me/review-check", () =>
-        HttpResponse.json({
-          openCount: 1,
-          questions: [
-            {
-              id: "q1",
-              position: 0,
-              type: "MULTIPLE_CHOICE",
-              question: "Which one?",
-              options: [{ id: "o1", position: 0, label: "A" }],
-              review: true,
-              reviewSourcePhaseTitle: "Setup",
-            },
-          ],
-        }),
-      ),
-    );
-
-    const pool = await onboardingService.fetchReviewCheck();
-
-    expect(pool.openCount).toBe(1);
-    expect(pool.questions[0].review).toBe(true);
-    expect(pool.questions[0].reviewSourcePhaseTitle).toBe("Setup");
-    // Correct answers must not leak into the pool listing.
-    expect(pool.questions[0].options?.[0]).not.toHaveProperty("correct");
-  });
-
-  it("submitReviewCheck posts only the answered questions and reports what is left", async () => {
+  it("savePhaseQuestions sends a PUT with the questions payload", async () => {
     let capturedBody: unknown = null;
     server.use(
-      http.post("/api/v1/onboarding/me/review-check/attempts", async ({ request }) => {
-        capturedBody = await request.json();
-        return HttpResponse.json({
-          answeredCount: 1,
-          correctCount: 1,
-          remainingCount: 0,
-          onboardingCompleted: true,
-          results: [
-            {
-              questionId: "q1",
-              correct: true,
-              correctOptionIds: ["o1"],
-              correctAnswer: null,
-              explanation: null,
-              feedback: null,
-              review: true,
-              reviewSourcePhaseTitle: "Setup",
-            },
-          ],
-        });
-      }),
-    );
-
-    const result = await onboardingService.submitReviewCheck([
-      { questionId: "q1", selectedOptionIds: ["o1"] },
-    ]);
-
-    expect(capturedBody).toEqual({
-      answers: [{ questionId: "q1", selectedOptionIds: ["o1"] }],
-    });
-    expect(result.remainingCount).toBe(0);
-    // Clearing the last open question is what finishes the onboarding journey.
-    expect(result.onboardingCompleted).toBe(true);
-  });
-
-  it("fetchUserReviewCheck loads another user's open pool for reviewers", async () => {
-    server.use(
-      http.get("/api/v1/onboarding/users/user1/review-check", () =>
-        HttpResponse.json({
-          openCount: 1,
-          questions: [
-            {
-              id: "q1",
-              position: 0,
-              type: "SHORT_TEXT",
-              question: "cmd?",
-              review: true,
-              reviewSourcePhaseTitle: "Setup",
-            },
-          ],
-        }),
-      ),
-    );
-
-    const pool = await onboardingService.fetchUserReviewCheck("user1");
-
-    expect(pool.openCount).toBe(1);
-    expect(pool.questions[0].reviewSourcePhaseTitle).toBe("Setup");
-  });
-
-  it("savePhaseCheck sends a PUT with the questions payload", async () => {
-    let capturedBody: unknown = null;
-    server.use(
-      http.put("/api/v1/onboarding/phases/phase1/checks", async ({ request }) => {
+      http.put("/api/v1/onboarding/phases/phase1/questions", async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json({ phaseId: "phase1", questions: [] });
       }),
     );
 
-    await onboardingService.savePhaseCheck("phase1", [
+    await onboardingService.savePhaseQuestions("phase1", [
       { position: 0, type: "SHORT_TEXT", question: "cmd?", correctAnswer: "run" },
     ]);
 
@@ -348,29 +202,57 @@ describe("onboardingService", () => {
     });
   });
 
-  it("fetchPhaseCheckAttempts loads a user's attempts for review", async () => {
+  it("fetchPhaseQuestionsForEditing loads questions with correct answers", async () => {
     server.use(
-      http.get("/api/v1/onboarding/users/user1/phases/phase1/checks/attempts", () =>
+      http.get("/api/v1/onboarding/phases/phase1/questions", () =>
         HttpResponse.json({
-          userId: "user1",
           phaseId: "phase1",
-          attempts: [
+          questions: [
             {
-              id: "attempt1",
-              passed: true,
-              createdAt: new Date().toISOString(),
-              correctAnswerCount: 2,
-              questionCount: 2,
-              answers: [],
+              id: "q1",
+              position: 0,
+              type: "MULTIPLE_CHOICE",
+              question: "Which one?",
+              explanation: null,
+              options: [
+                { id: "o1", position: 0, label: "A", correct: true },
+                { id: "o2", position: 1, label: "B", correct: false },
+              ],
             },
           ],
         }),
       ),
     );
 
-    const review = await onboardingService.fetchPhaseCheckAttempts("user1", "phase1");
+    const check = await onboardingService.fetchPhaseQuestionsForEditing("phase1");
+
+    expect(check.phaseId).toBe("phase1");
+    // Admin editing screens get the correct flag, unlike the user-facing path.
+    expect(check.questions[0].options?.[0].correct).toBe(true);
+  });
+
+  it("fetchQuestionAttempts loads a user's attempts on one question for review", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/users/user1/questions/q1/attempts", () =>
+        HttpResponse.json({
+          userId: "user1",
+          questionId: "q1",
+          attempts: [
+            {
+              id: "attempt1",
+              correct: true,
+              createdAt: new Date().toISOString(),
+              selectedOptionIds: ["o1"],
+              textAnswer: null,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const review = await onboardingService.fetchQuestionAttempts("user1", "q1");
 
     expect(review.attempts).toHaveLength(1);
-    expect(review.attempts[0].correctAnswerCount).toBe(2);
+    expect(review.attempts[0].correct).toBe(true);
   });
 });

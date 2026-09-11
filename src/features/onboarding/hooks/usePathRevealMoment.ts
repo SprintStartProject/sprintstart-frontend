@@ -48,7 +48,9 @@ function markRevealed(pathId: string) {
 function isPathUntouched(path: OnboardingPathEndpoint): boolean {
   return path.phases.every(
     (phase) =>
-      !phase.checkSummary?.passed &&
+      phase.questions.every(
+        (question) => question.status === "LOCKED" || question.status === "OPEN",
+      ) &&
       phase.steps.every(
         (step) =>
           step.startedAt === null &&

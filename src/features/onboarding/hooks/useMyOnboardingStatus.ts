@@ -57,25 +57,12 @@ export function useMyOnboardingStatus(): MyOnboardingStatus {
         const path = await onboardingService.fetchPath();
         const nextAction = resolveNextAction(path);
 
-        // The review pool only decides anything once every step and check is behind the
-        // user: up to that point something else is already next. So it costs a request
-        // exactly then — and a failed read leaves the journey looking finished rather
-        // than broken, which is the harmless way to be wrong here.
-        const openReviewCount =
-          nextAction.kind === "done"
-            ? await onboardingService
-                .fetchReviewCheck()
-                .then((pool) => pool.openCount)
-                .catch(() => 0)
-            : 0;
-
         if (!isCurrentRequest) return;
 
         setStatus({
           state: "ready",
           progress: countPathProgress(path),
-          nextAction:
-            openReviewCount > 0 ? { kind: "review", openCount: openReviewCount } : nextAction,
+          nextAction,
         });
       } catch (error) {
         if (!isCurrentRequest) return;
