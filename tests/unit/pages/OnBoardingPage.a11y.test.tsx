@@ -75,6 +75,7 @@ vi.mock("../../../src/services/onboardingService", () => ({
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     }),

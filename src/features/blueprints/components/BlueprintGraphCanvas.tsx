@@ -10,6 +10,13 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
+import {
+  routeEdgePath,
+  ROUTING_CLEARANCE,
+  routingSegments,
+  type RoutingObstacle,
+  type RoutingSegment,
+} from "./graphRouting.ts";
 
 type Viewport = { x: number; y: number; zoom: number };
 type CanvasSize = { width: number; height: number };
@@ -23,6 +30,10 @@ type LibraryTemplate = { id: string; title: string; description: string };
 const libraryTemplateMimeType = "application/x-blueprint-library-template";
 
 const fallbackNodeSize: NodeSize = { halfWidth: 96, halfHeight: 44 };
+const PORT_TRUNK_CLEARANCE = 28;
+// SVG markers scale with stroke width by default. At a 2px stroke the arrow extends almost 20px
+// behind its tip, so its final segment needs to remain straight for longer than node clearance.
+const ARROW_TERMINAL_CLEARANCE = 24;
 
 /** The common graph fields persisted for both Blueprint phases and phase-subgraph nodes. */
 export type BlueprintGraphCanvasNode = {
@@ -65,22 +76,84 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   renderNode: (node: TNode, props: BlueprintGraphCanvasNodeProps) => ReactNode;
 };
 
-/** Returns the nearest cardinal edge point between two node centres. */
-function connectionPoint(
+/** Returns which cardinal side of a node most directly faces another node. */
+function nearestConnectionSide(
   origin: CanvasPoint,
   target: CanvasPoint,
   nodeSize: NodeSize,
-  horizontalOverlap = 0,
-  verticalOverlap = 0,
-): CanvasPoint {
+): ConnectionSide {
   const deltaX = target.x - origin.x;
   const deltaY = target.y - origin.y;
   if (Math.abs(deltaX) * nodeSize.halfHeight > Math.abs(deltaY) * nodeSize.halfWidth) {
-    const offset = nodeSize.halfWidth - horizontalOverlap;
-    return { x: origin.x + (deltaX >= 0 ? offset : -offset), y: origin.y };
+    return deltaX >= 0 ? "right" : "left";
   }
-  const offset = nodeSize.halfHeight - verticalOverlap;
-  return { x: origin.x, y: origin.y + (deltaY >= 0 ? offset : -offset) };
+  return deltaY >= 0 ? "bottom" : "top";
+}
+
+function connectionPointForSide(
+  center: CanvasPoint,
+  nodeSize: NodeSize,
+  side: ConnectionSide,
+  overlap = 0,
+): CanvasPoint {
+  switch (side) {
+    case "top":
+      return { x: center.x, y: center.y - nodeSize.halfHeight + overlap };
+    case "right":
+      return { x: center.x + nodeSize.halfWidth - overlap, y: center.y };
+    case "bottom":
+      return { x: center.x, y: center.y + nodeSize.halfHeight - overlap };
+    case "left":
+      return { x: center.x - nodeSize.halfWidth + overlap, y: center.y };
+  }
+}
+
+/** Keeps the first and last edge segments perpendicular to the node side they connect to. */
+function connectionLeadPoint(
+  center: CanvasPoint,
+  connection: CanvasPoint,
+  nodeSize: NodeSize,
+  clearance = ROUTING_CLEARANCE,
+): CanvasPoint {
+  if (connection.x !== center.x) {
+    return {
+      x: center.x + Math.sign(connection.x - center.x) * (nodeSize.halfWidth + clearance),
+      y: connection.y,
+    };
+  }
+  return {
+    x: connection.x,
+    y: center.y + Math.sign(connection.y - center.y) * (nodeSize.halfHeight + clearance),
+  };
+}
+
+function polylineMidpoint(points: CanvasPoint[]): CanvasPoint {
+  const segments = routingSegments(points);
+  const totalLength = segments.reduce(
+    (total, segment) =>
+      total + Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y),
+    0,
+  );
+  let remaining = totalLength / 2;
+  for (const segment of segments) {
+    const length =
+      Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y);
+    if (remaining <= length) {
+      const ratio = length === 0 ? 0 : remaining / length;
+      return {
+        x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
+        y: segment.from.y + (segment.to.y - segment.from.y) * ratio,
+      };
+    }
+    remaining -= length;
+  }
+  return points.at(-1) ?? { x: 0, y: 0 };
+}
+
+function svgPolylinePath(points: CanvasPoint[], centerX: number, centerY: number): string {
+  return points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${centerX + point.x} ${centerY + point.y}`)
+    .join(" ");
 }
 
 /**
@@ -139,11 +212,91 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     () => new Map(displayedNodes.map((node) => [node.id, node])),
     [displayedNodes],
   );
-  const placedNodes = displayedNodes.filter((node) => node.graphX !== null && node.graphY !== null);
+  const placedNodes = useMemo(
+    () => displayedNodes.filter((node) => node.graphX !== null && node.graphY !== null),
+    [displayedNodes],
+  );
   const nodeSize = useCallback(
     (nodeId: string) => nodeSizes.get(nodeId) ?? fallbackNodeSize,
     [nodeSizes],
   );
+  // Node hit-boxes every edge is routed around, so a long edge no longer cuts through
+  // intermediate nodes and looks like a chain of adjacent connections instead.
+  const obstacleByNodeId = useMemo(
+    () =>
+      new Map(
+        placedNodes.map((node) => {
+          const size = nodeSize(node.id);
+          return [
+            node.id,
+            {
+              center: { x: node.graphX!, y: node.graphY! },
+              halfWidth: size.halfWidth,
+              halfHeight: size.halfHeight,
+            } satisfies RoutingObstacle,
+          ];
+        }),
+      ),
+    [placedNodes, nodeSize],
+  );
+  const routedDependencies = useMemo(() => {
+    const occupiedSegments: RoutingSegment[] = [];
+    return placedNodes.flatMap((node) =>
+      node.blockerIds.flatMap((blockerId) => {
+        const blocker = nodeById.get(blockerId);
+        if (!blocker || blocker.graphX === null || blocker.graphY === null) return [];
+        const sourceCenter = { x: blocker.graphX, y: blocker.graphY };
+        const targetCenter = { x: node.graphX!, y: node.graphY! };
+        const sourceSize = nodeSize(blocker.id);
+        const targetSize = nodeSize(node.id);
+        const preferredSourceSide = nearestConnectionSide(sourceCenter, targetCenter, sourceSize);
+        const preferredTargetSide = nearestConnectionSide(targetCenter, sourceCenter, targetSize);
+        const obstacles = placedNodes.map((candidate) => {
+          const obstacle = obstacleByNodeId.get(candidate.id)!;
+          const terminalClearance =
+            candidate.id === node.id
+              ? ARROW_TERMINAL_CLEARANCE
+              : candidate.id === blockerId
+                ? PORT_TRUNK_CLEARANCE
+                : ROUTING_CLEARANCE;
+          const terminalAllowance = terminalClearance - ROUTING_CLEARANCE;
+          return {
+            ...obstacle,
+            halfWidth: obstacle.halfWidth + terminalAllowance,
+            halfHeight: obstacle.halfHeight + terminalAllowance,
+          };
+        });
+        const sourcePoint = connectionPointForSide(
+          sourceCenter,
+          sourceSize,
+          preferredSourceSide,
+          8,
+        );
+        const targetPoint = connectionPointForSide(targetCenter, targetSize, preferredTargetSide);
+        const sourceLead = connectionLeadPoint(
+          sourceCenter,
+          sourcePoint,
+          sourceSize,
+          PORT_TRUNK_CLEARANCE,
+        );
+        const targetLead = connectionLeadPoint(
+          targetCenter,
+          targetPoint,
+          targetSize,
+          ARROW_TERMINAL_CLEARANCE,
+        );
+        const points = [
+          sourcePoint,
+          sourceLead,
+          ...routeEdgePath(sourceLead, targetLead, obstacles, ROUTING_CLEARANCE, occupiedSegments),
+          targetLead,
+          targetPoint,
+        ];
+        occupiedSegments.push(...routingSegments(points));
+        return [{ blockedNodeId: node.id, blockerId, points }];
+      }),
+    );
+  }, [nodeById, nodeSize, obstacleByNodeId, placedNodes]);
   const centerX = canvasSize.width / 2;
   const centerY = canvasSize.height / 2;
   const gridLevel = Math.floor(Math.log2(1 / viewport.zoom) + 0.5);
@@ -176,33 +329,18 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
 
   const selectedDependencyPosition = useMemo(() => {
     if (!selectedDependency) return null;
-    const blocked = nodeById.get(selectedDependency.blockedNodeId);
-    const blocker = nodeById.get(selectedDependency.blockerId);
-    if (
-      !blocked ||
-      !blocker ||
-      blocked.graphX === null ||
-      blocked.graphY === null ||
-      blocker.graphX === null ||
-      blocker.graphY === null
-    )
-      return null;
-    const source = connectionPoint(
-      { x: blocker.graphX, y: blocker.graphY },
-      { x: blocked.graphX, y: blocked.graphY },
-      nodeSize(blocker.id),
-      8,
+    const route = routedDependencies.find(
+      (dependency) =>
+        dependency.blockedNodeId === selectedDependency.blockedNodeId &&
+        dependency.blockerId === selectedDependency.blockerId,
     );
-    const target = connectionPoint(
-      { x: blocked.graphX, y: blocked.graphY },
-      { x: blocker.graphX, y: blocker.graphY },
-      nodeSize(blocked.id),
-    );
+    if (!route) return null;
+    const midpoint = polylineMidpoint(route.points);
     return {
-      x: centerX + ((source.x + target.x) / 2) * viewport.zoom + viewport.x,
-      y: centerY + ((source.y + target.y) / 2) * viewport.zoom + viewport.y,
+      x: centerX + midpoint.x * viewport.zoom + viewport.x,
+      y: centerY + midpoint.y * viewport.zoom + viewport.y,
     };
-  }, [centerX, centerY, nodeById, nodeSize, selectedDependency, viewport]);
+  }, [centerX, centerY, routedDependencies, selectedDependency, viewport]);
 
   useEffect(() => {
     const canvas = canvasElement;
@@ -549,55 +687,43 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   <path d="M0,0 L0,6 L9,3 z" className="fill-app-brand" />
                 </marker>
               </defs>
-              {placedNodes.flatMap((node) =>
-                node.blockerIds.flatMap((blockerId) => {
-                  const blocker = nodeById.get(blockerId);
-                  if (!blocker || blocker.graphX === null || blocker.graphY === null) return [];
-                  const sourcePoint = connectionPoint(
-                    { x: blocker.graphX, y: blocker.graphY },
-                    { x: node.graphX!, y: node.graphY! },
-                    nodeSize(blocker.id),
-                    8,
-                  );
-                  const targetPoint = connectionPoint(
-                    { x: node.graphX!, y: node.graphY! },
-                    { x: blocker.graphX, y: blocker.graphY },
-                    nodeSize(node.id),
-                  );
-                  const selectConnection = () => {
-                    if (editable) setSelectedDependency({ blockedNodeId: node.id, blockerId });
-                  };
-                  return (
-                    <g key={`${node.id}-${blockerId}`} data-graph-edge>
-                      <line
-                        x1={centerX + sourcePoint.x}
-                        y1={centerY + sourcePoint.y}
-                        x2={centerX + targetPoint.x}
-                        y2={centerY + targetPoint.y}
-                        className="pointer-events-none stroke-app-brand"
-                        strokeWidth="2"
-                        markerEnd="url(#blueprint-arrow)"
-                      />
-                      <line
-                        x1={centerX + sourcePoint.x}
-                        y1={centerY + sourcePoint.y}
-                        x2={centerX + targetPoint.x}
-                        y2={centerY + targetPoint.y}
-                        stroke="transparent"
-                        strokeWidth="14"
-                        className={editable ? "cursor-pointer" : "pointer-events-none"}
-                        onClick={selectConnection}
-                      />
-                    </g>
-                  );
-                }),
-              )}
+              {routedDependencies.map(({ blockedNodeId, blockerId, points }) => {
+                const d = svgPolylinePath(points, centerX, centerY);
+                const selectConnection = () => {
+                  if (editable) setSelectedDependency({ blockedNodeId, blockerId });
+                };
+                return (
+                  <g key={`${blockedNodeId}-${blockerId}`} data-graph-edge>
+                    <path
+                      d={d}
+                      fill="none"
+                      className="pointer-events-none stroke-app-brand"
+                      strokeWidth="2"
+                      markerEnd="url(#blueprint-arrow)"
+                    />
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth="14"
+                      className={editable ? "cursor-pointer" : "pointer-events-none"}
+                      onClick={selectConnection}
+                    />
+                  </g>
+                );
+              })}
               {connectionDraft ? (
-                <line
-                  x1={centerX + connectionDraft.start.x}
-                  y1={centerY + connectionDraft.start.y}
-                  x2={centerX + connectionDraft.pointer.x}
-                  y2={centerY + connectionDraft.pointer.y}
+                <path
+                  d={svgPolylinePath(
+                    [
+                      connectionDraft.start,
+                      ...routeEdgePath(connectionDraft.start, connectionDraft.pointer, []),
+                      connectionDraft.pointer,
+                    ],
+                    centerX,
+                    centerY,
+                  )}
+                  fill="none"
                   className="stroke-app-brand"
                   strokeWidth="2"
                   strokeDasharray="6 4"

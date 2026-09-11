@@ -100,14 +100,14 @@ export function BlueprintPathDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, isLoading: isProjectLoading } = useProjectContext();
   const isGlobal = searchParams.get("scope") === "global" && profile?.permissionGroup === "ADMIN";
   const blueprintScope = useMemo<BlueprintScope>(
     () => (isGlobal ? { kind: "global" } : { kind: "project", projectId: selectedProjectId }),
     [isGlobal, selectedProjectId],
   );
   const blueprintListPath = isGlobal ? "/blueprints?scope=global" : "/blueprints";
-  const projectIdAtMount = useRef(selectedProjectId);
+  const projectIdAtMount = useRef<string | null>(null);
   const [path, setPath] = useState<BlueprintPath | null>(null);
   const [subGraphPhaseId, setSubGraphPhaseId] = useState<string | null>(null);
   const [subGraphNodes, setSubGraphNodes] = useState<BlueprintGraphNode[]>([]);
@@ -165,13 +165,22 @@ export function BlueprintPathDetailPage() {
   );
 
   useEffect(() => {
-    if (!isGlobal && projectIdAtMount.current !== selectedProjectId) {
-      projectIdAtMount.current = selectedProjectId;
-      void navigate("/blueprints", { replace: true });
-      return;
+    if (!isGlobal) {
+      if (isProjectLoading) return;
+      if (!selectedProjectId) {
+        void navigate("/blueprints", { replace: true });
+        return;
+      }
+      if (projectIdAtMount.current === null) {
+        projectIdAtMount.current = selectedProjectId;
+      } else if (projectIdAtMount.current !== selectedProjectId) {
+        projectIdAtMount.current = selectedProjectId;
+        void navigate("/blueprints", { replace: true });
+        return;
+      }
     }
     void loadPath();
-  }, [isGlobal, loadPath, navigate, selectedProjectId]);
+  }, [isGlobal, isProjectLoading, loadPath, navigate, selectedProjectId]);
 
   async function openHistory() {
     if (!path) return;

@@ -23,6 +23,8 @@ export interface OnboardingPathSummaryEndpoint {
 
 export type StepStatus = "WAITING" | "IN_PROGRESS" | "FINISHED" | "SKIPPED";
 export type StepType = "VIDEO" | "DOCUMENT" | "TASK" | "LINK";
+export type GenerationStatus =
+  "NOT_APPLICABLE" | "GENERATED" | "EMPTY" | "SKIPPED" | "FAILED" | "TIMED_OUT";
 // Matches the backend SkipStatus enum (CreateOnboardingSkipResponse.status etc.)
 export type SkipStatus = "PENDING" | "ACCEPTED" | "DENIED";
 
@@ -65,18 +67,8 @@ export interface OnboardingStepEndpoint {
   graphY?: number | null;
   /** IDs of prerequisite steps or knowledge-check questions in the same phase. */
   blockerIds?: string[];
-}
-
-// Why the backend considers a phase locked (see OnboardingPhaseEndpoint.unlockReason)
-export type PhaseUnlockReason = "PREVIOUS_PHASE_INCOMPLETE" | "PREVIOUS_PHASE_CHECK_NOT_PASSED";
-
-// Compact knowledge check state embedded into each phase of GET /onboarding/me/path
-export interface PhaseCheckSummaryEndpoint {
-  required: boolean;
-  questionCount: number;
-  passed: boolean;
-  latestAttemptId: string | null;
-  latestAttemptAt: string | null;
+  /** True when the phase or an in-phase blocker keeps this step out of reach. */
+  locked?: boolean;
 }
 
 export interface OnboardingPhaseEndpoint {
@@ -86,14 +78,21 @@ export interface OnboardingPhaseEndpoint {
   title: string;
   description: string;
   locked: boolean;
-  unlockReason: PhaseUnlockReason | null;
-  checkSummary: PhaseCheckSummaryEndpoint;
   steps: OnboardingStepEndpoint[];
+  /** The phase's knowledge-check questions, first-class nodes alongside its steps. */
+  questions: OnboardingQuestionEndpoint[];
   /** Persisted position copied from the blueprint path graph. */
   graphX?: number | null;
   graphY?: number | null;
   /** IDs of prerequisite phases in this onboarding path. */
   blockerIds?: string[];
+  generationStatus?: GenerationStatus;
+}
+
+export interface OnboardingGenerationIssueEndpoint {
+  phaseId: string;
+  title: string;
+  status: "EMPTY" | "SKIPPED" | "FAILED" | "TIMED_OUT";
 }
 
 export interface OnboardingPathEndpoint {
@@ -102,6 +101,8 @@ export interface OnboardingPathEndpoint {
   createdAt: string;
   phases: OnboardingPhaseEndpoint[];
   blueprintId?: string | null;
+  /** AI phases retained for auditing but omitted from the visible journey. */
+  generationIssues?: OnboardingGenerationIssueEndpoint[];
 }
 
 // ─── Step Detail (GET /onboarding/steps/{stepId}) ────────────────────────────
@@ -139,139 +140,88 @@ export interface OnboardingStepDetail extends OnboardingStepEndpoint {
   resources: OnboardingResourceEndpoint[];
 }
 
-// ─── Phase Knowledge Checks (GET/POST /onboarding/me/phases/{phaseId}/checks…) ─
+// ─── Knowledge-Check Questions (first-class onboarding nodes) ──────────────
 
 export type CheckQuestionType = "MULTIPLE_CHOICE" | "SHORT_TEXT";
 
-export interface PhaseCheckOptionEndpoint {
+/** Availability of a question for the user, derived by the backend. */
+export type QuestionStatus = "LOCKED" | "OPEN" | "RETRY" | "PASSED";
+
+export interface OnboardingQuestionOptionEndpoint {
   id: string;
   position: number;
   label: string;
 }
 
-export interface PhaseCheckQuestionEndpoint {
+/** A knowledge-check question embedded in the user's path, alongside the phase's steps. */
+export interface OnboardingQuestionEndpoint {
   id: string;
+  phaseId: string;
   position: number;
   type: CheckQuestionType;
   question: string;
   // Only present for MULTIPLE_CHOICE questions
-  options?: PhaseCheckOptionEndpoint[];
-  // True for questions from the review pool. A phase check never returns these; they
-  // only appear in the standalone review check (see ReviewCheckEndpoint).
-  review?: boolean;
-  reviewSourcePhaseTitle?: string | null;
-  /** Display title and graph metadata copied from the blueprint question. */
+  options?: OnboardingQuestionOptionEndpoint[];
+  status: QuestionStatus;
+  /** Display title copied from the blueprint question. */
   title?: string;
   graphX?: number | null;
   graphY?: number | null;
   blockerIds?: string[];
 }
 
-// GET /onboarding/me/phases/{phaseId}/checks — never contains correct answers
-export interface PhaseCheckEndpoint {
-  phaseId: string;
-  required: boolean;
-  passed: boolean;
-  latestAttemptId: string | null;
-  questions: PhaseCheckQuestionEndpoint[];
-}
-
-export interface PhaseCheckAnswerSubmission {
-  questionId: string;
+// POST /onboarding/me/questions/{questionId}/attempts — reveals correct answers
+export interface QuestionAttemptSubmission {
   selectedOptionIds?: string[];
   textAnswer?: string;
 }
 
-export interface PhaseCheckAnswerResult {
+export interface QuestionAttemptResult {
+  attemptId: string;
   questionId: string;
   correct: boolean;
+  createdAt: string;
   correctOptionIds: string[];
   correctAnswer: string | null;
   explanation: string | null;
   // AI feedback for short-text answers; null for multiple choice.
   feedback: string | null;
-  // True when this result is for a question from the review pool.
-  review?: boolean;
-  reviewSourcePhaseTitle?: string | null;
-}
-
-// POST /onboarding/me/phases/{phaseId}/checks/attempts — reveals correct answers
-export interface PhaseCheckAttemptResult {
-  attemptId: string;
-  phaseId: string;
-  passed: boolean;
-  createdAt: string;
-  // How many questions were correct, out of how many, and the pass threshold (percent).
-  correctCount: number;
-  questionCount: number;
-  requiredPercent: number;
-  phaseCheckSummary: PhaseCheckSummaryEndpoint;
-  nextPhaseUnlocked: boolean;
-  // Questions waiting in the review pool after this attempt, including any collected from
-  // it. Passing the final phase check does not finish onboarding while this is > 0.
-  openReviewCount: number;
+  status: QuestionStatus;
   // True when this attempt completed the entire onboarding journey.
   onboardingCompleted: boolean;
-  results: PhaseCheckAnswerResult[];
 }
 
-// ─── Review Check (GET/POST /onboarding/me/review-check) ──────────────────────
+// ─── Question Admin (GET/PUT /onboarding/phases/{phaseId}/questions) ───────
 
-/**
- * The user's review pool: questions they answered incorrectly in earlier phases and
- * still have to answer correctly once. Asked separately from the phase checks, where
- * they would be off-topic, and cleared before onboarding counts as finished.
- */
-export interface ReviewCheckEndpoint {
-  openCount: number;
-  questions: PhaseCheckQuestionEndpoint[];
-}
-
-/**
- * Result of answering review questions. There is no pass threshold: correct answers
- * leave the pool for good, wrong ones stay open for another try.
- */
-export interface ReviewCheckResult {
-  answeredCount: number;
-  correctCount: number;
-  remainingCount: number;
-  // True when clearing the pool completed the entire onboarding journey.
-  onboardingCompleted: boolean;
-  results: PhaseCheckAnswerResult[];
-}
-
-// ─── Phase Check Admin (GET/PUT /onboarding/phases/{phaseId}/checks) ──────────
-
-export interface AdminPhaseCheckOptionEndpoint {
+export interface AdminQuestionOptionEndpoint {
   id: string;
   position: number;
   label: string;
   correct: boolean;
 }
 
-export interface AdminPhaseCheckQuestionEndpoint {
+export interface AdminQuestionEndpoint {
   id: string;
   position: number;
   type: CheckQuestionType;
   question: string;
   explanation: string | null;
   correctAnswer?: string | null;
-  options?: AdminPhaseCheckOptionEndpoint[];
+  options?: AdminQuestionOptionEndpoint[];
 }
 
-export interface AdminPhaseCheckEndpoint {
+export interface AdminPhaseQuestionsEndpoint {
   phaseId: string;
-  questions: AdminPhaseCheckQuestionEndpoint[];
+  questions: AdminQuestionEndpoint[];
 }
 
-export interface UpsertPhaseCheckQuestion {
+export interface UpsertQuestion {
   /**
    * ID of an existing question, so it survives the update with its identity intact.
    * Omit for questions being created.
    *
-   * Sending it back matters: review pool items and stored attempt answers reference
-   * questions by ID, so a question recreated instead of updated loses that history and
-   * silently drops out of every member's review pool.
+   * Sending it back matters: stored attempts reference questions by ID, so a question
+   * recreated instead of updated loses its whole history.
    */
   id?: string | null;
   position: number;
@@ -282,7 +232,7 @@ export interface UpsertPhaseCheckQuestion {
   correctAnswer?: string | null;
   // MULTIPLE_CHOICE only
   options?: {
-    /** ID of an existing option; omit for new ones. Stored answers reference these. */
+    /** ID of an existing option; omit for new ones. Stored attempts reference these. */
     id?: string | null;
     position: number;
     label: string;
@@ -290,22 +240,16 @@ export interface UpsertPhaseCheckQuestion {
   }[];
 }
 
-// GET /onboarding/users/{userId}/phases/{phaseId}/checks/attempts
-export interface PhaseCheckAttemptsReviewEndpoint {
+// GET /onboarding/users/{userId}/questions/{questionId}/attempts
+export interface QuestionAttemptsReviewEndpoint {
   userId: string;
-  phaseId: string;
+  questionId: string;
   attempts: {
     id: string;
-    passed: boolean;
+    correct: boolean;
     createdAt: string;
-    correctAnswerCount: number;
-    questionCount: number;
-    answers: {
-      questionId: string;
-      selectedOptionIds: string[];
-      textAnswer: string | null;
-      correct: boolean;
-    }[];
+    selectedOptionIds: string[];
+    textAnswer: string | null;
   }[];
 }
 

@@ -10,21 +10,18 @@ import type {
   OnboardingPersonalizeEvent,
   OnboardingPersonalizeHandlers,
   StepStatus,
-  PhaseCheckEndpoint,
-  PhaseCheckAnswerSubmission,
-  PhaseCheckAttemptResult,
-  ReviewCheckEndpoint,
-  ReviewCheckResult,
-  AdminPhaseCheckEndpoint,
-  UpsertPhaseCheckQuestion,
-  PhaseCheckAttemptsReviewEndpoint,
+  QuestionAttemptSubmission,
+  QuestionAttemptResult,
+  AdminPhaseQuestionsEndpoint,
+  UpsertQuestion,
+  QuestionAttemptsReviewEndpoint,
 } from "../features/onboarding/types";
 import onboardingStepMock from "../mocks/onboardingStepMock.json";
 
 /**
- * Onboarding path, step, phase check and task CRUD.
+ * Onboarding path, step, question and task CRUD.
  * Streams AI path generation over SSE; falls back to mock data on fetch
- * failures. Phase checks handle question/answer submission and review.
+ * failures. Questions are answered one at a time and own their attempt history.
  */
 export const onboardingService = {
   // ── PATH ─────────────────────────────────────────────────
@@ -155,76 +152,44 @@ export const onboardingService = {
     );
   },
 
-  // ── PHASE KNOWLEDGE CHECKS ────────────────────────────────
+  // ── KNOWLEDGE-CHECK QUESTIONS ───────────────────────────
 
   /**
-   * Loads the knowledge check of a phase for the current user.
-   * Never contains correct answers — those only come back from submitPhaseCheck.
+   * Submits the user's answer to one question. The result says whether it was correct
+   * and reveals the correct answer, explanation, and (for short text) AI feedback.
    */
-  async fetchPhaseCheck(phaseId: string): Promise<PhaseCheckEndpoint> {
-    return await apiClient.fetch<PhaseCheckEndpoint>(
-      `/api/v1/onboarding/me/phases/${phaseId}/checks`,
-    );
-  },
-
-  /**
-   * Submits the user's answers for a phase knowledge check. The result says
-   * whether the attempt passed and reveals the correct answers per question.
-   */
-  async submitPhaseCheck(
-    phaseId: string,
-    answers: PhaseCheckAnswerSubmission[],
-  ): Promise<PhaseCheckAttemptResult> {
-    return await apiClient.fetch<PhaseCheckAttemptResult>(
-      `/api/v1/onboarding/me/phases/${phaseId}/checks/attempts`,
+  async submitQuestionAttempt(
+    questionId: string,
+    answer: QuestionAttemptSubmission,
+  ): Promise<QuestionAttemptResult> {
+    return await apiClient.fetch<QuestionAttemptResult>(
+      `/api/v1/onboarding/me/questions/${questionId}/attempts`,
       {
         method: "POST",
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify(answer),
       },
     );
   },
 
-  // ── REVIEW CHECK ──────────────────────────────────────────
-
   /**
-   * Loads the current user's review pool: questions they got wrong in earlier phases
-   * and still have to answer correctly once. Never contains correct answers.
-   */
-  async fetchReviewCheck(): Promise<ReviewCheckEndpoint> {
-    return await apiClient.fetch<ReviewCheckEndpoint>("/api/v1/onboarding/me/review-check");
-  },
-
-  /**
-   * Submits answers for the review pool. Correctly answered questions leave the pool
-   * permanently, wrong ones stay open. Answering only some open questions is allowed,
-   * so the pool can be worked through in several sittings.
-   */
-  async submitReviewCheck(answers: PhaseCheckAnswerSubmission[]): Promise<ReviewCheckResult> {
-    return await apiClient.fetch<ReviewCheckResult>("/api/v1/onboarding/me/review-check/attempts", {
-      method: "POST",
-      body: JSON.stringify({ answers }),
-    });
-  },
-
-  /**
-   * Loads a phase check for admin editing screens, including correct answers.
+   * Loads a phase's questions for admin editing screens, including correct answers.
    * Requires ADMIN/PM/HR role.
    */
-  async fetchPhaseCheckForEditing(phaseId: string): Promise<AdminPhaseCheckEndpoint> {
-    return await apiClient.fetch<AdminPhaseCheckEndpoint>(
-      `/api/v1/onboarding/phases/${phaseId}/checks`,
+  async fetchPhaseQuestionsForEditing(phaseId: string): Promise<AdminPhaseQuestionsEndpoint> {
+    return await apiClient.fetch<AdminPhaseQuestionsEndpoint>(
+      `/api/v1/onboarding/phases/${phaseId}/questions`,
     );
   },
 
   /**
-   * Replaces all knowledge check questions of a phase. Requires ADMIN/PM/HR role.
+   * Replaces all knowledge-check questions of a phase. Requires ADMIN/PM/HR role.
    */
-  async savePhaseCheck(
+  async savePhaseQuestions(
     phaseId: string,
-    questions: UpsertPhaseCheckQuestion[],
-  ): Promise<AdminPhaseCheckEndpoint> {
-    return await apiClient.fetch<AdminPhaseCheckEndpoint>(
-      `/api/v1/onboarding/phases/${phaseId}/checks`,
+    questions: UpsertQuestion[],
+  ): Promise<AdminPhaseQuestionsEndpoint> {
+    return await apiClient.fetch<AdminPhaseQuestionsEndpoint>(
+      `/api/v1/onboarding/phases/${phaseId}/questions`,
       {
         method: "PUT",
         body: JSON.stringify({ questions }),
@@ -233,26 +198,15 @@ export const onboardingService = {
   },
 
   /**
-   * Loads a user's open review pool so admins, PMs, or HR can see which earlier
-   * questions still keep that user from finishing onboarding. Never contains correct
-   * answers — use fetchPhaseCheckForEditing for those. Requires ADMIN/PM/HR role.
+   * Loads a user's attempts on one question so admins, PMs, or HR can review how the
+   * answer was reached. Requires ADMIN/PM/HR role.
    */
-  async fetchUserReviewCheck(userId: string): Promise<ReviewCheckEndpoint> {
-    return await apiClient.fetch<ReviewCheckEndpoint>(
-      `/api/v1/onboarding/users/${userId}/review-check`,
-    );
-  },
-
-  /**
-   * Loads a user's submitted check attempts for a phase so admins, PMs, or HR
-   * can review the results. Requires ADMIN/PM/HR role.
-   */
-  async fetchPhaseCheckAttempts(
+  async fetchQuestionAttempts(
     userId: string,
-    phaseId: string,
-  ): Promise<PhaseCheckAttemptsReviewEndpoint> {
-    return await apiClient.fetch<PhaseCheckAttemptsReviewEndpoint>(
-      `/api/v1/onboarding/users/${userId}/phases/${phaseId}/checks/attempts`,
+    questionId: string,
+  ): Promise<QuestionAttemptsReviewEndpoint> {
+    return await apiClient.fetch<QuestionAttemptsReviewEndpoint>(
+      `/api/v1/onboarding/users/${userId}/questions/${questionId}/attempts`,
     );
   },
 

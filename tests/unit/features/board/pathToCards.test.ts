@@ -41,15 +41,8 @@ function phase(over: Partial<OnboardingPhaseEndpoint> = {}): OnboardingPhaseEndp
     title: "Getting set up",
     description: "",
     locked: false,
-    unlockReason: null,
-    checkSummary: {
-      required: false,
-      questionCount: 0,
-      passed: false,
-      latestAttemptId: null,
-      latestAttemptAt: null,
-    },
     steps: [step()],
+    questions: [],
     ...over,
   };
 }

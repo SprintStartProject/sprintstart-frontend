@@ -32,11 +32,12 @@ import {
   AlertCircle,
   Trophy,
   CircleArrowRight,
-  ClipboardCheck,
+  CircleHelp,
   Lightbulb,
   ThumbsUp,
   ThumbsDown,
 } from "lucide-react";
+import { resolveNextAction } from "../nextAction";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
 
@@ -44,8 +45,8 @@ type LoadingState = "idle" | "loading" | "success" | "error";
  * Where the user goes once this step is behind them.
  *
  * Resolved from the path rather than assumed, because "next" is not always another step:
- * clearing the last step of a phase leaves its knowledge check as the only thing standing
- * between the user and the rest of their journey.
+ * clearing the last step of a phase can leave a knowledge-check question as the only
+ * thing standing between the user and the rest of their journey.
  */
 type NextAction =
   | {
@@ -59,7 +60,7 @@ type NextAction =
        */
       isFirstStart: boolean;
     }
-  | { kind: "check"; phaseId: string }
+  | { kind: "question"; phaseId: string; questionId: string }
   | { kind: "done" };
 
 // ─────────────────────────────────────────────────────────────
@@ -127,60 +128,57 @@ export function OnBoardingItemPage() {
    * Works out what comes after this step, once the step is behind the user.
    *
    * Resolved up front rather than on click so the button can say where it leads. A locked
-   * phase is never a candidate: while this phase's knowledge check is unpassed the next
-   * phase stays locked, and its steps are not reachable yet.
+   * phase is never a candidate: while a prerequisite phase is incomplete the next phase
+   * stays locked, and its nodes are not reachable yet.
    */
   useEffect(() => {
     if (!currentStepId || !currentPhaseId) return;
     if (currentStatus !== "FINISHED" && currentStatus !== "SKIPPED") return;
 
-    const resolveNextAction = async () => {
+    const resolveNext = async () => {
       try {
         const path = await onboardingService.fetchPath();
+        const next = resolveNextAction(path);
 
-        const nextStep = path.phases
-          .filter((phase) => !phase.locked)
-          .flatMap((phase) => phase.steps)
-          .find(
-            (step) =>
-              step.id !== currentStepId && step.status !== "FINISHED" && step.status !== "SKIPPED",
-          );
-        if (nextStep) {
+        if (next.kind === "step") {
           setNextAction({
             kind: "step",
-            stepId: nextStep.id,
-            isFirstStart: nextStep.status === "WAITING",
+            stepId: next.step.id,
+            isFirstStart: next.step.status === "WAITING",
           });
           return;
         }
-
-        // No reachable step left: either this phase's own check is what blocks the way,
-        // or the whole journey is done.
-        const ownPhase = path.phases.find((phase) => phase.id === currentPhaseId);
-        setNextAction(
-          ownPhase?.checkSummary?.required && !ownPhase.checkSummary.passed
-            ? { kind: "check", phaseId: ownPhase.id }
-            : { kind: "done" },
-        );
+        if (next.kind === "question") {
+          setNextAction({
+            kind: "question",
+            phaseId: next.phase.id,
+            questionId: next.question.id,
+          });
+          return;
+        }
+        setNextAction({ kind: "done" });
       } catch (err) {
         console.error("Failed to resolve the next onboarding action:", err);
       }
     };
 
-    void resolveNextAction();
+    void resolveNext();
   }, [currentStepId, currentPhaseId, currentStatus]);
 
   /**
    * Follows [nextAction]: starts and opens the next step, or returns to the overview —
-   * pointing it at the pending knowledge check when that is what is waiting.
+   * pointing it at the pending question when that is what is waiting.
    */
   const goToNextStep = async (): Promise<void> => {
     if (!nextAction) return;
 
-    if (nextAction.kind !== "step") {
-      void navigate("/onboarding", {
-        state: nextAction.kind === "check" ? { focusCheckPhaseId: nextAction.phaseId } : undefined,
-      });
+    if (nextAction.kind === "question") {
+      void navigate("/onboarding", { state: { focusQuestionId: nextAction.questionId } });
+      return;
+    }
+
+    if (nextAction.kind === "done") {
+      void navigate("/onboarding");
       return;
     }
 
@@ -537,8 +535,8 @@ export function OnBoardingItemPage() {
                   disabled={!nextAction}
                   loading={nextLoading}
                   trailingIcon={
-                    nextLoading ? undefined : nextAction?.kind === "check" ? (
-                      <ClipboardCheck className="h-4 w-4" />
+                    nextLoading ? undefined : nextAction?.kind === "question" ? (
+                      <CircleHelp className="h-4 w-4" />
                     ) : (
                       <CircleArrowRight className="h-4 w-4" />
                     )
@@ -547,8 +545,8 @@ export function OnBoardingItemPage() {
                 >
                   {nextLoading || !nextAction
                     ? "Loading..."
-                    : nextAction.kind === "check"
-                      ? "Start knowledge check"
+                    : nextAction.kind === "question"
+                      ? "Answer the next question"
                       : nextAction.kind === "done"
                         ? "Back to overview"
                         : "Continue to next step"}

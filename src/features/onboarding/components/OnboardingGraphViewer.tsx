@@ -1,17 +1,21 @@
 import { ArrowLeft, CheckCircle2, CircleDot, GitBranch, Lock } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNode,
 } from "../../blueprints/components/BlueprintGraphCanvas.tsx";
-import { onboardingService } from "../../../services/onboardingService.ts";
-import type { OnboardingPathEndpoint, PhaseCheckEndpoint, StepStatus } from "../types.ts";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingQuestionEndpoint,
+  OnboardingStepEndpoint,
+  StepStatus,
+} from "../types.ts";
 
 type OnboardingGraphNode = BlueprintGraphCanvasNode & {
   kind: "phase" | "step" | "question";
-  status?: StepStatus;
+  status?: StepStatus | OnboardingQuestionEndpoint["status"];
   locked?: boolean;
   selected?: boolean;
 };
@@ -34,12 +38,21 @@ function fallbackCoordinate(index: number, count: number) {
 /**
  * Read-only projection of a personalized onboarding path onto the blueprint graph canvas.
  * Phase nodes open their copied step/question subgraph; graph authoring controls stay hidden.
+ * Questions come embedded in the path, so no separate check request is needed.
  */
 export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: Props) {
-  const [subGraphPhaseId, setSubGraphPhaseId] = useState<string | null>(null);
-  const [phaseCheck, setPhaseCheck] = useState<PhaseCheckEndpoint | null>(null);
-  const [isLoadingCheck, setIsLoadingCheck] = useState(false);
-  const [checkError, setCheckError] = useState<string | null>(null);
+  // Opens directly on the phase selected in the list view: the viewer is remounted every
+  // time the page switches to the graph, so this initial state is what the user sees first.
+  const [subGraphPhaseId, setSubGraphPhaseId] = useState<string | null>(selectedPhaseId ?? null);
+  const [syncedPhaseId, setSyncedPhaseId] = useState(selectedPhaseId);
+
+  // Header phase tabs can change while the viewer stays mounted: re-target the sub-graph
+  // during render (the sanctioned alternative to a setState effect) so a header click does
+  // not leave the previously drilled phase on screen.
+  if (syncedPhaseId !== selectedPhaseId) {
+    setSyncedPhaseId(selectedPhaseId);
+    setSubGraphPhaseId(selectedPhaseId ?? null);
+  }
 
   const sortedPhases = useMemo(
     () => [...path.phases].sort((left, right) => left.position - right.position),
@@ -48,30 +61,6 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
   const subGraphPhase = subGraphPhaseId
     ? (sortedPhases.find((phase) => phase.id === subGraphPhaseId) ?? null)
     : null;
-
-  useEffect(() => {
-    if (!subGraphPhase?.checkSummary?.required) return;
-
-    let cancelled = false;
-    void onboardingService
-      .fetchPhaseCheck(subGraphPhase.id)
-      .then((check) => {
-        if (!cancelled) setPhaseCheck(check);
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled)
-          setCheckError(
-            reason instanceof Error ? reason.message : "The knowledge-check graph could not load.",
-          );
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingCheck(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [subGraphPhase]);
 
   const phaseNodes = useMemo<OnboardingGraphNode[]>(
     () =>
@@ -95,21 +84,24 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
     if (!subGraphPhase) return [];
     const steps = [...subGraphPhase.steps]
       .sort((left, right) => left.position - right.position)
-      .map((step) => ({
+      .map((step: OnboardingStepEndpoint) => ({
         id: step.id,
         title: step.title,
         kind: "step" as const,
         status: step.status,
+        locked: step.locked,
         graphX: step.graphX,
         graphY: step.graphY,
         blockerIds: step.blockerIds,
       }));
-    const questions = [...(phaseCheck?.questions ?? [])]
+    const questions = [...subGraphPhase.questions]
       .sort((left, right) => left.position - right.position)
-      .map((question) => ({
+      .map((question: OnboardingQuestionEndpoint) => ({
         id: question.id,
         title: question.title || question.question,
         kind: "question" as const,
+        status: question.status,
+        locked: question.status === "LOCKED",
         graphX: question.graphX,
         graphY: question.graphY,
         blockerIds: question.blockerIds,
@@ -125,41 +117,26 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
         blockerIds: node.blockerIds ?? (index > 0 ? [nodes[index - 1].id] : []),
       };
     });
-  }, [phaseCheck, subGraphPhase]);
+  }, [subGraphPhase]);
 
   function openSubGraphNode(node: OnboardingGraphNode) {
     const phase = sortedPhases.find((item) => item.id === node.id);
     if (!phase) return;
     onSelectPhase(phase.id);
-    setPhaseCheck(null);
-    setCheckError(null);
-    setIsLoadingCheck(phase.checkSummary?.required ?? false);
     setSubGraphPhaseId(phase.id);
   }
 
   function returnToPhaseGraph() {
     setSubGraphPhaseId(null);
-    setPhaseCheck(null);
-    setCheckError(null);
-    setIsLoadingCheck(false);
   }
 
   if (subGraphPhase) {
     return (
       <div className="space-y-3">
-        {checkError ? (
-          <p role="alert" className="rounded-xl bg-app-danger-bg p-3 text-sm text-app-danger-text">
-            {checkError} The phase steps are still shown.
-          </p>
-        ) : null}
         <BlueprintGraphCanvas
           nodes={subGraphNodes}
           title={subGraphPhase.title}
-          description={
-            isLoadingCheck
-              ? "Loading the complete phase graph…"
-              : "Read-only view of this phase's steps and knowledge-check questions."
-          }
+          description="Read-only view of this phase's steps and knowledge-check questions."
           headerAction={
             <Button
               variant="secondary"
@@ -241,7 +218,28 @@ function PhaseGraphNodeCard({ node, onOpen }: { node: OnboardingGraphNode; onOpe
 }
 
 function SubGraphNodeCard({ node }: { node: OnboardingGraphNode }) {
-  const isComplete = node.status === "FINISHED" || node.status === "SKIPPED";
+  const isStep = node.kind === "step";
+  const isComplete = isStep
+    ? node.status === "FINISHED" || node.status === "SKIPPED"
+    : node.status === "PASSED";
+
+  const label = isStep
+    ? node.status === "FINISHED"
+      ? "Completed"
+      : node.status === "SKIPPED"
+        ? "Skipped"
+        : node.status === "IN_PROGRESS"
+          ? "In progress"
+          : node.locked
+            ? "Locked"
+            : "Waiting"
+    : node.status === "PASSED"
+      ? "Passed"
+      : node.status === "RETRY"
+        ? "Try again"
+        : node.locked
+          ? "Locked"
+          : "To do";
 
   return (
     <div
@@ -257,17 +255,7 @@ function SubGraphNodeCard({ node }: { node: OnboardingGraphNode }) {
         )}
       </div>
       <div className="mt-3">
-        <Badge variant={isComplete ? "success" : "neutral"}>
-          {node.kind === "question"
-            ? "Knowledge check"
-            : node.status === "FINISHED"
-              ? "Completed"
-              : node.status === "SKIPPED"
-                ? "Skipped"
-                : node.status === "IN_PROGRESS"
-                  ? "In progress"
-                  : "Waiting"}
-        </Badge>
+        <Badge variant={isComplete ? "success" : "neutral"}>{label}</Badge>
       </div>
     </div>
   );

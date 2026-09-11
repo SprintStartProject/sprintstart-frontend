@@ -23,16 +23,14 @@ export function BlueprintPathsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, isLoading: isProjectLoading } = useProjectContext();
   const isAdmin = profile?.permissionGroup === "ADMIN";
+  const isGlobal = searchParams.get("scope") === "global" && isAdmin;
   const scope = useMemo<BlueprintScope>(
-    () =>
-      searchParams.get("scope") === "global" && isAdmin
-        ? { kind: "global" }
-        : { kind: "project", projectId: selectedProjectId },
-    [isAdmin, searchParams, selectedProjectId],
+    () => (isGlobal ? { kind: "global" } : { kind: "project", projectId: selectedProjectId }),
+    [isGlobal, selectedProjectId],
   );
-  const isGlobal = scope.kind === "global";
+  const hasBlueprintScope = isGlobal || selectedProjectId !== "";
   const [paths, setPaths] = useState<BlueprintPathOverview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +40,13 @@ export function BlueprintPathsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const loadPaths = useCallback(async () => {
+    if (!hasBlueprintScope) {
+      setPaths([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -51,17 +56,21 @@ export function BlueprintPathsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [scope]);
+  }, [hasBlueprintScope, scope]);
 
   useEffect(() => {
+    if (!isGlobal && isProjectLoading) return;
+
     const loadTimeout = window.setTimeout(() => {
       void loadPaths();
     }, 0);
     return () => window.clearTimeout(loadTimeout);
-  }, [loadPaths]);
+  }, [isGlobal, isProjectLoading, loadPaths]);
 
   async function createPath(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasBlueprintScope) return;
+
     setIsSaving(true);
     setError(null);
     try {
@@ -85,6 +94,7 @@ export function BlueprintPathsPage() {
             variant="primary"
             icon={<FilePlus2 className="h-4 w-4" />}
             onClick={() => setIsCreateOpen(true)}
+            disabled={!hasBlueprintScope || (!isGlobal && isProjectLoading)}
           >
             New blueprint path
           </Button>
@@ -116,10 +126,14 @@ export function BlueprintPathsPage() {
         </p>
       ) : null}
 
-      {isLoading ? (
+      {(!isGlobal && isProjectLoading) || isLoading ? (
         <div className="flex items-center gap-3 py-12 text-app-text-muted">
           <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint paths…
         </div>
+      ) : !hasBlueprintScope ? (
+        <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No project available">
+          Create or join a project before adding project blueprint paths.
+        </EmptyState>
       ) : paths.length === 0 ? (
         <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No blueprint paths yet">
           Create the first reusable onboarding path to begin authoring.

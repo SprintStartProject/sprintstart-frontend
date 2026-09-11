@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { usePathRevealMoment } from "../../../../src/features/onboarding/hooks/usePathRevealMoment";
 import type {
   OnboardingPathEndpoint,
+  OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
+  QuestionStatus,
   StepStatus,
 } from "../../../../src/features/onboarding/types";
 
@@ -44,6 +46,17 @@ function step(
   };
 }
 
+function question(status: QuestionStatus = "OPEN"): OnboardingQuestionEndpoint {
+  return {
+    id: `q-${status}`,
+    phaseId: "phase1",
+    position: 1,
+    type: "MULTIPLE_CHOICE",
+    question: "Question",
+    status,
+  };
+}
+
 /** A freshly generated, completely untouched path. */
 function freshPath(
   id = "path1",
@@ -61,15 +74,8 @@ function freshPath(
         title: "Find your feet",
         description: "",
         locked: false,
-        unlockReason: null,
-        checkSummary: {
-          required: true,
-          questionCount: 3,
-          passed: false,
-          latestAttemptId: null,
-          latestAttemptAt: null,
-        },
         steps,
+        questions: [question("OPEN")],
       },
     ],
   };
@@ -176,9 +182,9 @@ describe("usePathRevealMoment", () => {
     expect(mockRevealPath).not.toHaveBeenCalled();
   });
 
-  it("stays quiet once a knowledge check has been passed", () => {
+  it("stays quiet once a knowledge-check question has been passed", () => {
     const path = freshPath();
-    path.phases[0].checkSummary.passed = true;
+    path.phases[0].questions[0].status = "PASSED";
 
     render(<Harness path={path} />);
 

@@ -12,11 +12,7 @@ import { useState, type DragEvent } from "react";
 import { DragHandle } from "../../../../components/ui/DragHandle";
 import { SpotlightCard } from "../../../../components/ui/SpotlightCard";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
-import type {
-  OnboardingPhaseEndpoint,
-  OnboardingStepEndpoint,
-  PhaseCheckSummaryEndpoint,
-} from "../../../onboarding/types";
+import type { OnboardingPhaseEndpoint, OnboardingStepEndpoint } from "../../../onboarding/types";
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
   startedAt?: string | null;
@@ -149,8 +145,8 @@ export function MemberOnboardingSection({
                 />
 
                 {/* Last in the phase, mirroring where the member meets the
-                                check in their own onboarding path. */}
-                <PhaseCheckCard summary={selectedPhase?.checkSummary} onOpenCheck={onOpenCheck} />
+                                questions in their own onboarding path. */}
+                <PhaseCheckCard phase={selectedPhase} onOpenCheck={onOpenCheck} />
               </div>
             </div>
           </>
@@ -161,41 +157,41 @@ export function MemberOnboardingSection({
 }
 
 /**
- * Knowledge-check status of the selected phase, with the entry points for reviewing the
+ * Knowledge-question status of the selected phase, with the entry points for reviewing the
  * member's attempts and editing the questions.
  *
- * Phases without a check still offer the editor, since that is how a check gets created
+ * Phases without questions still offer the editor, since that is how questions get created
  * in the first place when the AI generated none.
  */
 function PhaseCheckCard({
-  summary,
+  phase,
   onOpenCheck,
 }: {
-  summary?: PhaseCheckSummaryEndpoint;
+  phase?: OnboardingPhaseEndpoint;
   onOpenCheck: (tab: "results" | "questions") => void;
 }) {
-  const required = summary?.required ?? false;
-  const passed = summary?.passed ?? false;
-  const questionCount = summary?.questionCount ?? 0;
+  const questions = phase?.questions ?? [];
+  const passedCount = questions.filter((question) => question.status === "PASSED").length;
+  const questionCount = questions.length;
 
   return (
     <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <ClipboardCheck
           className={`mt-0.5 h-5 w-5 shrink-0 ${
-            passed ? "text-app-success-solid" : "text-app-text-muted"
+            questionCount > 0 && passedCount === questionCount
+              ? "text-app-success-solid"
+              : "text-app-text-muted"
           }`}
         />
         <div>
-          <p className="text-sm font-semibold text-app-text">Knowledge check</p>
+          <p className="text-sm font-semibold text-app-text">Knowledge questions</p>
           <p className="mt-0.5 text-xs text-app-text-muted">
-            {!required
+            {questionCount === 0
               ? "No questions configured for this phase."
-              : passed
-                ? `Passed · ${questionCount} question${questionCount === 1 ? "" : "s"}`
-                : `Not passed yet · ${questionCount} question${questionCount === 1 ? "" : "s"}`}
-            {summary?.latestAttemptAt &&
-              ` · last attempt ${new Date(summary.latestAttemptAt).toLocaleDateString()}`}
+              : passedCount === questionCount
+                ? `All ${questionCount} question${questionCount === 1 ? "" : "s"} passed`
+                : `${passedCount}/${questionCount} question${questionCount === 1 ? "" : "s"} passed`}
           </p>
         </div>
       </div>
@@ -215,7 +211,7 @@ function PhaseCheckCard({
           onClick={() => onOpenCheck("questions")}
           className="rounded-xl border border-app-border px-3 py-2 text-xs font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
         >
-          {required ? "Edit questions" : "Add questions"}
+          {questionCount > 0 ? "Edit questions" : "Add questions"}
         </button>
       </div>
     </div>
@@ -306,20 +302,22 @@ function PhasePicker({
                 {completed}/{steps.length} steps
               </p>
               {/* Icon plus label, so the state never rests on color alone. */}
-              {phase.checkSummary?.required && (
+              {phase.questions.length > 0 && (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    phase.checkSummary.passed
+                    phase.questions.every((question) => question.status === "PASSED")
                       ? "bg-app-success-bg text-app-success-text"
                       : "bg-app-surface text-app-text-muted"
                   }`}
                 >
-                  {phase.checkSummary.passed ? (
+                  {phase.questions.every((question) => question.status === "PASSED") ? (
                     <CheckCircle2 className="h-3 w-3" />
                   ) : (
                     <ClipboardCheck className="h-3 w-3" />
                   )}
-                  {phase.checkSummary.passed ? "Check passed" : "Check open"}
+                  {phase.questions.every((question) => question.status === "PASSED")
+                    ? "Questions passed"
+                    : "Questions open"}
                 </span>
               )}
             </div>
