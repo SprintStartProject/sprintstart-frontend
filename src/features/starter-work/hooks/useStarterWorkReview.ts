@@ -54,20 +54,23 @@ export function useStarterWorkReview() {
     })();
   }, [loadProposed]);
 
-  const generate = useCallback(async () => {
-    setIsGenerating(true);
-    setError(null);
-    setGenerateResult(null);
-    try {
-      const result = await starterWorkService.generate();
-      setGenerateResult(result);
-      await loadProposed();
-    } catch (err) {
-      setError(toMessage(err, "Could not mine starter tasks."));
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [loadProposed]);
+  const generate = useCallback(
+    async (projectId: string) => {
+      setIsGenerating(true);
+      setError(null);
+      setGenerateResult(null);
+      try {
+        const result = await starterWorkService.generate(projectId);
+        setGenerateResult(result);
+        await loadProposed();
+      } catch (err) {
+        setError(toMessage(err, "Could not mine starter tasks."));
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [loadProposed],
+  );
 
   const create = useCallback(async (input: CreateStarterWorkTaskInput): Promise<boolean> => {
     setError(null);
