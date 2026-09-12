@@ -13,6 +13,7 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { Pagination } from "../components/ui/Pagination";
 import { Button } from "../components/ui/Button";
 import { PageHeader } from "../components/layout/PageHeader";
+import { SCROLL_CONTAINER_ATTRIBUTE } from "../components/ui/useScrollLock";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
@@ -138,6 +139,9 @@ export function KnowledgeBasePage() {
 
       <main
         ref={swipeRef}
+        // Scrolls itself rather than the document, so scroll restoration has to be
+        // told where to look — see `SCROLL_CONTAINER_ATTRIBUTE`.
+        {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
         className="app-page-frame flex flex-1 flex-col overflow-y-auto py-6 sm:space-y-10 lg:py-8"
       >
         <div className="mx-auto w-full max-w-7xl">

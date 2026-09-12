@@ -19,11 +19,13 @@ import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
+import { useScrollRestoration } from "./hooks/useScrollRestoration";
 
 function AppContent() {
   const { status } = useAuth();
   const { showRocketPet } = useMoments();
   const { isFocused } = useFocusMode();
+  useScrollRestoration();
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
   const signedIn = status !== "unauthenticated" && status !== "loading";
