@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
+import { PageShell } from "../../../components/layout/PageShell";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -16,7 +17,6 @@ import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 import {
-  ArrowLeft,
   Loader2,
   AlertCircle,
   Clock,
@@ -58,35 +58,52 @@ export function KnowledgeGapsDetailPage() {
 
   const { data: teamUsers } = useFetch(() => getTeamOverview(), []);
 
-  // ── LOADING ────────────────────────────────────────────
+  // ── LOADING / ERROR ────────────────────────────────────
+  // The title is the gap's own component name, so there is nothing real to show
+  // for it until the fetch resolves — a generic placeholder stands in, but the
+  // band and back button are present from the first frame regardless.
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-          <p className="text-sm">Loading gap details...</p>
+      <PageShell
+        icon={ShieldAlert}
+        title="Knowledge gap"
+        subtitle=""
+        frame="content"
+        back={{ label: "Back", onClick: () => void navigate(-1) }}
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-app-text-muted">
+            <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+            <p className="text-sm">Loading gap details...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
-  // ── ERROR ──────────────────────────────────────────────
-
   if (error || !gap) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load gap</h2>
-          <p className="mb-6 text-sm text-app-text-muted">
-            This knowledge gap may no longer exist.
-          </p>
-          <Button variant="primary" onClick={() => void navigate(-1)}>
-            Go back
-          </Button>
+      <PageShell
+        icon={ShieldAlert}
+        title="Knowledge gap"
+        subtitle=""
+        frame="content"
+        back={{ label: "Back", onClick: () => void navigate(-1) }}
+      >
+        <div className="flex min-h-96 items-center justify-center p-8">
+          <div className="max-w-md text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+            <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load gap</h2>
+            <p className="mb-6 text-sm text-app-text-muted">
+              This knowledge gap may no longer exist.
+            </p>
+            <Button variant="primary" onClick={() => void navigate(-1)}>
+              Go back
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -144,195 +161,175 @@ export function KnowledgeGapsDetailPage() {
   // ── RENDER ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      {/* ── HEADER ──────────────────────────────────────── */}
-      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-content py-4">
-          <Button
-            variant="ghost"
-            onClick={() => void navigate(-1)}
-            icon={<ArrowLeft className="h-4 w-4" />}
-            className="mb-4"
-          >
-            Back
-          </Button>
+    <PageShell
+      icon={ShieldAlert}
+      title={gap.component}
+      subtitle={`First ingested ${formatDateTime(firstIngested)} · ${formatRelativeDate(firstIngested)}`}
+      frame="content"
+      back={{ label: "Back", onClick: () => void navigate(-1) }}
+      actions={
+        <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${badge}`}>
+          {longLabel}
+        </span>
+      }
+      mainClassName="space-y-4 py-8 pb-24"
+    >
+      {/* Severity + stats hero */}
+      <div className={`rounded-2xl border bg-app-surface/70 p-5 backdrop-blur-md ${ring}`}>
+        {/* Severity bar full width */}
+        <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-app-border">
+          <div
+            className={`h-full rounded-full ${bar}`}
+            style={{
+              width: SEVERITY_FILL[gap.severity],
+            }}
+          />
+        </div>
 
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="mb-1 text-xl font-semibold text-app-text sm:text-2xl">
-                {gap.component}
-              </h1>
-              <div className="flex items-center gap-2 text-xs text-app-text-muted">
-                <Clock className="h-3.5 w-3.5" />
-                First ingested {formatDateTime(firstIngested)} · {formatRelativeDate(firstIngested)}
-              </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-app-surface-muted p-3">
+            <div className="mb-1 flex items-center gap-1 text-xs text-app-text-muted">
+              <FileCheck className="h-3.5 w-3.5" />
+              Present document types
             </div>
-            <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${badge}`}>
-              {longLabel}
-            </span>
+            <div className="text-2xl font-semibold text-app-text">
+              {gap.presentTypes?.length ?? 0}
+            </div>
+          </div>
+          <div className="rounded-xl bg-app-surface-muted p-3">
+            <div className="mb-1 flex items-center gap-1 text-xs text-app-text-muted">
+              <Wrench className="h-3.5 w-3.5" />
+              Missing doc types
+            </div>
+            <div className="text-2xl font-semibold text-app-text">{gap.missingTypes.length}</div>
           </div>
         </div>
       </div>
 
-      {/* ── CONTENT ─────────────────────────────────────── */}
-      <main className="app-page-content space-y-4 py-8 pb-24">
-        {/* Severity + stats hero */}
-        <div className={`rounded-2xl border bg-app-surface/70 p-5 backdrop-blur-md ${ring}`}>
-          {/* Severity bar full width */}
-          <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-app-border">
-            <div
-              className={`h-full rounded-full ${bar}`}
-              style={{
-                width: SEVERITY_FILL[gap.severity],
-              }}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-app-surface-muted p-3">
-              <div className="mb-1 flex items-center gap-1 text-xs text-app-text-muted">
-                <FileCheck className="h-3.5 w-3.5" />
-                Present document types
-              </div>
-              <div className="text-2xl font-semibold text-app-text">
-                {gap.presentTypes?.length ?? 0}
-              </div>
-            </div>
-            <div className="rounded-xl bg-app-surface-muted p-3">
-              <div className="mb-1 flex items-center gap-1 text-xs text-app-text-muted">
-                <Wrench className="h-3.5 w-3.5" />
-                Missing doc types
-              </div>
-              <div className="text-2xl font-semibold text-app-text">{gap.missingTypes.length}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Present types */}
-        {gap.presentTypes && gap.presentTypes.length > 0 && (
-          <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
-            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
-              <FileCheck className="h-3.5 w-3.5" />
-              Present document types
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {gap.presentTypes.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-lg border border-app-success-border bg-app-success-bg px-3 py-1.5 text-sm text-app-success-text"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Missing types */}
+      {/* Present types */}
+      {gap.presentTypes && gap.presentTypes.length > 0 && (
         <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
           <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
-            <ShieldAlert className="h-3.5 w-3.5" />
-            Missing documentation types
+            <FileCheck className="h-3.5 w-3.5" />
+            Present document types
           </div>
           <div className="flex flex-wrap gap-2">
-            {gap.missingTypes.map((t) => (
+            {gap.presentTypes.map((t) => (
               <span
                 key={t}
-                className="rounded-lg border border-app-border bg-app-surface-muted px-3 py-1.5 text-sm text-app-text"
+                className="rounded-lg border border-app-success-border bg-app-success-bg px-3 py-1.5 text-sm text-app-success-text"
               >
                 {t}
               </span>
             ))}
           </div>
         </div>
+      )}
 
-        {/* Owner */}
-        <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
-          <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
-            <User className="h-3.5 w-3.5" />
-            Owner
-          </div>
-          <div className="space-y-2">
-            {!currentOwner && <p className="text-sm text-app-text-muted">No owner assigned yet.</p>}
-            {currentOwner && (
-              <div className="flex items-center gap-3 rounded-xl bg-app-surface-muted p-3">
-                {/* Avatar initials */}
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
-                  <span className="text-xs font-semibold text-app-brand-text">
-                    {currentOwner.firstname[0]}
-                    {currentOwner.lastname[0]}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-app-text">
-                    {currentOwner.firstname} {currentOwner.lastname}
-                  </div>
-                  <div className="text-xs text-app-text-muted">
-                    @{currentOwner.username}
-                    {currentOwner.role ? ` · ${currentOwner.role}` : ""}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Assign / change owner */}
-          <div className="mt-3 flex items-center gap-2">
-            <UserPlus aria-hidden="true" className="h-4 w-4 shrink-0 text-app-text-muted" />
-            <FilterSelect
-              label={currentOwner ? "Change the owner of this component" : "Assign an owner"}
-              value={currentOwner?.id ?? ""}
-              options={ownerOptions}
-              onChange={setOwner}
-              disabled={savingOwners}
-              className="flex-1"
-            />
-          </div>
+      {/* Missing types */}
+      <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
+        <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Missing documentation types
         </div>
+        <div className="flex flex-wrap gap-2">
+          {gap.missingTypes.map((t) => (
+            <span
+              key={t}
+              className="rounded-lg border border-app-border bg-app-surface-muted px-3 py-1.5 text-sm text-app-text"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
 
-        {/* Data source */}
-        <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
-          <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
-            <Database className="h-3.5 w-3.5" />
-            Data source
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1 text-sm text-app-text">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0 text-app-text-muted" />
-                <span>
-                  Last ingested{" "}
-                  <span className="font-medium">{formatDateTime(gap.lastIngested)}</span>{" "}
-                  <span className="text-app-text-muted">
-                    · {formatRelativeDate(gap.lastIngested)}
-                  </span>
+      {/* Owner */}
+      <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
+        <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
+          <User className="h-3.5 w-3.5" />
+          Owner
+        </div>
+        <div className="space-y-2">
+          {!currentOwner && <p className="text-sm text-app-text-muted">No owner assigned yet.</p>}
+          {currentOwner && (
+            <div className="flex items-center gap-3 rounded-xl bg-app-surface-muted p-3">
+              {/* Avatar initials */}
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-brand-soft">
+                <span className="text-xs font-semibold text-app-brand-text">
+                  {currentOwner.firstname[0]}
+                  {currentOwner.lastname[0]}
                 </span>
               </div>
-              <div className="pl-6 text-xs text-app-text-muted">
-                Last analyzed {formatDateTime(gap.refreshedAt)}
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-app-text">
+                  {currentOwner.firstname} {currentOwner.lastname}
+                </div>
+                <div className="text-xs text-app-text-muted">
+                  @{currentOwner.username}
+                  {currentOwner.role ? ` · ${currentOwner.role}` : ""}
+                </div>
               </div>
-            </div>
-            {/* Straight to this component's repository, not just to the page. Data Ingestion
-                accepts the component (`owner/repo`) as a `sourceId` and opens that card's
-                details — otherwise the reader lands on the list and has to find it again. */}
-            <Button
-              variant="primary"
-              onClick={() => void navigate(dataIngestionLink)}
-              icon={<Database className="h-4 w-4" />}
-              className="shrink-0"
-            >
-              Update data source
-            </Button>
-          </div>
-          {isStale && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg border border-app-warning-border bg-app-warning-bg px-3 py-2 text-xs text-app-warning-text">
-              <Clock className="h-3.5 w-3.5 shrink-0" />
-              This data was last ingested {daysSinceIngest} days ago — re-ingest the source to
-              refresh it.
             </div>
           )}
         </div>
-      </main>
-    </div>
+
+        {/* Assign / change owner */}
+        <div className="mt-3 flex items-center gap-2">
+          <UserPlus aria-hidden="true" className="h-4 w-4 shrink-0 text-app-text-muted" />
+          <FilterSelect
+            label={currentOwner ? "Change the owner of this component" : "Assign an owner"}
+            value={currentOwner?.id ?? ""}
+            options={ownerOptions}
+            onChange={setOwner}
+            disabled={savingOwners}
+            className="flex-1"
+          />
+        </div>
+      </div>
+
+      {/* Data source */}
+      <div className="rounded-2xl border border-app-border/70 bg-app-surface/70 p-5 backdrop-blur-md">
+        <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-app-text-muted uppercase">
+          <Database className="h-3.5 w-3.5" />
+          Data source
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1 text-sm text-app-text">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 shrink-0 text-app-text-muted" />
+              <span>
+                Last ingested{" "}
+                <span className="font-medium">{formatDateTime(gap.lastIngested)}</span>{" "}
+                <span className="text-app-text-muted">
+                  · {formatRelativeDate(gap.lastIngested)}
+                </span>
+              </span>
+            </div>
+            <div className="pl-6 text-xs text-app-text-muted">
+              Last analyzed {formatDateTime(gap.refreshedAt)}
+            </div>
+          </div>
+          {/* Straight to this component's repository, not just to the page. Data Ingestion
+                accepts the component (`owner/repo`) as a `sourceId` and opens that card's
+                details — otherwise the reader lands on the list and has to find it again. */}
+          <Button
+            variant="primary"
+            onClick={() => void navigate(dataIngestionLink)}
+            icon={<Database className="h-4 w-4" />}
+            className="shrink-0"
+          >
+            Update data source
+          </Button>
+        </div>
+        {isStale && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-app-warning-border bg-app-warning-bg px-3 py-2 text-xs text-app-warning-text">
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            This data was last ingested {daysSinceIngest} days ago — re-ingest the source to refresh
+            it.
+          </div>
+        )}
+      </div>
+    </PageShell>
   );
 }

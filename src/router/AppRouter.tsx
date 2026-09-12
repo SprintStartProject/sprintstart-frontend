@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
+import { PageShellSkeleton } from "../components/layout/PageShell";
 import { ChatPage } from "../pages/ChatPage";
 import { AssistantShell } from "../components/layout/AssistantShell";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
@@ -43,11 +44,7 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
   const { canManageSelected, isLoading } = useProjectContext();
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-app-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-app-brand border-t-transparent" />
-      </div>
-    );
+    return <PageShellSkeleton />;
   }
 
   if (!canAccessRoute(profile, route, canManageSelected)) {

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { PageShellSkeleton } from "../components/layout/PageShell";
 import {
   getDefaultRoute,
   getMatchingProtectedRoute,
@@ -58,9 +59,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
       // them out of the app.
       try {
         const teamMember = await getMyTeamOverview();
-        const completed = await hasCompletedSkillAssessment(teamMember.userId);
         const promptState = getSkillAssessmentPromptState(teamMember.userId);
-        const allSkills = await getSkills();
+        const [completed, allSkills] = await Promise.all([
+          hasCompletedSkillAssessment(teamMember.userId),
+          getSkills(),
+        ]);
 
         const hasSkillsForRoles = teamMember.roles.some((role) =>
           allSkills.some(
@@ -83,11 +86,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [status, profile?.id]);
 
   if (status === "loading" || checkingSkillAssessment) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-app-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-app-brand border-t-transparent" />
-      </div>
-    );
+    return <PageShellSkeleton />;
   }
 
   if (status === "unauthenticated" && location.pathname !== "/login") {

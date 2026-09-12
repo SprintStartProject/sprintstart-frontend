@@ -15,13 +15,13 @@ import type {
 import { onboardingService } from "../../../services/onboardingService";
 import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
+import { PageShell } from "../../../components/layout/PageShell";
 import { Textarea } from "../../../components/ui/Textarea";
 import { StepOriginBadge } from "./StepOriginBadge";
 import { TaskCheckItem } from "./TaskCheckItem";
 import { useMoments } from "../../moments";
 
 import {
-  ArrowLeft,
   CheckCircle2,
   Circle,
   Clock3,
@@ -335,430 +335,417 @@ export function OnBoardingItemPage() {
   const taskPercentage =
     sortedTasks.length > 0 ? Math.round((doneTasks / sortedTasks.length) * 100) : 0;
 
+  const backToOverview = { label: "Back to Onboarding Overview", to: "/onboarding" } as const;
+
   // ── LOADING ───────────────────────────────────────────────
   if (loadingState === "loading" || loadingState === "idle") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-          <p className="text-sm">Loading step...</p>
+      <PageShell icon={ClipboardCheck} title="Onboarding step" subtitle="" back={backToOverview}>
+        <div className="flex min-h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-app-text-muted">
+            <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+            <p className="text-sm">Loading step...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   // ── ERROR ─────────────────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load step</h2>
-          <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
-          <Button variant="primary" onClick={() => void navigate("/onboarding")}>
-            Back to Onboarding Overview
-          </Button>
+      <PageShell icon={ClipboardCheck} title="Onboarding step" subtitle="" back={backToOverview}>
+        <div className="flex min-h-96 items-center justify-center p-8">
+          <div className="max-w-md text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+            <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load step</h2>
+            <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
+            <Button variant="primary" onClick={() => void navigate("/onboarding")}>
+              Back to Onboarding Overview
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   // ── EMPTY ─────────────────────────────────────────────────
   if (!stepDetail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="text-center">
-          <p className="mb-4 text-sm text-app-text-muted">Step not found.</p>
-          <Button variant="primary" onClick={() => void navigate("/onboarding")}>
-            Back to Onboarding Overview
-          </Button>
+      <PageShell icon={ClipboardCheck} title="Onboarding step" subtitle="" back={backToOverview}>
+        <div className="flex min-h-96 items-center justify-center">
+          <div className="text-center">
+            <p className="mb-4 text-sm text-app-text-muted">Step not found.</p>
+            <Button variant="primary" onClick={() => void navigate("/onboarding")}>
+              Back to Onboarding Overview
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   // ── RENDER ────────────────────────────────────────────────
-  return (
-    <div className="min-h-screen bg-app-bg">
-      {/* HEADER */}
-      <section
-        aria-label="Page header"
-        className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl"
+  const statusBadge = (
+    <div className="flex items-center gap-3">
+      <div
+        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
+          stepDetail.status === "FINISHED"
+            ? "bg-app-success-bg text-app-success-text"
+            : stepDetail.status === "IN_PROGRESS"
+              ? "bg-app-warning-bg text-app-warning-text"
+              : stepDetail.status === "SKIPPED"
+                ? "bg-app-neutral-bg text-app-text-muted"
+                : "bg-app-brand-soft text-app-brand-text"
+        }`}
       >
-        <div className="app-page-content py-4">
-          <button
-            onClick={() => void navigate("/onboarding")}
-            className="mb-4 inline-flex items-center gap-2 text-sm text-app-text-muted transition-all hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Onboarding Overview
-          </button>
+        {stepDetail.status === "FINISHED"
+          ? "Finished"
+          : stepDetail.status === "IN_PROGRESS"
+            ? "In Progress"
+            : stepDetail.status === "SKIPPED"
+              ? "Skipped"
+              : "Open"}
+      </div>
+      <StepOriginBadge step={stepDetail} />
+    </div>
+  );
 
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              {/* Status-Badge */}
-              <div
-                className={`mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-                  stepDetail.status === "FINISHED"
-                    ? "bg-app-success-bg text-app-success-text"
-                    : stepDetail.status === "IN_PROGRESS"
-                      ? "bg-app-warning-bg text-app-warning-text"
-                      : stepDetail.status === "SKIPPED"
-                        ? "bg-app-neutral-bg text-app-text-muted"
-                        : "bg-app-brand-soft text-app-brand-text"
-                }`}
-              >
-                {stepDetail.status === "FINISHED"
-                  ? "Finished"
-                  : stepDetail.status === "IN_PROGRESS"
-                    ? "In Progress"
-                    : stepDetail.status === "SKIPPED"
-                      ? "Skipped"
-                      : "Open"}
-              </div>
-
-              <h1 className="text-2xl font-bold text-app-text sm:text-3xl">{stepDetail.title}</h1>
-              <div className="mt-3">
-                <StepOriginBadge step={stepDetail} />
-              </div>
-              <p className="mt-2 text-sm text-app-text-muted">{stepDetail.description}</p>
-            </div>
-
-            {stepDetail.estimatedMinutes > 0 && (
-              <div className="hidden shrink-0 items-center gap-2 rounded-xl bg-app-surface-muted px-3 py-2 text-sm text-app-text-muted sm:flex">
-                <Clock3 className="h-4 w-4" />
-                {formatMinutes(stepDetail.estimatedMinutes)}
-              </div>
-            )}
+  return (
+    <PageShell
+      icon={ClipboardCheck}
+      title={stepDetail.title}
+      subtitle={stepDetail.description}
+      back={backToOverview}
+      bandExtra={statusBadge}
+      actions={
+        stepDetail.estimatedMinutes > 0 && (
+          <div className="hidden shrink-0 items-center gap-2 rounded-xl bg-app-surface-muted px-3 py-2 text-sm text-app-text-muted sm:flex">
+            <Clock3 className="h-4 w-4" />
+            {formatMinutes(stepDetail.estimatedMinutes)}
           </div>
-        </div>
-      </section>
-
-      {/* MAIN CONTENT */}
-      <main className="app-page-content py-6 pb-24">
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* LEFT COLUMN */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Expected Outcomes */}
-            {stepDetail.expectedOutcomes && stepDetail.expectedOutcomes.length > 0 && (
-              <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-app-brand" />
-                  <h2 className="font-semibold text-app-text">Expected Outcomes</h2>
-                </div>
-                <ul className="space-y-3">
-                  {stepDetail.expectedOutcomes.map((outcome, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-app-success-solid" />
-                      <span className="text-sm text-app-text">{outcome}</span>
-                    </li>
-                  ))}
-                </ul>
+        )
+      }
+      mainClassName="py-6 pb-24"
+    >
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* LEFT COLUMN */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Expected Outcomes */}
+          {stepDetail.expectedOutcomes && stepDetail.expectedOutcomes.length > 0 && (
+            <div className="rounded-2xl border border-app-border bg-app-surface p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-app-brand" />
+                <h2 className="font-semibold text-app-text">Expected Outcomes</h2>
               </div>
-            )}
+              <ul className="space-y-3">
+                {stepDetail.expectedOutcomes.map((outcome, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-app-success-solid" />
+                    <span className="text-sm text-app-text">{outcome}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-            {/* TASKS (Step by Step) */}
-            {sortedTasks.length > 0 && (
-              <div className="rounded-2xl border border-app-border bg-app-surface p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-app-warning-solid" />
-                    <h2 className="font-semibold text-app-text">Tasks</h2>
-                  </div>
-                  <span className="text-xs text-app-text-muted">
-                    {doneTasks}/{sortedTasks.length} completed
-                  </span>
+          {/* TASKS (Step by Step) */}
+          {sortedTasks.length > 0 && (
+            <div className="rounded-2xl border border-app-border bg-app-surface p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-app-warning-solid" />
+                  <h2 className="font-semibold text-app-text">Tasks</h2>
                 </div>
+                <span className="text-xs text-app-text-muted">
+                  {doneTasks}/{sortedTasks.length} completed
+                </span>
+              </div>
 
-                {/* Progress Bar. Sprung rather than tweened so it overshoots a
+              {/* Progress Bar. Sprung rather than tweened so it overshoots a
                     hair on each tick — the bar reacts to the click instead of
                     catching up to it half a second later. */}
-                <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-app-border-muted">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end"
-                    initial={false}
-                    animate={{ width: `${taskPercentage}%` }}
-                    transition={centralSpringToken}
+              <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-app-border-muted">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end"
+                  initial={false}
+                  animate={{ width: `${taskPercentage}%` }}
+                  transition={centralSpringToken}
+                />
+              </div>
+
+              <div className="space-y-3">
+                {sortedTasks.map((task, index) => (
+                  <TaskCheckItem
+                    key={task.id}
+                    index={index}
+                    title={task.title}
+                    description={task.description}
+                    isDone={localFinished.has(task.id)}
+                    onToggle={() => toggleTask(task.id)}
                   />
-                </div>
-
-                <div className="space-y-3">
-                  {sortedTasks.map((task, index) => (
-                    <TaskCheckItem
-                      key={task.id}
-                      index={index}
-                      title={task.title}
-                      description={task.description}
-                      isDone={localFinished.has(task.id)}
-                      onToggle={() => toggleTask(task.id)}
-                    />
-                  ))}
-                </div>
+                ))}
               </div>
-            )}
-
-            {/* mark step as done */}
-            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="mb-3 text-sm font-semibold text-app-text">Complete Step</h3>
-              <button
-                onClick={() =>
-                  stepDetail.status === "FINISHED" ? undefined : void updateStepStatus("FINISHED")
-                }
-                disabled={stepDetail.status === "FINISHED" || !allTasksDone}
-                className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all duration-200 ${
-                  stepDetail.status === "FINISHED"
-                    ? "cursor-default border-app-success-border bg-app-success-bg text-app-success-text"
-                    : allTasksDone
-                      ? "border-dashed border-app-border-strong text-app-text-muted hover:border-app-brand-border-strong hover:text-app-brand"
-                      : "cursor-not-allowed border-dashed border-app-border text-app-text-disabled"
-                }`}
-              >
-                {stepDetail.status === "FINISHED" ? (
-                  <Trophy className="h-5 w-5 shrink-0" />
-                ) : (
-                  <Circle className="h-5 w-5 shrink-0" />
-                )}
-                <span className="flex-1 text-left text-sm font-medium">
-                  {stepDetail.status === "FINISHED"
-                    ? "Finished!"
-                    : allTasksDone
-                      ? "Mark as Completed"
-                      : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? "" : "s"} pending`}
-                </span>
-              </button>
-
-              {/* Once this step is behind the user (finished or skipped),
-                  jump straight to the next pending step. */}
-              {(stepDetail.status === "FINISHED" || stepDetail.status === "SKIPPED") && (
-                <Button
-                  variant="primary"
-                  fullWidth
-                  onClick={() => void goToNextStep()}
-                  disabled={!nextAction}
-                  loading={nextLoading}
-                  trailingIcon={
-                    nextLoading ? undefined : nextAction?.kind === "check" ? (
-                      <ClipboardCheck className="h-4 w-4" />
-                    ) : (
-                      <CircleArrowRight className="h-4 w-4" />
-                    )
-                  }
-                  className="mt-3"
-                >
-                  {nextLoading || !nextAction
-                    ? "Loading..."
-                    : nextAction.kind === "check"
-                      ? "Start knowledge check"
-                      : nextAction.kind === "done"
-                        ? "Back to overview"
-                        : "Continue to next step"}
-                </Button>
-              )}
             </div>
-          </div>
+          )}
 
-          {/* RIGHT COLUMN */}
-          <div className="space-y-6">
-            {/* STATUS */}
-            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="mb-3 text-sm font-semibold text-app-text">Status</h3>
-              <div
-                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
-                  stepDetail.status === "FINISHED"
-                    ? "bg-app-success-bg text-app-success-text"
-                    : stepDetail.status === "SKIPPED"
-                      ? "bg-app-danger-bg text-app-danger-text"
-                      : "bg-app-surface-muted text-app-text-muted"
-                }`}
-              >
-                {stepDetail.status === "FINISHED" ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : stepDetail.status === "SKIPPED" ? (
-                  <CircleArrowRight className="h-4 w-4" />
-                ) : (
-                  <Circle className="h-4 w-4" />
-                )}
+          {/* mark step as done */}
+          <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+            <h3 className="mb-3 text-sm font-semibold text-app-text">Complete Step</h3>
+            <button
+              onClick={() =>
+                stepDetail.status === "FINISHED" ? undefined : void updateStepStatus("FINISHED")
+              }
+              disabled={stepDetail.status === "FINISHED" || !allTasksDone}
+              className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all duration-200 ${
+                stepDetail.status === "FINISHED"
+                  ? "cursor-default border-app-success-border bg-app-success-bg text-app-success-text"
+                  : allTasksDone
+                    ? "border-dashed border-app-border-strong text-app-text-muted hover:border-app-brand-border-strong hover:text-app-brand"
+                    : "cursor-not-allowed border-dashed border-app-border text-app-text-disabled"
+              }`}
+            >
+              {stepDetail.status === "FINISHED" ? (
+                <Trophy className="h-5 w-5 shrink-0" />
+              ) : (
+                <Circle className="h-5 w-5 shrink-0" />
+              )}
+              <span className="flex-1 text-left text-sm font-medium">
                 {stepDetail.status === "FINISHED"
-                  ? "Finished"
-                  : stepDetail.status === "IN_PROGRESS"
-                    ? "In Progress"
-                    : stepDetail.status === "SKIPPED"
-                      ? "Skipped"
-                      : "Open"}
-              </div>
-              {stepDetail.status === "FINISHED" && stepDetail.completedAt && (
-                <p className="mt-3 text-xs text-app-text-muted">
-                  Completed on{" "}
-                  {new Date(stepDetail.completedAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </p>
-              )}
-              {stepDetail.startedAt && (
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-app-text-muted">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  {stepDetail.status === "FINISHED" || stepDetail.status === "SKIPPED"
-                    ? "Time spent: "
-                    : "Time on step: "}
-                  {formatMinutes(
-                    Math.max(
-                      0,
-                      Math.floor(
-                        ((stepDetail.completedAt
-                          ? new Date(stepDetail.completedAt).getTime()
-                          : now) -
-                          new Date(stepDetail.startedAt).getTime()) /
-                          60000,
-                      ),
-                    ),
-                  )}
-                </p>
-              )}
-            </div>
+                  ? "Finished!"
+                  : allTasksDone
+                    ? "Mark as Completed"
+                    : `Still ${sortedTasks.length - doneTasks} task${sortedTasks.length - doneTasks === 1 ? "" : "s"} pending`}
+              </span>
+            </button>
 
-            {/* RESOURCES */}
-            {resources.length > 0 && (
-              <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-                <h3 className="mb-3 text-sm font-semibold text-app-text">Resources</h3>
-                <div className="space-y-2">
-                  {resources.map((resource) => (
-                    <a
-                      key={resource.id}
-                      href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center justify-between rounded-xl border border-app-border p-3 transition-all hover:border-app-brand-border-strong"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-app-text">
-                          {resource.title}
-                        </p>
-                        {resource.description && (
-                          <p className="mt-0.5 truncate text-xs text-app-text-subtle">
-                            {resource.description}
-                          </p>
-                        )}
-                      </div>
-                      <ExternalLink className="ml-2 h-4 w-4 shrink-0 text-app-text-subtle transition-all group-hover:text-app-brand" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/*SKIP STEP */}
-            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
-                <CircleArrowRight className="h-4 w-4 text-app-danger-solid" />
-                Skip Step
-              </h3>
-              <Textarea
-                value={skipReason}
-                onChange={(e) => setSkipReason(e.target.value)}
-                placeholder="Reason for skipping..."
-                aria-label="Reason for skipping"
-                minRows={3}
-                maxRows={10}
-                disabled={skipLoading || stepDetail.status === "SKIPPED" || hasPendingSkipRequest}
-              />
+            {/* Once this step is behind the user (finished or skipped),
+                  jump straight to the next pending step. */}
+            {(stepDetail.status === "FINISHED" || stepDetail.status === "SKIPPED") && (
               <Button
                 variant="primary"
-                className="mt-3"
-                onClick={() => void skipCurrentStep()}
-                loading={skipLoading}
-                disabled={
-                  !skipReason.trim() || stepDetail.status === "SKIPPED" || hasPendingSkipRequest
+                fullWidth
+                onClick={() => void goToNextStep()}
+                disabled={!nextAction}
+                loading={nextLoading}
+                trailingIcon={
+                  nextLoading ? undefined : nextAction?.kind === "check" ? (
+                    <ClipboardCheck className="h-4 w-4" />
+                  ) : (
+                    <CircleArrowRight className="h-4 w-4" />
+                  )
                 }
+                className="mt-3"
               >
-                {skipLoading
-                  ? "Skipping..."
-                  : hasPendingSkipRequest
-                    ? "Skip Requested"
-                    : stepDetail.status === "SKIPPED"
-                      ? "Step Skipped"
-                      : "Skip Step"}
+                {nextLoading || !nextAction
+                  ? "Loading..."
+                  : nextAction.kind === "check"
+                    ? "Start knowledge check"
+                    : nextAction.kind === "done"
+                      ? "Back to overview"
+                      : "Continue to next step"}
               </Button>
-            </div>
-
-            {/* FEEDBACK */}
-            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
-                <MessageSquareCheck className="h-4 w-4 text-app-brand" />
-                Feedback
-              </h3>
-              {feedbackSubmitted ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-sm text-app-text-muted">
-                    {feedbackHelpful ? (
-                      <ThumbsUp className="h-4 w-4 text-app-success-solid" />
-                    ) : (
-                      <ThumbsDown className="h-4 w-4 text-app-danger-solid" />
-                    )}
-                    <span>{feedbackHelpful ? "Marked as helpful" : "Marked as not helpful"}</span>
-                  </div>
-                  {feedbackComment && (
-                    <p className="rounded-xl bg-app-surface-muted p-3 text-sm text-app-text">
-                      {feedbackComment}
-                    </p>
-                  )}
-                  <button
-                    onClick={() => setFeedbackSubmitted(false)}
-                    className="text-left text-xs text-app-text-muted transition-all hover:text-app-text"
-                  >
-                    Edit feedback
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-3 flex gap-2">
-                    <button
-                      onClick={() => setFeedbackHelpful(true)}
-                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
-                        feedbackHelpful === true
-                          ? "border-app-success-border bg-app-success-bg text-app-success-text"
-                          : "border-app-border text-app-text-muted hover:border-app-brand-border-strong"
-                      }`}
-                    >
-                      <ThumbsUp className="h-4 w-4" />
-                      Helpful
-                    </button>
-                    <button
-                      onClick={() => setFeedbackHelpful(false)}
-                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
-                        feedbackHelpful === false
-                          ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
-                          : "border-app-border text-app-text-muted hover:border-app-brand-border-strong"
-                      }`}
-                    >
-                      <ThumbsDown className="h-4 w-4" />
-                      Not helpful
-                    </button>
-                  </div>
-                  <Textarea
-                    value={feedbackComment}
-                    onChange={(e) => setFeedbackComment(e.target.value)}
-                    placeholder="Tell us what worked or what was missing..."
-                    aria-label="Feedback comment"
-                    minRows={3}
-                    maxRows={10}
-                  />
-                  <Button
-                    variant="primary"
-                    onClick={() => void submitFeedback()}
-                    disabled={feedbackHelpful === null || !feedbackComment.trim()}
-                    loading={feedbackLoading}
-                    className="mt-3"
-                  >
-                    {feedbackLoading ? "Submitting..." : "Submit feedback"}
-                  </Button>
-                </>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      </main>
-    </div>
+
+        {/* RIGHT COLUMN */}
+        <div className="space-y-6">
+          {/* STATUS */}
+          <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+            <h3 className="mb-3 text-sm font-semibold text-app-text">Status</h3>
+            <div
+              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                stepDetail.status === "FINISHED"
+                  ? "bg-app-success-bg text-app-success-text"
+                  : stepDetail.status === "SKIPPED"
+                    ? "bg-app-danger-bg text-app-danger-text"
+                    : "bg-app-surface-muted text-app-text-muted"
+              }`}
+            >
+              {stepDetail.status === "FINISHED" ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : stepDetail.status === "SKIPPED" ? (
+                <CircleArrowRight className="h-4 w-4" />
+              ) : (
+                <Circle className="h-4 w-4" />
+              )}
+              {stepDetail.status === "FINISHED"
+                ? "Finished"
+                : stepDetail.status === "IN_PROGRESS"
+                  ? "In Progress"
+                  : stepDetail.status === "SKIPPED"
+                    ? "Skipped"
+                    : "Open"}
+            </div>
+            {stepDetail.status === "FINISHED" && stepDetail.completedAt && (
+              <p className="mt-3 text-xs text-app-text-muted">
+                Completed on{" "}
+                {new Date(stepDetail.completedAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            )}
+            {stepDetail.startedAt && (
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-app-text-muted">
+                <Clock3 className="h-3.5 w-3.5" />
+                {stepDetail.status === "FINISHED" || stepDetail.status === "SKIPPED"
+                  ? "Time spent: "
+                  : "Time on step: "}
+                {formatMinutes(
+                  Math.max(
+                    0,
+                    Math.floor(
+                      ((stepDetail.completedAt ? new Date(stepDetail.completedAt).getTime() : now) -
+                        new Date(stepDetail.startedAt).getTime()) /
+                        60000,
+                    ),
+                  ),
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* RESOURCES */}
+          {resources.length > 0 && (
+            <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+              <h3 className="mb-3 text-sm font-semibold text-app-text">Resources</h3>
+              <div className="space-y-2">
+                {resources.map((resource) => (
+                  <a
+                    key={resource.id}
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center justify-between rounded-xl border border-app-border p-3 transition-all hover:border-app-brand-border-strong"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-app-text">{resource.title}</p>
+                      {resource.description && (
+                        <p className="mt-0.5 truncate text-xs text-app-text-subtle">
+                          {resource.description}
+                        </p>
+                      )}
+                    </div>
+                    <ExternalLink className="ml-2 h-4 w-4 shrink-0 text-app-text-subtle transition-all group-hover:text-app-brand" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/*SKIP STEP */}
+          <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
+              <CircleArrowRight className="h-4 w-4 text-app-danger-solid" />
+              Skip Step
+            </h3>
+            <Textarea
+              value={skipReason}
+              onChange={(e) => setSkipReason(e.target.value)}
+              placeholder="Reason for skipping..."
+              aria-label="Reason for skipping"
+              minRows={3}
+              maxRows={10}
+              disabled={skipLoading || stepDetail.status === "SKIPPED" || hasPendingSkipRequest}
+            />
+            <Button
+              variant="primary"
+              className="mt-3"
+              onClick={() => void skipCurrentStep()}
+              loading={skipLoading}
+              disabled={
+                !skipReason.trim() || stepDetail.status === "SKIPPED" || hasPendingSkipRequest
+              }
+            >
+              {skipLoading
+                ? "Skipping..."
+                : hasPendingSkipRequest
+                  ? "Skip Requested"
+                  : stepDetail.status === "SKIPPED"
+                    ? "Step Skipped"
+                    : "Skip Step"}
+            </Button>
+          </div>
+
+          {/* FEEDBACK */}
+          <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-app-text">
+              <MessageSquareCheck className="h-4 w-4 text-app-brand" />
+              Feedback
+            </h3>
+            {feedbackSubmitted ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-sm text-app-text-muted">
+                  {feedbackHelpful ? (
+                    <ThumbsUp className="h-4 w-4 text-app-success-solid" />
+                  ) : (
+                    <ThumbsDown className="h-4 w-4 text-app-danger-solid" />
+                  )}
+                  <span>{feedbackHelpful ? "Marked as helpful" : "Marked as not helpful"}</span>
+                </div>
+                {feedbackComment && (
+                  <p className="rounded-xl bg-app-surface-muted p-3 text-sm text-app-text">
+                    {feedbackComment}
+                  </p>
+                )}
+                <button
+                  onClick={() => setFeedbackSubmitted(false)}
+                  className="text-left text-xs text-app-text-muted transition-all hover:text-app-text"
+                >
+                  Edit feedback
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2">
+                  <button
+                    onClick={() => setFeedbackHelpful(true)}
+                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                      feedbackHelpful === true
+                        ? "border-app-success-border bg-app-success-bg text-app-success-text"
+                        : "border-app-border text-app-text-muted hover:border-app-brand-border-strong"
+                    }`}
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                    Helpful
+                  </button>
+                  <button
+                    onClick={() => setFeedbackHelpful(false)}
+                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                      feedbackHelpful === false
+                        ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
+                        : "border-app-border text-app-text-muted hover:border-app-brand-border-strong"
+                    }`}
+                  >
+                    <ThumbsDown className="h-4 w-4" />
+                    Not helpful
+                  </button>
+                </div>
+                <Textarea
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  placeholder="Tell us what worked or what was missing..."
+                  aria-label="Feedback comment"
+                  minRows={3}
+                  maxRows={10}
+                />
+                <Button
+                  variant="primary"
+                  onClick={() => void submitFeedback()}
+                  disabled={feedbackHelpful === null || !feedbackComment.trim()}
+                  loading={feedbackLoading}
+                  className="mt-3"
+                >
+                  {feedbackLoading ? "Submitting..." : "Submit feedback"}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </PageShell>
   );
 }

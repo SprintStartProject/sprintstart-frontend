@@ -627,14 +627,6 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-app-text-muted">Loading team member...</p>
-      </div>
-    );
-  }
-
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
       void navigate(-1);
@@ -643,19 +635,48 @@ export function TeamMemberDetailPage() {
     }
   }
 
+  // Loading and not-found share the same header/main shell as the success render below —
+  // the header's *content* is necessarily minimal until the member is fetched (it presents
+  // that person, not a static title), but the band itself never disappears and reappears.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-app-bg">
+        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <button
+              onClick={goBack}
+              className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          </div>
+        </header>
+        <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
+          <div className="flex min-h-96 items-center justify-center">
+            <p className="text-sm text-app-text-muted">Loading team member...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen bg-app-bg">
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <button
-            onClick={goBack}
-            className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-
-          <div className="mt-6 rounded-3xl border border-app-border bg-app-surface p-8">
+        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <button
+              onClick={goBack}
+              className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          </div>
+        </header>
+        <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-app-border bg-app-surface p-8">
             <p className="text-sm text-app-text">Team member not found.</p>
           </div>
         </main>
