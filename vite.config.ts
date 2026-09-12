@@ -1,4 +1,5 @@
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import { keycloakify } from "keycloakify/vite-plugin";
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
@@ -42,5 +43,14 @@ export default defineConfig({
     // parallel. The default 5s bounds machine load rather than the code under test, so a
     // busy runner fails whichever file happens to be scheduled last.
     testTimeout: 30000,
+    alias: {
+      // Every test's `render` gets a QueryClientProvider for free, without touching the
+      // ~230 files that import it directly — see tests/unit/setup/rtl.tsx. The trailing
+      // "$" is load-bearing: an exact-match alias, so rtl.tsx's own deep import of the
+      // real package (".../dist/index.js") doesn't loop back into this alias.
+      "@testing-library/react$": fileURLToPath(
+        new URL("./tests/unit/setup/rtl.tsx", import.meta.url),
+      ),
+    },
   },
 });

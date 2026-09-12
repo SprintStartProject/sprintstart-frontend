@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./services/queryClient";
 import { AppRouter } from "./router/AppRouter";
 import { SideBar } from "./components/layout/SideBar";
 import { AuthProvider } from "./context/AuthProvider";
@@ -141,35 +143,38 @@ function App() {
   // depends on the authenticated user's permission group.
   return (
     <ThemeProvider>
-      {/* Outermost app-level provider (just inside theme, so cards pick up
-          light/dark): toasts must be reachable from every page, signed in or
-          not, and must outlive route changes. */}
-      <ToastProvider>
-        <AuthProvider>
-          <ProjectProvider>
-            <ChatProvider>
-              {/* Inside ProjectProvider: what a user owns is asked per selected project, and
-                  above the router so the owner announcement can appear on any page. */}
-              <MyKnowledgeGapsProvider>
-                {/* Inside AuthProvider: the launch sequence is triggered
-                              by the user becoming authenticated. */}
-                <MomentsProvider>
-                  {/* Inside the router's providers and outside the router itself: the shell has to
-                      read the flag a page sets, and both live under this. */}
-                  <FocusModeProvider>
-                    {/* Inside ProjectProvider, which it reads the project id from, and outside the
-                        router, because the toolbar that makes a highlight is mounted out here too —
-                        the board page under it lends its cards in. */}
-                    <CardMarksProvider>
-                      <AppContent />
-                    </CardMarksProvider>
-                  </FocusModeProvider>
-                </MomentsProvider>
-              </MyKnowledgeGapsProvider>
-            </ChatProvider>
-          </ProjectProvider>
-        </AuthProvider>
-      </ToastProvider>
+      {/* Outermost data provider, just inside theme: every provider below reads or
+          writes through the query cache, including AuthProvider on logout. */}
+      <QueryClientProvider client={queryClient}>
+        {/* Toasts must be reachable from every page, signed in or not, and must
+            outlive route changes. */}
+        <ToastProvider>
+          <AuthProvider>
+            <ProjectProvider>
+              <ChatProvider>
+                {/* Inside ProjectProvider: what a user owns is asked per selected project, and
+                    above the router so the owner announcement can appear on any page. */}
+                <MyKnowledgeGapsProvider>
+                  {/* Inside AuthProvider: the launch sequence is triggered
+                                by the user becoming authenticated. */}
+                  <MomentsProvider>
+                    {/* Inside the router's providers and outside the router itself: the shell has to
+                        read the flag a page sets, and both live under this. */}
+                    <FocusModeProvider>
+                      {/* Inside ProjectProvider, which it reads the project id from, and outside the
+                          router, because the toolbar that makes a highlight is mounted out here too —
+                          the board page under it lends its cards in. */}
+                      <CardMarksProvider>
+                        <AppContent />
+                      </CardMarksProvider>
+                    </FocusModeProvider>
+                  </MomentsProvider>
+                </MyKnowledgeGapsProvider>
+              </ChatProvider>
+            </ProjectProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

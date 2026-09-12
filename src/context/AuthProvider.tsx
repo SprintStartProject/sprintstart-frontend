@@ -4,6 +4,7 @@ import { userService } from "../services/userService";
 import type { UserProfile } from "../services/types";
 import { AuthContext, type AuthStatus, type LoginOptions } from "./AuthContext";
 import keycloak from "../config/keycloak";
+import { queryClient } from "../services/queryClient";
 import { markSigningOut } from "../bootSplash";
 import { buildRedirectUri, clearRedirectTarget, storeRedirectTarget } from "../auth/redirectUtils";
 /**
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // what stops the boot splash starting a launch for somebody leaving.
     markSigningOut();
     clearRedirectTarget();
+    queryClient.clear();
     await keycloak.logout({ redirectUri: `${window.location.origin}/login` });
   };
 
