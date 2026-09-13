@@ -22,6 +22,14 @@
  * anybody meant to ask. And a future context-reference feature, where the buddy is handed a
  * *pointer* to material and fetches it, is a different mechanism under different rules; nothing
  * here licenses it.
+ *
+ * The same line separates what the attribution may say. **Where the hire was is part of their
+ * question; a URL for the buddy to follow is not.** "From the deployment guide" is the hire
+ * telling the buddy what they were reading, which is exactly what makes the difference between
+ * *"what does this mean"* answered in the abstract and answered about this project's deployment
+ * guide. An in-app path with a text fragment on the end would be a pointer the buddy cannot
+ * follow and has no business being handed — so {@link CapturedSelection.source} goes in and
+ * {@link CapturedSelection.origin} stays out.
  */
 
 import type { CapturedSelection } from "../board/selection/selectionCapture";
@@ -36,21 +44,29 @@ import type { CapturedSelection } from "../board/selection/selectionCapture";
 export const QUOTE_LIMIT = 600;
 
 /**
- * The draft a selection becomes: the words as a markdown quote, then an empty line for the
- * question.
+ * The draft a selection becomes: the words as a markdown quote, where they were found, then an
+ * empty line for the question.
  *
  * A blockquote rather than plain text, because the transcript renders markdown and the hire should
- * be able to see at a glance which half of their own message they wrote. One line is all this ever
+ * be able to see at a glance which part of their own message they wrote. One line is all this ever
  * has to prefix: `captureSelection` collapses whitespace runs on the way in, so a drag across four
- * paragraphs arrives here as one — which is also what makes the quote survive being pasted into a
- * composer that submits on Enter.
+ * paragraphs arrives here as one.
+ *
+ * `From <place>` under it, in the same words and the same shape the board's notes use
+ * (`board/generation/noteComposition.ts`) — the nearest heading the hire passed on the way down,
+ * or the page's title when there was none. Two surfaces asking the same question of a selection
+ * should not answer it differently, and a hire who does not want the line can delete it, because
+ * nothing has been sent.
  *
  * The trailing blank line is where the caret ends up, and it is the whole reason nothing is sent
  * from here: the hire almost always wants to add *"what does this mean"* or *"is this still true"*
  * to it, and a message that left without them is a message they did not ask.
  */
-export function quoteFromSelection(selection: Pick<CapturedSelection, "text">): string {
-  return `> ${clamp(selection.text.trim(), QUOTE_LIMIT)}\n\n`;
+export function quoteFromSelection(selection: Pick<CapturedSelection, "text" | "source">): string {
+  const quote = `> ${clamp(selection.text.trim(), QUOTE_LIMIT)}`;
+  const from = selection.source?.trim();
+
+  return `${[quote, from && `From ${from}`].filter(Boolean).join("\n\n")}\n\n`;
 }
 
 /**
