@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookmarkPlus, Eraser, Highlighter } from "lucide-react";
+import { BookmarkPlus, Eraser, Highlighter, MessageCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -8,6 +8,8 @@ import { boardService } from "../../../services/boardService";
 import { rememberOrigin } from "../layout/cardOrigins";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
+import { openAiBuddy } from "../../buddy/aiBuddyBus";
+import { quoteFromSelection } from "../../buddy/quoteFromSelection";
 import { cardFor } from "./selectionCapture";
 import { useTextSelection } from "./useTextSelection";
 
@@ -26,7 +28,14 @@ const TOOLBAR_HEIGHT = 44;
  * remembering to come back for it, or nobody does.
  *
  * Deliberately does not navigate. Being pulled to `/board` to confirm something landed is exactly
- * the interruption this exists to avoid; the toast carries the way there for whoever wants it.
+ * the interruption this exists to avoid; the toast carries the way there for whoever wants it. The
+ * same holds for the second offer: asking the buddy opens the dock over the page rather than going
+ * to `/buddy`, because what the question is about is what is on screen.
+ *
+ * **Two things to do with found text, and they are not the same thing.** Keeping it is for text
+ * that will matter later; asking about it is for text that does not make sense now. Offering only
+ * the first made the board the answer to both, and a hire who did not understand a sentence filed
+ * it instead of asking about it.
  */
 export function SelectionActions() {
   const { selection, clear } = useTextSelection();
@@ -65,6 +74,23 @@ export function SelectionActions() {
       setSaving(false);
     }
   }, [selection, selectedProjectId, toast, navigate, clear]);
+
+  /**
+   * Hands the selection to the buddy as a quote, unsent.
+   *
+   * Nothing is awaited and nothing can fail: the bus is a `CustomEvent`, the dock is already
+   * mounted, and the draft is state. So the selection is cleared straight away — the words are in
+   * the composer now, and a toolbar still floating over them invites sending them twice.
+   *
+   * See `buddy/quoteFromSelection.ts` for why a quote the hire has not sent yet is the hire
+   * speaking rather than the frontend speaking for them.
+   */
+  const ask = useCallback(() => {
+    if (!selection) return;
+
+    openAiBuddy({ draft: quoteFromSelection(selection) });
+    clear();
+  }, [selection, clear]);
 
   // Nothing to keep, or nowhere to keep it. A hire on no project has no board, and an offer that
   // can only fail is worse than no offer.
@@ -199,6 +225,18 @@ export function SelectionActions() {
             icon={<BookmarkPlus className="h-4 w-4" />}
           >
             Add to board
+          </Button>
+          <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
+          {/* Second, not first. Keeping is the offer that was always here and the one a hire
+              reaches for without thinking; asking is the one they reach for having read something
+              twice. Putting it left of the familiar button would have moved the familiar button. */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={ask}
+            icon={<MessageCircle className="h-4 w-4" />}
+          >
+            Ask the buddy
           </Button>
         </div>
       )}
