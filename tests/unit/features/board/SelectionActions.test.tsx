@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SelectionActions } from "../../../../src/features/board/selection/SelectionActions";
 import { boardService } from "../../../../src/services/boardService";
 import { ChatContext, type ChatContextValue } from "../../../../src/context/ChatContext";
+import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -24,6 +25,8 @@ const mockQuoteSelection = vi.fn();
 const mockChatContext = {
   quoteSelection: mockQuoteSelection,
 } as unknown as ChatContextValue;
+
+vi.mock("../../../../src/features/buddy/aiBuddyBus", () => ({ openAiBuddy: vi.fn() }));
 
 /**
  * The toolbar, at the level a hire meets it: highlight something, press the button, and find out
@@ -187,5 +190,59 @@ describe("SelectionActions", () => {
 
     expect(await screen.findByRole("button", { name: /reply/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add to board/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * The second half of the toolbar: text that does not make sense now, as opposed to text that
+   * will matter later. What the quote itself looks like is covered in
+   * `buddy/quoteFromSelection.test.ts`.
+   */
+  describe("asking the buddy", () => {
+    it("offers to ask about a selection alongside keeping it", async () => {
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      expect(await screen.findByRole("button", { name: /ask the buddy/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /add to board/i })).toBeInTheDocument();
+    });
+
+    /**
+     * The dock is opened through the bus rather than by navigating, and it does not matter
+     * whether it was open: the bus opens a closed dock and seeds an open one the same way, which
+     * is what lets this work from any page. `buddy/useBuddy.test.tsx` covers that end.
+     */
+    it("hands the selection to the buddy as an unsent quote", async () => {
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      expect(openAiBuddy).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
+        draft: "> The migration runs on deploy.\n\n",
+      });
+    });
+
+    /** Asking is not filing. A hire who wanted the card would have pressed the other button. */
+    it("does not put the selection on the board", async () => {
+      const addCard = vi.spyOn(boardService, "addCard").mockResolvedValue({} as never);
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      expect(addCard).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    /** The words are in the composer now; a toolbar still over them invites sending them twice. */
+    it("takes the toolbar down once the quote is handed over", async () => {
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      await waitFor(() => expect(screen.queryByRole("toolbar")).not.toBeInTheDocument());
+    });
   });
 });

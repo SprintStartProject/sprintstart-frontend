@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import { BuddyProviderWithStubs } from "./buddyTestHarness";
+import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -168,6 +169,47 @@ describe("useBuddy", () => {
       expect(result.current.messages.at(-1)?.content).toBe("Here is a good first task.");
     });
     expect(result.current.messages.at(-1)?.actions ?? []).toHaveLength(0);
+  });
+
+  /**
+   * The case every surface that seeds a draft depends on: the hire was not in the dock when they
+   * pressed the button. A seed that only landed in an already-open dock would make "Ask the
+   * buddy" on a selection do nothing visible from most of the app.
+   */
+  it("opens a closed dock and seeds the composer", async () => {
+    server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    expect(result.current.isOpen).toBe(false);
+
+    act(() => {
+      openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
+    });
+
+    await waitFor(() => expect(result.current.isOpen).toBe(true));
+    expect(result.current.draft).toBe("> The migration runs on deploy.\n\n");
+  });
+
+  /** Seeded, never sent: the question the hire is about to type is the point of the message. */
+  it("does not send what it was handed", async () => {
+    let sent = false;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => {
+        sent = true;
+        return silentGreeting();
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+    act(() => {
+      openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
+    });
+
+    await waitFor(() => expect(result.current.isOpen).toBe(true));
+    expect(sent).toBe(false);
+    expect(result.current.messages).toHaveLength(0);
   });
 
   it("toggles open state", () => {
