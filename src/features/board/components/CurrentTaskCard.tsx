@@ -12,6 +12,8 @@ type CurrentTaskCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /** Told when the hire makes a checklist out of this task, so the board can re-read itself. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -30,7 +32,13 @@ type CurrentTaskCardProps = {
  * and where to go next, and the buddy question is repointed at picking a new one. Silently
  * dropping the card would leave the hire still thinking this is their goal.
  */
-export function CurrentTaskCard({ content, card, onDismiss, dismissing }: CurrentTaskCardProps) {
+export function CurrentTaskCard({
+  content,
+  card,
+  onDismiss,
+  dismissing,
+  onCardAdded,
+}: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
   const closed = hasTask && content.closedAtSource;
   // A live card, so its highlights are matched by their words rather than written into the text —
@@ -101,7 +109,12 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
           `generation/taskChecklist.ts`. */}
       {hasTask && content.title && (
         <div className="mt-3">
-          <AddTaskToBoard title={content.title} summary={content.summary} url={content.url} />
+          <AddTaskToBoard
+            title={content.title}
+            summary={content.summary}
+            url={content.url}
+            onAdded={onCardAdded}
+          />
         </div>
       )}
 

@@ -415,6 +415,15 @@ type BoardGridProps = {
    * `layout/cardOrigins.ts`, including the note about wanting this on the wire instead.
    */
   cardOrigins?: CardOrigins;
+  /**
+   * Told when a card made *from* a card on this board has landed — a checklist broken out of a
+   * task, today the only case.
+   *
+   * Separate from `onEdit` and `onDismiss` because it is not a change to a card the grid is
+   * holding: it is a new card appearing, which only a re-read can show. Without it the write goes
+   * through, the toast says so, and the board keeps drawing what it read before the press.
+   */
+  onCardAdded?: () => void;
 };
 
 type SharedProps = {
@@ -423,6 +432,8 @@ type SharedProps = {
   dismissing: boolean;
   /** Where this card came from, for the kinds that can have been found somewhere. */
   origin?: CardOrigin | null;
+  /** Told when this card made another one — see `BoardGridProps.onCardAdded`. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -436,6 +447,7 @@ function BoardCardView({
   card,
   onEdit,
   origin,
+  onCardAdded,
   ...shared
 }: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
   // Only the authored kinds take an origin — all three of them now, since a checklist minted from
@@ -451,9 +463,9 @@ function BoardCardView({
     case "OPEN_PULL_REQUESTS":
       return <OpenPullRequestsCard content={card.content} {...props} />;
     case "CURRENT_TASK":
-      return <CurrentTaskCard content={card.content} {...props} />;
+      return <CurrentTaskCard content={card.content} onCardAdded={onCardAdded} {...props} />;
     case "SUGGESTED_TASKS":
-      return <SuggestedTasksCard content={card.content} {...props} />;
+      return <SuggestedTasksCard content={card.content} onCardAdded={onCardAdded} {...props} />;
     case "COMPETENCY_PROGRESS":
       return <CompetencyProgressCard content={card.content} {...props} />;
     case "MEMORY_RECAP":
@@ -533,6 +545,7 @@ export function BoardGrid({
   cardSizes,
   cardOrigins,
   onResizeCard,
+  onCardAdded,
 }: BoardGridProps) {
   const wideEnough = useMediaQuery(TWO_COLUMN_QUERY);
 
@@ -1013,6 +1026,7 @@ export function BoardGrid({
         }
         size={sizeOf(cardSizes, card.id)}
         origin={originOf(cardOrigins, card.id)}
+        onCardAdded={onCardAdded}
         onResize={onResizeCard ? (next) => onResizeCard(card.id, next) : undefined}
       />
     );
@@ -1341,6 +1355,8 @@ type BoardCardCellProps = {
   stack?: CardStack;
   /** Where this card came from, passed through to the kinds that show it. */
   origin?: CardOrigin | null;
+  /** Passed through to the kinds that can make a card — see `BoardGridProps.onCardAdded`. */
+  onCardAdded?: () => void;
   onToggleStack?: (rootId: string) => void;
   /** Opens the pile and brings one member into view. Absent when the pile cannot be opened. */
   onRevealMember?: (cardId: string) => void;
@@ -1394,6 +1410,7 @@ function BoardCardCell({
   onSetPredecessor,
   stack,
   origin,
+  onCardAdded,
   onToggleStack,
   onRevealMember,
   size,
@@ -1791,6 +1808,7 @@ function BoardCardCell({
               dismissing={dismissing}
               onEdit={onEdit}
               origin={origin}
+              onCardAdded={onCardAdded}
             />
           </BoardCardContext.Provider>
         </motion.div>

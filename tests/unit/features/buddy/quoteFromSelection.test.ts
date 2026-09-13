@@ -9,7 +9,7 @@ import { QUOTE_LIMIT, quoteFromSelection } from "../../../../src/features/buddy/
  */
 describe("quoteFromSelection", () => {
   /** A selection found somewhere the capture could not name — no heading, no page title. */
-  const nowhere = (text: string) => ({ text, source: null });
+  const nowhere = (text: string) => ({ text, source: null, page: null });
 
   it("quotes the selection", () => {
     expect(quoteFromSelection(nowhere("The migration runs on deploy."))).toMatch(
@@ -54,27 +54,62 @@ describe("quoteFromSelection", () => {
    * Where the hire was is part of what they are asking. The same sentence the board writes onto a
    * note made from the same selection — one question about a selection, one answer to it.
    */
+  /**
+   * The buddy cannot open a page — it searches this project's material by words. So the point of
+   * this block is that the line reads as two searchable phrases, not that it reads nicely.
+   */
   describe("where it was found", () => {
-    it("says where the selection came from", () => {
+    it("names the part and the page it was on", () => {
       expect(
         quoteFromSelection({
           text: "The migration runs on deploy.",
-          source: "the deployment guide",
+          source: "Acceptance Criteria",
+          page: "Fix the login redirect",
         }),
-      ).toBe("> The migration runs on deploy.\n\nFrom the deployment guide\n\n");
+      ).toBe(
+        "> The migration runs on deploy.\n\nFrom Acceptance Criteria, on Fix the login redirect\n\n",
+      );
+    });
+
+    /**
+     * `source` already falls back to the page title when there is no heading, so the two arrive
+     * equal as often as not. Saying it twice reads as a stutter, not as precision.
+     */
+    it("says it once when the heading is the page's own name", () => {
+      expect(
+        quoteFromSelection({
+          text: "Run it twice.",
+          source: "Deployment guide",
+          page: "Deployment guide",
+        }),
+      ).toBe("> Run it twice.\n\nFrom Deployment guide\n\n");
+    });
+
+    it("names the page alone when nothing above the selection was a heading", () => {
+      expect(
+        quoteFromSelection({ text: "Run it twice.", source: null, page: "Deployment guide" }),
+      ).toContain("From Deployment guide");
+    });
+
+    it("names the heading alone when the document has no title", () => {
+      expect(
+        quoteFromSelection({ text: "Run it twice.", source: "Deployment", page: null }),
+      ).toContain("From Deployment");
     });
 
     /** Still an empty line at the end: the question goes after the attribution, not before it. */
     it("leaves the caret under the attribution", () => {
-      expect(quoteFromSelection({ text: "Run it twice.", source: "Deployment" })).toMatch(/\n\n$/);
+      expect(
+        quoteFromSelection({ text: "Run it twice.", source: "Deployment", page: "Runbook" }),
+      ).toMatch(/\n\n$/);
     });
 
     it("says nothing when the capture could not name the place", () => {
-      expect(quoteFromSelection({ text: "Run it twice.", source: null })).not.toContain("From");
+      expect(quoteFromSelection(nowhere("Run it twice."))).not.toContain("From");
     });
 
     it("says nothing rather than 'From' with a blank after it", () => {
-      expect(quoteFromSelection({ text: "Run it twice.", source: "   " })).toBe(
+      expect(quoteFromSelection({ text: "Run it twice.", source: "   ", page: "  " })).toBe(
         "> Run it twice.\n\n",
       );
     });

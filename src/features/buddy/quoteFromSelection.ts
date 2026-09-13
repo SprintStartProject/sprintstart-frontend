@@ -24,12 +24,16 @@
  * here licenses it.
  *
  * The same line separates what the attribution may say. **Where the hire was is part of their
- * question; a URL for the buddy to follow is not.** "From the deployment guide" is the hire
- * telling the buddy what they were reading, which is exactly what makes the difference between
- * *"what does this mean"* answered in the abstract and answered about this project's deployment
- * guide. An in-app path with a text fragment on the end would be a pointer the buddy cannot
- * follow and has no business being handed — so {@link CapturedSelection.source} goes in and
- * {@link CapturedSelection.origin} stays out.
+ * question; a URL for the buddy to follow is not.** The buddy has no tool that opens a page — what
+ * it has is `search_canonical_answers`, which takes *words* and searches this project's own
+ * material. So the attribution is written to be searchable rather than clickable: an in-app path
+ * with a text fragment on the end is a pointer nothing on the other end can follow, while
+ * "Acceptance Criteria, on Fix the login redirect" is two phrases the buddy can go and read the
+ * rest of. That is also where the issue draws the line — handing the buddy a reference it resolves
+ * itself is the context-reference mechanism, a different feature under different rules.
+ *
+ * Hence both halves of where it was found: the heading says which part, the page title says which
+ * page, and either on its own can send the search after the wrong thing. `origin` stays out.
  */
 
 import type { CapturedSelection } from "../board/selection/selectionCapture";
@@ -52,21 +56,39 @@ export const QUOTE_LIMIT = 600;
  * has to prefix: `captureSelection` collapses whitespace runs on the way in, so a drag across four
  * paragraphs arrives here as one.
  *
- * `From <place>` under it, in the same words and the same shape the board's notes use
- * (`board/generation/noteComposition.ts`) — the nearest heading the hire passed on the way down,
- * or the page's title when there was none. Two surfaces asking the same question of a selection
- * should not answer it differently, and a hire who does not want the line can delete it, because
- * nothing has been sent.
+ * `From <place>` under it, opening with the same word the board's notes use
+ * (`board/generation/noteComposition.ts`), so a hire who keeps a selection and a hire who asks
+ * about one read the same sentence. Both halves when they differ — *"From Acceptance Criteria, on
+ * Fix the login redirect"* — and one when the heading is all there is, or is the page's own name
+ * anyway. A hire who does not want the line deletes it, because nothing has been sent.
  *
  * The trailing blank line is where the caret ends up, and it is the whole reason nothing is sent
  * from here: the hire almost always wants to add *"what does this mean"* or *"is this still true"*
  * to it, and a message that left without them is a message they did not ask.
  */
-export function quoteFromSelection(selection: Pick<CapturedSelection, "text" | "source">): string {
+export function quoteFromSelection(
+  selection: Pick<CapturedSelection, "text" | "source" | "page">,
+): string {
   const quote = `> ${clamp(selection.text.trim(), QUOTE_LIMIT)}`;
-  const from = selection.source?.trim();
 
-  return `${[quote, from && `From ${from}`].filter(Boolean).join("\n\n")}\n\n`;
+  return `${[quote, whereFrom(selection)].filter(Boolean).join("\n\n")}\n\n`;
+}
+
+/**
+ * The attribution line, or null when the capture could not name anywhere.
+ *
+ * `source` already falls back to the page title when there was no heading above the selection, so
+ * the two arrive equal as often as not — saying it twice would read as a stutter, not as
+ * precision.
+ */
+function whereFrom(selection: Pick<CapturedSelection, "source" | "page">): string | null {
+  const heading = selection.source?.trim() || null;
+  const page = selection.page?.trim() || null;
+
+  if (!heading) return page && `From ${page}`;
+  if (!page || page === heading) return `From ${heading}`;
+
+  return `From ${heading}, on ${page}`;
 }
 
 /**

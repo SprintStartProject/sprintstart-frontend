@@ -12,6 +12,8 @@ type SuggestedTasksCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /** Told when the hire makes a checklist out of one of these, so the board can re-read itself. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -30,6 +32,7 @@ export function SuggestedTasksCard({
   card,
   onDismiss,
   dismissing,
+  onCardAdded,
 }: SuggestedTasksCardProps) {
   // Matched by their words: this list is re-ranked on every board read, so a highlight cannot be
   // pinned to a position. A reason the hire marked stays marked while it is still being given.
@@ -80,7 +83,7 @@ export function SuggestedTasksCard({
                   label="I want to work on this"
                 />
                 <div className="mt-3">
-                  <AddTaskToBoard title={task.title} url={task.url} />
+                  <AddTaskToBoard title={task.title} url={task.url} onAdded={onCardAdded} />
                 </div>
               </div>
               {task.reasons.length > 0 && (
