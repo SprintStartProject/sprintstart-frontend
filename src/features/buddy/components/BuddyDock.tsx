@@ -13,6 +13,8 @@ import { BookmarkPlus } from "lucide-react";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
 import { buddyReplyNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import { BUDDY_ACTION_PLACE_CHECKLIST } from "../types";
+import type { BuddyMessageView } from "../types";
 
 /**
  * The hand-off to `/buddy`, in seconds, in two parts.
@@ -294,9 +296,15 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
-            renderReplyAction={(reply) => (
+            renderReplyAction={(reply, message) => (
               <div className="flex flex-wrap items-center gap-1">
-                <SaveReplyToBoard content={reply} />
+                {/* Not beside a list the mentor has already offered to keep. A reply with a
+                    `place_checklist` proposal on it carries two ways to keep the same thing, and
+                    they do not agree: the proposal is the steps as the mentor chose them, this one
+                    is every markdown bullet in the reply scraped flat — so a structured answer
+                    would come back as one list of five and one of twenty. The mentor's is the
+                    curated one, so it wins and this stands down. */}
+                {!offersChecklist(message) && <SaveReplyToBoard content={reply} />}
                 {/* Icon-only here and worded on the page. The dock is a narrow column beside
                     whatever the hire was actually doing, and a second worded button in it wraps to
                     its own line — the same control, sized for where it is. */}
@@ -368,5 +376,12 @@ export function BuddyDock({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/** Whether the mentor has already offered to keep a list out of this reply. */
+function offersChecklist(message: BuddyMessageView): boolean {
+  return (message.actions ?? []).some(
+    (action) => action.action === BUDDY_ACTION_PLACE_CHECKLIST && action.status !== "dismissed",
   );
 }

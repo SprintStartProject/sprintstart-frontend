@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BUDDY_ACTION_PLACE_CHECKLIST } from "../types";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
@@ -139,13 +140,19 @@ export function BuddyConversation({
           )}
 
           <BuddyThread
-            renderReplyAction={(reply) => (
+            renderReplyAction={(reply, message) => (
               <div className="flex flex-wrap items-center gap-1">
                 {/* Two different things, and the order says which is the better one. A list the
                     buddy wrote becomes a checklist you can tick; anything else can still be kept,
                     but only as the words it was. `SaveReplyToBoard` draws nothing when the reply
                     holds no list, so most replies show one button. */}
-                <SaveReplyToBoard content={reply} />
+                {/* Not beside a list the mentor has already offered to keep. A reply with a
+                    `place_checklist` proposal on it carries two ways to keep the same thing, and
+                    they do not agree: the proposal is the steps as the mentor chose them, this one
+                    is every markdown bullet in the reply scraped flat — so a structured answer
+                    would come back as one list of five and one of twenty. The mentor's is the
+                    curated one, so it wins and this stands down. */}
+                {!offersChecklist(message) && <SaveReplyToBoard content={reply} />}
                 <SaveToBoard
                   request={() => buddyReplyNote(reply)}
                   label="Keep this answer"
@@ -188,5 +195,12 @@ export function BuddyConversation({
         </div>
       </div>
     </>
+  );
+}
+
+/** Whether the mentor has already offered to keep a list out of this reply. */
+function offersChecklist(message: BuddyMessageView): boolean {
+  return (message.actions ?? []).some(
+    (action) => action.action === BUDDY_ACTION_PLACE_CHECKLIST && action.status !== "dismissed",
   );
 }

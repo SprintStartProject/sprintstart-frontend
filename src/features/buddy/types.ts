@@ -17,6 +17,15 @@ export type ProposedActionStatus = "idle" | "confirming" | "resolved" | "error" 
  */
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
+/**
+ * The backend's `place_checklist` action: the mentor offering to keep a list it just wrote.
+ *
+ * Named here because two surfaces have to recognise it — the proposal draws the lines it would
+ * keep, and the reply's own "keep this list" button stands down beside it rather than offering a
+ * second, flatter version of the same thing.
+ */
+export const BUDDY_ACTION_PLACE_CHECKLIST = "place_checklist";
+
 export type ProposedAction = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
