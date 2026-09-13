@@ -151,6 +151,26 @@ describe("SelectionActions", () => {
       });
     });
 
+    /**
+     * The same attribution the board writes onto a note made from the same words. Without it the
+     * buddy answers "what does this mean" about nothing in particular, which is the answer a hire
+     * could have got without highlighting anything.
+     */
+    it("tells the buddy where the hire was reading", async () => {
+      const heading = document.createElement("h2");
+      heading.textContent = "Deploying a change";
+      document.body.appendChild(heading);
+
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
+        draft: "> The migration runs on deploy.\n\nFrom Deploying a change\n\n",
+      });
+    });
+
     /** Asking is not filing. A hire who wanted the card would have pressed the other button. */
     it("does not put the selection on the board", async () => {
       const addCard = vi.spyOn(boardService, "addCard").mockResolvedValue({} as never);
