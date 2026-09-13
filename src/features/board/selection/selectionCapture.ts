@@ -19,6 +19,16 @@ export type CapturedSelection = {
   /** Where in the app it came from, in words. Null when nothing better than the app name exists. */
   source: string | null;
   /**
+   * The page the selection was on, by its title, independent of {@link source}.
+   *
+   * Kept apart because the two answer different questions and a reader usually wants both: the
+   * heading says which part, the title says which page, and "the bit under Acceptance Criteria" on
+   * its own could be any task in the system. `source` already falls back to this when there is no
+   * heading, so the two are equal as often as not — a caller showing both has to say so only when
+   * they differ.
+   */
+  page: string | null;
+  /**
    * Where in the app it came from, as something you can click.
    *
    * An in-app path plus a text fragment naming the selected words, so the card this becomes can
@@ -72,6 +82,7 @@ export function captureSelection(selection: Selection | null): CapturedSelection
     text,
     url: linkFor(anchor, text),
     source: sourceFor(anchor),
+    page: pageTitle(),
     origin: originUrl(window.location, text),
     cardId: elementOf(anchor)?.closest("[data-card-id]")?.getAttribute("data-card-id") ?? null,
     inLink: Boolean(elementOf(anchor)?.closest("a")),
@@ -148,8 +159,14 @@ function httpUrl(candidate: string): string | null {
  */
 function sourceFor(node: Node): string | null {
   const heading = nearestHeadingAbove(node);
-  if (heading) return heading;
-  const title = document.title.trim();
+
+  return heading ?? pageTitle();
+}
+
+/** The page's own name, or null when the document has not got one. */
+function pageTitle(): string | null {
+  const title = normalise(document.title);
+
   return title.length > 0 ? title : null;
 }
 

@@ -15,7 +15,8 @@ vi.mock("../../../../src/context/useToast", () => ({ useToast: () => toast }));
 
 /**
  * The offer as a hire meets it on a task card. What the card's *lines* end up being is decided in
- * `taskChecklist.test.ts`; this is about the request going out and the trail back being kept.
+ * `taskChecklist.test.ts`; this is about what the button says, the request going out, and the trail
+ * back being kept.
  */
 describe("AddTaskToBoard", () => {
   beforeEach(() => {
@@ -24,11 +25,24 @@ describe("AddTaskToBoard", () => {
     window.localStorage.clear();
   });
 
+  const press = () => userEvent.click(screen.getByRole("button", { name: /checklist/i }));
+
+  /**
+   * It does not say "add to my board", and that is the point. On the current-task card — which is
+   * on the board by definition — an offer to add it there looked already done. What this makes is
+   * the thing the task card cannot be.
+   */
+  it("says what it makes, not where it goes", () => {
+    render(<AddTaskToBoard title="Fix the login redirect" />);
+
+    expect(screen.getByRole("button", { name: "Break this into a checklist" })).toBeInTheDocument();
+  });
+
   it("mints a checklist the hire owns", async () => {
     const addCard = vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
-    render(<AddTaskToBoard title="Fix the login redirect" summary="- Reproduce it\n- Fix it" />);
+    render(<AddTaskToBoard title="Fix the login redirect" summary={"- Reproduce it\n- Fix it"} />);
 
-    await userEvent.click(screen.getByRole("button", { name: /add to my board/i }));
+    await press();
 
     await waitFor(() => expect(addCard).toHaveBeenCalledOnce());
     expect(addCard.mock.calls[0][0]).toBe("p1");
@@ -38,12 +52,51 @@ describe("AddTaskToBoard", () => {
     });
   });
 
+  /**
+   * The board is what the hire is looking at, and a card it has not re-read is a card that is on
+   * the server and not on their screen. Without this the write lands silently.
+   */
+  it("tells the board to re-read itself once the card is really there", async () => {
+    vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
+    const onAdded = vi.fn();
+    render(<AddTaskToBoard title="Fix the login redirect" onAdded={onAdded} />);
+
+    await press();
+
+    await waitFor(() => expect(onAdded).toHaveBeenCalledOnce());
+  });
+
+  it("does not tell the board anything when the write failed", async () => {
+    vi.spyOn(boardService, "addCard").mockRejectedValue(new Error("nope"));
+    const onAdded = vi.fn();
+    render(<AddTaskToBoard title="Fix the login redirect" onAdded={onAdded} />);
+
+    await press();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onAdded).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The card lands in front of them. A button still reading "on your board" beside the card it
+   * made is a hint about something they can see, which reads as the button being stuck.
+   */
+  it("keeps saying the same thing after a save", async () => {
+    vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
+    render(<AddTaskToBoard title="Fix the login redirect" />);
+
+    await press();
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Break this into a checklist" })).toBeInTheDocument();
+  });
+
   /** "Which task was this again" is what the working copy cannot answer on its own. */
   it("records the way back to the task", async () => {
     vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
     render(<AddTaskToBoard title="Fix the login redirect" url="https://example.test/issues/7" />);
 
-    await userEvent.click(screen.getByRole("button", { name: /add to my board/i }));
+    await press();
 
     await waitFor(() =>
       expect(readCardOrigins("p1").c1).toEqual({
@@ -58,7 +111,7 @@ describe("AddTaskToBoard", () => {
     vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
     render(<AddTaskToBoard title="Fix the login redirect" url={null} />);
 
-    await userEvent.click(screen.getByRole("button", { name: /add to my board/i }));
+    await press();
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
     expect(readCardOrigins("p1")).toEqual({});
@@ -68,10 +121,10 @@ describe("AddTaskToBoard", () => {
     vi.spyOn(boardService, "addCard").mockRejectedValue(new Error("nope"));
     render(<AddTaskToBoard title="Fix the login redirect" />);
 
-    await userEvent.click(screen.getByRole("button", { name: /add to my board/i }));
+    await press();
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(screen.getByRole("button", { name: /add to my board/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /checklist/i })).toBeInTheDocument();
   });
 
   /** A hire on no project has no board, and an offer that can only fail is worse than none. */

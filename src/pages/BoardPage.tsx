@@ -1226,6 +1226,10 @@ export function BoardPage() {
                   onDismiss={handleDismiss}
                   dismissingId={dismissingId}
                   onEdit={(cardId, request) => void editCard(cardId, request)}
+                  // A checklist broken out of a task is a *new* card, which only a re-read can
+                  // show. Without this the write lands and the board keeps drawing what it read
+                  // before the press.
+                  onCardAdded={refresh}
                   onReorder={handleReorder}
                   boardOrder={allCards.map((card) => card.id)}
                   isArranging={isArranging}

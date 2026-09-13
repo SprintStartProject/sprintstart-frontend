@@ -12,6 +12,8 @@ type CurrentTaskCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /** Told when the hire makes a checklist out of this task, so the board can re-read itself. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -25,7 +27,13 @@ type CurrentTaskCardProps = {
  * cleared would read as the board losing things, and "you have nothing on" is usually the thing
  * worth fixing.
  */
-export function CurrentTaskCard({ content, card, onDismiss, dismissing }: CurrentTaskCardProps) {
+export function CurrentTaskCard({
+  content,
+  card,
+  onDismiss,
+  dismissing,
+  onCardAdded,
+}: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
   // A live card, so its highlights are matched by their words rather than written into the text —
   // see `marks/cardMarks.ts`. The title and the summary are re-read from the tracker on every
@@ -82,7 +90,12 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
           `generation/taskChecklist.ts`. */}
       {hasTask && content.title && (
         <div className="mt-3">
-          <AddTaskToBoard title={content.title} summary={content.summary} url={content.url} />
+          <AddTaskToBoard
+            title={content.title}
+            summary={content.summary}
+            url={content.url}
+            onAdded={onCardAdded}
+          />
         </div>
       )}
 
