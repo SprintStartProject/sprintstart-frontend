@@ -45,11 +45,21 @@ export interface OnboardingStepSkip {
   reviewedAt: string | null;
 }
 
+/** Who put a step on a path — see the backend's `StepOrigin`. */
+export type StepOrigin = "GENERATED" | "PM" | "HIRE" | "BUDDY";
+
 export interface OnboardingStepEndpoint {
   id: string;
   phaseId: string;
   position: number;
   isAiAssisted?: boolean;
+  /**
+   * Who put this step on the path.
+   *
+   * Optional because a row written before the column existed carries none; `StepOriginBadge` falls
+   * back to `isAiAssisted` for those, which is the only signal they have.
+   */
+  origin?: StepOrigin;
   title: string;
   description: string;
   type: StepType;

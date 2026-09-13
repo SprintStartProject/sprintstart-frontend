@@ -12,6 +12,7 @@ import type {
   OnboardingStepEndpoint,
   StepStatus,
 } from "../types.ts";
+import { itemNumbers } from "../itemNumbers.ts";
 
 type OnboardingGraphNode = BlueprintGraphCanvasNode & {
   kind: "phase" | "step" | "question";
@@ -107,11 +108,15 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
         blockerIds: question.blockerIds,
       }));
     const nodes = [...steps, ...questions];
+    // The same numbers the list view prints and the buddy uses, so a node here can be talked about
+    // by the number the hire can see on it — which is the entire point of numbering them.
+    const numbers = itemNumbers(subGraphPhase);
 
     return nodes.map((node, index) => {
       const fallback = fallbackCoordinate(index, nodes.length);
       return {
         ...node,
+        title: `#${numbers.get(node.id)} ${node.title}`,
         graphX: node.graphX ?? fallback.x,
         graphY: node.graphY ?? fallback.y,
         blockerIds: node.blockerIds ?? (index > 0 ? [nodes[index - 1].id] : []),

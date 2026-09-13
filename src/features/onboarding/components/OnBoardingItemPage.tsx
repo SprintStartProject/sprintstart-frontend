@@ -41,6 +41,7 @@ import { resolveNextAction } from "../nextAction";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../../buddy/aiBuddyBus";
 import { askAboutStep } from "../buddyDrafts";
+import { itemNumbers } from "../itemNumbers";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
 
@@ -126,6 +127,34 @@ export function OnBoardingItemPage() {
   const currentStatus = stepDetail?.status;
 
   const { flyby } = useMoments();
+
+  /**
+   * The number this step wears on the overview, so the two pages call it the same thing.
+   *
+   * Costs one read of the path, because a number is a fact about a step's *place among its
+   * siblings* and a single step cannot know it. Worth the request: the number is how a hire refers to
+   * this step when they ask their buddy about it, and a page that showed a different one — or none —
+   * would make that referring useless.
+   */
+  const [stepNumber, setStepNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!stepId) return;
+
+    void (async () => {
+      try {
+        const path = await onboardingService.fetchPath();
+        const phase = path.phases.find((candidate) =>
+          candidate.steps.some((step) => step.id === stepId),
+        );
+        setStepNumber(phase ? (itemNumbers(phase).get(stepId) ?? null) : null);
+      } catch {
+        // A number is decoration next to the title; a page that cannot fetch the path still shows
+        // the step. Silent on purpose -- the loader below reports anything that actually matters.
+        setStepNumber(null);
+      }
+    })();
+  }, [stepId]);
 
   /**
    * Works out what comes after this step, once the step is behind the user.
@@ -450,7 +479,14 @@ export function OnBoardingItemPage() {
                       : "Open"}
               </div>
 
-              <h1 className="text-2xl font-bold text-app-text sm:text-3xl">{stepDetail.title}</h1>
+              <h1 className="text-2xl font-bold text-app-text sm:text-3xl">
+                {stepNumber !== null && (
+                  <span className="mr-2 font-mono text-xl text-app-text-subtle sm:text-2xl">
+                    #{stepNumber}
+                  </span>
+                )}
+                {stepDetail.title}
+              </h1>
               <div className="mt-3">
                 <StepOriginBadge step={stepDetail} />
               </div>

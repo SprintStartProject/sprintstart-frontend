@@ -337,6 +337,20 @@ export async function markOnboardingFeedbackRead(feedbackId: string): Promise<vo
   notifyPmAttentionChanged();
 }
 
+/**
+ * One member's onboarding path, for a reviewer looking at it.
+ *
+ * The endpoint now answers with the path *as its owner has it* — phases with their steps and their
+ * questions, each carrying that member's own status — so the hydration below is a fallback for a
+ * thin response rather than the normal road it used to be.
+ *
+ * **Every phase is normalised before it leaves here**, and that is the part worth keeping. The
+ * absence of `questions` on a phase took the whole team page down with a TypeError the moment
+ * questions became first-class members of a phase: three surfaces read `phase.questions` because the
+ * type promised it, and the wire did not deliver it. A missing array is filled at the boundary where
+ * untrusted JSON becomes a typed object — which is the only place a default belongs, and the reason
+ * no caller downstream has to defend itself against the same thing again.
+ */
 export async function getUserOnboardingPath(
   userId: string,
 ): Promise<OnboardingPathEndpoint | null> {
@@ -354,22 +368,20 @@ export async function getUserOnboardingPath(
 
     const hydratedPhases = await Promise.all(
       phases.map(async (phase) => {
-        if (phase.steps?.length > 0) return phase;
+        // Questions cannot be hydrated the way steps can: no endpoint hands out one member's
+        // questions with their status. An empty list is the honest stand-in, and it keeps the page
+        // standing instead of taking it down.
+        const normalised = { ...phase, questions: phase.questions ?? [] };
+        if (normalised.steps?.length > 0) return normalised;
 
         try {
           const steps = await apiClient.fetch<OnboardingStepEndpoint[]>(
             `/api/v1/onboarding/phases/${phase.id}/steps`,
           );
 
-          return {
-            ...phase,
-            steps,
-          };
+          return { ...normalised, steps };
         } catch {
-          return {
-            ...phase,
-            steps: [],
-          };
+          return { ...normalised, steps: [] };
         }
       }),
     );
