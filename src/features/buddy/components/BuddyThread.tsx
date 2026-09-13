@@ -43,7 +43,7 @@ type BuddyThreadProps = {
    * keeping or how — it hands over the text and lets the caller decide, which is what stops this
    * component from growing a dependency on the board.
    */
-  renderReplyAction?: (reply: string) => ReactNode;
+  renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
@@ -192,7 +192,7 @@ export function BuddyThread({
               footer={
                 <>
                   {isUser && renderQuestionAction?.(message.content)}
-                  {!isUser && hasText && renderReplyAction?.(message.content)}
+                  {!isUser && hasText && renderReplyAction?.(message.content, message)}
                   {!isUser && hasActions && (
                     <BuddyActionProposals
                       messageId={message.id}

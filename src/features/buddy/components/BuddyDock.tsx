@@ -298,7 +298,9 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
-            renderReplyAction={(reply) => <BuddyReplyActions reply={reply} />}
+            renderReplyAction={(reply, message) => (
+              <BuddyReplyActions reply={reply} message={message} />
+            )}
             compact
             messages={messages}
             isThinking={isThinking}
