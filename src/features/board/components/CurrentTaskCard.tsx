@@ -114,18 +114,25 @@ export function CurrentTaskCard({
             summary={content.summary}
             url={content.url}
             onAdded={onCardAdded}
+            // This card asks the mentor for first steps in its own words below. A second button
+            // opening the same conversation with the same question is one button too many.
+            offerToAsk={false}
           />
         </div>
       )}
 
       {/* "How do I start this" is what makes the mentor offer to assemble the orientation
-                packet, so the card needs no orientation action of its own. */}
+                packet, so the card needs no orientation action of its own.
+
+                It asks for a checklist, which is not decoration: a task that states no steps of
+                its own gets them here or nowhere, and the offer to keep a reply as a card only
+                appears under a reply that holds a list. See `AddTaskToBoard`. */}
       <AskTheBuddy
         question={
           closed
             ? `My task "${content.title ?? "my task"}" was closed. Which one should I take instead?`
             : hasTask
-              ? `How do I get started on "${content.title ?? "my task"}"?`
+              ? `How do I get started on "${content.title ?? "my task"}"? A short checklist of first steps would help.`
               : "What would be a good task for me to pick up?"
         }
         label={closed ? "Help me pick another one" : undefined}
