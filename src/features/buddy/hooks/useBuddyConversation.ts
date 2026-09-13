@@ -6,6 +6,8 @@ import {
   streamMessage,
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
+import { announceBuddyPathChanged } from "../aiBuddyBus";
+import { BUDDY_PATH_ACTIONS } from "../types";
 import type { BuddyMessageView, ProposedAction } from "../types";
 
 /**
@@ -354,6 +356,11 @@ export function useBuddyConversation() {
               githubLogin: proposal.githubLogin,
               competencyKey: proposal.competencyKey,
               level: proposal.level,
+              stepId: proposal.stepId,
+              questionId: proposal.questionId,
+              phaseId: proposal.phaseId,
+              answer: proposal.answer,
+              description: proposal.description,
               status: "idle",
             });
           },
@@ -427,12 +434,22 @@ export function useBuddyConversation() {
             githubLogin: action.githubLogin,
             competencyKey: action.competencyKey,
             level: action.level,
+            stepId: action.stepId,
+            questionId: action.questionId,
+            phaseId: action.phaseId,
+            answer: action.answer,
+            description: action.description,
           });
           patchAction(messageId, action.id, {
             status: "resolved",
             ok: result.ok,
             outcome: result.message,
           });
+          // A path action just moved something on a page that may be open behind this dock. Told
+          // rather than polled, and only on success: a refused confirm changed nothing to refresh.
+          if (result.ok && BUDDY_PATH_ACTIONS.includes(action.action)) {
+            announceBuddyPathChanged();
+          }
         } catch (e) {
           console.error(e);
           patchAction(messageId, action.id, { status: "error" });

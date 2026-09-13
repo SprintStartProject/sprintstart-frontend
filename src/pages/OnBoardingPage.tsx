@@ -10,6 +10,14 @@ import type {
   OnboardingStepEndpoint,
 } from "../features/onboarding/types";
 import { findActivePhaseIndex } from "../features/onboarding/activePhase";
+import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
+import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
+import {
+  askAboutEmptyPhase,
+  askAboutPhase,
+  askAboutQuestion,
+  askAboutStep,
+} from "../features/onboarding/buddyDrafts";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -299,6 +307,19 @@ export function OnBoardingPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [loadingState, gameActive, isUnlocked]);
 
+  /**
+   * Re-reads the path after the buddy changed it.
+   *
+   * The buddy lives in a dock over this page, which is the page a hire is most likely to be on while
+   * talking about their path. Without this, confirming "mark this step as done" in the conversation
+   * left the list behind it still showing the step open — their own click looking like it had done
+   * nothing. Told rather than polled; see `announceBuddyPathChanged`.
+   *
+   * Subscribed once: `refreshPath` only closes over the service and a setter, both stable for the
+   * life of the page.
+   */
+  useEffect(() => onBuddyPathChanged(() => void refreshPath()), []);
+
   // ── DATA FETCHING using useEffect ─────────────────────────────
 
   // Guards the initial GET against StrictMode's development-only effect replay.
@@ -582,6 +603,17 @@ export function OnBoardingPage() {
           >
             Try generation again
           </Button>
+          {/* Generating again is the wrong hope when the corpus is what was thin -- it will come
+              back empty a second time. The conversation is the one thing here that can actually
+              produce something, so it is offered next to the retry rather than instead of it. */}
+          {generationIssues.length > 0 && (
+            <div>
+              <AskTheBuddy
+                question={askAboutEmptyPhase(generationIssues[0].title)}
+                label="Work it out with your buddy instead"
+              />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -785,6 +817,20 @@ export function OnBoardingPage() {
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-app-text">{currentPhase.title}</h2>
               <p className="mt-1 text-sm text-app-text-muted">{currentPhase.description}</p>
+              {/* The phase-level way in. A hire who does not know why a phase is here is not helped
+                  by any of the buttons below it. */}
+              <AskTheBuddy
+                question={
+                  currentPhase.steps.length === 0 && currentPhase.questions.length === 0
+                    ? askAboutEmptyPhase(currentPhase.title)
+                    : askAboutPhase(currentPhase)
+                }
+                label={
+                  currentPhase.steps.length === 0 && currentPhase.questions.length === 0
+                    ? "This phase is empty — talk it through with your buddy"
+                    : "Ask your buddy about this phase"
+                }
+              />
             </div>
 
             {/* Locked phase notice */}
@@ -851,6 +897,14 @@ export function OnBoardingPage() {
                               <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
                                 {step.description}
                               </p>
+                              {/* Not on a finished or skipped step: there is nothing left to be
+                                  stuck on, and an invitation there is noise on a list of them. */}
+                              {mode !== "completed" && (
+                                <AskTheBuddy
+                                  question={askAboutStep(step)}
+                                  label="Ask your buddy about this step"
+                                />
+                              )}
                             </div>
 
                             {/* Action depends on the step's mode:
@@ -948,6 +1002,19 @@ export function OnBoardingPage() {
                                       ? "Multiple choice"
                                       : "Short text answer"}
                                   </p>
+                                  {/* The tutoring moment. Offered on a question still open --
+                                      loudest on one already answered wrong, which is where a hire
+                                      previously had nowhere to go but another guess. */}
+                                  {mode !== "completed" && (
+                                    <AskTheBuddy
+                                      question={askAboutQuestion(question, currentPhase.title)}
+                                      label={
+                                        question.status === "RETRY"
+                                          ? "Go through this with your buddy"
+                                          : "Ask your buddy to explain the material"
+                                      }
+                                    />
+                                  )}
                                 </div>
 
                                 <div className="shrink-0 self-start sm:self-center">

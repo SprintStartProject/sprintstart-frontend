@@ -15,7 +15,9 @@ import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../types
 import { CheckQuestionCard } from "./CheckQuestionCard";
 import { emptyDraft, isAnswered, toSubmission, type DraftAnswer } from "../checkAnswers";
 import { ConfettiBurst } from "./ConfettiBurst";
-import { Loader2, RotateCcw, Trophy, XCircle } from "lucide-react";
+import { Loader2, MessageCircle, RotateCcw, Trophy, XCircle } from "lucide-react";
+import { openAiBuddy } from "../../buddy/aiBuddyBus";
+import { askAboutQuestion, askAboutWrongAnswer } from "../buddyDrafts";
 
 interface QuestionModalProps {
   question: OnboardingQuestionEndpoint;
@@ -84,6 +86,20 @@ export function QuestionModal({ question, phaseTitle, onClose }: QuestionModalPr
       onboardingCompleted: result?.onboardingCompleted ?? false,
     });
 
+  /**
+   * Hands the question over to the buddy.
+   *
+   * Closes the modal on the way out rather than opening the dock behind it: the dock renders under
+   * the modal, so a hire who asked for help would have watched nothing happen. Reported as an
+   * ordinary close — the mentor may go on to send an answer from the conversation, and the page
+   * re-reads the path when it does (see `announceBuddyPathChanged`), so this does not have to guess
+   * at what happens next.
+   */
+  const handOffToBuddy = (opening: string) => {
+    openAiBuddy({ draft: opening });
+    close();
+  };
+
   const footer = result ? (
     <>
       {!result.correct && (
@@ -146,6 +162,17 @@ export function QuestionModal({ question, phaseTitle, onClose }: QuestionModalPr
             <div className="mt-0.5 text-xs text-app-text-muted">
               Review the answer below and try again.
             </div>
+            {/* Where a second guess used to be the only thing on offer. The buddy cannot tell them
+                the answer -- it is not given one -- so this is help with the material, which is what
+                a wrong answer actually calls for. */}
+            <button
+              type="button"
+              onClick={() => handOffToBuddy(askAboutWrongAnswer(question, phaseTitle))}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text transition hover:underline"
+            >
+              <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              Go through it with your buddy
+            </button>
           </div>
         </div>
       )}
@@ -158,6 +185,20 @@ export function QuestionModal({ question, phaseTitle, onClose }: QuestionModalPr
         onToggleOption={toggleOption}
         onTextChange={setTextAnswer}
       />
+
+      {/* Before an attempt, and deliberately quiet: guessing is allowed and costs nothing here, so
+          this is an offer rather than a nudge. Gone once the answer has been graded, where the
+          banner above carries the same offer with the reason for it. */}
+      {!result && (
+        <button
+          type="button"
+          onClick={() => handOffToBuddy(askAboutQuestion(question, phaseTitle))}
+          className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-app-text-muted transition hover:text-app-text hover:underline"
+        >
+          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          Not sure? Ask your buddy to explain the material
+        </button>
+      )}
     </Modal>
   );
 }

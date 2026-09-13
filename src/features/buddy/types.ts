@@ -17,6 +17,20 @@ export type ProposedActionStatus = "idle" | "confirming" | "resolved" | "error" 
  */
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
+/**
+ * The actions that change the hire's onboarding path.
+ *
+ * Listed once, here, because two surfaces need the same answer: confirming one of these has to tell
+ * whatever is showing a path that it is now stale (see `announceBuddyPathChanged`). Answering a
+ * question counts even when the answer was wrong — the attempt is recorded and the question's status
+ * moves either way.
+ */
+export const BUDDY_PATH_ACTIONS: readonly string[] = [
+  "complete_step",
+  "answer_question",
+  "add_path_step",
+];
+
 export type ProposedAction = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
@@ -58,6 +72,19 @@ export type ProposedAction = {
    */
   competencyKey?: string;
   level?: string;
+  /**
+   * The path-action confirm payloads: which node of the hire's own onboarding path the action is
+   * aimed at, the answer `answer_question` would send, and a new step's description.
+   *
+   * Echoed back verbatim for the same reason as `githubLogin`: the hire reads the step, or their own
+   * answer, on the button before agreeing to it, so what gets written has to be what they were
+   * shown — never something the client derived afterwards.
+   */
+  stepId?: string;
+  questionId?: string;
+  phaseId?: string;
+  answer?: string;
+  description?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -140,5 +167,10 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    stepId?: string;
+    questionId?: string;
+    phaseId?: string;
+    answer?: string;
+    description?: string;
   }) => void;
 };

@@ -120,6 +120,13 @@ interface BuddyStreamChunk {
   github_login?: string;
   competency_key?: string;
   level?: string;
+  // Path-action confirm payloads: which node of the hire's own onboarding path the action names,
+  // the answer `answer_question` would send in their own words, and a new step's description.
+  step_id?: string;
+  question_id?: string;
+  phase_id?: string;
+  answer?: string;
+  description?: string;
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -133,7 +140,9 @@ export interface BuddyActionResult {
  * changed nothing. The project is re-resolved server-side from the caller, so only the action name
  * and the proposal's own confirm payloads are sent: `question` for flag-to-PM, `taskId` for a
  * goal claim, `title` + `attesterId` for an attestation request, `githubLogin` for saving a
- * username, `competencyKey` + `level` for recording where a conversation placed the hire.
+ * username, `competencyKey` + `level` for recording where a conversation placed the hire, and the
+ * path-node ids (`stepId`, `questionId`, `phaseId`, plus `answer` and `description`) for the three
+ * actions that move the hire along their onboarding path.
  */
 export async function performAction(
   action: string,
@@ -145,6 +154,11 @@ export async function performAction(
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    stepId?: string;
+    questionId?: string;
+    phaseId?: string;
+    answer?: string;
+    description?: string;
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -158,6 +172,11 @@ export async function performAction(
       githubLogin: extras.githubLogin,
       competencyKey: extras.competencyKey,
       level: extras.level,
+      stepId: extras.stepId,
+      questionId: extras.questionId,
+      phaseId: extras.phaseId,
+      answer: extras.answer,
+      description: extras.description,
     }),
   });
 }
@@ -327,6 +346,11 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               githubLogin: event.github_login,
               competencyKey: event.competency_key,
               level: event.level,
+              stepId: event.step_id,
+              questionId: event.question_id,
+              phaseId: event.phase_id,
+              answer: event.answer,
+              description: event.description,
             });
           }
           break;

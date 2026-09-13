@@ -54,3 +54,28 @@ export function onBuddyPageReady(handler: () => void): () => void {
   window.addEventListener(BUDDY_PAGE_READY_EVENT, handler);
   return () => window.removeEventListener(BUDDY_PAGE_READY_EVENT, handler);
 }
+
+const BUDDY_PATH_CHANGED_EVENT = "sprintstart:buddy-path-changed";
+
+/**
+ * Announced after the hire confirms a buddy action that changed their onboarding path.
+ *
+ * The buddy lives in a dock over whatever page the hire is on, and the path page is the page they
+ * are most likely to be on while talking about their path. Without this, confirming "mark this step
+ * as done" left a page behind the dock still showing it open — the hire's own click looking like it
+ * had done nothing.
+ *
+ * A signal rather than shared state, for the same reason `openAiBuddy` is one: the dock would
+ * otherwise have to know about the onboarding page's data layer, and every other surface that grows
+ * an interest in the path would have to be wired through it too. Whoever is showing a path listens;
+ * nobody has to.
+ */
+export function announceBuddyPathChanged(): void {
+  window.dispatchEvent(new Event(BUDDY_PATH_CHANGED_EVENT));
+}
+
+/** Subscribes to path changes the buddy made. Returns an unsubscribe function. */
+export function onBuddyPathChanged(handler: () => void): () => void {
+  window.addEventListener(BUDDY_PATH_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(BUDDY_PATH_CHANGED_EVENT, handler);
+}

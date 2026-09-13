@@ -38,6 +38,8 @@ import {
   ThumbsDown,
 } from "lucide-react";
 import { resolveNextAction } from "../nextAction";
+import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { askAboutStep } from "../buddyDrafts";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
 
@@ -420,6 +422,15 @@ export function OnBoardingItemPage() {
                 <StepOriginBadge step={stepDetail} />
               </div>
               <p className="mt-2 text-sm text-app-text-muted">{stepDetail.description}</p>
+              {/* The step page is where a hire sits when they are stuck on one, and until now the
+                  only things here were the task list and a Finish button. Offered while the step is
+                  still open: there is nothing left to be stuck on once it is finished or skipped. */}
+              {stepDetail.status !== "FINISHED" && stepDetail.status !== "SKIPPED" && (
+                <AskTheBuddy
+                  question={askAboutStep(stepDetail)}
+                  label="Stuck? Ask your buddy about this step"
+                />
+              )}
             </div>
 
             {stepDetail.estimatedMinutes > 0 && (
