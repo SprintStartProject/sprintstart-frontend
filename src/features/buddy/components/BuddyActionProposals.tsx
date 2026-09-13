@@ -1,4 +1,4 @@
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, RotateCcw, X } from "lucide-react";
 import type { ProposedAction } from "../types";
 import { BUDDY_ACTION_OPEN_ORIENTATION } from "../types";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
@@ -19,6 +19,14 @@ type BuddyActionProposalsProps = {
  *
  * Shared by the full-page conversation and the floating widget so a proposal looks and behaves the
  * same wherever the hire meets it.
+ *
+ * **An action that came back "couldn't" can be run again, and that is not the same as a retry on a
+ * transport error.** A confirm used to be spent whichever way it went: a refusal replaced the
+ * button with its own outcome line and left nothing to press. That is fine when the refusal is
+ * permanent, and it was badly wrong when it was not — a hire whose packet failed to assemble had
+ * the only control for it taken away, and the mentor, which is never told what became of a
+ * proposal, went on asking them to click a button that was no longer on screen. So the outcome
+ * stays, and the offer comes back under it.
  */
 export function BuddyActionProposals({
   messageId,
@@ -41,7 +49,7 @@ export function BuddyActionProposals({
 
         if (action.status === "resolved") {
           return (
-            <div key={action.id} className="flex flex-col">
+            <div key={action.id} className="flex flex-col items-start">
               <p
                 className={`flex min-w-0 items-start gap-1.5 text-sm break-words ${
                   action.ok ? "text-app-text" : "text-app-text-muted"
@@ -55,6 +63,20 @@ export function BuddyActionProposals({
                 />
                 {action.outcome}
               </p>
+              {/* Under the refusal, not instead of it. The outcome is why it did not work and is
+                  the thing worth reading; this is only the way to try it once the reason has been
+                  dealt with. Never offered on success — running a confirmed action twice is how
+                  somebody claims the same task twice. */}
+              {!action.ok && (
+                <button
+                  type="button"
+                  onClick={() => onConfirm(messageId, action)}
+                  className="mt-1.5 ml-5.5 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Try {action.label.toLowerCase()} again
+                </button>
+              )}
               {/* Opening orientation is the one action whose result is content, not
                                 just an outcome line: the packet renders right here in the thread
                                 instead of navigating to a page. */}

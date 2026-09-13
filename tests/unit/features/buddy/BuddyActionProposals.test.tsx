@@ -139,4 +139,53 @@ describe("BuddyActionProposals", () => {
 
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
   });
+
+  /**
+   * A refusal is not always permanent, and the mentor is never told what became of a proposal — so
+   * a spent confirm left the hire with no control while being asked to press one.
+   */
+  describe("an action that came back couldn't", () => {
+    const refused = () =>
+      action({
+        action: "open_orientation",
+        label: "Open the task packet",
+        status: "resolved",
+        ok: false,
+        outcome: "I couldn't put a packet together just now.",
+      });
+
+    it("keeps the reason and offers it again under it", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[refused()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(/couldn't put a packet together/i)).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole("button", { name: /try open the task packet again/i }),
+      );
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm.mock.calls[0][0]).toBe("m1");
+    });
+
+    /** Running a confirmed action twice is how somebody claims the same task twice. */
+    it("offers nothing again once it worked", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[action({ status: "resolved", ok: true, outcome: "Task 0 is yours." })]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: /again/i })).not.toBeInTheDocument();
+    });
+  });
 });
