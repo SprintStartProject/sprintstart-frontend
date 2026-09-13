@@ -33,9 +33,19 @@ type CardOriginLinkProps = {
 export function CardOriginLink({ origin }: CardOriginLinkProps) {
   if (!origin) return null;
 
+  /**
+   * Whether the way back leaves the app.
+   *
+   * Most origins are in-app paths and should replace the page, which is what makes the text
+   * fragment work. A card minted from a task points at the tracker instead, and sending somebody
+   * to GitHub *in place of* their board costs them the board — so that one opens beside it.
+   */
+  const external = /^https?:\/\//.test(origin.url);
+
   return (
     <a
       href={origin.url}
+      {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
       className="mt-3 flex w-fit max-w-full items-center gap-1.5 text-xs text-app-text-muted hover:text-app-text hover:underline"
     >
       <CornerUpLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

@@ -4,6 +4,7 @@ import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AddTaskToBoard } from "./AddTaskToBoard";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
 type SuggestedTasksCardProps = {
@@ -68,13 +69,20 @@ export function SuggestedTasksCard({
                   </a>
                 )}
               </div>
-              {/* Seeds the conversation rather than claiming here: claiming changes
-                                what the hire's whole plan aims at, so it stays behind the mentor's
-                                confirm button. */}
-              <AskTheBuddy
-                question={`I'd like to work on "${task.title}". Can you set that as my goal?`}
-                label="I want to work on this"
-              />
+              {/* Two different things, and only one of them is a commitment. Saying "I want to
+                  work on this" aims the hire's whole plan at the task and goes through the
+                  mentor's confirm button; keeping it is a working copy on their own board that
+                  claims nothing. A hire who is not ready to claim anything should still be able to
+                  put a task somewhere they will find it again. */}
+              <div className="flex flex-wrap items-center gap-x-3">
+                <AskTheBuddy
+                  question={`I'd like to work on "${task.title}". Can you set that as my goal?`}
+                  label="I want to work on this"
+                />
+                <div className="mt-3">
+                  <AddTaskToBoard title={task.title} url={task.url} />
+                </div>
+              </div>
               {task.reasons.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5">
                   {task.reasons.map((reason) => (

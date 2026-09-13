@@ -7,10 +7,12 @@ import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { readableTitle } from "../generation/pathToCards";
 import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { CardOriginLink } from "./CardOriginLink";
 import { Marked } from "./Marked";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutChecklist } from "../generation/cardQuestion";
 import { useCardMarks } from "../marks/useCardMarks";
+import type { CardOrigin } from "../layout/cardOrigins";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
 type ChecklistCardProps = {
@@ -19,6 +21,13 @@ type ChecklistCardProps = {
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /**
+   * Where this list came from, when it was made out of something — a task, most often.
+   *
+   * A checklist minted from a task is the hire's working copy of it, and "which task was this
+   * again" is the question the copy cannot answer on its own a week later.
+   */
+  origin?: CardOrigin | null;
 };
 
 /**
@@ -64,6 +73,7 @@ export function ChecklistCard({
   onDismiss,
   dismissing,
   onEdit,
+  origin,
 }: ChecklistCardProps) {
   // A checklist's lines are written by the generator and read back from the server, so a highlight
   // on one is kept beside the card rather than inside its text. See `marks/cardMarks.ts`.
@@ -239,6 +249,8 @@ export function ChecklistCard({
           </Button>
         </div>
       )}
+
+      <CardOriginLink origin={origin ?? null} />
 
       {/* What the hire marked in the list seeds the question ahead of the list itself: somebody who
           highlighted two lines has already said which part they are stuck on. */}

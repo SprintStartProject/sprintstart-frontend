@@ -84,6 +84,27 @@ export function extractChecklist(markdown: string): ExtractedChecklist | null {
 }
 
 /**
+ * Every list item in a piece of markdown, in the order they appear.
+ *
+ * The looser reading of the same lines {@link extractChecklist} groups into blocks, and the two
+ * wants are genuinely different. A buddy reply is prose that *may* contain a list, so the question
+ * there is which block is the answer. A task body is a document somebody wrote as a task: its
+ * checklist items and its acceptance criteria are both lists of things to do, separated by the
+ * headings between them, and taking only the longest block would drop half the task.
+ *
+ * No minimum here either, for the same reason — one acceptance criterion is still the task saying
+ * what has to be true.
+ */
+export function listItemsIn(markdown: string): string[] {
+  return markdown
+    .split("\n")
+    .map((line) => LIST_ITEM.exec(line))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => plain(match[1]))
+    .filter((text) => text.length > 0);
+}
+
+/**
  * What to call the list: the nearest heading or lead-in sentence above it.
  *
  * Looks back a few lines only. A title from further away is not a title for *this* list, and a card

@@ -4,6 +4,7 @@ import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AddTaskToBoard } from "./AddTaskToBoard";
 import type { BoardCard, CurrentTaskContent } from "../types";
 
 type CurrentTaskCardProps = {
@@ -92,6 +93,16 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
           Nothing claimed yet. Ask your buddy what would be a good one to pick up — they can suggest
           tasks that fit what you&apos;ve already shown.
         </EmptyState>
+      )}
+
+      {/* A working copy of the task, on the hire's own board, that they may break down and tick
+          off. This card is a live read they cannot edit, and the steps somebody thinks up while
+          reading a task have to go somewhere. It changes nothing about the task — see
+          `generation/taskChecklist.ts`. */}
+      {hasTask && content.title && (
+        <div className="mt-3">
+          <AddTaskToBoard title={content.title} summary={content.summary} url={content.url} />
+        </div>
       )}
 
       {/* "How do I start this" is what makes the mentor offer to assemble the orientation

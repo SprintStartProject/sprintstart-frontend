@@ -438,9 +438,10 @@ function BoardCardView({
   origin,
   ...shared
 }: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
-  // Only the authored kinds take an origin, so it is unpacked here rather than spread with the
-  // rest: a live card was never found anywhere, and handing it a prop it ignores invites somebody
-  // to wire one up later and wonder why nothing shows.
+  // Only the authored kinds take an origin — all three of them now, since a checklist minted from
+  // a task is as found as a note taken from a paragraph. It is unpacked here rather than spread
+  // with the rest: a live card was never found anywhere, and handing it a prop it ignores invites
+  // somebody to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
     case "PATH_TO_FIRST_CONTRIBUTION":
@@ -464,7 +465,7 @@ function BoardCardView({
     case "LINK":
       return <LinkCard content={card.content} origin={origin} {...props} />;
     case "CHECKLIST":
-      return <ChecklistCard content={card.content} onEdit={onEdit} {...props} />;
+      return <ChecklistCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
     default:
       return (
         <section className="rounded-2xl border border-dashed border-app-border p-4">
