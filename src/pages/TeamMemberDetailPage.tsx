@@ -56,7 +56,6 @@ import { AddCustomStepModal } from "../features/team-management/components/detai
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
 import { MemberOnboardingSection } from "../features/team-management/components/detail/MemberOnboardingSection";
-import { MemberReviewPoolPanel } from "../features/team-management/components/detail/MemberReviewPoolPanel";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
@@ -852,7 +851,6 @@ export function TeamMemberDetailPage() {
             getStepStatusStyles={getStepStatusStyles}
           />
           <aside aria-label="Member insights" className="space-y-4">
-            {userId && <MemberReviewPoolPanel userId={userId} />}
             <div className="rounded-3xl border border-app-border bg-app-surface p-6">
               <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
 

@@ -81,13 +81,7 @@ const mockResources = [
   },
 ];
 
-const noCheck = {
-  required: false,
-  questionCount: 0,
-  passed: false,
-  latestAttemptId: null,
-  latestAttemptAt: null,
-};
+const noQuestions: [] = [];
 
 /** A path where another step is still waiting, so what comes next is a step. */
 const pathWithNextStep = {
@@ -102,24 +96,32 @@ const pathWithNextStep = {
       title: "Phase 1",
       description: "",
       locked: false,
-      unlockReason: null,
-      checkSummary: noCheck,
       steps: [
         { ...mockStep, status: "FINISHED" as const },
         { ...mockStep, id: "step2", position: 2, title: "Step 2", status: "WAITING" as const },
       ],
+      questions: noQuestions,
     },
   ],
 };
 
-/** A path whose only remaining obstacle is the current phase's knowledge check. */
-const pathWithPendingCheck = {
+/** A path whose only remaining obstacle is an open knowledge question. */
+const pathWithPendingQuestion = {
   ...pathWithNextStep,
   phases: [
     {
       ...pathWithNextStep.phases[0],
-      checkSummary: { ...noCheck, required: true, questionCount: 3 },
       steps: [{ ...mockStep, status: "FINISHED" as const }],
+      questions: [
+        {
+          id: "q1",
+          phaseId: "phase1",
+          position: 1,
+          type: "MULTIPLE_CHOICE" as const,
+          question: "Which is correct?",
+          status: "OPEN" as const,
+        },
+      ],
     },
   ],
 };
@@ -278,36 +280,36 @@ describe("OnBoardingItemPage", () => {
     expect(await screen.findByText("Continue to next step")).toBeInTheDocument();
   });
 
-  it("offers the knowledge check when that is what blocks the way", async () => {
+  it("offers the next question when that is what blocks the way", async () => {
     vi.mocked(onboardingService.fetchStep).mockResolvedValue({
       ...mockStep,
       status: "FINISHED",
       completedAt: "2026-07-02T00:00:00Z",
     });
-    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithPendingCheck);
+    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithPendingQuestion);
     render(<OnBoardingItemPage />);
 
-    // Calling this "next step" would be a lie: the next phase is locked behind the check.
-    expect(await screen.findByText("Start knowledge check")).toBeInTheDocument();
+    // Calling this "next step" would be a lie: the next phase is locked behind the question.
+    expect(await screen.findByText("Answer the next question")).toBeInTheDocument();
     expect(screen.queryByText("Continue to next step")).not.toBeInTheDocument();
   });
 
-  it("sends the user to the check on the overview instead of starting a step", async () => {
+  it("sends the user to the question on the overview instead of starting a step", async () => {
     const user = userEvent.setup();
     vi.mocked(onboardingService.fetchStep).mockResolvedValue({
       ...mockStep,
       status: "FINISHED",
       completedAt: "2026-07-02T00:00:00Z",
     });
-    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithPendingCheck);
+    vi.mocked(onboardingService.fetchPath).mockResolvedValue(pathWithPendingQuestion);
     render(<OnBoardingItemPage />);
 
-    await user.click(await screen.findByText("Start knowledge check"));
+    await user.click(await screen.findByText("Answer the next question"));
 
-    // The phase id lets the overview scroll to the check rather than dropping the user
+    // The question id lets the overview scroll to the question rather than dropping the user
     // at the top of the step list they just worked through.
     expect(mockNavigate).toHaveBeenCalledWith("/onboarding", {
-      state: { focusCheckPhaseId: "phase1" },
+      state: { focusQuestionId: "q1" },
     });
     expect(onboardingService.startStep).not.toHaveBeenCalled();
   });
@@ -330,14 +332,6 @@ describe("OnBoardingItemPage", () => {
           title: "Phase 1",
           description: "",
           locked: false,
-          unlockReason: null,
-          checkSummary: {
-            required: false,
-            questionCount: 0,
-            passed: false,
-            latestAttemptId: null,
-            latestAttemptAt: null,
-          },
           steps: [
             {
               id: "step2",
@@ -357,6 +351,7 @@ describe("OnBoardingItemPage", () => {
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     });
@@ -388,14 +383,6 @@ describe("OnBoardingItemPage", () => {
           title: "Phase 1",
           description: "",
           locked: false,
-          unlockReason: null,
-          checkSummary: {
-            required: false,
-            questionCount: 0,
-            passed: false,
-            latestAttemptId: null,
-            latestAttemptAt: null,
-          },
           steps: [
             {
               id: "step2",
@@ -415,6 +402,7 @@ describe("OnBoardingItemPage", () => {
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     });

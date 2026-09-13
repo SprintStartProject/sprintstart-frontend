@@ -108,13 +108,13 @@ describe("accessPolicy", () => {
       expect(isOnboardingAccessible(profile)).toBe(true);
     });
 
-    it("is false before a role is assigned, because no path exists yet", () => {
+    it("is true before a role is assigned so the empty page can be reached", () => {
       const profile = {
         ...createMockProfile(PermissionGroup.USER),
         hasCompletedOnboarding: false,
         projectRoles: [],
       };
-      expect(isOnboardingAccessible(profile)).toBe(false);
+      expect(isOnboardingAccessible(profile)).toBe(true);
     });
 
     it("stays false once completed, even while a role is still held", () => {

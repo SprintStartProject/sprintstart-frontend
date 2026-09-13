@@ -1,10 +1,10 @@
 // ============================================================
 // PhaseCheckAdminModal.tsx
 // ============================================================
-// PM/HR/Admin view of one phase's knowledge check, with two
-// tabs: the member's submitted attempts, and an editor for the
-// questions themselves. Onboarding paths are per-user, so
-// editing here only affects this member's check.
+// PM/HR/Admin view of one phase's knowledge questions, with two
+// tabs: each question's attempts by this member, and an editor
+// for the questions themselves. Onboarding paths are per-user,
+// so editing here only affects this member's phase.
 // ============================================================
 
 import { useState, useEffect } from "react";
@@ -12,9 +12,9 @@ import { Modal } from "../../../../components/ui/Modal";
 import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
 import type {
-  AdminPhaseCheckQuestionEndpoint,
-  PhaseCheckAttemptsReviewEndpoint,
-  UpsertPhaseCheckQuestion,
+  AdminQuestionEndpoint,
+  QuestionAttemptsReviewEndpoint,
+  UpsertQuestion,
   CheckQuestionType,
 } from "../../../onboarding/types";
 import {
@@ -24,7 +24,8 @@ import {
   XCircle,
   Plus,
   Trash2,
-  ClipboardCheck,
+  CircleHelp,
+  ChevronDown,
 } from "lucide-react";
 
 export type PhaseCheckAdminTab = "results" | "questions";
@@ -41,11 +42,11 @@ type PhaseCheckAdminModalProps = {
 };
 
 /**
- * Editor state for one question; mirrors UpsertPhaseCheckQuestion plus a local key.
+ * Editor state for one question; mirrors UpsertQuestion plus a local key.
  *
  * `id` is the server's ID, kept so the save can tell the backend which questions already
- * exist — without it every save recreates the whole check, which orphans the members'
- * review pool entries and their attempt history. Null means "new question".
+ * exist — without it every save recreates the questions, which orphans the members'
+ * attempt history. Null means "new question".
  */
 type QuestionDraft = {
   key: string;
@@ -60,7 +61,7 @@ type QuestionDraft = {
 let draftKeySeed = 0;
 const nextKey = () => `draft-${draftKeySeed++}`;
 
-function toDraft(question: AdminPhaseCheckQuestionEndpoint): QuestionDraft {
+function toDraft(question: AdminQuestionEndpoint): QuestionDraft {
   return {
     key: nextKey(),
     id: question.id,
@@ -122,10 +123,10 @@ function validate(drafts: QuestionDraft[]): string | null {
  * Turns the editor state into the save payload.
  *
  * IDs of existing questions and options are passed through so the backend updates them in
- * place instead of recreating the check. Questions the user removed are simply absent, which
+ * place instead of recreating the set. Questions the user removed are simply absent, which
  * is how the backend learns to delete exactly those.
  */
-function toPayload(drafts: QuestionDraft[]): UpsertPhaseCheckQuestion[] {
+function toPayload(drafts: QuestionDraft[]): UpsertQuestion[] {
   return drafts.map((draft, index) => ({
     id: draft.id ?? undefined,
     position: index,
@@ -157,34 +158,25 @@ export function PhaseCheckAdminModal({
   onClose,
 }: PhaseCheckAdminModalProps) {
   const [tab, setTab] = useState<PhaseCheckAdminTab>(initialTab);
-  const [questions, setQuestions] = useState<AdminPhaseCheckQuestionEndpoint[] | null>(null);
+  const [questions, setQuestions] = useState<AdminQuestionEndpoint[] | null>(null);
   const [drafts, setDrafts] = useState<QuestionDraft[]>([]);
-  const [attempts, setAttempts] = useState<PhaseCheckAttemptsReviewEndpoint | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // `saveError` now only carries the inline draft validation; the save request's
-  // own outcome is a toast.
   const [saveError, setSaveError] = useState<string | null>(null);
   const toast = useToast();
 
-  // Both tabs need the questions: the editor edits them, the results tab joins them
-  // onto the attempts, which only carry question ids.
   useEffect(() => {
     const load = async () => {
       try {
-        const [check, review] = await Promise.all([
-          onboardingService.fetchPhaseCheckForEditing(phaseId),
-          onboardingService.fetchPhaseCheckAttempts(userId, phaseId),
-        ]);
+        const check = await onboardingService.fetchPhaseQuestionsForEditing(phaseId);
         setQuestions(check.questions);
         setDrafts(check.questions.map(toDraft));
-        setAttempts(review);
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : "Unknown error");
       }
     };
     void load();
-  }, [phaseId, userId]);
+  }, [phaseId]);
 
   const updateDraft = (key: string, patch: Partial<QuestionDraft>) =>
     setDrafts((current) =>
@@ -200,7 +192,7 @@ export function PhaseCheckAdminModal({
     setSaving(true);
     setSaveError(null);
     try {
-      const saved = await onboardingService.savePhaseCheck(phaseId, toPayload(drafts));
+      const saved = await onboardingService.savePhaseQuestions(phaseId, toPayload(drafts));
       setQuestions(saved.questions);
       setDrafts(saved.questions.map(toDraft));
       onSaved();
@@ -228,14 +220,14 @@ export function PhaseCheckAdminModal({
   return (
     <Modal
       isOpen
-      title="Knowledge check"
+      title="Knowledge questions"
       description={`${phaseTitle} · ${memberName}`}
       size="xl"
       bodyClassName="max-h-[60vh] overflow-y-auto px-7 py-6"
       onClose={onClose}
       footer={footer}
     >
-      <div role="tablist" aria-label="Knowledge check sections" className="mb-5 flex gap-2">
+      <div role="tablist" aria-label="Knowledge question sections" className="mb-5 flex gap-2">
         <TabButton active={tab === "results"} onClick={() => setTab("results")} label="Results" />
         <TabButton
           active={tab === "questions"}
@@ -247,7 +239,7 @@ export function PhaseCheckAdminModal({
       {!questions && !loadError && (
         <div className="flex flex-col items-center gap-3 py-12 text-app-text-muted">
           <Loader2 className="h-6 w-6 animate-spin text-app-brand" />
-          <p className="text-sm">Loading knowledge check...</p>
+          <p className="text-sm">Loading questions...</p>
         </div>
       )}
       {loadError && (
@@ -257,7 +249,7 @@ export function PhaseCheckAdminModal({
         </div>
       )}
 
-      {questions && tab === "results" && <ResultsTab attempts={attempts} questions={questions} />}
+      {questions && tab === "results" && <ResultsTab userId={userId} questions={questions} />}
 
       {questions && tab === "questions" && (
         <QuestionsEditor
@@ -302,80 +294,114 @@ function TabButton({
 // Results tab
 // ─────────────────────────────────────────────────────────────
 
-function ResultsTab({
-  attempts,
-  questions,
-}: {
-  attempts: PhaseCheckAttemptsReviewEndpoint | null;
-  questions: AdminPhaseCheckQuestionEndpoint[];
-}) {
-  const questionText = new Map(questions.map((question) => [question.id, question.question]));
+function ResultsTab({ userId, questions }: { userId: string; questions: AdminQuestionEndpoint[] }) {
+  const [attemptsByQuestion, setAttemptsByQuestion] = useState<
+    Record<string, QuestionAttemptsReviewEndpoint | null>
+  >({});
+  const [loadingQuestionId, setLoadingQuestionId] = useState<string | null>(null);
 
-  if (!attempts || attempts.attempts.length === 0) {
+  if (questions.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
-        <ClipboardCheck className="h-8 w-8 text-app-text-muted" />
-        <p className="text-sm font-semibold text-app-text">No attempts yet</p>
+        <CircleHelp className="h-8 w-8 text-app-text-muted" />
+        <p className="text-sm font-semibold text-app-text">No questions yet</p>
         <p className="text-sm text-app-text-muted">
-          This member has not submitted the knowledge check of this phase.
+          This phase has no knowledge questions configured.
         </p>
       </div>
     );
   }
 
+  const loadAttempts = async (questionId: string) => {
+    setLoadingQuestionId(questionId);
+    try {
+      const attempts = await onboardingService.fetchQuestionAttempts(userId, questionId);
+      setAttemptsByQuestion((current) => ({ ...current, [questionId]: attempts }));
+    } catch {
+      setAttemptsByQuestion((current) => ({ ...current, [questionId]: null }));
+    } finally {
+      setLoadingQuestionId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {attempts.attempts.map((attempt, index) => (
-        <div
-          key={attempt.id}
-          className={`rounded-2xl border p-4 ${
-            attempt.passed ? "border-app-success-solid/40" : "border-app-danger-solid/40"
-          }`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              {attempt.passed ? (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-app-success-solid" />
-              ) : (
-                <XCircle className="h-5 w-5 shrink-0 text-app-danger-solid" />
-              )}
-              <span className="text-sm font-semibold text-app-text">
-                {attempt.passed ? "Passed" : "Not passed"}
-              </span>
-              <span className="text-xs text-app-text-muted">
-                {attempt.correctAnswerCount}/{attempt.questionCount} correct
-              </span>
-            </div>
-            <span className="text-xs text-app-text-muted">
-              {/* Newest first, so the first entry is the most recent attempt. */}
-              {index === 0 ? "Latest · " : ""}
-              {new Date(attempt.createdAt).toLocaleString()}
-            </span>
-          </div>
-
-          <ul className="mt-3 space-y-1.5">
-            {attempt.answers.map((answer) => (
-              <li
-                key={answer.questionId}
-                className="flex items-start gap-2 text-xs text-app-text-muted"
-              >
-                {answer.correct ? (
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-success-solid" />
+      <p className="rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
+        Expand a question to see this member&apos;s attempts on it.
+      </p>
+      {questions.map((question) => {
+        const attempts = attemptsByQuestion[question.id];
+        const loaded = question.id in attemptsByQuestion;
+        return (
+          <div key={question.id} className="rounded-2xl border border-app-border p-4">
+            <button
+              type="button"
+              className="flex w-full items-start justify-between gap-3 text-left"
+              onClick={() => {
+                if (!loaded) void loadAttempts(question.id);
+              }}
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-app-text">{question.question}</p>
+                <p className="mt-0.5 text-xs text-app-text-muted">
+                  {question.type === "MULTIPLE_CHOICE" ? "Multiple choice" : "Short text"}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {loadingQuestionId === question.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-app-brand" />
                 ) : (
-                  <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-danger-solid" />
+                  <ChevronDown className="h-4 w-4 text-app-text-muted" />
                 )}
-                <span className="min-w-0">
-                  {/* Questions replaced since this attempt are no longer resolvable. */}
-                  {questionText.get(answer.questionId) ?? "Question was replaced"}
-                  {answer.textAnswer && (
-                    <span className="text-app-text"> — “{answer.textAnswer}”</span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+              </div>
+            </button>
+
+            {loaded && attempts && attempts.attempts.length === 0 && (
+              <p className="mt-3 text-xs text-app-text-muted">No attempts on this question yet.</p>
+            )}
+            {loaded && attempts && attempts.attempts.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {attempts.attempts.map((attempt) => (
+                  <li
+                    key={attempt.id}
+                    className={`flex items-start gap-2 rounded-xl border p-2.5 text-xs ${
+                      attempt.correct ? "border-app-success-solid/30" : "border-app-danger-solid/30"
+                    }`}
+                  >
+                    {attempt.correct ? (
+                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-success-solid" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-danger-solid" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="font-medium text-app-text">
+                        {attempt.correct ? "Correct" : "Incorrect"} ·{" "}
+                        {new Date(attempt.createdAt).toLocaleString()}
+                      </span>
+                      {attempt.textAnswer && (
+                        <span className="mt-0.5 block text-app-text-muted">
+                          “{attempt.textAnswer}”
+                        </span>
+                      )}
+                      {attempt.selectedOptionIds.length > 0 && (
+                        <span className="mt-0.5 block text-app-text-muted">
+                          Selected {attempt.selectedOptionIds.length} option
+                          {attempt.selectedOptionIds.length === 1 ? "" : "s"}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {loaded && attempts === null && (
+              <p className="mt-3 text-xs text-app-danger-solid">
+                Could not load the attempts for this question.
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -400,8 +426,8 @@ function QuestionsEditor({
   return (
     <div className="space-y-4">
       <p className="rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
-        Saving replaces this member&apos;s check for the phase. Earlier attempts stay as history,
-        and questions they already cleared are not asked again.
+        Saving replaces this member&apos;s questions for the phase. Earlier attempts stay as
+        history; a question recreated instead of updated loses the attempts pointing at it.
       </p>
 
       {drafts.map((draft, index) => (

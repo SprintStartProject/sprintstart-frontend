@@ -12,6 +12,7 @@ export type AppRoute =
   | "/onboarding"
   | "/buddy"
   | "/board"
+  | "/blueprints"
   | "/data-ingestion"
   | "/arrival-steps"
   | "/starter-work"
@@ -41,6 +42,7 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
   // The hire's own board. Same audience as the buddy: it is the durable half of the same
   // surface, and everybody onboards onto a project at some point.
   "/board": ALL_GROUPS,
+  "/blueprints": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/data-ingestion": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   // HR reads the arrival list; PM/ADMIN author it (enforced server-side too -- this only decides
   // who sees the page). Worth revisiting: paperwork and accounts are arguably HR's to own.
@@ -86,6 +88,7 @@ const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
 const routePrefixes: Partial<Record<AppRoute, readonly string[]>> = {
   "/chat": ["/chat/"],
   "/onboarding": ["/onboarding/"],
+  "/blueprints": ["/blueprints/"],
   "/team-management": ["/team/"],
   "/insights/faq": ["/insights/faq/"],
   "/insights/knowledge-gaps": ["/insights/knowledge-gaps/"],
@@ -123,25 +126,12 @@ export function canAccessRoute(
 /**
  * Whether the onboarding experience is available to this user.
  *
- * Two gates, at opposite ends of the journey:
- *
- * - **Not yet started.** A path is generated from the user's project role, so a
- *   user who has not been given one has nothing to generate from — the backend
- *   returns no path at all. Offering the entry anyway leads to a page that can
- *   only fail, so it stays hidden until a role is assigned. The path is built on
- *   the next sign-in or reload after that, which is when the entry appears.
- * - **Already finished.** Onboarding is a one-time journey: once the final
- *   knowledge check is passed and the user is promoted to an existing member,
- *   the routes and the sidebar entry are hidden again.
- *
- * Independent of the permission group.
+ * Onboarding is a one-time journey. An incomplete user can open the page even
+ * before a path exists and explicitly start personalization there; a completed
+ * user no longer sees or directly accesses the onboarding UI.
  */
 export function isOnboardingAccessible(profile: UserProfile | null): boolean {
-  if (!profile || profile.hasCompletedOnboarding) {
-    return false;
-  }
-
-  return profile.projectRoles.length > 0;
+  return Boolean(profile && !profile.hasCompletedOnboarding);
 }
 
 export function getDefaultRoute(profile: UserProfile | null): AppRoute {
