@@ -11,6 +11,20 @@
  * to the tracker, by design: a checklist that half-wrote task state would be a second place the
  * task's status lives, and the hire would have no way of knowing which one anybody else is
  * reading. What the card carries back to the task is a link — see `layout/cardOrigins.ts`.
+ *
+ * **And it is only offered for a task that already says what its steps are.** The first version
+ * fell back to a one-line checklist named after the task, on the reasoning that something tickable
+ * beats nothing. It does not: a new hire looking at *"Fix the login redirect"* with a checkbox
+ * beside it has been handed the title back and learned nothing. That is not a gap this module can
+ * close, because closing it means *writing steps somebody has to be right about* — and nothing
+ * here asks a model anything, which is exactly what makes every line on the card a line the hire
+ * can find in the task.
+ *
+ * The steps for a task that carries none are the mentor's to write, in the conversation, where the
+ * hire reads them before they become a card: ask, read the answer, keep it (`AskTheBuddy` →
+ * `buddy/SaveReplyToBoard`). One press more, and the press is the hire agreeing that those are the
+ * steps. See the `place_checklist` note in `checklistFromMarkdown.ts` for what would make it one
+ * press, and why that is a thing to be careful with rather than an oversight.
  */
 
 import { listItemsIn } from "./checklistFromMarkdown";
@@ -32,25 +46,36 @@ export type TaskForChecklist = {
 export const MAX_TASK_ITEMS = 25;
 
 /**
+ * The steps a task already states, in the order it states them. Empty when it states none.
+ *
+ * Checklist items and acceptance criteria both, because a task that separates them is a task whose
+ * steps are in two places — see `listItemsIn`. What comes back is verbatim apart from markdown
+ * syntax: nothing is summarised, ordered or invented.
+ *
+ * The predicate as much as the content. A caller asks this first to find out whether there is a
+ * checklist to offer at all, which is the whole of the no-structure branch: there isn't one.
+ */
+export function taskSteps(task: TaskForChecklist): string[] {
+  return listItemsIn(task.summary ?? "").slice(0, MAX_TASK_ITEMS);
+}
+
+/**
  * The checklist a task becomes.
  *
- * Two branches, and the second one is not a failure case. A task written with checkboxes or
- * acceptance criteria already says what its steps are, and those lines become the items verbatim —
- * nothing here asks a model anything, so every line on the card is a line the hire can find in the
- * task. A task with no structure at all becomes a single item named after the task, which is worth
- * more than nothing: it is a thing on their board they can tick off, which is what they asked for.
+ * Only meaningful for a task with {@link taskSteps} — a task that states none has nothing to break
+ * down, and this returns null rather than inventing a card out of its own title. Callers use that
+ * null to offer the conversation instead.
  *
  * The title is the task's, never a lead taken from the body. A hire scanning their board is looking
  * for the task they know the name of.
  */
-export function checklistFromTask(task: TaskForChecklist): AuthoredCardRequest {
-  const title = task.title.trim();
-  const structured = listItemsIn(task.summary ?? "").slice(0, MAX_TASK_ITEMS);
-  const items = structured.length > 0 ? structured : [title];
+export function checklistFromTask(task: TaskForChecklist): AuthoredCardRequest | null {
+  const steps = taskSteps(task);
+  if (steps.length === 0) return null;
 
   return {
     kind: "CHECKLIST",
-    title,
-    items: items.map((text) => ({ text, done: false })),
+    title: task.title.trim(),
+    items: steps.map((text) => ({ text, done: false })),
   };
 }
