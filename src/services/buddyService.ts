@@ -120,6 +120,14 @@ interface BuddyStreamChunk {
   github_login?: string;
   competency_key?: string;
   level?: string;
+  /**
+   * `place_checklist` confirm payload: the list the buddy offered to keep.
+   *
+   * Content rather than a target id, and echoed back for a sharper version of the same reason:
+   * re-deriving these lines at confirm time would keep a card the hire never read.
+   */
+  checklist_title?: string;
+  checklist_items?: string[];
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -145,6 +153,8 @@ export async function performAction(
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    checklistTitle?: string;
+    checklistItems?: string[];
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -158,6 +168,8 @@ export async function performAction(
       githubLogin: extras.githubLogin,
       competencyKey: extras.competencyKey,
       level: extras.level,
+      checklistTitle: extras.checklistTitle,
+      checklistItems: extras.checklistItems,
     }),
   });
 }
@@ -327,6 +339,8 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               githubLogin: event.github_login,
               competencyKey: event.competency_key,
               level: event.level,
+              checklistTitle: event.checklist_title,
+              checklistItems: event.checklist_items,
             });
           }
           break;
