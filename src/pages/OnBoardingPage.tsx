@@ -2,7 +2,7 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
@@ -10,6 +10,7 @@ import type {
   OnboardingStepEndpoint,
 } from "../features/onboarding/types";
 import { findActivePhaseIndex } from "../features/onboarding/activePhase";
+import { itemNumbers } from "../features/onboarding/itemNumbers";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
 import {
@@ -18,7 +19,7 @@ import {
   askAboutQuestion,
   askAboutStep,
 } from "../features/onboarding/buddyDrafts";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { onboardingService } from "../services/onboardingService";
@@ -137,6 +138,21 @@ export function OnBoardingPage() {
   // user and the rest of their path, so this page can land on the question's phase.
   const focusQuestionId = (location.state as { focusQuestionId?: string } | null)?.focusQuestionId;
 
+  /**
+   * Where a link from the buddy points.
+   *
+   * The mentor is given each item's path so it can say "want to take [#3](...)?" and have that be
+   * clickable. A question has no route of its own — it is a modal on this page — so it arrives as
+   * `?question=<id>`, and a phase as `?phase=<id>`.
+   *
+   * In the URL rather than in router state, unlike `focusQuestionId`: this link is written by the
+   * model into text the hire can copy, keep, or open in a second tab, and state does not survive any
+   * of that.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedQuestionId = searchParams.get("question");
+  const linkedPhaseId = searchParams.get("phase");
+
   // The question list of the focused phase, so the page can scroll to it.
   const questionListRef = useRef<HTMLDivElement>(null);
   const hasFocusedQuestionRef = useRef(false);
@@ -195,6 +211,9 @@ export function OnBoardingPage() {
   }) => {
     const phases = OnBoardingPathEndpoint?.phases ?? [];
     setQuestionToAnswer(null);
+    // Also the link, if that is what opened it — otherwise closing the modal would reopen it on the
+    // next render, since the URL would still be asking for it.
+    if (linkedQuestionId) clearLink();
 
     // The backend decides completion; nothing here is derived from the phase alone.
     if (onboardingCompleted) {
@@ -320,6 +339,37 @@ export function OnBoardingPage() {
    */
   useEffect(() => onBuddyPathChanged(() => void refreshPath()), []);
 
+  /**
+   * The phase and the question a buddy link names, resolved from the URL rather than copied into
+   * state.
+   *
+   * Derived on purpose. A link can arrive two ways — a fresh mount, or a click while the hire is
+   * already standing on this page — and writing state from an effect would both trip the
+   * set-state-in-an-effect rule and only handle the first. Deriving handles both and needs no
+   * clean-up: the link stops winning the moment the hire picks a different phase or closes the
+   * modal, because those clear the parameter.
+   */
+  const linkedPhaseIndex = useMemo(() => {
+    const phases = OnBoardingPathEndpoint?.phases ?? [];
+    if (linkedQuestionId) {
+      return phases.findIndex((phase) =>
+        phase.questions.some((question) => question.id === linkedQuestionId),
+      );
+    }
+    return linkedPhaseId ? phases.findIndex((phase) => phase.id === linkedPhaseId) : -1;
+  }, [OnBoardingPathEndpoint, linkedQuestionId, linkedPhaseId]);
+
+  /** Forgets the link, so the hire's own next click decides what they are looking at. */
+  const clearLink = () =>
+    setSearchParams(
+      (params) => {
+        params.delete("question");
+        params.delete("phase");
+        return params;
+      },
+      { replace: true },
+    );
+
   // ── DATA FETCHING using useEffect ─────────────────────────────
 
   // Guards the initial GET against StrictMode's development-only effect replay.
@@ -363,7 +413,9 @@ export function OnBoardingPage() {
     // makes a re-run a no-op anyway.
   }, [focusQuestionId]);
 
-  const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
+  // A link from the buddy wins while it is in the URL; the hire's own tab click clears it.
+  const shownPhaseIndex = linkedPhaseIndex >= 0 ? linkedPhaseIndex : selectedPhaseIndex;
+  const currentPhase = OnBoardingPathEndpoint?.phases[shownPhaseIndex] ?? null;
   const generationIssues = OnBoardingPathEndpoint?.generationIssues ?? [];
   const generationIssueSummary = generationIssues
     .map(
@@ -371,6 +423,30 @@ export function OnBoardingPage() {
         `${issue.title} (${issue.status === "TIMED_OUT" ? "timed out" : issue.status.toLowerCase()})`,
     )
     .join(", ");
+
+  /**
+   * The question the modal is showing: the one a card opened, or the one a link names.
+   *
+   * A linked question only opens when the hire could actually answer it. A link to a locked or
+   * already-passed question is a dead end, and landing on its phase — which still happens — is the
+   * useful half of following it.
+   */
+  const linkedQuestion =
+    linkedQuestionId && currentPhase
+      ? currentPhase.questions.find(
+          (question) =>
+            question.id === linkedQuestionId &&
+            question.status !== "LOCKED" &&
+            question.status !== "PASSED",
+        )
+      : undefined;
+  const shownQuestion =
+    questionToAnswer ??
+    (linkedQuestion ? { question: linkedQuestion, phaseTitle: currentPhase?.title ?? "" } : null);
+
+  // The numbers this phase's items are shown with. The buddy's path tool derives the same ones, so
+  // "let's do 3" means one item on both sides — see `itemNumbers`.
+  const numbers = currentPhase ? itemNumbers(currentPhase) : new Map<string, number>();
 
   // Helper function for phase progress — steps and questions both count.
   const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
@@ -679,7 +755,10 @@ export function OnBoardingPage() {
                   key={phase.id}
                   type="button"
                   aria-pressed={isSelected}
-                  onClick={() => setSelectedPhaseIndex(index)}
+                  onClick={() => {
+                    setSelectedPhaseIndex(index);
+                    clearLink();
+                  }}
                   className={`min-w-64 flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
                     isSelected
                       ? "border-app-brand bg-app-brand-soft"
@@ -889,6 +968,12 @@ export function OnBoardingPage() {
                                     : "text-app-text"
                                 }`}
                               >
+                                {/* The number the buddy uses for this item. Quiet, and not part of
+                                    the title: it is a handle for talking about the step, not
+                                    something the step is called. */}
+                                <span className="mr-2 font-mono text-sm text-app-text-subtle">
+                                  #{numbers.get(step.id)}
+                                </span>
                                 {step.title}
                               </h3>
                               <div className="mt-2">
@@ -995,6 +1080,9 @@ export function OnBoardingPage() {
                                         : "text-app-text"
                                     }`}
                                   >
+                                    <span className="mr-2 font-mono text-sm text-app-text-subtle">
+                                      #{numbers.get(question.id)}
+                                    </span>
                                     {question.question}
                                   </h3>
                                   <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
@@ -1049,11 +1137,11 @@ export function OnBoardingPage() {
         )}
       </main>
 
-      {/* Per-question answer modal */}
-      {questionToAnswer && (
+      {/* Per-question answer modal. Opened by a card, or by a link the buddy wrote. */}
+      {shownQuestion && (
         <QuestionModal
-          question={questionToAnswer.question}
-          phaseTitle={questionToAnswer.phaseTitle}
+          question={shownQuestion.question}
+          phaseTitle={shownQuestion.phaseTitle}
           onClose={closeQuestionModal}
         />
       )}

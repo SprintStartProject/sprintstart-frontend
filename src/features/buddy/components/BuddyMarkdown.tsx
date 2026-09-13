@@ -1,5 +1,20 @@
 import ReactMarkdown from "react-markdown";
+import { Link } from "react-router-dom";
 import remarkGfm from "remark-gfm";
+
+/**
+ * Whether a link the buddy wrote points inside the app.
+ *
+ * The mentor is given the paths of the things it talks about — a step, a question, a phase — so that
+ * "want to take the check?" can arrive as something clickable. Those are app paths, and opening one
+ * in a new tab would reload the whole SPA and lose the conversation the hire was having.
+ *
+ * Root-relative only, and deliberately: a protocol-relative `//evil.example` is also "relative" to a
+ * careless check, and the model's output is not a place to be careless.
+ */
+function isInAppPath(href: string | undefined): href is string {
+  return href !== undefined && href.startsWith("/") && !href.startsWith("//");
+}
 
 /**
  * Renders the buddy's reply as Markdown (GitHub-flavoured), so lists, bold, headings, links,
@@ -27,11 +42,17 @@ export function BuddyMarkdown({ content }: { content: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
+          // An app path navigates in place; anything else is still somebody else's site in a new
+          // tab. The dock stays mounted across a route change, so a hire who follows a link into
+          // their path keeps the conversation that sent them there.
+          a: ({ children, href }) =>
+            isInAppPath(href) ? (
+              <Link to={href}>{children}</Link>
+            ) : (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            ),
           table: ({ children }) => (
             <div className="max-w-full min-w-0 overflow-x-auto">
               <table className="w-full border-collapse border border-app-border-muted">

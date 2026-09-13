@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { resolveNextAction } from "../nextAction";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { onBuddyPathChanged } from "../../buddy/aiBuddyBus";
 import { askAboutStep } from "../buddyDrafts";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
@@ -228,6 +229,38 @@ export function OnBoardingItemPage() {
       toast.error(err instanceof Error ? err.message : "Couldn't update the task.");
     }
   };
+
+  /**
+   * Re-reads this step after the buddy changed something on it.
+   *
+   * The dock sits over this page, so ticking a line off in the conversation used to leave the
+   * checklist behind it unchanged — the hire's own click looking like it had done nothing. Silent on
+   * purpose: it re-reads the step and its tasks without going back through the loading state, because
+   * the page is already on screen and a spinner over it would be a worse answer than a stale tick
+   * box.
+   */
+  useEffect(
+    () =>
+      onBuddyPathChanged(() => {
+        if (!stepId) return;
+        void (async () => {
+          try {
+            const [step, refreshedTasks] = await Promise.all([
+              onboardingService.fetchStep(stepId),
+              onboardingService.fetchTasks(stepId),
+            ]);
+            setStepDetail(step);
+            setTasks(refreshedTasks);
+            setLocalFinished(
+              new Set(refreshedTasks.filter((task) => task.finished).map((task) => task.id)),
+            );
+          } catch (err) {
+            console.error("Failed to refresh the step after a buddy action:", err);
+          }
+        })();
+      }),
+    [stepId],
+  );
 
   /**
    * Data Fetching Effect: Loads the full hierarchy of a step (details, tasks, resources).

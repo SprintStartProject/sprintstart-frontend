@@ -32,7 +32,7 @@ describe("buddy drafts", () => {
       steps: [],
       questions: [],
       ...over,
-    }) as OnboardingPhaseEndpoint;
+    }) satisfies OnboardingPhaseEndpoint;
 
   const step = (over: Partial<OnboardingStepEndpoint> = {}) =>
     ({
@@ -41,9 +41,18 @@ describe("buddy drafts", () => {
       position: 0,
       title: "Clone the repository",
       description: "",
+      type: "TASK",
+      estimatedMinutes: 20,
+      expectedOutcomes: [],
+      tasks: [],
+      resources: [],
       status: "WAITING",
+      startedAt: null,
+      completedAt: null,
+      feedback: null,
+      skip: null,
       ...over,
-    }) as OnboardingStepEndpoint;
+    }) satisfies OnboardingStepEndpoint;
 
   const question = (over: Partial<OnboardingQuestionEndpoint> = {}) =>
     ({
@@ -54,7 +63,7 @@ describe("buddy drafts", () => {
       question: "Which meeting sets the sprint scope?",
       status: "OPEN",
       ...over,
-    }) as OnboardingQuestionEndpoint;
+    }) satisfies OnboardingQuestionEndpoint;
 
   it("asks in the hire's own voice, not the page's", () => {
     for (const draft of [

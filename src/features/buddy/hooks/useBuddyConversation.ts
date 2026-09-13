@@ -359,6 +359,7 @@ export function useBuddyConversation() {
               stepId: proposal.stepId,
               questionId: proposal.questionId,
               phaseId: proposal.phaseId,
+              onboardingTaskId: proposal.onboardingTaskId,
               answer: proposal.answer,
               description: proposal.description,
               status: "idle",
@@ -437,6 +438,7 @@ export function useBuddyConversation() {
             stepId: action.stepId,
             questionId: action.questionId,
             phaseId: action.phaseId,
+            onboardingTaskId: action.onboardingTaskId,
             answer: action.answer,
             description: action.description,
           });

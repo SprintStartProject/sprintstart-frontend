@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -472,5 +472,94 @@ describe("OnBoardingPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Phase 2" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Phase 1" })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Following a link the buddy wrote.
+ *
+ * The mentor is handed each item's path so that "want to take #3?" can be clickable. A question has
+ * no route of its own — it is a modal on this page — so it arrives as `?question=<id>`, which also
+ * means the link survives being copied, kept or opened in a second tab.
+ */
+describe("OnBoardingPage: links from the buddy", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    projectContextState.selectedProjectId = "proj1";
+  });
+
+  function pathWithQuestion(status: "OPEN" | "LOCKED" | "PASSED") {
+    const phase = phaseFixture("phase-2", 1, "Meetings");
+    return {
+      id: "path1",
+      userId: "user1",
+      createdAt: new Date().toISOString(),
+      generationIssues: [],
+      phases: [
+        phaseFixture("phase-1", 0, "Overview"),
+        {
+          ...phase,
+          questions: [
+            {
+              id: "q-linked",
+              phaseId: phase.id,
+              position: 1,
+              type: "SHORT_TEXT",
+              question: "Who runs the retro?",
+              options: [],
+              status,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  it("opens the question a link names, on its own phase", async () => {
+    server.use(http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))));
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?question=q-linked"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    // The modal, and the phase behind it: a link lands on both, because a question the hire cannot
+    // see the context of is a link that only half arrived.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Who runs the retro?")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
+  });
+
+  it("lands on the phase but opens nothing for a question that cannot be answered", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("LOCKED"))),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?question=q-linked"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    // A modal over a locked question is a link that leads to a dead end; its phase is the useful half.
+    expect(
+      await screen.findByRole("heading", { name: "Meetings", level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("lands on the phase a link names", async () => {
+    server.use(http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))));
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?phase=phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Meetings", level: 2 }),
+    ).toBeInTheDocument();
   });
 });

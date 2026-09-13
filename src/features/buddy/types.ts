@@ -27,6 +27,7 @@ export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
  */
 export const BUDDY_PATH_ACTIONS: readonly string[] = [
   "complete_step",
+  "complete_task",
   "answer_question",
   "add_path_step",
 ];
@@ -83,6 +84,7 @@ export type ProposedAction = {
   stepId?: string;
   questionId?: string;
   phaseId?: string;
+  onboardingTaskId?: string;
   answer?: string;
   description?: string;
   status: ProposedActionStatus;
@@ -170,6 +172,7 @@ export type BuddyStreamHandlers = {
     stepId?: string;
     questionId?: string;
     phaseId?: string;
+    onboardingTaskId?: string;
     answer?: string;
     description?: string;
   }) => void;

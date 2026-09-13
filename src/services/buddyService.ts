@@ -125,6 +125,7 @@ interface BuddyStreamChunk {
   step_id?: string;
   question_id?: string;
   phase_id?: string;
+  onboarding_task_id?: string;
   answer?: string;
   description?: string;
 }
@@ -157,6 +158,7 @@ export async function performAction(
     stepId?: string;
     questionId?: string;
     phaseId?: string;
+    onboardingTaskId?: string;
     answer?: string;
     description?: string;
   } = {},
@@ -175,6 +177,7 @@ export async function performAction(
       stepId: extras.stepId,
       questionId: extras.questionId,
       phaseId: extras.phaseId,
+      onboardingTaskId: extras.onboardingTaskId,
       answer: extras.answer,
       description: extras.description,
     }),
@@ -349,6 +352,7 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               stepId: event.step_id,
               questionId: event.question_id,
               phaseId: event.phase_id,
+              onboardingTaskId: event.onboarding_task_id,
               answer: event.answer,
               description: event.description,
             });
