@@ -94,6 +94,31 @@ export function BuddyActionProposals({
             key={action.id}
             className="flex max-w-full min-w-0 flex-col gap-1.5 rounded-xl border border-app-border bg-app-bg p-2.5"
           >
+            {/* Shown before the press, not after it, and only where the payload is *content*.
+                `place_checklist` is the one action whose confirm writes the mentor's own sentences
+                onto a surface the hire owns — the same reason the assessment proposal names the
+                skill and the level rather than saying "Save this". The lines are in the reply
+                above as well; having them here is what makes the two comparable, so a list that
+                does not match what was written is visible before it is kept, not after. */}
+            {action.checklistItems && action.checklistItems.length > 0 && (
+              <div className="min-w-0">
+                {action.checklistTitle && (
+                  <p className="text-sm font-medium break-words text-app-text">
+                    {action.checklistTitle}
+                  </p>
+                )}
+                <ul className="mt-1 space-y-0.5">
+                  {action.checklistItems.map((item, index) => (
+                    <li
+                      key={`${action.id}-${index}`}
+                      className="text-xs break-words text-app-text-muted"
+                    >
+                      · {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {/* `action.label` is written by the model, so its length is not ours to
                                 assume. In a 384 px panel an unbreakable one would push the button

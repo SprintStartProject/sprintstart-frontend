@@ -58,6 +58,16 @@ export type ProposedAction = {
    */
   competencyKey?: string;
   level?: string;
+  /**
+   * The `place_checklist` confirm payload: the list the buddy wrote and offered to keep.
+   *
+   * Echoed back like every payload above, and here the rule has its sharpest form: these lines are
+   * *content the model wrote*, not a pointer at something that already exists. A client that
+   * re-derived them — from the reply's markdown, say — could keep a card whose words the hire
+   * never read, which is the one thing the confirm button is there to prevent.
+   */
+  checklistTitle?: string;
+  checklistItems?: string[];
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -140,5 +150,7 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    checklistTitle?: string;
+    checklistItems?: string[];
   }) => void;
 };

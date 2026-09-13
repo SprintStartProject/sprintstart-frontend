@@ -354,6 +354,8 @@ export function useBuddyConversation() {
               githubLogin: proposal.githubLogin,
               competencyKey: proposal.competencyKey,
               level: proposal.level,
+              checklistTitle: proposal.checklistTitle,
+              checklistItems: proposal.checklistItems,
               status: "idle",
             });
           },
@@ -427,6 +429,8 @@ export function useBuddyConversation() {
             githubLogin: action.githubLogin,
             competencyKey: action.competencyKey,
             level: action.level,
+            checklistTitle: action.checklistTitle,
+            checklistItems: action.checklistItems,
           });
           patchAction(messageId, action.id, {
             status: "resolved",

@@ -141,6 +141,70 @@ describe("BuddyActionProposals", () => {
   });
 
   /**
+   * The one action whose confirm writes the mentor's own sentences onto the hire's board. Which is
+   * why the lines are on the offer: "Keep this" over words somebody else wrote is not something to
+   * agree to blind.
+   */
+  describe("a proposed checklist", () => {
+    const proposal = () =>
+      action({
+        action: "place_checklist",
+        label: "Keep this as a checklist",
+        checklistTitle: "Getting started on the skill-gap view",
+        checklistItems: ["Find the component", "Run it locally", "Open a draft PR"],
+      });
+
+    it("shows what would be kept, before it is kept", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[proposal()]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Getting started on the skill-gap view")).toBeInTheDocument();
+      expect(screen.getByText(/Find the component/)).toBeInTheDocument();
+      expect(screen.getByText(/Open a draft PR/)).toBeInTheDocument();
+    });
+
+    /** The lines ride back verbatim, so what is kept is what they read. */
+    it("hands the lines back on confirm rather than re-deriving them", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[proposal()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /keep this as a checklist/i }));
+
+      expect(onConfirm.mock.calls[0][1]).toMatchObject({
+        checklistTitle: "Getting started on the skill-gap view",
+        checklistItems: ["Find the component", "Run it locally", "Open a draft PR"],
+      });
+    });
+
+    /** Every other action carries a target, not content — nothing to preview there. */
+    it("previews nothing for an action that carries no list", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[action({})]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+  });
+
+  /**
    * A refusal is not always permanent, and the mentor is never told what became of a proposal — so
    * a spent confirm left the hire with no control while being asked to press one.
    */
