@@ -183,6 +183,34 @@ describe("the cards the hire writes", () => {
     expect(onEdit.mock.calls[0][1].items[1]).toEqual({ text: "read the runbook", done: false });
   });
 
+  /**
+   * A checklist minted from a task is the hire's working copy of it, and the link is the only
+   * thing tying the two together — ticking a line here never reaches the task.
+   */
+  it("a checklist made from a task carries the way back to it", () => {
+    const onEdit = vi.fn();
+    render(
+      <BoardGrid
+        board={board([checklist([{ id: "i1", text: "Reproduce it", done: false }], "Fix login")])}
+        cardOrigins={{
+          c0: { url: "https://example.test/issues/7", label: "Fix login" },
+        }}
+        onEdit={onEdit}
+      />,
+    );
+
+    const back = screen.getByRole("link", { name: /back to fix login/i });
+    expect(back).toHaveAttribute("href", "https://example.test/issues/7");
+    // The tracker opens beside the board rather than in place of it.
+    expect(back).toHaveAttribute("target", "_blank");
+
+    fireEvent.click(screen.getByLabelText("Reproduce it"));
+
+    // The tick is an edit to the hire's card and nothing else: no second call goes anywhere.
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit.mock.calls[0][1]).toMatchObject({ kind: "CHECKLIST" });
+  });
+
   it("counts a checklist rather than scoring it", () => {
     render(
       <BoardGrid
