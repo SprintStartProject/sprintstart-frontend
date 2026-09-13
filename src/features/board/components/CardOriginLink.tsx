@@ -21,6 +21,14 @@ type CardOriginLinkProps = {
  *
  * Renders nothing when there is no origin. Most cards have none: the live cards were never "found"
  * anywhere, and a note typed straight into the board came from the board.
+ *
+ * **`flex w-fit`, not `inline-flex`, and that is the whole reason this line sits alone.** The
+ * control that follows it on a card — `AskTheBuddy` — is itself inline, so two inline boxes shared
+ * a line and JSX eats the whitespace between sibling elements: "Back to <somewhere>" ran straight
+ * into "Ask your buddy about this" as though a space had been dropped, and a long origin label
+ * crowded it further. Block-level puts provenance on its own row and lets the next control's own
+ * `mt-3` do the spacing; `w-fit` keeps the hit area on the words rather than stretching it across
+ * the card.
  */
 export function CardOriginLink({ origin }: CardOriginLinkProps) {
   if (!origin) return null;
@@ -28,7 +36,7 @@ export function CardOriginLink({ origin }: CardOriginLinkProps) {
   return (
     <a
       href={origin.url}
-      className="mt-3 inline-flex max-w-full items-center gap-1.5 text-xs text-app-text-muted hover:text-app-text hover:underline"
+      className="mt-3 flex w-fit max-w-full items-center gap-1.5 text-xs text-app-text-muted hover:text-app-text hover:underline"
     >
       <CornerUpLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {/* "Back to", not "From". A note made out of a selection already carries `From <place>` as the
