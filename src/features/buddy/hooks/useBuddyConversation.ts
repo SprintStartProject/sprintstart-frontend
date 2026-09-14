@@ -360,6 +360,8 @@ export function useBuddyConversation() {
               linkUrl: proposal.linkUrl,
               linkLabel: proposal.linkLabel,
               noteText: proposal.noteText,
+              lineBefore: proposal.lineBefore,
+              lineAfter: proposal.lineAfter,
               status: "idle",
             });
           },
@@ -439,6 +441,8 @@ export function useBuddyConversation() {
             linkUrl: action.linkUrl,
             linkLabel: action.linkLabel,
             noteText: action.noteText,
+            lineBefore: action.lineBefore,
+            lineAfter: action.lineAfter,
           });
           patchAction(messageId, action.id, {
             status: "resolved",

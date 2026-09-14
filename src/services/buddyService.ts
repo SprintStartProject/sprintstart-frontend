@@ -135,6 +135,9 @@ interface BuddyStreamChunk {
   link_label?: string;
   /** `place_note` confirm payload. */
   note_text?: string;
+  /** `reword_checklist_item`: the line as it reads now, and as it would read. */
+  line_before?: string;
+  line_after?: string;
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -166,6 +169,8 @@ export async function performAction(
     linkUrl?: string;
     linkLabel?: string;
     noteText?: string;
+    lineBefore?: string;
+    lineAfter?: string;
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -185,6 +190,8 @@ export async function performAction(
       linkUrl: extras.linkUrl,
       linkLabel: extras.linkLabel,
       noteText: extras.noteText,
+      lineBefore: extras.lineBefore,
+      lineAfter: extras.lineAfter,
     }),
   });
 }
@@ -360,6 +367,8 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               linkUrl: event.link_url,
               linkLabel: event.link_label,
               noteText: event.note_text,
+              lineBefore: event.line_before,
+              lineAfter: event.line_after,
             });
           }
           break;

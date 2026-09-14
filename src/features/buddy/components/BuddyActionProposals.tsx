@@ -1,6 +1,10 @@
 import { Check, Loader2, RotateCcw, X } from "lucide-react";
 import type { ProposedAction } from "../types";
-import { BUDDY_ACTION_AMEND_CHECKLIST, BUDDY_ACTION_OPEN_ORIENTATION } from "../types";
+import {
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_OPEN_ORIENTATION,
+  BUDDY_ACTION_TICK_CHECKLIST,
+} from "../types";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
 
 type BuddyActionProposalsProps = {
@@ -115,6 +119,11 @@ export function BuddyActionProposals({
                     Added to the end of that list — nothing on it changes:
                   </p>
                 )}
+                {action.action === BUDDY_ACTION_TICK_CHECKLIST && (
+                  <p className="text-xs text-app-text-muted">
+                    Ticked off on that list — nothing else on it changes:
+                  </p>
+                )}
                 <ul className="mt-1 space-y-0.5">
                   {action.checklistItems.map((item, index) => (
                     <li
@@ -138,6 +147,16 @@ export function BuddyActionProposals({
                   </p>
                 )}
                 <p className="text-xs break-all text-app-text-muted">{action.linkUrl}</p>
+              </div>
+            )}
+
+            {/* The one offer that *replaces* something already on a card, so it shows both: the
+                line as it reads now and as it would read. Only the new wording would be asking
+                them to agree to a change they would have to go and diff for themselves. */}
+            {action.lineBefore && action.lineAfter && (
+              <div className="min-w-0 text-xs">
+                <p className="break-words text-app-text-muted line-through">{action.lineBefore}</p>
+                <p className="break-words text-app-text">{action.lineAfter}</p>
               </div>
             )}
 
