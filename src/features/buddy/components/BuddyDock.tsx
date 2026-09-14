@@ -3,16 +3,14 @@ import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
 import { BuddyThread } from "./BuddyThread";
-import { SaveReplyToBoard } from "./SaveReplyToBoard";
-import { BookmarkPlus } from "lucide-react";
-import { SaveToBoard } from "../../board/save/SaveToBoard";
-import { buddyReplyNote } from "../../board/generation/chatToCard";
+import { BuddyReplyActions } from "./BuddyReplyActions";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 
 /**
@@ -249,8 +247,10 @@ export function BuddyDock({
                     aborting the stream is the other half and belongs in the session, alongside
                     the same gap on `BuddyPage`. */}
           {hasUserMessage && !isBusy && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
+              iconOnly
               onClick={() => void startFreshVisit()}
               aria-label="Start a new conversation"
               // No chord named here, deliberately. The window floats over every page, and
@@ -258,10 +258,9 @@ export function BuddyDock({
               // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
               // would be promising a key that does somebody else's job.
               title="Start a new conversation — your buddy keeps what it has learned about you"
-              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
             >
               <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
           )}
 
           {/* The answer to "this is too small" is the page that already exists, rather than a
@@ -269,26 +268,28 @@ export function BuddyDock({
                     components with room to spare. The draft goes with it — a control that
                     discarded what somebody was typing would be worse than not offering one. */}
           {onOpenFull && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
+              iconOnly
               onClick={onOpenFull}
               aria-label="Open the full buddy page"
               title="Open the full page"
-              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
             >
               <Maximize2 className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
           )}
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
+            iconOnly
             onClick={onClose}
             aria-label="Minimise your buddy"
             title="Minimise"
-            className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
           >
             <Minus className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </Button>
         </header>
 
         <div
@@ -298,22 +299,8 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
-            renderReplyAction={(reply) => (
-              <div className="flex flex-wrap items-center gap-1">
-                <SaveReplyToBoard content={reply} />
-                {/* Icon-only here and worded on the page. The dock is a narrow column beside
-                    whatever the hire was actually doing, and a second worded button in it wraps to
-                    its own line — the same control, sized for where it is. */}
-                <SaveToBoard
-                  request={() => buddyReplyNote(reply)}
-                  label="Keep this answer on my board"
-                  savedLabel="On your board"
-                  description="The reply, frozen as a note."
-                  icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
-                  iconOnly
-                />
-              </div>
-            )}
+            renderReplyAction={(reply) => <BuddyReplyActions reply={reply} />}
+            compact
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}
@@ -343,15 +330,17 @@ export function BuddyDock({
                 compact
                 headingAction={
                   onHideSuggestions && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      iconOnly
                       onClick={onHideSuggestions}
                       aria-label="Hide suggestions"
                       title="Hide suggestions"
-                      className="-mr-1 rounded p-1 text-app-text-disabled transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="-my-1.5 -mr-1.5"
                     >
                       <X className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                    </Button>
                   )
                 }
               />

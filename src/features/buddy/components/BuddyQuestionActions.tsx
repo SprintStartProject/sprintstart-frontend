@@ -13,11 +13,15 @@ import { FlagToPmButton } from "../../knowledge-request/components/FlagToPmButto
  */
 export function BuddyQuestionActions({ question }: { question: string }) {
   return (
-    <FlagToPmButton
-      defaultQuestion={question}
-      // Short, because it repeats under every question. The default phrasing ("Buddy can't
-      // help?") is a reaction to an answer, which is not what this is attached to any more.
-      triggerLabel="Send this to your PM"
-    />
+    // Pulled right by the button's own padding, so the flag's label ends on the bubble's edge —
+    // the mirror of `BuddyReplyActions` under the buddy's side.
+    <div className="-mr-2 flex justify-end">
+      <FlagToPmButton
+        defaultQuestion={question}
+        // Short, because it repeats under every question. The default phrasing ("Buddy can't
+        // help?") is a reaction to an answer, which is not what this is attached to any more.
+        triggerLabel="Send this to your PM"
+      />
+    </div>
   );
 }

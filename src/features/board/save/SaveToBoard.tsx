@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 
-import { Button } from "../../../components/ui/Button";
+import { Button, type ButtonSize } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -26,6 +26,8 @@ type SaveToBoardProps = {
   /** The second line of the toast: what exactly landed on the board. */
   description?: string;
   iconOnly?: boolean;
+  /** `xs` under a chat message, where it sits beside the other quiet message actions. */
+  size?: ButtonSize;
   className?: string;
 };
 
@@ -54,6 +56,7 @@ export function SaveToBoard({
   icon,
   description,
   iconOnly = false,
+  size = "sm",
   className = "",
 }: SaveToBoardProps) {
   const { selectedProjectId } = useProjectContext();
@@ -90,7 +93,7 @@ export function SaveToBoard({
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size={size}
       iconOnly={iconOnly}
       className={className}
       loading={saving}
