@@ -29,6 +29,18 @@ export const BUDDY_ACTION_PLACE_CHECKLIST = "place_checklist";
 /** The backend's `amend_checklist` action: lines the mentor would add to a list they already have. */
 export const BUDDY_ACTION_AMEND_CHECKLIST = "amend_checklist";
 
+/**
+ * The backend's `tick_checklist_items` action: lines the hire has said they finished.
+ *
+ * Carried in the same payload field as an amendment's, and drawn differently for it — one adds
+ * lines the mentor wrote, the other ticks lines the hire already has, and confirming the wrong one
+ * changes a card in a way they did not mean.
+ */
+export const BUDDY_ACTION_TICK_CHECKLIST = "tick_checklist_items";
+
+/** The backend's `reword_checklist_item` action: one line replaced, shown before and after. */
+export const BUDDY_ACTION_REWORD_CHECKLIST = "reword_checklist_item";
+
 export type ProposedAction = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
@@ -92,6 +104,15 @@ export type ProposedAction = {
   linkLabel?: string;
   /** `place_note` confirm payload: the note's text, shown on the offer before it is kept. */
   noteText?: string;
+  /**
+   * `reword_checklist_item`: the line as it reads now, and as it would read.
+   *
+   * Both, because this is the one action that *replaces* something the hire can already see. An
+   * offer showing only the new wording would be asking them to agree to a change they would have
+   * to go and diff.
+   */
+  lineBefore?: string;
+  lineAfter?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -189,5 +210,7 @@ export type BuddyStreamHandlers = {
     linkUrl?: string;
     linkLabel?: string;
     noteText?: string;
+    lineBefore?: string;
+    lineAfter?: string;
   }) => void;
 };
