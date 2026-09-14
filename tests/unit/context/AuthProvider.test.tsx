@@ -21,6 +21,7 @@ const DummyConsumer = () => {
 describe("AuthProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
   });
 
   it("shows loading state while keycloak initializes", () => {
@@ -81,6 +82,38 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("status")).toHaveTextContent("unauthenticated");
     });
   });
+
+  it.each([false, true])(
+    "keeps the logout marker until SSO settles (login required: %s)",
+    async (loginRequired) => {
+      sessionStorage.setItem("sprintstart.boot.signout", "1");
+      let settle!: () => void;
+      mockKeycloakInstance.init.mockReturnValue(
+        new Promise<boolean>((resolve, reject) => {
+          settle = () => {
+            if (loginRequired) {
+              reject(Object.assign(new Error("Login required"), { error: "login_required" }));
+            } else resolve(false);
+          };
+        }),
+      );
+
+      render(
+        <AuthProvider>
+          <DummyConsumer />
+        </AuthProvider>,
+      );
+
+      expect(screen.getByTestId("status")).toHaveTextContent("loading");
+      expect(sessionStorage.getItem("sprintstart.boot.signout")).toBe("1");
+
+      settle();
+      await waitFor(() => {
+        expect(screen.getByTestId("status")).toHaveTextContent("unauthenticated");
+      });
+      expect(sessionStorage.getItem("sprintstart.boot.signout")).toBeNull();
+    },
+  );
 
   it("retries fetching profile on null response", async () => {
     mockKeycloakInstance.init.mockResolvedValue(true);

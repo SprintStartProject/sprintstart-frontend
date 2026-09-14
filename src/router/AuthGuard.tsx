@@ -52,8 +52,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
       setCheckingSkillAssessment(true);
 
-      // Nothing here may throw past this point: the guard renders a full-screen spinner
-      // while it runs, so an unhandled rejection leaves the whole app on that spinner.
+      // Nothing here may throw past this point: the guard renders a loading skeleton
+      // while it runs, so an unhandled rejection leaves the whole app on that skeleton.
       // A user whose overview cannot be read (no onboarding path, or a role that may not
       // read it) simply has no assessment to prompt for — that is not a reason to lock
       // them out of the app.
@@ -84,6 +84,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     void checkSkillAssessment();
   }, [status, profile?.id]);
+
+  // The boot script detects the logout return before React mounts.
+  // Keep that return load blank until auth settles, just like its suppressed splash.
+  if (status === "loading" && window.__bootSigningOut) return null;
 
   if (status === "loading" || checkingSkillAssessment) {
     return <PageShellSkeleton />;

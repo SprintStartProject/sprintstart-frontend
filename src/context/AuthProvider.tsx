@@ -5,7 +5,7 @@ import type { UserProfile } from "../services/types";
 import { AuthContext, type AuthStatus, type LoginOptions } from "./AuthContext";
 import keycloak from "../config/keycloak";
 import { queryClient } from "../services/queryClient";
-import { markSigningOut } from "../bootSplash";
+import { clearSigningOut, markSigningOut } from "../bootSplash";
 import { buildRedirectUri, clearRedirectTarget, storeRedirectTarget } from "../auth/redirectUtils";
 /**
  * Provider component that manages the global authentication state via Keycloak.
@@ -70,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error("Keycloak initialization failed", error);
         }
         setStatus("unauthenticated");
+      } finally {
+        clearSigningOut();
       }
     };
 

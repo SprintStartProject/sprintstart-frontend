@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthGuard } from "../../../src/router/AuthGuard";
 import { useAuth } from "../../../src/context/useAuth";
@@ -44,6 +44,7 @@ describe("AuthGuard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    delete window.__bootSigningOut;
     vi.mocked(teamManagementService.hasCompletedSkillAssessment).mockResolvedValue(true);
     vi.mocked(teamManagementService.getMyTeamOverview).mockResolvedValue({
       userId: "user1",
@@ -61,7 +62,11 @@ describe("AuthGuard", () => {
     vi.mocked(teamManagementService.getSkillAssessmentPromptState).mockReturnValue(null);
   });
 
-  it("renders loading spinner when status is loading", () => {
+  afterEach(() => {
+    delete window.__bootSigningOut;
+  });
+
+  it("renders the page skeleton during normal auth loading", () => {
     vi.mocked(useAuth).mockReturnValue({
       status: "loading",
       profile: null,
@@ -85,8 +90,61 @@ describe("AuthGuard", () => {
       </MemoryRouter>,
     );
 
+    expect(container.querySelector("header .animate-pulse")).toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByText("Protected")).not.toBeInTheDocument();
+  });
+
+  it("keeps the logout return blank until auth settles, then renders login", () => {
+    window.__bootSigningOut = true;
+    const auth = {
+      status: "loading" as const,
+      profile: null,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    };
+    vi.mocked(useAuth).mockReturnValue(auth);
+
+    const page = () => (
+      <StrictMode>
+        <MemoryRouter initialEntries={["/login"]}>
+          <AuthGuard>
+            <div>Login Page</div>
+          </AuthGuard>
+        </MemoryRouter>
+      </StrictMode>
+    );
+    const { container, rerender } = render(page());
+
+    expect(container).toBeEmptyDOMElement();
+
+    vi.mocked(useAuth).mockReturnValue({ ...auth, status: "unauthenticated" });
+    rerender(page());
+
+    expect(screen.getByText("Login Page")).toBeInTheDocument();
+    expect(container.querySelector("header")).not.toBeInTheDocument();
+  });
+
+  it("keeps the skeleton when opening login without a logout", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "loading",
+      profile: null,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <AuthGuard>
+          <div>Login Page</div>
+        </AuthGuard>
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector("header .animate-pulse")).toBeInTheDocument();
+    expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
   });
 
   it("redirects to /login if unauthenticated and not on /login", async () => {

@@ -662,14 +662,18 @@
         // after a sign-out carries no auth parameters at all, so the app leaves
         // a note for it on the way out (see markSigningOut in bootSplash.ts).
         var signedOut = /[?&#]error=/.test(url);
+        var signingOut = false;
         try {
           if (window.sessionStorage.getItem(SIGNOUT_KEY)) {
-            window.sessionStorage.removeItem(SIGNOUT_KEY);
+            signingOut = true;
             signedOut = true;
           }
         } catch (error) {
           // No session storage: the `error=` leg still gets caught below.
         }
+
+        // Keep logout blank across the SSO round-trip until AuthProvider settles.
+        window.__bootSigningOut = signingOut;
 
         if (signedOut) {
           splash.remove();

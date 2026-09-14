@@ -17,6 +17,8 @@ declare global {
   interface Window {
     /** Published by the inline boot script; absent in tests and Storybook. */
     __bootSplash?: { start: number; flightMs: number };
+    /** Logout return detected by index.html; suppresses the auth loading shell. */
+    __bootSigningOut?: boolean;
   }
 }
 
@@ -80,14 +82,23 @@ export function rememberBootGreeting(firstName: string | null | undefined): void
  * for somebody leaving, cut short a moment later when the app works out that
  * nobody is signed in.
  *
- * In `sessionStorage` rather than `localStorage`, and cleared by the very next
- * load that reads it: it describes one navigation, not a preference.
+ * In `sessionStorage` rather than `localStorage`, and cleared once auth settles
+ * after the SSO round-trip: it describes one logout, not a preference.
  */
 export function markSigningOut(): void {
   try {
     window.sessionStorage.setItem(SIGNOUT_KEY, "1");
   } catch {
     // The splash will briefly show a pad. Not worth failing a sign-out for.
+  }
+}
+
+/** Clears the logout marker once auth settles, so later boots load normally. */
+export function clearSigningOut(): void {
+  try {
+    window.sessionStorage.removeItem(SIGNOUT_KEY);
+  } catch {
+    // Storage may be unavailable, just as when writing the marker.
   }
 }
 
