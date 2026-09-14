@@ -8,13 +8,15 @@ import { starterWorkService } from "../../../../src/services/starterWorkService"
 import { userService } from "../../../../src/services/userService";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 
+const selectedProjectId = vi.hoisted(() => ({ current: "p1" }));
+
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
     await import("../../setup/projectContext");
   return {
     useProjectContext: () =>
       createProjectContextValue({
-        selectedProjectId: "p1",
+        selectedProjectId: selectedProjectId.current,
         projects: [createSelectableProject({ id: "p1", name: "Project One" })],
         selectedProject: createSelectableProject({ id: "p1", name: "Project One" }),
       }),
@@ -47,6 +49,7 @@ describe("StarterWorkPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     permissionGroup.current = "PM";
+    selectedProjectId.current = "p1";
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [task] });
     // The page loads the live pool for the overview alongside the review queue. Stub it (and the
     // caller's projects) so these tests stay about the review queue.
@@ -194,7 +197,7 @@ describe("StarterWorkPage", () => {
   });
 
   it("shows generated work as a success toast", async () => {
-    vi.spyOn(starterWorkService, "generate").mockResolvedValue({
+    const generateSpy = vi.spyOn(starterWorkService, "generate").mockResolvedValue({
       status: "COMPLETED",
       tasksProposed: 2,
       notes: [],
@@ -205,6 +208,14 @@ describe("StarterWorkPage", () => {
     await user.click(await screen.findByTestId("generate-starter-work"));
 
     expect(await screen.findByText("2 tasks added")).toBeInTheDocument();
+    expect(generateSpy).toHaveBeenCalledWith("p1");
+  });
+
+  it("disables mining without a selected project", async () => {
+    selectedProjectId.current = "";
+    render(<StarterWorkPage />);
+
+    expect(await screen.findByTestId("generate-starter-work")).toBeDisabled();
   });
 
   it("surfaces a failed load", async () => {

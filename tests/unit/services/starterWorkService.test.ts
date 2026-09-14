@@ -7,6 +7,19 @@ describe("starterWorkService", () => {
     vi.restoreAllMocks();
   });
 
+  it("triggers mining scoped to the project", async () => {
+    const fetchSpy = vi
+      .spyOn(apiClient, "fetch")
+      .mockResolvedValue({ status: "OK", tasksProposed: 0, notes: [] });
+
+    await starterWorkService.generate("p1");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/v1/onboarding/starter-work/generate?projectId=p1",
+      { method: "POST" },
+    );
+  });
+
   it("reads candidate issues scoped to the project", async () => {
     const fetchSpy = vi.spyOn(apiClient, "fetch").mockResolvedValue([]);
 

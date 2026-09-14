@@ -303,8 +303,9 @@ export function StarterWorkPage() {
                 <button
                   type="button"
                   data-testid="generate-starter-work"
-                  onClick={() => void generate()}
-                  disabled={isGenerating}
+                  onClick={() => void generate(selectedProjectId)}
+                  disabled={isGenerating || !selectedProjectId}
+                  title={!selectedProjectId ? "Pick a project first" : undefined}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isGenerating ? (
