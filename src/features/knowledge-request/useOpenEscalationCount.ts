@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   knowledgeRequestService,
   onOpenEscalationsChanged,
 } from "../../services/knowledgeRequestService";
 import { useRateLimitedRead } from "../../hooks/useRateLimitedRead";
+import { queryKeys } from "../../services/queryKeys";
 
 /**
  * How many escalated questions are still waiting on a person for this project.
@@ -33,23 +35,24 @@ export function useOpenEscalationCount(
   enabled: boolean,
   refreshKey?: string,
 ): number {
-  // Bumped when the queue demonstrably changed under the PM's own hands, so the
-  // recheck is immediate rather than waiting for a navigation that may never
-  // come — they can answer every question without leaving the inbox.
-  const [changeNonce, setChangeNonce] = useState(0);
+  const queryClient = useQueryClient();
 
-  useEffect(
-    () =>
-      onOpenEscalationsChanged(() => {
-        setChangeNonce((current) => current + 1);
-      }),
-    [],
+  // Re-subscribed on a project switch so the closure always invalidates the
+  // project actually on screen. What used to be a local nonce bumped on this
+  // event is now a direct cache invalidation of that project's own query.
+  useEffect(() => {
+    if (!projectId) return;
+    return onOpenEscalationsChanged(() => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledgeRequest.openCount(projectId),
+      });
+    });
+  }, [queryClient, projectId]);
+
+  return useRateLimitedRead(
+    queryKeys.knowledgeRequest.openCount(projectId ?? ""),
+    () => knowledgeRequestService.countOpen(projectId as string),
+    0,
+    { enabled: enabled && Boolean(projectId), refreshKey },
   );
-
-  return useRateLimitedRead(() => knowledgeRequestService.countOpen(projectId as string), 0, {
-    key: projectId,
-    enabled,
-    refreshKey,
-    nonce: changeNonce,
-  });
 }

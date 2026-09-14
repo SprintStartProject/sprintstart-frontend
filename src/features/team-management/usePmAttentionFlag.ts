@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getTeamOverview, onPmAttentionChanged } from "../../services/teamManagementService";
 import { MIN_REFRESH_INTERVAL_MS, useRateLimitedRead } from "../../hooks/useRateLimitedRead";
+import { queryKeys } from "../../services/queryKeys";
 
 export { MIN_REFRESH_INTERVAL_MS };
 
@@ -31,25 +33,26 @@ export function usePmAttentionFlag(
   enabled: boolean,
   refreshKey?: string,
 ): boolean {
-  // Bumped when the user acts on the very thing the badge points at, so the
-  // recheck is immediate rather than waiting for the rate limit to lapse. Stays
-  // here rather than in the generic hook: it is this signal's own bus.
-  const [changeNonce, setChangeNonce] = useState(0);
+  const queryClient = useQueryClient();
+  const isActive = enabled && Boolean(projectId);
 
-  useEffect(
-    () =>
-      onPmAttentionChanged(() => {
-        setChangeNonce((current) => current + 1);
-      }),
-    [],
-  );
+  // Re-subscribed on a project switch so the closure always invalidates the
+  // project actually on screen. What used to be a local nonce bumped on this
+  // event is now a direct cache invalidation of that project's own query.
+  useEffect(() => {
+    if (!projectId) return;
+    return onPmAttentionChanged(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pmAttention.byProject(projectId) });
+    });
+  }, [queryClient, projectId]);
 
   return useRateLimitedRead(
+    queryKeys.pmAttention.byProject(projectId ?? ""),
     async () => {
       const users = await getTeamOverview(undefined, undefined, [projectId as string]);
       return users.some((user) => user.hasFeedback || user.currentStep?.skip?.status === "PENDING");
     },
     false,
-    { key: projectId, enabled, refreshKey, nonce: changeNonce },
+    { enabled: isActive, refreshKey },
   );
 }

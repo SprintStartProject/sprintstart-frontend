@@ -66,6 +66,10 @@ export const queryKeys = {
   knowledgeRequest: {
     open: (projectId: string) => ["knowledge-request", "open", projectId] as const,
     answers: (projectId: string) => ["knowledge-request", "answers", projectId] as const,
+    openCount: (projectId: string) => ["knowledge-request", "open-count", projectId] as const,
+  },
+  pmAttention: {
+    byProject: (projectId: string) => ["pm-attention", projectId] as const,
   },
   onboardingMetrics: {
     project: (projectId: string) => ["onboarding-metrics", "project", projectId] as const,
