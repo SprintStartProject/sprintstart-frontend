@@ -10,12 +10,18 @@
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
+  OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
 } from "./types";
 
-/** A step still waiting to be done — neither finished nor skipped. */
+/** A step still waiting to be done — neither finished nor skipped nor locked. */
 export function isStepOpen(step: OnboardingStepEndpoint): boolean {
   return step.status !== "FINISHED" && step.status !== "SKIPPED";
+}
+
+/** A question still waiting to be answered — not passed yet. */
+export function isQuestionOpen(question: OnboardingQuestionEndpoint): boolean {
+  return question.status !== "PASSED";
 }
 
 export type PathProgress = {
@@ -49,8 +55,7 @@ export function countPathProgress(path: OnboardingPathEndpoint): PathProgress {
  */
 export type OnboardingNextAction =
   | { kind: "step"; phase: OnboardingPhaseEndpoint; step: OnboardingStepEndpoint }
-  | { kind: "check"; phase: OnboardingPhaseEndpoint; isFinalPhase: boolean }
-  | { kind: "review"; openCount: number }
+  | { kind: "question"; phase: OnboardingPhaseEndpoint; question: OnboardingQuestionEndpoint }
   | { kind: "done" };
 
 function byPosition<T extends { position: number }>(items: readonly T[]): T[] {
@@ -58,44 +63,35 @@ function byPosition<T extends { position: number }>(items: readonly T[]): T[] {
 }
 
 /**
- * Resolves the next action from a path and the size of the review pool.
+ * Resolves the next action from a path.
  *
  * Walks the phases in order and stops at the first one with anything open, which is what
  * keeps the answer inside the phase the member is actually allowed to be in:
  *
- * - **Locked phases are skipped entirely.** Their steps exist but cannot be started, so
- *   offering one leads to a step the backend refuses. This is the difference to reading
- *   `currentStep` off the team overview, which reports the first unfinished step in the
- *   path regardless of locks — for someone standing in front of an unpassed check that is
- *   a step in the *next* phase, which is exactly where they may not go.
- * - **A phase's knowledge check comes before anything in a later phase.** Once its steps
- *   are done the check is that phase's last item, and while it is unpassed nothing behind
- *   it is reachable.
- * - **The review pool outlives the phases.** Questions missed earlier have to be answered
- *   correctly once, and the backend does not count the journey as finished while any are
- *   still open — so a path whose phases are all cleared can still have work left.
+ * - **Locked phases are skipped entirely.** Their steps and questions exist but cannot be
+ *   started, so offering one leads to a step the backend refuses.
+ * - **Within a phase, position order wins, mixing steps and questions.** Questions are
+ *   first-class nodes next to steps, so the next action is the first open, unlocked item —
+ *   whichever kind it is.
+ * - **A question that was answered wrong stays open** until answered correctly once; it
+ *   has no separate review pool to fall back to.
  *
  * @param path The member's own path, as returned by `GET /onboarding/me/path`.
- * @param openReviewCount Questions waiting in the review pool. Only consulted when the
- *   phases have nothing left, so callers may leave it out while they do not know it yet.
  */
-export function resolveNextAction(
-  path: OnboardingPathEndpoint,
-  openReviewCount = 0,
-): OnboardingNextAction {
+export function resolveNextAction(path: OnboardingPathEndpoint): OnboardingNextAction {
   const phases = byPosition(path.phases);
-  const finalPhaseId = phases.at(-1)?.id;
 
   for (const phase of phases) {
     if (phase.locked) continue;
 
-    const openStep = byPosition(phase.steps).find(isStepOpen);
+    const openStep = byPosition(phase.steps).find((step) => isStepOpen(step) && !step.locked);
     if (openStep) return { kind: "step", phase, step: openStep };
 
-    if (phase.checkSummary?.required && !phase.checkSummary.passed) {
-      return { kind: "check", phase, isFinalPhase: phase.id === finalPhaseId };
-    }
+    const openQuestion = byPosition(phase.questions).find(
+      (question) => isQuestionOpen(question) && question.status !== "LOCKED",
+    );
+    if (openQuestion) return { kind: "question", phase, question: openQuestion };
   }
 
-  return openReviewCount > 0 ? { kind: "review", openCount: openReviewCount } : { kind: "done" };
+  return { kind: "done" };
 }

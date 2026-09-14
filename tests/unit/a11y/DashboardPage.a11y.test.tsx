@@ -11,6 +11,7 @@ import { createProjectContextValue, createSelectableProject } from "../setup/pro
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     permissionGroup: undefined as PermissionGroup | undefined,
+    hasCompletedOnboarding: false,
     projectContext: null as ProjectContextValue | null,
   },
 }));
@@ -27,7 +28,7 @@ vi.mock("../../../src/context/useAuth", () => ({
       projectRoles: [],
       projectIds: [],
       permissionGroup: mocks.permissionGroup,
-      hasCompletedOnboarding: false,
+      hasCompletedOnboarding: mocks.hasCompletedOnboarding,
     },
   }),
 }));
@@ -74,6 +75,7 @@ vi.mock("../../../src/services/knowledgeGapService", () => ({
 describe("DashboardPage Accessibility", () => {
   beforeEach(() => {
     mocks.permissionGroup = undefined;
+    mocks.hasCompletedOnboarding = false;
     mocks.projectContext = createProjectContextValue();
   });
 
@@ -104,6 +106,10 @@ describe("DashboardPage Accessibility", () => {
   // a button, holding the severity ring and its legend.
   it("should not have any a11y violations with the team insights in the slot", async () => {
     mocks.permissionGroup = PermissionGroup.ADMIN;
+    // A running onboarding outranks the team insights for the one slot both want, and the
+    // shared handler answers with a path that still has a step open — so the journey has to
+    // be over for the manager's own card to be the one that lands there.
+    mocks.hasCompletedOnboarding = true;
     mocks.projectContext = createProjectContextValue({
       projects: [createSelectableProject({ id: "1", name: "Apollo" })],
       selectedProject: createSelectableProject({ id: "1", name: "Apollo" }),
