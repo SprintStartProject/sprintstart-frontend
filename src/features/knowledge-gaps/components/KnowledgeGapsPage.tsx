@@ -18,6 +18,7 @@ import { ShieldAlert, Clock, Filter, X, RefreshCw, FileText, User } from "lucide
 import { AnimatePresence, motion } from "framer-motion";
 import { PageShell } from "../../../components/layout/PageShell";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { buttonHoverMotion } from "../../../styles/tokens";
 
@@ -54,9 +55,8 @@ export function KnowledgeGapsPage() {
     loading,
     error,
     refresh,
-  } = useLiveFetch(
-    () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [selectedProjectId],
+  } = useLiveFetch(queryKeys.knowledgeGaps.overview(selectedProjectId), () =>
+    knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
   );
 
   // The backend rescans on its own once new documentation is indexed; while it

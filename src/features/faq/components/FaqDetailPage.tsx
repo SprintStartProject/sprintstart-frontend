@@ -10,7 +10,8 @@ import { insightsService } from "../../../services/faqService";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { PageShell } from "../../../components/layout/PageShell";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { TrendBadge } from "./TrendBadge";
 import { formatAskedAt } from "../format";
@@ -38,11 +39,8 @@ export function FaqDetailPage() {
     data: detail,
     loading,
     error,
-  } = useFetch(
-    () => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
-    // The project is part of what is being fetched, so switching it has to
-    // refetch -- otherwise the page keeps showing the previous project's entry.
-    [selectedProjectId, groupId],
+  } = useQueryFetch(queryKeys.faq.detail(selectedProjectId, groupId ?? ""), () =>
+    insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
   );
 
   // ── RENDER ───────────────────────────────────────────────

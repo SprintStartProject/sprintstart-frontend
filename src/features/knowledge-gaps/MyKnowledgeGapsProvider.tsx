@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "../../context/useAuth";
-import { useFetch } from "../../hooks/useFetch";
+import { useQueryFetch } from "../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
+import { queryKeys } from "../../services/queryKeys";
 import { useProjectContext } from "../projects/useProjectContext";
 import { MyKnowledgeGapsContext, type MyKnowledgeGapsValue } from "./MyKnowledgeGapsContext";
 import { readSeenComponents, storeSeenComponents } from "./ownerAnnouncement";
@@ -26,12 +27,12 @@ export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
   const userId = profile?.id ?? "";
   const canAsk = status === "authenticated" && selectedProjectId !== "";
 
-  const { data, loading, error } = useFetch(
+  const { data, loading, error } = useQueryFetch(
+    queryKeys.knowledgeGaps.mine(selectedProjectId),
     () =>
       canAsk
         ? knowledgeGapService.fetchMyKnowledgeGaps(selectedProjectId)
         : Promise.resolve({ gaps: [] }),
-    [canAsk, selectedProjectId],
   );
 
   /*

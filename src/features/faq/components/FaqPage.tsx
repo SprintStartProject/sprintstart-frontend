@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { PageShell } from "../../../components/layout/PageShell";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 const PAGE_ICON = MessageSquareMore;
@@ -76,7 +77,9 @@ export function FaqPage() {
     revalidating,
     error,
     refresh,
-  } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
+  } = useLiveFetch(queryKeys.faq.groups(selectedProjectId), () =>
+    insightsService.fetchFAQGroups(selectedProjectId),
+  );
 
   // Closes first, then works. A rebuild takes as long as an AI call and there is
   // nothing to watch — holding the dialog open would pin the PM to a spinner for

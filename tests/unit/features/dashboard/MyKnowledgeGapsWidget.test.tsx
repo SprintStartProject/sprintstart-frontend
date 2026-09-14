@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { MyKnowledgeGapsWidget } from "../../../../src/features/dashboard/components/MyKnowledgeGapsWidget";
@@ -81,8 +81,8 @@ function renderWidget(size: "small" | "medium" | "wide" = "medium") {
   );
 }
 
-/** Lets the widget's `useFetch` resolve before anything is asserted. */
-const settled = () => screen.findByText("Your knowledge gaps");
+/** Lets the widget's query resolve before anything is asserted. */
+const settled = () => waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
 
 describe("MyKnowledgeGapsWidget", () => {
   beforeEach(() => {

@@ -11,7 +11,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { getTeamOverview } from "../../../services/teamManagementService";
 import { useToast } from "../../../context/useToast";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { queryKeys } from "../../../services/queryKeys";
 import { formatDateTime, formatRelativeDate, daysSince } from "../format";
 import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -40,7 +41,6 @@ export function KnowledgeGapsDetailPage() {
   const { gapId } = useParams<{ gapId: string }>();
   const navigate = useNavigate();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [savingOwners, setSavingOwners] = useState(false);
   const toast = useToast();
 
@@ -48,15 +48,14 @@ export function KnowledgeGapsDetailPage() {
     data: gap,
     loading,
     error,
-  } = useFetch(
-    () => knowledgeGapService.fetchKnowledgeGap(selectedProjectId, gapId ?? ""),
-    // The project belongs in here as much as the gap does: switching projects in the header
-    // while a gap is open otherwise leaves another project's gap on screen, and the owner
-    // control below would then write to whichever project the switcher now names.
-    [gapId, refreshKey, selectedProjectId],
+    refetch: refetchGap,
+  } = useQueryFetch(queryKeys.knowledgeGaps.detail(selectedProjectId, gapId ?? ""), () =>
+    knowledgeGapService.fetchKnowledgeGap(selectedProjectId, gapId ?? ""),
   );
 
-  const { data: teamUsers } = useFetch(() => getTeamOverview(), []);
+  const { data: teamUsers } = useQueryFetch(queryKeys.teamOverview.filtered(null), () =>
+    getTeamOverview(),
+  );
 
   // ── LOADING / ERROR ────────────────────────────────────
   // The title is the gap's own component name, so there is nothing real to show
@@ -136,7 +135,7 @@ export function KnowledgeGapsDetailPage() {
     setSavingOwners(true);
     try {
       await knowledgeGapService.setComponentOwners(selectedProjectId, gap.component, userIds);
-      setRefreshKey((key) => key + 1);
+      refetchGap();
       toast.success(userIds.length === 0 ? "Owner removed" : "Owner updated");
     } catch (err) {
       console.error("Failed to update owner", err);

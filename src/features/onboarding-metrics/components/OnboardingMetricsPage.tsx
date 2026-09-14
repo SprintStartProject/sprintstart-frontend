@@ -21,9 +21,10 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
 import { StatTile } from "./StatTile";
@@ -89,7 +90,6 @@ export function OnboardingMetricsPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [hireFilter, setHireFilter] = useState<HireFilter>("all");
   const [search, setSearch] = useState("");
@@ -107,25 +107,25 @@ export function OnboardingMetricsPage() {
     data: metrics,
     loading,
     error,
-  } = useFetch(
-    () =>
-      selectedProjectId
-        ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
-        : Promise.resolve(null),
-    [selectedProjectId, refreshKey],
+    isFetching,
+    refetch,
+  } = useQueryFetch(queryKeys.onboardingMetrics.project(selectedProjectId), () =>
+    selectedProjectId
+      ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
+      : Promise.resolve(null),
   );
 
   const handleRefresh = () => {
     if (!selectedProjectId) return;
     pendingRefreshRef.current = true;
     setRefreshing(true);
-    setRefreshKey((key) => key + 1);
+    refetch();
   };
 
   // After a manual refresh settles, say what it found. The empty states below
   // already carry the "no hires" case, so this only speaks up for real outcomes.
   useEffect(() => {
-    if (loading || !pendingRefreshRef.current) return;
+    if (isFetching || !pendingRefreshRef.current) return;
     pendingRefreshRef.current = false;
     setRefreshing(false);
     if (error) {
@@ -141,11 +141,11 @@ export function OnboardingMetricsPage() {
     } else {
       toast.success("Metrics refreshed");
     }
-  }, [loading, error, metrics, toast]);
+  }, [isFetching, error, metrics, toast]);
 
   // A load failure that wasn't a manual refresh still deserves a toast, once.
   useEffect(() => {
-    if (loading) return;
+    if (isFetching) return;
     if (!error) {
       errorToastRef.current = false;
       return;
@@ -156,12 +156,12 @@ export function OnboardingMetricsPage() {
         description: "The onboarding metrics couldn't be loaded. Try again shortly.",
       });
     }
-  }, [loading, error, toast]);
+  }, [isFetching, error, toast]);
 
   // Warn once per project when some hires have no GitHub login, since their work
   // can't be attributed and the numbers below quietly exclude it.
   useEffect(() => {
-    if (loading || error || !metrics) return;
+    if (isFetching || error || !metrics) return;
     if (metrics.unattributableMemberCount > 0 && warnedProjectRef.current !== metrics.projectId) {
       warnedProjectRef.current = metrics.projectId;
       toast.warning(
@@ -171,7 +171,7 @@ export function OnboardingMetricsPage() {
         { description: "They have no GitHub login, so their work is left out of these numbers." },
       );
     }
-  }, [loading, error, metrics, toast]);
+  }, [isFetching, error, metrics, toast]);
 
   // Stalled hires lead the per-hire list — they are what a PM should act on today.
   const orderedHires = useMemo(() => {

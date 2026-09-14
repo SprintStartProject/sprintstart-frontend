@@ -38,7 +38,10 @@ export const queryKeys = {
     mine: (userId: string) => ["atlassian-credentials", userId] as const,
   },
   knowledgeGaps: {
-    mine: (userId: string) => ["knowledge-gaps", "mine", userId] as const,
+    mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,
+    overview: (projectId: string) => ["knowledge-gaps", "overview", projectId] as const,
+    detail: (projectId: string, gapId: string) =>
+      ["knowledge-gaps", "detail", projectId, gapId] as const,
   },
   board: {
     byProject: (projectId: string) => ["board", projectId] as const,
@@ -48,5 +51,23 @@ export const queryKeys = {
   },
   knowledgeBase: {
     byProject: (projectId: string) => ["knowledge-base", projectId] as const,
+  },
+  faq: {
+    groups: (projectId: string) => ["faq", "groups", projectId] as const,
+    detail: (projectId: string, groupId: string) => ["faq", "detail", projectId, groupId] as const,
+  },
+  teamOverview: {
+    // `projectId` is `null` for the unfiltered, org-wide read.
+    filtered: (projectId: string | null) => ["team-overview", projectId ?? "all"] as const,
+  },
+  ingestion: {
+    sourceStatuses: (projectId: string) => ["ingestion", "source-statuses", projectId] as const,
+  },
+  knowledgeRequest: {
+    open: (projectId: string) => ["knowledge-request", "open", projectId] as const,
+    answers: (projectId: string) => ["knowledge-request", "answers", projectId] as const,
+  },
+  onboardingMetrics: {
+    project: (projectId: string) => ["onboarding-metrics", "project", projectId] as const,
   },
 } as const;

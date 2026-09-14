@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, ShieldAlert } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Spinner } from "../../../components/ui/Spinner";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { queryKeys } from "../../../services/queryKeys";
 import type { FAQGroup } from "../../faq/types";
 import type { KnowledgeGap, KnowledgeGapSeverity } from "../../knowledge-gaps/types";
 import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
@@ -256,14 +257,14 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
   const navigate = useNavigate();
   const { selectedProjectId } = useProjectContext();
 
-  const { data: faq, loading: faqLoading } = useFetch(
+  const { data: faq, loading: faqLoading } = useQueryFetch(
+    queryKeys.faq.groups(selectedProjectId),
     () => insightsService.fetchFAQGroups(selectedProjectId),
-    [selectedProjectId],
   );
 
-  const { data: knowledgeGaps, loading: gapsLoading } = useFetch(
+  const { data: knowledgeGaps, loading: gapsLoading } = useQueryFetch(
+    queryKeys.knowledgeGaps.overview(selectedProjectId),
     () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [selectedProjectId],
   );
 
   if (faqLoading || gapsLoading) {

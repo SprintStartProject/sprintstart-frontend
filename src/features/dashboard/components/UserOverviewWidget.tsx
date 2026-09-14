@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { adminUserService, type AdminUser } from "../../../services/adminUserService";
+import { queryKeys } from "../../../services/queryKeys";
 import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetBar } from "./WidgetBar";
 import { WidgetMetrics, type WidgetMetric } from "./WidgetMetrics";
@@ -66,7 +67,9 @@ function metricsFor(users: readonly AdminUser[]): WidgetMetric[] {
  * "people" would ever have shown it.
  */
 export function UserOverviewWidget({ size }: { size: DashboardWidgetSize }) {
-  const { data, loading, error } = useFetch(() => adminUserService.getUsers(), []);
+  const { data, loading, error } = useQueryFetch(queryKeys.admin.users(), () =>
+    adminUserService.getUsers(),
+  );
 
   const users = data ?? [];
   const metrics = metricsFor(users);
