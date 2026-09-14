@@ -458,7 +458,7 @@ export function OnBoardingPage() {
    */
   const linkedCard = (id: string) =>
     id === linkedItemId
-      ? { id: linkedCardId(id), key: `${id}:${location.key}`, highlight: " app-link-highlight" }
+      ? { id: linkedCardId(id), key: `${id}:${location.key}`, highlight: "app-link-highlight" }
       : { id: linkedCardId(id), key: id, highlight: "" };
 
   // The numbers this phase's items are shown with. The buddy's path tool derives the same ones, so
@@ -954,7 +954,7 @@ export function OnBoardingPage() {
                     // Completed and locked steps stay still on purpose: nothing
                     // happens when you click them, and magnifying them would
                     // promise an interaction that is not there.
-                    className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100${linkedCard(step.id).highlight} ${
+                    className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${linkedCard(step.id).highlight} ${
                       mode === "completed"
                         ? "border-app-border opacity-60"
                         : mode === "locked"
@@ -1073,7 +1073,7 @@ export function OnBoardingPage() {
                       <div
                         key={linkedCard(question.id).key}
                         id={linkedCard(question.id).id}
-                        className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100${linkedCard(question.id).highlight} ${
+                        className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${linkedCard(question.id).highlight} ${
                           mode === "completed"
                             ? "border-app-border opacity-60"
                             : mode === "locked"
