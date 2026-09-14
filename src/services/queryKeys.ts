@@ -58,7 +58,10 @@ export const queryKeys = {
     byProject: (projectId: string) => ["board", projectId] as const,
   },
   attestations: {
-    pending: (userId: string) => ["attestations", "pending", userId] as const,
+    // Not scoped by user id, like `atlassianCredentials.mine` above: the
+    // backend already answers "mine" from the auth token, and
+    // `queryClient.clear()` on logout covers a session change.
+    pending: () => ["attestations", "pending"] as const,
   },
   knowledgeBase: {
     byProject: (projectId: string) => ["knowledge-base", projectId] as const,
@@ -78,6 +81,10 @@ export const queryKeys = {
     open: (projectId: string) => ["knowledge-request", "open", projectId] as const,
     answers: (projectId: string) => ["knowledge-request", "answers", projectId] as const,
     openCount: (projectId: string) => ["knowledge-request", "open-count", projectId] as const,
+    // The hire's own questions across every project, not scoped by project id
+    // like the three above — see `atlassianCredentials.mine` for why no user
+    // id either.
+    mine: () => ["knowledge-request", "mine"] as const,
   },
   pmAttention: {
     byProject: (projectId: string) => ["pm-attention", projectId] as const,
