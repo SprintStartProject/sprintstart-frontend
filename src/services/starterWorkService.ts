@@ -23,10 +23,11 @@ const BASE_URL = "/api/v1/onboarding/starter-work";
  */
 export const starterWorkService = {
   /** Mines the ingested corpus for well-scoped starter tasks. They are claimable on arrival. */
-  async generate(): Promise<GenerateStarterWorkResult> {
-    return await apiClient.fetch<GenerateStarterWorkResult>(`${BASE_URL}/generate`, {
-      method: "POST",
-    });
+  async generate(projectId: string): Promise<GenerateStarterWorkResult> {
+    return await apiClient.fetch<GenerateStarterWorkResult>(
+      `${BASE_URL}/generate?projectId=${encodeURIComponent(projectId)}`,
+      { method: "POST" },
+    );
   },
 
   /** The live tasks nobody has vouched for yet — not a queue anything is waiting in. */

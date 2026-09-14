@@ -15,7 +15,9 @@ function toMessage(error: unknown, fallback: string): string {
 /** How a task reached the pool without being mined: written from scratch, or picked from the corpus. */
 export type TaskOrigin = "authored" | "picked";
 
-type ReviewAction = { kind: "generate" } | { kind: "create"; input: CreateStarterWorkTaskInput };
+type ReviewAction =
+  | { kind: "generate"; projectId: string }
+  | { kind: "create"; input: CreateStarterWorkTaskInput };
 
 const NO_TASKS: StarterWorkTask[] = [];
 
@@ -64,7 +66,10 @@ export function useStarterWorkReview() {
   const actionMutation = useMutation({
     mutationFn: async (action: ReviewAction) => {
       if (action.kind === "generate") {
-        return { kind: "generate" as const, result: await starterWorkService.generate() };
+        return {
+          kind: "generate" as const,
+          result: await starterWorkService.generate(action.projectId),
+        };
       }
       return { kind: "create" as const, task: await starterWorkService.create(action.input) };
     },
@@ -79,13 +84,16 @@ export function useStarterWorkReview() {
     },
   });
 
-  const generate = useCallback(async () => {
-    try {
-      await actionMutation.mutateAsync({ kind: "generate" });
-    } catch {
-      // Surfaced below via `error`; callers don't need the rejection.
-    }
-  }, [actionMutation]);
+  const generate = useCallback(
+    async (projectId: string) => {
+      try {
+        await actionMutation.mutateAsync({ kind: "generate", projectId });
+      } catch {
+        // Surfaced below via `error`; callers don't need the rejection.
+      }
+    },
+    [actionMutation],
+  );
 
   const create = useCallback(
     async (input: CreateStarterWorkTaskInput): Promise<boolean> => {
