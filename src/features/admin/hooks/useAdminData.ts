@@ -46,13 +46,7 @@ export function useAdminData(): UseAdminDataResult {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.admin.overview();
 
-  const {
-    data,
-    status,
-    isFetching,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, status, isFetching, error, refetch } = useQuery({
     queryKey,
     queryFn: async (): Promise<AdminOverview> => {
       const [nextUsers, nextProjects] = await Promise.all([

@@ -8,21 +8,61 @@ import { starterWorkService } from "./starterWorkService";
 /**
  * Route → cache warm-up, fired from the sidebar on `pointerdown` (see `SidebarNavLink`).
  *
- * Only routes with one dominant, already-migrated read register here. A page assembled
- * from several independent widget queries (the two dashboards) has no single key worth
- * racing ahead of, and a page that still owns its data by hand (Data Ingestion,
- * OnBoarding, Arrival Steps) has nothing here to prefetch into in the first place.
+ * Every sidebar route warms its lazy page module. Routes with one dominant, migrated read
+ * also warm that query; pages assembled from several widgets, or still owning their data by
+ * hand, only prefetch their code.
  *
- * Each entry mirrors the `queryKey`/`queryFn` pair its page's own hook already runs, so a
- * revisit within the shared 30s `staleTime` finds the data already warm. `prefetchQuery`
+ * Each data entry mirrors the `queryKey`/`queryFn` pair its page's own hook already runs, so
+ * a revisit within the shared 30s `staleTime` finds the data already warm. `prefetchQuery`
  * itself is a no-op against data that is still fresh, so a pointerdown on the already-active
  * entry (or a second one before the first lands) costs nothing extra.
  */
+function prefetchRouteModule(path: string): void {
+  switch (path) {
+    case "/":
+      void import("../pages/DashboardPage");
+      return;
+    case "/board":
+      void import("../pages/BoardPage");
+      return;
+    case "/chat":
+      void import("../pages/ChatPage");
+      return;
+    case "/knowledge-base":
+      void import("../pages/KnowledgeBasePage");
+      return;
+    case "/onboarding":
+      void import("../pages/OnBoardingPage");
+      return;
+    case "/pm-dashboard":
+      void import("../pages/PmDashboardPage");
+      return;
+    case "/data-ingestion":
+      void import("../pages/DataIngestionPage");
+      return;
+    case "/arrival-steps":
+      void import("../pages/ArrivalStepsPage");
+      return;
+    case "/starter-work":
+      void import("../pages/StarterWorkPage");
+      return;
+    case "/insights/knowledge-requests":
+      void import("../features/knowledge-request/components/KnowledgeRequestInboxPage");
+      return;
+    case "/admin":
+      void import("../pages/AdminPage");
+      return;
+    default:
+      return;
+  }
+}
 export function prefetchRoute(
   queryClient: QueryClient,
   path: string,
   projectId: string | null,
 ): void {
+  prefetchRouteModule(path);
+
   switch (path) {
     case "/knowledge-base":
       if (!projectId) return;

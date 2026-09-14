@@ -413,7 +413,9 @@ export function StarterWorkPoolCloud({
       {showLoadingSkeleton ? (
         <SkeletonGroup
           label="Loading the pool"
-          className={fullWidth ? "grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2" : "space-y-2.5"}
+          className={
+            fullWidth ? "grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2" : "space-y-2.5"
+          }
         >
           {Array.from({ length: fullWidth ? 6 : 3 }).map((_, index) => (
             <PoolRowSkeleton key={index} />

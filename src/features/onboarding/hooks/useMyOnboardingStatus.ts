@@ -24,8 +24,7 @@ export type MyOnboardingStatus =
 const ABSENT: MyOnboardingStatus = { state: "absent" };
 
 type OnboardingQueryResult =
-  | { kind: "absent" }
-  | { kind: "ready"; progress: PathProgress; nextAction: OnboardingNextAction };
+  { kind: "absent" } | { kind: "ready"; progress: PathProgress; nextAction: OnboardingNextAction };
 
 /**
  * How far the signed-in user is through their own onboarding, and what comes next.
@@ -90,6 +89,7 @@ export function useMyOnboardingStatus(): MyOnboardingStatus {
   if (isLoading) return { state: "loading" };
   if (isError) return { state: "error" };
   if (data?.kind === "absent") return ABSENT;
-  if (data?.kind === "ready") return { state: "ready", progress: data.progress, nextAction: data.nextAction };
+  if (data?.kind === "ready")
+    return { state: "ready", progress: data.progress, nextAction: data.nextAction };
   return { state: "loading" };
 }

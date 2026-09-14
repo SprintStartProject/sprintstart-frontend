@@ -117,11 +117,9 @@ export function AddSourceModal({
   // `size=100`, so a project past a hundred members would quietly lose the tail of the list —
   // fine for now, and the reason to reach for a searchable picker when it stops being.
   const { data: teamUsers } = useQueryFetch(
-    queryKeys.teamOverview.filtered(canAssignOwners ? projectId : null),
-    () =>
-      canAssignOwners && projectId
-        ? getTeamOverview(undefined, undefined, [projectId])
-        : Promise.resolve([]),
+    queryKeys.teamOverview.filtered(projectId),
+    () => getTeamOverview(undefined, undefined, [projectId as string]),
+    { enabled: canAssignOwners && Boolean(projectId) },
   );
 
   const ownerOptions = useMemo(

@@ -3,6 +3,7 @@
 // ============================================================
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -13,6 +14,7 @@ import type {
   StepStatus,
 } from "../types";
 import { onboardingService } from "../../../services/onboardingService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
 import { PageShell } from "../../../components/layout/PageShell";
@@ -88,6 +90,7 @@ function formatMinutes(minutes: number): string {
  */
 export function OnBoardingItemPage() {
   const { stepId } = useParams<{ stepId: string }>();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [stepDetail, setStepDetail] = useState<OnboardingStepDetail | null>(null);
@@ -187,6 +190,7 @@ export function OnBoardingItemPage() {
     setNextLoading(true);
     try {
       await onboardingService.startStep(nextAction.stepId);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
       if (nextAction.isFirstStart) flyby();
     } catch (err) {
       console.error("Failed to start next onboarding step:", err);
@@ -201,6 +205,7 @@ export function OnBoardingItemPage() {
     if (!stepDetail) return;
     try {
       await onboardingService.updateStepStatus(stepDetail, newStatus);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
       setStepDetail((prev) => (prev ? { ...prev, status: newStatus } : prev));
     } catch (err) {
       console.error("Error updating step:", err);
@@ -213,6 +218,7 @@ export function OnBoardingItemPage() {
     if (!task) return;
     try {
       await onboardingService.updateTask(task, finished);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, finished } : t)));
       setLocalFinished((prev) => {
         const next = new Set(prev);
@@ -280,6 +286,7 @@ export function OnBoardingItemPage() {
     setSkipLoading(true);
     try {
       const created = await onboardingService.skipStep(stepDetail, reason);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
       // The create-skip response is status-based; the step-detail skip block is
       // accepted-based (null = still pending), so map it into that shape.
       setStepDetail((prev) =>

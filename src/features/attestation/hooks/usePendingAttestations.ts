@@ -14,10 +14,7 @@ export interface UsePendingAttestationsResult {
   sendBack: (id: string, reason: string) => Promise<void>;
 }
 
-type AnswerVariables = { id: string } & (
-  | { kind: "accept" }
-  | { kind: "sendBack"; reason: string }
-);
+type AnswerVariables = { id: string } & ({ kind: "accept" } | { kind: "sendBack"; reason: string });
 
 /**
  * What is waiting on this person to confirm.
@@ -34,11 +31,7 @@ export function usePendingAttestations(): UsePendingAttestationsResult {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.attestations.pending();
 
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey,
     queryFn: () => attestationService.fetchPending(),
   });

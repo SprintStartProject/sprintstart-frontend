@@ -29,10 +29,8 @@ export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
 
   const { data, loading, error } = useQueryFetch(
     queryKeys.knowledgeGaps.mine(selectedProjectId),
-    () =>
-      canAsk
-        ? knowledgeGapService.fetchMyKnowledgeGaps(selectedProjectId)
-        : Promise.resolve({ gaps: [] }),
+    () => knowledgeGapService.fetchMyKnowledgeGaps(selectedProjectId),
+    { enabled: canAsk },
   );
 
   /*

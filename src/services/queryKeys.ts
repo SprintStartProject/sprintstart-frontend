@@ -36,6 +36,7 @@ export const queryKeys = {
     mine: (userId: string) => ["profile", userId] as const,
   },
   onboarding: {
+    myStatuses: () => ["onboarding", "my-status"] as const,
     myStatus: (userId: string) => ["onboarding", "my-status", userId] as const,
   },
   projectInsights: {

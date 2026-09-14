@@ -46,7 +46,11 @@ export function useGithubTokens(): UseGithubTokensResult {
   return {
     tokenNames: data ?? [],
     tokensLoaded: !isLoading,
-    tokensError: isError ? (error instanceof Error ? error.message : "Failed to load tokens.") : null,
+    tokensError: isError
+      ? error instanceof Error
+        ? error.message
+        : "Failed to load tokens."
+      : null,
     isRefreshing: isFetching,
     // Cancels any in-flight fetch first (react-query only supersedes one on
     // its own once a query has data, and the very first load never does),

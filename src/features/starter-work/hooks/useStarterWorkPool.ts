@@ -18,13 +18,7 @@ export function useStarterWorkPool() {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.starterWork.pool();
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey,
     queryFn: () => starterWorkService.fetchPool(),
   });

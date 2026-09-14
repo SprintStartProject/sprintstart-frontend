@@ -21,7 +21,10 @@ export function SkeletonBlock({ className = "" }: SkeletonProps) {
  * grid rows, so a page composes its skeleton rows from `SkeletonLine`/
  * `SkeletonBlock` without repeating the border/padding boilerplate.
  */
-export function SkeletonCard({ className = "", children }: SkeletonProps & { children: ReactNode }) {
+export function SkeletonCard({
+  className = "",
+  children,
+}: SkeletonProps & { children: ReactNode }) {
   return (
     <div className={`rounded-2xl border border-app-border bg-app-surface p-4 ${className}`}>
       {children}

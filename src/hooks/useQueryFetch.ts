@@ -13,6 +13,11 @@ export interface UseQueryFetchResult<T> extends UseFetchResult<T> {
   isFetching: boolean;
 }
 
+export type UseQueryFetchOptions = {
+  /** Skip the request until every input and permission required by the loader is available. */
+  enabled?: boolean;
+};
+
 /**
  * `useFetch`, backed by the shared query cache instead of a private
  * `useState`/`useEffect` pair — same return shape (plus `refetch`, for the
@@ -33,14 +38,19 @@ export interface UseQueryFetchResult<T> extends UseFetchResult<T> {
 export function useQueryFetch<T>(
   queryKey: QueryKey,
   loader: () => Promise<T>,
+  { enabled = true }: UseQueryFetchOptions = {},
 ): UseQueryFetchResult<T> {
-  const { data, isLoading, isFetching, isError, refetch } = useQuery({ queryKey, queryFn: loader });
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey,
+    queryFn: loader,
+    enabled,
+  });
 
   return {
-    data: data ?? null,
-    loading: isLoading,
-    error: isError,
+    data: enabled ? (data ?? null) : null,
+    loading: enabled && isLoading,
+    error: enabled && isError,
     refetch: () => void refetch(),
-    isFetching,
+    isFetching: enabled && isFetching,
   };
 }

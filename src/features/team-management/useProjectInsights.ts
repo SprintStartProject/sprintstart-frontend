@@ -105,7 +105,9 @@ export function useProjectInsights(projectIds: string): Record<string, ProjectIn
   const { data } = useQuery({
     queryKey: queryKeys.projectInsights.byProjectIds(projectIds),
     queryFn: async () => {
-      const entries = await Promise.all(ids.map(async (projectId) => [projectId, await loadOne(projectId)] as const));
+      const entries = await Promise.all(
+        ids.map(async (projectId) => [projectId, await loadOne(projectId)] as const),
+      );
       return Object.fromEntries(entries);
     },
     enabled: ids.length > 0,

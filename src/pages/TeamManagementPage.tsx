@@ -15,7 +15,12 @@ import { getTeamOverview, getProjectRoles } from "../services/teamManagementServ
 import { ApiError } from "../services/apiClient";
 import { PageShell } from "../components/layout/PageShell";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
-import { SkeletonBlock, SkeletonCard, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
+import {
+  SkeletonBlock,
+  SkeletonCard,
+  SkeletonGroup,
+  SkeletonLine,
+} from "../components/ui/Skeleton";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 

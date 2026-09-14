@@ -2,7 +2,8 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
@@ -13,6 +14,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { onboardingService } from "../services/onboardingService";
+import { queryKeys } from "../services/queryKeys";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/apiClient";
 import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
@@ -122,6 +124,11 @@ export function OnBoardingPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const invalidateMyOnboardingStatus = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() }),
+    [queryClient],
+  );
 
   // Set by the step page when a knowledge check is what stands between the user and the
   // rest of their path, so this page can put that check in front of them.
@@ -220,6 +227,7 @@ export function OnBoardingPage() {
     // user as onboarded, but keeping the in-memory profile stale until the next reload
     // lets the celebration play out before the onboarding UI is gated away.
     if (submittedAttempt) {
+      void invalidateMyOnboardingStatus();
       void refreshPath();
       // A passed check moves every missed question into the pool.
       if (passed) void refreshReviewCount();
@@ -236,6 +244,7 @@ export function OnBoardingPage() {
     setReviewCheckOpen(false);
     if (onboardingCompleted) completeMission();
     if (answeredAny) {
+      void invalidateMyOnboardingStatus();
       void refreshReviewCount();
       void refreshPath();
     }
@@ -256,33 +265,40 @@ export function OnBoardingPage() {
    * is precisely what the user asked to replace, and quietly handing back the
    * old one would look like the button does nothing.
    */
-  const generatePath = async ({ recoverExisting = false } = {}) => {
-    setLoadingState("generating");
-    setGenerationStage(null);
-    setGameActive(false);
-    await onboardingService.personalizePath({
-      onStage: (name, detail) => setGenerationStage({ name, detail }),
-      onPath: (path) => setOnBoardingPath(path),
-      onDone: () => setLoadingState("success"),
-      onError: (message) => {
-        void (async () => {
-          if (recoverExisting) {
-            try {
-              const path = await onboardingService.fetchPath();
-              setOnBoardingPath(path);
-              setSelectedPhaseIndex(findActivePhaseIndex(path));
-              setLoadingState("success");
-              return;
-            } catch {
-              // Nothing there after all — the original error stands.
+  const generatePath = useCallback(
+    async ({ recoverExisting = false } = {}) => {
+      setLoadingState("generating");
+      setGenerationStage(null);
+      setGameActive(false);
+      await onboardingService.personalizePath({
+        onStage: (name, detail) => setGenerationStage({ name, detail }),
+        onPath: (path) => {
+          setOnBoardingPath(path);
+          void invalidateMyOnboardingStatus();
+        },
+        onDone: () => setLoadingState("success"),
+        onError: (message) => {
+          void (async () => {
+            if (recoverExisting) {
+              try {
+                const path = await onboardingService.fetchPath();
+                setOnBoardingPath(path);
+                void invalidateMyOnboardingStatus();
+                setSelectedPhaseIndex(findActivePhaseIndex(path));
+                setLoadingState("success");
+                return;
+              } catch {
+                // Nothing there after all — the original error stands.
+              }
             }
-          }
-          setLoadingState("error");
-          setErrorMessage(message);
-        })();
-      },
-    });
-  };
+            setLoadingState("error");
+            setErrorMessage(message);
+          })();
+        },
+      });
+    },
+    [invalidateMyOnboardingStatus],
+  );
 
   // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
   useEffect(() => {
@@ -370,7 +386,7 @@ export function OnBoardingPage() {
     // Both flags come from the navigation that mounted this page, so they are fixed for the
     // visit; listing them keeps the effect honest about what it reads, and `hasLoadedRef`
     // makes a re-run a no-op anyway.
-  }, [focusCheckPhaseId, shouldOpenReviewCheck]);
+  }, [focusCheckPhaseId, generatePath, shouldOpenReviewCheck]);
 
   const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
@@ -438,6 +454,7 @@ export function OnBoardingPage() {
   const startStep = async (stepId: string) => {
     try {
       await onboardingService.startStep(stepId);
+      await invalidateMyOnboardingStatus();
     } catch (err) {
       console.error("Failed to start onboarding step:", err);
     }

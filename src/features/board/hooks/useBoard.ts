@@ -56,12 +56,7 @@ export function useBoard(projectId: string): UseBoardResult {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.board.byProject(projectId);
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey,
     queryFn: () => boardService.fetchBoard(projectId),
     enabled: Boolean(projectId),
@@ -119,6 +114,9 @@ export function useBoard(projectId: string): UseBoardResult {
         // request instead would put a card on screen that differs from the stored one in small ways
         // nobody would think to look for.
         const updated = await boardService.editCard(cardId, request);
+        // A focus/manual refresh may already be returning the pre-edit board. Cancel it before
+        // committing the server-confirmed card so its older answer cannot overwrite this one.
+        await queryClient.cancelQueries({ queryKey });
         queryClient.setQueryData(queryKey, (prev: Board | null | undefined) =>
           prev
             ? {
@@ -139,6 +137,9 @@ export function useBoard(projectId: string): UseBoardResult {
   const reorder = useCallback(
     async (cardIds: string[]) => {
       setWriteError(false);
+      // Freeze the last confirmed snapshot before applying an optimistic order. Otherwise a
+      // background read can land between the patch and the write response and reorder it again.
+      await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<Board | null>(queryKey);
       // Shown before it is saved: a drag that snaps back while a request is in flight feels
       // broken even when it worked.
