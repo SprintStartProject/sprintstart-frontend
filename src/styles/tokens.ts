@@ -281,3 +281,13 @@ export const SKELETON_APPEAR_DELAY_MS = 200;
  * budget it took to appear.
  */
 export const SKELETON_MIN_VISIBLE_MS = 350;
+
+/**
+ * Enter transition for a route change (`PageTransition`). Short and simple on
+ * purpose: it runs on every navigation, so anything heavier would make the app
+ * feel slower to move around in rather than smoother.
+ */
+export const pageTransitionToken: Transition = {
+  duration: 0.18,
+  ease: "easeOut",
+};

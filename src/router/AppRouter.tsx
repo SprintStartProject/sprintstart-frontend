@@ -4,6 +4,7 @@ import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
 import { PageShellSkeleton } from "../components/layout/PageShell";
+import { PageTransition } from "../components/layout/PageTransition";
 import { ChatPage } from "../pages/ChatPage";
 import { AssistantShell } from "../components/layout/AssistantShell";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
@@ -57,88 +58,90 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
 export function AppRouter() {
   return (
     <AuthGuard>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/skill-wizard" element={<SkillWizardPage />} />
-        <Route path="/" element={<DashboardPage />} />
-        {/* One layout route for both halves of the assistant, so the shared header survives
-            the crossing and the panel underneath can slide instead of cut. Their URLs are
-            unchanged — `/buddy` is still `/buddy`; only who draws the header moved. */}
-        <Route element={<AssistantShell />}>
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/chat/:id" element={<ChatPage />} />
-          <Route path="/buddy" element={<BuddyPage />} />
-        </Route>
-        <Route path="/onboarding" element={<OnBoardingPage />} />
-        <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-        <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
-        <Route
-          path="/data-ingestion"
-          element={
-            <ManagerAreaGuard route="/data-ingestion">
-              <DataIngestionPage />
-            </ManagerAreaGuard>
-          }
-        />
-        <Route path="/team-management" element={<TeamManagementPage />} />
-        <Route path="/team/:userId" element={<TeamMemberDetailPage />} />
-        <Route
-          path="/pm-dashboard"
-          element={
-            <ManagerAreaGuard route="/pm-dashboard">
-              <PmDashboardPage />
-            </ManagerAreaGuard>
-          }
-        />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/insights/faq" element={<FaqPage />} />
-        <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
-        <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
-        <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
-        <Route
-          path="/insights/knowledge-requests"
-          element={
-            <ManagerAreaGuard route="/insights/knowledge-requests">
-              <KnowledgeRequestInboxPage />
-            </ManagerAreaGuard>
-          }
-        />
-        <Route
-          path="/insights/onboarding"
-          element={
-            <ManagerAreaGuard route="/insights/onboarding">
-              <OnboardingMetricsPage />
-            </ManagerAreaGuard>
-          }
-        />
-        {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
-            in place of it: both ways in stay open. The buddy itself now sits with the chat,
-            under `AssistantShell`. */}
-        <Route path="/board" element={<BoardPage />} />
-        {/* Guarded, because the access policy says they are PM/HR/ADMIN-only and the sidebar
-            merely hides them -- which leaves the URL. Both pages already gate their *actions*
-            by role, but a hire who typed the path still got the page and a column of failed
-            requests, and the policy claimed otherwise. */}
-        <Route
-          path="/arrival-steps"
-          element={
-            <ManagerAreaGuard route="/arrival-steps">
-              <ArrivalStepsPage />
-            </ManagerAreaGuard>
-          }
-        />
-        <Route
-          path="/starter-work"
-          element={
-            <ManagerAreaGuard route="/starter-work">
-              <StarterWorkPage />
-            </ManagerAreaGuard>
-          }
-        />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/profile" element={<Navigate to="/settings" replace />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <PageTransition>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/skill-wizard" element={<SkillWizardPage />} />
+          <Route path="/" element={<DashboardPage />} />
+          {/* One layout route for both halves of the assistant, so the shared header survives
+              the crossing and the panel underneath can slide instead of cut. Their URLs are
+              unchanged — `/buddy` is still `/buddy`; only who draws the header moved. */}
+          <Route element={<AssistantShell />}>
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:id" element={<ChatPage />} />
+            <Route path="/buddy" element={<BuddyPage />} />
+          </Route>
+          <Route path="/onboarding" element={<OnBoardingPage />} />
+          <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+          <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
+          <Route
+            path="/data-ingestion"
+            element={
+              <ManagerAreaGuard route="/data-ingestion">
+                <DataIngestionPage />
+              </ManagerAreaGuard>
+            }
+          />
+          <Route path="/team-management" element={<TeamManagementPage />} />
+          <Route path="/team/:userId" element={<TeamMemberDetailPage />} />
+          <Route
+            path="/pm-dashboard"
+            element={
+              <ManagerAreaGuard route="/pm-dashboard">
+                <PmDashboardPage />
+              </ManagerAreaGuard>
+            }
+          />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/insights/faq" element={<FaqPage />} />
+          <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
+          <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
+          <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
+          <Route
+            path="/insights/knowledge-requests"
+            element={
+              <ManagerAreaGuard route="/insights/knowledge-requests">
+                <KnowledgeRequestInboxPage />
+              </ManagerAreaGuard>
+            }
+          />
+          <Route
+            path="/insights/onboarding"
+            element={
+              <ManagerAreaGuard route="/insights/onboarding">
+                <OnboardingMetricsPage />
+              </ManagerAreaGuard>
+            }
+          />
+          {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
+              in place of it: both ways in stay open. The buddy itself now sits with the chat,
+              under `AssistantShell`. */}
+          <Route path="/board" element={<BoardPage />} />
+          {/* Guarded, because the access policy says they are PM/HR/ADMIN-only and the sidebar
+              merely hides them -- which leaves the URL. Both pages already gate their *actions*
+              by role, but a hire who typed the path still got the page and a column of failed
+              requests, and the policy claimed otherwise. */}
+          <Route
+            path="/arrival-steps"
+            element={
+              <ManagerAreaGuard route="/arrival-steps">
+                <ArrivalStepsPage />
+              </ManagerAreaGuard>
+            }
+          />
+          <Route
+            path="/starter-work"
+            element={
+              <ManagerAreaGuard route="/starter-work">
+                <StarterWorkPage />
+              </ManagerAreaGuard>
+            }
+          />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/profile" element={<Navigate to="/settings" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </PageTransition>
     </AuthGuard>
   );
 }

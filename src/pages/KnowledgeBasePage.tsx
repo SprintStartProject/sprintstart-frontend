@@ -155,17 +155,13 @@ export function KnowledgeBasePage() {
   return (
     <div className="flex min-h-screen flex-col text-app-text">
       <header className="border-b border-app-border bg-app-bg">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="app-page-frame py-6"
-        >
+        <div className="app-page-frame py-6">
           <PageHeader
             icon={BookOpen}
             title="Knowledge Base"
             subtitle="Explore unified project documentation, code runbooks, and artifacts."
           />
-        </motion.div>
+        </div>
       </header>
 
       <main
