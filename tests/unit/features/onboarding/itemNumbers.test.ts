@@ -52,9 +52,7 @@ describe("itemNumbers", () => {
   it("gives steps and questions distinct numbers even when their positions collide", () => {
     // They carry their own positions underneath, so a shared one is ordinary. A hire counting down
     // one visible list must still get one number per item.
-    const numbers = itemNumbers(
-      phase({ steps: [step("s1", 0)], questions: [question("q1", 0)] }),
-    );
+    const numbers = itemNumbers(phase({ steps: [step("s1", 0)], questions: [question("q1", 0)] }));
 
     expect([...numbers.values()]).toEqual([1, 2]);
   });

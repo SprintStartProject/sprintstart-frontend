@@ -4,6 +4,11 @@ import type { OnboardingStepEndpoint } from "../types";
 
 type StepOriginBadgeProps = {
   step: OnboardingStepEndpoint;
+  /**
+   * Who is looking. The hire reads "you" and "your buddy"; a PM reviewing somebody else's path
+   * would read those as being about themselves, so the reviewer view names the hire instead.
+   */
+  viewer?: "hire" | "reviewer";
 };
 
 /**
@@ -18,16 +23,17 @@ type StepOriginBadgeProps = {
  * A generated step wears nothing. It is the ordinary case, and the whole path would otherwise carry
  * the same badge on every card, which is a label for the page rather than for a step.
  *
- * **The `isAiAssisted` fallback stays** for rows written before `origin` existed: those default to
- * `GENERATED` in the database while `isAiAssisted` still records that a person authored them. Their
- * badge is the one they have always had.
+ * **The `isAiAssisted` fallback stays**, for two kinds of step that arrive as `GENERATED` with
+ * `isAiAssisted` false: a step copied from a blueprint step the PM wrote by hand (the copy keeps the
+ * blueprint's flag), and a row written before `origin` existed. Both were authored by a person on
+ * the team, and both keep the badge they have always had.
  */
-export function StepOriginBadge({ step }: StepOriginBadgeProps) {
+export function StepOriginBadge({ step, viewer = "hire" }: StepOriginBadgeProps) {
   if (step.origin === "BUDDY") {
     return (
       <Badge variant="brand" className="gap-1.5">
         <MessageCircle className="h-3.5 w-3.5" />
-        Added with your buddy
+        {viewer === "hire" ? "Added with your buddy" : "Added with the buddy"}
       </Badge>
     );
   }
@@ -36,12 +42,12 @@ export function StepOriginBadge({ step }: StepOriginBadgeProps) {
     return (
       <Badge variant="neutral" className="gap-1.5">
         <Sparkles className="h-3.5 w-3.5" />
-        You added this
+        {viewer === "hire" ? "You added this" : "Added by the hire"}
       </Badge>
     );
   }
 
-  // PM, or a pre-`origin` row that a person authored.
+  // PM, or a hand-written blueprint copy or pre-`origin` row -- see above.
   if (step.origin === "PM" || step.isAiAssisted === false) {
     return (
       <Badge variant="brand" className="gap-1.5">

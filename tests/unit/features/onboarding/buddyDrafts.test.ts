@@ -81,7 +81,9 @@ describe("buddy drafts", () => {
   it("names the thing it is about, so the mentor does not have to ask", () => {
     expect(askAboutPhase(phase())).toContain("Environment Setup");
     expect(askAboutStep(step())).toContain("Clone the repository");
-    expect(askAboutQuestion(question(), "Meetings")).toContain("Which meeting sets the sprint scope?");
+    expect(askAboutQuestion(question(), "Meetings")).toContain(
+      "Which meeting sets the sprint scope?",
+    );
     expect(askAboutQuestion(question(), "Meetings")).toContain("Meetings");
   });
 

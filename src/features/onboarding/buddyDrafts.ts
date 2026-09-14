@@ -6,7 +6,11 @@
 // for them.
 // ============================================================
 
-import type { OnboardingPhaseEndpoint, OnboardingQuestionEndpoint, OnboardingStepEndpoint } from "./types";
+import type {
+  OnboardingPhaseEndpoint,
+  OnboardingQuestionEndpoint,
+  OnboardingStepEndpoint,
+} from "./types";
 
 /**
  * Taking what you are looking at on your path into the conversation.
@@ -68,10 +72,7 @@ export function askAboutStep(step: OnboardingStepEndpoint): string {
  * a refusal as their first experience of the feature, and this is the cheapest way to not start
  * there.
  */
-export function askAboutQuestion(
-  question: OnboardingQuestionEndpoint,
-  phaseTitle: string,
-): string {
+export function askAboutQuestion(question: OnboardingQuestionEndpoint, phaseTitle: string): string {
   return `I'm stuck on the knowledge question "${snippet(question.question)}" in "${snippet(phaseTitle)}". Can you go through the material with me? I'd rather work the answer out than be told it.`;
 }
 

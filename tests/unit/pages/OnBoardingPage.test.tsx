@@ -516,7 +516,9 @@ describe("OnBoardingPage: links from the buddy", () => {
   }
 
   it("opens the question a link names, on its own phase", async () => {
-    server.use(http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))));
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
 
     render(
       <MemoryRouter initialEntries={["/onboarding?question=q-linked"]}>
@@ -543,14 +545,14 @@ describe("OnBoardingPage: links from the buddy", () => {
     );
 
     // A modal over a locked question is a link that leads to a dead end; its phase is the useful half.
-    expect(
-      await screen.findByRole("heading", { name: "Meetings", level: 2 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("lands on the phase a link names", async () => {
-    server.use(http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))));
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
 
     render(
       <MemoryRouter initialEntries={["/onboarding?phase=phase-2"]}>
@@ -558,8 +560,6 @@ describe("OnBoardingPage: links from the buddy", () => {
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByRole("heading", { name: "Meetings", level: 2 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
   });
 });

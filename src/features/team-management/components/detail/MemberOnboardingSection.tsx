@@ -569,7 +569,7 @@ function StepCard({
                 {step.title}
               </h4>
               <div className="mt-2">
-                <StepOriginBadge step={step} />
+                <StepOriginBadge step={step} viewer="reviewer" />
               </div>
             </div>
 

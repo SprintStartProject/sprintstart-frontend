@@ -27,6 +27,19 @@ describe("StepOriginBadge", () => {
     expect(screen.getByText("You added this")).toBeInTheDocument();
   });
 
+  it("names the hire, not 'you', for a PM reviewing somebody else's path", () => {
+    // The same badge sits on the team page, where "You added this" would read as the PM's own step.
+    render(<StepOriginBadge step={step({ origin: "HIRE" })} viewer="reviewer" />);
+    expect(screen.getByText("Added by the hire")).toBeInTheDocument();
+    expect(screen.queryByText("You added this")).not.toBeInTheDocument();
+  });
+
+  it("says the buddy without 'your' in the reviewer view", () => {
+    render(<StepOriginBadge step={step({ origin: "BUDDY" })} viewer="reviewer" />);
+
+    expect(screen.getByText("Added with the buddy")).toBeInTheDocument();
+  });
+
   it("keeps the PM badge for what a PM prescribed", () => {
     render(<StepOriginBadge step={step({ origin: "PM" })} />);
 
