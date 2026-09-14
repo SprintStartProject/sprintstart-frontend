@@ -71,6 +71,8 @@ const createdProject: AdminProjectDetails = {
   manager: null,
   sources: [],
   users: [],
+  industry: "",
+  industryConfidence: null,
 };
 
 function adminUser(id: string, firstName: string): AdminUser {

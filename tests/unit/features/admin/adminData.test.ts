@@ -59,6 +59,8 @@ const projects: ProjectOverview[] = [
         projectRoles: ["MEMBER"],
       },
     ],
+    industry: "",
+    industryConfidence: null,
   },
 ];
 

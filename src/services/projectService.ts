@@ -36,6 +36,14 @@ export type ProjectSource = {
   status: ProjectSourceStatus;
 };
 
+export type IndustryConfidence = "high" | "medium" | "low";
+
+export type ProjectIndustryEvaluation = {
+  industry: string;
+  confidence: IndustryConfidence;
+  evidence: string[];
+};
+
 /**
  * A role as the authoring surfaces need it: the id to edit by, the name to show.
  *
@@ -89,6 +97,8 @@ export type AdminProject = {
   manager: ProjectManager | null;
   sources: ProjectSource[];
   users: ProjectUserSummary[];
+  industry: string;
+  industryConfidence: IndustryConfidence | null;
 };
 
 export type AdminProjectDetails = Omit<AdminProject, "users"> & {
@@ -101,6 +111,8 @@ export type ManagedProject = {
   name: string;
   description: string;
   memberCount: number;
+  industry: string;
+  industryConfidence: IndustryConfidence | null;
 };
 
 export type ProjectSummary = Pick<AdminProject, "id" | "name">;
@@ -108,11 +120,15 @@ export type ProjectSummary = Pick<AdminProject, "id" | "name">;
 export type CreateProjectRequest = {
   name: string;
   description?: string;
+  industry?: string;
+  industryConfidence?: IndustryConfidence;
 };
 
 export type UpdateProjectRequest = {
   name?: string;
   description?: string;
+  industry?: string;
+  industryConfidence?: IndustryConfidence;
 };
 
 export type AssignProjectUsersRequest = {
@@ -159,6 +175,8 @@ type BackendManagedProject = {
   name: string;
   description: string | null;
   memberCount: number;
+  industry: string | null;
+  industryConfidence: string | null;
 };
 
 type BackendAdminProject = {
@@ -168,6 +186,14 @@ type BackendAdminProject = {
   manager: BackendProjectManager | null;
   sources: BackendProjectSource[];
   users: BackendProjectUserSummary[];
+  industry: string | null;
+  industryConfidence: string | null;
+};
+
+type BackendProjectIndustryEvaluation = {
+  industry: string;
+  confidence: string;
+  evidence: string[];
 };
 
 type BackendAdminProjectDetails = Omit<BackendAdminProject, "users"> & {
@@ -184,6 +210,14 @@ type BackendCurrentUser = {
   projectIds?: string[];
   projects?: BackendCurrentUserProject[];
 };
+
+function toIndustryConfidence(confidence: string | null | undefined): IndustryConfidence | null {
+  if (confidence === "high" || confidence === "medium" || confidence === "low") {
+    return confidence;
+  }
+
+  return null;
+}
 
 function toProjectSource(source: BackendProjectSource): ProjectSource {
   return {
@@ -237,6 +271,8 @@ function toManagedProject(project: BackendManagedProject): ManagedProject {
     name: project.name,
     description: project.description ?? "",
     memberCount: project.memberCount,
+    industry: project.industry ?? "",
+    industryConfidence: toIndustryConfidence(project.industryConfidence),
   };
 }
 
@@ -248,6 +284,8 @@ function toAdminProject(project: BackendAdminProject): AdminProject {
     manager: toProjectManager(project.manager),
     sources: project.sources.map(toProjectSource),
     users: project.users.map(toProjectUserSummary),
+    industry: project.industry ?? "",
+    industryConfidence: toIndustryConfidence(project.industryConfidence),
   };
 }
 
@@ -259,6 +297,8 @@ function toAdminProjectDetails(project: BackendAdminProjectDetails): AdminProjec
     manager: toProjectManager(project.manager),
     sources: project.sources.map(toProjectSource),
     users: project.users.map(toProjectUser),
+    industry: project.industry ?? "",
+    industryConfidence: toIndustryConfidence(project.industryConfidence),
   };
 }
 
@@ -266,6 +306,8 @@ function toBackendProjectRequest(request: CreateProjectRequest | UpdateProjectRe
   return {
     name: request.name,
     description: request.description,
+    industry: request.industry,
+    industryConfidence: request.industryConfidence,
   };
 }
 
@@ -277,6 +319,8 @@ function toFallbackProject(id: string, name?: string): AdminProject {
     manager: null,
     sources: [],
     users: [],
+    industry: "",
+    industryConfidence: null,
   };
 }
 async function getProjectsFromCurrentUser(): Promise<AdminProject[]> {
@@ -455,5 +499,25 @@ export const projectService = {
     await apiClient.fetch<void>(`/api/v1/admin/projects/${projectId}/manager`, {
       method: "DELETE",
     });
+  },
+
+  /**
+   * Triggers an AI re-evaluation of a project's industry.
+   *
+   * Unlike the fetch methods, this does not fall back to mock data: the caller
+   * needs to know whether the evaluation actually succeeded, so errors
+   * propagate. Requires ADMIN or the project's assigned manager.
+   */
+  async evaluateProjectIndustry(projectId: string): Promise<ProjectIndustryEvaluation> {
+    const result = await apiClient.fetch<BackendProjectIndustryEvaluation>(
+      `/api/v1/projects/${projectId}/industry/evaluate`,
+      { method: "POST" },
+    );
+
+    return {
+      industry: result.industry,
+      confidence: toIndustryConfidence(result.confidence) ?? "low",
+      evidence: result.evidence,
+    };
   },
 };

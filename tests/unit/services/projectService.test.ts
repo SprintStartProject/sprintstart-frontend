@@ -7,6 +7,8 @@ const backendProject = {
   id: "project-1",
   name: "SprintStart Frontend",
   description: null,
+  industry: "Fintech",
+  industryConfidence: "high",
   sources: [
     {
       id: "source-1",
@@ -72,8 +74,27 @@ describe("projectService", () => {
             projectRoles: [],
           },
         ],
+        industry: "Fintech",
+        industryConfidence: "high",
       },
     ]);
+  });
+
+  it("getProjects normalizes a missing or unknown industry confidence to null", async () => {
+    server.use(
+      http.get("/api/v1/admin/projects", () =>
+        HttpResponse.json([
+          { ...backendProject, industry: null, industryConfidence: null },
+          { ...backendProject, id: "project-2", industryConfidence: "unexpected" },
+        ]),
+      ),
+    );
+
+    const projects = await projectService.getProjects();
+
+    expect(projects[0].industry).toBe("");
+    expect(projects[0].industryConfidence).toBeNull();
+    expect(projects[1].industryConfidence).toBeNull();
   });
 
   it("falls back to current-user project ids when admin projects are forbidden", async () => {
@@ -92,6 +113,8 @@ describe("projectService", () => {
         manager: null,
         sources: [],
         users: [],
+        industry: "",
+        industryConfidence: null,
       },
     ]);
   });
@@ -137,6 +160,28 @@ describe("projectService", () => {
       description: "Test Desc",
     });
     expect(newProject.id).toBe("project-new");
+  });
+
+  it("createProject sends industry and industryConfidence when provided", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/v1/admin/projects", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ ...backendProjectDetails, id: "project-new" });
+      }),
+    );
+
+    await projectService.createProject({
+      name: "Test Project",
+      industry: "Fintech",
+      industryConfidence: "high",
+    });
+
+    expect(capturedBody).toEqual({
+      name: "Test Project",
+      industry: "Fintech",
+      industryConfidence: "high",
+    });
   });
 
   it("updateProject patches backend-supported fields and keeps empty descriptions", async () => {
@@ -192,5 +237,38 @@ describe("projectService", () => {
     const result = await projectService.deleteProject("project-1");
 
     expect(result).toEqual({ id: "project-1", deleted: true });
+  });
+
+  it("evaluateProjectIndustry returns the AI evaluation", async () => {
+    server.use(
+      http.post("/api/v1/projects/project-1/industry/evaluate", () =>
+        HttpResponse.json({
+          industry: "Fintech",
+          confidence: "medium",
+          evidence: ["Mentions payment processing", "References banking APIs"],
+        }),
+      ),
+    );
+
+    const evaluation = await projectService.evaluateProjectIndustry("project-1");
+
+    expect(evaluation).toEqual({
+      industry: "Fintech",
+      confidence: "medium",
+      evidence: ["Mentions payment processing", "References banking APIs"],
+    });
+  });
+
+  it("evaluateProjectIndustry propagates a 502 when the AI service fails", async () => {
+    server.use(
+      http.post(
+        "/api/v1/projects/project-1/industry/evaluate",
+        () => new HttpResponse("Bad Gateway", { status: 502 }),
+      ),
+    );
+
+    await expect(projectService.evaluateProjectIndustry("project-1")).rejects.toMatchObject({
+      status: 502,
+    });
   });
 });

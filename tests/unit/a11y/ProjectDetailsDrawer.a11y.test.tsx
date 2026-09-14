@@ -37,6 +37,8 @@ const project: ProjectOverview = {
   manager: null,
   sources: [],
   users: [],
+  industry: "",
+  industryConfidence: null,
 };
 
 describe("ProjectDetailsDrawer Accessibility", () => {

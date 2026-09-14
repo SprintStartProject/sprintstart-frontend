@@ -37,6 +37,8 @@ const projectOverview: ProjectOverview = {
   manager: null,
   sources: [],
   users: [],
+  industry: "",
+  industryConfidence: null,
 };
 
 const projectDetails: AdminProjectDetails = {
@@ -57,6 +59,8 @@ const projectDetails: AdminProjectDetails = {
       enabled: true,
     },
   ],
+  industry: "",
+  industryConfidence: null,
 };
 
 describe("ProjectDetailsDrawer", () => {

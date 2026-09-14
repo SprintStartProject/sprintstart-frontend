@@ -40,6 +40,8 @@ export function createSelectableProject(
     manager: null,
     sources: [],
     users: [],
+    industry: "",
+    industryConfidence: null,
     isManaged: true,
     memberCount: 3,
     sourceCount: 2,

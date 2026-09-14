@@ -16,6 +16,8 @@ const projects: ProjectOverview[] = [
       { id: "s2", name: "Jira", type: "JIRA", status: "CONNECTED" },
     ],
     users: [{ id: "u1", username: "asmith", email: "alice@example.com", projectRoles: ["MEMBER"] }],
+    industry: "",
+    industryConfidence: null,
   },
   {
     id: "p2",
@@ -24,6 +26,8 @@ const projects: ProjectOverview[] = [
     manager: null,
     sources: [],
     users: [],
+    industry: "",
+    industryConfidence: null,
   },
 ];
 
