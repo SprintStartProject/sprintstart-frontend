@@ -9,7 +9,6 @@ import {
   Hourglass,
   Inbox,
   LayoutGrid,
-  Loader2,
   RefreshCw,
   Rocket,
   Search,
@@ -22,9 +21,11 @@ import { FilterSelect, type FilterSelectOption } from "../../../components/ui/Fi
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
 import { StatTile } from "./StatTile";
@@ -66,6 +67,60 @@ function hasActivity(hires: HireTimeline[]): boolean {
       hire.firstContributionOpenedAt !== null ||
       hire.acceptedContributionCount > 0 ||
       hire.openContributionCount > 0,
+  );
+}
+
+/** Matches the `grid grid-cols-2 gap-3 lg:grid-cols-4` layout of {@link StatTile}. */
+function StatTileSkeleton() {
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">
+      <div className="flex items-center justify-between">
+        <SkeletonLine className="w-24" />
+        <SkeletonBlock className="h-[18px] w-[18px]" />
+      </div>
+      <SkeletonLine className="mt-auto h-8 w-16" />
+      <SkeletonLine className="mt-1 w-20" />
+    </div>
+  );
+}
+
+/** Matches {@link HireTimelineCard}'s avatar row and five-step moment rail. */
+function HireTimelineCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+      <div className="flex flex-1 items-center gap-3">
+        <SkeletonBlock className="h-10 w-10 shrink-0 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <SkeletonLine className="w-1/3" />
+          <SkeletonLine className="w-1/4" />
+        </div>
+      </div>
+      <div className="mt-4 flex items-start gap-4 overflow-x-hidden">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="flex w-20 shrink-0 flex-col items-center gap-2">
+            <SkeletonBlock className="h-9 w-9 rounded-full" />
+            <SkeletonLine className="w-14" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OnboardingMetricsSkeleton() {
+  return (
+    <SkeletonGroup label="Loading onboarding metrics" className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <StatTileSkeleton key={index} />
+        ))}
+      </div>
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <HireTimelineCardSkeleton key={index} />
+        ))}
+      </div>
+    </SkeletonGroup>
   );
 }
 
@@ -114,6 +169,8 @@ export function OnboardingMetricsPage() {
       ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
       : Promise.resolve(null),
   );
+
+  const showLoadingSkeleton = useDelayedFlag(loading);
 
   const handleRefresh = () => {
     if (!selectedProjectId) return;
@@ -257,11 +314,9 @@ export function OnboardingMetricsPage() {
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No projects">
             There are no projects to report on yet.
           </EmptyState>
-        ) : loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-app-brand" aria-hidden="true" />
-          </div>
-        ) : error ? (
+        ) : showLoadingSkeleton ? (
+          <OnboardingMetricsSkeleton />
+        ) : loading ? null : error ? (
           <EmptyState
             icon={<AlertCircle className="h-8 w-8 text-app-danger-solid" />}
             title="Couldn't load metrics"

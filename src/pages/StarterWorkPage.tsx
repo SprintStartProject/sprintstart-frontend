@@ -32,6 +32,8 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { useStarterWorkReview } from "../features/starter-work/hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../features/starter-work/hooks/useStarterWorkPool";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
 import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../features/starter-work/types";
 
 /**
@@ -475,6 +477,17 @@ export function StarterWorkPage() {
   );
 }
 
+/** Placeholder for one `StarterWorkTaskCard`, matching its title, summary and meta-badge rows. */
+function StarterWorkTaskCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-app-border bg-app-surface p-4">
+      <SkeletonLine className="w-3/4" />
+      <SkeletonLine className="mt-2 w-1/2" />
+      <SkeletonLine className="mt-2 h-5 w-20" />
+    </div>
+  );
+}
+
 /** The review queue shared by the overview column and its full-width tab. */
 function ReviewQueue({
   tasks,
@@ -493,6 +506,8 @@ function ReviewQueue({
   onApprove: (id: string, origin?: PoolFlightRect) => Promise<void>;
   onReject: (id: string, reason?: string) => Promise<void>;
 }) {
+  const showLoadingSkeleton = useDelayedFlag(isLoading);
+
   return (
     <section aria-label="Awaiting your review">
       <SectionHeading
@@ -500,11 +515,13 @@ function ReviewQueue({
         description="Vouch to lift a task's rank. Removal is permanent."
         count={tasks.length}
       />
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-app-text-muted">
-          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-        </div>
-      ) : tasks.length === 0 ? (
+      {showLoadingSkeleton ? (
+        <SkeletonGroup label="Loading tasks awaiting review" className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <StarterWorkTaskCardSkeleton key={index} />
+          ))}
+        </SkeletonGroup>
+      ) : isLoading ? null : tasks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
           <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
           <p className="mx-auto max-w-md text-sm text-app-text-muted">

@@ -6,9 +6,11 @@ import type { FAQGroup, FAQRebuildScope } from "../types";
 import { insightsService } from "../../../services/faqService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { TrendBadge } from "./TrendBadge";
 import { RebuildFaqDialog } from "./RebuildFaqDialog";
 import { formatAskedAt } from "../format";
@@ -60,6 +62,48 @@ const SORTERS: Record<FaqSortOption, (a: FAQGroup, b: FAQGroup) => number> = {
   title: (a, b) => a.title.localeCompare(b.title),
 };
 
+/** Placeholder for one recurring-question row, matching its title/count and tag-badge rows. */
+function FaqGroupRowSkeleton() {
+  return (
+    <div className="rounded-2xl border border-app-border bg-app-surface p-4">
+      <div className="mb-2 flex items-start justify-between gap-4">
+        <SkeletonLine className="w-1/2" />
+        <SkeletonLine className="h-6 w-8" />
+      </div>
+      <SkeletonLine className="w-1/3" />
+    </div>
+  );
+}
+
+/** Matches the four-tile stats grid in {@link FaqPage}'s header band. */
+function FaqStatsGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="rounded-xl border border-app-border bg-app-surface p-3">
+          <div className="flex items-center gap-3">
+            <SkeletonBlock className="h-5 w-5" />
+            <div className="space-y-1.5">
+              <SkeletonLine className="h-6 w-10" />
+              <SkeletonLine className="w-20" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FaqOverviewSkeleton() {
+  return (
+    <SkeletonGroup label="Loading recurring questions" className="space-y-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <FaqGroupRowSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
+
 export function FaqPage() {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
@@ -80,6 +124,8 @@ export function FaqPage() {
   } = useLiveFetch(queryKeys.faq.groups(selectedProjectId), () =>
     insightsService.fetchFAQGroups(selectedProjectId),
   );
+
+  const showLoadingSkeleton = useDelayedFlag(loading);
 
   // Closes first, then works. A rebuild takes as long as an AI call and there is
   // nothing to watch — holding the dialog open would pin the PM to a spinner for
@@ -139,7 +185,7 @@ export function FaqPage() {
     />
   );
 
-  if (loading) {
+  if (showLoadingSkeleton || loading) {
     // Nothing to rebuild from until the fetch resolves, same as the error state below.
     return (
       <PageShell
@@ -148,10 +194,10 @@ export function FaqPage() {
         subtitle={PAGE_SUBTITLE}
         frame="content"
         back={PAGE_BACK}
+        bandExtra={showLoadingSkeleton ? <FaqStatsGridSkeleton /> : undefined}
+        mainClassName="py-8"
       >
-        <div className="flex justify-center py-20">
-          <Spinner size="lg" label="Loading" />
-        </div>
+        {showLoadingSkeleton && <FaqOverviewSkeleton />}
       </PageShell>
     );
   }

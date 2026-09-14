@@ -15,7 +15,43 @@ import { getTeamOverview, getProjectRoles } from "../services/teamManagementServ
 import { ApiError } from "../services/apiClient";
 import { PageShell } from "../components/layout/PageShell";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { SkeletonBlock, SkeletonCard, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+
+/** Placeholder for one `TeamMemberCard`, matching its avatar row, status badge and progress bar. */
+function TeamMemberCardSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <SkeletonBlock className="h-10 w-10 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <SkeletonLine className="w-2/3" />
+          <SkeletonLine className="w-1/3" />
+        </div>
+      </div>
+      <SkeletonLine className="h-5 w-24 rounded-full" />
+      <div className="space-y-2">
+        <SkeletonLine className="w-full" />
+        <SkeletonLine className="w-3/4" />
+      </div>
+      <SkeletonBlock className="h-2 w-full rounded-full" />
+    </SkeletonCard>
+  );
+}
+
+function TeamOverviewSkeleton() {
+  return (
+    <SkeletonGroup
+      label="Loading team overview"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+    >
+      {Array.from({ length: 6 }).map((_, index) => (
+        <TeamMemberCardSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
 
 const FRAME_CLASS_NAME = "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8";
 
@@ -55,6 +91,8 @@ export function TeamManagementPage() {
 
     void loadInitialData();
   }, [loadTeamOverview]);
+
+  const showLoadingSkeleton = useDelayedFlag(loading);
 
   // Two-finger swipe between the tabs, for people who would rather not aim
   // at the bar.
@@ -106,7 +144,7 @@ export function TeamManagementPage() {
       ? ([filteredUsers.length, "members"] as const)
       : ([roles.length, roles.length === 1 ? "role" : "roles"] as const);
 
-  const headerActions = !loading && !loadError && (
+  const headerActions = !showLoadingSkeleton && !loadError && (
     <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
       <div className="text-3xl font-bold text-app-brand">{headerCount}</div>
       <div className="text-xs font-medium text-app-brand-text">{headerLabel}</div>
@@ -124,11 +162,9 @@ export function TeamManagementPage() {
       mainClassName="py-6 pt-8 pb-24"
       mainRef={loading || loadError ? undefined : swipeRef}
     >
-      {loading ? (
-        <div className="flex min-h-96 items-center justify-center">
-          <p className="text-sm text-app-text-muted">Loading team overview...</p>
-        </div>
-      ) : loadError ? (
+      {showLoadingSkeleton ? (
+        <TeamOverviewSkeleton />
+      ) : loading ? null : loadError ? (
         <div className="flex min-h-96 items-center justify-center px-6">
           <p className="text-sm text-app-danger-text">{loadError}</p>
         </div>

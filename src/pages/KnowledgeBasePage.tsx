@@ -18,6 +18,36 @@ import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
+
+/** Placeholder for one `ArtifactCard`, matching its icon box, title/badge row and meta row. */
+function ArtifactCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-app-border bg-app-surface p-4">
+      <div className="flex items-start gap-4">
+        <SkeletonBlock className="h-9 w-9 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <SkeletonLine className="w-1/3" />
+            <SkeletonLine className="h-4 w-12" />
+          </div>
+          <SkeletonLine className="mt-2 w-1/2" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactListSkeleton() {
+  return (
+    <SkeletonGroup label="Loading artifacts" className="space-y-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <ArtifactCardSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
 
 /** Roles allowed to delete uploaded artifacts. Pattern A gate mirroring
  *  the backend `@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")` — keeps
@@ -65,6 +95,7 @@ export function KnowledgeBasePage() {
   } = useKnowledgeBase(projectId);
 
   const isLoading = isProjectLoading || isArtifactsLoading;
+  const showLoadingSkeleton = useDelayedFlag(isLoading);
 
   /*
     `?artifact=<id>` says which document is open, and it is in the URL the whole time one is.
@@ -207,11 +238,9 @@ export function KnowledgeBasePage() {
                 </div>
               )}
 
-              {isLoading ? (
-                <div className="flex justify-center p-12" aria-busy="true" aria-live="polite">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-app-brand border-t-transparent"></div>
-                </div>
-              ) : fetchError ? null : (
+              {showLoadingSkeleton ? (
+                <ArtifactListSkeleton />
+              ) : isLoading ? null : fetchError ? null : (
                 // Only the list slides; the loading and error
                 // states above are not tabs and would otherwise
                 // animate on their way in too.

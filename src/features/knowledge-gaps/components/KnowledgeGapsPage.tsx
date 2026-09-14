@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 
 import type { KnowledgeGapSeverity } from "../types";
@@ -7,12 +6,14 @@ import type { KnowledgeGapSeverity } from "../types";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { formatRelativeDate } from "../format";
 import { describeEmptyState } from "../emptyState";
 import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { Button } from "../../../components/ui/Button";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 
 import { ShieldAlert, Clock, Filter, X, RefreshCw, FileText, User } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -36,6 +37,57 @@ const PAGE_SUBTITLE =
   "Documentation gaps identified across the organization and prioritized by impact.";
 const PAGE_BACK = { label: "Back to PM-Dashboard", to: "/pm-dashboard" } as const;
 
+/** Placeholder for one gap row, matching its severity bar, tag chips and owner/date footer. */
+function KnowledgeGapRowSkeleton() {
+  return (
+    <div className="flex w-full items-stretch gap-3 rounded-2xl border border-app-border bg-app-surface p-4">
+      <SkeletonBlock className="w-1.5 shrink-0 rounded-full" />
+      <div className="min-w-0 flex-1">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <SkeletonLine className="w-1/3" />
+          <SkeletonLine className="h-5 w-16 rounded-full" />
+        </div>
+        <div className="mb-3 space-y-1.5">
+          <SkeletonLine className="w-1/4" />
+          <div className="flex flex-wrap gap-1.5">
+            <SkeletonLine className="h-6 w-16" />
+            <SkeletonLine className="h-6 w-20" />
+            <SkeletonLine className="h-6 w-14" />
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <SkeletonLine className="w-24" />
+          <SkeletonLine className="w-20" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Matches the stacked bar + legend of {@link SeveritySummaryBar} in the header band. */
+function GapsSummaryBarSkeleton() {
+  return (
+    <div>
+      <SkeletonLine className="mb-2 h-2 w-full rounded-full" />
+      <div className="flex items-center gap-3">
+        <SkeletonLine className="h-3 w-20" />
+        <SkeletonLine className="h-3 w-20" />
+        <SkeletonLine className="h-3 w-16" />
+      </div>
+    </div>
+  );
+}
+
+function GapsOverviewSkeleton() {
+  return (
+    <SkeletonGroup label="Loading knowledge gaps" className="space-y-3">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <KnowledgeGapRowSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
+
 // ------------------------------------------------------------------
 // PAGE
 // ------------------------------------------------------------------
@@ -58,6 +110,8 @@ export function KnowledgeGapsPage() {
   } = useLiveFetch(queryKeys.knowledgeGaps.overview(selectedProjectId), () =>
     knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
   );
+
+  const showLoadingSkeleton = useDelayedFlag(loading);
 
   // The backend rescans on its own once new documentation is indexed; while it
   // does, the gaps below are the previous result.
@@ -96,7 +150,7 @@ export function KnowledgeGapsPage() {
     </Button>
   );
 
-  if (loading) {
+  if (showLoadingSkeleton || loading) {
     // Nothing to rescan from until the fetch resolves.
     return (
       <PageShell
@@ -105,10 +159,10 @@ export function KnowledgeGapsPage() {
         subtitle={PAGE_SUBTITLE}
         frame="content"
         back={PAGE_BACK}
+        bandExtra={showLoadingSkeleton ? <GapsSummaryBarSkeleton /> : undefined}
+        mainClassName="py-8"
       >
-        <div className="flex justify-center py-20">
-          <Spinner size="lg" label="Loading" />
-        </div>
+        {showLoadingSkeleton && <GapsOverviewSkeleton />}
       </PageShell>
     );
   }

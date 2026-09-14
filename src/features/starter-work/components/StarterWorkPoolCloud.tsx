@@ -13,8 +13,10 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
+import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { useToast } from "../../../context/useToast";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { orientationService } from "../../../services/orientationService";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -143,6 +145,19 @@ type PoolTaskProps = {
   isBusy: boolean;
   onOpen: (task: StarterWorkTask) => void;
 };
+
+/** Placeholder for one pool row, matching `PoolListRow`'s title/description/meta shape. */
+function PoolRowSkeleton() {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4">
+      <div className="min-w-0 flex-1">
+        <SkeletonLine className="w-2/3" />
+        <SkeletonLine className="mt-1.5 w-1/2" />
+        <SkeletonLine className="mt-2 h-5 w-20" />
+      </div>
+    </div>
+  );
+}
 
 /** Pick any of the other four layouts, so every page change is visibly different. */
 function nextCloudLayout(current: number): number {
@@ -291,6 +306,7 @@ export function StarterWorkPoolCloud({
   const { selectedProjectId } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
   const { error: showErrorToast } = useToast();
+  const showLoadingSkeleton = useDelayedFlag(isLoading);
 
   const [view, setView] = useState<PoolView>("cloud");
   const [layoutIndex, setLayoutIndex] = useState(0);
@@ -394,11 +410,16 @@ export function StarterWorkPoolCloud({
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-app-text-muted">
-          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-        </div>
-      ) : tasks.length === 0 ? (
+      {showLoadingSkeleton ? (
+        <SkeletonGroup
+          label="Loading the pool"
+          className={fullWidth ? "grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2" : "space-y-2.5"}
+        >
+          {Array.from({ length: fullWidth ? 6 : 3 }).map((_, index) => (
+            <PoolRowSkeleton key={index} />
+          ))}
+        </SkeletonGroup>
+      ) : isLoading ? null : tasks.length === 0 ? (
         <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
           Nothing has been vouched for yet. Review a task on the left and it lands here.
         </EmptyState>

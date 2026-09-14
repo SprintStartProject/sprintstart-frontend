@@ -256,10 +256,11 @@ describe("FaqPage", () => {
     expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
   });
 
-  it("shows loading state", () => {
-    vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, loading: true });
-    const { container } = renderPage();
-    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+  it("shows loading state", async () => {
+    vi.mocked(useLiveFetch).mockReturnValue({ ...loaded, data: null, loading: true });
+    renderPage();
+    // The skeleton only appears after a short delay, so it never flashes on a fast load.
+    expect(await screen.findByText("Loading recurring questions")).toBeInTheDocument();
   });
 
   // A FAQ nobody has filled yet and one that could not be loaded look the same
