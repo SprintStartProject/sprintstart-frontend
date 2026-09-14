@@ -128,6 +128,13 @@ interface BuddyStreamChunk {
    */
   checklist_title?: string;
   checklist_items?: string[];
+  /** `amend_checklist`: which card of theirs the lines would be added to. */
+  card_id?: string;
+  /** `place_link` confirm payload. */
+  link_url?: string;
+  link_label?: string;
+  /** `place_note` confirm payload. */
+  note_text?: string;
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -155,6 +162,10 @@ export async function performAction(
     level?: string;
     checklistTitle?: string;
     checklistItems?: string[];
+    cardId?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    noteText?: string;
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -170,6 +181,10 @@ export async function performAction(
       level: extras.level,
       checklistTitle: extras.checklistTitle,
       checklistItems: extras.checklistItems,
+      cardId: extras.cardId,
+      linkUrl: extras.linkUrl,
+      linkLabel: extras.linkLabel,
+      noteText: extras.noteText,
     }),
   });
 }
@@ -341,6 +356,10 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               level: event.level,
               checklistTitle: event.checklist_title,
               checklistItems: event.checklist_items,
+              cardId: event.card_id,
+              linkUrl: event.link_url,
+              linkLabel: event.link_label,
+              noteText: event.note_text,
             });
           }
           break;

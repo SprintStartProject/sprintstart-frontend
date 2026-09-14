@@ -204,6 +204,101 @@ describe("BuddyActionProposals", () => {
     });
   });
 
+  /** An addition to a list they already have, said as an addition. */
+  describe("a proposed amendment", () => {
+    it("names it as an addition and shows only the new lines", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "amend_checklist",
+              label: "Add these to the list",
+              cardId: "card-7",
+              checklistItems: ["Write the test", "Open a draft PR"],
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(/nothing on it changes/i)).toBeInTheDocument();
+      expect(screen.getByText(/Write the test/)).toBeInTheDocument();
+    });
+
+    it("carries the card it would be added to back on confirm", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "amend_checklist",
+              label: "Add these to the list",
+              cardId: "card-7",
+              checklistItems: ["Write the test"],
+            }),
+          ]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /add these to the list/i }));
+
+      expect(onConfirm.mock.calls[0][1]).toMatchObject({
+        cardId: "card-7",
+        checklistItems: ["Write the test"],
+      });
+    });
+  });
+
+  /** The label is the mentor's wording; the address is the part that has to be right. */
+  describe("a proposed link", () => {
+    it("shows the address as well as the label", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "place_link",
+              label: "Keep this link",
+              linkUrl: "https://example.test/runbook",
+              linkLabel: "The deploy runbook",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("The deploy runbook")).toBeInTheDocument();
+      expect(screen.getByText("https://example.test/runbook")).toBeInTheDocument();
+    });
+  });
+
+  describe("a proposed note", () => {
+    it("shows the words that would be kept", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "place_note",
+              label: "Keep this as a note",
+              noteText: "Deploys run on Thursdays\n\nBehind a feature flag.",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(/Deploys run on Thursdays/)).toBeInTheDocument();
+    });
+  });
+
   /**
    * A refusal is not always permanent, and the mentor is never told what became of a proposal — so
    * a spent confirm left the hire with no control while being asked to press one.
