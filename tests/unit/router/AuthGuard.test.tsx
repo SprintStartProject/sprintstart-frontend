@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthGuard } from "../../../src/router/AuthGuard";
 import { useAuth } from "../../../src/context/useAuth";
