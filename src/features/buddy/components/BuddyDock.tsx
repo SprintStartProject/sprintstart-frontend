@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
@@ -51,6 +52,8 @@ type BuddyDockProps = Pick<
   | "startFreshVisit"
 > & {
   onClose: () => void;
+  /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
+  lastMessageFooter?: ReactNode;
   /**
    * Opens the full page, carrying the draft. Omitted when there is nowhere to go — on
    * `/buddy` itself, where the control would offer the page the hire is already reading.
@@ -115,6 +118,7 @@ export function BuddyDock({
   startFreshVisit,
   openError,
   onClose,
+  lastMessageFooter,
   onOpenFull,
   onRetryOpen,
   suggestionsHidden = false,
@@ -313,6 +317,7 @@ export function BuddyDock({
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}
+            lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}

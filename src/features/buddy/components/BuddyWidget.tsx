@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Sparkles } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { onBuddyPageReady } from "../aiBuddyBus";
 import { useBuddy } from "../hooks/useBuddy";
+import { useGreetingReveal } from "../hooks/useGreetingReveal";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
 
@@ -36,7 +39,12 @@ export function BuddyWidget() {
     messages,
     isThinking,
     isStreaming,
+    isOpening,
     activeTool,
+    openerAction,
+    sendMessage,
+    presentedGreetingId,
+    markGreetingPresented,
     isOpen,
     toggleOpen,
     draft,
@@ -50,6 +58,15 @@ export function BuddyWidget() {
     closeDock,
     startFreshVisit,
   } = useBuddy();
+
+  // The greeting is usually written before the dock is ever opened; this is what still lets the
+  // hire watch the buddy think and write it — see the hook.
+  const greeting = useGreetingReveal({
+    messages,
+    active: isOpen,
+    presentedGreetingId,
+    markGreetingPresented,
+  });
 
   /**
    * Where the hand-off to `/buddy` has got to.
@@ -182,8 +199,24 @@ export function BuddyWidget() {
         {isOpen && (
           <BuddyDock
             key="buddy-dock"
-            messages={messages}
-            isThinking={isThinking}
+            messages={greeting.messages}
+            // `isOpening` too, the way `/buddy` passes it: a dock opened while the greeting is
+            // still being written showed an empty window instead of the buddy typing.
+            isThinking={isThinking || isOpening || greeting.isThinking}
+            // The greeting's one suggested next step, which only `/buddy` used to offer.
+            lastMessageFooter={
+              openerAction && !greeting.isRevealing && !messages.some((m) => m.role === "USER") ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="mt-1.5"
+                  icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+                  onClick={() => void sendMessage(openerAction.question)}
+                >
+                  {openerAction.label}
+                </Button>
+              ) : undefined
+            }
             isStreaming={isStreaming}
             activeTool={activeTool}
             draft={draft}

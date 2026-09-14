@@ -44,6 +44,12 @@ export function useBuddyConversation() {
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  /**
+   * The last greeting a surface has actually put in front of the hire — either watched while it
+   * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
+   * dock already played is not played again on `/buddy`, and the other way round.
+   */
+  const [presentedGreetingId, setPresentedGreetingId] = useState<string | null>(null);
 
   const loadedRef = useRef(false);
   // Guards the greeting against overlapping calls — see `startFreshVisit`.
@@ -79,6 +85,7 @@ export function useBuddyConversation() {
         citations: [],
         // Only worth marking when there is something above it to be divided from.
         startsVisit: prev.length > 0,
+        isGreeting: true,
       },
     ]);
 
@@ -180,7 +187,12 @@ export function useBuddyConversation() {
       // turn in the list by the time this resolves — assigning would delete their own message
       // out from under them. History is older, so it belongs in front.
       setMessages((prev) => [
-        ...history.map((message) => ({ ...message, id: crypto.randomUUID() })),
+        ...history.map((message) => ({
+          ...message,
+          id: crypto.randomUUID(),
+          // The one-message window below: a greeting nobody answered, replayed as it was.
+          isGreeting: history.length === 1 && message.role === "ASSISTANT",
+        })),
         ...prev,
       ]);
 
@@ -482,5 +494,8 @@ export function useBuddyConversation() {
     ensureOpened,
     retryOpen,
     startFreshVisit,
+
+    presentedGreetingId,
+    markGreetingPresented: setPresentedGreetingId,
   };
 }
