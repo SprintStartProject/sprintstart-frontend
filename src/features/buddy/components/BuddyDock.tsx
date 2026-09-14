@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { Button } from "../../../components/ui/Button";
@@ -12,6 +12,14 @@ import { BuddySuggestionChips } from "./BuddySuggestionChips";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import {
+  DEFAULT_CORNER,
+  cornerTransformOrigin,
+  dockBox,
+  isTopCorner,
+  useViewportSize,
+  type BuddyCorner,
+} from "../buddyCorner";
 
 /**
  * The hand-off to `/buddy`, in seconds, in two parts.
@@ -26,14 +34,6 @@ import { useStickToBottom } from "../hooks/useStickToBottom";
  */
 export const DOCK_EXPAND_S = 0.42;
 export const DOCK_REVEAL_S = 0.2;
-
-/** The window's resting size. Big enough to hold a conversation, small enough to leave the page. */
-const DOCK_WIDTH = 400;
-const DOCK_HEIGHT = 560;
-
-/** Distance from the viewport's right edge, and from the launcher sitting below it. */
-const DOCK_RIGHT = 24;
-const DOCK_BOTTOM = 104;
 
 type BuddyDockProps = Pick<
   ReturnType<typeof useBuddy>,
@@ -52,6 +52,14 @@ type BuddyDockProps = Pick<
   onClose: () => void;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
   lastMessageFooter?: ReactNode;
+  /** The corner the launcher sits in; the window opens beside it. */
+  corner?: BuddyCorner;
+  /**
+   * The launcher's drag offset. The window rides along on it while the launcher is dragged, and
+   * settles with it once it is dropped.
+   */
+  dragX?: MotionValue<number>;
+  dragY?: MotionValue<number>;
   /**
    * Opens the full page, carrying the draft. Omitted when there is nowhere to go — on
    * `/buddy` itself, where the control would offer the page the hire is already reading.
@@ -82,7 +90,8 @@ type BuddyDockProps = Pick<
 };
 
 /**
- * The buddy's own little window, in the bottom-right corner over whatever page you are on.
+ * The buddy's own little window, in the corner of whatever page you are on — beside the launcher,
+ * in whichever of the four corners the hire has dragged it to.
  *
  * **Small on purpose.** It is the size of a conversation, not the size of the app: the buddy is
  * consulted *about* what you are looking at, so a full-height drawer that covered the page hid
@@ -117,6 +126,9 @@ export function BuddyDock({
   openError,
   onClose,
   lastMessageFooter,
+  corner = DEFAULT_CORNER,
+  dragX,
+  dragY,
   onOpenFull,
   onRetryOpen,
   suggestionsHidden = false,
@@ -144,28 +156,14 @@ export function BuddyDock({
   // that is still arriving.
   const isBusy = isThinking || isStreaming;
 
-  const resting = {
-    width: DOCK_WIDTH,
-    height: DOCK_HEIGHT,
-    right: DOCK_RIGHT,
-    bottom: DOCK_BOTTOM,
-    borderRadius: 20,
-  };
+  const viewport = useViewportSize();
+  const resting = { ...dockBox(corner, viewport), borderRadius: 20 };
 
-  // Read here rather than kept in state: the viewport size matters for exactly one animation
-  // target, on the render where `isExpanding` flips. A resize listener would be a subscription
-  // held for the life of the widget to serve a value used once — and Framer Motion cannot
-  // interpolate `400px` to `100vw`, so the target has to be in pixels either way.
-  const box =
-    isExpanding && typeof window !== "undefined"
-      ? {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          right: 0,
-          bottom: 0,
-          borderRadius: 0,
-        }
-      : resting;
+  // The viewport in pixels rather than `100vw`: Framer Motion cannot interpolate `400px` to
+  // `100vw`, so the growth target has to be the same unit as the resting box.
+  const box = isExpanding
+    ? { left: 0, top: 0, width: viewport.width, height: viewport.height, borderRadius: 0 }
+    : resting;
 
   return (
     <motion.div
@@ -175,15 +173,21 @@ export function BuddyDock({
       initial={
         prefersReducedMotion
           ? { opacity: 0, ...resting }
-          : { opacity: 0, scale: 0.86, y: 24, ...resting }
+          : {
+              opacity: 0,
+              scale: 0.86,
+              ...resting,
+              // Rises out of a launcher below it, drops out of one above it. `top` rather than
+              // `y`, because `y` is the drag offset it shares with the launcher.
+              top: resting.top + (isTopCorner(corner) ? -24 : 24),
+            }
       }
       animate={{
         opacity: isRevealing ? 0 : 1,
         scale: 1,
-        y: 0,
         ...box,
       }}
-      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 16 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
       transition={
         prefersReducedMotion
           ? { duration: 0 }
@@ -195,21 +199,16 @@ export function BuddyDock({
               ? { duration: DOCK_EXPAND_S, ease: [0.32, 0.72, 0, 1] }
               : centralSpringToken
       }
-      // The corner it grows out of, so opening reads as the buddy standing up rather than as a
-      // box fading in over the page.
-      style={{ transformOrigin: "bottom right" }}
-      // The caps keep the window inside a small viewport at rest; while it is growing into the
-      // page they would stop it a rem short of the edges, which is exactly where the illusion
-      // that it *became* the page would break.
-      //
-      // They have to subtract the offsets the window is anchored by, not just a margin. The
-      // window hangs `DOCK_BOTTOM` above the bottom edge, so a cap of `100vh - 2rem` still let
-      // it grow past the *top* of a short viewport -- which put the header, and with it the
-      // close and expand controls, off screen and out of reach. `8rem` is `DOCK_BOTTOM` plus a
-      // `DOCK_RIGHT`-sized gap at the top; `3rem` is `DOCK_RIGHT` on both sides.
-      className={`fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl ${
-        isExpanding ? "" : "max-h-[calc(100vh-8rem)] max-w-[calc(100vw-3rem)]"
-      }`}
+      style={{
+        // The corner it grows out of, so opening reads as the buddy standing up rather than as
+        // a box fading in over the page.
+        transformOrigin: cornerTransformOrigin(corner),
+        x: dragX,
+        y: dragY,
+      }}
+      // No `max-h`/`max-w` caps any more: `dockBox` already fits the window inside the viewport,
+      // with its header on screen, and caps would stop the growth into the page short of the edges.
+      className="fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl"
     >
       {/* Everything inside fades as the window grows, so by the time the route changes the
                 screen holds nothing but a full-bleed `bg-app-bg` surface — which is exactly what
