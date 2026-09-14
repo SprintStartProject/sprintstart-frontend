@@ -7,7 +7,9 @@
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { onboardingService } from "../../../services/onboardingService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useToast } from "../../../context/useToast";
 import { Modal } from "../../../components/ui/Modal";
 import type {
@@ -64,6 +66,7 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<PhaseCheckAttemptResult | null>(null);
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   // Anchor at the very top of the scrollable modal body. After grading, the user is
@@ -131,6 +134,7 @@ export function PhaseCheckModal({ phaseId, phaseTitle, onClose }: PhaseCheckModa
         toSubmission(question, getDraft(question.id)),
       );
       const attemptResult = await onboardingService.submitPhaseCheck(check.phaseId, payload);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
       setResult(attemptResult);
       setHasSubmitted(true);
     } catch (err) {

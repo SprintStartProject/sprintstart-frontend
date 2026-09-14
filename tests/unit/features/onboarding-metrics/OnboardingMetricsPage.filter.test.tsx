@@ -77,8 +77,14 @@ const metrics = {
 
 // Return the metrics synchronously — the filter is client-side, so the fetch shape
 // is irrelevant to what this test proves.
-vi.mock("../../../../src/hooks/useFetch", () => ({
-  useFetch: () => ({ data: metrics, loading: false, error: false }),
+vi.mock("../../../../src/hooks/useQueryFetch", () => ({
+  useQueryFetch: () => ({
+    data: metrics,
+    loading: false,
+    error: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 import { OnboardingMetricsPage } from "../../../../src/features/onboarding-metrics/components/OnboardingMetricsPage";

@@ -67,13 +67,16 @@ describe("StarterWorkPage", () => {
     ]);
     render(<StarterWorkPage />);
 
-    const poolCard = (await screen.findByText("Available to new hires")).parentElement;
+    // The KPI cards render on the very first pass regardless of load state (their value defaults
+    // to 0), so the count itself — not just the static label — has to be the awaited condition;
+    // otherwise this can observe either card before its own query has settled.
+    const poolCard = screen.getByText("Available to new hires").parentElement;
     const reviewedCard = screen.getByText("Vouched for by your team").parentElement;
 
     expect(poolCard).toHaveTextContent("In the pool");
-    expect(poolCard).toHaveTextContent("2");
+    await waitFor(() => expect(poolCard).toHaveTextContent("2"));
     expect(reviewedCard).toHaveTextContent("Reviewed");
-    expect(reviewedCard).toHaveTextContent("1");
+    await waitFor(() => expect(reviewedCard).toHaveTextContent("1"));
     expect(screen.queryByText("Skills exercised")).not.toBeInTheDocument();
     expect(screen.queryByText("Linked to a source")).not.toBeInTheDocument();
   });

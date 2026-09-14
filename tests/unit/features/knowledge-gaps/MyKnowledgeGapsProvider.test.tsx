@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MyKnowledgeGapsProvider } from "../../../../src/features/knowledge-gaps/MyKnowledgeGapsProvider";
@@ -132,5 +133,31 @@ describe("MyKnowledgeGapsProvider", () => {
 
     await waitFor(() => expect(screen.getByTestId("gaps")).toBeEmptyDOMElement());
     expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+  });
+  it("loads the selected project's gaps once authentication settles", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+    });
+    mocks.status = "loading";
+    mocks.fetchMyKnowledgeGaps.mockResolvedValue({
+      gaps: [gap("acme/service")],
+    });
+
+    const tree = () => (
+      <QueryClientProvider client={client}>
+        <MyKnowledgeGapsProvider>
+          <Probe />
+        </MyKnowledgeGapsProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree());
+
+    expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+
+    mocks.status = "authenticated";
+    rerender(tree());
+
+    await waitFor(() => expect(screen.getByTestId("gaps")).toHaveTextContent("acme/service"));
+    expect(mocks.fetchMyKnowledgeGaps).toHaveBeenCalledWith("p1");
   });
 });

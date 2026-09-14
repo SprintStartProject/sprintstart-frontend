@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { Clock, FileWarning, FolderOpen, ShieldCheck } from "lucide-react";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { queryKeys } from "../../../services/queryKeys";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { MyKnowledgeGapsDrawer } from "../../knowledge-gaps/components/MyKnowledgeGapsDrawer";
@@ -428,12 +429,12 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
   */
   const hasProject = selectedProjectId !== "";
 
-  const { data, loading, error } = useFetch(
+  const { data, loading, error } = useQueryFetch(
+    queryKeys.knowledgeGaps.mine(selectedProjectId),
     () =>
       hasProject
         ? knowledgeGapService.fetchMyKnowledgeGaps(selectedProjectId)
         : Promise.resolve({ gaps: [] }),
-    [selectedProjectId],
   );
 
   const canOpenPage = canAccessRoute(profile, "/insights/knowledge-gaps", canManageSelected);

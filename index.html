@@ -662,14 +662,22 @@
         // after a sign-out carries no auth parameters at all, so the app leaves
         // a note for it on the way out (see markSigningOut in bootSplash.ts).
         var signedOut = /[?&#]error=/.test(url);
+        var signingOut = false;
         try {
           if (window.sessionStorage.getItem(SIGNOUT_KEY)) {
-            window.sessionStorage.removeItem(SIGNOUT_KEY);
+            signingOut = true;
             signedOut = true;
           }
         } catch (error) {
           // No session storage: the `error=` leg still gets caught below.
         }
+
+        // Keep this load blank until AuthProvider settles, exactly like the splash above:
+        // both the explicit logout leg and the failed-silent-check `error=` leg already know
+        // no signed-in UI is coming, so React's own loading skeleton is as unearned here as
+        // the rocket would be. `signedOut`, not `signingOut` -- the narrower flag alone missed
+        // the `error=` leg, which is what let its skeleton flash back in for a moment.
+        window.__bootSigningOut = signedOut;
 
         if (signedOut) {
           splash.remove();

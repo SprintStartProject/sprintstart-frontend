@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
 /**
  * Shortest gap between two checks triggered by navigation or by returning to
@@ -9,163 +10,106 @@ import { useEffect, useRef, useState } from "react";
  * the thing being counted is created on somebody else's device, so a caller
  * cannot learn about it any sooner than its next check.
  *
- * A changed key and a bumped nonce always refetch regardless, since the answer
- * demonstrably changed.
+ * A caller-invalidated query (see `queryClient.invalidateQueries`) always
+ * refetches immediately regardless, since the answer demonstrably changed.
  */
 export const MIN_REFRESH_INTERVAL_MS = 5_000;
 
 type RateLimitedReadOptions = {
-  /**
-   * What the answer is *about* — a project id, typically. A change forces a
-   * refetch past the rate limit, and a null key means there is nothing to read.
-   */
-  key: string | null | undefined;
-  /** Whether the caller is allowed to see this at all. */
+  /** Whether the caller is allowed to see this at all, and has something to key it by. */
   enabled: boolean;
   /**
    * Changing this asks for a recheck — callers pass the current route, so
    * switching views refreshes. Rate-limited by {@link MIN_REFRESH_INTERVAL_MS}.
    */
   refreshKey?: string;
-  /**
-   * Bumped when the caller knows the answer changed (they acted on the very
-   * thing being counted). Forces an immediate refetch, like a key change.
-   */
-  nonce?: number;
 };
 
 /**
  * A small read whose answer decorates the shell of the app — a badge, a count,
  * a dot — kept fresh without a subscription and without hammering the backend.
  *
- * Extracted from `usePmAttentionFlag`, which solved this once for the PM
- * dashboard marker. None of the mechanism is specific to that marker, and the
- * pieces that look like ceremony are each a fix for something that actually
- * happened — copying them to serve a second badge is how the two drift apart.
+ * Backed by the shared query cache, with `staleTime` doing the rate limiting
+ * that this hook used to hand-roll. What is left to do by hand is asking for a
+ * recheck in the first place: the sidebar that calls this never unmounts, so
+ * react-query's own refetch-on-mount and refetch-on-window-focus have nothing
+ * to attach to. A route change (`refreshKey`) or the tab regaining focus both
+ * ask, by reading the query's cache entry straight from the client rather than
+ * from this render's `useQuery` result -- a raw `focus` listener fires as soon
+ * as the event dispatches, which can be before React has re-rendered to catch
+ * up with a fetch that already resolved a moment earlier, and the client's own
+ * cache entry (unlike this render's snapshot) is always current.
  *
- * Errors are swallowed to [fallback]: a badge is not worth surfacing an error
- * for, and staying quiet beats claiming there is nothing to do.
+ * `queryKey` is the caller's own — unlike the single shared `key` this hook
+ * used to take, a bare project id would collide between two different badges
+ * reading the same project. Use the central `queryKeys` factory.
  *
- * @param read The request. Re-read from a ref, so callers need not memoise it.
- * @param fallback What to report before the first answer, while disabled, and
- * when the read fails.
+ * Errors are swallowed to `fallback`: a badge is not worth surfacing an error
+ * for, and staying quiet beats claiming there is nothing to do. Unlike
+ * `useLiveFetch`, a failed refetch does not keep the last good value on
+ * screen — a stale badge is a wrong answer, not a stand-in for a fresh one.
  */
 export function useRateLimitedRead<T>(
+  queryKey: QueryKey,
   read: () => Promise<T>,
   fallback: T,
-  { key, enabled, refreshKey, nonce = 0 }: RateLimitedReadOptions,
+  { enabled, refreshKey }: RateLimitedReadOptions,
 ): T {
-  // The key the value in hand actually answers for. Without it, a value read for
-  // one key goes on being served while the next key's read is in flight -- which
-  // as a boolean dot was invisible, and as a number is a confident wrong answer
-  // about the wrong thing.
-  const [answer, setAnswer] = useState<{ key: string | null; value: T }>({
-    key: null,
-    value: fallback,
-  });
-  // Bumped on tab focus. Unlike `nonce` this only *asks* for a check and still
-  // respects the rate limit, since nothing is known to have changed.
-  const [revalidateNonce, setRevalidateNonce] = useState(0);
-  const lastFetch = useRef<{ key: string | null; nonce: number; at: number }>({
-    key: null,
-    nonce: -1,
-    at: 0,
+  const queryClient = useQueryClient();
+  const { data, isError, refetch } = useQuery({
+    queryKey,
+    queryFn: read,
+    enabled,
+    staleTime: MIN_REFRESH_INTERVAL_MS,
   });
 
-  // Held in a ref rather than a dependency: `read` is a closure the caller
-  // rebuilds every render, so depending on it would refetch on every render and
-  // make the rate limit the only thing standing between us and a request loop.
-  //
-  // Synced in an effect rather than assigned during render, and declared
-  // *before* the fetch below: effects run in declaration order, so by the time
-  // the fetch effect reads the ref it already holds this render's closure.
-  const readRef = useRef(read);
+  // Read from a ref inside the long-lived focus listener and the recheck
+  // effect below, so neither needs to be torn down and re-added on every
+  // render. Synced in an effect rather than assigned during render so it is
+  // always this render's values by the time an event fires (effects run
+  // after commit, in declaration order).
+  const latest = useRef({ enabled, refetch, queryKey });
+  useEffect(() => {
+    latest.current = { enabled, refetch, queryKey };
+  });
+
+  const recheck = useCallback(() => {
+    const { enabled: isEnabled, refetch: doRefetch, queryKey: key } = latest.current;
+    if (!isEnabled) return;
+    const state = queryClient.getQueryState(key);
+    // A fetch already in flight (e.g. this same mount's initial load) is
+    // joined rather than duplicated by react-query, but still worth skipping
+    // here so a burst of navigation/focus events doesn't queue up refetches.
+    if (state?.fetchStatus === "fetching") return;
+    // `errorUpdatedAt` also counts as "checked recently": without it, a
+    // failing read never advances past `dataUpdatedAt`, so every navigation
+    // or focus event during an outage would retry immediately instead of
+    // respecting the throttle.
+    const lastCheckedAt = Math.max(state?.dataUpdatedAt ?? 0, state?.errorUpdatedAt ?? 0);
+    if (Date.now() - lastCheckedAt >= MIN_REFRESH_INTERVAL_MS) {
+      void doRefetch();
+    }
+  }, [queryClient]);
 
   useEffect(() => {
-    readRef.current = read;
-  });
-
-  const isActive = Boolean(enabled && key);
+    recheck();
+  }, [refreshKey, recheck]);
 
   // Coming back to the tab is the strongest hint that time has passed and the
   // answer may be stale. Costs nothing while the tab sits in the background,
   // unlike a timer, and covers the common "I was in Slack for ten minutes"
   // case that navigation alone never catches.
   useEffect(() => {
-    if (!isActive) return;
-
-    const recheck = () => {
-      if (document.visibilityState === "visible") {
-        setRevalidateNonce((current) => current + 1);
-      }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") recheck();
     };
-
     window.addEventListener("focus", recheck);
-    document.addEventListener("visibilitychange", recheck);
-
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("focus", recheck);
-      document.removeEventListener("visibilitychange", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [isActive]);
+  }, [recheck]);
 
-  useEffect(() => {
-    if (!isActive || !key) return;
-
-    const previous = lastFetch.current;
-    // A changed key or a just-handled item is a real change of answer, so
-    // neither waits for the rate limit.
-    const isForced = previous.key !== key || previous.nonce !== nonce;
-
-    if (!isForced && Date.now() - previous.at < MIN_REFRESH_INTERVAL_MS) {
-      return;
-    }
-
-    // Claim the slot up front so two effects cannot race into the same request,
-    // but remember what to restore if this one never lands.
-    const releasedSlot = previous;
-    lastFetch.current = { key, nonce, at: Date.now() };
-
-    let active = true;
-    let applied = false;
-
-    const run = async () => {
-      try {
-        const next = await readRef.current();
-        if (!active) return;
-
-        applied = true;
-        setAnswer({ key, value: next });
-      } catch {
-        if (!active) return;
-        applied = true;
-        setAnswer({ key, value: fallback });
-      }
-    };
-
-    void run();
-
-    return () => {
-      active = false;
-
-      // Hand the slot back when this effect is torn down before its result
-      // applied. Without this, React StrictMode's double-invoke discards the
-      // first request and then finds the second one rate limited, so the answer
-      // never arrives at all -- and the same happens in production whenever a
-      // view changes mid-request.
-      if (!applied) {
-        lastFetch.current = releasedSlot;
-      }
-    };
-    // `fallback` is deliberately absent: it is a constant for any given caller,
-    // and depending on it would refetch whenever somebody passed a fresh object.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, isActive, refreshKey, nonce, revalidateNonce]);
-
-  // Gated on read rather than reset in the effect: somebody who cannot see the
-  // thing, a session with no key, or a key whose answer has not arrived yet must
-  // never be shown somebody else's number, and this keeps that rule out of the
-  // async path entirely -- no reset-on-change effect, and so no render where the
-  // previous key's value is still on screen.
-  return isActive && answer.key === key ? answer.value : fallback;
+  return enabled && !isError ? (data ?? fallback) : fallback;
 }

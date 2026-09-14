@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { MyKnowledgeGapsWidget } from "../../../../src/features/dashboard/components/MyKnowledgeGapsWidget";
@@ -81,9 +81,6 @@ function renderWidget(size: "small" | "medium" | "wide" = "medium") {
   );
 }
 
-/** Lets the widget's `useFetch` resolve before anything is asserted. */
-const settled = () => screen.findByText("Your knowledge gaps");
-
 describe("MyKnowledgeGapsWidget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -107,9 +104,8 @@ describe("MyKnowledgeGapsWidget", () => {
     });
 
     renderWidget();
-    await settled();
 
-    expect(screen.getByText("auth-service")).toBeInTheDocument();
+    expect(await screen.findByText("auth-service")).toBeInTheDocument();
     expect(screen.queryByText("billing")).not.toBeInTheDocument();
   });
 
@@ -154,8 +150,7 @@ describe("MyKnowledgeGapsWidget", () => {
   it("asks only for the selected project", async () => {
     renderWidget();
 
-    await settled();
-    expect(mocks.fetchMyKnowledgeGaps).toHaveBeenCalledWith("1");
+    await waitFor(() => expect(mocks.fetchMyKnowledgeGaps).toHaveBeenCalledWith("1"));
   });
 
   it("names the worst component and what it lacks at small", async () => {
@@ -258,7 +253,7 @@ describe("MyKnowledgeGapsWidget", () => {
 
     renderWidget("medium");
 
-    await settled();
+    await screen.findByText("auth-service");
     const components = screen
       .getAllByText(/auth-service|payment-service|frontend-portal/)
       .map((element) => element.textContent);
@@ -284,7 +279,7 @@ describe("MyKnowledgeGapsWidget", () => {
   it("has nothing to press when nothing is assigned", async () => {
     renderWidget();
 
-    await settled();
+    expect(await screen.findByText("Nothing assigned to you.")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Open your knowledge gaps" }),
     ).not.toBeInTheDocument();

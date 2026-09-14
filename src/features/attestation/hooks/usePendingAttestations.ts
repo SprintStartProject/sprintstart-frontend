@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
-import { useFetch } from "../../../hooks/useFetch";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { attestationService } from "../../../services/attestationService";
+import { queryKeys } from "../../../services/queryKeys";
 import type { Attestation } from "../types";
 
 export interface UsePendingAttestationsResult {
@@ -14,60 +14,67 @@ export interface UsePendingAttestationsResult {
   sendBack: (id: string, reason: string) => Promise<void>;
 }
 
+type AnswerVariables = { id: string } & ({ kind: "accept" } | { kind: "sendBack"; reason: string });
+
 /**
  * What is waiting on this person to confirm.
  *
  * An answered request leaves the queue rather than staying with a new badge: the queue is a list of
  * things still needing this person, and an item they have dealt with is noise in it. The hire sees
- * the outcome on their own ramp, which is where it matters.
+ * the outcome on their own ramp, which is where it matters. It leaves the cache list directly on
+ * success rather than a refetch, since the backend has nothing more to tell this reader about it.
  *
  * A failed answer removes nothing. The card keeps showing what the backend actually holds, so a
  * failure can never look like it worked — the same rule the role-track table follows.
  */
 export function usePendingAttestations(): UsePendingAttestationsResult {
-  const { data, loading, error } = useFetch<Attestation[]>(
-    () => attestationService.fetchPending(),
-    [],
-  );
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.attestations.pending();
 
-  const [answeredIds, setAnsweredIds] = useState<string[]>([]);
-  const [answeringId, setAnsweringId] = useState<string | null>(null);
-  const [answerError, setAnswerError] = useState<string | null>(null);
+  const { data, isLoading, isError } = useQuery({
+    queryKey,
+    queryFn: () => attestationService.fetchPending(),
+  });
 
-  const answer = useCallback(async (id: string, run: () => Promise<unknown>, failure: string) => {
-    setAnsweringId(id);
-    setAnswerError(null);
+  const mutation = useMutation({
+    mutationFn: (vars: AnswerVariables) =>
+      vars.kind === "accept"
+        ? attestationService.accept(vars.id)
+        : attestationService.sendBack(vars.id, vars.reason),
+    onSuccess: (_result, vars) => {
+      queryClient.setQueryData(queryKey, (prev: Attestation[] | undefined) =>
+        prev?.filter((item) => item.id !== vars.id),
+      );
+    },
+  });
+
+  const accept = async (id: string) => {
     try {
-      await run();
-      setAnsweredIds((current) => [...current, id]);
+      await mutation.mutateAsync({ kind: "accept", id });
     } catch {
-      setAnswerError(failure);
-    } finally {
-      setAnsweringId(null);
+      // Surfaced below via `answerError`; callers don't need the rejection.
     }
-  }, []);
+  };
 
-  const accept = useCallback(
-    (id: string) =>
-      answer(
-        id,
-        () => attestationService.accept(id),
-        "Could not confirm that. Try again in a moment.",
-      ),
-    [answer],
-  );
+  const sendBack = async (id: string, reason: string) => {
+    try {
+      await mutation.mutateAsync({ kind: "sendBack", id, reason });
+    } catch {
+      // Surfaced below via `answerError`; callers don't need the rejection.
+    }
+  };
 
-  const sendBack = useCallback(
-    (id: string, reason: string) =>
-      answer(
-        id,
-        () => attestationService.sendBack(id, reason),
-        "Could not send that back. Try again in a moment.",
-      ),
-    [answer],
-  );
-
-  const pending = (data ?? []).filter((item) => !answeredIds.includes(item.id));
-
-  return { pending, loading, error, answeringId, answerError, accept, sendBack };
+  return {
+    pending: data ?? [],
+    loading: isLoading,
+    error: isError,
+    answeringId: mutation.isPending ? (mutation.variables?.id ?? null) : null,
+    answerError: mutation.isError
+      ? mutation.variables?.kind === "accept"
+        ? "Could not confirm that. Try again in a moment."
+        : "Could not send that back. Try again in a moment."
+      : null,
+    accept,
+    sendBack,
+  };
 }

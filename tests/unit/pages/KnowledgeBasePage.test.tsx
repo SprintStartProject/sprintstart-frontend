@@ -197,7 +197,10 @@ describe("KnowledgeBasePage", () => {
       </MemoryRouter>,
     );
 
-    expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    // The skeleton only appears after a short delay, so it never flashes on a fast load.
+    await waitFor(() => {
+      expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    });
     expect(screen.queryByText("No project available")).not.toBeInTheDocument();
   });
 

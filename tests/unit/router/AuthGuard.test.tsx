@@ -61,7 +61,7 @@ describe("AuthGuard", () => {
     vi.mocked(teamManagementService.getSkillAssessmentPromptState).mockReturnValue(null);
   });
 
-  it("renders loading spinner when status is loading", () => {
+  it("renders the page skeleton during normal auth loading", () => {
     vi.mocked(useAuth).mockReturnValue({
       status: "loading",
       profile: null,
@@ -85,8 +85,62 @@ describe("AuthGuard", () => {
       </MemoryRouter>,
     );
 
+    expect(container.querySelector("header .animate-pulse")).toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByText("Protected")).not.toBeInTheDocument();
+  });
+
+  it("keeps the logout return blank until auth settles, then renders login", () => {
+    const auth = {
+      status: "signingOut" as const,
+      profile: null,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    };
+    vi.mocked(useAuth).mockReturnValue(auth);
+
+    const page = () => (
+      <StrictMode>
+        <MemoryRouter initialEntries={["/login"]}>
+          <AuthGuard>
+            <div>Login Page</div>
+          </AuthGuard>
+        </MemoryRouter>
+      </StrictMode>
+    );
+    const { container, rerender } = render(page());
+
+    expect(container).toBeEmptyDOMElement();
+
+    vi.mocked(useAuth).mockReturnValue({ ...auth, status: "unauthenticated" });
+    rerender(page());
+
+    expect(screen.getByText("Login Page")).toBeInTheDocument();
+    expect(container.querySelector("header")).not.toBeInTheDocument();
+  });
+
+  // LoginPage has no header/band of its own, so the page-shell skeleton (which previews
+  // one) would flash a shape nothing on this route ever settles into.
+  it("stays blank rather than showing the mismatched skeleton while loading on /login", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: "loading",
+      profile: null,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <AuthGuard>
+          <div>Login Page</div>
+        </AuthGuard>
+      </MemoryRouter>,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
   });
 
   it("redirects to /login if unauthenticated and not on /login", async () => {

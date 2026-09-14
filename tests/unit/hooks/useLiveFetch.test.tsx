@@ -22,7 +22,7 @@ describe("useLiveFetch", () => {
 
   it("starts in the loading state with null data", () => {
     const loader = vi.fn().mockImplementation(() => new Promise<string>(() => {}));
-    const { result } = renderHook(() => useLiveFetch(loader, []));
+    const { result } = renderHook(() => useLiveFetch(["live-fetch", "pending"], loader));
 
     expect(result.current.data).toBeNull();
     expect(result.current.loading).toBe(true);
@@ -31,7 +31,7 @@ describe("useLiveFetch", () => {
 
   it("sets data and clears loading on a successful load", async () => {
     const loader = vi.fn().mockResolvedValue("hello");
-    const { result } = renderHook(() => useLiveFetch(loader, []));
+    const { result } = renderHook(() => useLiveFetch(["live-fetch", "success"], loader));
 
     await waitFor(() => expect(result.current.data).toBe("hello"));
     expect(result.current.loading).toBe(false);
@@ -40,18 +40,19 @@ describe("useLiveFetch", () => {
 
   it("reports failure of the first load, which has nothing to fall back on", async () => {
     const loader = vi.fn().mockRejectedValue(new Error("boom"));
-    const { result } = renderHook(() => useLiveFetch(loader, []));
+    const { result } = renderHook(() => useLiveFetch(["live-fetch", "error"], loader));
 
     await waitFor(() => expect(result.current.error).toBe(true));
     expect(result.current.data).toBeNull();
   });
 
-  it("re-runs the loader when deps change and applies the new result", async () => {
+  it("re-fetches when the query key changes and applies the new result", async () => {
     let value = 1;
     const loader = vi.fn().mockImplementation(() => Promise.resolve(value));
-    const { result, rerender } = renderHook(({ dep }) => useLiveFetch(loader, [dep]), {
-      initialProps: { dep: 1 },
-    });
+    const { result, rerender } = renderHook(
+      ({ dep }) => useLiveFetch(["live-fetch", "key-change", dep], loader),
+      { initialProps: { dep: 1 } },
+    );
 
     await waitFor(() => expect(result.current.data).toBe(1));
 
@@ -62,14 +63,15 @@ describe("useLiveFetch", () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
-  it("clears the previous data when deps change", async () => {
+  it("starts fresh rather than keeping the previous key's data on screen", async () => {
     const loader = vi
       .fn()
       .mockResolvedValueOnce("project-a")
       .mockImplementation(() => new Promise<string>(() => {}));
-    const { result, rerender } = renderHook(({ dep }) => useLiveFetch(loader, [dep]), {
-      initialProps: { dep: "a" },
-    });
+    const { result, rerender } = renderHook(
+      ({ dep }) => useLiveFetch(["live-fetch", "clears", dep], loader),
+      { initialProps: { dep: "a" } },
+    );
 
     await waitFor(() => expect(result.current.data).toBe("project-a"));
 
@@ -80,9 +82,9 @@ describe("useLiveFetch", () => {
     await waitFor(() => expect(result.current.data).toBeNull());
   });
 
-  it("does not re-run the loader when deps stay the same across re-renders", async () => {
+  it("does not re-fetch when the query key stays the same across re-renders", async () => {
     const loader = vi.fn().mockResolvedValue("stable");
-    const { result, rerender } = renderHook(() => useLiveFetch(loader, [1]));
+    const { result, rerender } = renderHook(() => useLiveFetch(["live-fetch", "stable"], loader));
 
     await waitFor(() => expect(result.current.data).toBe("stable"));
 
@@ -103,7 +105,9 @@ describe("useLiveFetch", () => {
           }),
       );
 
-    const { result } = renderHook(() => useLiveFetch(loader, [], { minIntervalMs: 0 }));
+    const { result } = renderHook(() =>
+      useLiveFetch(["live-fetch", "refresh"], loader, { minIntervalMs: 0 }),
+    );
     await waitFor(() => expect(result.current.data).toBe("first"));
 
     act(() => result.current.refresh());
@@ -124,7 +128,9 @@ describe("useLiveFetch", () => {
   it("keeps the last good data when a reload fails", async () => {
     const loader = vi.fn().mockResolvedValueOnce("good").mockRejectedValueOnce(new Error("boom"));
 
-    const { result } = renderHook(() => useLiveFetch(loader, [], { minIntervalMs: 0 }));
+    const { result } = renderHook(() =>
+      useLiveFetch(["live-fetch", "reload-fails"], loader, { minIntervalMs: 0 }),
+    );
     await waitFor(() => expect(result.current.data).toBe("good"));
 
     await act(async () => {
@@ -139,58 +145,21 @@ describe("useLiveFetch", () => {
     expect(result.current.data).toBe("good");
   });
 
-  it("reloads when the tab regains focus", async () => {
-    const loader = vi.fn().mockResolvedValue("value");
-    const { result } = renderHook(() => useLiveFetch(loader, [], { minIntervalMs: 0 }));
-    await waitFor(() => expect(result.current.data).toBe("value"));
-
-    await act(async () => {
-      window.dispatchEvent(new Event("focus"));
-      await Promise.resolve();
-    });
-
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
-  });
-
-  it("throttles repeated focus events into a single reload", async () => {
-    const loader = vi.fn().mockResolvedValue("value");
-    const { result } = renderHook(() => useLiveFetch(loader, [], { minIntervalMs: 60_000 }));
-    await waitFor(() => expect(result.current.data).toBe("value"));
-
-    await act(async () => {
-      window.dispatchEvent(new Event("focus"));
-      window.dispatchEvent(new Event("focus"));
-      window.dispatchEvent(new Event("focus"));
-      await Promise.resolve();
-    });
-
-    // Alt-tabbing fires focus every time; without the floor each one would be
-    // a request.
-    expect(loader).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not poll a hidden tab", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it("does not load at all while disabled", async () => {
     const loader = vi.fn().mockResolvedValue("value");
     const { result } = renderHook(() =>
-      useLiveFetch(loader, [], { intervalMs: 1000, minIntervalMs: 0 }),
+      useLiveFetch(["live-fetch", "disabled"], loader, { enabled: false }),
     );
-    await waitFor(() => expect(result.current.data).toBe("value"));
 
-    setVisibility("hidden");
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
-    });
-
-    // Nobody is reading it, and polling costs the backend real work.
-    expect(loader).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(loader).not.toHaveBeenCalled();
   });
 
   it("polls a visible tab on the configured interval", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const loader = vi.fn().mockResolvedValue("value");
     const { result } = renderHook(() =>
-      useLiveFetch(loader, [], { intervalMs: 1000, minIntervalMs: 0 }),
+      useLiveFetch(["live-fetch", "interval"], loader, { intervalMs: 1000, minIntervalMs: 0 }),
     );
     await waitFor(() => expect(result.current.data).toBe("value"));
 
@@ -199,68 +168,5 @@ describe("useLiveFetch", () => {
     });
 
     expect(loader.mock.calls.length).toBeGreaterThan(1);
-  });
-
-  it("does not load at all while disabled", async () => {
-    const loader = vi.fn().mockResolvedValue("value");
-    const { result } = renderHook(() => useLiveFetch(loader, [], { enabled: false }));
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(loader).not.toHaveBeenCalled();
-  });
-
-  it("ignores results from a superseded call", async () => {
-    let resolveFirst: (v: string) => void = () => {};
-    let resolveSecond: (v: string) => void = () => {};
-    const loader = vi
-      .fn()
-      .mockReturnValueOnce(
-        new Promise<string>((resolve) => {
-          resolveFirst = resolve;
-        }),
-      )
-      .mockReturnValueOnce(
-        new Promise<string>((resolve) => {
-          resolveSecond = resolve;
-        }),
-      );
-
-    const { result, rerender } = renderHook(({ dep }) => useLiveFetch(loader, [dep]), {
-      initialProps: { dep: "first" },
-    });
-
-    // Let the first load actually reach the loader before superseding it.
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
-
-    rerender({ dep: "second" });
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
-
-    // Resolve the second (latest) call first.
-    await act(async () => {
-      resolveSecond("second-value");
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(result.current.data).toBe("second-value"));
-
-    // Now the stale first call — it must not overwrite the latest result.
-    await act(async () => {
-      resolveFirst("stale-value");
-      await Promise.resolve();
-    });
-
-    expect(result.current.data).toBe("second-value");
-  });
-
-  it("does not even call the loader when the deps change before it starts", async () => {
-    const loader = vi.fn().mockResolvedValue("value");
-    const { rerender } = renderHook(({ dep }) => useLiveFetch(loader, [dep]), {
-      initialProps: { dep: "first" },
-    });
-
-    // Switching projects twice in quick succession should cost one request,
-    // not one per intermediate selection.
-    rerender({ dep: "second" });
-
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
   });
 });

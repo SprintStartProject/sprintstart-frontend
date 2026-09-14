@@ -2,7 +2,8 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
@@ -13,6 +14,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { onboardingService } from "../services/onboardingService";
+import { queryKeys } from "../services/queryKeys";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/apiClient";
 import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
@@ -33,7 +35,7 @@ import {
   ClipboardCheck,
   Brain,
 } from "lucide-react";
-import { PageHeader } from "../components/layout/PageHeader";
+import { PageShell } from "../components/layout/PageShell";
 import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { PhaseCheckModal } from "../features/onboarding/components/PhaseCheckModal";
 import { useMoments } from "../features/moments";
@@ -122,6 +124,11 @@ export function OnBoardingPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const invalidateMyOnboardingStatus = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() }),
+    [queryClient],
+  );
 
   // Set by the step page when a knowledge check is what stands between the user and the
   // rest of their path, so this page can put that check in front of them.
@@ -220,6 +227,7 @@ export function OnBoardingPage() {
     // user as onboarded, but keeping the in-memory profile stale until the next reload
     // lets the celebration play out before the onboarding UI is gated away.
     if (submittedAttempt) {
+      void invalidateMyOnboardingStatus();
       void refreshPath();
       // A passed check moves every missed question into the pool.
       if (passed) void refreshReviewCount();
@@ -236,6 +244,7 @@ export function OnBoardingPage() {
     setReviewCheckOpen(false);
     if (onboardingCompleted) completeMission();
     if (answeredAny) {
+      void invalidateMyOnboardingStatus();
       void refreshReviewCount();
       void refreshPath();
     }
@@ -256,33 +265,40 @@ export function OnBoardingPage() {
    * is precisely what the user asked to replace, and quietly handing back the
    * old one would look like the button does nothing.
    */
-  const generatePath = async ({ recoverExisting = false } = {}) => {
-    setLoadingState("generating");
-    setGenerationStage(null);
-    setGameActive(false);
-    await onboardingService.personalizePath({
-      onStage: (name, detail) => setGenerationStage({ name, detail }),
-      onPath: (path) => setOnBoardingPath(path),
-      onDone: () => setLoadingState("success"),
-      onError: (message) => {
-        void (async () => {
-          if (recoverExisting) {
-            try {
-              const path = await onboardingService.fetchPath();
-              setOnBoardingPath(path);
-              setSelectedPhaseIndex(findActivePhaseIndex(path));
-              setLoadingState("success");
-              return;
-            } catch {
-              // Nothing there after all — the original error stands.
+  const generatePath = useCallback(
+    async ({ recoverExisting = false } = {}) => {
+      setLoadingState("generating");
+      setGenerationStage(null);
+      setGameActive(false);
+      await onboardingService.personalizePath({
+        onStage: (name, detail) => setGenerationStage({ name, detail }),
+        onPath: (path) => {
+          setOnBoardingPath(path);
+          void invalidateMyOnboardingStatus();
+        },
+        onDone: () => setLoadingState("success"),
+        onError: (message) => {
+          void (async () => {
+            if (recoverExisting) {
+              try {
+                const path = await onboardingService.fetchPath();
+                setOnBoardingPath(path);
+                void invalidateMyOnboardingStatus();
+                setSelectedPhaseIndex(findActivePhaseIndex(path));
+                setLoadingState("success");
+                return;
+              } catch {
+                // Nothing there after all — the original error stands.
+              }
             }
-          }
-          setLoadingState("error");
-          setErrorMessage(message);
-        })();
-      },
-    });
-  };
+            setLoadingState("error");
+            setErrorMessage(message);
+          })();
+        },
+      });
+    },
+    [invalidateMyOnboardingStatus],
+  );
 
   // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
   useEffect(() => {
@@ -370,7 +386,7 @@ export function OnBoardingPage() {
     // Both flags come from the navigation that mounted this page, so they are fixed for the
     // visit; listing them keeps the effect honest about what it reads, and `hasLoadedRef`
     // makes a re-run a no-op anyway.
-  }, [focusCheckPhaseId, shouldOpenReviewCheck]);
+  }, [focusCheckPhaseId, generatePath, shouldOpenReviewCheck]);
 
   const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
 
@@ -438,6 +454,7 @@ export function OnBoardingPage() {
   const startStep = async (stepId: string) => {
     try {
       await onboardingService.startStep(stepId);
+      await invalidateMyOnboardingStatus();
     } catch (err) {
       console.error("Failed to start onboarding step:", err);
     }
@@ -458,12 +475,18 @@ export function OnBoardingPage() {
   // ── RENDER: LOADING STATE ──────────────────────────────────
   if (loadingState === "loading" || loadingState === "idle") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-          <p className="text-sm">Loading onboarding path...</p>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-app-text-muted">
+            <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+            <p className="text-sm">Loading onboarding path...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -498,27 +521,39 @@ export function OnBoardingPage() {
   // ── RENDER: ERROR STATE ────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">
-            Onboarding could not be loaded
-          </h2>
-          <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
-          <Button variant="primary" onClick={() => window.location.reload()}>
-            Try again
-          </Button>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+      >
+        <div className="flex min-h-96 items-center justify-center p-8">
+          <div className="max-w-md text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+            <h2 className="mb-2 text-lg font-semibold text-app-text">
+              Onboarding could not be loaded
+            </h2>
+            <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
+            <Button variant="primary" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   // ── RENDER: EMPTY STATE ────────────────────────────────────
   if (!OnBoardingPathEndpoint || !currentPhase) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <p className="text-sm text-app-text-muted">No onboarding path found.</p>
-      </div>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <p className="text-sm text-app-text-muted">No onboarding path found.</p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -531,110 +566,108 @@ export function OnBoardingPage() {
   const isFinalPhase = OnBoardingPathEndpoint.phases.at(-1)?.id === currentPhase.id;
 
   // ── RENDER: SUCCESS STATE ──────────────────────────────────
-  return (
-    <div className="min-h-screen bg-app-bg">
-      {/* ── HEADER ───────────────────────────────────────── */}
-      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-content py-4">
-          <PageHeader
-            icon={Sparkles}
-            title="Your onboarding journey"
-            subtitle="Follow your personalized path, continue the next task and review completed steps."
-            className="mb-4"
-            actions={
-              <>
-                {/* Only offered once something is actually waiting to be reviewed. */}
-                {openReviewCount > 0 && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setReviewCheckOpen(true)}
-                    title="Answer the questions you got wrong earlier"
-                    icon={<Brain className="h-4 w-4" />}
-                    className="border-app-warning-border bg-app-warning-bg text-app-warning-text hover:border-app-warning-solid"
-                  >
-                    <span className="hidden sm:inline">Test your knowledge</span>
-                    <Badge variant="warning" size="sm">
-                      {openReviewCount}
-                    </Badge>
-                  </Button>
+  const headerActions = (
+    <>
+      {/* Only offered once something is actually waiting to be reviewed. */}
+      {openReviewCount > 0 && (
+        <Button
+          variant="secondary"
+          onClick={() => setReviewCheckOpen(true)}
+          title="Answer the questions you got wrong earlier"
+          icon={<Brain className="h-4 w-4" />}
+          className="border-app-warning-border bg-app-warning-bg text-app-warning-text hover:border-app-warning-solid"
+        >
+          <span className="hidden sm:inline">Test your knowledge</span>
+          <Badge variant="warning" size="sm">
+            {openReviewCount}
+          </Badge>
+        </Button>
+      )}
+
+      <Button
+        variant="secondary"
+        iconOnly
+        onClick={() => void generatePath()}
+        aria-label="Regenerate path with AI"
+        title="Regenerate path with AI"
+      >
+        <RefreshCw className="h-4 w-4" />
+      </Button>
+
+      <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
+        <div className="text-3xl font-bold text-app-brand">{totalPercentage}%</div>
+        <div className="text-xs font-medium text-app-brand-text">overall</div>
+      </div>
+    </>
+  );
+
+  const headerBandExtra = (
+    <>
+      {/* Total progress bar */}
+      <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
+
+      {/* Phase tabs */}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        {OnBoardingPathEndpoint.phases.map((phase, index) => {
+          const progress = getPhaseProgress(phase);
+          const isSelected = selectedPhaseIndex === index;
+
+          return (
+            <button
+              key={phase.id}
+              onClick={() => setSelectedPhaseIndex(index)}
+              className={`flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
+                isSelected
+                  ? "border-app-brand bg-app-brand-soft"
+                  : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
+              }`}
+            >
+              <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-app-text">
+                {phase.locked && <Lock className="h-3.5 w-3.5 shrink-0 text-app-text-disabled" />}
+                <span className="truncate">{phase.title}</span>
+                {phase.checkSummary?.required && (
+                  <ClipboardCheck
+                    className={`h-3.5 w-3.5 shrink-0 ${
+                      phase.checkSummary.passed
+                        ? "text-app-success-solid"
+                        : "text-app-text-disabled"
+                    }`}
+                  />
                 )}
-
-                <Button
-                  variant="secondary"
-                  iconOnly
-                  onClick={() => void generatePath()}
-                  aria-label="Regenerate path with AI"
-                  title="Regenerate path with AI"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-
-                <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
-                  <div className="text-3xl font-bold text-app-brand">{totalPercentage}%</div>
-                  <div className="text-xs font-medium text-app-brand-text">overall</div>
-                </div>
-              </>
-            }
-          />
-
-          {/* Total progress bar */}
-          <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
-
-          {/* Phase tabs */}
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            {OnBoardingPathEndpoint.phases.map((phase, index) => {
-              const progress = getPhaseProgress(phase);
-              const isSelected = selectedPhaseIndex === index;
-
-              return (
-                <button
-                  key={phase.id}
-                  onClick={() => setSelectedPhaseIndex(index)}
-                  className={`flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
-                    isSelected
-                      ? "border-app-brand bg-app-brand-soft"
-                      : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
+              </div>
+              <ProgressBar value={progress.completed} max={progress.total} />
+              <div className="mt-2 flex justify-between">
+                <span className="text-xs text-app-text-muted">
+                  {progress.completed}/{progress.total} Tasks
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    progress.percentage === 100
+                      ? "bg-app-success-bg text-app-success-text"
+                      : "bg-app-surface-muted text-app-text-muted"
                   }`}
                 >
-                  <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-app-text">
-                    {phase.locked && (
-                      <Lock className="h-3.5 w-3.5 shrink-0 text-app-text-disabled" />
-                    )}
-                    <span className="truncate">{phase.title}</span>
-                    {phase.checkSummary?.required && (
-                      <ClipboardCheck
-                        className={`h-3.5 w-3.5 shrink-0 ${
-                          phase.checkSummary.passed
-                            ? "text-app-success-solid"
-                            : "text-app-text-disabled"
-                        }`}
-                      />
-                    )}
-                  </div>
-                  <ProgressBar value={progress.completed} max={progress.total} />
-                  <div className="mt-2 flex justify-between">
-                    <span className="text-xs text-app-text-muted">
-                      {progress.completed}/{progress.total} Tasks
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        progress.percentage === 100
-                          ? "bg-app-success-bg text-app-success-text"
-                          : "bg-app-surface-muted text-app-text-muted"
-                      }`}
-                    >
-                      {progress.percentage}%
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  {progress.percentage}%
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
+    </>
+  );
 
-      {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main className="app-page-content py-6 pt-8 pb-24">
+  return (
+    <>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+        frame="content"
+        actions={headerActions}
+        bandExtra={headerBandExtra}
+        mainClassName="py-6 pt-8 pb-24"
+      >
         {/* "Up Next" Banner — nur wenn es einen empfohlenen Step gibt */}
         {recommendedStep && (
           <div className="relative mb-6 overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8">
@@ -899,7 +932,7 @@ export function OnBoardingPage() {
               );
             })()}
         </div>
-      </main>
+      </PageShell>
 
       {/* Knowledge check modal */}
       {checkPhase && (
@@ -912,6 +945,6 @@ export function OnBoardingPage() {
 
       {/* Standalone review check for questions missed in earlier phases */}
       {reviewCheckOpen && <ReviewCheckModal onClose={closeReviewCheckModal} />}
-    </div>
+    </>
   );
 }

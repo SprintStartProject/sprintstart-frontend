@@ -151,7 +151,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const permissionGroup = profile?.permissionGroup ?? null;
   const userId = profile?.id ?? null;
-  const isAuthenticated = status !== "unauthenticated" && status !== "loading";
+  const isAuthenticated = status === "authenticated";
 
   const setSelectedProjectId = useCallback((projectId: string) => {
     setSelectedProjectIdState(projectId);

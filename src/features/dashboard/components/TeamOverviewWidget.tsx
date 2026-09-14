@@ -1,6 +1,7 @@
 import { MessageSquareText, SkipForward, Users } from "lucide-react";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getTeamOverview } from "../../../services/teamManagementService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import type { TeamOverviewUser } from "../../team-management/types";
 import type { DashboardWidgetSize } from "../layout/types";
@@ -97,10 +98,10 @@ function metricsFor(summary: TeamSummary): WidgetMetric[] {
 export function TeamOverviewWidget({ size }: { size: DashboardWidgetSize }) {
   const { selectedProjectId } = useProjectContext();
 
-  const { data, loading, error } = useFetch(
+  const { data, loading, error } = useQueryFetch(
+    queryKeys.teamOverview.filtered(selectedProjectId || null),
     () =>
       getTeamOverview(undefined, undefined, selectedProjectId ? [selectedProjectId] : undefined),
-    [selectedProjectId],
   );
 
   const summary = summarize(data ?? []);
