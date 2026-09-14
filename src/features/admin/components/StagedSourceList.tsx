@@ -110,7 +110,12 @@ function sourceDetail(source: DraftSource): string {
 /**
  * The status line under the title. A staged GitHub repository that is already
  * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
- * misdescribe it — it says so instead.
+ * misdescribe it — it says so instead, before and after the run.
+ *
+ * Saying so afterwards matters as much as before: a linked source finishes
+ * instantly and starts no ingestion, so a plain "Connected" leaves the PM
+ * watching for a run that is never coming and wondering whether the connect
+ * worked at all.
  */
 function statusDescription(source: DraftSource): string {
   if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
@@ -118,9 +123,17 @@ function statusDescription(source: DraftSource): string {
   }
 
   // The connect worked and the ownership write did not; see `ownerAssignmentFailed`. Said on
-  // the row rather than in a toast because it is true of this repository and no other.
+  // the row rather than in a toast because it is true of this repository and no other, and it
+  // wins over the reuse line below because it is the half the PM may want to put right. It
+  // still may not imply an ingestion a linked source never started.
   if (source.status === "connected" && source.ownerAssignmentFailed) {
-    return "Connected · the owner could not be assigned";
+    return source.wasReused
+      ? "Linked · the owner could not be assigned"
+      : "Connected · the owner could not be assigned";
+  }
+
+  if (source.status === "connected" && source.wasReused) {
+    return "Linked · already available, nothing re-ingested";
   }
 
   return `${statusLabels[source.status]} · ${sourceDetail(source)}`;

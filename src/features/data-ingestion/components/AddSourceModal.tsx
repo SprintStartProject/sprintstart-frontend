@@ -9,6 +9,7 @@ import { getTeamOverview } from "../../../services/teamManagementService.ts";
 import {
   addDraftSource,
   connectDraftSources,
+  connectOutcomeDescription,
   createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
@@ -370,7 +371,7 @@ export function AddSourceModal({
         });
       } else {
         toast.success("Sources connected", {
-          description: "Initial ingestion is running in the background.",
+          description: connectOutcomeDescription(connected),
         });
         onClose();
       }
@@ -413,7 +414,9 @@ export function AddSourceModal({
       if (hasFailedSources(retried)) {
         toast.error("Couldn't connect the source.");
       } else {
-        toast.success("Source connected");
+        toast.success("Source connected", {
+          description: connectOutcomeDescription(retried),
+        });
       }
     } finally {
       setIsSubmitting(false);
