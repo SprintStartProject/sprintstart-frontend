@@ -31,11 +31,12 @@ export const queryKeys = {
   projectInsights: {
     byProjectIds: (projectIds: string) => ["project-insights", projectIds] as const,
   },
-  githubTokens: {
-    mine: (userId: string) => ["github-tokens", userId] as const,
-  },
   atlassianCredentials: {
-    mine: (userId: string) => ["atlassian-credentials", userId] as const,
+    // Not scoped by user id: `queryClient.clear()` on logout already keeps a
+    // session change from serving the previous user's list, and threading
+    // `profile.id` through would cost these two hooks their standalone,
+    // auth-independent tests for no real protection.
+    mine: () => ["atlassian-credentials"] as const,
   },
   knowledgeGaps: {
     mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,

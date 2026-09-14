@@ -1,30 +1,51 @@
-import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from "react";
+import { useState, useMemo, useCallback, useDeferredValue } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
+import { queryKeys } from "../../../services/queryKeys";
 import type { Artifact } from "../types";
 import type { KnowledgeTab } from "../tabs";
 
 const ITEMS_PER_PAGE = 20;
+const NO_ARTIFACTS: Artifact[] = [];
 
 /**
  * State + data layer for the Knowledge Base page.
  *
- * Owns artifact fetching (with a generation guard so a stale response can't
- * overwrite a newer one), client-side filtering (search + tab), and pagination.
- * UI-only state (which drawer is open, which modal is open) stays in the page.
+ * Owns artifact fetching, client-side filtering (search + tab), and
+ * pagination. UI-only state (which drawer is open, which modal is open) stays
+ * in the page.
  *
  * @param projectId The project to scope artifact fetching to. When null, no
  *   fetch is attempted and the page should render its empty state.
  */
 export function useKnowledgeBase(projectId: string | null) {
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  // Initial loading only when a project is available; the effect's finally block
-  // flips this back to false after the first fetch completes or fails.
-  const [isLoading, setIsLoading] = useState(projectId !== null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.knowledgeBase.byProject(projectId ?? "");
 
-  // Generation counter so a slow in-flight fetch can't overwrite a newer one
-  // (e.g. when the user clicks Refresh twice, or projectId changes mid-flight).
-  const fetchGenerationRef = useRef(0);
+  const {
+    data,
+    isLoading: isQueryLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: () => knowledgeService.getUnifiedArtifacts(projectId as string),
+    enabled: projectId !== null,
+  });
+
+  const artifacts = projectId !== null ? (data ?? NO_ARTIFACTS) : NO_ARTIFACTS;
+  const isLoading = projectId !== null && isQueryLoading;
+  const fetchError = isError ? "Failed to load artifacts. Please try again." : null;
+
+  // A newer fetch (Refresh clicked twice, or projectId changing mid-flight) is
+  // meant to win over one already in flight; react-query only supersedes an
+  // in-flight fetch on its own once the query has data, which the very first
+  // load never does, so it is cancelled by hand first.
+  const fetchArtifacts = useCallback(async () => {
+    if (projectId === null) return;
+    await queryClient.cancelQueries({ queryKey });
+    await refetch();
+  }, [projectId, queryClient, queryKey, refetch]);
 
   const [searchQuery, setSearchQuery] = useState("");
   // Deferred so rapid typing doesn't re-filter the whole list on every keystroke;
@@ -42,41 +63,6 @@ export function useKnowledgeBase(projectId: string | null) {
     setPagedProjectId(projectId);
     setCurrentPage(1);
   }
-
-  const fetchArtifacts = useCallback(async () => {
-    if (!projectId) {
-      setArtifacts([]);
-      setIsLoading(false);
-      setFetchError(null);
-      return;
-    }
-    const generation = ++fetchGenerationRef.current;
-    setIsLoading(true);
-    setFetchError(null);
-    try {
-      const data = await knowledgeService.getUnifiedArtifacts(projectId);
-      if (generation !== fetchGenerationRef.current) return;
-      setArtifacts(data);
-    } catch (error) {
-      if (generation !== fetchGenerationRef.current) return;
-      console.error("Failed to load artifacts", error);
-      setFetchError("Failed to load artifacts. Please try again.");
-    } finally {
-      if (generation === fetchGenerationRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [projectId]);
-
-  /**
-   * Loads the initial batch of unified artifacts from the backend.
-   * Depends on the authenticated user's projectId to fetch the correct project scope.
-   */
-  useEffect(() => {
-    // Deferred to a microtask so synchronous setState calls at the top of
-    // fetchArtifacts do not run inside the effect body and cascade a render.
-    void Promise.resolve().then(() => fetchArtifacts());
-  }, [fetchArtifacts]);
 
   const filteredArtifacts = useMemo(() => {
     return artifacts.filter((artifact) => {

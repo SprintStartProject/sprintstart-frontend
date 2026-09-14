@@ -1,11 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { starterWorkService } from "../../../services/starterWorkService";
-import type { StarterWorkTask } from "../types";
-
-type ReloadOptions = {
-  /** Keep the existing cards visible while an action refreshes the pool in the background. */
-  preserveContent?: boolean;
-};
+import { queryKeys } from "../../../services/queryKeys";
 
 /**
  * Loads the live starter-work pool for the compact overview surface.
@@ -14,29 +9,40 @@ type ReloadOptions = {
  * unreviewed tasks are the PM's queue, while the pool also contains the tasks somebody already
  * vouched for. Callers can reload after a review, removal or manual promotion so both surfaces stay
  * in sync without coupling their local state.
+ *
+ * `reload` no longer takes a `preserveContent` option: react-query already keeps the pool on
+ * screen during a refetch (`isLoading` only reports a load with nothing to show yet), which is
+ * what every caller of that option wanted.
  */
 export function useStarterWorkPool() {
-  const [pool, setPool] = useState<StarterWorkTask[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.starterWork.pool();
 
-  const reload = useCallback(async (options?: ReloadOptions) => {
-    if (!options?.preserveContent) setIsLoading(true);
-    setError(null);
-    try {
-      setPool(await starterWorkService.fetchPool());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the starter-work pool.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: () => starterWorkService.fetchPool(),
+  });
 
-  useEffect(() => {
-    void (async () => {
-      await reload();
-    })();
-  }, [reload]);
-
-  return { pool, isLoading, error, reload };
+  return {
+    pool: data ?? [],
+    isLoading,
+    error: isError
+      ? error instanceof Error
+        ? error.message
+        : "Could not load the starter-work pool."
+      : null,
+    // Cancels any in-flight fetch first (react-query only supersedes one on its
+    // own once the query has data, and the very first load never does), so an
+    // explicit reload always wins over a slow one already in flight.
+    reload: async () => {
+      await queryClient.cancelQueries({ queryKey });
+      await refetch();
+    },
+  };
 }

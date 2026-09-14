@@ -187,7 +187,7 @@ export function StarterWorkPage() {
       try {
         await approve(id);
         if (approvedTask) launchPoolFlight(approvedTask, origin);
-        void reloadPool({ preserveContent: true });
+        void reloadPool();
         toast.success("Review saved");
       } catch (err) {
         toast.error("Review failed", {
@@ -205,7 +205,7 @@ export function StarterWorkPage() {
         await reject(id, reason);
         // Preserve content on reload so the pool holds its cards instead of flashing to a spinner,
         // matching approve — both are single decisions that should not blank the whole column.
-        void reloadPool({ preserveContent: true });
+        void reloadPool();
         toast.success("Removed from pool");
       } catch (err) {
         toast.error("Remove failed", {
@@ -264,7 +264,7 @@ export function StarterWorkPage() {
     const ok = await create(input);
     setIsCreating(false);
     if (ok) {
-      await reloadPool({ preserveContent: true });
+      await reloadPool();
       launchPoolFlight(input, origin);
     }
     return ok;
@@ -273,7 +273,7 @@ export function StarterWorkPage() {
   const handlePromoted = useCallback(
     async (task: StarterWorkTask, origin?: PoolFlightRect) => {
       notePromoted(task);
-      await reloadPool({ preserveContent: true });
+      await reloadPool();
       launchPoolFlight(task, origin);
     },
     [launchPoolFlight, notePromoted, reloadPool],
