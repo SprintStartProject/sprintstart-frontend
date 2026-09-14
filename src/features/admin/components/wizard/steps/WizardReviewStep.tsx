@@ -14,6 +14,7 @@ export type ReviewPerson = {
 type WizardReviewStepProps = {
   name: string;
   description: string;
+  industry: string;
   /** The picked manager, or null when none was chosen. */
   manager: ReviewPerson | null;
   /** The picked members, excluding the manager (shown separately). */
@@ -93,6 +94,7 @@ function ReviewBlock({
 export function WizardReviewStep({
   name,
   description,
+  industry,
   manager,
   members,
   sources,
@@ -123,6 +125,14 @@ export function WizardReviewStep({
             <dt className="w-24 shrink-0 text-app-text-muted">Description</dt>
             <dd className="text-app-text">
               {description.trim() || <span className="text-app-text-muted">None</span>}
+            </dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-app-text-muted">Industry</dt>
+            <dd className="text-app-text">
+              {industry.trim() || (
+                <span className="text-app-text-muted">Detected automatically</span>
+              )}
             </dd>
           </div>
           <div className="flex items-center gap-3">
