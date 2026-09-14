@@ -1,18 +1,17 @@
 import { useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useReducedMotion } from "framer-motion";
-import { Key, Palette, Rocket, Settings, User } from "lucide-react";
+import { Key, Palette, Settings, User } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { PageHeader } from "../components/layout/PageHeader";
 import { SettingsSection } from "../features/settings/components/SettingsSection";
 import { ProfileSection } from "../features/settings/components/ProfileSection";
 import { AppearanceSection } from "../features/settings/components/AppearanceSection";
-import { MomentsSection } from "../features/settings/components/MomentsSection";
 import { AccessTokensSection } from "../features/settings/components/AccessTokensSection";
 import { useDinoEasterEgg } from "../features/settings/hooks/useDinoEasterEgg";
 
-type SectionId = "profile" | "appearance" | "moments" | "tokens";
+type SectionId = "profile" | "appearance" | "tokens";
 
 type SectionDef = {
   id: SectionId;
@@ -37,16 +36,8 @@ const ALL_SECTIONS: ReadonlyArray<SectionDef> = [
     label: "Appearance",
     icon: Palette,
     title: "Appearance",
-    description: "Choose a light, dark, or system theme preference.",
+    description: "Theme, visual effects and optional extras.",
     render: () => <AppearanceSection />,
-  },
-  {
-    id: "moments",
-    label: "Moments",
-    icon: Rocket,
-    title: "Moments",
-    description: "Small decorative extras that live outside the onboarding flow.",
-    render: () => <MomentsSection />,
   },
   {
     id: "tokens",
@@ -68,7 +59,7 @@ const PAT_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
 
 /**
  * Central settings hub — a single scrollable page grouping the user's
- * personal configuration (profile, theme, chat, access tokens) in one
+ * personal configuration (profile, appearance, access tokens) in one
  * predictable place. The PAT section is only shown to PM/HR/ADMIN. A hidden
  * dino-game easter-egg (triple-click the cogwheel) lives in its own hook.
  */
