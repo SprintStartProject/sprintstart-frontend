@@ -3,8 +3,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getTeamOverview, onPmAttentionChanged } from "../../services/teamManagementService";
 import { MIN_REFRESH_INTERVAL_MS, useRateLimitedRead } from "../../hooks/useRateLimitedRead";
 import { queryKeys } from "../../services/queryKeys";
+import type { TeamOverviewUser } from "./types";
 
 export { MIN_REFRESH_INTERVAL_MS };
+
+const NO_USERS: TeamOverviewUser[] = [];
 
 /**
  * Whether the PM Dashboard has anything waiting: a pending skip request, or
@@ -19,6 +22,11 @@ export { MIN_REFRESH_INTERVAL_MS };
  * Both signals come from the team overview: `currentStep.skip` carries the skip
  * request, and the service already folds unread feedback into `hasFeedback`.
  * There is no lighter endpoint for either.
+ *
+ * Reads under `queryKeys.teamOverview.filtered`, the same key (and the same
+ * `getTeamOverview` call) `TeamOverviewWidget` uses -- the sidebar badge and the
+ * dashboard card share one cache entry instead of each firing their own request
+ * for the same project's overview.
  *
  * The freshness machinery — rate limiting, revalidating on tab focus, surviving
  * StrictMode's double-invoke — lives in {@link useRateLimitedRead}, which was
@@ -42,17 +50,16 @@ export function usePmAttentionFlag(
   useEffect(() => {
     if (!projectId) return;
     return onPmAttentionChanged(() => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.pmAttention.byProject(projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamOverview.filtered(projectId) });
     });
   }, [queryClient, projectId]);
 
-  return useRateLimitedRead(
-    queryKeys.pmAttention.byProject(projectId ?? ""),
-    async () => {
-      const users = await getTeamOverview(undefined, undefined, [projectId as string]);
-      return users.some((user) => user.hasFeedback || user.currentStep?.skip?.status === "PENDING");
-    },
-    false,
+  const users = useRateLimitedRead(
+    queryKeys.teamOverview.filtered(projectId ?? null),
+    () => getTeamOverview(undefined, undefined, [projectId as string]),
+    NO_USERS,
     { enabled: isActive, refreshKey },
   );
+
+  return users.some((user) => user.hasFeedback || user.currentStep?.skip?.status === "PENDING");
 }

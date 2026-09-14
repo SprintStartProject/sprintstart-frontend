@@ -1,9 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
-import { boardService } from "./boardService";
-import { knowledgeService } from "./knowledgeService";
 import { knowledgeRequestService } from "./knowledgeRequestService";
-import { starterWorkService } from "./starterWorkService";
+import { loadBoard } from "../features/board/hooks/useBoard";
+import { loadKnowledgeBaseArtifacts } from "../features/knowledge-base/hooks/useKnowledgeBase";
+import { loadStarterWorkReviewQueue } from "../features/starter-work/hooks/useStarterWorkReview";
 
 /**
  * Route → cache warm-up, fired from the sidebar on `pointerdown` (see `SidebarNavLink`).
@@ -12,10 +12,11 @@ import { starterWorkService } from "./starterWorkService";
  * also warm that query; pages assembled from several widgets, or still owning their data by
  * hand, only prefetch their code.
  *
- * Each data entry mirrors the `queryKey`/`queryFn` pair its page's own hook already runs, so
- * a revisit within the shared 30s `staleTime` finds the data already warm. `prefetchQuery`
- * itself is a no-op against data that is still fresh, so a pointerdown on the already-active
- * entry (or a second one before the first lands) costs nothing extra.
+ * Each data entry pairs the `queryKey` its page's own hook uses with that hook's exported
+ * loader function, so a revisit within the shared 30s `staleTime` finds the data already
+ * warm and a change to a loader's transform can't silently drift out of sync with this list.
+ * `prefetchQuery` itself is a no-op against data that is still fresh, so a pointerdown on the
+ * already-active entry (or a second one before the first lands) costs nothing extra.
  */
 function prefetchRouteModule(path: string): void {
   switch (path) {
@@ -68,7 +69,7 @@ export function prefetchRoute(
       if (!projectId) return;
       void queryClient.prefetchQuery({
         queryKey: queryKeys.knowledgeBase.byProject(projectId),
-        queryFn: () => knowledgeService.getUnifiedArtifacts(projectId),
+        queryFn: () => loadKnowledgeBaseArtifacts(projectId),
       });
       return;
 
@@ -76,14 +77,14 @@ export function prefetchRoute(
       if (!projectId) return;
       void queryClient.prefetchQuery({
         queryKey: queryKeys.board.byProject(projectId),
-        queryFn: () => boardService.fetchBoard(projectId),
+        queryFn: () => loadBoard(projectId),
       });
       return;
 
     case "/starter-work":
       void queryClient.prefetchQuery({
         queryKey: queryKeys.starterWork.review(),
-        queryFn: () => starterWorkService.fetchUnreviewed().then((proposed) => proposed.tasks),
+        queryFn: loadStarterWorkReviewQueue,
       });
       return;
 

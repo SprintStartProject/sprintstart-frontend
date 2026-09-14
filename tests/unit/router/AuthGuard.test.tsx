@@ -44,7 +44,6 @@ describe("AuthGuard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    delete window.__bootSigningOut;
     vi.mocked(teamManagementService.hasCompletedSkillAssessment).mockResolvedValue(true);
     vi.mocked(teamManagementService.getMyTeamOverview).mockResolvedValue({
       userId: "user1",
@@ -60,10 +59,6 @@ describe("AuthGuard", () => {
     });
     vi.mocked(teamManagementService.getSkills).mockResolvedValue([]);
     vi.mocked(teamManagementService.getSkillAssessmentPromptState).mockReturnValue(null);
-  });
-
-  afterEach(() => {
-    delete window.__bootSigningOut;
   });
 
   it("renders the page skeleton during normal auth loading", () => {
@@ -96,9 +91,8 @@ describe("AuthGuard", () => {
   });
 
   it("keeps the logout return blank until auth settles, then renders login", () => {
-    window.__bootSigningOut = true;
     const auth = {
-      status: "loading" as const,
+      status: "signingOut" as const,
       profile: null,
       login: vi.fn(),
       logout: vi.fn(),
@@ -126,7 +120,9 @@ describe("AuthGuard", () => {
     expect(container.querySelector("header")).not.toBeInTheDocument();
   });
 
-  it("keeps the skeleton when opening login without a logout", () => {
+  // LoginPage has no header/band of its own, so the page-shell skeleton (which previews
+  // one) would flash a shape nothing on this route ever settles into.
+  it("stays blank rather than showing the mismatched skeleton while loading on /login", () => {
     vi.mocked(useAuth).mockReturnValue({
       status: "loading",
       profile: null,
@@ -143,7 +139,7 @@ describe("AuthGuard", () => {
       </MemoryRouter>,
     );
 
-    expect(container.querySelector("header .animate-pulse")).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
     expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
   });
 

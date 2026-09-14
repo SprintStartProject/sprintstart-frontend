@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
+import { SkeletonLine } from "../ui/Skeleton";
 import { PageHeader } from "./PageHeader";
 
 export type PageShellFrame = "page" | "content" | "admin";
@@ -118,7 +119,7 @@ export function PageShellSkeleton({ frame = "page" }: { frame?: PageShellFrame }
     <div className="min-h-screen bg-app-bg">
       <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className={`${frameClass} py-6`}>
-          <div className="h-8 w-48 animate-pulse rounded-lg bg-app-surface-muted" />
+          <SkeletonLine className="h-8 w-48" />
         </div>
       </header>
       <main className={`${frameClass} flex justify-center py-16`}>

@@ -4,6 +4,11 @@ import { boardService } from "../../../services/boardService";
 import { queryKeys } from "../../../services/queryKeys";
 import type { AuthoredCardRequest, Board, BoardCard } from "../types";
 
+/** The board query's loader, shared with route prefetch so the two never drift apart. */
+export function loadBoard(projectId: string): Promise<Board> {
+  return boardService.fetchBoard(projectId);
+}
+
 type UseBoardResult = {
   board: Board | null;
   loading: boolean;
@@ -58,7 +63,7 @@ export function useBoard(projectId: string): UseBoardResult {
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey,
-    queryFn: () => boardService.fetchBoard(projectId),
+    queryFn: () => loadBoard(projectId),
     enabled: Boolean(projectId),
   });
 

@@ -17,7 +17,12 @@ declare global {
   interface Window {
     /** Published by the inline boot script; absent in tests and Storybook. */
     __bootSplash?: { start: number; flightMs: number };
-    /** Logout return detected by index.html; suppresses the auth loading shell. */
+    /**
+     * Set by index.html when this load already knows it won't show a signed-in UI --
+     * a logout return, or a failed silent SSO check (`error=` on the URL) -- so
+     * `AuthProvider` can start `signingOut` instead of `loading` and suppress the
+     * auth loading shell for it.
+     */
     __bootSigningOut?: boolean;
   }
 }
@@ -95,6 +100,10 @@ export function markSigningOut(): void {
 
 /** Clears the logout marker once auth settles, so later boots load normally. */
 export function clearSigningOut(): void {
+  // AuthProvider only reads this to pick its initial status; resetting it here
+  // is just hygiene against a stray later read finding a stale `true`.
+  window.__bootSigningOut = false;
+
   try {
     window.sessionStorage.removeItem(SIGNOUT_KEY);
   } catch {

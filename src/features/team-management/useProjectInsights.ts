@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { getTeamOverview } from "../../services/teamManagementService";
 import { getIngestionSourceStatuses, getProjectArtifacts } from "../../services/ingestionService";
 import { queryKeys } from "../../services/queryKeys";
@@ -64,10 +64,17 @@ function toAttentionItems(users: TeamOverviewUser[]): AttentionItem[] {
     );
 }
 
-async function loadOne(projectId: string): Promise<ProjectInsights> {
+async function loadOne(queryClient: QueryClient, projectId: string): Promise<ProjectInsights> {
   const [sources, users, artifacts] = await Promise.all([
     getIngestionSourceStatuses(projectId).catch(() => null),
-    getTeamOverview(undefined, undefined, [projectId]).catch(() => null),
+    // Shares the cache entry `TeamOverviewWidget` and `usePmAttentionFlag` read the same
+    // project's overview under, instead of firing a fourth independent request for it.
+    queryClient
+      .fetchQuery({
+        queryKey: queryKeys.teamOverview.filtered(projectId),
+        queryFn: () => getTeamOverview(undefined, undefined, [projectId]),
+      })
+      .catch(() => null),
     getProjectArtifacts(projectId, { page: 1, size: 1 })
       .then((page) => page.page.totalElements)
       .catch(() => null),
@@ -100,13 +107,14 @@ async function loadOne(projectId: string): Promise<ProjectInsights> {
  * with the same ids does not retrigger the fetch.
  */
 export function useProjectInsights(projectIds: string): Record<string, ProjectInsights> {
+  const queryClient = useQueryClient();
   const ids = projectIds.split(",").filter(Boolean);
 
   const { data } = useQuery({
     queryKey: queryKeys.projectInsights.byProjectIds(projectIds),
     queryFn: async () => {
       const entries = await Promise.all(
-        ids.map(async (projectId) => [projectId, await loadOne(projectId)] as const),
+        ids.map(async (projectId) => [projectId, await loadOne(queryClient, projectId)] as const),
       );
       return Object.fromEntries(entries);
     },

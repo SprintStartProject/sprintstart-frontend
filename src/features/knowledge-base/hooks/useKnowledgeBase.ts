@@ -8,6 +8,11 @@ import type { KnowledgeTab } from "../tabs";
 const ITEMS_PER_PAGE = 20;
 const NO_ARTIFACTS: Artifact[] = [];
 
+/** The knowledge-base query's loader, shared with route prefetch so the two never drift apart. */
+export function loadKnowledgeBaseArtifacts(projectId: string): Promise<Artifact[]> {
+  return knowledgeService.getUnifiedArtifacts(projectId);
+}
+
 /**
  * State + data layer for the Knowledge Base page.
  *
@@ -29,7 +34,7 @@ export function useKnowledgeBase(projectId: string | null) {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => knowledgeService.getUnifiedArtifacts(projectId as string),
+    queryFn: () => loadKnowledgeBaseArtifacts(projectId as string),
     enabled: projectId !== null,
   });
 

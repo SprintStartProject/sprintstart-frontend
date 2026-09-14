@@ -28,7 +28,10 @@ function AppContent() {
   useScrollRestoration();
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
-  const signedIn = status !== "unauthenticated" && status !== "loading";
+  // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"
+  // flag settling back toward unauthenticated (see `AuthContext`'s `AuthStatus`), and the shell
+  // must not flash back in while that resolves.
+  const signedIn = status === "authenticated";
 
   // A page in focus mode has asked for the whole screen, and the dock is the one piece of the shell
   // that cannot step aside politely: it floats *over* the content, and a surface somebody asked to

@@ -85,9 +85,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
     void checkSkillAssessment();
   }, [status, profile?.id]);
 
-  // The boot script detects the logout return before React mounts.
-  // Keep that return load blank until auth settles, just like its suppressed splash.
-  if (status === "loading" && window.__bootSigningOut) return null;
+  // A logout return, or a failed silent SSO check, keeps that load blank until auth
+  // settles, just like its suppressed splash -- see `AuthProvider`'s initial state for
+  // how the boot script's flag becomes this.
+  if (status === "signingOut") return null;
+
+  // `PageShellSkeleton` previews the header/band every *other* route settles into --
+  // wrong here, since `LoginPage` has no header at all. Landing on `/login` while still
+  // `loading` (the redirect chain above can take a moment to resolve once it is back)
+  // would otherwise flash that mismatched band right before the login card replaces it.
+  if (status === "loading" && location.pathname === "/login") return null;
 
   if (status === "loading" || checkingSkillAssessment) {
     return <PageShellSkeleton />;

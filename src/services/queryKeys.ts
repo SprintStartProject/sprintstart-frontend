@@ -87,9 +87,6 @@ export const queryKeys = {
     // id either.
     mine: () => ["knowledge-request", "mine"] as const,
   },
-  pmAttention: {
-    byProject: (projectId: string) => ["pm-attention", projectId] as const,
-  },
   onboardingMetrics: {
     project: (projectId: string) => ["onboarding-metrics", "project", projectId] as const,
   },

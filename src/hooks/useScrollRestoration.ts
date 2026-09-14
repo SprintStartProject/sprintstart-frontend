@@ -156,21 +156,40 @@ export function useScrollRestoration(): void {
   // Keeps the current page's position current for whenever the reader comes back to it.
   useEffect(() => {
     const host = getScrollHost();
-    const handleScroll = () => {
-      const scrollTop = getScrollTop(host);
+    let rafId: number | null = null;
+    let latestScrollTop = getScrollTop(host);
+
+    // The actual sessionStorage read-modify-write, run at most once per animation
+    // frame -- a wheel or trackpad scroll fires dozens of `scroll` events a second,
+    // and none of them need their own JSON round trip.
+    const flush = () => {
+      rafId = null;
       const pending = pendingRestorationRef.current;
 
       // A browser may emit a scroll event for a clamped restoration attempt. Do
       // not replace the saved target with that temporary, too-short position.
       if (pending?.key === location.key) {
-        if (Math.abs(scrollTop - pending.target) > 1) return;
+        if (Math.abs(latestScrollTop - pending.target) > 1) return;
         pendingRestorationRef.current = null;
       }
 
-      writePosition(location.key, scrollTop);
+      writePosition(location.key, latestScrollTop);
+    };
+
+    const handleScroll = () => {
+      latestScrollTop = getScrollTop(host);
+      if (rafId === null) rafId = window.requestAnimationFrame(flush);
     };
 
     host.addEventListener("scroll", handleScroll, { passive: true });
-    return () => host.removeEventListener("scroll", handleScroll);
+    return () => {
+      host.removeEventListener("scroll", handleScroll);
+      // A frame still pending when the route changes would otherwise never run,
+      // silently dropping the last position of a reader who scrolled and left fast.
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        flush();
+      }
+    };
   }, [location.key]);
 }

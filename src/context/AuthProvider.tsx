@@ -11,7 +11,13 @@ import { buildRedirectUri, clearRedirectTarget, storeRedirectTarget } from "../a
  * Provider component that manages the global authentication state via Keycloak.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
+  // The boot script (index.html) detects a logout return, or a failed silent SSO check,
+  // before React mounts and leaves this flag for the first render to pick up, so the guard
+  // can keep that load blank instead of flashing its loading skeleton before settling into
+  // authenticated/unauthenticated.
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    window.__bootSigningOut ? "signingOut" : "loading",
+  );
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const isInitialized = useRef(false);
 

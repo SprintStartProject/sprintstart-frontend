@@ -19,6 +19,11 @@ type ReviewAction = { kind: "generate" } | { kind: "create"; input: CreateStarte
 
 const NO_TASKS: StarterWorkTask[] = [];
 
+/** The review queue's loader, shared with route prefetch so the two never drift apart. */
+export function loadStarterWorkReviewQueue(): Promise<StarterWorkTask[]> {
+  return starterWorkService.fetchUnreviewed().then((proposed) => proposed.tasks);
+}
+
 /**
  * Owns the PM's starter-work review queue: mining new proposals and deciding on each one.
  *
@@ -43,7 +48,7 @@ export function useStarterWorkReview() {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => starterWorkService.fetchUnreviewed().then((proposed) => proposed.tasks),
+    queryFn: loadStarterWorkReviewQueue,
   });
 
   // A hand-authored task never joins the unreviewed queue below -- somebody already vouched

@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, MessageSquareText, Pencil, Plus, SkipForward, X } from "lucide-react";
+import { Check, MessageSquareText, Pencil, Plus, SkipForward, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
@@ -51,6 +51,7 @@ function getElapsedDays(startedAt: string): number {
 
 import { UserAvatar } from "../components/common/UserAvatar";
 import { Modal } from "../components/ui/Modal";
+import { PageShell } from "../components/layout/PageShell";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { AddCustomStepModal } from "../features/team-management/components/detail/AddCustomStepModal";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
@@ -635,52 +636,35 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  // Loading and not-found share the same header/main shell as the success render below —
-  // the header's *content* is necessarily minimal until the member is fetched (it presents
-  // that person, not a static title), but the band itself never disappears and reappears.
+  // Loading and not-found share PageShell with the success render below, so the band
+  // (and the back button in it) never disappears and reappears while the member loads.
   if (loading) {
     return (
-      <div className="min-h-screen bg-app-bg">
-        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-            <button
-              onClick={goBack}
-              className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-          </div>
-        </header>
-        <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
-          <div className="flex min-h-96 items-center justify-center">
-            <p className="text-sm text-app-text-muted">Loading team member...</p>
-          </div>
-        </main>
-      </div>
+      <PageShell
+        icon={Users}
+        title="Team member"
+        subtitle=""
+        back={{ label: "Back", onClick: goBack }}
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <p className="text-sm text-app-text-muted">Loading team member...</p>
+        </div>
+      </PageShell>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-app-bg">
-        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-            <button
-              onClick={goBack}
-              className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-          </div>
-        </header>
-        <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
-          <div className="rounded-3xl border border-app-border bg-app-surface p-8">
-            <p className="text-sm text-app-text">Team member not found.</p>
-          </div>
-        </main>
-      </div>
+      <PageShell
+        icon={Users}
+        title="Team member"
+        subtitle=""
+        back={{ label: "Back", onClick: goBack }}
+      >
+        <div className="rounded-3xl border border-app-border bg-app-surface p-8">
+          <p className="text-sm text-app-text">Team member not found.</p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -749,34 +733,28 @@ export function TeamMemberDetailPage() {
     allSteps.find((step) => step.status !== "FINISHED" && step.status !== "SKIPPED") ?? null;
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <button
-            onClick={goBack}
-            className="mb-4 inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
+    <>
+      <PageShell
+        icon={Users}
+        title={`${user.firstname} ${user.lastname}`}
+        subtitle={user.currentStep?.title || "Onboarding completed"}
+        frame="content"
+        back={{ label: "Back", onClick: goBack }}
+        mainClassName="pt-8 pb-24"
+        bandExtra={
+          <div>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center justify-center">
+                  <UserAvatar
+                    profileIcon={user.profileIcon}
+                    fallbackName={`${user.firstname} ${user.lastname}`.trim()}
+                    seed={user.userId}
+                    size={56}
+                  />
+                </div>
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex shrink-0 items-center justify-center">
-                <UserAvatar
-                  profileIcon={user.profileIcon}
-                  fallbackName={`${user.firstname} ${user.lastname}`.trim()}
-                  seed={user.userId}
-                  size={56}
-                />
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-bold text-app-text">
-                  {user.firstname} {user.lastname}
-                </h1>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {user.roles.length > 0 ? (
                     user.roles.map((role) => (
                       <button
@@ -803,42 +781,40 @@ export function TeamMemberDetailPage() {
                   )}
                 </div>
               </div>
+
+              <div className="lg:text-right">
+                <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
+                  Current Step
+                  {user.currentStep?.startedAt && (
+                    <span className="ml-2 font-normal normal-case">
+                      · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
+                    </span>
+                  )}
+                </p>
+
+                <p className="mt-2 text-sm font-medium text-app-text">
+                  {user.currentStep?.title || "Onboarding Completed"}
+                </p>
+              </div>
             </div>
 
-            <div className="lg:text-right">
-              <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
-                Current Step
-                {user.currentStep?.startedAt && (
-                  <span className="ml-2 font-normal normal-case">
-                    · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
-                  </span>
-                )}
-              </p>
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
+                  style={{
+                    width: `${progressPercentage}%`,
+                  }}
+                />
+              </div>
 
-              <p className="mt-2 text-sm font-medium text-app-text">
-                {user.currentStep?.title || "Onboarding Completed"}
-              </p>
+              <span className="text-sm font-medium text-app-text tabular-nums">
+                {progressPercentage}%
+              </span>
             </div>
           </div>
-
-          <div className="mt-6 flex items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
-                style={{
-                  width: `${progressPercentage}%`,
-                }}
-              />
-            </div>
-
-            <span className="text-sm font-medium text-app-text tabular-nums">
-              {progressPercentage}%
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
+        }
+      >
         {/* items-start keeps both columns at their own height: without it the grid
                     stretches the onboarding card to match the insights column, which grows
                     when the review questions are expanded. */}
@@ -1058,8 +1034,7 @@ export function TeamMemberDetailPage() {
             />
           </aside>
         </div>
-      </main>
-
+      </PageShell>
       <Modal
         isOpen={rolesModalOpen}
         title="Manage Roles"
@@ -1198,6 +1173,6 @@ export function TeamMemberDetailPage() {
           />
         )}
       </PanelPresence>
-    </div>
+    </>
   );
 }

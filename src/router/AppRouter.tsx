@@ -7,6 +7,12 @@ import { AssistantShell } from "../components/layout/AssistantShell";
 import { PageShellSkeleton } from "../components/layout/PageShell";
 import { PageTransition } from "../components/layout/PageTransition";
 import { AuthGuard } from "./AuthGuard";
+// Not lazy, unlike every other route below: `AuthGuard`'s Keycloak redirect chain (logout,
+// the silent SSO check on boot) can land here through several full page reloads in a row,
+// each needing this chunk again. `PageShellSkeleton` -- the shared `Suspense` fallback -- has
+// no login-card shape to preview, so every one of those loads would flash its header/spinner
+// right before this replaces it. Bundling it eagerly removes the wait Suspense would show.
+import { LoginPage } from "../pages/LoginPage";
 
 const ChatPage = lazy(() =>
   import("../pages/ChatPage").then((module) => ({ default: module.ChatPage })),
@@ -31,9 +37,6 @@ const OnBoardingItemPage = lazy(() =>
   import("../features/onboarding/components/OnBoardingItemPage").then((module) => ({
     default: module.OnBoardingItemPage,
   })),
-);
-const LoginPage = lazy(() =>
-  import("../pages/LoginPage").then((module) => ({ default: module.LoginPage })),
 );
 const SkillWizardPage = lazy(() =>
   import("../pages/SkillWizardPage").then((module) => ({ default: module.SkillWizardPage })),
