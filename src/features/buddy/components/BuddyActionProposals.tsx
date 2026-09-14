@@ -1,6 +1,6 @@
 import { Check, Loader2, RotateCcw, X } from "lucide-react";
 import type { ProposedAction } from "../types";
-import { BUDDY_ACTION_OPEN_ORIENTATION } from "../types";
+import { BUDDY_ACTION_AMEND_CHECKLIST, BUDDY_ACTION_OPEN_ORIENTATION } from "../types";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
 
 type BuddyActionProposalsProps = {
@@ -107,6 +107,14 @@ export function BuddyActionProposals({
                     {action.checklistTitle}
                   </p>
                 )}
+                {/* Named as an addition when it is one. The card keeps everything it already has,
+                    and these lines go after it — saying so is the difference between agreeing to
+                    three new steps and agreeing to whatever the list becomes. */}
+                {action.action === BUDDY_ACTION_AMEND_CHECKLIST && (
+                  <p className="text-xs text-app-text-muted">
+                    Added to the end of that list — nothing on it changes:
+                  </p>
+                )}
                 <ul className="mt-1 space-y-0.5">
                   {action.checklistItems.map((item, index) => (
                     <li
@@ -118,6 +126,27 @@ export function BuddyActionProposals({
                   ))}
                 </ul>
               </div>
+            )}
+
+            {/* The address as well as the label, because the label is the mentor's wording and the
+                address is the part that has to be right. A link card is a promise that it works. */}
+            {action.linkUrl && (
+              <div className="min-w-0">
+                {action.linkLabel && (
+                  <p className="text-sm font-medium break-words text-app-text">
+                    {action.linkLabel}
+                  </p>
+                )}
+                <p className="text-xs break-all text-app-text-muted">{action.linkUrl}</p>
+              </div>
+            )}
+
+            {/* Whitespace kept: the note's first line becomes the card's heading, so a preview that
+                reflowed it would not be showing what would be kept. */}
+            {action.noteText && (
+              <p className="min-w-0 text-xs break-words whitespace-pre-wrap text-app-text-muted">
+                {action.noteText}
+              </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
               {/* `action.label` is written by the model, so its length is not ours to

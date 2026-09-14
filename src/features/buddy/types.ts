@@ -26,6 +26,9 @@ export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
  */
 export const BUDDY_ACTION_PLACE_CHECKLIST = "place_checklist";
 
+/** The backend's `amend_checklist` action: lines the mentor would add to a list they already have. */
+export const BUDDY_ACTION_AMEND_CHECKLIST = "amend_checklist";
+
 export type ProposedAction = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
@@ -77,6 +80,18 @@ export type ProposedAction = {
    */
   checklistTitle?: string;
   checklistItems?: string[];
+  /**
+   * `amend_checklist`: the card of theirs the lines go on.
+   *
+   * The lines here are the *new* ones only — the card keeps what it already has, and the offer
+   * shows just the addition, because a change nobody can see is one nobody agreed to.
+   */
+  cardId?: string;
+  /** `place_link` confirm payload: the address and what to call it. */
+  linkUrl?: string;
+  linkLabel?: string;
+  /** `place_note` confirm payload: the note's text, shown on the offer before it is kept. */
+  noteText?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -161,5 +176,9 @@ export type BuddyStreamHandlers = {
     level?: string;
     checklistTitle?: string;
     checklistItems?: string[];
+    cardId?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    noteText?: string;
   }) => void;
 };

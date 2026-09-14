@@ -356,6 +356,10 @@ export function useBuddyConversation() {
               level: proposal.level,
               checklistTitle: proposal.checklistTitle,
               checklistItems: proposal.checklistItems,
+              cardId: proposal.cardId,
+              linkUrl: proposal.linkUrl,
+              linkLabel: proposal.linkLabel,
+              noteText: proposal.noteText,
               status: "idle",
             });
           },
@@ -431,6 +435,10 @@ export function useBuddyConversation() {
             level: action.level,
             checklistTitle: action.checklistTitle,
             checklistItems: action.checklistItems,
+            cardId: action.cardId,
+            linkUrl: action.linkUrl,
+            linkLabel: action.linkLabel,
+            noteText: action.noteText,
           });
           patchAction(messageId, action.id, {
             status: "resolved",
