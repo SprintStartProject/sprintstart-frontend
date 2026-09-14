@@ -1,82 +1,123 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminUserService } from "../../../services/adminUserService";
 import { projectService } from "../../../services/projectService";
-import { getGithubPatNames } from "../../../services/sources/githubService";
+import { queryKeys } from "../../../services/queryKeys";
 import { enrichUsersWithProjectNames, getAvailableProjects } from "../data";
+import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import type { AdminUser, LoadingState, ProjectOverview } from "../types";
 
-export function useAdminData() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [projects, setProjects] = useState<ProjectOverview[]>([]);
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [selectedProject, setSelectedProject] = useState<ProjectOverview | null>(null);
+type AdminOverview = {
+  users: AdminUser[];
+  projects: ProjectOverview[];
+};
 
-  const [loadingState, setLoadingState] = useState<LoadingState>("loading");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isRefreshing, setIsRefreshing] = useState(false);
+const EMPTY_USERS: AdminUser[] = [];
+const EMPTY_PROJECTS: ProjectOverview[] = [];
 
-  const [tokenNames, setTokenNames] = useState<string[]>([]);
-  const [tokensLoaded, setTokensLoaded] = useState(false);
+type UseAdminDataResult = {
+  users: AdminUser[];
+  setUsers: (update: SetStateAction<AdminUser[]>) => void;
+  projects: ProjectOverview[];
+  setProjects: (update: SetStateAction<ProjectOverview[]>) => void;
+  selectedUser: AdminUser | null;
+  setSelectedUser: Dispatch<SetStateAction<AdminUser | null>>;
+  selectedProject: ProjectOverview | null;
+  setSelectedProject: Dispatch<SetStateAction<ProjectOverview | null>>;
+  loadingState: LoadingState;
+  errorMessage: string;
+  isRefreshing: boolean;
+  refreshAdminData: () => Promise<void>;
+  tokenNames: string[];
+  tokensLoaded: boolean;
+  loadTokenNames: () => Promise<void>;
+};
 
-  const loadAdminData = useCallback(async () => {
-    try {
+/**
+ * Users and projects load together and stay together: a project update
+ * patches the handful of affected users' `projects` field directly (see
+ * `AdminPage.handleProjectUpdated`) without touching their `projectIds`, so a
+ * derivation re-run from `projectIds` on every render would immediately
+ * overwrite that patch with stale data. One cache entry, mutated ad hoc via
+ * `setUsers`/`setProjects`, is what the original hand-rolled state did and
+ * what this preserves.
+ */
+export function useAdminData(): UseAdminDataResult {
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.admin.overview();
+
+  const {
+    data,
+    status,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: async (): Promise<AdminOverview> => {
       const [nextUsers, nextProjects] = await Promise.all([
         adminUserService.getUsers(),
         projectService.getProjects(),
       ]);
       const nextProjectSummaries = getAvailableProjects(nextProjects);
-      const nextEnrichedUsers = enrichUsersWithProjectNames(nextUsers, nextProjectSummaries);
 
-      setUsers(nextEnrichedUsers);
-      setProjects(nextProjects);
-      setLoadingState("success");
+      return {
+        users: enrichUsersWithProjectNames(nextUsers, nextProjectSummaries),
+        projects: nextProjects,
+      };
+    },
+  });
 
-      setSelectedUser((currentSelectedUser) => {
-        if (!currentSelectedUser) return null;
+  const users = data?.users ?? EMPTY_USERS;
+  const projects = data?.projects ?? EMPTY_PROJECTS;
 
-        return (
-          nextEnrichedUsers.find((user) => user.id === currentSelectedUser.id) ??
-          currentSelectedUser
-        );
-      });
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectOverview | null>(null);
 
-      setSelectedProject((currentSelectedProject) => {
-        if (!currentSelectedProject) return null;
-
-        return (
-          nextProjects.find((project) => project.id === currentSelectedProject.id) ??
-          currentSelectedProject
-        );
-      });
-    } catch (error) {
-      setLoadingState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Admin data could not be loaded.");
-    }
-  }, []);
-
+  // Re-resolves the drawer's selection against a fresh load, the same way the
+  // old `loadAdminData` did inline on every successful fetch — a stale
+  // reference from before a refresh should not go on being shown. Deferred to
+  // a microtask so these setState calls don't run synchronously in the effect
+  // body (React's cascading-render guard).
   useEffect(() => {
-    void Promise.resolve().then(loadAdminData);
-  }, [loadAdminData]);
+    if (!data) return;
+    void Promise.resolve().then(() => {
+      setSelectedUser((current) =>
+        current ? (data.users.find((user) => user.id === current.id) ?? current) : null,
+      );
+      setSelectedProject((current) =>
+        current ? (data.projects.find((project) => project.id === current.id) ?? current) : null,
+      );
+    });
+  }, [data]);
 
-  const refreshAdminData = useCallback(async () => {
-    setIsRefreshing(true);
+  const setUsers = useCallback(
+    (update: SetStateAction<AdminUser[]>) => {
+      queryClient.setQueryData(queryKey, (prev: AdminOverview | undefined) => {
+        if (!prev) return prev;
+        const nextUsers = typeof update === "function" ? update(prev.users) : update;
+        return { ...prev, users: nextUsers };
+      });
+    },
+    [queryClient, queryKey],
+  );
 
-    try {
-      await loadAdminData();
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [loadAdminData]);
+  const setProjects = useCallback(
+    (update: SetStateAction<ProjectOverview[]>) => {
+      queryClient.setQueryData(queryKey, (prev: AdminOverview | undefined) => {
+        if (!prev) return prev;
+        const nextProjects = typeof update === "function" ? update(prev.projects) : update;
+        return { ...prev, projects: nextProjects };
+      });
+    },
+    [queryClient, queryKey],
+  );
 
-  const loadTokenNames = useCallback(async () => {
-    try {
-      const names = await getGithubPatNames();
-      setTokenNames(names);
-      setTokensLoaded(true);
-    } catch {
-      setTokensLoaded(true);
-    }
-  }, []);
+  // Shares its cache entry with the user-settings PAT list — see
+  // `useGithubTokens` — so visiting either section saves the other the round trip.
+  const { tokenNames, tokensLoaded, loadTokenNames } = useGithubTokens();
+
+  const loadingState: LoadingState = status === "pending" ? "loading" : status;
 
   return {
     users,
@@ -88,9 +129,18 @@ export function useAdminData() {
     selectedProject,
     setSelectedProject,
     loadingState,
-    errorMessage,
-    isRefreshing,
-    refreshAdminData,
+    errorMessage: error
+      ? error instanceof Error
+        ? error.message
+        : "Admin data could not be loaded."
+      : "",
+    // Excludes the very first load, which `loadingState` already covers with
+    // its own full-page state — this is only for a refresh of data already on
+    // screen (or another attempt after an error).
+    isRefreshing: isFetching && status !== "pending",
+    refreshAdminData: async () => {
+      await refetch();
+    },
     tokenNames,
     tokensLoaded,
     loadTokenNames,

@@ -13,6 +13,16 @@ export const queryKeys = {
     users: () => ["admin", "users"] as const,
     projects: () => ["admin", "projects"] as const,
     githubTokenNames: () => ["admin", "github-tokens"] as const,
+    // Users and projects on the Access Management page are not independent:
+    // a user's `projects` field is corrected against the freshly fetched
+    // project list at load time, and a project update patches specific users'
+    // `projects` in place without touching their `projectIds`. Keeping both
+    // under one cache entry is what makes that patch stick instead of being
+    // silently overwritten by a re-derivation on the next render — unlike
+    // `admin.users()`/`admin.projects()` above, which stay independent, raw
+    // reads for callers (like the dashboard's user overview widget) that don't
+    // need the cross-referencing.
+    overview: () => ["admin", "overview"] as const,
   },
   attention: {
     byProject: (projectId: string) => ["attention", projectId] as const,
