@@ -93,6 +93,12 @@ export type ProposedAction = {
    * in the hire's name and a label has no room for it.
    */
   reason?: string;
+  /**
+   * Where `add_path_step` puts the new step in its phase's graph — what it waits on, and what will
+   * wait on it. Echoed back verbatim and re-checked against the hire's own path on confirm.
+   */
+  waitsOnIds?: string[];
+  unlocksIds?: string[];
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -182,5 +188,7 @@ export type BuddyStreamHandlers = {
     answer?: string;
     description?: string;
     reason?: string;
+    waitsOnIds?: string[];
+    unlocksIds?: string[];
   }) => void;
 };

@@ -363,6 +363,8 @@ export function useBuddyConversation() {
               answer: proposal.answer,
               description: proposal.description,
               reason: proposal.reason,
+              waitsOnIds: proposal.waitsOnIds,
+              unlocksIds: proposal.unlocksIds,
               status: "idle",
             });
           },
@@ -443,6 +445,8 @@ export function useBuddyConversation() {
             answer: action.answer,
             description: action.description,
             reason: action.reason,
+            waitsOnIds: action.waitsOnIds,
+            unlocksIds: action.unlocksIds,
           });
           patchAction(messageId, action.id, {
             status: "resolved",

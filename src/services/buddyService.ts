@@ -130,6 +130,9 @@ interface BuddyStreamChunk {
   description?: string;
   /** `request_skip` confirm payload: the reason that goes to the PM. */
   reason?: string;
+  /** `add_path_step` confirm payload: where the step goes in its phase's graph. */
+  waits_on_ids?: string[];
+  unlocks_ids?: string[];
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -164,6 +167,8 @@ export async function performAction(
     answer?: string;
     description?: string;
     reason?: string;
+    waitsOnIds?: string[];
+    unlocksIds?: string[];
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -184,6 +189,8 @@ export async function performAction(
       answer: extras.answer,
       description: extras.description,
       reason: extras.reason,
+      waitsOnIds: extras.waitsOnIds,
+      unlocksIds: extras.unlocksIds,
     }),
   });
 }
@@ -360,6 +367,8 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               answer: event.answer,
               description: event.description,
               reason: event.reason,
+              waitsOnIds: event.waits_on_ids,
+              unlocksIds: event.unlocks_ids,
             });
           }
           break;
