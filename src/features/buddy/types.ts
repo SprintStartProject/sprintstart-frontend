@@ -30,6 +30,7 @@ export const BUDDY_PATH_ACTIONS: readonly string[] = [
   "complete_task",
   "answer_question",
   "add_path_step",
+  "request_skip",
 ];
 
 export type ProposedAction = {
@@ -87,6 +88,11 @@ export type ProposedAction = {
   onboardingTaskId?: string;
   answer?: string;
   description?: string;
+  /**
+   * The reason `request_skip` sends to the PM. Shown in full under the button, because it goes out
+   * in the hire's name and a label has no room for it.
+   */
+  reason?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -175,5 +181,6 @@ export type BuddyStreamHandlers = {
     onboardingTaskId?: string;
     answer?: string;
     description?: string;
+    reason?: string;
   }) => void;
 };

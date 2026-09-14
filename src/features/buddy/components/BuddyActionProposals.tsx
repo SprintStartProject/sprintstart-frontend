@@ -100,6 +100,13 @@ export function BuddyActionProposals({
                 Not now
               </button>
             </div>
+            {/* A skip request is sent to a person in the hire's name, so the words go on screen
+                before the click -- the label only names the step. */}
+            {action.reason && (
+              <p className="px-1 text-xs break-words text-app-text-muted">
+                Your reason: &ldquo;{action.reason}&rdquo;
+              </p>
+            )}
             {action.status === "error" && (
               <p className="text-xs text-app-danger-text">
                 Couldn&apos;t reach the server — try again.

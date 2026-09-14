@@ -362,6 +362,7 @@ export function useBuddyConversation() {
               onboardingTaskId: proposal.onboardingTaskId,
               answer: proposal.answer,
               description: proposal.description,
+              reason: proposal.reason,
               status: "idle",
             });
           },
@@ -441,6 +442,7 @@ export function useBuddyConversation() {
             onboardingTaskId: action.onboardingTaskId,
             answer: action.answer,
             description: action.description,
+            reason: action.reason,
           });
           patchAction(messageId, action.id, {
             status: "resolved",

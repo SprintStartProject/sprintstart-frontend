@@ -279,6 +279,8 @@ export function OnBoardingItemPage() {
               onboardingService.fetchTasks(stepId),
             ]);
             setStepDetail(step);
+            // A skip request the buddy sent shows up here as the pending reason, not an empty box.
+            setSkipReason(step.skip?.reason ?? "");
             setTasks(refreshedTasks);
             setLocalFinished(
               new Set(refreshedTasks.filter((task) => task.finished).map((task) => task.id)),

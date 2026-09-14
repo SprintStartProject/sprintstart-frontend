@@ -128,6 +128,8 @@ interface BuddyStreamChunk {
   onboarding_task_id?: string;
   answer?: string;
   description?: string;
+  /** `request_skip` confirm payload: the reason that goes to the PM. */
+  reason?: string;
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -142,8 +144,8 @@ export interface BuddyActionResult {
  * and the proposal's own confirm payloads are sent: `question` for flag-to-PM, `taskId` for a
  * goal claim, `title` + `attesterId` for an attestation request, `githubLogin` for saving a
  * username, `competencyKey` + `level` for recording where a conversation placed the hire, and the
- * path-node ids (`stepId`, `questionId`, `phaseId`, plus `answer` and `description`) for the three
- * actions that move the hire along their onboarding path.
+ * path-node ids (`stepId`, `questionId`, `phaseId`, plus `answer`, `description` and `reason`) for
+ * the actions that move the hire along their onboarding path.
  */
 export async function performAction(
   action: string,
@@ -161,6 +163,7 @@ export async function performAction(
     onboardingTaskId?: string;
     answer?: string;
     description?: string;
+    reason?: string;
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -180,6 +183,7 @@ export async function performAction(
       onboardingTaskId: extras.onboardingTaskId,
       answer: extras.answer,
       description: extras.description,
+      reason: extras.reason,
     }),
   });
 }
@@ -355,6 +359,7 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               onboardingTaskId: event.onboarding_task_id,
               answer: event.answer,
               description: event.description,
+              reason: event.reason,
             });
           }
           break;

@@ -139,4 +139,26 @@ describe("BuddyActionProposals", () => {
 
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
   });
+
+  it("shows the whole skip reason before the hire sends it in their name", () => {
+    render(
+      <BuddyActionProposals
+        messageId="m1"
+        actions={[
+          action({
+            action: "request_skip",
+            label: "Ask your PM to skip “Set up the VPN”",
+            stepId: "s1",
+            reason: "I already have VPN access from my last team.",
+          }),
+        ]}
+        onConfirm={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Your reason: “I already have VPN access from my last team.”"),
+    ).toBeInTheDocument();
+  });
 });
