@@ -80,6 +80,11 @@ function ProgressBar({ value, max }: ProgressBarProps) {
 // MAIN COMPONENT: OnBoardingPage
 // ─────────────────────────────────────────────────────────────
 
+/** The DOM id of a step or question card, which a link from the buddy scrolls to. */
+function linkedCardId(itemId: string): string {
+  return `onboarding-item-${itemId}`;
+}
+
 /**
  * Displays the user's personalized onboarding path hierarchy.
  * Fetches and tracks progress through phases, steps and knowledge-check
@@ -141,17 +146,23 @@ export function OnBoardingPage() {
   /**
    * Where a link from the buddy points.
    *
-   * The mentor is given each item's path so it can say "want to take [#3](...)?" and have that be
-   * clickable. A question has no route of its own — it is a modal on this page — so it arrives as
-   * `?question=<id>`, and a phase as `?phase=<id>`.
+   * The mentor is given each item's link so it can say "you are on [#3](...)" and have that be
+   * clickable: `?step=<id>`, `?question=<id>` or `?phase=<id>`.
+   *
+   * A step or question link *lands* on the item rather than starting it — the right phase opens,
+   * the page scrolls to the card, and the card lights up briefly. Following a link in a
+   * conversation is a way of finding something, and starting a step (or opening a question to
+   * answer) is the hire's own click on the card they can now see.
    *
    * In the URL rather than in router state, unlike `focusQuestionId`: this link is written by the
    * model into text the hire can copy, keep, or open in a second tab, and state does not survive any
    * of that.
    */
   const [searchParams, setSearchParams] = useSearchParams();
+  const linkedStepId = searchParams.get("step");
   const linkedQuestionId = searchParams.get("question");
   const linkedPhaseId = searchParams.get("phase");
+  const linkedItemId = linkedStepId ?? linkedQuestionId;
 
   // The question list of the focused phase, so the page can scroll to it.
   const questionListRef = useRef<HTMLDivElement>(null);
@@ -211,9 +222,6 @@ export function OnBoardingPage() {
   }) => {
     const phases = OnBoardingPathEndpoint?.phases ?? [];
     setQuestionToAnswer(null);
-    // Also the link, if that is what opened it — otherwise closing the modal would reopen it on the
-    // next render, since the URL would still be asking for it.
-    if (linkedQuestionId) clearLink();
 
     // The backend decides completion; nothing here is derived from the phase alone.
     if (onboardingCompleted) {
@@ -340,29 +348,32 @@ export function OnBoardingPage() {
   useEffect(() => onBuddyPathChanged(() => void refreshPath()), []);
 
   /**
-   * The phase and the question a buddy link names, resolved from the URL rather than copied into
-   * state.
+   * The phase a buddy link names, resolved from the URL rather than copied into state.
    *
    * Derived on purpose. A link can arrive two ways — a fresh mount, or a click while the hire is
    * already standing on this page — and writing state from an effect would both trip the
    * set-state-in-an-effect rule and only handle the first. Deriving handles both and needs no
-   * clean-up: the link stops winning the moment the hire picks a different phase or closes the
-   * modal, because those clear the parameter.
+   * clean-up: the link stops winning the moment the hire picks a different phase or view, because
+   * those clear the parameter.
    */
   const linkedPhaseIndex = useMemo(() => {
     const phases = OnBoardingPathEndpoint?.phases ?? [];
+    if (linkedStepId) {
+      return phases.findIndex((phase) => phase.steps.some((step) => step.id === linkedStepId));
+    }
     if (linkedQuestionId) {
       return phases.findIndex((phase) =>
         phase.questions.some((question) => question.id === linkedQuestionId),
       );
     }
     return linkedPhaseId ? phases.findIndex((phase) => phase.id === linkedPhaseId) : -1;
-  }, [OnBoardingPathEndpoint, linkedQuestionId, linkedPhaseId]);
+  }, [OnBoardingPathEndpoint, linkedStepId, linkedQuestionId, linkedPhaseId]);
 
   /** Forgets the link, so the hire's own next click decides what they are looking at. */
   const clearLink = () =>
     setSearchParams(
       (params) => {
+        params.delete("step");
         params.delete("question");
         params.delete("phase");
         return params;
@@ -424,25 +435,31 @@ export function OnBoardingPage() {
     )
     .join(", ");
 
+  // A link names a card in the list, so it shows the list even if the hire had left it on the graph.
+  const shownViewMode = linkedItemId ? "list" : viewMode;
+
   /**
-   * The question the modal is showing: the one a card opened, or the one a link names.
+   * Scrolls to the card a link landed on.
    *
-   * A linked question only opens when the hire could actually answer it. A link to a locked or
-   * already-passed question is a dead end, and landing on its phase — which still happens — is the
-   * useful half of following it.
+   * Keyed on `location.key` as well as the id, so following the same link a second time — the hire
+   * scrolled away and clicked it again in the conversation — scrolls again. Only a scroll, never
+   * state: which phase is open and which card lights up are both derived from the URL.
    */
-  const linkedQuestion =
-    linkedQuestionId && currentPhase
-      ? currentPhase.questions.find(
-          (question) =>
-            question.id === linkedQuestionId &&
-            question.status !== "LOCKED" &&
-            question.status !== "PASSED",
-        )
-      : undefined;
-  const shownQuestion =
-    questionToAnswer ??
-    (linkedQuestion ? { question: linkedQuestion, phaseTitle: currentPhase?.title ?? "" } : null);
+  useEffect(() => {
+    if (loadingState !== "success" || !linkedItemId) return;
+    document
+      .getElementById(linkedCardId(linkedItemId))
+      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [loadingState, linkedItemId, location.key]);
+
+  /**
+   * What a card needs to be the one a link landed on: an id to scroll to, a key that restarts the
+   * light when the same link is followed again, and the class that plays it.
+   */
+  const linkedCard = (id: string) =>
+    id === linkedItemId
+      ? { id: linkedCardId(id), key: `${id}:${location.key}`, highlight: " app-link-highlight" }
+      : { id: linkedCardId(id), key: id, highlight: "" };
 
   // The numbers this phase's items are shown with. The buddy's path tool derives the same ones, so
   // "let's do 3" means one item on both sides — see `itemNumbers`.
@@ -798,8 +815,8 @@ export function OnBoardingPage() {
         <div className="mb-6 flex flex-wrap gap-2" aria-label="Onboarding view">
           <Button
             size="sm"
-            variant={viewMode === "list" ? "primary" : "secondary"}
-            aria-pressed={viewMode === "list"}
+            variant={shownViewMode === "list" ? "primary" : "secondary"}
+            aria-pressed={shownViewMode === "list"}
             icon={<ListChecks className="h-4 w-4" />}
             onClick={() => setViewMode("list")}
           >
@@ -807,16 +824,19 @@ export function OnBoardingPage() {
           </Button>
           <Button
             size="sm"
-            variant={viewMode === "graph" ? "primary" : "secondary"}
-            aria-pressed={viewMode === "graph"}
+            variant={shownViewMode === "graph" ? "primary" : "secondary"}
+            aria-pressed={shownViewMode === "graph"}
             icon={<GitBranch className="h-4 w-4" />}
-            onClick={() => setViewMode("graph")}
+            onClick={() => {
+              setViewMode("graph");
+              clearLink();
+            }}
           >
             Graph view
           </Button>
         </div>
 
-        {viewMode === "graph" ? (
+        {shownViewMode === "graph" ? (
           <OnboardingGraphViewer
             path={OnBoardingPathEndpoint}
             selectedPhaseId={currentPhase.id}
@@ -825,6 +845,7 @@ export function OnBoardingPage() {
                 (phase) => phase.id === phaseId,
               );
               if (phaseIndex >= 0) setSelectedPhaseIndex(phaseIndex);
+              clearLink();
             }}
           />
         ) : (
@@ -928,11 +949,12 @@ export function OnBoardingPage() {
                 const mode = getStepMode(step, currentPhase.locked);
                 return (
                   <div
-                    key={step.id}
+                    key={linkedCard(step.id).key}
+                    id={linkedCard(step.id).id}
                     // Completed and locked steps stay still on purpose: nothing
                     // happens when you click them, and magnifying them would
                     // promise an interaction that is not there.
-                    className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${
+                    className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100${linkedCard(step.id).highlight} ${
                       mode === "completed"
                         ? "border-app-border opacity-60"
                         : mode === "locked"
@@ -1049,8 +1071,9 @@ export function OnBoardingPage() {
                     const mode = questionMode(question);
                     return (
                       <div
-                        key={question.id}
-                        className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${
+                        key={linkedCard(question.id).key}
+                        id={linkedCard(question.id).id}
+                        className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100${linkedCard(question.id).highlight} ${
                           mode === "completed"
                             ? "border-app-border opacity-60"
                             : mode === "locked"
@@ -1137,11 +1160,11 @@ export function OnBoardingPage() {
         )}
       </main>
 
-      {/* Per-question answer modal. Opened by a card, or by a link the buddy wrote. */}
-      {shownQuestion && (
+      {/* Per-question answer modal. Opened by the card's own button, never by a link. */}
+      {questionToAnswer && (
         <QuestionModal
-          question={shownQuestion.question}
-          phaseTitle={shownQuestion.phaseTitle}
+          question={questionToAnswer.question}
+          phaseTitle={questionToAnswer.phaseTitle}
           onClose={closeQuestionModal}
         />
       )}

@@ -58,6 +58,28 @@ export function BuddyComposer({
     field.setSelectionRange(field.value.length, field.value.length);
   }, [focusOnMount]);
 
+  /**
+   * The last value the hire typed here, so a draft written *from outside* can be told apart.
+   *
+   * A suggestion chip, or "Ask your buddy about this step" while the dock is already open, sets the
+   * draft without touching the box — and focus stayed on whatever was clicked. Pressing Enter then
+   * re-clicked the chip instead of sending, so a filled-in question looked unsendable. Any draft
+   * that did not come from typing takes the caret, behind the text, which is where it has to be for
+   * Enter to send it and for typing to add to it.
+   */
+  const typedRef = useRef(draft);
+
+  useEffect(() => {
+    if (draft === typedRef.current) return;
+    typedRef.current = draft;
+    // Cleared after a send: nothing to hand over, and the caret is not wanted back mid-turn.
+    if (!draft) return;
+    const field = fieldRef.current;
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [draft]);
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;
     // Enter also *commits* an IME candidate — a compose-key 'ü', or any CJK input. Sending
@@ -85,7 +107,10 @@ export function BuddyComposer({
           value={draft}
           rows={1}
           placeholder={placeholder}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            typedRef.current = event.target.value;
+            setDraft(event.target.value);
+          }}
           onKeyDown={handleKeyDown}
           className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
         />

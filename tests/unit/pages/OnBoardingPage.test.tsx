@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -478,9 +478,10 @@ describe("OnBoardingPage", () => {
 /**
  * Following a link the buddy wrote.
  *
- * The mentor is handed each item's path so that "want to take #3?" can be clickable. A question has
- * no route of its own — it is a modal on this page — so it arrives as `?question=<id>`, which also
- * means the link survives being copied, kept or opened in a second tab.
+ * The mentor is handed each item's link so that "you are on #3" can be clickable: `?step=<id>`,
+ * `?question=<id>` or `?phase=<id>`, which also means the link survives being copied, kept or
+ * opened in a second tab. A step or question link *lands* on the card — its phase opens, the page
+ * scrolls to it, and it lights up — and starts nothing: that stays the hire's own click.
  */
 describe("OnBoardingPage: links from the buddy", () => {
   beforeEach(() => {
@@ -515,38 +516,45 @@ describe("OnBoardingPage: links from the buddy", () => {
     };
   }
 
-  it("opens the question a link names, on its own phase", async () => {
+  it("lands on a linked question and lights it up, without opening it", async () => {
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
     server.use(
       http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
     );
 
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={["/onboarding?question=q-linked"]}>
         <OnBoardingPage />
       </MemoryRouter>,
     );
 
-    // The modal, and the phase behind it: a link lands on both, because a question the hire cannot
-    // see the context of is a link that only half arrived.
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Who runs the retro?")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
+    // Its phase, because a card the hire cannot see the context of is a link that only half arrived.
+    expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
+    const card = container.querySelector("#onboarding-item-q-linked");
+    expect(card).toHaveClass("app-link-highlight");
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    // Answering is the hire's click on the card, not something following a link does for them.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("lands on the phase but opens nothing for a question that cannot be answered", async () => {
+  it("lands on a linked step in a later phase and lights only that card", async () => {
     server.use(
-      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("LOCKED"))),
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
     );
 
-    render(
-      <MemoryRouter initialEntries={["/onboarding?question=q-linked"]}>
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?step=step-phase-2"]}>
         <OnBoardingPage />
       </MemoryRouter>,
     );
 
-    // A modal over a locked question is a link that leads to a dead end; its phase is the useful half.
     expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveClass(
+      "app-link-highlight",
+    );
+    expect(container.querySelector("#onboarding-item-q-linked")).not.toHaveClass(
+      "app-link-highlight",
+    );
   });
 
   it("lands on the phase a link names", async () => {

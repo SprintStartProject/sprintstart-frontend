@@ -1,5 +1,5 @@
 import { Check, Filter, Send, Square, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { SOURCE_META } from "../../data-ingestion/data";
 import type { SourceSystem } from "../types";
@@ -110,6 +110,27 @@ export function ChatComposer({
     applyRecalled(element, promptHistory[index]);
   };
   const blocked = rangeInvalid || !hasProject;
+
+  /*
+    The last value typed into the box, so a value set *from outside* can be told apart.
+
+    A suggestion chip fills the composer without touching it, and a hire who picked one and pressed
+    Enter found nothing sent. Owning the focus here, rather than in each page that can fill the box,
+    means every way of handing text over behaves the same: any value that did not come from typing
+    takes the caret, behind the text, so Enter sends it and typing adds to it.
+  */
+  const typedRef = useRef(value);
+
+  useEffect(() => {
+    if (value === typedRef.current) return;
+    typedRef.current = value;
+    // Cleared after a send: the page blurs the box on purpose so Space can start the game.
+    if (!value) return;
+    const element = textareaRef.current;
+    if (!element) return;
+    element.focus();
+    element.setSelectionRange(element.value.length, element.value.length);
+  }, [value, textareaRef]);
 
   return (
     <footer className="app-page-frame shrink-0 border-t border-app-border bg-app-bg py-4">
@@ -292,6 +313,7 @@ export function ChatComposer({
           value={value}
           rows={1}
           onChange={(e) => {
+            typedRef.current = e.currentTarget.value;
             onChange(e.currentTarget.value);
             e.currentTarget.style.height = "auto";
             e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;

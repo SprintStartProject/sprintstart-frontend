@@ -924,3 +924,37 @@ body {
     animation: none;
   }
 }
+
+/* The brief light on an onboarding step or question that a link from the buddy landed on.
+
+   The link opens the right phase and scrolls to the item, and on a list of look-alike cards
+   that is not quite enough to find it: this says "this one" twice and then gets out of the way.
+   Deliberately not a way of starting anything -- the hire presses the item's own button.
+
+   A ring rather than a background, so it reads over any card state (open, locked, done), and
+   delayed a beat so it plays after the smooth scroll has arrived rather than during it. */
+@keyframes app-link-highlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  25%,
+  65% {
+    box-shadow: 0 0 0 3px var(--color-app-brand);
+  }
+  45% {
+    box-shadow: 0 0 0 1px var(--color-app-brand-border);
+  }
+}
+
+.app-link-highlight {
+  animation: app-link-highlight 1.6s ease-in-out 0.35s 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No pulse, but still marked: finding the item is the point, not the motion. */
+  .app-link-highlight {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--color-app-brand);
+  }
+}
