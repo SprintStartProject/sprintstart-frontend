@@ -92,6 +92,13 @@ export function useAdminData(): UseAdminDataResult {
         const nextUsers = typeof update === "function" ? update(prev.users) : update;
         return { ...prev, users: nextUsers };
       });
+
+      // The dashboard's user overview widget reads the raw `admin.users()` query
+      // independently of this overview. Removed rather than patched: a project
+      // update only touches these users' `projects` field here, not their
+      // authoritative `projectIds`, so copying this overview's value over would
+      // leave that query's assignment data wrong.
+      queryClient.removeQueries({ queryKey: queryKeys.admin.users() });
     },
     [queryClient, queryKey],
   );

@@ -11,6 +11,14 @@ export interface UseQueryFetchResult<T> extends UseFetchResult<T> {
    * refresh's completion callback), rather than "is there nothing to show yet."
    */
   isFetching: boolean;
+  /**
+   * True when a refetch (not the initial load) just failed while valid cached
+   * data is still on screen. Separate from `error`, which only covers the case
+   * where there is nothing usable to show — a background refetch failure should
+   * not replace good cached content with a full error state, but a caller doing
+   * a manual refresh still wants to know it didn't work.
+   */
+  refetchError: boolean;
 }
 
 export type UseQueryFetchOptions = {
@@ -40,7 +48,7 @@ export function useQueryFetch<T>(
   loader: () => Promise<T>,
   { enabled = true }: UseQueryFetchOptions = {},
 ): UseQueryFetchResult<T> {
-  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+  const { data, isLoading, isFetching, isLoadingError, isRefetchError, refetch } = useQuery({
     queryKey,
     queryFn: loader,
     enabled,
@@ -49,7 +57,8 @@ export function useQueryFetch<T>(
   return {
     data: enabled ? (data ?? null) : null,
     loading: enabled && isLoading,
-    error: enabled && isError,
+    error: enabled && isLoadingError,
+    refetchError: enabled && isRefetchError,
     refetch: () => void refetch(),
     isFetching: enabled && isFetching,
   };

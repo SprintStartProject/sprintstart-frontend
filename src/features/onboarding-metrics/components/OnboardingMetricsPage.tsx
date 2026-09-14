@@ -162,6 +162,7 @@ export function OnboardingMetricsPage() {
     data: metrics,
     loading,
     error,
+    refetchError,
     isFetching,
     refetch,
   } = useQueryFetch(queryKeys.onboardingMetrics.project(selectedProjectId), () =>
@@ -185,7 +186,7 @@ export function OnboardingMetricsPage() {
     if (isFetching || !pendingRefreshRef.current) return;
     pendingRefreshRef.current = false;
     setRefreshing(false);
-    if (error) {
+    if (error || refetchError) {
       toast.error("Couldn't refresh onboarding metrics", { description: "Try again shortly." });
       return;
     }
@@ -198,7 +199,7 @@ export function OnboardingMetricsPage() {
     } else {
       toast.success("Metrics refreshed");
     }
-  }, [isFetching, error, metrics, toast]);
+  }, [isFetching, error, refetchError, metrics, toast]);
 
   // A load failure that wasn't a manual refresh still deserves a toast, once.
   useEffect(() => {

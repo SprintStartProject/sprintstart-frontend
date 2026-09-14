@@ -76,11 +76,17 @@ export function useRateLimitedRead<T>(
   const recheck = useCallback(() => {
     const { enabled: isEnabled, refetch: doRefetch, queryKey: key } = latest.current;
     if (!isEnabled) return;
-    const updatedAt = queryClient.getQueryState(key)?.dataUpdatedAt ?? 0;
+    const state = queryClient.getQueryState(key);
     // A fetch already in flight (e.g. this same mount's initial load) is
-    // joined rather than duplicated: react-query dedupes concurrent fetches
-    // for one query key.
-    if (Date.now() - updatedAt >= MIN_REFRESH_INTERVAL_MS) {
+    // joined rather than duplicated by react-query, but still worth skipping
+    // here so a burst of navigation/focus events doesn't queue up refetches.
+    if (state?.fetchStatus === "fetching") return;
+    // `errorUpdatedAt` also counts as "checked recently": without it, a
+    // failing read never advances past `dataUpdatedAt`, so every navigation
+    // or focus event during an outage would retry immediately instead of
+    // respecting the throttle.
+    const lastCheckedAt = Math.max(state?.dataUpdatedAt ?? 0, state?.errorUpdatedAt ?? 0);
+    if (Date.now() - lastCheckedAt >= MIN_REFRESH_INTERVAL_MS) {
       void doRefetch();
     }
   }, [queryClient]);
