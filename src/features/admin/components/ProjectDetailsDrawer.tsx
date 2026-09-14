@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, FileText, Folder, Link2, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, FileText, Folder, Link2, Loader2, Tag, Trash2 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -9,6 +9,7 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
+import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
 import { getProjectEditFormState, getProjectSourcesCount, getProjectUsersCount } from "../data";
 import {
   applyPeopleChanges,
@@ -45,7 +46,11 @@ type ProjectDetailsDrawerProps = {
 const EMPTY_PROJECT_USERS: ProjectUser[] = [];
 
 function isSameDetails(left: ProjectEditFormState, right: ProjectEditFormState) {
-  return left.name === right.name && left.description === right.description;
+  return (
+    left.name === right.name &&
+    left.description === right.description &&
+    left.industry === right.industry
+  );
 }
 
 /**
@@ -70,6 +75,7 @@ export function ProjectDetailsDrawer({
 }: ProjectDetailsDrawerProps) {
   const nameInputId = useId();
   const descriptionInputId = useId();
+  const industryInputId = useId();
 
   const [projectDetails, setProjectDetails] = useState<AdminProjectDetails | null>(null);
   const [detailsError, setDetailsError] = useState("");
@@ -128,6 +134,7 @@ export function ProjectDetailsDrawer({
 
   const savedDetails = getProjectEditFormState(visibleProject);
   const hasDetailsChanges = !isSameDetails(draftProject, savedDetails);
+  const hasIndustryChanges = draftProject.industry.trim() !== savedDetails.industry.trim();
 
   const peopleSnapshotKey = buildPeopleSnapshotKey(visibleUsers, projectDetails?.manager ?? null);
   const activePeopleDraft = resolvePeopleDraft(peopleDraft, peopleSnapshotKey);
@@ -177,9 +184,13 @@ export function ProjectDetailsDrawer({
 
     try {
       if (hasDetailsChanges) {
+        const trimmedIndustry = draftProject.industry.trim();
+
         await projectService.updateProject(project.id, {
           name: draftProject.name.trim(),
           description: draftProject.description.trim(),
+          industry: trimmedIndustry,
+          ...(hasIndustryChanges && trimmedIndustry ? { industryConfidence: "high" as const } : {}),
         });
       }
 
@@ -197,6 +208,22 @@ export function ProjectDetailsDrawer({
       toast.error(error instanceof Error ? error.message : "Couldn't save the project changes.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Re-fetches and adopts the whole project rather than merging the evaluation
+  // result in place: a re-evaluation persists on the server regardless of the
+  // local draft, so the draft is reset to match rather than left to disagree
+  // with what was just saved.
+  const handleIndustryEvaluated = async () => {
+    try {
+      const updatedProject = await projectService.getProjectById(project.id);
+      applyProjectUpdate(updatedProject);
+      resetDrafts(updatedProject);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't refresh the project after evaluation.",
+      );
     }
   };
 
@@ -312,7 +339,28 @@ export function ProjectDetailsDrawer({
               </div>
             </DrawerCard>
 
-            <DrawerCard index={1}>
+            <DrawerCard label="Industry" icon={Tag} index={1}>
+              <div className="space-y-4">
+                <Field label="Industry" controlId={industryInputId} disabled={isSaving}>
+                  <Input
+                    value={draftProject.industry}
+                    onChange={(event) => updateDraftField("industry", event.target.value)}
+                    placeholder="e.g. Fintech / Banking"
+                  />
+                </Field>
+
+                <ProjectIndustryPanel
+                  projectId={project.id}
+                  industry={visibleProject.industry}
+                  industryConfidence={visibleProject.industryConfidence}
+                  canEvaluate={canManageLifecycle}
+                  disabled={hasIndustryChanges || isSaving}
+                  onEvaluated={() => void handleIndustryEvaluated()}
+                />
+              </div>
+            </DrawerCard>
+
+            <DrawerCard index={2}>
               <ProjectPeopleSection
                 members={visibleUsers}
                 manager={projectDetails?.manager ?? null}
@@ -325,7 +373,7 @@ export function ProjectDetailsDrawer({
               />
             </DrawerCard>
 
-            <DrawerCard label="Connected sources" icon={Link2} index={2}>
+            <DrawerCard label="Connected sources" icon={Link2} index={3}>
               <SourceList
                 sources={visibleProject.sources}
                 onOpenSourceDetails={
@@ -337,7 +385,7 @@ export function ProjectDetailsDrawer({
             </DrawerCard>
 
             {canManageLifecycle && (
-              <DrawerCard label="Danger zone" variant="danger" index={3}>
+              <DrawerCard label="Danger zone" variant="danger" index={4}>
                 <p className="text-sm text-app-danger-text">
                   Deleting a project removes it and all of its user assignments. Connected sources
                   are kept and stay available to other projects.

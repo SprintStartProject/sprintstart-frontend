@@ -18,6 +18,7 @@ vi.mock("../../../../../src/services/projectService", () => ({
     setProjectManager: vi.fn(),
     clearProjectManager: vi.fn(),
     updateProject: vi.fn(),
+    evaluateProjectIndustry: vi.fn(),
   },
 }));
 
@@ -263,6 +264,7 @@ describe("ProjectDetailsDrawer", () => {
         expect(vi.mocked(projectService.updateProject)).toHaveBeenCalledWith("proj-1", {
           name: "Beta",
           description: "Detailed project description",
+          industry: "",
         }),
       );
       expect(vi.mocked(projectService.removeUserFromProject)).toHaveBeenCalledWith("proj-1", "u-1");
@@ -302,6 +304,114 @@ describe("ProjectDetailsDrawer", () => {
       await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
 
       expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("industry", () => {
+    it("shows the current industry and its confidence badge", async () => {
+      vi.mocked(projectService.getProjectById).mockResolvedValue({
+        ...projectDetails,
+        industry: "Fintech",
+        industryConfidence: "high",
+      });
+
+      render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+      expect(screen.getByText("High confidence")).toBeInTheDocument();
+    });
+
+    it("saves an edited industry with confidence 'high'", async () => {
+      const user = userEvent.setup();
+      vi.mocked(projectService.updateProject).mockResolvedValue(projectDetails);
+
+      render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+
+      await user.type(screen.getByLabelText("Industry"), "Fintech");
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      await waitFor(() =>
+        expect(vi.mocked(projectService.updateProject)).toHaveBeenCalledWith("proj-1", {
+          name: "Alpha",
+          description: "Detailed project description",
+          industry: "Fintech",
+          industryConfidence: "high",
+        }),
+      );
+    });
+
+    it("clears the industry by saving an empty value", async () => {
+      const user = userEvent.setup();
+      vi.mocked(projectService.getProjectById).mockResolvedValue({
+        ...projectDetails,
+        industry: "Fintech",
+        industryConfidence: "high",
+      });
+      vi.mocked(projectService.updateProject).mockResolvedValue(projectDetails);
+
+      render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+
+      await user.clear(screen.getByLabelText("Industry"));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      await waitFor(() =>
+        expect(vi.mocked(projectService.updateProject)).toHaveBeenCalledWith("proj-1", {
+          name: "Alpha",
+          description: "Detailed project description",
+          industry: "",
+        }),
+      );
+    });
+
+    it("shows the re-evaluate button only to users who can manage the lifecycle", async () => {
+      render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          isOpen={true}
+          canManageLifecycle={false}
+          onClose={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      expect(screen.queryByTestId("reevaluate-industry-button")).not.toBeInTheDocument();
+    });
+
+    it("reloads the project after a successful re-evaluation", async () => {
+      const user = userEvent.setup();
+      vi.mocked(projectService.getProjectById)
+        .mockResolvedValueOnce(projectDetails)
+        .mockResolvedValueOnce({
+          ...projectDetails,
+          industry: "Fintech",
+          industryConfidence: "high",
+        });
+      vi.mocked(projectService.evaluateProjectIndustry).mockResolvedValue({
+        industry: "Fintech",
+        confidence: "high",
+        evidence: [],
+      });
+
+      render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          isOpen={true}
+          canManageLifecycle
+          onClose={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+
+      await user.click(screen.getByTestId("reevaluate-industry-button"));
+
+      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+      expect(screen.getByText("High confidence")).toBeInTheDocument();
+      expect(vi.mocked(projectService.getProjectById)).toHaveBeenCalledTimes(2);
     });
   });
 

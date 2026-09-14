@@ -33,6 +33,7 @@ export type UserEditFormState = {
 export type ProjectEditFormState = {
   name: string;
   description: string;
+  industry: string;
 };
 
 export type ProjectOverview = AdminProject;

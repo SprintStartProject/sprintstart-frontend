@@ -13,6 +13,8 @@ vi.mock("../../../src/services/projectService", () => ({
       description: "Main application",
       manager: null,
       tags: [],
+      industry: "",
+      industryConfidence: null,
       sources: [{ id: "s1", name: "GitHub", type: "GITHUB", status: "CONNECTED" }],
       users: [
         {
