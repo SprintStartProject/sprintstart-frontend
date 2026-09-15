@@ -76,10 +76,18 @@ export function BlueprintNodeCard({
       onClick={onClick}
       className={[
         "flex w-full flex-col overflow-hidden rounded-xl border bg-app-surface text-left",
-        "shadow-sm transition-[box-shadow,transform,border-color,background-color] duration-150",
+        "transition-[box-shadow,transform,border-color,background-color] duration-150",
         "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
         isCompact ? "justify-center" : "p-3",
-        highlighted ? "border-app-brand bg-app-brand-soft" : "border-app-border",
+        // On the canvas the card has to hold its own outline against a dotted surface and a
+        // vignette, so it takes the strong border and a shadow that reads at a distance. In the
+        // library it sits on a plain panel next to other list rows, where that would shout.
+        inLibrary ? "shadow-sm" : "shadow-md",
+        highlighted
+          ? "border-app-brand bg-app-brand-soft"
+          : inLibrary
+            ? "border-app-border"
+            : "border-app-border-strong",
         disabled
           ? "cursor-default opacity-70"
           : // Depth is what tells a card from the surface it sits on: it lifts a little and casts
