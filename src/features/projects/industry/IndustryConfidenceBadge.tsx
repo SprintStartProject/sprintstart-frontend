@@ -1,10 +1,12 @@
 import { Badge, type BadgeSize, type BadgeVariant } from "../../../components/ui/Badge";
 import type { IndustryConfidence } from "../../../services/projectService";
 
+// `low` deliberately uses `orange` rather than `warning` — the warning
+// token's text color reads as too bright/yellow at this badge's small size.
 const CONFIDENCE_VARIANT: Record<IndustryConfidence, BadgeVariant> = {
   high: "success",
   medium: "brand",
-  low: "warning",
+  low: "orange",
 };
 
 const CONFIDENCE_LABEL: Record<IndustryConfidence, string> = {

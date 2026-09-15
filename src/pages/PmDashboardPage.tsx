@@ -4,6 +4,7 @@ import { IngestionStatusWidget } from "../features/data-ingestion/components/Ing
 import { FaqWidget } from "../features/faq/components/FaqWidget";
 import { KnowledgeGapWidget } from "../features/knowledge-gaps/components/KnowledgeGapWidget";
 import { OnboardingMetricsWidget } from "../features/onboarding-metrics/components/OnboardingMetricsWidget";
+import { ProjectIndustryWidget } from "../features/projects/industry/ProjectIndustryWidget";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { TeamManagementWidget } from "../features/team-management/components/TeamManagementWidget";
 import { SpotlightCard } from "../components/ui/SpotlightCard";
@@ -65,6 +66,12 @@ export function PmDashboardPage() {
             </div>
           </section>
         </SpotlightCard>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2">
+          <SpotlightCard roundedClassName="rounded-2xl">
+            <ProjectIndustryWidget />
+          </SpotlightCard>
+        </div>
       </main>
     </div>
   );

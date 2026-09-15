@@ -249,6 +249,70 @@ describe("ProjectIndustryPanel", () => {
     );
   });
 
+  it("shows the evidence list outright by default (collapsibleEvidence unset)", async () => {
+    const { projectService } = await import("../../../../../src/services/projectService");
+    vi.mocked(projectService.evaluateProjectIndustry).mockResolvedValue({
+      industry: "Healthcare",
+      confidence: "medium",
+      evidence: ["Mentions patient records"],
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ProjectIndustryPanel
+        projectId="proj-1"
+        industry=""
+        industryConfidence={null}
+        canEvaluate
+        onEvaluated={onEvaluated}
+      />,
+    );
+
+    await user.click(screen.getByTestId("reevaluate-industry-button"));
+
+    await waitFor(() => expect(screen.getByText("Mentions patient records")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /show evidence/i })).not.toBeInTheDocument();
+  });
+
+  it("hides the evidence list behind a toggle when collapsibleEvidence is set", async () => {
+    const { projectService } = await import("../../../../../src/services/projectService");
+    vi.mocked(projectService.evaluateProjectIndustry).mockResolvedValue({
+      industry: "Healthcare",
+      confidence: "medium",
+      evidence: ["Mentions patient records", "References clinical workflows"],
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ProjectIndustryPanel
+        projectId="proj-1"
+        industry=""
+        industryConfidence={null}
+        canEvaluate
+        collapsibleEvidence
+        onEvaluated={onEvaluated}
+      />,
+    );
+
+    await user.click(screen.getByTestId("reevaluate-industry-button"));
+
+    const toggle = await screen.findByRole("button", { name: "Show evidence (2)" });
+    expect(screen.queryByText("Mentions patient records")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+
+    expect(screen.getByText("Mentions patient records")).toBeInTheDocument();
+    expect(screen.getByText("References clinical workflows")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide evidence" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hide evidence" }));
+    expect(screen.queryByText("Mentions patient records")).not.toBeInTheDocument();
+  });
+
   it("disables the button when the disabled prop is set", () => {
     render(
       <ProjectIndustryPanel
