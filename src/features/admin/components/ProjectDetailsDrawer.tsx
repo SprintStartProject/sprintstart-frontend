@@ -46,11 +46,7 @@ type ProjectDetailsDrawerProps = {
 const EMPTY_PROJECT_USERS: ProjectUser[] = [];
 
 function isSameDetails(left: ProjectEditFormState, right: ProjectEditFormState) {
-  return (
-    left.name === right.name &&
-    left.description === right.description &&
-    left.industry === right.industry
-  );
+  return left.name === right.name && left.description === right.description;
 }
 
 /**
@@ -75,7 +71,6 @@ export function ProjectDetailsDrawer({
 }: ProjectDetailsDrawerProps) {
   const nameInputId = useId();
   const descriptionInputId = useId();
-  const industryInputId = useId();
 
   const [projectDetails, setProjectDetails] = useState<AdminProjectDetails | null>(null);
   const [detailsError, setDetailsError] = useState("");
@@ -134,7 +129,6 @@ export function ProjectDetailsDrawer({
 
   const savedDetails = getProjectEditFormState(visibleProject);
   const hasDetailsChanges = !isSameDetails(draftProject, savedDetails);
-  const hasIndustryChanges = draftProject.industry.trim() !== savedDetails.industry.trim();
 
   const peopleSnapshotKey = buildPeopleSnapshotKey(visibleUsers, projectDetails?.manager ?? null);
   const activePeopleDraft = resolvePeopleDraft(peopleDraft, peopleSnapshotKey);
@@ -184,12 +178,9 @@ export function ProjectDetailsDrawer({
 
     try {
       if (hasDetailsChanges) {
-        const trimmedIndustry = draftProject.industry.trim();
-
         await projectService.updateProject(project.id, {
           name: draftProject.name.trim(),
           description: draftProject.description.trim(),
-          industry: trimmedIndustry,
         });
       }
 
@@ -223,6 +214,22 @@ export function ProjectDetailsDrawer({
       toast.error(
         error instanceof Error ? error.message : "Couldn't refresh the project after evaluation.",
       );
+    }
+  };
+
+  // Same reload-and-adopt approach as `handleIndustryEvaluated`, plus the
+  // actual persist call. Rethrows so `ProjectIndustryPanel` keeps its edit
+  // field open (with the typed value) for the user to retry.
+  const handleSaveIndustry = async (industry: string) => {
+    try {
+      await projectService.setProjectIndustry(project.id, industry);
+      const updatedProject = await projectService.getProjectById(project.id);
+      applyProjectUpdate(updatedProject);
+      resetDrafts(updatedProject);
+      toast.success(`Industry set to "${industry}"`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save the project's industry.");
+      throw error;
     }
   };
 
@@ -339,25 +346,17 @@ export function ProjectDetailsDrawer({
             </DrawerCard>
 
             <DrawerCard label="Industry" icon={Tag} index={1}>
-              <div className="space-y-4">
-                <Field label="Industry" controlId={industryInputId} disabled={isSaving}>
-                  <Input
-                    value={draftProject.industry}
-                    onChange={(event) => updateDraftField("industry", event.target.value)}
-                    placeholder="e.g. Fintech / Banking"
-                  />
-                </Field>
-
-                <ProjectIndustryPanel
-                  projectId={project.id}
-                  industry={visibleProject.industry}
-                  industryConfidence={visibleProject.industryConfidence}
-                  industryCustom={visibleProject.industryCustom}
-                  canEvaluate={canManageLifecycle}
-                  disabled={hasIndustryChanges || isSaving}
-                  onEvaluated={() => void handleIndustryEvaluated()}
-                />
-              </div>
+              <ProjectIndustryPanel
+                projectId={project.id}
+                industry={visibleProject.industry}
+                industryConfidence={visibleProject.industryConfidence}
+                industryCustom={visibleProject.industryCustom}
+                canEvaluate={canManageLifecycle}
+                canEdit={canManageLifecycle}
+                onSave={handleSaveIndustry}
+                disabled={isSaving}
+                onEvaluated={() => void handleIndustryEvaluated()}
+              />
             </DrawerCard>
 
             <DrawerCard index={2}>

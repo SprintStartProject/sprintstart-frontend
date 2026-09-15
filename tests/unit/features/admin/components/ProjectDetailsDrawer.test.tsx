@@ -19,6 +19,7 @@ vi.mock("../../../../../src/services/projectService", () => ({
     clearProjectManager: vi.fn(),
     updateProject: vi.fn(),
     evaluateProjectIndustry: vi.fn(),
+    setProjectIndustry: vi.fn(),
   },
 }));
 
@@ -266,7 +267,6 @@ describe("ProjectDetailsDrawer", () => {
         expect(vi.mocked(projectService.updateProject)).toHaveBeenCalledWith("proj-1", {
           name: "Beta",
           description: "Detailed project description",
-          industry: "",
         }),
       );
       expect(vi.mocked(projectService.removeUserFromProject)).toHaveBeenCalledWith("proj-1", "u-1");
@@ -319,7 +319,9 @@ describe("ProjectDetailsDrawer", () => {
 
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+      await waitFor(() =>
+        expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Fintech"),
+      );
       expect(screen.getByText("High confidence")).toBeInTheDocument();
     });
 
@@ -333,56 +335,13 @@ describe("ProjectDetailsDrawer", () => {
 
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+      await waitFor(() =>
+        expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Fintech"),
+      );
       expect(screen.getByText("Custom")).toBeInTheDocument();
     });
 
-    it("saves an edited industry", async () => {
-      const user = userEvent.setup();
-      vi.mocked(projectService.updateProject).mockResolvedValue(projectDetails);
-
-      render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
-
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
-
-      await user.type(screen.getByLabelText("Industry"), "Fintech");
-      await user.click(screen.getByRole("button", { name: "Save changes" }));
-
-      await waitFor(() =>
-        expect(vi.mocked(projectService.updateProject)).toHaveBeenCalledWith("proj-1", {
-          name: "Alpha",
-          description: "Detailed project description",
-          industry: "Fintech",
-        }),
-      );
-    });
-
-    it("clears the industry by saving an empty value", async () => {
-      const user = userEvent.setup();
-      vi.mocked(projectService.getProjectById).mockResolvedValue({
-        ...projectDetails,
-        industry: "Fintech",
-        industryConfidence: "high",
-      });
-      vi.mocked(projectService.updateProject).mockResolvedValue(projectDetails);
-
-      render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
-
-      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
-
-      await user.clear(screen.getByLabelText("Industry"));
-      await user.click(screen.getByRole("button", { name: "Save changes" }));
-
-      await waitFor(() =>
-        expect(vi.mocked(projectService.updateProject)).toHaveBeenCalledWith("proj-1", {
-          name: "Alpha",
-          description: "Detailed project description",
-          industry: "",
-        }),
-      );
-    });
-
-    it("shows the re-evaluate button only to users who can manage the lifecycle", async () => {
+    it("shows the edit and re-evaluate buttons only to users who can manage the lifecycle", async () => {
       render(
         <ProjectDetailsDrawer
           project={projectOverview}
@@ -393,7 +352,50 @@ describe("ProjectDetailsDrawer", () => {
       );
 
       await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      expect(screen.queryByTestId("edit-industry-button")).not.toBeInTheDocument();
       expect(screen.queryByTestId("reevaluate-industry-button")).not.toBeInTheDocument();
+    });
+
+    it("manually sets the industry and reloads the project as Custom", async () => {
+      const user = userEvent.setup();
+      vi.mocked(projectService.getProjectById)
+        .mockResolvedValueOnce(projectDetails)
+        .mockResolvedValueOnce({
+          ...projectDetails,
+          industry: "Healthcare",
+          industryConfidence: null,
+          industryCustom: true,
+        });
+      vi.mocked(projectService.setProjectIndustry).mockResolvedValue({
+        industry: "Healthcare",
+        industryConfidence: null,
+        industryCustom: true,
+      });
+
+      render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          isOpen={true}
+          canManageLifecycle
+          onClose={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(screen.getByTestId("edit-industry-button")).toBeInTheDocument());
+      await user.click(screen.getByTestId("edit-industry-button"));
+
+      const input = screen.getByTestId("industry-edit-input");
+      await user.type(input, "Healthcare");
+      await user.click(screen.getByTestId("save-industry-button"));
+
+      await waitFor(() =>
+        expect(projectService.setProjectIndustry).toHaveBeenCalledWith("proj-1", "Healthcare"),
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Healthcare"),
+      );
+      expect(screen.getByText("Custom")).toBeInTheDocument();
+      expect(vi.mocked(projectService.getProjectById)).toHaveBeenCalledTimes(2);
     });
 
     it("reloads the project after a successful re-evaluation", async () => {
@@ -424,7 +426,9 @@ describe("ProjectDetailsDrawer", () => {
 
       await user.click(screen.getByTestId("reevaluate-industry-button"));
 
-      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+      await waitFor(() =>
+        expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Fintech"),
+      );
       expect(screen.getByText("High confidence")).toBeInTheDocument();
       expect(vi.mocked(projectService.getProjectById)).toHaveBeenCalledTimes(2);
     });

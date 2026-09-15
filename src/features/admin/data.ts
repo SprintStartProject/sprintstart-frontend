@@ -73,12 +73,11 @@ export function getDraftDisplayName(user: AdminUser, draftUser: UserEditFormStat
 }
 
 export function getProjectEditFormState(
-  project: Pick<ProjectOverview, "name" | "description" | "industry">,
+  project: Pick<ProjectOverview, "name" | "description">,
 ): ProjectEditFormState {
   return {
     name: project.name,
     description: project.description,
-    industry: project.industry,
   };
 }
 
