@@ -17,15 +17,20 @@ import { readSeenComponents, storeSeenComponents } from "./ownerAnnouncement";
  * the user and carries its own loading and failure states, and rewiring it here would buy one
  * request at the cost of the widget no longer standing on its own.
  *
- * Nothing is requested until there is a signed-in user *and* a selected project — the endpoint
- * is scoped to a project and answers `400` without one, which is not a failure worth showing.
+ * Nothing is requested until there is a signed-in user *and* a selected project the loaded
+ * project list confirms — the endpoint is scoped to a project, answers `400` without one, and
+ * would otherwise be asked about a selection restored from storage that may not be this user's.
  */
 export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
   const { status, profile } = useAuth();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProject, selectedProjectId } = useProjectContext();
 
   const userId = profile?.id ?? "";
-  const canAsk = status === "authenticated" && selectedProjectId !== "";
+
+  // Asks only about a selection the loaded project list confirms. A restored ID is non-empty
+  // long before that list arrives, and it may name a project this user has no access to.
+  const hasSelectedProject = selectedProject !== null;
+  const canAsk = status === "authenticated" && hasSelectedProject;
 
   const { data, loading, error } = useQueryFetch(
     queryKeys.knowledgeGaps.mine(selectedProjectId),
