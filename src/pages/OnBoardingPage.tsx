@@ -5,22 +5,25 @@
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
   BookOpen,
+  CheckCircle2,
   ChevronRight,
   CircleHelp,
-  Clock,
   Eye,
   FolderKanban,
   GitBranch,
   ListChecks,
   Loader2,
+  Lock,
   PlayCircle,
   RefreshCw,
+  Rocket,
   Sparkles,
-  Trophy,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -28,27 +31,26 @@ import { SegmentedTabs } from "../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
-import { findActivePhaseIndex } from "../features/onboarding/activePhase";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
 import { ItemAside } from "../features/onboarding/components/journey/ItemAside";
-import {
-  PathGraphExplorer,
-  type GraphScope,
-} from "../features/onboarding/components/journey/PathGraphExplorer";
+import { JourneyGraph } from "../features/onboarding/components/journey/JourneyGraph";
+import { PhaseChooser } from "../features/onboarding/components/journey/PhaseChooser";
 import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
+import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
 import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
-import { PhaseRail } from "../features/onboarding/components/journey/PhaseRail";
 import { QuestionModal } from "../features/onboarding/components/QuestionModal";
 import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
 import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
-  formatMinutes,
+  blockingPhases,
   itemState,
   pathProgress,
   phaseItems,
   phaseProgress,
+  phaseState,
+  phasesUnlockedBy,
   sortedPhases,
   type PhaseItem,
 } from "../features/onboarding/journey";
@@ -69,15 +71,40 @@ type ViewMode = "list" | "graph";
 
 const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
 
+type NavigationState = { focusQuestionId?: string; choosePhase?: boolean } | null;
+
+/** The phase a visit opens on: what the member was sent for, else where they are, else a choice. */
+function initialPhaseId(
+  path: OnboardingPathEndpoint,
+  phases: OnboardingPhaseEndpoint[],
+  focusQuestionId: string | undefined,
+): string {
+  const requested = focusQuestionId
+    ? phases.find((phase) => phase.questions.some((question) => question.id === focusQuestionId))
+    : undefined;
+  if (requested) return requested.id;
+  const next = resolveNextAction(path);
+  if (next.kind === "step" || next.kind === "question") return next.phase.id;
+  if (next.kind === "choose") return next.phases[0].id;
+  return (
+    (phases.find((phase) => phaseState(phase) !== "done") ?? phases[phases.length - 1])?.id ?? ""
+  );
+}
+
 /**
  * The hire's onboarding path.
  *
- * Laid out for paths with many phases: every phase in a rail on the left, the selected phase on the
- * right as a list or as its graph. The list and the graph are two readings of the same thing, so they
- * share one switch -- the app's sliding segmented control, also reachable with a two-finger swipe.
+ * Two ways through the same path, switched by the page's slider (or a two-finger swipe):
  *
- * Building a path is not this page's job any more: `OnboardingJourneyProvider` owns the generation,
- * so leaving the page no longer cancels it, and coming back shows its progress again.
+ * - **List** -- the phases on the left, grouped by where the hire stands with them, and the selected
+ *   phase's steps and questions on the right. Phases are not a queue: a blueprint opens several at
+ *   once, so the page shows them as a choice, and "up next" follows the phase the hire is working in
+ *   rather than the lowest phase number.
+ * - **Graph** -- the journey map of all phases. Clicking a phase flies into it and shows the graph of
+ *   its steps; "Journey map" flies back out.
+ *
+ * Building a path is not this page's job: `OnboardingJourneyProvider` owns the generation, so
+ * leaving the page does not cancel it, and coming back shows its progress again.
  */
 export function OnBoardingPage() {
   const navigate = useNavigate();
@@ -93,25 +120,26 @@ export function OnBoardingPage() {
   const journey = useOnboardingJourney();
   const { generation, startGeneration, clearGeneration } = journey;
 
+  const navigationState = location.state as NavigationState;
+  // Set by the step page when a knowledge-check question is what stands between the user and the
+  // rest of their path, so this page can land on the question's phase.
+  const focusQuestionId = navigationState?.focusQuestionId;
+
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedPhaseId, setSelectedPhaseId] = useState("");
+  // A phase picked from the chooser before anything in it was started -- until then nothing else
+  // says that this is where the hire wants to be.
+  const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [graphScope, setGraphScope] = useState<GraphScope>("phase");
+  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
-  // null follows the view: the graph wants the width, the list reads better beside the full rail.
-  const [railCollapsed, setRailCollapsed] = useState<boolean | null>(null);
-  const isRailCollapsed = railCollapsed ?? viewMode === "graph";
   const [questionToAnswer, setQuestionToAnswer] = useState<{
     question: OnboardingQuestionEndpoint;
     phaseTitle: string;
   } | null>(null);
-
-  // Set by the step page when a knowledge-check question is what stands between the user and the
-  // rest of their path, so this page can land on the question's phase.
-  const focusQuestionId = (location.state as { focusQuestionId?: string } | null)?.focusQuestionId;
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
@@ -123,13 +151,7 @@ export function OnBoardingPage() {
       setSelectedPhaseId((current) => {
         const ordered = sortedPhases(next);
         if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
-        const requested = focusQuestionId
-          ? ordered.find((phase) =>
-              phase.questions.some((question) => question.id === focusQuestionId),
-            )
-          : undefined;
-        const active = ordered[findActivePhaseIndex({ ...next, phases: ordered })];
-        return requested?.id ?? active?.id ?? "";
+        return initialPhaseId(next, ordered, focusQuestionId);
       });
       setLoadingState("success");
     },
@@ -183,15 +205,19 @@ export function OnBoardingPage() {
     };
   }, [applyPath, clearGeneration, generation]);
 
-  // Brings the question the user was sent for into view, once per visit.
-  const hasFocusedQuestionRef = useRef(false);
+  // Brings what the user was sent for into view, once per visit.
+  const hasFocusedRef = useRef(false);
   useEffect(() => {
-    if (loadingState !== "success" || !focusQuestionId || hasFocusedQuestionRef.current) return;
-    hasFocusedQuestionRef.current = true;
-    document
-      .querySelector(`[data-item-id="${focusQuestionId}"]`)
-      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  }, [loadingState, focusQuestionId]);
+    if (loadingState !== "success" || hasFocusedRef.current) return;
+    const target = focusQuestionId
+      ? `[data-item-id="${focusQuestionId}"]`
+      : navigationState?.choosePhase
+        ? "#phase-chooser"
+        : null;
+    if (!target) return;
+    hasFocusedRef.current = true;
+    document.querySelector(target)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [loadingState, focusQuestionId, navigationState]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
@@ -202,16 +228,19 @@ export function OnBoardingPage() {
 
   // ── Derived ─────────────────────────────────────────────────
 
-  const nextAction = useMemo(() => (path ? resolveNextAction(path) : null), [path]);
+  const nextAction = useMemo(
+    () => (path ? resolveNextAction(path, { preferPhaseId: chosenPhaseId }) : null),
+    [chosenPhaseId, path],
+  );
   const nextItemId =
     nextAction?.kind === "step"
       ? nextAction.step.id
       : nextAction?.kind === "question"
         ? nextAction.question.id
         : null;
-  const currentPhaseId = nextAction && nextAction.kind !== "done" ? nextAction.phase.id : null;
+  const focusPhaseId =
+    nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
-  const selectedPhaseIndex = selectedPhase ? phases.indexOf(selectedPhase) : -1;
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
   const generationIssueSummary = generationIssues
@@ -250,6 +279,16 @@ export function OnBoardingPage() {
     else void startStep(item.step.id);
   };
 
+  const selectPhase = (phaseId: string) => {
+    setSelectedPhaseId(phaseId);
+    setSelectedItemId(null);
+  };
+
+  const choosePhase = (phaseId: string) => {
+    setChosenPhaseId(phaseId);
+    selectPhase(phaseId);
+  };
+
   const closeQuestionModal = ({
     answered,
     correct,
@@ -268,7 +307,6 @@ export function OnBoardingPage() {
     } else if (correct && answeredQuestion) {
       // Celebrate the phase, not the question: only when this answer finished its last open item.
       const phase = phases.find((item) => item.id === answeredQuestion.question.phaseId);
-      const phaseIndex = phases.findIndex((item) => item.id === answeredQuestion.question.phaseId);
       const allStepsDone = phase?.steps.every(
         (step) => step.status === "FINISHED" || step.status === "SKIPPED",
       );
@@ -276,11 +314,12 @@ export function OnBoardingPage() {
         (question) => question.status === "PASSED" || question.id === answeredQuestion.question.id,
       );
       if (allStepsDone && allQuestionsPassed) {
+        const done = (overall?.phasesDone ?? 0) + 1;
         celebrateMoment({
           tone: "milestone",
           title: "Phase completed",
           message: phase ? `You completed the ${phase.title} phase.` : "You completed the phase.",
-          progress: phaseIndex >= 0 ? { current: phaseIndex + 1, total: phases.length } : undefined,
+          progress: { current: Math.min(done, phases.length), total: phases.length },
         });
       }
     }
@@ -390,234 +429,190 @@ export function OnBoardingPage() {
 
   // ── Render: the journey ─────────────────────────────────────
 
-  const phaseProgressValue = phaseProgress(selectedPhase);
-  const selectedPhaseItems = phaseItems(selectedPhase);
-  const openInPhase = selectedPhaseItems.filter((item) => {
-    const state = itemState(item, selectedPhase.locked);
-    return state === "open" || state === "active" || state === "retry";
-  }).length;
+  const isFinished = nextAction?.kind === "done";
 
   return (
     <div className="min-h-screen" ref={swipeRef}>
-      {/* ── Hero ── */}
-      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-content flex flex-col gap-5 py-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-5">
-            <ProgressRing value={overall?.percentage ?? 0} size={72} stroke={6}>
-              <span className="text-lg font-bold text-app-text tabular-nums">
-                {overall?.percentage ?? 0}%
-              </span>
-            </ProgressRing>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold tracking-[0.14em] text-app-brand-text uppercase">
-                Onboarding journey
-              </p>
-              <h1 className="mt-1 text-2xl font-bold text-app-text sm:text-3xl">
-                {nextAction?.kind === "done" ? "You made it through" : "Your path into the project"}
-              </h1>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-app-text-muted">
-                <span className="inline-flex items-center gap-1.5">
-                  <ListChecks className="h-4 w-4" aria-hidden="true" />
-                  {overall?.completed}/{overall?.total} items
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Trophy className="h-4 w-4" aria-hidden="true" />
-                  {overall?.phasesDone}/{phases.length} phases
-                </span>
-                {overall && overall.remainingMinutes > 0 ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" aria-hidden="true" />~
-                    {formatMinutes(overall.remainingMinutes)} left
+      <header className="border-b border-app-border bg-app-bg">
+        <div className="app-page-frame py-6">
+          <PageHeader
+            icon={Rocket}
+            title="Onboarding"
+            subtitle={
+              isFinished
+                ? "You made it through every phase. Everything stays here to look back on."
+                : "Your path into the project. Phases that are open can be done in any order."
+            }
+            actions={
+              <>
+                {generationIssues.length > 0 && (
+                  <span
+                    role="status"
+                    aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
+                  >
+                    <Badge variant="warning" size="sm" title={generationIssueSummary}>
+                      <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                      {generationIssues.length}
+                    </Badge>
                   </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-start lg:self-center">
-            {generationIssues.length > 0 && (
-              <span
-                role="status"
-                aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
-              >
-                <Badge variant="warning" size="sm" title={generationIssueSummary}>
-                  <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                  {generationIssues.length}
-                </Badge>
-              </span>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setConfirmRegenerate(true)}
-              icon={<RefreshCw className="h-4 w-4" />}
-              aria-label="Regenerate path with AI"
-              title="Regenerate path with AI"
-              disabled={!selectedProjectId}
-            >
-              Rebuild
-            </Button>
-          </div>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => setConfirmRegenerate(true)}
+                  icon={<RefreshCw className="h-4 w-4" />}
+                  aria-label="Regenerate path with AI"
+                  title="Regenerate path with AI"
+                  disabled={!selectedProjectId}
+                >
+                  Rebuild
+                </Button>
+              </>
+            }
+          />
         </div>
       </header>
 
-      <main className="app-page-content space-y-6 py-6 pb-24">
-        {nextAction && nextAction.kind !== "done" ? (
-          <UpNextCard
-            phase={nextAction.phase}
-            phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
-            item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
-            onPrimary={runPrimary}
-          />
-        ) : null}
-
-        <div
-          className={`grid items-start gap-6 transition-[grid-template-columns] duration-300 ${
-            isRailCollapsed
-              ? "lg:grid-cols-[4.25rem_minmax(0,1fr)]"
-              : "lg:grid-cols-[18rem_minmax(0,1fr)]"
-          }`}
-        >
-          <PhaseRail
-            phases={phases}
-            selectedPhaseId={selectedPhase.id}
-            currentPhaseId={currentPhaseId}
-            onSelect={(phaseId) => {
-              setSelectedPhaseId(phaseId);
+      <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <SegmentedTabs
+            layoutId="onboarding-view-mode"
+            ariaLabel="Onboarding view"
+            value={viewMode}
+            onChange={(mode) => {
+              setViewMode(mode);
               setSelectedItemId(null);
             }}
-            className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]"
-            collapsed={isRailCollapsed}
-            onCollapsedChange={setRailCollapsed}
+            options={[
+              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
+              { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
+            ]}
           />
-
-          <section aria-labelledby="phase-title" className="min-w-0 space-y-4">
-            <div className="flex flex-col gap-4 rounded-3xl border border-app-border bg-app-surface p-5 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
-                  Phase {selectedPhaseIndex + 1} of {phases.length}
-                  {selectedPhase.locked
-                    ? " · Locked"
-                    : openInPhase > 0
-                      ? ` · ${openInPhase} ready`
-                      : ""}
+          {overall ? (
+            <div className="flex items-center gap-3">
+              <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
+                <span className="text-[11px] font-bold text-app-text tabular-nums">
+                  {overall.percentage}%
+                </span>
+              </ProgressRing>
+              <div className="text-sm leading-tight">
+                <p className="font-semibold text-app-text tabular-nums">
+                  {overall.phasesDone} of {phases.length} phases complete
                 </p>
-                <h2 id="phase-title" className="mt-1 text-xl font-semibold text-app-text">
-                  {selectedPhase.title}
-                </h2>
-                {selectedPhase.description ? (
-                  <p className="mt-1 max-w-2xl text-sm text-app-text-muted">
-                    {selectedPhase.description}
-                  </p>
-                ) : null}
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-[width] duration-500"
-                      style={{ width: `${phaseProgressValue.percentage}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-app-text-muted tabular-nums">
-                    {phaseProgressValue.completed}/{phaseProgressValue.total} done
-                  </span>
-                </div>
+                <p className="text-xs text-app-text-muted tabular-nums">
+                  {overall.stepsDone} {overall.stepsDone === 1 ? "step" : "steps"} done
+                  {overall.phasesDone > 0 ? " — keep it up" : ""}
+                </p>
               </div>
-              <SegmentedTabs
-                layoutId="onboarding-view-mode"
-                ariaLabel="Onboarding view"
-                value={viewMode}
-                onChange={(mode) => {
-                  setViewMode(mode);
-                  setSelectedItemId(null);
-                }}
-                options={[
-                  { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
-                  { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
-                ]}
-                className="shrink-0 self-start"
-              />
             </div>
+          ) : null}
+        </div>
 
-            {selectedPhase.locked ? (
-              <div className="flex items-center gap-3 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                This phase opens once the phases before it are complete. You can look around
-                already.
-              </div>
-            ) : null}
-
-            <SlidingTabPanel activeKey={viewMode} index={VIEW_ORDER.indexOf(viewMode)}>
-              {viewMode === "list" ? (
-                <PhaseItemList
-                  phase={selectedPhase}
-                  nextItemId={nextItemId}
+        <SlidingTabPanel activeKey={viewMode} index={VIEW_ORDER.indexOf(viewMode)}>
+          {viewMode === "list" ? (
+            <div className="space-y-5">
+              {nextAction?.kind === "choose" ? (
+                <div id="phase-chooser">
+                  <PhaseChooser
+                    phases={nextAction.phases}
+                    allPhases={phases}
+                    onChoose={choosePhase}
+                  />
+                </div>
+              ) : nextAction && (nextAction.kind === "step" || nextAction.kind === "question") ? (
+                <UpNextCard
+                  phase={nextAction.phase}
+                  phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
+                  item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
                   onPrimary={runPrimary}
-                  onView={(item) => openStep(item.id)}
+                  onShowPhase={() => selectPhase(nextAction.phase.id)}
                 />
-              ) : (
-                <PathGraphExplorer
+              ) : null}
+
+              <div className="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+                <PhaseNavigator
                   phases={phases}
                   selectedPhaseId={selectedPhase.id}
-                  onSelectPhase={(phaseId) => {
-                    setSelectedPhaseId(phaseId);
-                    setSelectedItemId(null);
-                  }}
-                  scope={graphScope}
-                  onScopeChange={setGraphScope}
-                  nextItemId={nextItemId}
-                  currentPhaseId={currentPhaseId}
-                  saveLayout={saveLayout}
-                  selectedItemId={selectedItemId}
-                  onSelectItem={setSelectedItemId}
-                  onOpenItem={(item) => {
-                    const state = itemState(item, selectedPhase.locked);
-                    if (primaryActionLabel(item, state)) runPrimary(item);
-                    else if (item.kind === "step" && state !== "locked") openStep(item.id);
-                  }}
-                  hint="Hover a node to trace what it needs and unlocks"
-                  renderItemAside={(item, phase) => {
-                    const state = itemState(item, phase.locked);
-                    const action = primaryActionLabel(item, state);
-                    return (
-                      <ItemAside
-                        item={item}
-                        phase={phase}
-                        onClose={() => setSelectedItemId(null)}
-                        onSelect={setSelectedItemId}
-                        actions={
-                          <>
-                            {action ? (
-                              <Button
-                                size="sm"
-                                variant="primary"
-                                onClick={() => runPrimary(item)}
-                                trailingIcon={<ChevronRight className="h-4 w-4" />}
-                              >
-                                {action}
-                              </Button>
-                            ) : null}
-                            {item.kind === "step" && state !== "locked" ? (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => openStep(item.id)}
-                                icon={<Eye className="h-4 w-4" />}
-                              >
-                                Open step
-                              </Button>
-                            ) : null}
-                          </>
-                        }
-                      >
-                        {item.kind === "step" ? <StepOriginBadge step={item.step} /> : null}
-                      </ItemAside>
-                    );
-                  }}
+                  focusPhaseId={focusPhaseId}
+                  onSelect={selectPhase}
+                  className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-[44rem]"
                 />
-              )}
-            </SlidingTabPanel>
-          </section>
-        </div>
+
+                <section aria-labelledby="phase-title" className="min-w-0 space-y-4">
+                  <PhaseHeaderCard
+                    phase={selectedPhase}
+                    phases={phases}
+                    isFocus={selectedPhase.id === focusPhaseId}
+                    onSelectPhase={selectPhase}
+                  />
+                  <PhaseItemList
+                    phase={selectedPhase}
+                    nextItemId={nextItemId}
+                    onPrimary={runPrimary}
+                    onView={(item) => openStep(item.id)}
+                  />
+                </section>
+              </div>
+            </div>
+          ) : (
+            <JourneyGraph
+              phases={phases}
+              openPhaseId={graphPhaseId}
+              onOpenPhaseChange={(phaseId) => {
+                setGraphPhaseId(phaseId);
+                if (phaseId) selectPhase(phaseId);
+              }}
+              focusPhaseId={focusPhaseId}
+              nextItemId={nextItemId}
+              saveLayout={saveLayout}
+              selectedItemId={selectedItemId}
+              onSelectItem={setSelectedItemId}
+              onOpenItem={(item) => {
+                const phase = phaseOf(item);
+                const state = itemState(item, phase?.locked ?? false);
+                if (primaryActionLabel(item, state)) runPrimary(item);
+                else if (item.kind === "step" && state !== "locked") openStep(item.id);
+              }}
+              renderItemAside={(item, phase) => {
+                const state = itemState(item, phase.locked);
+                const action = primaryActionLabel(item, state);
+                return (
+                  <ItemAside
+                    item={item}
+                    phase={phase}
+                    onClose={() => setSelectedItemId(null)}
+                    onSelect={setSelectedItemId}
+                    actions={
+                      <>
+                        {action ? (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => runPrimary(item)}
+                            trailingIcon={<ChevronRight className="h-4 w-4" />}
+                          >
+                            {action}
+                          </Button>
+                        ) : null}
+                        {item.kind === "step" && state !== "locked" ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openStep(item.id)}
+                            icon={<Eye className="h-4 w-4" />}
+                          >
+                            Open step
+                          </Button>
+                        ) : null}
+                      </>
+                    }
+                  >
+                    {item.kind === "step" ? <StepOriginBadge step={item.step} /> : null}
+                  </ItemAside>
+                );
+              }}
+            />
+          )}
+        </SlidingTabPanel>
       </main>
 
       <AlertDialog
@@ -652,7 +647,7 @@ export function OnBoardingPage() {
 
 function CenteredState({ children }: { children: ReactNode }) {
   return (
-    <div className="app-page-content flex min-h-screen flex-col items-center justify-center py-12 text-center">
+    <div className="app-page-frame flex min-h-screen flex-col items-center justify-center py-12 text-center">
       {children}
     </div>
   );
@@ -681,6 +676,100 @@ function StateIcon({
   );
 }
 
+function PhaseLinks({
+  label,
+  phases,
+  onSelect,
+}: {
+  label: string;
+  phases: OnboardingPhaseEndpoint[];
+  onSelect: (phaseId: string) => void;
+}) {
+  if (phases.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-app-text-subtle">{label}</span>
+      {phases.map((phase) => (
+        <button
+          key={phase.id}
+          type="button"
+          onClick={() => onSelect(phase.id)}
+          className="inline-flex items-center gap-1 rounded-full border border-app-border px-2.5 py-1 font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-text"
+        >
+          {phase.title}
+          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The selected phase: what it is, how far along, and how it hangs together with the others. */
+function PhaseHeaderCard({
+  phase,
+  phases,
+  isFocus,
+  onSelectPhase,
+}: {
+  phase: OnboardingPhaseEndpoint;
+  phases: OnboardingPhaseEndpoint[];
+  isFocus: boolean;
+  onSelectPhase: (phaseId: string) => void;
+}) {
+  const state = phaseState(phase);
+  const progress = phaseProgress(phase);
+  const waitsOn = blockingPhases(phase, phases);
+  const unlocks = phasesUnlockedBy(phase, phases);
+
+  return (
+    <div className="rounded-3xl border border-app-border bg-app-surface p-5">
+      <p className="text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
+        Phase {phases.indexOf(phase) + 1} of {phases.length}
+        {isFocus ? <span className="text-app-brand-text"> · You are here</span> : null}
+      </p>
+      <h2 id="phase-title" className="mt-1 text-xl font-semibold text-app-text">
+        {phase.title}
+      </h2>
+      {phase.description ? (
+        <p className="mt-1 max-w-3xl text-sm text-app-text-muted">{phase.description}</p>
+      ) : null}
+      <div className="mt-3 flex items-center gap-3">
+        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-[width] duration-500"
+            style={{ width: `${progress.percentage}%` }}
+          />
+        </div>
+        <span className="text-xs text-app-text-muted tabular-nums">
+          {progress.completed}/{progress.total} done
+        </span>
+      </div>
+
+      {state === "locked" ? (
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5 text-sm text-app-text-muted">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            Opens once {waitsOn.map((blocker) => blocker.title).join(" and ")}{" "}
+            {waitsOn.length === 1 ? "is" : "are"} complete. You can look around already.
+          </span>
+        </div>
+      ) : state === "done" ? (
+        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-app-success-border bg-app-success-bg px-3 py-2.5 text-sm text-app-success-text">
+          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Phase complete.
+        </div>
+      ) : null}
+
+      {waitsOn.length > 0 || unlocks.length > 0 ? (
+        <div className="mt-4 space-y-2 border-t border-app-border pt-3">
+          <PhaseLinks label="Waits on" phases={waitsOn} onSelect={onSelectPhase} />
+          <PhaseLinks label="Leads to" phases={unlocks} onSelect={onSelectPhase} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * The one thing to do next, on top of everything else.
  */
@@ -689,11 +778,13 @@ function UpNextCard({
   phaseIndex,
   item,
   onPrimary,
+  onShowPhase,
 }: {
   phase: OnboardingPhaseEndpoint;
   phaseIndex: number;
   item: PhaseItem | undefined;
   onPrimary: (item: PhaseItem) => void;
+  onShowPhase: () => void;
 }) {
   if (!item) return null;
   const state = itemState(item, phase.locked);
@@ -714,8 +805,14 @@ function UpNextCard({
           </span>
           <div className="min-w-0">
             <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
-              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} ·
-              Phase {phaseIndex + 1}: {phase.title}
+              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} ·{" "}
+              <button
+                type="button"
+                onClick={onShowPhase}
+                className="uppercase underline-offset-2 hover:underline"
+              >
+                Phase {phaseIndex + 1}: {phase.title}
+              </button>
             </p>
             <h2 className="mt-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
               {isQuestion ? item.question.question : item.title}

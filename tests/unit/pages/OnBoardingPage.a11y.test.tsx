@@ -93,7 +93,7 @@ describe("OnBoardingPage Accessibility", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your path into the project")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
     });
 
     expect(

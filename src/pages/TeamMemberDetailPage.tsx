@@ -49,16 +49,10 @@ function getElapsedDays(startedAt: string): number {
 import { UserAvatar } from "../components/common/UserAvatar";
 import { Modal } from "../components/ui/Modal";
 import { PanelPresence } from "../components/ui/PanelPresence";
-import { AddCustomStepModal } from "../features/team-management/components/detail/AddCustomStepModal";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
-import {
-  MemberJourneySection,
-  type StepPlacementTarget,
-} from "../features/team-management/components/detail/MemberJourneySection";
+import { MemberJourneySection } from "../features/team-management/components/detail/MemberJourneySection";
 import { AlertDialog } from "../components/ui/AlertDialog";
-import { onboardingGraphService } from "../services/onboardingGraphService";
-import { phaseItems } from "../features/onboarding/journey";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
@@ -127,19 +121,10 @@ export function TeamMemberDetailPage() {
   const [graphStepToDelete, setGraphStepToDelete] = useState<string | null>(null);
   const [stepToDelete, setStepToDelete] = useState<DetailOnboardingStep | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<OnboardingTaskEndpoint | null>(null);
-  const [stepInsertTarget, setStepInsertTarget] = useState<StepPlacementTarget | null>(null);
   // The phase whose knowledge-check modal is open, and on which tab (null = closed).
   const [checkModal, setCheckModal] = useState<{ phaseId: string; tab: PhaseCheckAdminTab } | null>(
     null,
   );
-  const [customStepTitle, setCustomStepTitle] = useState("");
-  const [customStepDescription, setCustomStepDescription] = useState("");
-  const [customStepExpectedOutcome, setCustomStepExpectedOutcome] = useState("");
-  const [customStepMinutes, setCustomStepMinutes] = useState("30");
-  const [customStepTasks, setCustomStepTasks] = useState<
-    Array<{ title: string; description: string }>
-  >([{ title: "", description: "" }]);
-  const [addingStep, setAddingStep] = useState(false);
   const [taskInsertTarget, setTaskInsertTarget] = useState<{
     stepId: string;
     position: number;
@@ -487,90 +472,6 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  async function handleCreateCustomStep() {
-    if (!stepInsertTarget || !customStepTitle.trim()) return;
-
-    const targetPhase = onboardingPath?.phases.find(
-      (phase) => phase.id === stepInsertTarget.phaseId,
-    );
-
-    if (!targetPhase) return;
-
-    setAddingStep(true);
-
-    // The list position follows the graph: right after the last step it waits on, else right before
-    // the first step it unlocks, else at the end -- the same rule the buddy's placement uses.
-    const stepPositions = new Map(targetPhase.steps.map((step) => [step.id, step.position]));
-    const after = stepInsertTarget.waitsOn
-      .map((id) => stepPositions.get(id))
-      .filter((position): position is number => position !== undefined);
-    const before = stepInsertTarget.unlocks
-      .map((id) => stepPositions.get(id))
-      .filter((position): position is number => position !== undefined);
-    const position = Math.min(
-      targetPhase.steps.length,
-      after.length
-        ? Math.max(...after) + 1
-        : before.length
-          ? Math.min(...before)
-          : targetPhase.steps.length,
-    );
-
-    try {
-      const createdStep = await onboardingGraphService.createConnectedStep(targetPhase.id, {
-        step: {
-          position,
-          title: customStepTitle.trim(),
-          description: customStepDescription.trim(),
-          type: "TASK",
-          estimatedMinutes: Number(customStepMinutes) || 30,
-          expectedOutcome: customStepExpectedOutcome.trim(),
-        },
-        waitsOn: stepInsertTarget.waitsOn,
-        unlocks: stepInsertTarget.unlocks,
-        graphX: stepInsertTarget.graphX,
-        graphY: stepInsertTarget.graphY,
-      });
-      const tasksToCreate = customStepTasks
-        .map((task) => ({
-          title: task.title.trim(),
-          description: task.description.trim(),
-        }))
-        .filter((task) => task.title.length > 0);
-
-      // Create tasks sequentially: the backend validates each task's position
-      // against the current task count, so creating them in parallel makes every
-      // task after the first fail ("Position must be between 0 and 0").
-      for (const [index, task] of tasksToCreate.entries()) {
-        await createOnboardingTaskForStep(createdStep.id, {
-          position: index,
-          title: task.title,
-          description: task.description,
-          finished: false,
-        });
-      }
-
-      setCustomStepTitle("");
-      setCustomStepDescription("");
-      setCustomStepExpectedOutcome("");
-      setCustomStepMinutes("30");
-      setCustomStepTasks([{ title: "", description: "" }]);
-      setStepInsertTarget(null);
-      setDetailStepId(createdStep.id);
-      await refreshOnboardingPath();
-      if (tasksToCreate.length > 0) {
-        await refreshStepTasks(createdStep.id);
-      }
-      toast.success("Step added");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Couldn't create the custom onboarding step.",
-      );
-    } finally {
-      setAddingStep(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -590,7 +491,7 @@ export function TeamMemberDetailPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-app-bg">
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <main className="app-page-frame py-8">
           <button
             onClick={goBack}
             className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
@@ -617,9 +518,6 @@ export function TeamMemberDetailPage() {
       .sort((a, b) => a.position - b.position)
       .map((step) => step as DetailOnboardingStep),
   );
-  const insertPhase = stepInsertTarget
-    ? (phases.find((phase) => phase.id === stepInsertTarget.phaseId) ?? null)
-    : null;
   const checkModalPhase = checkModal
     ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
     : null;
@@ -667,8 +565,8 @@ export function TeamMemberDetailPage() {
 
   return (
     <div className="min-h-screen bg-app-bg">
-      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-[96rem] px-4 py-4 sm:px-6 lg:px-8">
+      <header className="border-b border-app-border bg-app-bg">
+        <div className="app-page-frame py-6">
           <button
             onClick={goBack}
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
@@ -755,7 +653,7 @@ export function TeamMemberDetailPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[96rem] px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
+      <main className="app-page-frame py-6 pb-24 lg:py-8">
         <MemberJourneySection
           userId={user.userId}
           memberName={`${user.firstname} ${user.lastname}`.trim()}
@@ -763,14 +661,6 @@ export function TeamMemberDetailPage() {
           stepTaskCounts={stepTaskCounts}
           onOpenStep={setDetailStepId}
           onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
-          onAddStep={(target) => {
-            setCustomStepTitle("");
-            setCustomStepDescription("");
-            setCustomStepExpectedOutcome("");
-            setCustomStepMinutes("30");
-            setCustomStepTasks([{ title: "", description: "" }]);
-            setStepInsertTarget(target);
-          }}
           onDeleteStep={setGraphStepToDelete}
           onPathChanged={refreshOnboardingPath}
         />
@@ -1038,41 +928,6 @@ export function TeamMemberDetailPage() {
           void handleRemoveRole(role.id);
           setRoleToRemove(null);
         }}
-      />
-      <AddCustomStepModal
-        open={Boolean(stepInsertTarget)}
-        title={customStepTitle}
-        description={customStepDescription}
-        expectedOutcome={customStepExpectedOutcome}
-        estimatedMinutes={customStepMinutes}
-        tasks={customStepTasks}
-        addingStep={addingStep}
-        onTitleChange={setCustomStepTitle}
-        onDescriptionChange={setCustomStepDescription}
-        onExpectedOutcomeChange={setCustomStepExpectedOutcome}
-        onEstimatedMinutesChange={setCustomStepMinutes}
-        onTasksChange={(updater) => setCustomStepTasks(updater)}
-        onClose={() => setStepInsertTarget(null)}
-        onSubmit={() => void handleCreateCustomStep()}
-        placement={
-          stepInsertTarget && insertPhase
-            ? {
-                phaseTitle: insertPhase.title,
-                options: phaseItems(insertPhase).map((item) => ({
-                  id: item.id,
-                  title: item.title,
-                  kind: item.kind,
-                })),
-                waitsOn: stepInsertTarget.waitsOn,
-                unlocks: stepInsertTarget.unlocks,
-                onWaitsOnChange: (waitsOn) =>
-                  setStepInsertTarget((current) => (current ? { ...current, waitsOn } : current)),
-                onUnlocksChange: (unlocks) =>
-                  setStepInsertTarget((current) => (current ? { ...current, unlocks } : current)),
-                pinned: stepInsertTarget.graphX !== undefined,
-              }
-            : undefined
-        }
       />
       {checkModal && checkModalPhase && userId && (
         <PhaseCheckAdminModal

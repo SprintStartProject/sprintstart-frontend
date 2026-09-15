@@ -255,7 +255,7 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your path into the project")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
     });
 
     expect(screen.getAllByText("Phase 1").length).toBeGreaterThan(0);
@@ -343,11 +343,12 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your path into the project")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
     });
 
     expect(screen.getAllByText("33%").length).toBeGreaterThan(0);
-    expect(screen.getByText("1/3 items")).toBeInTheDocument();
+    expect(screen.getByText("0 of 1 phases complete")).toBeInTheDocument();
+    expect(screen.getByText(/1 step done/)).toBeInTheDocument();
   });
 
   it("shows a warning beside regeneration when a generated phase was hidden", async () => {
@@ -483,9 +484,7 @@ describe("OnBoardingPage", () => {
     await user.click(await screen.findByRole("button", { name: "Graph" }));
 
     expect(
-      await screen.findByRole("application", {
-        name: "Graph of the steps and questions in Phase 1",
-      }),
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
     ).toBeInTheDocument();
     // The hire reads and arranges their graph; nothing here rewires it.
     expect(screen.queryByTitle("Drag to what this unlocks")).not.toBeInTheDocument();
@@ -497,7 +496,7 @@ describe("OnBoardingPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("follows the phase rail in the graph, and opens a phase from the journey map", async () => {
+  it("steps into a phase from the journey map, and back out", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
@@ -513,13 +512,8 @@ describe("OnBoardingPage", () => {
     renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Graph" }));
-    expect(
-      await screen.findByRole("application", {
-        name: "Graph of the steps and questions in Phase 1",
-      }),
-    ).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /^Phase 2: Phase 2,/ }));
 
-    await user.click(screen.getAllByRole("button", { name: /Phase 2/ })[0]);
     expect(
       await screen.findByRole("application", {
         name: "Graph of the steps and questions in Phase 2",
@@ -528,11 +522,38 @@ describe("OnBoardingPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Journey map" }));
     expect(
-      await screen.findByRole("application", { name: "Journey map of all onboarding phases" }),
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Phase 1: Phase 1, \d+% complete/ }),
-    ).toBeInTheDocument();
+  });
+
+  it("lets the hire pick the next phase when several open at once", async () => {
+    const finished = phaseFixture("phase1", 1, "Basics");
+    finished.steps[0].status = "FINISHED";
+    const left = phaseFixture("phase2", 2, "Backend");
+    left.steps[0].status = "WAITING";
+    const right = phaseFixture("phase3", 3, "Frontend");
+    right.steps[0].status = "WAITING";
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [finished, left, right],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    renderPage();
+
+    expect(await screen.findByText(/2 phases are open/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Phase 3\s*Frontend/ }));
+
+    expect(screen.queryByText(/2 phases are open/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start now" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Frontend step" })).toBeInTheDocument();
   });
 
   it("names what a locked item is waiting on", async () => {

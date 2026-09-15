@@ -3,9 +3,11 @@ import {
   collectDownstream,
   collectUpstream,
   computeRanks,
+  edgeKey,
   layeredLayout,
   orderByGraph,
   resolveLayout,
+  routeEdges,
   wouldCreateCycle,
 } from "../../../../../src/features/onboarding/graph/layout";
 
@@ -84,5 +86,48 @@ describe("onboarding graph layout", () => {
     expect(wouldCreateCycle(nodes, "a", "c")).toBe(true);
     expect(wouldCreateCycle(nodes, "c", "a")).toBe(false);
     expect(wouldCreateCycle(nodes, "a", "a")).toBe(true);
+  });
+});
+
+describe("routeEdges", () => {
+  const footprint = { width: 200, height: 80 };
+
+  it("takes an edge that skips a row around the card in its way", () => {
+    const nodes = [
+      { id: "top", blockerIds: [] },
+      { id: "middle", blockerIds: ["top"] },
+      { id: "bottom", blockerIds: ["top", "middle"] },
+    ];
+    const positions = new Map([
+      ["top", { x: 0, y: 0 }],
+      ["middle", { x: 0, y: 150 }],
+      ["bottom", { x: 0, y: 300 }],
+    ]);
+
+    const routes = routeEdges(nodes, positions, footprint);
+
+    const waypoints = routes.get(edgeKey("top", "bottom"));
+    expect(waypoints).toHaveLength(1);
+    expect(Math.abs(waypoints![0].x)).toBeGreaterThan(footprint.width / 2);
+    expect(waypoints![0].y).toBe(150);
+    // Neighbouring rows need no detour.
+    expect(routes.has(edgeKey("top", "middle"))).toBe(false);
+  });
+
+  it("goes straight through a row when nothing is in the way", () => {
+    const nodes = [
+      { id: "a", blockerIds: [] },
+      { id: "far", blockerIds: [] },
+      { id: "b", blockerIds: ["a"] },
+    ];
+    const positions = new Map([
+      ["a", { x: 0, y: 0 }],
+      ["far", { x: 900, y: 150 }],
+      ["b", { x: 0, y: 300 }],
+    ]);
+
+    expect(routeEdges(nodes, positions, footprint).get(edgeKey("a", "b"))).toEqual([
+      { x: 0, y: 150 },
+    ]);
   });
 });

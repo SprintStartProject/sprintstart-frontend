@@ -7,6 +7,7 @@ import {
   phaseState,
   waitingOn,
 } from "../../../../src/features/onboarding/journey";
+import { resolveNextAction } from "../../../../src/features/onboarding/nextAction";
 import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
@@ -122,14 +123,67 @@ describe("onboarding journey vocabulary", () => {
       ],
     });
 
-    expect(progress).toMatchObject({ completed: 2, total: 3, phasesDone: 1, remainingMinutes: 25 });
+    expect(progress).toMatchObject({ completed: 2, total: 3, phasesDone: 1, stepsDone: 1 });
   });
 
-  it("marks the phase the member is in", () => {
-    const current = phase({ id: "p1", steps: [step({})] });
+  it("tells started, untouched, locked and finished phases apart", () => {
+    expect(phaseState(phase({ steps: [step({ status: "IN_PROGRESS" })] }))).toBe("active");
+    expect(phaseState(phase({ steps: [step({})] }))).toBe("open");
+    expect(phaseState(phase({ locked: true, steps: [step({})] }))).toBe("locked");
+    expect(phaseState(phase({ steps: [step({ status: "FINISHED" })] }))).toBe("done");
+    // The backend unlocks whatever waits on an empty phase, so it counts as done.
+    expect(phaseState(phase({}))).toBe("done");
+  });
+});
 
-    expect(phaseState(current, "p1")).toBe("current");
-    expect(phaseState({ ...current, locked: true }, null)).toBe("locked");
-    expect(phaseState(phase({ steps: [step({ status: "FINISHED" })] }), null)).toBe("done");
+describe("resolveNextAction", () => {
+  const path = (phases: OnboardingPhaseEndpoint[]) => ({
+    id: "path",
+    userId: "u",
+    createdAt: "",
+    phases,
+  });
+
+  it("stays in the phase the member is in, even when an earlier phase is open too", () => {
+    const second = phase({ id: "p2", position: 1, steps: [step({ id: "a", phaseId: "p2" })] });
+    const third = phase({
+      id: "p3",
+      position: 2,
+      steps: [
+        step({ id: "b", phaseId: "p3", status: "FINISHED", completedAt: "2026-09-15T10:00:00Z" }),
+        step({ id: "c", phaseId: "p3", position: 1 }),
+      ],
+    });
+
+    const next = resolveNextAction(path([second, third]));
+
+    expect(next).toMatchObject({ kind: "step", step: { id: "c" } });
+    expect(
+      resolveNextAction(path([second, third]) as never, { preferPhaseId: "p2" }),
+    ).toMatchObject({ kind: "step", step: { id: "a" } });
+  });
+
+  it("lets the member choose when several untouched phases open at once", () => {
+    const done = phase({ id: "p1", steps: [step({ id: "x", status: "FINISHED" })] });
+    const left = phase({ id: "p2", position: 1, steps: [step({ id: "a" })] });
+    const right = phase({ id: "p3", position: 2, steps: [step({ id: "b" })] });
+
+    const next = resolveNextAction(path([done, left, right]));
+
+    expect(next.kind).toBe("choose");
+    expect(next.kind === "choose" && next.phases.map((candidate) => candidate.id)).toEqual([
+      "p2",
+      "p3",
+    ]);
+  });
+
+  it("goes straight on when only one phase is open", () => {
+    const open = phase({ id: "p1", steps: [step({ id: "a" })] });
+    const locked = phase({ id: "p2", position: 1, locked: true, steps: [step({ id: "b" })] });
+
+    expect(resolveNextAction(path([open, locked]) as never)).toMatchObject({
+      kind: "step",
+      step: { id: "a" },
+    });
   });
 });

@@ -36,6 +36,7 @@ import {
   Lightbulb,
   ThumbsUp,
   ThumbsDown,
+  Signpost,
 } from "lucide-react";
 import { resolveNextAction } from "../nextAction";
 
@@ -61,6 +62,7 @@ type NextAction =
       isFirstStart: boolean;
     }
   | { kind: "question"; phaseId: string; questionId: string }
+  | { kind: "choose" }
   | { kind: "done" };
 
 // ─────────────────────────────────────────────────────────────
@@ -138,7 +140,9 @@ export function OnBoardingItemPage() {
     const resolveNext = async () => {
       try {
         const path = await onboardingService.fetchPath();
-        const next = resolveNextAction(path);
+        // Stay in this step's phase while it has anything left: phases run side by side, and the
+        // member picked this one.
+        const next = resolveNextAction(path, { preferPhaseId: currentPhaseId });
 
         if (next.kind === "step") {
           setNextAction({
@@ -156,7 +160,7 @@ export function OnBoardingItemPage() {
           });
           return;
         }
-        setNextAction({ kind: "done" });
+        setNextAction({ kind: next.kind === "choose" ? "choose" : "done" });
       } catch (err) {
         console.error("Failed to resolve the next onboarding action:", err);
       }
@@ -174,6 +178,11 @@ export function OnBoardingItemPage() {
 
     if (nextAction.kind === "question") {
       void navigate("/onboarding", { state: { focusQuestionId: nextAction.questionId } });
+      return;
+    }
+
+    if (nextAction.kind === "choose") {
+      void navigate("/onboarding", { state: { choosePhase: true } });
       return;
     }
 
@@ -537,6 +546,8 @@ export function OnBoardingItemPage() {
                   trailingIcon={
                     nextLoading ? undefined : nextAction?.kind === "question" ? (
                       <CircleHelp className="h-4 w-4" />
+                    ) : nextAction?.kind === "choose" ? (
+                      <Signpost className="h-4 w-4" />
                     ) : (
                       <CircleArrowRight className="h-4 w-4" />
                     )
@@ -547,9 +558,11 @@ export function OnBoardingItemPage() {
                     ? "Loading..."
                     : nextAction.kind === "question"
                       ? "Answer the next question"
-                      : nextAction.kind === "done"
-                        ? "Back to overview"
-                        : "Continue to next step"}
+                      : nextAction.kind === "choose"
+                        ? "Phase complete — choose what's next"
+                        : nextAction.kind === "done"
+                          ? "Back to overview"
+                          : "Continue to next step"}
                 </Button>
               )}
             </div>

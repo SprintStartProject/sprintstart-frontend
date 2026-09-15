@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -11,15 +12,31 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import { createPortal } from "react-dom";
-import { collectDownstream, collectUpstream, type GraphPoint, type LayoutNode } from "./layout";
+import {
+  collectDownstream,
+  collectUpstream,
+  edgeKey,
+  routeEdges,
+  type GraphPoint,
+  type LayoutNode,
+} from "./layout";
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
 
 type Viewport = { x: number; y: number; zoom: number };
+
+/** Camera moves a caller can ask for -- the zoom into a phase, the view centre for "add here". */
+export type JourneyCameraHandle = {
+  /** Flies the view into a node until it fills the canvas. Resolves when the flight is over. */
+  zoomIntoNode: (id: string, durationMs?: number) => Promise<void>;
+  /** Where the middle of the visible canvas is, in world coordinates. */
+  viewCenter: () => GraphPoint;
+};
 
 /** How an edge is drawn: satisfied, the one being worked through right now, or still waiting. */
 export type JourneyEdgeTone = "done" | "active" | "waiting";
@@ -68,6 +85,11 @@ type Props<TNode extends LayoutNode> = {
   /** Shown over the canvas, right -- the details of the selected node. */
   aside?: ReactNode;
   heightClassName?: string;
+  cameraRef?: Ref<JourneyCameraHandle>;
+  /** Start zoomed into this node and fly out to the whole graph -- the way back out of a phase. */
+  enterFromId?: string | null;
+  /** Fades every node but this one -- used while flying into it. */
+  spotlightId?: string | null;
 };
 
 const MIN_ZOOM = 0.2;
@@ -79,13 +101,30 @@ const SNAP = 10;
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 
 /** The S-curve from the bottom of a blocker to the top of what waits on it. */
-function edgePath(from: GraphPoint, to: GraphPoint): string {
-  const bend = Math.max(56, Math.abs(to.y - from.y) / 2);
-  return `M ${from.x} ${from.y} C ${from.x} ${from.y + bend}, ${to.x} ${to.y - bend}, ${to.x} ${to.y}`;
+function edgePath(from: GraphPoint, to: GraphPoint, waypoints: readonly GraphPoint[] = []): string {
+  const points = [from, ...waypoints, to];
+  let d = `M ${from.x} ${from.y}`;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    // Vertical tangents at every point: the curve leaves and enters each row straight, which keeps it
+    // inside the gap a waypoint was put in.
+    const minimum = index === 1 || index === points.length - 1 ? 56 : 24;
+    const bend = Math.max(minimum, Math.abs(end.y - start.y) / 2);
+    d += ` C ${start.x} ${start.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`;
+  }
+  return d;
 }
 
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
 /** Point halfway along the S-curve (the cubic at t = 0.5). */
-function edgeMidpoint(from: GraphPoint, to: GraphPoint): GraphPoint {
+function edgeMidpoint(
+  from: GraphPoint,
+  to: GraphPoint,
+  waypoints: readonly GraphPoint[] = [],
+): GraphPoint {
+  if (waypoints.length) return waypoints[Math.floor((waypoints.length - 1) / 2)];
   return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
 }
 
@@ -129,6 +168,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   overlay,
   aside,
   heightClassName = "h-[36rem]",
+  cameraRef,
+  enterFromId = null,
+  spotlightId = null,
 }: Props<TNode>) {
   const markerId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -202,9 +244,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     };
   }, [nodeSize.height, nodeSize.width, positions]);
 
-  const fit = useCallback(
-    (preferFocus: boolean) => {
-      if (!bounds || !size.width || !size.height) return;
+  const fitTarget = useCallback(
+    (preferFocus: boolean): Viewport | null => {
+      if (!bounds || !size.width || !size.height) return null;
       const width = bounds.maxX - bounds.minX;
       const height = bounds.maxY - bounds.minY;
       const zoom = clampZoom(
@@ -216,23 +258,120 @@ export function JourneyCanvas<TNode extends LayoutNode>({
       );
       const focus = preferFocus && focusId ? positions.get(focusId) : undefined;
       // A graph that only fits at a size nobody can read opens on the node that matters instead.
-      if (focus && zoom < 0.45) {
-        const readable = 0.75;
-        setViewport({
+      if (focus && zoom < 0.5) {
+        const readable = 0.8;
+        return {
           zoom: readable,
           x: size.width / 2 - focus.x * readable,
           // A third of the way down: what a node leads to is below it, and that is what matters next.
           y: size.height / 3 - focus.y * readable,
-        });
-        return;
+        };
       }
-      setViewport({
+      return {
         zoom,
         x: size.width / 2 - ((bounds.minX + bounds.maxX) / 2) * zoom,
         y: size.height / 2 - ((bounds.minY + bounds.maxY) / 2) * zoom,
-      });
+      };
     },
     [bounds, focusId, positions, size.height, size.width],
+  );
+
+  const fit = useCallback(
+    (preferFocus: boolean) => {
+      const target = fitTarget(preferFocus);
+      if (target) setViewport(target);
+    },
+    [fitTarget],
+  );
+
+  // ── Camera flights ─────────────────────────────────────────
+
+  const viewportRef = useRef(viewport);
+  useLayoutEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
+  const flightRef = useRef<{ frame: number; timeout: number } | null>(null);
+
+  const cancelFlight = useCallback(() => {
+    if (!flightRef.current) return;
+    cancelAnimationFrame(flightRef.current.frame);
+    window.clearTimeout(flightRef.current.timeout);
+    flightRef.current = null;
+  }, []);
+
+  const flyTo = useCallback(
+    (target: Viewport, durationMs: number) =>
+      new Promise<void>((resolve) => {
+        cancelFlight();
+        const reduced =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reduced || durationMs <= 0 || typeof requestAnimationFrame !== "function") {
+          setViewport(target);
+          resolve();
+          return;
+        }
+        const origin = viewportRef.current;
+        const startedAt = performance.now();
+        const finish = () => {
+          cancelFlight();
+          setViewport(target);
+          resolve();
+        };
+        const step = (now: number) => {
+          const t = Math.min(1, (now - startedAt) / durationMs);
+          if (t >= 1) {
+            finish();
+            return;
+          }
+          const eased = easeInOut(t);
+          setViewport({
+            // Zoom on a log scale, so a flight across a large zoom range moves evenly.
+            zoom: Math.exp(
+              Math.log(origin.zoom) + (Math.log(target.zoom) - Math.log(origin.zoom)) * eased,
+            ),
+            x: origin.x + (target.x - origin.x) * eased,
+            y: origin.y + (target.y - origin.y) * eased,
+          });
+          if (flightRef.current) flightRef.current.frame = requestAnimationFrame(step);
+        };
+        // A hidden tab never runs animation frames; the timeout lands the flight regardless.
+        flightRef.current = {
+          frame: requestAnimationFrame(step),
+          timeout: window.setTimeout(finish, durationMs + 120),
+        };
+      }),
+    [cancelFlight],
+  );
+
+  useEffect(() => cancelFlight, [cancelFlight]);
+
+  const viewportIntoNode = useCallback(
+    (id: string): Viewport | null => {
+      const point = positions.get(id);
+      if (!point || !size.width || !size.height) return null;
+      const zoom = Math.min(size.width / nodeSize.width, size.height / nodeSize.height) * 0.92;
+      return { zoom, x: size.width / 2 - point.x * zoom, y: size.height / 2 - point.y * zoom };
+    },
+    [nodeSize.height, nodeSize.width, positions, size.height, size.width],
+  );
+
+  useImperativeHandle(
+    cameraRef,
+    () => ({
+      zoomIntoNode: async (id, durationMs = 460) => {
+        const target = viewportIntoNode(id);
+        if (target) await flyTo(target, durationMs);
+      },
+      viewCenter: () => {
+        const current = viewportRef.current;
+        return {
+          x: (size.width / 2 - current.x) / current.zoom,
+          y: (size.height / 2 - current.y) / current.zoom,
+        };
+      },
+    }),
+    [flyTo, size.height, size.width, viewportIntoNode],
   );
 
   // Refit when the graph itself changes or the canvas first gets a size -- not on every position
@@ -241,9 +380,18 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   useLayoutEffect(() => {
     const key = `${fitKey}|${expanded}|${size.width > 0}`;
     if (!size.width || fittedRef.current === key) return;
+    const isFirstFit = fittedRef.current === null;
     fittedRef.current = key;
+    const from = isFirstFit && enterFromId ? viewportIntoNode(enterFromId) : null;
+    if (from) {
+      setViewport(from);
+      viewportRef.current = from;
+      const target = fitTarget(true);
+      if (target) void flyTo(target, 560);
+      return;
+    }
     fit(true);
-  }, [expanded, fit, fitKey, size.width]);
+  }, [enterFromId, expanded, fit, fitKey, fitTarget, flyTo, size.width, viewportIntoNode]);
 
   const zoomAround = useCallback((factor: number, screenX: number, screenY: number) => {
     setViewport((current) => {
@@ -261,6 +409,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     if (!element) return;
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
+      cancelFlight();
       // Keep the gesture inside the graph; the page around it treats horizontal swipes as tab switches.
       event.stopPropagation();
       const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size.height : 1;
@@ -281,7 +430,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     };
     element.addEventListener("wheel", handleWheel, { passive: false });
     return () => element.removeEventListener("wheel", handleWheel);
-  }, [expanded, size.height, zoomAround]);
+  }, [cancelFlight, expanded, size.height, zoomAround]);
 
   // ── Pointer gestures ───────────────────────────────────────
 
@@ -299,6 +448,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest("[data-canvas-control]")) return;
+    cancelFlight();
 
     const port = target.closest<HTMLElement>("[data-port-for]");
     if (port && canConnect) {
@@ -478,6 +628,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   }, [emphasisSourceId, nodes]);
 
   const emphasisOf = (id: string): JourneyNodeEmphasis => {
+    if (spotlightId) return id === spotlightId ? "focus" : "dimmed";
     if (!emphasisSourceId || !related) return "none";
     if (id === emphasisSourceId) return "focus";
     return related.has(id) ? "related" : "dimmed";
@@ -486,6 +637,16 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   // ── Edges ──────────────────────────────────────────────────
 
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const effectivePositions = useMemo(() => {
+    if (!dragOverride) return positions;
+    const next = new Map(positions);
+    next.set(dragOverride.id, dragOverride.position);
+    return next;
+  }, [dragOverride, positions]);
+  const routes = useMemo(
+    () => routeEdges(nodes, effectivePositions, nodeSize),
+    [effectivePositions, nodeSize, nodes],
+  );
   const edges = nodes.flatMap((node) =>
     node.blockerIds
       .filter((blockerId) => nodeById.has(blockerId) && blockerId !== node.id)
@@ -500,7 +661,8 @@ export function JourneyCanvas<TNode extends LayoutNode>({
           !!emphasisSourceId &&
           (blockerId === emphasisSourceId || related?.has(blockerId) || false) &&
           (node.id === emphasisSourceId || related?.has(node.id) || false);
-        return { blockerId, nodeId: node.id, from, to, tone, inChain };
+        const waypoints = routes.get(edgeKey(blockerId, node.id)) ?? [];
+        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain };
       })
       .filter((edge): edge is NonNullable<typeof edge> => edge !== null),
   );
@@ -591,10 +753,10 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               ))}
             </defs>
             {edges.map((edge) => {
-              const d = edgePath(edge.from, edge.to);
+              const d = edgePath(edge.from, edge.to, edge.waypoints);
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
-              const dimmed = !!emphasisSourceId && !edge.inChain;
+              const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);
               return (
                 <g key={`${edge.blockerId}->${edge.nodeId}`}>
                   <path
@@ -696,10 +858,14 @@ export function JourneyCanvas<TNode extends LayoutNode>({
             className="absolute z-40 -translate-x-1/2 -translate-y-1/2"
             style={{
               left:
-                edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to).x * viewport.zoom +
+                edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to, selectedEdgeData.waypoints)
+                  .x *
+                  viewport.zoom +
                 viewport.x,
               top:
-                edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to).y * viewport.zoom +
+                edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to, selectedEdgeData.waypoints)
+                  .y *
+                  viewport.zoom +
                 viewport.y,
             }}
           >

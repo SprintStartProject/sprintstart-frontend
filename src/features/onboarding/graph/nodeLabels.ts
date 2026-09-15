@@ -9,7 +9,7 @@
 import type { ItemState, PhaseItem, PhaseState } from "../journey";
 
 export const ITEM_NODE_SIZE = { width: 248, height: 92 };
-export const PHASE_NODE_SIZE = { width: 252, height: 108 };
+export const PHASE_NODE_SIZE = { width: 280, height: 190 };
 
 export const itemStateLabel: Record<ItemState, string> = {
   done: "Done",
@@ -38,8 +38,8 @@ export function itemKindLabel(item: PhaseItem): string {
 
 export const phaseStateLabel: Record<PhaseState, string> = {
   done: "Complete",
-  current: "You are here",
-  open: "Open",
+  active: "In progress",
+  open: "Ready to start",
   locked: "Locked",
 };
 

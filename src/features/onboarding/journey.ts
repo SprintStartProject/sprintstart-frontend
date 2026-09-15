@@ -48,7 +48,14 @@ export type PhaseItem =
  */
 export type ItemState = "done" | "skipped" | "active" | "open" | "retry" | "locked";
 
-export type PhaseState = "done" | "current" | "open" | "locked";
+/**
+ * - `done`: every step finished or skipped, every question passed. An empty phase is done too --
+ *   the backend unlocks what waits on it, so nothing here may treat it as still to do.
+ * - `active`: open, and the member has already started on it.
+ * - `open`: reachable, not started yet -- one of the phases the member can pick next.
+ * - `locked`: waits on a phase that is not done.
+ */
+export type PhaseState = "done" | "active" | "open" | "locked";
 
 export type Progress = { completed: number; total: number; percentage: number };
 
@@ -113,22 +120,20 @@ export function phaseProgress(phase: OnboardingPhaseEndpoint): Progress {
 
 export function pathProgress(path: OnboardingPathEndpoint): Progress & {
   phasesDone: number;
-  remainingMinutes: number;
+  stepsDone: number;
 } {
   let completed = 0;
   let total = 0;
   let phasesDone = 0;
-  let remainingMinutes = 0;
+  let stepsDone = 0;
   for (const phase of path.phases) {
     const progress = phaseProgress(phase);
     completed += progress.completed;
     total += progress.total;
-    if (progress.total > 0 && progress.completed === progress.total) phasesDone += 1;
-    remainingMinutes += phase.steps
-      .filter((step) => step.status !== "FINISHED" && step.status !== "SKIPPED")
-      .reduce((sum, step) => sum + (step.estimatedMinutes || 0), 0);
+    if (phaseState(phase) === "done") phasesDone += 1;
+    stepsDone += phase.steps.filter((step) => step.status === "FINISHED").length;
   }
-  return { completed, total, percentage: percent(completed, total), phasesDone, remainingMinutes };
+  return { completed, total, percentage: percent(completed, total), phasesDone, stepsDone };
 }
 
 /** Phases in position order. */
@@ -136,13 +141,51 @@ export function sortedPhases(path: OnboardingPathEndpoint): OnboardingPhaseEndpo
   return [...path.phases].sort((left, right) => left.position - right.position);
 }
 
-export function phaseState(
-  phase: OnboardingPhaseEndpoint,
-  currentPhaseId: string | null,
-): PhaseState {
-  if (!isPhaseOpen(phase) && (phase.steps.length > 0 || phase.questions.length > 0)) return "done";
+/** Whether the member has touched anything in a phase: a step begun or behind them, a question tried. */
+export function isPhaseStarted(phase: OnboardingPhaseEndpoint): boolean {
+  return (
+    phase.steps.some((step) => step.status !== "WAITING") ||
+    (phase.questions ?? []).some(
+      (question) => question.status === "PASSED" || question.status === "RETRY",
+    )
+  );
+}
+
+export function phaseState(phase: OnboardingPhaseEndpoint): PhaseState {
+  if (!isPhaseOpen(phase)) return "done";
   if (phase.locked) return "locked";
-  return phase.id === currentPhaseId ? "current" : "open";
+  return isPhaseStarted(phase) ? "active" : "open";
+}
+
+/** When the member last did something in a phase, as epoch millis; 0 when never. */
+export function lastActivityAt(phase: OnboardingPhaseEndpoint): number {
+  return phase.steps.reduce((latest, step) => {
+    const times = [step.startedAt, step.completedAt]
+      .map((value) => (value ? Date.parse(value) : 0))
+      .filter((value) => Number.isFinite(value));
+    return Math.max(latest, ...times);
+  }, 0);
+}
+
+/** The phases a phase still waits on, by name -- "why is this locked", for a whole phase. */
+export function blockingPhases(
+  phase: OnboardingPhaseEndpoint,
+  phases: readonly OnboardingPhaseEndpoint[],
+): OnboardingPhaseEndpoint[] {
+  const byId = new Map(phases.map((candidate) => [candidate.id, candidate]));
+  return (phase.blockerIds ?? [])
+    .map((id) => byId.get(id))
+    .filter(
+      (blocker): blocker is OnboardingPhaseEndpoint => !!blocker && phaseState(blocker) !== "done",
+    );
+}
+
+/** Phases that wait on this one directly. */
+export function phasesUnlockedBy(
+  phase: OnboardingPhaseEndpoint,
+  phases: readonly OnboardingPhaseEndpoint[],
+): OnboardingPhaseEndpoint[] {
+  return phases.filter((candidate) => (candidate.blockerIds ?? []).includes(phase.id));
 }
 
 /** Titles of the unfinished items an item still waits on -- "why is this locked", in words. */

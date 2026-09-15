@@ -262,3 +262,80 @@ export function wouldCreateCycle(
 ): boolean {
   return nodeId === blockerId || collectUpstream(nodes, blockerId).has(nodeId);
 }
+
+/** Key of an edge in a route map. */
+export const edgeKey = (blockerId: string, nodeId: string) => `${blockerId}->${nodeId}`;
+
+/**
+ * Waypoints that take each edge around the cards between its two ends.
+ *
+ * An edge that skips a row -- or reaches the second line of a wrapped row -- would otherwise be drawn
+ * straight through whatever sits in between, and a line under a card reads as a connection to it. For
+ * every row an edge passes, it gets one waypoint at that row's height: where the edge would cross
+ * anyway if nothing is in the way, else in the nearest gap between two cards (or beside the row).
+ * Edges sharing a gap are fanned out a little so they stay tellable apart.
+ *
+ * Works on any positions, not only on the layered layout's: rows are simply the heights nodes sit at.
+ */
+export function routeEdges(
+  nodes: readonly LayoutNode[],
+  positions: ReadonlyMap<string, GraphPoint>,
+  footprint: NodeFootprint,
+): Map<string, GraphPoint[]> {
+  const rows = new Map<number, number[]>();
+  nodes.forEach((node) => {
+    const point = positions.get(node.id);
+    if (!point) return;
+    const y = Math.round(point.y);
+    rows.set(y, [...(rows.get(y) ?? []), point.x]);
+  });
+  const rowYs = [...rows.keys()].sort((a, b) => a - b);
+  rows.forEach((xs) => xs.sort((a, b) => a - b));
+
+  const margin = 14;
+  const halfWidth = footprint.width / 2;
+  const channelUse = new Map<string, number>();
+  const routes = new Map<string, GraphPoint[]>();
+  const blockers = blockersInGraph(nodes);
+
+  blockers.forEach((blockerIds, nodeId) => {
+    const to = positions.get(nodeId);
+    if (!to) return;
+    blockerIds.forEach((blockerId) => {
+      const from = positions.get(blockerId);
+      if (!from || to.y - from.y <= footprint.height) return;
+      const waypoints: GraphPoint[] = [];
+      rowYs
+        .filter((y) => y > from.y + 1 && y < to.y - 1)
+        .forEach((y) => {
+          const xs = rows.get(y)!;
+          const t = (y - from.y) / (to.y - from.y);
+          const ideal = from.x + (to.x - from.x) * t;
+          const blocked = xs.some((x) => Math.abs(x - ideal) < halfWidth + margin);
+          let x = ideal;
+          if (blocked) {
+            const channels = [
+              xs[0] - halfWidth - margin * 2,
+              xs[xs.length - 1] + halfWidth + margin * 2,
+            ];
+            for (let index = 1; index < xs.length; index += 1) {
+              if (xs[index] - xs[index - 1] >= footprint.width + margin) {
+                channels.push((xs[index] + xs[index - 1]) / 2);
+              }
+            }
+            x = channels.reduce((best, channel) =>
+              Math.abs(channel - ideal) < Math.abs(best - ideal) ? channel : best,
+            );
+            const slot = `${y}:${Math.round(x)}`;
+            const used = channelUse.get(slot) ?? 0;
+            channelUse.set(slot, used + 1);
+            x += (used % 2 === 0 ? 1 : -1) * Math.ceil(used / 2) * 6;
+          }
+          waypoints.push({ x, y });
+        });
+      if (waypoints.length) routes.set(edgeKey(blockerId, nodeId), waypoints);
+    });
+  });
+
+  return routes;
+}
