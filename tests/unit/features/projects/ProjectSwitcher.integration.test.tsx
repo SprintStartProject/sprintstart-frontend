@@ -29,6 +29,7 @@ function project(id: string, name: string): AdminProject {
     users: [],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
   };
 }
 

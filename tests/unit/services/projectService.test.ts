@@ -76,6 +76,7 @@ describe("projectService", () => {
         ],
         industry: "Fintech",
         industryConfidence: "high",
+        industryCustom: false,
       },
     ]);
   });
@@ -115,6 +116,7 @@ describe("projectService", () => {
         users: [],
         industry: "",
         industryConfidence: null,
+        industryCustom: false,
       },
     ]);
   });
@@ -162,7 +164,7 @@ describe("projectService", () => {
     expect(newProject.id).toBe("project-new");
   });
 
-  it("createProject sends industry and industryConfidence when provided", async () => {
+  it("createProject sends industry when provided", async () => {
     let capturedBody: unknown;
     server.use(
       http.post("/api/v1/admin/projects", async ({ request }) => {
@@ -174,13 +176,11 @@ describe("projectService", () => {
     await projectService.createProject({
       name: "Test Project",
       industry: "Fintech",
-      industryConfidence: "high",
     });
 
     expect(capturedBody).toEqual({
       name: "Test Project",
       industry: "Fintech",
-      industryConfidence: "high",
     });
   });
 
@@ -269,6 +269,44 @@ describe("projectService", () => {
 
     await expect(projectService.evaluateProjectIndustry("project-1")).rejects.toMatchObject({
       status: 502,
+    });
+  });
+
+  it("setProjectIndustry puts the industry and returns the custom result", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.put("/api/v1/projects/project-1/industry", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          industry: "Healthcare",
+          industryConfidence: null,
+          industryCustom: true,
+        });
+      }),
+    );
+
+    const result = await projectService.setProjectIndustry("project-1", "Healthcare");
+
+    expect(capturedBody).toEqual({ industry: "Healthcare" });
+    expect(result).toEqual({
+      industry: "Healthcare",
+      industryConfidence: null,
+      industryCustom: true,
+    });
+  });
+
+  it("setProjectIndustry propagates a 403 when the caller may not manage the project", async () => {
+    server.use(
+      http.put(
+        "/api/v1/projects/project-1/industry",
+        () => new HttpResponse("Forbidden", { status: 403 }),
+      ),
+    );
+
+    await expect(
+      projectService.setProjectIndustry("project-1", "Healthcare"),
+    ).rejects.toMatchObject({
+      status: 403,
     });
   });
 });

@@ -516,7 +516,6 @@ export function CreateProjectWizard({
       name: trimmedName,
       description: description.trim() || undefined,
       industry: trimmedIndustry || undefined,
-      ...(trimmedIndustry ? { industryConfidence: "high" as const } : {}),
     });
 
     // Members before the manager: assigning a manager also makes them a member,

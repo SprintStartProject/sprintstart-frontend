@@ -40,6 +40,7 @@ const projectOverview: ProjectOverview = {
   users: [],
   industry: "",
   industryConfidence: null,
+  industryCustom: false,
 };
 
 const projectDetails: AdminProjectDetails = {
@@ -62,6 +63,7 @@ const projectDetails: AdminProjectDetails = {
   ],
   industry: "",
   industryConfidence: null,
+  industryCustom: false,
 };
 
 describe("ProjectDetailsDrawer", () => {
@@ -321,7 +323,7 @@ describe("ProjectDetailsDrawer", () => {
       expect(screen.getByText("High confidence")).toBeInTheDocument();
     });
 
-    it("saves an edited industry with confidence 'high'", async () => {
+    it("saves an edited industry", async () => {
       const user = userEvent.setup();
       vi.mocked(projectService.updateProject).mockResolvedValue(projectDetails);
 
@@ -337,7 +339,6 @@ describe("ProjectDetailsDrawer", () => {
           name: "Alpha",
           description: "Detailed project description",
           industry: "Fintech",
-          industryConfidence: "high",
         }),
       );
     });

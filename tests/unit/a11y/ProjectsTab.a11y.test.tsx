@@ -18,6 +18,7 @@ const projects: ProjectOverview[] = [
     users: [{ id: "u1", username: "asmith", email: "alice@example.com", projectRoles: ["MEMBER"] }],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
   },
   {
     id: "p2",
@@ -28,6 +29,7 @@ const projects: ProjectOverview[] = [
     users: [],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
   },
 ];
 

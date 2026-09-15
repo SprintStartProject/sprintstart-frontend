@@ -73,6 +73,7 @@ const createdProject: AdminProjectDetails = {
   users: [],
   industry: "",
   industryConfidence: null,
+  industryCustom: false,
 };
 
 function adminUser(id: string, firstName: string): AdminUser {
@@ -377,7 +378,7 @@ describe("CreateProjectWizard", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("sends the entered industry with confidence 'high' when set", async () => {
+  it("sends the entered industry when set", async () => {
     const user = userEvent.setup();
     renderWizard();
     await settleModalFocus();
@@ -394,12 +395,11 @@ describe("CreateProjectWizard", () => {
         name: "Apollo",
         description: undefined,
         industry: "Fintech",
-        industryConfidence: "high",
       }),
     );
   });
 
-  it("does not send an industry or confidence when the field is left empty", async () => {
+  it("does not send an industry when the field is left empty", async () => {
     const user = userEvent.setup();
     renderWizard();
 
@@ -409,7 +409,6 @@ describe("CreateProjectWizard", () => {
     await waitFor(() => expect(vi.mocked(projectService.createProject)).toHaveBeenCalled());
     const [payload] = vi.mocked(projectService.createProject).mock.calls[0];
     expect(payload.industry).toBeUndefined();
-    expect(payload.industryConfidence).toBeUndefined();
   });
 
   it("shows the entered industry on the review step, or 'Detected automatically' when empty", async () => {

@@ -38,6 +38,7 @@ function project(
     users: [],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
     isManaged,
     memberCount: 3,
     sourceCount: 2,

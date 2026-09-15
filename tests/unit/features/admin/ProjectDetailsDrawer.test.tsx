@@ -29,6 +29,7 @@ const projectOverview: ProjectOverview = {
   ],
   industry: "",
   industryConfidence: null,
+  industryCustom: false,
 };
 
 describe("ProjectDetailsDrawer", () => {

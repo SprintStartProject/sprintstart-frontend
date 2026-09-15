@@ -41,6 +41,7 @@ const project: ProjectOverview = {
   users: [],
   industry: "",
   industryConfidence: null,
+  industryCustom: false,
 };
 
 describe("ProjectDetailsDrawer Accessibility", () => {

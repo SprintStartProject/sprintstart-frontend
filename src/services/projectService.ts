@@ -99,6 +99,8 @@ export type AdminProject = {
   users: ProjectUserSummary[];
   industry: string;
   industryConfidence: IndustryConfidence | null;
+  /** True when the industry was set by hand (PM/admin) rather than by the AI evaluation. */
+  industryCustom: boolean;
 };
 
 export type AdminProjectDetails = Omit<AdminProject, "users"> & {
@@ -113,6 +115,8 @@ export type ManagedProject = {
   memberCount: number;
   industry: string;
   industryConfidence: IndustryConfidence | null;
+  /** True when the industry was set by hand (PM/admin) rather than by the AI evaluation. */
+  industryCustom: boolean;
 };
 
 export type ProjectSummary = Pick<AdminProject, "id" | "name">;
@@ -121,14 +125,12 @@ export type CreateProjectRequest = {
   name: string;
   description?: string;
   industry?: string;
-  industryConfidence?: IndustryConfidence;
 };
 
 export type UpdateProjectRequest = {
   name?: string;
   description?: string;
   industry?: string;
-  industryConfidence?: IndustryConfidence;
 };
 
 export type AssignProjectUsersRequest = {
@@ -177,6 +179,7 @@ type BackendManagedProject = {
   memberCount: number;
   industry: string | null;
   industryConfidence: string | null;
+  industryCustom?: boolean;
 };
 
 type BackendAdminProject = {
@@ -188,6 +191,7 @@ type BackendAdminProject = {
   users: BackendProjectUserSummary[];
   industry: string | null;
   industryConfidence: string | null;
+  industryCustom?: boolean;
 };
 
 type BackendProjectIndustryEvaluation = {
@@ -273,6 +277,7 @@ function toManagedProject(project: BackendManagedProject): ManagedProject {
     memberCount: project.memberCount,
     industry: project.industry ?? "",
     industryConfidence: toIndustryConfidence(project.industryConfidence),
+    industryCustom: project.industryCustom ?? false,
   };
 }
 
@@ -286,6 +291,7 @@ function toAdminProject(project: BackendAdminProject): AdminProject {
     users: project.users.map(toProjectUserSummary),
     industry: project.industry ?? "",
     industryConfidence: toIndustryConfidence(project.industryConfidence),
+    industryCustom: project.industryCustom ?? false,
   };
 }
 
@@ -299,6 +305,7 @@ function toAdminProjectDetails(project: BackendAdminProjectDetails): AdminProjec
     users: project.users.map(toProjectUser),
     industry: project.industry ?? "",
     industryConfidence: toIndustryConfidence(project.industryConfidence),
+    industryCustom: project.industryCustom ?? false,
   };
 }
 
@@ -307,7 +314,6 @@ function toBackendProjectRequest(request: CreateProjectRequest | UpdateProjectRe
     name: request.name,
     description: request.description,
     industry: request.industry,
-    industryConfidence: request.industryConfidence,
   };
 }
 
@@ -321,6 +327,7 @@ function toFallbackProject(id: string, name?: string): AdminProject {
     users: [],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
   };
 }
 async function getProjectsFromCurrentUser(): Promise<AdminProject[]> {
@@ -518,6 +525,33 @@ export const projectService = {
       industry: result.industry,
       confidence: toIndustryConfidence(result.confidence) ?? "low",
       evidence: result.evidence,
+    };
+  },
+
+  /**
+   * Manually sets a project's industry, marking it as custom rather than AI-evaluated.
+   *
+   * Like `evaluateProjectIndustry`, this does not fall back to mock data: errors
+   * propagate so the caller can show them. Requires ADMIN or the project's
+   * assigned manager.
+   */
+  async setProjectIndustry(
+    projectId: string,
+    industry: string,
+  ): Promise<{ industry: string; industryConfidence: IndustryConfidence | null; industryCustom: boolean }> {
+    const result = await apiClient.fetch<{
+      industry: string | null;
+      industryConfidence: string | null;
+      industryCustom: boolean;
+    }>(`/api/v1/projects/${projectId}/industry`, {
+      method: "PUT",
+      body: JSON.stringify({ industry }),
+    });
+
+    return {
+      industry: result.industry ?? "",
+      industryConfidence: toIndustryConfidence(result.industryConfidence),
+      industryCustom: result.industryCustom,
     };
   },
 };

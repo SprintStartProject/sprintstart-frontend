@@ -190,7 +190,6 @@ export function ProjectDetailsDrawer({
           name: draftProject.name.trim(),
           description: draftProject.description.trim(),
           industry: trimmedIndustry,
-          ...(hasIndustryChanges && trimmedIndustry ? { industryConfidence: "high" as const } : {}),
         });
       }
 

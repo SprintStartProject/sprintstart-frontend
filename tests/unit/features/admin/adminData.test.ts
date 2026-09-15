@@ -61,6 +61,7 @@ const projects: ProjectOverview[] = [
     ],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
   },
 ];
 

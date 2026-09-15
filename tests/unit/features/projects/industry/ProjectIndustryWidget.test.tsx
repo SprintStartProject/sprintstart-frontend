@@ -55,6 +55,7 @@ function projectDetails(
     users: [],
     industry: "",
     industryConfidence: null,
+    industryCustom: false,
     ...overrides,
   };
 }
