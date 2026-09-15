@@ -4,6 +4,7 @@ import {
   BackgroundVariant,
   BaseEdge,
   ConnectionLineType,
+  ConnectionMode,
   Controls,
   Handle,
   MarkerType,
@@ -50,10 +51,12 @@ import {
   chainFor,
   chainPositions,
   edgeRefusal,
+  edgeSides,
   entryPointIds,
   separateOverlaps,
   withFallbackPositions,
   type ChainPosition,
+  type GraphSide,
 } from "./graphLayout.ts";
 
 /** The common graph fields persisted for both Blueprint phases and phase-subgraph nodes. */
@@ -253,12 +256,16 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   const nodeTypes = useMemo<NodeTypes>(() => ({ blueprint: BlueprintFlowNodeCard }), []);
   const edgeTypes = useMemo<EdgeTypes>(() => ({ blueprint: BlueprintFlowEdge }), []);
 
+  // Stored coordinates can overlap — the seeded blueprint's do — so what gets drawn is the stored
+  // arrangement with any collisions pushed apart. Nothing here is written back. Shared with the
+  // edges, which pick the side of each card they attach to from where the two cards ended up.
+  const positions = useMemo(
+    () => separateOverlaps(placedNodes, withFallbackPositions(placedNodes)),
+    [placedNodes],
+  );
+
   const computedNodes = useMemo<BlueprintFlowNode[]>(
     () => {
-      // Stored coordinates can overlap — the seeded blueprint's do — so what gets drawn is the
-      // stored arrangement with any collisions pushed apart. Nothing here is written back.
-      const positions = separateOverlaps(placedNodes, withFallbackPositions(placedNodes));
-
       return placedNodes.map((node) => {
         const centre = positions[node.id];
         const isEntryPoint = entryPoints.has(node.id);
@@ -309,6 +316,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     // threshold is crossed rather than on every wheel notch.
     [
       placedNodes,
+      positions,
       entryPoints,
       chainIds,
       chainPositionById,
@@ -335,34 +343,42 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     return placedNodes.flatMap((node) =>
       node.blockerIds
         .filter((blockerId) => drawn.has(blockerId))
-        .map((blockerId) => ({
-          id: `${blockerId}->${node.id}`,
-          source: blockerId,
-          target: node.id,
-          // Our own curve — see `blueprintEdgePath`. The library's shapes are a staircase or a
-          // bezier too shy to read as one across a sixteen-phase graph.
-          type: "blueprint" as const,
-          focusable: true,
-          deletable: editable,
-          style: {
-            // React Flow's own stroke is a fixed light grey that vanishes on the dark theme, so
-            // the edge carries the brand token and a weight that survives being zoomed out.
-            stroke: "var(--color-app-brand)",
-            strokeWidth: 2,
-            strokeLinecap: "round" as const,
-            opacity:
-              chainIds !== null && !(chainIds.has(blockerId) && chainIds.has(node.id)) ? 0.15 : 1,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 18,
-            height: 18,
-            color: "var(--color-app-brand)",
-          },
-          ariaLabel: `${nodeById.get(blockerId)?.title ?? "A node"} must be finished before ${node.title}`,
-        })),
+        .map((blockerId) => {
+          // Which side of each card this edge uses is read off where the two cards are, not fixed
+          // at right-out/left-in: a card below the one it waits on is reached from below.
+          const sides = edgeSides(positions[blockerId], positions[node.id]);
+
+          return {
+            id: `${blockerId}->${node.id}`,
+            source: blockerId,
+            target: node.id,
+            sourceHandle: sides.source,
+            targetHandle: sides.target,
+            // Our own curve — see `blueprintEdgePath`. The library's shapes are a staircase or a
+            // bezier too shy to read as one across a sixteen-phase graph.
+            type: "blueprint" as const,
+            focusable: true,
+            deletable: editable,
+            style: {
+              // React Flow's own stroke is a fixed light grey that vanishes on the dark theme, so
+              // the edge carries the brand token and a weight that survives being zoomed out.
+              stroke: "var(--color-app-brand)",
+              strokeWidth: 2,
+              strokeLinecap: "round" as const,
+              opacity:
+                chainIds !== null && !(chainIds.has(blockerId) && chainIds.has(node.id)) ? 0.15 : 1,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 18,
+              height: 18,
+              color: "var(--color-app-brand)",
+            },
+            ariaLabel: `${nodeById.get(blockerId)?.title ?? "A node"} must be finished before ${node.title}`,
+          };
+        }),
     );
-  }, [placedNodes, chainIds, editable, nodeById]);
+  }, [placedNodes, positions, chainIds, editable, nodeById]);
 
   /** Runs one graph mutation, holding the canvas still and surfacing the reason if it fails. */
   const runMutation = useCallback(
@@ -598,6 +614,11 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             deleteKeyCode={editable ? ["Backspace", "Delete"] : null}
             // The line under the pointer while an edge is being drawn is the same curve, in the
             // same colour, as the edge it will become — so what is being aimed at is what lands.
+            // Every handle both starts and accepts a connection, so the author drags between the
+            // two sides that face each other rather than between a fixed out dot and in dot. The
+            // direction still comes from where the drag started: from the prerequisite to the
+            // thing it unlocks, which is the direction the arrow then points.
+            connectionMode={ConnectionMode.Loose}
             connectionLineType={ConnectionLineType.Bezier}
             connectionLineStyle={{
               stroke: "var(--color-app-brand)",
@@ -746,13 +767,30 @@ function GraphLegend({ editable }: { editable: boolean }) {
       </span>
       {editable ? (
         <span className="text-app-text-subtle">
-          Click a node to edit it. Drag right handle → left handle to lock; select an arrow and
-          press Backspace to unlock.
+          Click a node to edit it. To lock one behind another, drag from a dot on the edge of the
+          first to the second — any of the four sides. Select an arrow and press Backspace to
+          unlock.
         </span>
       ) : null}
     </div>
   );
 }
+
+/** The four sides a card can be connected on, and where React Flow puts each one. */
+const SIDE_HANDLES: { side: GraphSide; position: Position }[] = [
+  { side: "left", position: Position.Left },
+  { side: "right", position: Position.Right },
+  { side: "top", position: Position.Top },
+  { side: "bottom", position: Position.Bottom },
+];
+
+/** React Flow reports the side an endpoint landed on in its own vocabulary; this is ours. */
+const SIDE_BY_POSITION: Record<Position, GraphSide> = {
+  [Position.Left]: "left",
+  [Position.Right]: "right",
+  [Position.Top]: "top",
+  [Position.Bottom]: "bottom",
+};
 
 /**
  * An edge, drawn on the geometry in `graphLayout` rather than on one of React Flow's own shapes.
@@ -765,15 +803,24 @@ function BlueprintFlowEdge({
   id,
   sourceX,
   sourceY,
+  sourcePosition,
   targetX,
   targetY,
+  targetPosition,
   markerEnd,
   style,
 }: EdgeProps) {
   return (
     <BaseEdge
       id={id}
-      path={blueprintEdgePath({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })}
+      path={blueprintEdgePath(
+        { x: sourceX, y: sourceY },
+        { x: targetX, y: targetY },
+        {
+          source: SIDE_BY_POSITION[sourcePosition],
+          target: SIDE_BY_POSITION[targetPosition],
+        },
+      )}
       markerEnd={markerEnd}
       style={style}
       interactionWidth={20}
@@ -815,20 +862,31 @@ function BlueprintFlowNodeCard({ id, data, selected }: NodeProps<BlueprintFlowNo
       aria-label={data.ariaLabel}
     >
       {/*
-        Always rendered, even read-only. React Flow anchors an edge to its handles, so a node
-        without them has nowhere for an arrow to end — which is why the hire's view drew no
-        arrows at all. Read-only hides the dot and refuses connections instead of removing it.
+        One handle per side, always rendered — even read-only. React Flow anchors an edge to a
+        handle, so a node without them has nowhere for an arrow to end, which is why the hire's
+        view once drew no arrows at all. Read-only makes them invisible and refuses connections
+        rather than removing them.
+
+        `ConnectionMode.Loose` on the canvas is what lets one handle per side do the work of two:
+        every handle both starts a connection and accepts one, so an author drags between whichever
+        two sides face each other instead of hunting for the out dot and then the in dot.
       */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={data.hasHandles}
-        className={
-          data.hasHandles
-            ? "!h-3 !w-3 !border-2 !border-app-brand !bg-app-surface"
-            : "!h-1 !w-1 !border-0 !bg-transparent !opacity-0"
-        }
-      />
+      {SIDE_HANDLES.map(({ side, position }) => (
+        <Handle
+          key={side}
+          id={side}
+          type="source"
+          position={position}
+          isConnectable={data.hasHandles}
+          className={
+            data.hasHandles
+              ? // Shown on approach rather than always: four dots on every card is sixty-four dots
+                // on a sixteen-phase graph, and an author only needs the ones they are aiming at.
+                "!h-3 !w-3 !border-2 !border-app-brand !bg-app-surface !opacity-0 transition-opacity group-focus-within:!opacity-100 group-hover:!opacity-100"
+              : "!h-1 !w-1 !border-0 !bg-transparent !opacity-0"
+          }
+        />
+      ))}
 
       <div
         className={
@@ -849,17 +907,6 @@ function BlueprintFlowNodeCard({ id, data, selected }: NodeProps<BlueprintFlowNo
           </Badge>
         </span>
       ) : null}
-
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={data.hasHandles}
-        className={
-          data.hasHandles
-            ? "!h-3 !w-3 !border-2 !border-app-brand !bg-app-surface"
-            : "!h-1 !w-1 !border-0 !bg-transparent !opacity-0"
-        }
-      />
     </div>
   );
 }

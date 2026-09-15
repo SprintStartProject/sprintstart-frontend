@@ -6,6 +6,7 @@ import {
   autoLayoutPositions,
   blueprintEdgePath,
   canConnect,
+  edgeSides,
   chainFor,
   chainPositions,
   compactTitlePx,
@@ -387,6 +388,46 @@ describe("separateOverlaps", () => {
   });
 });
 
+/** The sides two cards side by side use: out of the right, into the left. */
+const ACROSS = { source: "right", target: "left" } as const;
+
+describe("edgeSides", () => {
+  it("sends an edge out of the side its target lies on", () => {
+    expect(edgeSides({ x: 0, y: 0 }, { x: 400, y: 0 })).toEqual({
+      source: "right",
+      target: "left",
+    });
+    expect(edgeSides({ x: 400, y: 0 }, { x: 0, y: 0 })).toEqual({
+      source: "left",
+      target: "right",
+    });
+  });
+
+  it("reaches a card below through the bottom rather than around the side", () => {
+    expect(edgeSides({ x: 0, y: 0 }, { x: 0, y: 300 })).toEqual({
+      source: "bottom",
+      target: "top",
+    });
+    expect(edgeSides({ x: 0, y: 300 }, { x: 0, y: 0 })).toEqual({
+      source: "top",
+      target: "bottom",
+    });
+  });
+
+  it("judges the axis against the card's shape, not in bare pixels", () => {
+    // 200 to the right and 200 down are the same number and not the same displacement: the card is
+    // 248 wide and 168 tall, so 200 down clears it and 200 across does not.
+    expect(edgeSides({ x: 0, y: 0 }, { x: 200, y: 200 }).source).toBe("bottom");
+    expect(edgeSides({ x: 0, y: 0 }, { x: 400, y: 200 }).source).toBe("right");
+  });
+
+  it("gives the same pair of cards the same sides every time", () => {
+    expect(edgeSides({ x: 12, y: 30 }, { x: 350, y: 96 })).toEqual(
+      edgeSides({ x: 12, y: 30 }, { x: 350, y: 96 }),
+    );
+  });
+});
+
 describe("blueprintEdgePath", () => {
   /** The four control values of a cubic `M sx,sy C c1x,c1y c2x,c2y tx,ty`. */
   function parse(path: string) {
@@ -397,7 +438,7 @@ describe("blueprintEdgePath", () => {
   }
 
   it("draws one cubic curve, from the source handle to the target handle", () => {
-    const path = blueprintEdgePath({ x: 0, y: 0 }, { x: 400, y: 120 });
+    const path = blueprintEdgePath({ x: 0, y: 0 }, { x: 400, y: 120 }, ACROSS);
     const { sx, sy, tx, ty } = parse(path);
 
     expect(path.startsWith("M 0,0 C ")).toBe(true);
@@ -406,21 +447,23 @@ describe("blueprintEdgePath", () => {
   });
 
   it("leaves each handle horizontally, which is the direction the handle faces", () => {
-    const { sx, c1x, c2x, tx } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 400, y: 120 }));
+    const { sx, c1x, c2x, tx } = parse(
+      blueprintEdgePath({ x: 0, y: 0 }, { x: 400, y: 120 }, ACROSS),
+    );
 
     expect(c1x).toBeGreaterThan(sx);
     expect(c2x).toBeLessThan(tx);
   });
 
   it("reaches further the further it has to go, so a long edge sweeps", () => {
-    const short = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 260, y: 120 }));
-    const long = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 700, y: 120 }));
+    const short = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 260, y: 120 }, ACROSS));
+    const long = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 700, y: 120 }, ACROSS));
 
     expect(long.c1x - long.sx).toBeGreaterThan(short.c1x - short.sx);
   });
 
   it("stops reaching before a very long edge loops off the canvas", () => {
-    const { sx, c1x } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 4000, y: 0 }));
+    const { sx, c1x } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 4000, y: 0 }, ACROSS));
 
     expect(c1x - sx).toBeLessThanOrEqual(260);
   });
@@ -428,7 +471,7 @@ describe("blueprintEdgePath", () => {
   it("bows an edge between two handles at the same height, rather than drawing a dash", () => {
     // Nothing tilts a curve between two points on one line, so without this the seeded blueprint's
     // rows are straight horizontal strokes — several of them parallel and hard to tell apart.
-    const { sy, c1y, c2y, ty } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 320, y: 0 }));
+    const { sy, c1y, c2y, ty } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 320, y: 0 }, ACROSS));
 
     expect(c1y).toBeGreaterThan(sy);
     expect(c2y).toBeGreaterThan(ty);
@@ -436,22 +479,39 @@ describe("blueprintEdgePath", () => {
   });
 
   it("does not bow an edge that already has a direction to curve in", () => {
-    const { sy, c1y, ty, c2y } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 320, y: 200 }));
+    const { sy, c1y, ty, c2y } = parse(
+      blueprintEdgePath({ x: 0, y: 0 }, { x: 320, y: 200 }, ACROSS),
+    );
 
     expect(c1y).toBe(sy);
     expect(c2y).toBe(ty);
   });
 
   it("swings a backwards edge wide, so the exception is visible as one", () => {
-    const { sx, c1x, tx, c2x } = parse(blueprintEdgePath({ x: 600, y: 0 }, { x: 0, y: 40 }));
+    const { sx, c1x, tx, c2x } = parse(
+      blueprintEdgePath({ x: 600, y: 0 }, { x: 0, y: 40 }, ACROSS),
+    );
 
     expect(c1x).toBeGreaterThan(sx);
     expect(c2x).toBeLessThan(tx);
   });
 
+  it("leaves a vertical handle vertically, rather than cutting across the card's corner", () => {
+    const down = { source: "bottom", target: "top" } as const;
+    const { sx, sy, c1x, c1y, tx, ty, c2x, c2y } = parse(
+      blueprintEdgePath({ x: 0, y: 0 }, { x: 0, y: 400 }, down),
+    );
+
+    expect(c1y).toBeGreaterThan(sy);
+    expect(c2y).toBeLessThan(ty);
+    // The bow on a vertical run is sideways, which is the only direction left for it.
+    expect(c1x).toBeGreaterThan(sx);
+    expect(c2x).toBeGreaterThan(tx);
+  });
+
   it("draws the same edge the same way every time", () => {
-    const first = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 });
-    const second = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 });
+    const first = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 }, ACROSS);
+    const second = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 }, ACROSS);
 
     expect(second).toBe(first);
   });

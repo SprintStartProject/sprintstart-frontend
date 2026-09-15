@@ -462,8 +462,49 @@ export function separateOverlaps(
 const EDGE_MIN_REACH = 72;
 /** And at the very most, so a long edge sweeps rather than loops off the canvas. */
 const EDGE_MAX_REACH = 260;
-/** Below this vertical difference an edge counts as flat and is bowed rather than left straight. */
+/** Below this sideways difference an edge counts as flat and is bowed rather than left straight. */
 const EDGE_FLAT_THRESHOLD = 28;
+
+/** Which side of a card an edge leaves from or lands on. */
+export type GraphSide = "left" | "right" | "top" | "bottom";
+
+/** The direction a side faces, which is the direction an edge leaves it in. */
+const SIDE_NORMAL: Record<GraphSide, GraphPoint> = {
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+  top: { x: 0, y: -1 },
+  bottom: { x: 0, y: 1 },
+};
+
+/** The two sides an edge between these two card centres should use. */
+export type GraphEdgeSides = { source: GraphSide; target: GraphSide };
+
+/**
+ * Which sides of two cards the edge between them should connect.
+ *
+ * Every edge used to leave on the right and land on the left, whatever the two cards' actual
+ * arrangement. A card sitting directly below the one it waits on got an edge that left rightwards,
+ * turned around and came back — a detour describing nothing, since the relation is the same one an
+ * arrow straight down would draw. So the side is picked from where the cards are: the edge leaves
+ * towards its target and lands facing where it came from.
+ *
+ * **Derived, never stored.** The backend has no field for a side and does not need one — move a
+ * card and its edges rearrange themselves, which is the behaviour an author expects and the one
+ * that cannot go stale.
+ *
+ * The axis is chosen against the card's own proportions rather than in raw pixels: the card is
+ * wider than it is tall, so "150 to the right" is a smaller displacement than "150 below", and
+ * comparing the two as bare numbers would send far too many edges out of the top and bottom.
+ */
+export function edgeSides(source: GraphPoint, target: GraphPoint): GraphEdgeSides {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+
+  if (Math.abs(dx) / GRAPH_NODE_WIDTH >= Math.abs(dy) / GRAPH_NODE_HEIGHT) {
+    return dx >= 0 ? { source: "right", target: "left" } : { source: "left", target: "right" };
+  }
+  return dy >= 0 ? { source: "bottom", target: "top" } : { source: "top", target: "bottom" };
+}
 
 /**
  * The shape of an edge: one cubic curve from the source handle to the target handle.
@@ -473,41 +514,55 @@ const EDGE_FLAT_THRESHOLD = 28;
  * on the same row got a dead straight dash, and several of those running parallel are hard to tell
  * apart at a glance. So the geometry is ours:
  *
- * - **Reach** grows with the distance the edge has to cover, bounded at both ends: a short hop still
- *   leaves its handle horizontally, and a long one sweeps instead of looping off the canvas.
- * - **A flat edge is bowed.** When the two handles sit at nearly the same height there is no
- *   direction for a curve to take, so both control points are pushed down by an amount that scales
- *   with the span. That is the swing on an otherwise straight run, and it separates two parallel
- *   edges that would otherwise be one line.
- * - **A backwards edge** (a target left of its source) falls out of the same rule as a wide loop
- *   out and back, which is what makes it visible as the exception it is.
+ * - **Each end leaves along the direction its side faces**, so the curve grows out of the card
+ *   rather than cutting across its corner.
+ * - **Reach** grows with the distance the edge has to cover, bounded at both ends, and never past
+ *   halfway on an edge already pointing the right way — past halfway the two control points sit
+ *   behind each other's handles and the curve doubles back on itself, which on a short hop between
+ *   two neighbours reads as a kink rather than a connection.
+ * - **A flat edge is bowed.** Two handles facing each other across an empty run have no direction
+ *   for a curve to take, so both control points are pushed sideways by an amount that scales with
+ *   the run. That is the swing, and it is what separates two parallel edges that would otherwise
+ *   be drawn as one line.
+ * - **An edge that has to double back** — a card that waits on one placed after it — keeps the full
+ *   reach and loops, which is what makes an edge running against the flow visible as one.
  *
  * Pure geometry, so what the canvas draws can be checked without mounting a canvas.
  */
-export function blueprintEdgePath(source: GraphPoint, target: GraphPoint): string {
+export function blueprintEdgePath(
+  source: GraphPoint,
+  target: GraphPoint,
+  sides: GraphEdgeSides,
+): string {
+  const sourceNormal = SIDE_NORMAL[sides.source];
+  const targetNormal = SIDE_NORMAL[sides.target];
+  const isHorizontal = sourceNormal.x !== 0;
+
   const dx = target.x - source.x;
   const dy = target.y - source.y;
+  // Along the axis the handles face; across it for everything else.
+  const along = isHorizontal ? dx : dy;
+  const across = Math.abs(isHorizontal ? dy : dx);
+  const span = Math.abs(along);
+  const facesTarget = along * (isHorizontal ? sourceNormal.x : sourceNormal.y) > 0;
 
-  const span = Math.abs(dx);
-  const wanted = Math.max(EDGE_MIN_REACH, span * 0.55 + Math.abs(dy) * 0.25);
-  // A forward edge's control points never pass each other: past halfway they sit behind each
-  // other's handles and the curve doubles back on itself, which on a short hop between two
-  // neighbouring cards reads as a kink rather than a connection. The bow below is what gives a
-  // short edge its shape instead. A backwards edge keeps the full reach — there the loop is the
-  // point, and it is what makes an edge running against the flow visible as one.
-  const reach = Math.min(EDGE_MAX_REACH, dx > 0 ? Math.min(wanted, span * 0.5) : wanted);
+  const wanted = Math.max(EDGE_MIN_REACH, span * 0.55 + across * 0.25);
+  const reach = Math.min(EDGE_MAX_REACH, facesTarget ? Math.min(wanted, span * 0.5) : wanted);
 
   // Both control points are offset the same way, which bows the curve rather than tilting it.
   // Proportional, with no floor: a long flat run gets a real swing, and a short hop between two
   // neighbouring cards stays nearly flat rather than kinking over the few pixels it has.
-  const bow = Math.abs(dy) < EDGE_FLAT_THRESHOLD ? Math.min(44, span * 0.16) : 0;
+  const bowSize = across < EDGE_FLAT_THRESHOLD ? Math.min(44, span * 0.16) : 0;
+  const bow = isHorizontal ? { x: 0, y: bowSize } : { x: bowSize, y: 0 };
 
   const round = (value: number) => Math.round(value * 100) / 100;
+  const control = (point: GraphPoint, normal: GraphPoint) =>
+    `${round(point.x + normal.x * reach + bow.x)},${round(point.y + normal.y * reach + bow.y)}`;
 
   return [
     `M ${round(source.x)},${round(source.y)}`,
-    `C ${round(source.x + reach)},${round(source.y + bow)}`,
-    `${round(target.x - reach)},${round(target.y + bow)}`,
+    `C ${control(source, sourceNormal)}`,
+    control(target, targetNormal),
     `${round(target.x)},${round(target.y)}`,
   ].join(" ");
 }
