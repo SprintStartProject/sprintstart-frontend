@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenCheck,
   CircleHelp,
@@ -112,6 +112,8 @@ export function BlueprintPathsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  /** Guards against a scope switch landing the previous scope's answers. */
+  const loadToken = useRef(0);
 
   const loadPaths = useCallback(async () => {
     if (!hasBlueprintScope) {
@@ -122,35 +124,44 @@ export function BlueprintPathsPage() {
       return;
     }
 
+    const token = ++loadToken.current;
     setIsLoading(true);
     setError(null);
-    try {
-      const overviews = await blueprintService.getPaths(scope);
-      setPaths(overviews);
-      setContents({});
 
-      // Read in the background: the cards are useful the moment the overviews land, and a count is
-      // never worth making somebody wait for the list. A path that fails to read simply has no
-      // counts — an error box over a whole page because one number is missing helps nobody.
-      const readable = overviews.slice(0, CONTENTS_FETCH_LIMIT);
-      const summaries = await Promise.all(
-        readable.map(async (overview) => {
-          try {
-            return [
-              overview.id,
-              summarise(await blueprintService.getPath(scope, overview.id)),
-            ] as const;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      setContents(Object.fromEntries(summaries.filter((entry) => entry !== null)));
+    let overviews: BlueprintPathOverview[];
+    try {
+      overviews = await blueprintService.getPaths(scope);
     } catch (reason) {
+      if (token !== loadToken.current) return;
       setError(reason instanceof Error ? reason.message : "Blueprint paths could not be loaded.");
-    } finally {
       setIsLoading(false);
+      return;
     }
+
+    if (token !== loadToken.current) return;
+    setPaths(overviews);
+    setContents({});
+    // The list is done here. Reading each path for its counts happens after, because a count is
+    // never worth making somebody wait for the list — and a path that fails to read simply has no
+    // counts rather than putting an error box over the page.
+    setIsLoading(false);
+
+    const summaries = await Promise.all(
+      overviews.slice(0, CONTENTS_FETCH_LIMIT).map(async (overview) => {
+        try {
+          return [
+            overview.id,
+            summarise(await blueprintService.getPath(scope, overview.id)),
+          ] as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    // A scope switch while these were in flight must not drop the previous scope's counts in.
+    if (token !== loadToken.current) return;
+    setContents(Object.fromEntries(summaries.filter((entry) => entry !== null)));
   }, [hasBlueprintScope, scope]);
 
   useEffect(() => {
