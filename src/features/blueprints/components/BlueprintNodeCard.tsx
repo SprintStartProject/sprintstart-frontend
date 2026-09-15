@@ -1,6 +1,6 @@
 import { KeyRound, type LucideIcon } from "lucide-react";
 import { Badge, type BadgeVariant } from "../../../components/ui/Badge.tsx";
-import { compactTitlePx } from "./graphLayout.ts";
+import { GRAPH_NODE_HEIGHT, compactTitlePx } from "./graphLayout.ts";
 import type { BlueprintGraphCanvasNodeProps } from "./BlueprintGraphCanvas.tsx";
 
 export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
@@ -75,16 +75,26 @@ export function BlueprintNodeCard({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "flex w-full flex-col rounded-xl border bg-app-surface text-left shadow-sm transition-colors",
+        "flex w-full flex-col overflow-hidden rounded-xl border bg-app-surface text-left",
+        "shadow-sm transition-[box-shadow,transform,border-color,background-color] duration-150",
         "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
         isCompact ? "justify-center" : "p-3",
         highlighted ? "border-app-brand bg-app-brand-soft" : "border-app-border",
-        disabled ? "cursor-default opacity-70" : "hover:border-app-brand-border-strong",
-        inLibrary ? "min-h-16" : "min-h-[6.5rem]",
+        disabled
+          ? "cursor-default opacity-70"
+          : // Depth is what tells a card from the surface it sits on: it lifts a little and casts
+            // further as the pointer comes to it, and settles back when it leaves.
+            "hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg motion-reduce:hover:translate-y-0",
+        inLibrary ? "min-h-16" : "",
       ].join(" ")}
-      // Compact padding scales with the title for the same reason the title does: a 12px inset
-      // beside a 39px word reads as no inset at all.
-      style={isCompact ? { padding: `${titlePx * 0.5}px` } : undefined}
+      style={{
+        // Exactly the box the layout reserved for it. A card free to outgrow its own footprint is
+        // a card the tidy layout leaves too little room for, which is how they end up overlapping.
+        ...(inLibrary ? {} : { height: GRAPH_NODE_HEIGHT }),
+        // Compact padding scales with the title for the same reason the title does: a 12px inset
+        // beside a 39px word reads as no inset at all.
+        ...(isCompact ? { padding: `${titlePx * 0.5}px` } : {}),
+      }}
     >
       {isCompact ? (
         <>
@@ -118,20 +128,23 @@ export function BlueprintNodeCard({
             <KindIcon className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
           </span>
 
-          {meta ? (
-            <span className="mt-1.5 line-clamp-2 block text-xs text-app-text-muted">{meta}</span>
-          ) : null}
+          {/* The middle takes whatever is left over and clips, so the chips below never move. */}
+          <span className="mt-1.5 min-h-0 flex-1 overflow-hidden">
+            {meta ? (
+              <span className="line-clamp-2 block text-xs text-app-text-muted">{meta}</span>
+            ) : null}
 
-          {gates.length > 0 ? (
-            <span className="mt-1.5 flex items-start gap-1 text-xs text-app-text-muted">
-              <KeyRound className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-              <span className="line-clamp-2">
-                Only for {gates.map((gate) => gate.label).join(", ")}
+            {gates.length > 0 ? (
+              <span className="mt-1.5 flex items-start gap-1 text-xs text-app-text-muted">
+                <KeyRound className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="line-clamp-2">
+                  Only for {gates.map((gate) => gate.label).join(", ")}
+                </span>
               </span>
-            </span>
-          ) : null}
+            ) : null}
+          </span>
 
-          <span className="mt-3 flex flex-wrap gap-1.5">
+          <span className="mt-2 flex flex-wrap gap-1.5">
             <Badge variant="neutral" size="sm">
               {kind.label}
             </Badge>

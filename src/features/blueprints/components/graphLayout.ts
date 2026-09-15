@@ -15,13 +15,18 @@ import dagre from "dagre";
  */
 
 /**
- * The card box on the canvas, fixed.
+ * The card box on the canvas, fixed — and the card is drawn at exactly this size.
  *
  * Fixed rather than measured because dagre needs a size before React Flow has laid anything out,
  * and because two cards of different heights in one rank make a tidy layout look untidy.
+ *
+ * The height used to be an estimate the card was free to exceed: a title over two lines, a line of
+ * context, a requirements line and a row of chips came to about 180px against an assumed 116, so
+ * every gap the layout left was too small and cards sat on top of each other. Both the geometry and
+ * the card now read this, so they cannot drift apart again.
  */
 export const GRAPH_NODE_WIDTH = 248;
-export const GRAPH_NODE_HEIGHT = 116;
+export const GRAPH_NODE_HEIGHT = 168;
 
 /** The grid an unplaced node falls into, and the spacing "tidy up" lays chains out on. */
 const COLUMN_STEP = GRAPH_NODE_WIDTH + 80;

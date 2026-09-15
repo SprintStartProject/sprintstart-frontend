@@ -591,6 +591,19 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             proOptions={{ hideAttribution: false }}
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+            {/*
+              A vignette over the dots, under everything else. The cards read as lying *on* a
+              surface rather than being drawn *in* a texture, which is the whole of the third
+              dimension here — nothing is actually perspective-projected.
+            */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(120% 80% at 50% 35%, transparent 40%, var(--color-app-bg) 100%)",
+              }}
+            />
             <Controls showInteractive={false} />
             {/*
               React Flow's minimap ships a white panel and grey nodes, which on the dark theme is a
@@ -771,7 +784,9 @@ function BlueprintFlowNodeCard({ id, data, selected }: NodeProps<BlueprintFlowNo
 
       <div
         className={
-          selected ? "rounded-xl ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg" : undefined
+          selected
+            ? "rounded-xl shadow-lg ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg transition-transform"
+            : "transition-transform"
         }
       >
         {data.render()}
