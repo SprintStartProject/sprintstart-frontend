@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { Badge } from "../components/ui/Badge.tsx";
 import { Button } from "../components/ui/Button.tsx";
+import { SegmentedTabs } from "../components/ui/SegmentedTabs.tsx";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
 import { EmptyState } from "../components/ui/EmptyState.tsx";
 import { Field } from "../components/ui/Field.tsx";
 import { Input } from "../components/ui/Input.tsx";
@@ -19,6 +21,9 @@ function statusVariant(status: BlueprintPathOverview["status"]) {
 }
 
 /** Lists all authoring Blueprint paths and starts the path-creation flow. */
+/** Left-to-right order of the scope bar, shared by the bar and the swipe gesture. */
+const BLUEPRINT_SCOPE_ORDER = ["project", "global"] as const;
+
 export function BlueprintPathsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -83,8 +88,18 @@ export function BlueprintPathsPage() {
     }
   }
 
+  // Two-finger swipe between the two scopes, for people who would rather not aim at the bar.
+  const swipeRef = useSwipeableTabs<"project" | "global", HTMLElement>({
+    order: BLUEPRINT_SCOPE_ORDER,
+    value: isGlobal ? "global" : "project",
+    onChange: (next) => setSearchParams(next === "global" ? { scope: "global" } : {}),
+    enabled: isAdmin,
+  });
+
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+    // The swipe listens on the page rather than on the bar: having to be over the control to change
+    // scope makes the gesture feel like it only works in one corner.
+    <main ref={swipeRef} className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         icon={Layers3}
         title="Blueprint paths"
@@ -102,22 +117,16 @@ export function BlueprintPathsPage() {
       />
 
       {isAdmin ? (
-        <div className="flex flex-wrap gap-2" aria-label="Blueprint scope">
-          <Button
-            variant={isGlobal ? "secondary" : "primary"}
-            aria-pressed={!isGlobal}
-            onClick={() => setSearchParams({})}
-          >
-            Project blueprints
-          </Button>
-          <Button
-            variant={isGlobal ? "primary" : "secondary"}
-            aria-pressed={isGlobal}
-            onClick={() => setSearchParams({ scope: "global" })}
-          >
-            Global blueprints
-          </Button>
-        </div>
+        <SegmentedTabs
+          value={isGlobal ? "global" : "project"}
+          options={[
+            { value: "project", label: "Project blueprints" },
+            { value: "global", label: "Global blueprints" },
+          ]}
+          onChange={(next) => setSearchParams(next === "global" ? { scope: "global" } : {})}
+          layoutId="blueprint-scope-pill"
+          ariaLabel="Blueprint scope"
+        />
       ) : null}
 
       {error ? (
