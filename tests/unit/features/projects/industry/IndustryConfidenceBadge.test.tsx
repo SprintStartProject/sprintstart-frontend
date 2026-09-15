@@ -16,4 +16,17 @@ describe("IndustryConfidenceBadge", () => {
     render(<IndustryConfidenceBadge confidence={confidence} />);
     expect(screen.getByText(label)).toBeInTheDocument();
   });
+
+  it("renders a Custom badge instead of a confidence badge when isCustom is set", () => {
+    render(<IndustryConfidenceBadge confidence="high" isCustom />);
+
+    expect(screen.getByText("Custom")).toBeInTheDocument();
+    expect(screen.queryByText("High confidence")).not.toBeInTheDocument();
+  });
+
+  it("renders a Custom badge even without a confidence value", () => {
+    render(<IndustryConfidenceBadge confidence={null} isCustom />);
+
+    expect(screen.getByText("Custom")).toBeInTheDocument();
+  });
 });

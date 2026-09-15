@@ -33,6 +33,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate={false}
         onEvaluated={onEvaluated}
       />,
@@ -47,6 +48,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry="Fintech"
         industryConfidence="high"
+        industryCustom={false}
         canEvaluate={false}
         onEvaluated={onEvaluated}
       />,
@@ -56,12 +58,28 @@ describe("ProjectIndustryPanel", () => {
     expect(screen.getByText("High confidence")).toBeInTheDocument();
   });
 
+  it("shows a Custom badge instead of a confidence badge when the industry was set by hand", () => {
+    render(
+      <ProjectIndustryPanel
+        projectId="proj-1"
+        industry="Fintech"
+        industryConfidence={null}
+        industryCustom
+        canEvaluate={false}
+        onEvaluated={onEvaluated}
+      />,
+    );
+
+    expect(screen.getByText("Custom")).toBeInTheDocument();
+  });
+
   it("hides the re-evaluate button when canEvaluate is false", () => {
     render(
       <ProjectIndustryPanel
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate={false}
         onEvaluated={onEvaluated}
       />,
@@ -84,6 +102,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -120,6 +139,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry="Fintech"
         industryConfidence="high"
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -137,6 +157,25 @@ describe("ProjectIndustryPanel", () => {
     );
   });
 
+  it("warns that a manually set industry will be overwritten when the industry is custom", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProjectIndustryPanel
+        projectId="proj-1"
+        industry="Fintech"
+        industryConfidence={null}
+        industryCustom
+        canEvaluate
+        onEvaluated={onEvaluated}
+      />,
+    );
+
+    await user.click(screen.getByTestId("reevaluate-industry-button"));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText(/manually set industry/)).toBeInTheDocument();
+  });
+
   it("does not evaluate when the confirmation is cancelled", async () => {
     const { projectService } = await import("../../../../../src/services/projectService");
 
@@ -146,6 +185,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry="Fintech"
         industryConfidence="high"
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -173,6 +213,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -200,6 +241,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -234,6 +276,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -263,6 +306,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         onEvaluated={onEvaluated}
       />,
@@ -288,6 +332,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         collapsibleEvidence
         onEvaluated={onEvaluated}
@@ -319,6 +364,7 @@ describe("ProjectIndustryPanel", () => {
         projectId="proj-1"
         industry=""
         industryConfidence={null}
+        industryCustom={false}
         canEvaluate
         disabled
         onEvaluated={onEvaluated}

@@ -14,6 +14,8 @@ type ProjectIndustryPanelProps = {
   projectId: string;
   industry: string;
   industryConfidence: IndustryConfidence | null;
+  /** Whether the industry was set by hand (PM/admin) rather than by the AI evaluation. */
+  industryCustom: boolean;
   /** Whether the viewer may trigger a re-evaluation. Hides the button entirely when false. */
   canEvaluate: boolean;
   disabled?: boolean;
@@ -38,6 +40,7 @@ export function ProjectIndustryPanel({
   projectId,
   industry,
   industryConfidence,
+  industryCustom,
   canEvaluate,
   disabled = false,
   collapsibleEvidence = false,
@@ -87,7 +90,7 @@ export function ProjectIndustryPanel({
           <p className="text-sm font-medium text-app-text" data-testid="project-industry-value">
             {industry || "Not determined yet"}
           </p>
-          <IndustryConfidenceBadge confidence={industryConfidence} />
+          <IndustryConfidenceBadge confidence={industryConfidence} isCustom={industryCustom} />
         </div>
 
         {canEvaluate && (
@@ -142,7 +145,11 @@ export function ProjectIndustryPanel({
       <AlertDialog
         isOpen={isConfirmOpen}
         title="Re-evaluate industry?"
-        description={`This overwrites the current industry ("${industry}") with a fresh AI evaluation.`}
+        description={
+          industryCustom
+            ? `This overwrites the manually set industry ("${industry}") with a fresh AI evaluation.`
+            : `This overwrites the current industry ("${industry}") with a fresh AI evaluation.`
+        }
         confirmLabel="Re-evaluate"
         cancelLabel="Cancel"
         onClose={() => setIsConfirmOpen(false)}

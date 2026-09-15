@@ -323,6 +323,20 @@ describe("ProjectDetailsDrawer", () => {
       expect(screen.getByText("High confidence")).toBeInTheDocument();
     });
 
+    it("shows a Custom badge instead of a confidence badge for a manually set industry", async () => {
+      vi.mocked(projectService.getProjectById).mockResolvedValue({
+        ...projectDetails,
+        industry: "Fintech",
+        industryConfidence: null,
+        industryCustom: true,
+      });
+
+      render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => expect(screen.getByLabelText("Industry")).toHaveValue("Fintech"));
+      expect(screen.getByText("Custom")).toBeInTheDocument();
+    });
+
     it("saves an edited industry", async () => {
       const user = userEvent.setup();
       vi.mocked(projectService.updateProject).mockResolvedValue(projectDetails);

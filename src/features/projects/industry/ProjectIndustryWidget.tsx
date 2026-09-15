@@ -99,6 +99,7 @@ export function ProjectIndustryWidget() {
           projectId={selectedProjectId}
           industry={project.industry}
           industryConfidence={project.industryConfidence}
+          industryCustom={project.industryCustom}
           canEvaluate={canEvaluate}
           collapsibleEvidence
           onEvaluated={() => void handleEvaluated()}

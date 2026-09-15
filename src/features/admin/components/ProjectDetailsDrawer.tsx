@@ -352,6 +352,7 @@ export function ProjectDetailsDrawer({
                   projectId={project.id}
                   industry={visibleProject.industry}
                   industryConfidence={visibleProject.industryConfidence}
+                  industryCustom={visibleProject.industryCustom}
                   canEvaluate={canManageLifecycle}
                   disabled={hasIndustryChanges || isSaving}
                   onEvaluated={() => void handleIndustryEvaluated()}

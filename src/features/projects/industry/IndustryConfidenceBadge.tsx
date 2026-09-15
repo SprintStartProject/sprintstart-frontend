@@ -17,11 +17,29 @@ const CONFIDENCE_LABEL: Record<IndustryConfidence, string> = {
 
 type IndustryConfidenceBadgeProps = {
   confidence: IndustryConfidence | null;
+  /** Whether the industry was set by hand rather than detected by the AI. */
+  isCustom?: boolean;
   size?: BadgeSize;
 };
 
-/** `null` renders nothing — there is no confidence to show for an undetermined industry. */
-export function IndustryConfidenceBadge({ confidence, size }: IndustryConfidenceBadgeProps) {
+/**
+ * `null` confidence renders nothing unless the industry is custom, in which case a
+ * "Custom" badge takes its place — there is no AI confidence to show for a manually
+ * set value, but it is still worth flagging that it did not come from an evaluation.
+ */
+export function IndustryConfidenceBadge({
+  confidence,
+  isCustom = false,
+  size,
+}: IndustryConfidenceBadgeProps) {
+  if (isCustom) {
+    return (
+      <Badge variant="neutral" size={size}>
+        Custom
+      </Badge>
+    );
+  }
+
   if (!confidence) return null;
 
   return (
