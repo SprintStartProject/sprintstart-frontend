@@ -432,6 +432,42 @@ describe("ProjectDetailsDrawer", () => {
       expect(screen.getByText("High confidence")).toBeInTheDocument();
       expect(vi.mocked(projectService.getProjectById)).toHaveBeenCalledTimes(2);
     });
+
+    it("keeps an unsaved name edit after a re-evaluation refreshes the project", async () => {
+      const user = userEvent.setup();
+      vi.mocked(projectService.getProjectById)
+        .mockResolvedValueOnce(projectDetails)
+        .mockResolvedValueOnce({
+          ...projectDetails,
+          industry: "Fintech",
+          industryConfidence: "high",
+        });
+      vi.mocked(projectService.evaluateProjectIndustry).mockResolvedValue({
+        industry: "Fintech",
+        confidence: "high",
+        evidence: [],
+      });
+
+      render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          isOpen={true}
+          canManageLifecycle
+          onClose={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "Renamed draft");
+
+      await user.click(screen.getByTestId("reevaluate-industry-button"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Fintech"),
+      );
+      expect(screen.getByLabelText("Name")).toHaveValue("Renamed draft");
+    });
   });
 
   describe("people section", () => {

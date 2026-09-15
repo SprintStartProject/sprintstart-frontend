@@ -411,7 +411,7 @@ describe("CreateProjectWizard", () => {
     expect(payload.industry).toBeUndefined();
   });
 
-  it("shows the entered industry on the review step, or 'Detected automatically' when empty", async () => {
+  it("shows the entered industry on the review step, or 'Not set' when empty", async () => {
     const user = userEvent.setup();
     renderWizard();
     await settleModalFocus();
@@ -421,7 +421,7 @@ describe("CreateProjectWizard", () => {
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    expect(await screen.findByText("Detected automatically")).toBeInTheDocument();
+    expect(await screen.findByText("Not set")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Go to Details" }));
     await user.type(screen.getByLabelText("Industry"), "Fintech");

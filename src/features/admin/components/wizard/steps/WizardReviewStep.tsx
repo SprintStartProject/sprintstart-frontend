@@ -130,9 +130,7 @@ export function WizardReviewStep({
           <div className="flex gap-3">
             <dt className="w-24 shrink-0 text-app-text-muted">Industry</dt>
             <dd className="text-app-text">
-              {industry.trim() || (
-                <span className="text-app-text-muted">Detected automatically</span>
-              )}
+              {industry.trim() || <span className="text-app-text-muted">Not set</span>}
             </dd>
           </div>
           <div className="flex items-center gap-3">

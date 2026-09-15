@@ -73,6 +73,22 @@ describe("ProjectIndustryPanel", () => {
     expect(screen.getByText("Custom")).toBeInTheDocument();
   });
 
+  it("hides the confidence badge when the industry is empty", () => {
+    render(
+      <ProjectIndustryPanel
+        projectId="proj-1"
+        industry=""
+        industryConfidence="low"
+        industryCustom={false}
+        canEvaluate={false}
+        onEvaluated={onEvaluated}
+      />,
+    );
+
+    expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Not determined yet");
+    expect(screen.queryByText("Low confidence")).not.toBeInTheDocument();
+  });
+
   it("hides the re-evaluate button when canEvaluate is false", () => {
     render(
       <ProjectIndustryPanel

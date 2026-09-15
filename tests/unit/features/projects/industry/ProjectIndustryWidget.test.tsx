@@ -48,6 +48,7 @@ const render = () => rtlRender(<ProjectIndustryWidget />, { wrapper: ToastProvid
 
 function projectDetails(
   overrides: Partial<{
+    id: string;
     industry: string;
     industryConfidence: "high" | "medium" | "low" | null;
   }> = {},
@@ -379,6 +380,40 @@ describe("ProjectIndustryWidget", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByTestId("industry-edit-input")).toHaveValue("Healthcare");
+  });
+
+  it("shows loading instead of the previous project's industry while switching projects", async () => {
+    const { projectService } = await import("../../../../../src/services/projectService");
+    let resolveSecond!: (value: ReturnType<typeof projectDetails>) => void;
+    vi.mocked(projectService.getAccessibleProject)
+      .mockResolvedValueOnce(projectDetails({ industry: "Fintech", industryConfidence: "high" }))
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+
+    const { rerender } = render();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Fintech"),
+    );
+
+    contextOverrides = {
+      selectedProjectId: "proj-2",
+      selectedProject: createSelectableProject({ id: "proj-2", isManaged: true }),
+    };
+    rerender(<ProjectIndustryWidget />);
+
+    expect(screen.getByText("Loading")).toBeInTheDocument();
+    expect(screen.queryByText("Fintech")).not.toBeInTheDocument();
+
+    resolveSecond(
+      projectDetails({ id: "proj-2", industry: "Healthcare", industryConfidence: "medium" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Healthcare"),
+    );
   });
 
   it("renders nothing when no project is selected", () => {

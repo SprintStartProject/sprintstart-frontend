@@ -201,15 +201,18 @@ export function ProjectDetailsDrawer({
     }
   };
 
-  // Re-fetches and adopts the whole project rather than merging the evaluation
-  // result in place: a re-evaluation persists on the server regardless of the
-  // local draft, so the draft is reset to match rather than left to disagree
-  // with what was just saved.
+  // Re-fetches and adopts the whole project, but only into `draftProject` -
+  // never `resetDrafts`, which would also wipe the unrelated people draft.
+  // The name/description draft itself is only replaced while untouched, so an
+  // admin's in-progress edits (or queued people changes) survive a
+  // re-evaluation rather than being silently discarded.
   const handleIndustryEvaluated = async () => {
     try {
       const updatedProject = await projectService.getProjectById(project.id);
       applyProjectUpdate(updatedProject);
-      resetDrafts(updatedProject);
+      if (!hasEditedDetailsRef.current) {
+        setDraftProject(getProjectEditFormState(updatedProject));
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Couldn't refresh the project after evaluation.",
@@ -225,7 +228,9 @@ export function ProjectDetailsDrawer({
       await projectService.setProjectIndustry(project.id, industry);
       const updatedProject = await projectService.getProjectById(project.id);
       applyProjectUpdate(updatedProject);
-      resetDrafts(updatedProject);
+      if (!hasEditedDetailsRef.current) {
+        setDraftProject(getProjectEditFormState(updatedProject));
+      }
       toast.success(`Industry set to "${industry}"`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save the project's industry.");

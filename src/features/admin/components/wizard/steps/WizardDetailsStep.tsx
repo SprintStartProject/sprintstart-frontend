@@ -102,7 +102,7 @@ export function WizardDetailsStep({
       <Field
         label="Industry"
         controlId={industryInputId}
-        hint="Optional. Leave empty to let the AI detect it after the first ingest."
+        hint="Optional. Leave empty and set or evaluate it later from the project's admin drawer."
       >
         <Input
           value={industry}

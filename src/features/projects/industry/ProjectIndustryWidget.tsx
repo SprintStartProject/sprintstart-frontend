@@ -62,6 +62,13 @@ export function ProjectIndustryWidget() {
 
   const canEvaluate = profile?.permissionGroup === "ADMIN" || (selectedProject?.isManaged ?? false);
 
+  // `project` only updates once the fetch for the newly selected project
+  // resolves, so right after switching projects it still holds the previous
+  // one. Treat that as "not loaded yet" rather than briefly showing the wrong
+  // project's industry.
+  const isProjectStale = project !== null && project.id !== selectedProjectId;
+  const visibleProject = isProjectStale ? null : project;
+
   // Deliberately does not call the project context's `reloadProjects`: that
   // flips its `isLoading` flag, which `ManagerAreaGuard` uses to swap this
   // whole route for a skeleton — unmounting this widget (and the freshly
@@ -106,16 +113,17 @@ export function ProjectIndustryWidget() {
 
       {error ? (
         <p className="text-sm text-app-text-muted">{error}</p>
-      ) : !project ? (
+      ) : !visibleProject ? (
         <div className="flex items-center justify-center p-4">
           <Spinner size="lg" label="Loading" />
         </div>
       ) : (
         <ProjectIndustryPanel
+          key={selectedProjectId}
           projectId={selectedProjectId}
-          industry={project.industry}
-          industryConfidence={project.industryConfidence}
-          industryCustom={project.industryCustom}
+          industry={visibleProject.industry}
+          industryConfidence={visibleProject.industryConfidence}
+          industryCustom={visibleProject.industryCustom}
           canEvaluate={canEvaluate}
           canEdit={canEvaluate}
           onSave={handleSaveIndustry}

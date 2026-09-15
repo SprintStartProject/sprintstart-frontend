@@ -169,7 +169,9 @@ export function ProjectIndustryPanel({
               <p className="text-sm font-medium text-app-text" data-testid="project-industry-value">
                 {industry || "Not determined yet"}
               </p>
-              <IndustryConfidenceBadge confidence={industryConfidence} isCustom={industryCustom} />
+              {industry && (
+                <IndustryConfidenceBadge confidence={industryConfidence} isCustom={industryCustom} />
+              )}
             </>
           )}
         </div>
@@ -252,8 +254,8 @@ export function ProjectIndustryPanel({
 
           {(!collapsibleEvidence || isEvidenceExpanded) && (
             <ul id={evidenceListId} className="space-y-1.5 text-sm text-app-text-muted">
-              {lastEvaluation.evidence.map((item) => (
-                <li key={item} className="flex gap-2">
+              {lastEvaluation.evidence.map((item, index) => (
+                <li key={index} className="flex gap-2">
                   <span aria-hidden="true">-</span>
                   <span>{item}</span>
                 </li>
