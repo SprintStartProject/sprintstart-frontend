@@ -136,7 +136,7 @@ function AppContent() {
 
         {/* Decorative easter egg; only for signed-in users, so it never
           sits on top of the login screen, and off unless turned on in
-          Settings (see MomentsSection). */}
+          Settings (see AppearanceSection). */}
         {signedIn && showRocketPet && <RocketPet />}
       </div>
     </BuddyProvider>
