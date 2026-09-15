@@ -40,6 +40,7 @@ import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
 import { useFocusMode } from "../../../context/useFocusMode.ts";
+import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
 import {
   COMPACT_DETAIL_ZOOM,
   EDGE_REFUSAL_MESSAGE,
@@ -55,10 +56,12 @@ import {
   edgeSides,
   entryPointIds,
   separateOverlaps,
+  EDGE_TONES,
   type ChainPosition,
+  type GraphEdgeTone,
   type GraphPositions,
   type GraphSide,
-} from "./graphLayout.ts";
+} from "../../graph-diagram/graphLayout.ts";
 
 /** The common graph fields persisted for both Blueprint phases and phase-subgraph nodes. */
 export type BlueprintGraphCanvasNode = {
@@ -130,6 +133,13 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   onRemoveBlocker: (node: TNode, blockerId: string) => Promise<void>;
   onCreateFromLibrary?: (templateId: string, x: number, y: number) => Promise<void>;
   renderNode: (node: TNode, props: BlueprintGraphCanvasNodeProps) => ReactNode;
+  /**
+   * Who put this arrow here, where that is a question the graph can answer.
+   *
+   * Left out by every Blueprint surface: there, one author wrote all of them, and three line styles
+   * for one kind of thing would be three claims where there is one.
+   */
+  edgeTone?: (node: TNode, blockerId: string) => GraphEdgeTone;
 };
 
 const LIBRARY_NODE_MIME = "application/x-blueprint-node";
@@ -195,6 +205,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   onRemoveBlocker,
   onCreateFromLibrary,
   renderNode,
+  edgeTone,
 }: Props<TNode>) {
   const { screenToFlowPosition, fitView } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
@@ -358,6 +369,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
           // Which side of each card this edge uses is read off where the two cards are, not fixed
           // at right-out/left-in: a card below the one it waits on is reached from below.
           const sides = edgeSides(positions[blockerId], positions[node.id]);
+          const tone = EDGE_TONES[edgeTone?.(node, blockerId) ?? "rule"];
 
           return {
             id: `${blockerId}->${node.id}`,
@@ -374,7 +386,8 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
               // React Flow's own stroke is a fixed light grey that vanishes on the dark theme, so
               // the edge carries the brand token and a weight that survives being zoomed out.
               stroke: "var(--color-app-brand)",
-              strokeWidth: 2,
+              strokeWidth: tone.width,
+              strokeDasharray: tone.dash,
               strokeLinecap: "round" as const,
               opacity:
                 chainIds !== null && !(chainIds.has(blockerId) && chainIds.has(node.id)) ? 0.15 : 1,
@@ -385,11 +398,11 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
               height: 18,
               color: "var(--color-app-brand)",
             },
-            ariaLabel: `${nodeById.get(blockerId)?.title ?? "A node"} must be finished before ${node.title}`,
+            ariaLabel: `${nodeById.get(blockerId)?.title ?? "A node"} must be finished before ${node.title}${edgeTone ? `, ${tone.said}` : ""}`,
           };
         }),
     );
-  }, [placedNodes, positions, chainIds, editable, nodeById]);
+  }, [placedNodes, positions, chainIds, editable, edgeTone, nodeById]);
 
   /** Runs one graph mutation, holding the canvas still and surfacing the reason if it fails. */
   const runMutation = useCallback(
@@ -801,7 +814,7 @@ function GraphLegend({ editable }: { editable: boolean }) {
             markerEnd="url(#legend-arrow)"
           />
         </svg>
-        An arrow is a lock: the node it points at stays closed until the other is finished.
+        {LOCK_SENTENCE}
       </span>
       <span className="flex items-center gap-2">
         <Flag className="h-3.5 w-3.5 shrink-0 text-app-brand" aria-hidden="true" />

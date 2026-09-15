@@ -20,6 +20,7 @@ import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
+import { BoardChainPanel } from "../features/board/components/BoardChainPanel";
 import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathCards";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
@@ -443,8 +444,23 @@ export function BoardPage() {
     [board, pathCard, pendingRemovals],
   );
 
-  const { states, assignStage, assignGroupStage, toggleDone, setPredecessor, applyPlan } =
-    useBoardStructure(boardId, allCards);
+  const {
+    structure,
+    states,
+    assignStage,
+    assignGroupStage,
+    toggleDone,
+    setPredecessor,
+    applyPlan,
+  } = useBoardStructure(boardId, allCards);
+
+  /**
+   * The card whose run is being looked at, or null.
+   *
+   * Held by the page rather than by a card: the picture is a panel over the whole board, and two
+   * cards each holding their own would be two panels racing to be the open one.
+   */
+  const [chainCardId, setChainCardId] = useState<string | null>(null);
 
   // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer
   // the marker pen on text that turns out to be on one of them. Taken back when this page leaves.
@@ -1244,6 +1260,7 @@ export function BoardPage() {
                   onAssignGroupStage={assignGroupStage}
                   onToggleDone={toggleDone}
                   onSetPredecessor={setPredecessor}
+                  onShowChain={setChainCardId}
                   stacks={stacks}
                   expandedStackIds={openStackIds}
                   onToggleStack={toggleStack}
@@ -1269,6 +1286,14 @@ export function BoardPage() {
           </Link>
         </p>
       </main>
+
+      <BoardChainPanel
+        cardId={chainCardId}
+        cards={allCards}
+        structure={structure}
+        states={states}
+        onClose={() => setChainCardId(null)}
+      />
     </div>
   );
 }

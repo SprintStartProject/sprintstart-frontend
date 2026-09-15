@@ -16,7 +16,7 @@ import {
   separateOverlaps,
   withFallbackPositions,
   type GraphRuleNode,
-} from "../../../../src/features/blueprints/components/graphLayout";
+} from "../../../../src/features/graph-diagram/graphLayout.ts";
 
 /** A placed node, since most of these rules only apply to what is actually drawn. */
 function node(id: string, blockerIds: string[] = [], x = 0, y = 0): GraphRuleNode {

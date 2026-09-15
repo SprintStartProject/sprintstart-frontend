@@ -58,10 +58,27 @@ export function BoardPathRail({ content }: BoardPathRailProps) {
                   }`}
                 />
                 {!isLast && (
-                  <span
+                  // A drawn line rather than a one-pixel rule, and the same hand the graphs are
+                  // drawn with: the connector between two moments is the same kind of statement as
+                  // the arrow between two cards, and it used to be the only one in the product
+                  // drawn as a ruler. The bow alternates, so five segments read as one line
+                  // travelling rather than as four separate rules — each still lights on its own,
+                  // because what it says is whether the moment on its far side has happened.
+                  <svg
                     aria-hidden="true"
-                    className={`h-px flex-1 ${nextReached ? "bg-app-brand" : "bg-app-border"}`}
-                  />
+                    className="h-3 flex-1"
+                    viewBox="0 0 100 12"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d={index % 2 === 0 ? "M0,6 C30,0 70,0 100,6" : "M0,6 C30,12 70,12 100,6"}
+                      fill="none"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      vectorEffect="non-scaling-stroke"
+                      className={nextReached ? "stroke-app-brand" : "stroke-app-border"}
+                    />
+                  </svg>
                 )}
               </div>
 

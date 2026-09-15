@@ -615,3 +615,24 @@ export function blueprintEdgePath(
     `${round(target.x)},${round(target.y)}`,
   ].join(" ");
 }
+
+/**
+ * How firm one arrow is, on a graph whose arrows do not all come from the same place.
+ *
+ * A Blueprint has one kind: every arrow is a rule its author wrote. A hire's board has three — a
+ * lock the team set, a sequence their buddy proposed, and one the hire arranged themselves — and
+ * which it is decides whether they may take it off. Drawn as the line's own weight and dashes
+ * rather than only in a tooltip, because "may I move this" is the first question asked of an arrow
+ * and a hover is a poor place to answer it.
+ *
+ * Here rather than in the canvas so that the legend explaining the styles reads the same table the
+ * canvas draws from: a legend that restates a style from memory is a legend that goes quietly
+ * wrong.
+ */
+export type GraphEdgeTone = "rule" | "suggestion" | "own";
+
+export const EDGE_TONES: Record<GraphEdgeTone, { dash?: string; width: number; said: string }> = {
+  rule: { width: 2.5, said: "set by the team" },
+  suggestion: { width: 2, dash: "7 5", said: "suggested by the buddy" },
+  own: { width: 1.5, dash: "2 4", said: "arranged by you" },
+};

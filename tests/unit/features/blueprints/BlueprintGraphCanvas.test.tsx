@@ -6,6 +6,7 @@ import {
   type BlueprintGraphCanvasNode,
 } from "../../../../src/features/blueprints/components/BlueprintGraphCanvas.tsx";
 import { BlueprintNodeCard } from "../../../../src/features/blueprints/components/BlueprintNodeCard.tsx";
+import { LOCK_SENTENCE } from "../../../../src/features/graph-diagram/lockWords.ts";
 
 /**
  * React Flow never measures anything in jsdom, so it leaves every node `visibility: hidden`.
@@ -113,9 +114,9 @@ describe("BlueprintGraphCanvas", () => {
   it("explains what an arrow means, because one relation unexplained reads as a suggestion", () => {
     renderCanvas([node("a")]);
 
-    expect(
-      screen.getByText(/An arrow is a lock: the node it points at stays closed/),
-    ).toBeInTheDocument();
+    // Read from the shared wording rather than restated: this sentence is the one place three
+    // surfaces agree on what an arrow is, and a test with its own copy would hide a drift.
+    expect(screen.getByText(LOCK_SENTENCE)).toBeInTheDocument();
   });
 
   it("tells an author how to reach a node, and a reader nothing of the sort", () => {
