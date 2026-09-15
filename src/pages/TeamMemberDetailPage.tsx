@@ -7,7 +7,6 @@ import type {
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
 } from "../features/onboarding/types";
-import { findActivePhaseIndex } from "../features/onboarding/activePhase";
 import type { ProjectRole, TeamOverviewUser } from "../features/team-management/types";
 import type { KnowledgeGap } from "../features/knowledge-gaps/types";
 import { knowledgeGapService } from "../services/knowledgeGapService";
@@ -22,12 +21,10 @@ import {
   getUserOnboardingFeedback,
   markOnboardingFeedbackRead,
   getUserOnboardingPath,
-  createOnboardingStepForPhase,
   createOnboardingTaskForStep,
   deleteOnboardingStep,
   deleteOnboardingTask,
   getOnboardingTasksByStep,
-  updateOnboardingStep,
   updateOnboardingTask,
   type OnboardingFeedback,
   type UserSkillLevel,
@@ -55,7 +52,13 @@ import { PanelPresence } from "../components/ui/PanelPresence";
 import { AddCustomStepModal } from "../features/team-management/components/detail/AddCustomStepModal";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
-import { MemberOnboardingSection } from "../features/team-management/components/detail/MemberOnboardingSection";
+import {
+  MemberJourneySection,
+  type StepPlacementTarget,
+} from "../features/team-management/components/detail/MemberJourneySection";
+import { AlertDialog } from "../components/ui/AlertDialog";
+import { onboardingGraphService } from "../services/onboardingGraphService";
+import { phaseItems } from "../features/onboarding/journey";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
@@ -119,17 +122,16 @@ export function TeamMemberDetailPage() {
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<OnboardingFeedback[]>([]);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [selectedPhaseId, setSelectedPhaseId] = useState("");
-  const [selectedStepId, setSelectedStepId] = useState("");
   const [detailStepId, setDetailStepId] = useState("");
+  // A step asked to be deleted from the graph, where there is no details panel to confirm in.
+  const [graphStepToDelete, setGraphStepToDelete] = useState<string | null>(null);
   const [stepToDelete, setStepToDelete] = useState<DetailOnboardingStep | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<OnboardingTaskEndpoint | null>(null);
-  const [stepInsertTarget, setStepInsertTarget] = useState<{
-    phaseId: string;
-    position: number;
-  } | null>(null);
-  // Which tab of the knowledge-check modal is open for the selected phase (null = closed).
-  const [checkModalTab, setCheckModalTab] = useState<PhaseCheckAdminTab | null>(null);
+  const [stepInsertTarget, setStepInsertTarget] = useState<StepPlacementTarget | null>(null);
+  // The phase whose knowledge-check modal is open, and on which tab (null = closed).
+  const [checkModal, setCheckModal] = useState<{ phaseId: string; tab: PhaseCheckAdminTab } | null>(
+    null,
+  );
   const [customStepTitle, setCustomStepTitle] = useState("");
   const [customStepDescription, setCustomStepDescription] = useState("");
   const [customStepExpectedOutcome, setCustomStepExpectedOutcome] = useState("");
@@ -191,11 +193,6 @@ export function TeamMemberDetailPage() {
       setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
       setFeedbackItems(feedback);
       setOnboardingPath(path);
-      // Open on the phase the member is actually working on. Phase 1 is almost never
-      // the interesting one for a reviewer, and it hides how far along they really are.
-      const activePhase = path?.phases?.[findActivePhaseIndex(path)];
-      setSelectedPhaseId(activePhase?.id ?? "");
-      setSelectedStepId(memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? "");
       setLoadingFeedback(false);
       setLoading(false);
     }
@@ -267,17 +264,6 @@ export function TeamMemberDetailPage() {
 
     const path = await getUserOnboardingPath(userId);
     setOnboardingPath(path);
-
-    // Only when the selected phase disappeared; fall back to the active one rather than
-    // to phase 1, for the same reason as on load.
-    if (path?.phases?.length && !path.phases.some((phase) => phase.id === selectedPhaseId)) {
-      setSelectedPhaseId(path.phases[findActivePhaseIndex(path)].id);
-    }
-
-    const refreshedSteps = path?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
-    if (refreshedSteps.length && !refreshedSteps.some((step) => step.id === selectedStepId)) {
-      setSelectedStepId(refreshedSteps[0].id);
-    }
   }
 
   const unassignedRoles = useMemo(() => {
@@ -366,69 +352,6 @@ export function TeamMemberDetailPage() {
       toast.success("Step deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't delete the step.");
-    } finally {
-      setStepActionId(null);
-    }
-  }
-
-  async function handleReorderSteps(phaseId: string, activeStepId: string, overStepId: string) {
-    if (activeStepId === overStepId) return;
-
-    const phase = onboardingPath?.phases.find((item) => item.id === phaseId);
-    const currentSteps = [...(phase?.steps ?? [])].sort((a, b) => a.position - b.position);
-    const activeIndex = currentSteps.findIndex((step) => step.id === activeStepId);
-    const overIndex = currentSteps.findIndex((step) => step.id === overStepId);
-
-    if (!phase || activeIndex < 0 || overIndex < 0) return;
-
-    const reorderedSteps = [...currentSteps];
-    const [movedStep] = reorderedSteps.splice(activeIndex, 1);
-    reorderedSteps.splice(overIndex, 0, movedStep);
-
-    const nextSteps = reorderedSteps.map((step, index) => ({
-      ...step,
-      position: index,
-    }));
-    const changedSteps = nextSteps.filter(
-      (step) =>
-        currentSteps.find((currentStep) => currentStep.id === step.id)?.position !== step.position,
-    );
-
-    setStepActionId(activeStepId);
-    setOnboardingPath((currentPath) =>
-      currentPath
-        ? {
-            ...currentPath,
-            phases: currentPath.phases.map((currentPhase) =>
-              currentPhase.id === phaseId
-                ? {
-                    ...currentPhase,
-                    steps: nextSteps,
-                  }
-                : currentPhase,
-            ),
-          }
-        : currentPath,
-    );
-
-    try {
-      for (const step of changedSteps) {
-        await updateOnboardingStep(step.id, {
-          position: step.position,
-          title: step.title,
-          description: step.description,
-          type: step.type,
-          estimatedMinutes: step.estimatedMinutes,
-          expectedOutcome: step.expectedOutcomes?.[0] ?? "",
-          status: step.status,
-          skip: step.skip ?? null,
-        });
-      }
-
-      await refreshOnboardingPath();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the steps.");
-      await refreshOnboardingPath();
     } finally {
       setStepActionId(null);
     }
@@ -565,25 +488,42 @@ export function TeamMemberDetailPage() {
   }
 
   async function handleCreateCustomStep() {
-    const targetPhaseId = stepInsertTarget?.phaseId ?? selectedPhaseId;
+    if (!stepInsertTarget || !customStepTitle.trim()) return;
 
-    if (!targetPhaseId || !customStepTitle.trim()) return;
+    const targetPhase = onboardingPath?.phases.find((phase) => phase.id === stepInsertTarget.phaseId);
 
-    const selectedPhase = onboardingPath?.phases.find((phase) => phase.id === targetPhaseId);
-
-    if (!selectedPhase) return;
+    if (!targetPhase) return;
 
     setAddingStep(true);
 
+    // The list position follows the graph: right after the last step it waits on, else right before
+    // the first step it unlocks, else at the end -- the same rule the buddy's placement uses.
+    const stepPositions = new Map(targetPhase.steps.map((step) => [step.id, step.position]));
+    const after = stepInsertTarget.waitsOn
+      .map((id) => stepPositions.get(id))
+      .filter((position): position is number => position !== undefined);
+    const before = stepInsertTarget.unlocks
+      .map((id) => stepPositions.get(id))
+      .filter((position): position is number => position !== undefined);
+    const position = Math.min(
+      targetPhase.steps.length,
+      after.length ? Math.max(...after) + 1 : before.length ? Math.min(...before) : targetPhase.steps.length,
+    );
+
     try {
-      const createdStep = await createOnboardingStepForPhase(targetPhaseId, {
-        position: stepInsertTarget?.position ?? selectedPhase.steps?.length ?? 0,
-        isAiAssisted: false,
-        title: customStepTitle.trim(),
-        description: customStepDescription.trim(),
-        type: "TASK",
-        estimatedMinutes: Number(customStepMinutes) || 30,
-        expectedOutcome: customStepExpectedOutcome.trim(),
+      const createdStep = await onboardingGraphService.createConnectedStep(targetPhase.id, {
+        step: {
+          position,
+          title: customStepTitle.trim(),
+          description: customStepDescription.trim(),
+          type: "TASK",
+          estimatedMinutes: Number(customStepMinutes) || 30,
+          expectedOutcome: customStepExpectedOutcome.trim(),
+        },
+        waitsOn: stepInsertTarget.waitsOn,
+        unlocks: stepInsertTarget.unlocks,
+        graphX: stepInsertTarget.graphX,
+        graphY: stepInsertTarget.graphY,
       });
       const tasksToCreate = customStepTasks
         .map((task) => ({
@@ -610,7 +550,6 @@ export function TeamMemberDetailPage() {
       setCustomStepMinutes("30");
       setCustomStepTasks([{ title: "", description: "" }]);
       setStepInsertTarget(null);
-      setSelectedStepId(createdStep.id);
       setDetailStepId(createdStep.id);
       await refreshOnboardingPath();
       if (tasksToCreate.length > 0) {
@@ -672,16 +611,12 @@ export function TeamMemberDetailPage() {
       .sort((a, b) => a.position - b.position)
       .map((step) => step as DetailOnboardingStep),
   );
-  const finishedSteps = allSteps.filter((step) => step.status === "FINISHED").length;
-  const skippedSteps = allSteps.filter((step) => step.status === "SKIPPED").length;
-  const pathPendingSkips = allSteps.filter((step) => step.skip?.status === "PENDING").length;
-  const estimatedMinutes = allSteps.reduce((sum, step) => sum + (step.estimatedMinutes || 0), 0);
-  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0];
-  const selectedPhaseSteps = [...(selectedPhase?.steps ?? [])]
-    .sort((a, b) => a.position - b.position)
-    .map((step) => step as DetailOnboardingStep);
-  const selectedStep =
-    allSteps.find((step) => step.id === selectedStepId) ?? selectedPhaseSteps[0] ?? null;
+  const insertPhase = stepInsertTarget
+    ? (phases.find((phase) => phase.id === stepInsertTarget.phaseId) ?? null)
+    : null;
+  const checkModalPhase = checkModal
+    ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
+    : null;
   const detailStep = allSteps.find((step) => step.id === detailStepId) ?? null;
   const detailStepTasks = detailStep ? (stepTasksById[detailStep.id] ?? []) : [];
   const sortedDetailStepTasks = [...detailStepTasks].sort((a, b) => a.position - b.position);
@@ -723,13 +658,11 @@ export function TeamMemberDetailPage() {
   const topKnowledgeGaps = [...knowledgeGaps]
     .sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3))
     .slice(0, 3);
-  const nextStep =
-    allSteps.find((step) => step.status !== "FINISHED" && step.status !== "SKIPPED") ?? null;
 
   return (
     <div className="min-h-screen bg-app-bg">
       <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[96rem] px-4 py-4 sm:px-6 lg:px-8">
           <button
             onClick={goBack}
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
@@ -816,41 +749,29 @@ export function TeamMemberDetailPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
-        {/* items-start keeps both columns at their own height: without it the grid
-                    stretches the onboarding card to match the insights column, which grows
-                    when the review questions are expanded. */}
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
-          <MemberOnboardingSection
-            phases={phases}
-            selectedPhase={selectedPhase}
-            selectedPhaseSteps={selectedPhaseSteps}
-            selectedStep={selectedStep}
-            nextStep={nextStep}
-            finishedSteps={finishedSteps}
-            totalSteps={allSteps.length}
-            estimatedMinutes={estimatedMinutes}
-            skippedSteps={skippedSteps}
-            pendingSkipCount={pathPendingSkips}
-            stepTaskCounts={stepTaskCounts}
-            onSelectPhase={(phaseId, firstStepId) => {
-              setSelectedPhaseId(phaseId);
-              setSelectedStepId(firstStepId);
-            }}
-            onSelectStep={(stepId) => {
-              setSelectedStepId(stepId);
-              setDetailStepId(stepId);
-            }}
-            onAddStep={setStepInsertTarget}
-            onReorderSteps={(phaseId, activeStepId, overStepId) =>
-              void handleReorderSteps(phaseId, activeStepId, overStepId)
-            }
-            onOpenCheck={setCheckModalTab}
-            formatMinutes={formatMinutes}
-            getActualMinutes={getActualMinutes}
-            getStepStatusStyles={getStepStatusStyles}
-          />
-          <aside aria-label="Member insights" className="space-y-4">
+      <main className="mx-auto max-w-[96rem] px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
+        <MemberJourneySection
+          userId={user.userId}
+          memberName={`${user.firstname} ${user.lastname}`.trim()}
+          path={onboardingPath}
+          stepTaskCounts={stepTaskCounts}
+          onOpenStep={setDetailStepId}
+          onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
+          onAddStep={(target) => {
+            setCustomStepTitle("");
+            setCustomStepDescription("");
+            setCustomStepExpectedOutcome("");
+            setCustomStepMinutes("30");
+            setCustomStepTasks([{ title: "", description: "" }]);
+            setStepInsertTarget(target);
+          }}
+          onDeleteStep={setGraphStepToDelete}
+          onPathChanged={refreshOnboardingPath}
+        />
+
+        {/* Below the journey rather than beside it: the graph needs the width, and these read fine
+            as two cards side by side. items-start keeps each card at its own height. */}
+        <aside aria-label="Member insights" className="mt-6 grid items-start gap-4 lg:grid-cols-2">
             <div className="rounded-3xl border border-app-border bg-app-surface p-6">
               <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
 
@@ -1034,7 +955,6 @@ export function TeamMemberDetailPage() {
               }}
             />
           </aside>
-        </div>
       </main>
 
       <Modal
@@ -1128,18 +1048,50 @@ export function TeamMemberDetailPage() {
         onTasksChange={(updater) => setCustomStepTasks(updater)}
         onClose={() => setStepInsertTarget(null)}
         onSubmit={() => void handleCreateCustomStep()}
+        placement={
+          stepInsertTarget && insertPhase
+            ? {
+                phaseTitle: insertPhase.title,
+                options: phaseItems(insertPhase).map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  kind: item.kind,
+                })),
+                waitsOn: stepInsertTarget.waitsOn,
+                unlocks: stepInsertTarget.unlocks,
+                onWaitsOnChange: (waitsOn) =>
+                  setStepInsertTarget((current) => (current ? { ...current, waitsOn } : current)),
+                onUnlocksChange: (unlocks) =>
+                  setStepInsertTarget((current) => (current ? { ...current, unlocks } : current)),
+                pinned: stepInsertTarget.graphX !== undefined,
+              }
+            : undefined
+        }
       />
-      {checkModalTab && selectedPhase && userId && (
+      {checkModal && checkModalPhase && userId && (
         <PhaseCheckAdminModal
           userId={userId}
-          phaseId={selectedPhase.id}
-          phaseTitle={selectedPhase.title}
+          phaseId={checkModalPhase.id}
+          phaseTitle={checkModalPhase.title}
           memberName={`${user.firstname} ${user.lastname}`.trim()}
-          initialTab={checkModalTab}
+          initialTab={checkModal.tab}
           onSaved={() => void refreshOnboardingPath()}
-          onClose={() => setCheckModalTab(null)}
+          onClose={() => setCheckModal(null)}
         />
       )}
+      <AlertDialog
+        isOpen={graphStepToDelete !== null}
+        title="Delete this step?"
+        description={`"${allSteps.find((step) => step.id === graphStepToDelete)?.title ?? "The step"}" is removed from ${user.firstname}'s path. Whatever waited on it waits on what it waited on instead.`}
+        confirmLabel="Delete step"
+        variant="danger"
+        isLoading={stepActionId === graphStepToDelete}
+        onClose={() => setGraphStepToDelete(null)}
+        onConfirm={() => {
+          const step = allSteps.find((candidate) => candidate.id === graphStepToDelete);
+          if (step) void handleDeleteStep(step).finally(() => setGraphStepToDelete(null));
+        }}
+      />
       <PanelPresence value={detailStep}>
         {(step) => (
           <StepDetailsPanel

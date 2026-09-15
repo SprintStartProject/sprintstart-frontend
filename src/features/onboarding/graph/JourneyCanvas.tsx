@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
@@ -392,7 +393,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     }
   };
 
-  const handleDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("[data-canvas-control]")) return;
     const nodeId = target.closest<HTMLElement>("[data-journey-node]")?.dataset.journeyNode;

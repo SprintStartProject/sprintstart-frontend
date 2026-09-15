@@ -19,7 +19,7 @@ import {
   Sparkles,
   Trophy,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
@@ -620,7 +620,7 @@ export function OnBoardingPage() {
 // Pieces
 // ─────────────────────────────────────────────────────────────
 
-function CenteredState({ children }: { children: React.ReactNode }) {
+function CenteredState({ children }: { children: ReactNode }) {
   return (
     <div className="app-page-content flex min-h-screen flex-col items-center justify-center py-12 text-center">
       {children}
@@ -628,7 +628,7 @@ function CenteredState({ children }: { children: React.ReactNode }) {
   );
 }
 
-function StateIcon({ tone, children }: { tone: "brand" | "warning" | "danger"; children: React.ReactNode }) {
+function StateIcon({ tone, children }: { tone: "brand" | "warning" | "danger"; children: ReactNode }) {
   const toneClass =
     tone === "danger"
       ? "bg-app-danger-bg text-app-danger-text"

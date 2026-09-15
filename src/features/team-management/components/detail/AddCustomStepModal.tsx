@@ -1,5 +1,5 @@
-import { Plus, X } from "lucide-react";
-import { useState, type DragEvent } from "react";
+import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import { Textarea } from "../../../../components/ui/Textarea";
 import { Input } from "../../../../components/ui/Input";
 import { Button } from "../../../../components/ui/Button";
@@ -9,6 +9,23 @@ import { Modal } from "../../../../components/ui/Modal";
 export type CustomStepTaskDraft = {
   title: string;
   description: string;
+};
+
+/** One step or question of the phase the new step is placed into. */
+export type PlacementOption = { id: string; title: string; kind: "step" | "question" };
+
+/**
+ * Where in the phase graph the new step goes. Left out, the modal only asks for the step itself.
+ */
+export type StepPlacement = {
+  phaseTitle: string;
+  options: PlacementOption[];
+  waitsOn: string[];
+  unlocks: string[];
+  onWaitsOnChange: (ids: string[]) => void;
+  onUnlocksChange: (ids: string[]) => void;
+  /** Set when the step goes where the PM double-clicked the canvas. */
+  pinned?: boolean;
 };
 
 type AddCustomStepModalProps = {
@@ -26,7 +43,68 @@ type AddCustomStepModalProps = {
   onTasksChange: (updater: (current: CustomStepTaskDraft[]) => CustomStepTaskDraft[]) => void;
   onClose: () => void;
   onSubmit: () => void;
+  placement?: StepPlacement;
 };
+
+function PlacementPicker({
+  label,
+  hint,
+  icon,
+  options,
+  selected,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  icon: ReactNode;
+  options: PlacementOption[];
+  selected: string[];
+  disabled: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="flex items-center gap-1.5 text-xs font-semibold text-app-text">
+        {icon}
+        {label}
+      </legend>
+      <p className="mt-0.5 text-xs text-app-text-muted">{hint}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {options.length === 0 ? (
+          <span className="text-xs text-app-text-subtle">Nothing in this phase yet.</span>
+        ) : (
+          options.map((option) => {
+            const isSelected = selected.includes(option.id);
+            const isDisabled = !isSelected && disabled.includes(option.id);
+            return (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={isSelected}
+                disabled={isDisabled}
+                onClick={() =>
+                  onChange(
+                    isSelected ? selected.filter((id) => id !== option.id) : [...selected, option.id],
+                  )
+                }
+                className={`max-w-full truncate rounded-full border px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  isSelected
+                    ? "border-app-brand bg-app-brand-soft font-semibold text-app-brand-text"
+                    : "border-app-border bg-app-surface text-app-text-muted hover:border-app-border-strong hover:text-app-text"
+                }`}
+                title={option.title}
+              >
+                {option.kind === "question" ? "Q · " : ""}
+                {option.title}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </fieldset>
+  );
+}
 
 export function AddCustomStepModal({
   open,
@@ -43,6 +121,7 @@ export function AddCustomStepModal({
   onTasksChange,
   onClose,
   onSubmit,
+  placement,
 }: AddCustomStepModalProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -61,8 +140,12 @@ export function AddCustomStepModal({
   return (
     <Modal
       isOpen={open}
-      title="Add Custom Step"
-      description="Add the project-specific step for the selected slot."
+      title={placement ? `Add a step to ${placement.phaseTitle}` : "Add Custom Step"}
+      description={
+        placement
+          ? "The step is added to this member's path only. Say where it sits in the phase, and it is connected into the graph."
+          : "Add the project-specific step for the selected slot."
+      }
       size="lg"
       zIndexClassName="z-[60]"
       bodyClassName="max-h-[min(68vh,720px)] overflow-y-auto px-7 py-6"
@@ -88,6 +171,32 @@ export function AddCustomStepModal({
       }
     >
       <div className="space-y-3">
+        {placement ? (
+          <div className="space-y-4 rounded-2xl border border-app-brand-border bg-app-brand-soft/40 p-3">
+            <PlacementPicker
+              label="Opens after"
+              hint="The step unlocks once these are done. Leave empty to open it right away."
+              icon={<ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />}
+              options={placement.options}
+              selected={placement.waitsOn}
+              disabled={placement.unlocks}
+              onChange={placement.onWaitsOnChange}
+            />
+            <PlacementPicker
+              label="Leads to"
+              hint="These wait on the new step from now on -- a direct connection between both sides is routed through it."
+              icon={<ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />}
+              options={placement.options}
+              selected={placement.unlocks}
+              disabled={placement.waitsOn}
+              onChange={placement.onUnlocksChange}
+            />
+            {placement.pinned ? (
+              <p className="text-xs text-app-text-muted">It is placed where you double-clicked the graph.</p>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Title and estimated minutes in one row */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div className="sm:col-span-3">
