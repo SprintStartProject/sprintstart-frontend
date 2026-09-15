@@ -14,21 +14,26 @@ import {
   Loader2,
   Milestone,
   Minus,
+  Pencil,
   Plus,
   Rocket,
   RotateCcw,
   Square,
 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AlertDialog } from "../components/ui/AlertDialog.tsx";
 import { Badge } from "../components/ui/Badge.tsx";
 import { Button } from "../components/ui/Button.tsx";
 import { EmptyState } from "../components/ui/EmptyState.tsx";
 import { Field } from "../components/ui/Field.tsx";
 import { Input } from "../components/ui/Input.tsx";
 import { Modal } from "../components/ui/Modal.tsx";
+import { SegmentedTabs } from "../components/ui/SegmentedTabs.tsx";
 import { Select } from "../components/ui/Select.tsx";
 import { Textarea } from "../components/ui/Textarea.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { useToast } from "../context/useToast.ts";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
 import type {
   BlueprintOption,
   BlueprintGraphNode,
@@ -59,7 +64,18 @@ type CreateTarget = {
   position: number;
   graphPosition?: { graphX: number; graphY: number };
 } | null;
+/**
+ * What the create/edit overlay is currently editing.
+ *
+ * Phase, step and question were missing: the list editor could add one and delete one, but not
+ * rename one — the only way to change a phase's own fields was the graph editor's side panel, three
+ * levels down and only on a draft. Deleting a phase from a surface that cannot edit it is the wrong
+ * half of the pair to offer.
+ */
 type EditTarget =
+  | { kind: "phase"; item: BlueprintPhase }
+  | { kind: "step"; item: BlueprintStep }
+  | { kind: "question"; item: BlueprintQuestion }
   | { kind: "task"; item: BlueprintTask }
   | { kind: "resource"; item: BlueprintResource }
   | { kind: "option"; item: BlueprintOption }
@@ -85,6 +101,78 @@ const kindLabels: Record<CreateKind, string> = {
 };
 
 /** Compact definition-list cell used by the graph node detail dialog. */
+
+/**
+ * A loaded path with its phases' graph coordinates and prerequisite edges filled in.
+ *
+ * Phases keep whatever the nested DTO said about everything else; only the three fields that
+ * response cannot carry come from the graph.
+ */
+function withGraphNodes(path: BlueprintPath, nodes: BlueprintGraphNode[]): BlueprintPath {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+
+  return {
+    ...path,
+    blueprintPhases: path.blueprintPhases.map((phase) => {
+      const node = nodesById.get(phase.id);
+      return node
+        ? {
+            ...phase,
+            revision: node.revision,
+            graphX: node.graphX,
+            graphY: node.graphY,
+            blockerIds: node.blockerIds,
+          }
+        : phase;
+    }),
+  };
+}
+
+/**
+ * What this version of the blueprint means for the people it is for.
+ *
+ * The status badge says `DRAFT · v4`, which answers a question nobody asked. The question authors
+ * actually have is whether editing this takes the thing out of service — and the answer is no: a
+ * draft is a copy of the active version, and the active version keeps being handed to new hires
+ * until the draft is published. Saying so is the difference between a surface people edit and one
+ * they are afraid to touch.
+ */
+function LifecycleNotice({
+  status,
+  version,
+}: {
+  status: BlueprintPath["status"];
+  version: number;
+}) {
+  if (status === "DRAFT") {
+    return (
+      <p className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+        <strong className="font-semibold">Draft v{version}.</strong> Nothing here reaches anybody
+        yet — the published version keeps being handed to new hires until you press Publish. Every
+        change is saved as you make it; Publish is what swaps the two over.
+      </p>
+    );
+  }
+
+  if (status === "ARCHIVED") {
+    return (
+      <p className="rounded-xl border border-app-neutral-border bg-app-neutral-bg px-4 py-3 text-sm text-app-neutral-text">
+        <strong className="font-semibold">Archived v{version}.</strong> Read-only. Hires who were
+        given this path keep their copy; nobody new is given it. &ldquo;Revert to this
+        version&rdquo; makes it the published one again.
+      </p>
+    );
+  }
+
+  return (
+    <p className="rounded-xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text">
+      <strong className="font-semibold">Published v{version}.</strong> This is what a new hire on
+      this project is given. To change it, open a draft — this version stays in service until the
+      draft is published.
+    </p>
+  );
+}
+
 function DetailStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-app-surface-muted p-3">
@@ -93,6 +181,10 @@ function DetailStat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/** The two editors, in the order the bar draws them — shared with the swipe gesture. */
+const EDITOR_MODE_ORDER = ["list", "graph"] as const;
+type EditorMode = (typeof EDITOR_MODE_ORDER)[number];
 
 /** Authors one Blueprint path and its reusable phases, content, and knowledge checks. */
 export function BlueprintPathDetailPage() {
@@ -138,6 +230,10 @@ export function BlueprintPathDetailPage() {
   const [history, setHistory] = useState<BlueprintPath[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+  const [isDraftPromptOpen, setIsDraftPromptOpen] = useState(false);
+  const [isOpeningDraft, setIsOpeningDraft] = useState(false);
+  const [draftPromptError, setDraftPromptError] = useState<string | null>(null);
   const [addRequirementTarget, setAddRequirementTarget] = useState<RequirementTarget>(null);
   const [removeRequirementTarget, setRemoveRequirementTarget] = useState<RequirementTarget>(null);
   const [requirementType, setRequirementType] = useState<"SKILL" | "PROJECT_ROLE">("SKILL");
@@ -145,16 +241,41 @@ export function BlueprintPathDetailPage() {
   const [requirementCatalog, setRequirementCatalog] = useState<RequirementCatalog | null>(null);
   const [isRequirementCatalogLoading, setIsRequirementCatalogLoading] = useState(false);
   const [isRequirementSaving, setIsRequirementSaving] = useState(false);
-  const [editorMode, setEditorMode] = useState<"list" | "graph">("list");
+  const toast = useToast();
+  const [editorMode, setEditorMode] = useState<EditorMode>("list");
+  // Two-finger swipe between the two editors, the same gesture the admin and inbox pages use.
+  const swipeRef = useSwipeableTabs<EditorMode, HTMLElement>({
+    order: EDITOR_MODE_ORDER,
+    value: editorMode,
+    onChange: (mode) => changeEditorMode(mode),
+  });
   const [graphDetail, setGraphDetail] = useState<GraphDetail | null>(null);
 
+  /**
+   * Loads the path together with its graph, and merges the two.
+   *
+   * The two requests are one fact. `GET /paths/{id}` returns phases without `graphX`, `graphY` or
+   * `blockerIds` — `GetBlueprintPhaseResponse` simply has no such fields, while the nested *step*
+   * response does — so a path loaded on its own describes every phase as never placed, and the
+   * canvas drawn from it is empty. That is what made the graph vanish after "Edit as draft" (which
+   * navigates to the new draft's id) and after Publish (which replaces the path with a fresh DTO),
+   * and why a reload appeared to fix it: a reload starts in list mode, and the graph was fetched
+   * again on the way back.
+   *
+   * Merging here rather than at each call site means no caller can forget. **Backend TODO:** the
+   * three fields on the nested phase response would remove the second request entirely.
+   */
   const loadPath = useCallback(
     async (showLoading = true) => {
       if (!pathId) return;
       if (showLoading) setIsLoading(true);
       setError(null);
       try {
-        setPath(await blueprintService.getPath(blueprintScope, pathId));
+        const [nextPath, graph] = await Promise.all([
+          blueprintService.getPath(blueprintScope, pathId),
+          blueprintService.getGraph(blueprintScope, pathId),
+        ]);
+        setPath(withGraphNodes(nextPath, graph.nodes));
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : "Blueprint path could not be loaded.");
       } finally {
@@ -218,6 +339,8 @@ export function BlueprintPathDetailPage() {
     setError(null);
     try {
       await blueprintService.archivePath(blueprintScope, path.blueprintKey);
+      setIsArchiveConfirmOpen(false);
+      toast.success(`"${path.title}" archived`);
       void navigate(blueprintListPath);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Blueprint path could not be archived.");
@@ -265,11 +388,82 @@ export function BlueprintPathDetailPage() {
     setTarget({ kind, parentId, position, graphPosition });
   }
 
+  /**
+   * Whether authoring actions apply right now.
+   *
+   * Only a draft is editable — the backend refuses a mutation on a published or archived path — but
+   * hiding every control on a published one left a page that looks like an editor and silently is
+   * not. So the controls stay, and asking one of them explains why and offers the way forward.
+   */
+  const isDraft = path?.status === "DRAFT";
+
+  /** Runs an authoring action on a draft, or offers to make one first. */
+  function whenEditable(run: () => void) {
+    if (isDraft) {
+      run();
+      return;
+    }
+    setDraftPromptError(null);
+    setIsDraftPromptOpen(true);
+  }
+
+  /** Opens (or reuses) the draft for this blueprint and continues there. */
+  async function openDraftFromPrompt() {
+    if (!path) return;
+    setIsOpeningDraft(true);
+    setDraftPromptError(null);
+    try {
+      const draft = await blueprintService.openDraft(blueprintScope, path.blueprintKey);
+      setIsDraftPromptOpen(false);
+      toast.info(`Editing draft v${draft.version}`, {
+        description: `Version ${path.version} stays published until you publish this one.`,
+      });
+      void navigate(`/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`);
+    } catch (reason) {
+      setDraftPromptError(
+        reason instanceof Error ? reason.message : "The draft could not be opened.",
+      );
+    } finally {
+      setIsOpeningDraft(false);
+    }
+  }
+
+  /** Opens the overlay on an existing item, seeded with whatever that kind of item actually has. */
   function openEdit(nextTarget: NonNullable<EditTarget>) {
-    setTitle(nextTarget.kind === "option" ? nextTarget.item.label : nextTarget.item.title);
-    setDescription(nextTarget.kind === "option" ? "" : nextTarget.item.description);
+    setError(null);
     setUrl(nextTarget.kind === "resource" ? nextTarget.item.url : "");
     setIsCorrect(nextTarget.kind === "option" && nextTarget.item.correct);
+
+    if (nextTarget.kind === "option") {
+      setTitle(nextTarget.item.label);
+      setDescription("");
+    } else if (nextTarget.kind === "question") {
+      // The overlay keeps the node's own name and the question text in two different fields.
+      setQuestionTitle(nextTarget.item.title);
+      setTitle(nextTarget.item.question);
+      setQuestionType(nextTarget.item.type);
+      setExplanation(nextTarget.item.explanation ?? "");
+      setCorrectAnswer(nextTarget.item.correctAnswer ?? "");
+    } else {
+      setTitle(nextTarget.item.title);
+      setDescription(
+        nextTarget.kind === "phase"
+          ? (nextTarget.item.description ?? "")
+          : nextTarget.item.description,
+      );
+    }
+
+    if (nextTarget.kind === "phase") {
+      setPhaseType(nextTarget.item.type);
+      setAiPrompt(nextTarget.item.aiPrompt ?? "");
+    }
+    if (nextTarget.kind === "step") {
+      setStepType(nextTarget.item.type);
+      setMinutes(String(nextTarget.item.estimatedMinutes));
+      setOutcome(nextTarget.item.expectedOutcome);
+    }
+    if (nextTarget.kind === "task") setQuestionTitle(nextTarget.item.title);
+
     setEditTarget(nextTarget);
   }
 
@@ -331,7 +525,10 @@ export function BlueprintPathDetailPage() {
         blueprintScope,
         phase.id,
         phase.revision,
-        selectedRequirementIds.map((referenceId) => ({ referenceId, type: requirementType })),
+        selectedRequirementIds.map((referenceId) => ({
+          referenceId,
+          type: requirementType,
+        })),
       );
       setPath((current) =>
         current
@@ -339,7 +536,11 @@ export function BlueprintPathDetailPage() {
               ...current,
               blueprintPhases: current.blueprintPhases.map((item) =>
                 item.id === phase.id
-                  ? { ...item, revision: response.revision, requirements: response.requirements }
+                  ? {
+                      ...item,
+                      revision: response.revision,
+                      requirements: response.requirements,
+                    }
                   : item,
               ),
             }
@@ -408,6 +609,36 @@ export function BlueprintPathDetailPage() {
     setIsSaving(true);
     setError(null);
     try {
+      if (editTarget?.kind === "phase")
+        await blueprintService.updatePhase(blueprintScope, editTarget.item.id, {
+          revision: editTarget.item.revision,
+          position: editTarget.item.position,
+          title,
+          description: description || null,
+          type: phaseType,
+          aiPrompt: phaseType === "AI_ENHANCED" ? aiPrompt || null : null,
+        });
+      if (editTarget?.kind === "step")
+        await blueprintService.updateStep(blueprintScope, editTarget.item.id, {
+          revision: editTarget.item.revision,
+          position: editTarget.item.position,
+          title,
+          description,
+          type: stepType as "VIDEO" | "DOCUMENT" | "TASK",
+          estimatedMinutes: Number(minutes),
+          expectedOutcome: outcome,
+          aiAssisted: editTarget.item.aiAssisted,
+        });
+      if (editTarget?.kind === "question")
+        await blueprintService.updateQuestion(blueprintScope, editTarget.item.id, {
+          revision: editTarget.item.revision,
+          position: editTarget.item.position,
+          title: questionTitle,
+          type: questionType as "MULTIPLE_CHOICE" | "SHORT_TEXT",
+          question: title,
+          explanation: explanation || null,
+          correctAnswer: correctAnswer || null,
+        });
       if (editTarget?.kind === "task")
         await blueprintService.updateTask(blueprintScope, editTarget.item.id, {
           revision: editTarget.item.revision,
@@ -430,8 +661,10 @@ export function BlueprintPathDetailPage() {
           url,
         });
       if (editTarget) {
+        const savedKind = editTarget.kind;
         setEditTarget(null);
         await refreshActiveEditorData();
+        toast.success(`${kindLabels[savedKind]} saved`);
         return;
       }
       if (!target) return;
@@ -447,7 +680,10 @@ export function BlueprintPathDetailPage() {
         if (target.graphPosition) {
           setPath((current) =>
             current
-              ? { ...current, blueprintPhases: [...current.blueprintPhases, phase] }
+              ? {
+                  ...current,
+                  blueprintPhases: [...current.blueprintPhases, phase],
+                }
               : current,
           );
           setTarget(null);
@@ -465,7 +701,10 @@ export function BlueprintPathDetailPage() {
           ...target.graphPosition,
         });
         if (target.graphPosition) {
-          appendCreatedSubGraphStep(step, { revision: step.revision, ...target.graphPosition });
+          appendCreatedSubGraphStep(step, {
+            revision: step.revision,
+            ...target.graphPosition,
+          });
           setTarget(null);
           return;
         }
@@ -485,7 +724,9 @@ export function BlueprintPathDetailPage() {
       if (target.kind === "question") {
         const question = await blueprintService.createQuestion(blueprintScope, target.parentId, {
           position: target.position,
-          title,
+          // The overlay asks for a node title separately; it used to send the question text as
+          // both, so every new question was named after its own wording.
+          title: questionTitle || title,
           type: questionType as "MULTIPLE_CHOICE" | "SHORT_TEXT",
           question: title,
           explanation: explanation || null,
@@ -559,7 +800,13 @@ export function BlueprintPathDetailPage() {
               const revision = revisionsById.get(item.id);
               if (revision === undefined) return item;
               return item.id === phase.id
-                ? { ...item, revision, graphX: null, graphY: null, blockerIds: [] }
+                ? {
+                    ...item,
+                    revision,
+                    graphX: null,
+                    graphY: null,
+                    blockerIds: [],
+                  }
                 : {
                     ...item,
                     revision,
@@ -645,7 +892,10 @@ export function BlueprintPathDetailPage() {
             ...current,
             blueprintPhases: current.blueprintPhases.map((phase) =>
               phase.id === step.blueprintPhaseId
-                ? { ...phase, blueprintSteps: [...phase.blueprintSteps, positionedStep] }
+                ? {
+                    ...phase,
+                    blueprintSteps: [...phase.blueprintSteps, positionedStep],
+                  }
                 : phase,
             ),
           }
@@ -658,7 +908,10 @@ export function BlueprintPathDetailPage() {
     question: BlueprintQuestion,
     graphPosition: { revision: number; graphX: number; graphY: number },
   ) {
-    const positionedQuestion = { ...question, revision: graphPosition.revision };
+    const positionedQuestion = {
+      ...question,
+      revision: graphPosition.revision,
+    };
     setSubGraphNodes((current) => [
       ...current,
       {
@@ -771,7 +1024,13 @@ export function BlueprintPathDetailPage() {
                   const revision = revisionsById.get(step.id);
                   if (revision === undefined) return step;
                   return step.id === node.id
-                    ? { ...step, revision, graphX: null, graphY: null, blockerIds: [] }
+                    ? {
+                        ...step,
+                        revision,
+                        graphX: null,
+                        graphY: null,
+                        blockerIds: [],
+                      }
                     : {
                         ...step,
                         revision,
@@ -923,6 +1182,19 @@ export function BlueprintPathDetailPage() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Blueprint graph could not be loaded.");
     }
+  }
+
+  /** Switching editors, from the bar or from a two-finger swipe — the two must not disagree. */
+  function changeEditorMode(mode: EditorMode) {
+    if (mode === editorMode) return;
+    if (mode === "graph") {
+      void openGraphEditor();
+      return;
+    }
+    setEditorMode("list");
+    // The graph endpoints update node revisions independently from the nested path DTO. Reload it
+    // before exposing list mutations so their optimistic-lock revisions are current.
+    void loadPath();
   }
 
   async function openGraphEditor() {
@@ -1244,12 +1516,19 @@ export function BlueprintPathDetailPage() {
           return items.map((item) => {
             const update = byId.get(item.id);
             return update
-              ? { ...item, revision: update.revision, position: update.position }
+              ? {
+                  ...item,
+                  revision: update.revision,
+                  position: update.position,
+                }
               : item;
           });
         };
         if (kind === "phase")
-          return { ...current, blueprintPhases: applyUpdates(current.blueprintPhases) };
+          return {
+            ...current,
+            blueprintPhases: applyUpdates(current.blueprintPhases),
+          };
         return {
           ...current,
           blueprintPhases: current.blueprintPhases.map((currentPhase) => ({
@@ -1358,12 +1637,82 @@ export function BlueprintPathDetailPage() {
       </main>
     );
 
+  // What the overlay is about, whichever way it was opened. The field conditions below used to ask
+  // `target?.kind`, which is only set while *creating* — so editing anything but a task, resource or
+  // option showed a title box and nothing else.
+  const formKind = editTarget?.kind ?? target?.kind ?? null;
+
   const subGraphPhase = subGraphPhaseId
     ? (path.blueprintPhases.find((phase) => phase.id === subGraphPhaseId) ?? null)
     : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
+    // The swipe listens on the page, not on the bar: a gesture that only works while the pointer is
+    // over a 20rem control reads as broken everywhere else.
+    <main ref={swipeRef} className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
+      <AlertDialog
+        isOpen={isDraftPromptOpen}
+        title={
+          path?.status === "ARCHIVED" ? "This version is archived" : "This version is published"
+        }
+        description={
+          path?.status === "ARCHIVED" ? (
+            <p>
+              Archived versions are kept as they were. To work from this one again, use
+              &ldquo;Revert to this version&rdquo; — it becomes the published blueprint, and you can
+              open a draft from there.
+            </p>
+          ) : (
+            <>
+              <p>
+                Changes are made in a draft, so the version new hires are being given never changes
+                under them mid-edit.
+              </p>
+              <p className="mt-2">
+                Opening draft v{(path?.version ?? 0) + 1} leaves v{path?.version} published until
+                you press Publish. Nothing you do in the draft reaches anybody before that.
+              </p>
+            </>
+          )
+        }
+        confirmLabel={
+          path?.status === "ARCHIVED" ? "Close" : `Open draft v${(path?.version ?? 0) + 1}`
+        }
+        cancelLabel={path?.status === "ARCHIVED" ? undefined : "Not now"}
+        isLoading={isOpeningDraft}
+        loadingLabel="Opening draft…"
+        errorMessage={draftPromptError ?? undefined}
+        onClose={() => setIsDraftPromptOpen(false)}
+        onConfirm={() => {
+          if (path?.status === "ARCHIVED") {
+            setIsDraftPromptOpen(false);
+            return;
+          }
+          void openDraftFromPrompt();
+        }}
+      />
+      <AlertDialog
+        isOpen={isArchiveConfirmOpen}
+        title="Archive this blueprint?"
+        description={
+          <>
+            <p>
+              New hires stop being given this path. Anybody already on one keeps the copy they were
+              given — a personalized path is a copy, not a live reference.
+            </p>
+            <p className="mt-2">
+              Any unpublished draft of this blueprint is deleted with it. You can bring an archived
+              version back from the version history.
+            </p>
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        isLoading={isArchiving}
+        loadingLabel="Archiving…"
+        onClose={() => setIsArchiveConfirmOpen(false)}
+        onConfirm={() => void archivePath()}
+      />
       <PageHeader
         icon={Layers3}
         title={path.title}
@@ -1393,7 +1742,7 @@ export function BlueprintPathDetailPage() {
                   variant="dangerSoft"
                   icon={<Archive className="h-4 w-4" />}
                   loading={isArchiving}
-                  onClick={() => void archivePath()}
+                  onClick={() => setIsArchiveConfirmOpen(true)}
                 >
                   Archive
                 </Button>
@@ -1403,9 +1752,14 @@ export function BlueprintPathDetailPage() {
                   onClick={() =>
                     void blueprintService
                       .openDraft(blueprintScope, path.blueprintKey)
-                      .then((draft) =>
-                        navigate(`/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`),
-                      )
+                      .then((draft) => {
+                        toast.info(`Editing draft v${draft.version}`, {
+                          description: `Version ${path.version} stays published until you publish this one.`,
+                        });
+                        return navigate(
+                          `/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`,
+                        );
+                      })
                       .catch((reason: unknown) =>
                         setError(
                           reason instanceof Error ? reason.message : "Draft could not be opened.",
@@ -1431,7 +1785,13 @@ export function BlueprintPathDetailPage() {
                 onClick={() =>
                   void blueprintService
                     .publishPath(blueprintScope, path.id)
-                    .then(setPath)
+                    // Publishing answers with the same nested DTO, so the graph has to be put back.
+                    .then(async () => {
+                      await loadPath(false);
+                      toast.success(`Version ${path.version} is now the published blueprint`, {
+                        description: "New hires on this project are given it from now on.",
+                      });
+                    })
                     .catch((reason: unknown) =>
                       setError(
                         reason instanceof Error
@@ -1452,37 +1812,32 @@ export function BlueprintPathDetailPage() {
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2" aria-label="Blueprint editor mode">
-        <Button
-          size="sm"
-          variant={editorMode === "list" ? "primary" : "secondary"}
-          aria-pressed={editorMode === "list"}
-          icon={<ListChecks className="h-4 w-4" />}
-          onClick={() => {
-            setEditorMode("list");
-            // The graph endpoints update node revisions independently from the nested path DTO.
-            // Reload it before exposing list mutations so their optimistic-lock revisions are current.
-            void loadPath();
-          }}
-        >
-          List editor
-        </Button>
-        <Button
-          size="sm"
-          variant={editorMode === "graph" ? "primary" : "secondary"}
-          aria-pressed={editorMode === "graph"}
-          icon={<Link className="h-4 w-4" />}
-          onClick={() => void openGraphEditor()}
-        >
-          Graph editor
-        </Button>
-      </div>
+      <LifecycleNotice status={path.status} version={path.version} />
+      <SegmentedTabs
+        value={editorMode}
+        options={[
+          {
+            value: "list",
+            label: "List editor",
+            icon: <ListChecks className="h-4 w-4" />,
+          },
+          {
+            value: "graph",
+            label: "Graph editor",
+            icon: <Link className="h-4 w-4" />,
+          },
+        ]}
+        onChange={changeEditorMode}
+        layoutId="blueprint-editor-mode-pill"
+        ariaLabel="Blueprint editor mode"
+      />
       {editorMode === "graph" ? (
         subGraphPhase ? (
           <BlueprintSubGraphEditor
             phase={subGraphPhase}
             nodes={subGraphNodes}
             editable={path.status === "DRAFT"}
+            onRequestDraft={() => whenEditable(() => undefined)}
             onBack={() => void returnToTopLevelGraph()}
             onPositionChange={saveSubGraphPosition}
             onRemoveNode={removeSubGraphNode}
@@ -1520,12 +1875,16 @@ export function BlueprintPathDetailPage() {
             phases={path.blueprintPhases}
             pathTitle={path.title}
             editable={path.status === "DRAFT"}
+            onRequestDraft={() => whenEditable(() => undefined)}
             onPositionChange={saveGraphPosition}
             onRemoveNode={removeGraphNode}
             onAddBlocker={addGraphBlocker}
             onRemoveBlocker={removeGraphBlocker}
             onCreateFromLibrary={(graphX, graphY) => {
-              openCreate("phase", path.id, path.blueprintPhases.length, { graphX, graphY });
+              openCreate("phase", path.id, path.blueprintPhases.length, {
+                graphX,
+                graphY,
+              });
               return Promise.resolve();
             }}
             onDeletePhase={(phase) => deleteItem("phase", phase.id)}
@@ -1604,16 +1963,29 @@ export function BlueprintPathDetailPage() {
                       </div>
                     </div>
                     {!collapsedPhaseIds.has(phase.id) ? (
-                      <Button
-                        aria-label={`Delete phase ${phase.title}`}
-                        iconOnly
-                        size="sm"
-                        variant="dangerGhost"
-                        loading={deletingId === phase.id}
-                        onClick={() => void deleteItem("phase", phase.id)}
-                      >
-                        <Minus className="h-4 w-4" strokeWidth={2.5} />
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          aria-label={`Edit phase ${phase.title}`}
+                          iconOnly
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            whenEditable(() => openEdit({ kind: "phase", item: phase }))
+                          }
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          aria-label={`Delete phase ${phase.title}`}
+                          iconOnly
+                          size="sm"
+                          variant="dangerGhost"
+                          loading={deletingId === phase.id}
+                          onClick={() => whenEditable(() => void deleteItem("phase", phase.id))}
+                        >
+                          <Minus className="h-4 w-4" strokeWidth={2.5} />
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                   {!collapsedPhaseIds.has(phase.id) ? (
@@ -1729,6 +2101,18 @@ export function BlueprintPathDetailPage() {
                                           <Button
                                             size="sm"
                                             variant="ghost"
+                                            icon={<Pencil className="h-3.5 w-3.5" />}
+                                            onClick={() =>
+                                              whenEditable(() =>
+                                                openEdit({ kind: "step", item: step }),
+                                              )
+                                            }
+                                          >
+                                            Edit step
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
                                             icon={<Plus className="h-3.5 w-3.5" />}
                                             onClick={() =>
                                               openCreate(
@@ -1766,7 +2150,10 @@ export function BlueprintPathDetailPage() {
                                                     tabIndex={0}
                                                     className="min-w-0 flex-1 cursor-pointer px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                                                     onClick={() =>
-                                                      openEdit({ kind: "task", item: task })
+                                                      openEdit({
+                                                        kind: "task",
+                                                        item: task,
+                                                      })
                                                     }
                                                     onKeyDown={(event) => {
                                                       if (
@@ -1774,7 +2161,10 @@ export function BlueprintPathDetailPage() {
                                                         event.key === " "
                                                       ) {
                                                         event.preventDefault();
-                                                        openEdit({ kind: "task", item: task });
+                                                        openEdit({
+                                                          kind: "task",
+                                                          item: task,
+                                                        });
                                                       }
                                                     }}
                                                   >
@@ -1811,7 +2201,10 @@ export function BlueprintPathDetailPage() {
                                                     tabIndex={0}
                                                     className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                                                     onClick={() =>
-                                                      openEdit({ kind: "resource", item: resource })
+                                                      openEdit({
+                                                        kind: "resource",
+                                                        item: resource,
+                                                      })
                                                     }
                                                     onKeyDown={(event) => {
                                                       if (
@@ -1916,22 +2309,37 @@ export function BlueprintPathDetailPage() {
                                           ) : null}
                                         </div>
                                       </div>
-                                      {question.type === "MULTIPLE_CHOICE" &&
-                                      !collapsedQuestionIds.has(question.id) ? (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          icon={<Plus className="h-3.5 w-3.5" />}
-                                          onClick={() =>
-                                            openCreate(
-                                              "option",
-                                              question.id,
-                                              question.blueprintCheckOptions.length,
-                                            )
-                                          }
-                                        >
-                                          Add option
-                                        </Button>
+                                      {!collapsedQuestionIds.has(question.id) ? (
+                                        <div className="flex shrink-0 flex-wrap items-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            icon={<Pencil className="h-3.5 w-3.5" />}
+                                            onClick={() =>
+                                              whenEditable(() =>
+                                                openEdit({ kind: "question", item: question }),
+                                              )
+                                            }
+                                          >
+                                            Edit
+                                          </Button>
+                                          {question.type === "MULTIPLE_CHOICE" ? (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              icon={<Plus className="h-3.5 w-3.5" />}
+                                              onClick={() =>
+                                                openCreate(
+                                                  "option",
+                                                  question.id,
+                                                  question.blueprintCheckOptions.length,
+                                                )
+                                              }
+                                            >
+                                              Add option
+                                            </Button>
+                                          ) : null}
+                                        </div>
                                       ) : null}
                                     </div>
                                     {!collapsedQuestionIds.has(question.id) &&
@@ -1949,12 +2357,18 @@ export function BlueprintPathDetailPage() {
                                                 tabIndex={0}
                                                 className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                                                 onClick={() =>
-                                                  openEdit({ kind: "option", item: option })
+                                                  openEdit({
+                                                    kind: "option",
+                                                    item: option,
+                                                  })
                                                 }
                                                 onKeyDown={(event) => {
                                                   if (event.key === "Enter" || event.key === " ") {
                                                     event.preventDefault();
-                                                    openEdit({ kind: "option", item: option });
+                                                    openEdit({
+                                                      kind: "option",
+                                                      item: option,
+                                                    });
                                                   }
                                                 }}
                                               >
@@ -2282,7 +2696,7 @@ export function BlueprintPathDetailPage() {
         zIndexClassName="z-[60]"
         title={
           editTarget
-            ? `Edit ${editTarget.kind}`
+            ? `Edit ${kindLabels[editTarget.kind]}`
             : `Add ${target ? kindLabels[target.kind] : "item"}`
         }
         description="This is reusable blueprint content, not a change to an active onboarding path."
@@ -2312,7 +2726,7 @@ export function BlueprintPathDetailPage() {
           className="space-y-4"
           onSubmit={(event) => void createItem(event)}
         >
-          {target?.kind === "question" ? (
+          {formKind === "question" ? (
             <>
               <Field label="Node title" required>
                 <Input
@@ -2330,22 +2744,21 @@ export function BlueprintPathDetailPage() {
               </Field>
             </>
           ) : (
-            <Field label="Title or label" required>
+            <Field label={formKind === "option" ? "Label" : "Title"} required>
               <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
             </Field>
           )}
-          {(target !== null && target.kind !== "option" && target.kind !== "question") ||
-          editTarget?.kind === "task" ||
-          editTarget?.kind === "resource" ? (
-            <Field label="Description" required={target?.kind !== "phase"}>
+          {formKind !== null && formKind !== "option" && formKind !== "question" ? (
+            // A phase may have no description; everything else that has one must have one.
+            <Field label="Description" required={formKind !== "phase"}>
               <Textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                required={target?.kind !== "phase"}
+                required={formKind !== "phase"}
               />
             </Field>
           ) : null}
-          {target?.kind === "phase" ? (
+          {formKind === "phase" ? (
             <>
               <div className="flex items-center justify-between gap-4 rounded-xl border border-app-border bg-app-surface-muted p-3">
                 <div>
@@ -2387,7 +2800,7 @@ export function BlueprintPathDetailPage() {
               ) : null}
             </>
           ) : null}
-          {target?.kind === "resource" || editTarget?.kind === "resource" ? (
+          {formKind === "resource" ? (
             <Field label="URL" required>
               <Input
                 type="url"
@@ -2397,7 +2810,7 @@ export function BlueprintPathDetailPage() {
               />
             </Field>
           ) : null}
-          {target?.kind === "step" ? (
+          {formKind === "step" ? (
             <>
               <Field label="Step type">
                 <Select value={stepType} onChange={(event) => setStepType(event.target.value)}>
@@ -2424,7 +2837,7 @@ export function BlueprintPathDetailPage() {
               </Field>
             </>
           ) : null}
-          {target?.kind === "question" ? (
+          {formKind === "question" ? (
             <>
               <Field label="Question type">
                 <Select
@@ -2449,7 +2862,7 @@ export function BlueprintPathDetailPage() {
               </Field>
             </>
           ) : null}
-          {target?.kind === "option" || editTarget?.kind === "option" ? (
+          {formKind === "option" ? (
             <label className="flex items-center gap-2 text-sm text-app-text">
               <input
                 type="checkbox"
