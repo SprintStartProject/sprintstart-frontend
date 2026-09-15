@@ -261,6 +261,7 @@ export function BlueprintSubGraphEditor({
         libraryTitle="Phase content"
         libraryDescription="Drag steps and knowledge checks onto the canvas. Drop a canvas node here to return it to the library."
         libraryEmptyMessage="All phase content is on the canvas."
+        emptyTitle="No steps or knowledge checks on the canvas yet"
         libraryTemplates={[
           {
             id: "step",

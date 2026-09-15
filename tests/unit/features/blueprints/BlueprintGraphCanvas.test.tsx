@@ -150,4 +150,19 @@ describe("BlueprintGraphCanvas", () => {
     renderCanvas([node("a")], { editable: false, showLibrary: false });
     expect(screen.queryByRole("button", { name: "Tidy up" })).not.toBeInTheDocument();
   });
+
+  it("says an empty canvas is empty, not broken", () => {
+    const empty = renderCanvas([]);
+    expect(screen.getByText("Nothing on the canvas yet")).toBeInTheDocument();
+    expect(screen.getByText(/drag a new one onto the canvas/)).toBeInTheDocument();
+    empty.unmount();
+
+    // With something already in the library, the way forward is that, not creating another.
+    const withLibrary = renderCanvas([node("a", [], false)]);
+    expect(screen.getByText(/drag one onto the canvas/)).toBeInTheDocument();
+    withLibrary.unmount();
+
+    renderCanvas([node("a")]);
+    expect(screen.queryByText("Nothing on the canvas yet")).not.toBeInTheDocument();
+  });
 });

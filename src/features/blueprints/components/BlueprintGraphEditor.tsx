@@ -155,6 +155,7 @@ export function BlueprintGraphEditor({
         libraryTitle="Phases"
         libraryDescription="Drag nodes onto the canvas. Drop a canvas node here to return it to the library."
         libraryEmptyMessage="All phases are on the canvas."
+        emptyTitle="No phases on the canvas yet"
         libraryTemplates={[
           {
             id: "phase",

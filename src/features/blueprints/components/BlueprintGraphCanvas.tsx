@@ -29,6 +29,7 @@ import {
   Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
+  Waypoints,
 } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
@@ -109,6 +110,8 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   /** Hides the authoring library when the canvas is reused as a read-only viewer. */
   showLibrary?: boolean;
   ariaLabel?: string;
+  /** Headline for the overlay drawn when nothing is placed. */
+  emptyTitle?: string;
   onNodeClick: (node: TNode) => void;
   onOpenNode?: (node: TNode) => void;
   onPositionChange: (node: TNode, x: number, y: number) => Promise<void>;
@@ -173,6 +176,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   editable,
   showLibrary = true,
   ariaLabel = "Blueprint graph canvas",
+  emptyTitle = "Nothing on the canvas yet",
   onNodeClick,
   onOpenNode,
   onPositionChange,
@@ -616,6 +620,27 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
               </Panel>
             ) : null}
           </ReactFlow>
+
+          {/*
+            An empty canvas is indistinguishable from one that failed to load, and a first-time
+            author has no way to guess that the way in is a panel they have not opened. This says
+            both — and it does not intercept the pointer, so dropping onto it still works.
+          */}
+          {placedNodes.length === 0 ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+              <div className="max-w-sm rounded-2xl border border-dashed border-app-border bg-app-surface/90 px-6 py-5 text-center">
+                <Waypoints className="mx-auto h-8 w-8 text-app-text-disabled" aria-hidden="true" />
+                <p className="mt-3 text-sm font-semibold text-app-text">{emptyTitle}</p>
+                <p className="mt-1 text-sm text-app-text-muted">
+                  {editable
+                    ? libraryNodes.length > 0
+                      ? "Open the panel on the left and drag one onto the canvas."
+                      : "Open the panel on the left and drag a new one onto the canvas."
+                    : "Nothing has been placed here yet."}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           {isSaving ? (
             <p className="absolute right-4 bottom-4 z-10 flex items-center gap-2 rounded-lg bg-app-surface px-3 py-2 text-xs text-app-text-muted shadow-lg">
