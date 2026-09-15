@@ -27,6 +27,9 @@ const projectOverview: ProjectOverview = {
       projectRoles: ["MEMBER"],
     },
   ],
+  industry: "",
+  industryConfidence: null,
+  industryCustom: false,
 };
 
 describe("ProjectDetailsDrawer", () => {
