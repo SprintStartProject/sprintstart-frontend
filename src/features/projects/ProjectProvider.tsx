@@ -5,8 +5,11 @@ import { PermissionGroup } from "../../services/types";
 import { projectService, type AdminProject } from "../../services/projectService";
 import { userService } from "../../services/userService";
 import { ProjectContext, type SelectableProject } from "./ProjectContext";
-
-const PROJECT_SELECTION_STORAGE_KEY = "sprintstart:selected-project-id";
+import {
+  dropLegacySelection,
+  readStoredProjectId,
+  storeProjectId,
+} from "./projectSelectionStorage";
 
 /**
  * Permission groups that get the global project switcher.
@@ -20,27 +23,6 @@ const PROJECT_SWITCHER_ROLES: readonly PermissionGroup[] = [
   PermissionGroup.HR,
   PermissionGroup.ADMIN,
 ];
-
-function readStoredProjectId(): string {
-  try {
-    return window.localStorage.getItem(PROJECT_SELECTION_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function storeProjectId(projectId: string) {
-  try {
-    if (projectId) {
-      window.localStorage.setItem(PROJECT_SELECTION_STORAGE_KEY, projectId);
-      return;
-    }
-
-    window.localStorage.removeItem(PROJECT_SELECTION_STORAGE_KEY);
-  } catch {
-    // Project selection is a convenience preference. Ignore storage failures.
-  }
-}
 
 function toSelectableProject(
   project: AdminProject,
@@ -145,13 +127,21 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
  *
  * Must be mounted inside `AuthProvider`: which projects are loaded depends on
  * the authenticated user's permission group. The selection is persisted to
- * localStorage and healed on load when the stored project is no longer
- * reachable (deleted, or access revoked).
+ * localStorage under the signed-in user's own key, and healed on load when the
+ * stored project is no longer reachable (deleted, or access revoked).
  */
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { profile, status } = useAuth();
   const [projects, setProjects] = useState<SelectableProject[]>([]);
-  const [selectedProjectId, setSelectedProjectIdState] = useState(readStoredProjectId);
+
+  /*
+    Starts empty rather than reading storage during the first render: the stored key is scoped
+    to the signed-in user, and at mount there is no user yet. The effect below fills the state
+    in as soon as `profile` arrives — which is before the project list resolves, so a reload
+    restores the previous selection before anything reads it, and the healed value written
+    further down cannot race it.
+  */
+  const [selectedProjectId, setSelectedProjectIdState] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -159,13 +149,33 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const userId = profile?.id ?? null;
   const isAuthenticated = status === "authenticated";
 
-  const setSelectedProjectId = useCallback((projectId: string) => {
-    setSelectedProjectIdState(projectId);
-    storeProjectId(projectId);
-  }, []);
+  const setSelectedProjectId = useCallback(
+    (projectId: string) => {
+      setSelectedProjectIdState(projectId);
+      storeProjectId(userId ?? "", projectId);
+    },
+    [userId],
+  );
+
+  /*
+    Restores this user's own selection and drops the unscoped entry older versions of the app
+    left behind — never adopting its value, since it cannot be attributed to the person now
+    signed in. Runs per user; signing out leaves the state alone, and the next sign-in
+    overwrites it here.
+
+    Deferred to a microtask for the same reason `loadProjects` is: setting state straight from
+    the effect body would cascade a render. It still lands before the project list resolves,
+    which is the only race that matters.
+  */
+  useEffect(() => {
+    if (!userId) return;
+
+    dropLegacySelection();
+    void Promise.resolve().then(() => setSelectedProjectIdState(readStoredProjectId(userId)));
+  }, [userId]);
 
   const loadProjects = useCallback(async () => {
-    if (!isAuthenticated || !permissionGroup) {
+    if (!isAuthenticated || !permissionGroup || !userId) {
       setProjects([]);
       setIsLoading(false);
       setErrorMessage(null);
@@ -213,7 +223,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
         const nextProjectId = hasCurrentProject ? currentProjectId : (sortedProjects[0]?.id ?? "");
 
-        storeProjectId(nextProjectId);
+        storeProjectId(userId, nextProjectId);
         return nextProjectId;
       });
     } catch (error) {
