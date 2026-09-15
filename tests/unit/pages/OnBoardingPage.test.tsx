@@ -333,7 +333,7 @@ describe("OnBoardingPage", () => {
         name: "1 onboarding phase could not be generated",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByTitle("Role-specific tasks (failed)")).toBeInTheDocument();
+    expect(screen.getByTitle("Role-specific tasks — Could not be reached")).toBeInTheDocument();
   });
 
   it("offers regeneration when every generated phase is hidden", async () => {
@@ -363,7 +363,8 @@ describe("OnBoardingPage", () => {
 
     expect(await screen.findByText("No onboarding phases were generated")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try generation again" })).toBeInTheDocument();
-    expect(screen.getByText("Role-specific tasks (empty)")).toBeInTheDocument();
+    expect(screen.getByText("Came back empty")).toBeInTheDocument();
+    expect(screen.getByText("Role-specific tasks")).toBeInTheDocument();
   });
 
   it("shows a 'timed out' label for a timed-out generation issue", async () => {
@@ -401,7 +402,7 @@ describe("OnBoardingPage", () => {
         name: "1 onboarding phase could not be generated",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByTitle("Architecture (timed out)")).toBeInTheDocument();
+    expect(screen.getByTitle("Architecture — Took too long")).toBeInTheDocument();
   });
 
   it("warns that every phase timed out and offers regeneration", async () => {
@@ -425,11 +426,10 @@ describe("OnBoardingPage", () => {
 
     expect(await screen.findByText("No onboarding phases were generated")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try generation again" })).toBeInTheDocument();
-    expect(screen.getByText("Architecture (timed out)")).toBeInTheDocument();
+    expect(screen.getByText("Took too long")).toBeInTheDocument();
+    expect(screen.getByText("Architecture")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "The generated phases were empty, could not be assembled, or timed out, so they have been left out of your journey.",
-      ),
+      screen.getByText(/the journey is simply empty until one of them lands/),
     ).toBeInTheDocument();
   });
 

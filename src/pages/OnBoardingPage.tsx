@@ -36,6 +36,8 @@ import {
   GitBranch,
   ListChecks,
 } from "lucide-react";
+import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary.tsx";
+import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues.ts";
 import { PageHeader } from "../components/layout/PageHeader";
 import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { QuestionModal } from "../features/onboarding/components/QuestionModal";
@@ -344,12 +346,6 @@ export function OnBoardingPage() {
 
   const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
   const generationIssues = OnBoardingPathEndpoint?.generationIssues ?? [];
-  const generationIssueSummary = generationIssues
-    .map(
-      (issue) =>
-        `${issue.title} (${issue.status === "TIMED_OUT" ? "timed out" : issue.status.toLowerCase()})`,
-    )
-    .join(", ");
 
   // Helper function for phase progress — steps and questions both count.
   const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
@@ -560,23 +556,38 @@ export function OnBoardingPage() {
   if (!currentPhase) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
+        <div className="w-full max-w-lg text-center">
           <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-app-warning-text" />
           <h2 className="mb-2 text-xl font-semibold text-app-text">
             {generationIssues.length > 0
               ? "No onboarding phases were generated"
               : "No onboarding phases are available"}
           </h2>
-          <p className="mb-2 text-sm text-app-text-muted">
+          <p className="mb-5 text-sm text-app-text-muted">
             {generationIssues.length > 0
-              ? "The generated phases were empty, could not be assembled, or timed out, so they have been left out of your journey."
+              ? "Every phase in this blueprint is written by the AI service when your path is built, and none of them could be. Nothing has been left half-finished — the journey is simply empty until one of them lands."
               : "This onboarding path does not contain any phases for your current role and skills."}
           </p>
-          {generationIssues.length > 0 && (
-            <p className="mb-6 text-xs text-app-text-subtle">{generationIssueSummary}</p>
-          )}
+          {generationIssues.length > 0 ? (
+            <>
+              <GenerationIssueSummary issues={generationIssues} />
+              {/*
+                Retrying a phase that was skipped for lack of material changes nothing, so when
+                that is all there is, the button says so rather than inviting the same answer.
+              */}
+              <p className="mt-5 mb-3 text-xs text-app-text-subtle">
+                {retryCouldHelp(generationIssues)
+                  ? "Trying again re-runs assembly for every phase."
+                  : "Another run will produce the same result until the project has more material."}
+              </p>
+            </>
+          ) : null}
           <Button
-            variant="primary"
+            variant={
+              generationIssues.length === 0 || retryCouldHelp(generationIssues)
+                ? "primary"
+                : "secondary"
+            }
             onClick={() => void generatePath()}
             icon={<RefreshCw className="h-4 w-4" />}
           >
@@ -605,7 +616,13 @@ export function OnBoardingPage() {
                     role="status"
                     aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
                   >
-                    <Badge variant="warning" size="sm" title={generationIssueSummary}>
+                    <Badge
+                      variant="warning"
+                      size="sm"
+                      title={generationIssues
+                        .map((issue) => `${issue.title} — ${issueStatusLabel(issue.status)}`)
+                        .join("\n")}
+                    >
                       <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                       {generationIssues.length}
                     </Badge>
