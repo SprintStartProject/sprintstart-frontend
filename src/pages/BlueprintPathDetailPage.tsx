@@ -19,6 +19,7 @@ import {
   Rocket,
   RotateCcw,
   Square,
+  X,
 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AlertDialog } from "../components/ui/AlertDialog.tsx";
@@ -90,6 +91,16 @@ type GraphDetail =
   | { kind: "phase"; item: BlueprintPhase }
   | { kind: "step"; item: BlueprintStep }
   | { kind: "question"; item: BlueprintQuestion };
+
+/** What else goes when one of these is deleted — the part somebody has to weigh before saying yes. */
+const DELETE_CONSEQUENCE: Record<CreateKind, string> = {
+  phase: "Its steps, knowledge checks and every prerequisite pointing at it go with it.",
+  step: "Its tasks, resources and every prerequisite pointing at it go with it.",
+  question: "Its answer options and every prerequisite pointing at it go with it.",
+  task: "The line disappears from this step's checklist.",
+  resource: "The link disappears from this step.",
+  option: "The answer disappears from this question.",
+};
 
 const kindLabels: Record<CreateKind, string> = {
   phase: "phase",
@@ -235,7 +246,12 @@ export function BlueprintPathDetailPage() {
   const [isOpeningDraft, setIsOpeningDraft] = useState(false);
   const [draftPromptError, setDraftPromptError] = useState<string | null>(null);
   const [addRequirementTarget, setAddRequirementTarget] = useState<RequirementTarget>(null);
-  const [removeRequirementTarget, setRemoveRequirementTarget] = useState<RequirementTarget>(null);
+  const [removingRequirementId, setRemovingRequirementId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    kind: CreateKind;
+    id: string;
+    label: string;
+  } | null>(null);
   const [requirementType, setRequirementType] = useState<"SKILL" | "PROJECT_ROLE">("SKILL");
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>([]);
   const [requirementCatalog, setRequirementCatalog] = useState<RequirementCatalog | null>(null);
@@ -485,11 +501,6 @@ export function BlueprintPathDetailPage() {
     }
   }
 
-  function openRemoveRequirements(phaseId: string) {
-    setRemoveRequirementTarget({ phaseId });
-    setSelectedRequirementIds([]);
-  }
-
   function toggleRequirementSelection(id: string) {
     setSelectedRequirementIds((current) =>
       current.includes(id) ? current.filter((currentId) => currentId !== id) : [...current, id],
@@ -556,23 +567,25 @@ export function BlueprintPathDetailPage() {
     }
   }
 
-  async function deleteRequirements(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!path || !removeRequirementTarget || selectedRequirementIds.length === 0) return;
-    const phase = path.blueprintPhases.find((item) => item.id === removeRequirementTarget.phaseId);
+  /**
+   * Takes one requirement off a phase.
+   *
+   * One at a time, from the chip itself. There used to be a second modal with a multi-select
+   * mirroring the add one, which is a lot of ceremony for "not that one" — and the thing being
+   * removed was already on screen with nothing to click.
+   */
+  async function removeRequirement(phaseId: string, requirementId: string) {
+    const phase = path?.blueprintPhases.find((item) => item.id === phaseId);
     if (!phase) return;
 
+    setRemovingRequirementId(requirementId);
     setError(null);
-    setIsRequirementSaving(true);
     try {
-      const selectedRequirements = (phase.requirements ?? []).filter((requirement) =>
-        selectedRequirementIds.includes(requirement.id),
-      );
       const response = await blueprintService.deletePhaseRequirements(
         blueprintScope,
         phase.id,
         phase.revision,
-        selectedRequirements.map(({ id }) => id),
+        [requirementId],
       );
       setPath((current) =>
         current
@@ -584,8 +597,7 @@ export function BlueprintPathDetailPage() {
                       ...item,
                       revision: response.revision,
                       requirements: (item.requirements ?? []).filter(
-                        (currentRequirement) =>
-                          !selectedRequirementIds.includes(currentRequirement.id),
+                        (currentRequirement) => currentRequirement.id !== requirementId,
                       ),
                     }
                   : item,
@@ -593,13 +605,13 @@ export function BlueprintPathDetailPage() {
             }
           : current,
       );
-      setRemoveRequirementTarget(null);
+      toast.success("Requirement removed");
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "The phase requirement could not be removed.",
       );
     } finally {
-      setIsRequirementSaving(false);
+      setRemovingRequirementId(null);
     }
   }
 
@@ -1369,6 +1381,18 @@ export function BlueprintPathDetailPage() {
     );
   }
 
+  /**
+   * Asks before deleting, for everything the list editor can delete.
+   *
+   * The graph editor already asked; the list editor did not, so the same phase was one guarded
+   * click away on one surface and one unguarded click away on the other. Nothing here is
+   * recoverable from the UI — there is no undo endpoint — so the question is the only safety net
+   * there is.
+   */
+  function requestDelete(kind: CreateKind, id: string, label: string) {
+    whenEditable(() => setPendingDelete({ kind, id, label }));
+  }
+
   async function deleteItem(
     kind: "phase" | "step" | "question" | "task" | "resource" | "option",
     id: string,
@@ -1650,6 +1674,33 @@ export function BlueprintPathDetailPage() {
     // The swipe listens on the page, not on the bar: a gesture that only works while the pointer is
     // over a 20rem control reads as broken everywhere else.
     <main ref={swipeRef} className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
+      <AlertDialog
+        isOpen={pendingDelete !== null}
+        title={
+          pendingDelete ? `Delete ${kindLabels[pendingDelete.kind]} "${pendingDelete.label}"?` : ""
+        }
+        description={
+          pendingDelete ? (
+            <>
+              <p>{DELETE_CONSEQUENCE[pendingDelete.kind]}</p>
+              <p className="mt-2">
+                Hires who already have a path built from this blueprint keep theirs — a personalized
+                path is a copy, not a live reference. This cannot be undone from here.
+              </p>
+            </>
+          ) : undefined
+        }
+        confirmLabel={pendingDelete ? `Delete ${kindLabels[pendingDelete.kind]}` : "Delete"}
+        variant="danger"
+        isLoading={pendingDelete !== null && deletingId === pendingDelete.id}
+        loadingLabel="Deleting…"
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const { kind, id } = pendingDelete;
+          void deleteItem(kind, id).then(() => setPendingDelete(null));
+        }}
+      />
       <AlertDialog
         isOpen={isDraftPromptOpen}
         title={
@@ -1981,7 +2032,7 @@ export function BlueprintPathDetailPage() {
                           size="sm"
                           variant="dangerGhost"
                           loading={deletingId === phase.id}
-                          onClick={() => whenEditable(() => void deleteItem("phase", phase.id))}
+                          onClick={() => requestDelete("phase", phase.id, phase.title)}
                         >
                           <Minus className="h-4 w-4" strokeWidth={2.5} />
                         </Button>
@@ -1998,25 +2049,14 @@ export function BlueprintPathDetailPage() {
                               Skills or project roles required before this phase unlocks.
                             </p>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              icon={<Plus className="h-3.5 w-3.5" />}
-                              onClick={() => void openAddRequirements(phase.id)}
-                            >
-                              Add requirements
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="dangerSoft"
-                              icon={<Minus className="h-3.5 w-3.5" />}
-                              disabled={(phase.requirements ?? []).length === 0}
-                              onClick={() => openRemoveRequirements(phase.id)}
-                            >
-                              Remove requirements
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<Plus className="h-3.5 w-3.5" />}
+                            onClick={() => whenEditable(() => void openAddRequirements(phase.id))}
+                          >
+                            Add requirement
+                          </Button>
                         </div>
                         {(phase.requirements ?? []).length === 0 ? (
                           <p className="mt-3 text-sm text-app-text-subtle">No requirements yet.</p>
@@ -2025,12 +2065,26 @@ export function BlueprintPathDetailPage() {
                             {(phase.requirements ?? []).map((requirement) => (
                               <li
                                 key={requirement.id}
-                                className="flex items-center gap-1 rounded-lg border border-app-border bg-app-surface px-2 py-1 text-sm text-app-text"
+                                className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface py-1 pr-1 pl-2 text-sm text-app-text"
                               >
                                 <span className="text-xs text-app-text-subtle">
                                   {requirement.type === "SKILL" ? "Skill:" : "Role:"}
                                 </span>
                                 <span>{requirement.displayName}</span>
+                                <Button
+                                  iconOnly
+                                  size="sm"
+                                  variant="dangerGhost"
+                                  aria-label={`Remove requirement ${requirement.displayName}`}
+                                  loading={removingRequirementId === requirement.id}
+                                  onClick={() =>
+                                    whenEditable(
+                                      () => void removeRequirement(phase.id, requirement.id),
+                                    )
+                                  }
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
                               </li>
                             ))}
                           </ul>
@@ -2176,7 +2230,9 @@ export function BlueprintPathDetailPage() {
                                                     size="sm"
                                                     variant="dangerGhost"
                                                     loading={deletingId === task.id}
-                                                    onClick={() => void deleteItem("task", task.id)}
+                                                    onClick={() =>
+                                                      requestDelete("task", task.id, task.title)
+                                                    }
                                                   >
                                                     <Minus className="h-4 w-4" strokeWidth={2.5} />
                                                   </Button>
@@ -2229,7 +2285,11 @@ export function BlueprintPathDetailPage() {
                                                     variant="dangerGhost"
                                                     loading={deletingId === resource.id}
                                                     onClick={() =>
-                                                      void deleteItem("resource", resource.id)
+                                                      requestDelete(
+                                                        "resource",
+                                                        resource.id,
+                                                        resource.title,
+                                                      )
                                                     }
                                                   >
                                                     <Minus className="h-4 w-4" strokeWidth={2.5} />
@@ -2385,7 +2445,9 @@ export function BlueprintPathDetailPage() {
                                                 size="sm"
                                                 variant="dangerGhost"
                                                 loading={deletingId === option.id}
-                                                onClick={() => void deleteItem("option", option.id)}
+                                                onClick={() =>
+                                                  requestDelete("option", option.id, option.label)
+                                                }
                                               >
                                                 <Minus className="h-4 w-4" strokeWidth={2.5} />
                                               </Button>
@@ -2574,55 +2636,6 @@ export function BlueprintPathDetailPage() {
             </fieldset>
           </form>
         )}
-      </Modal>
-      <Modal
-        isOpen={removeRequirementTarget !== null}
-        title="Remove phase requirements"
-        description="Select every requirement to remove from this phase."
-        onClose={() => setRemoveRequirementTarget(null)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setRemoveRequirementTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="dangerSoft"
-              type="submit"
-              form="remove-phase-requirements"
-              loading={isRequirementSaving}
-              disabled={selectedRequirementIds.length === 0}
-            >
-              Remove selected
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="remove-phase-requirements"
-          className="space-y-2"
-          onSubmit={(event) => void deleteRequirements(event)}
-        >
-          {(
-            path.blueprintPhases.find((phase) => phase.id === removeRequirementTarget?.phaseId)
-              ?.requirements ?? []
-          ).map((requirement) => (
-            <label
-              key={requirement.id}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text hover:bg-app-surface-muted"
-            >
-              <input
-                type="checkbox"
-                checked={selectedRequirementIds.includes(requirement.id)}
-                onChange={() => toggleRequirementSelection(requirement.id)}
-                className="h-4 w-4 accent-[var(--color-app-danger)]"
-              />
-              <span className="text-app-text-subtle">
-                {requirement.type === "SKILL" ? "Skill" : "Project role"}
-              </span>
-              <span>{requirement.displayName}</span>
-            </label>
-          ))}
-        </form>
       </Modal>
       <Modal
         isOpen={isHistoryOpen}
