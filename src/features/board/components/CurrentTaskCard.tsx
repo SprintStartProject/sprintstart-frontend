@@ -36,13 +36,7 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
       icon={Target}
       title="What you're working on"
       card={card}
-      subtitle={
-        hasTask
-          ? content.chosen
-            ? "You picked this one"
-            : "Handed to you as a first task"
-          : undefined
-      }
+      subtitle={hasTask ? "You picked this one" : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
     >

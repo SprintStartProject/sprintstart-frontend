@@ -90,6 +90,10 @@ export function stageOrder(stage: BoardStage): number {
  * - `TEAM` — from a card blueprint. The PM's, and the hire may not take it off.
  * - `BUDDY` — from a generated path. Named on the card so it does not look like the hire's own
  *   doing, but still theirs to clear: the buddy is an assistant, not an authority.
+ *
+ * Nothing writes `TEAM` or `BUDDY` any more: card blueprints and the generator that copied the path
+ * onto the board were retired when the onboarding path became the one plan (#311). Boards arranged
+ * before then still hold such edges, and they keep their meaning.
  * - `HIRE` — theirs, and the only kind their own controls write.
  */
 export type DependencySource = "TEAM" | "BUDDY" | "HIRE";
@@ -251,7 +255,6 @@ export function isSelfReporting(card: BoardCard): boolean {
   switch (card.content.kind) {
     case "CHECKLIST":
     case "ARRIVAL_STEPS":
-    case "PATH_TO_FIRST_CONTRIBUTION":
       return true;
     default:
       return false;
@@ -275,10 +278,6 @@ export function cardProgress(card: BoardCard): { done: number; total: number } |
     case "ARRIVAL_STEPS": {
       const total = content.steps.length;
       return { done: total - content.outstandingCount, total };
-    }
-    case "PATH_TO_FIRST_CONTRIBUTION": {
-      const total = content.moments.length;
-      return { done: content.moments.filter((moment) => moment.reachedAt !== null).length, total };
     }
     default:
       return null;

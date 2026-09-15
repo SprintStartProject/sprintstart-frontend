@@ -33,20 +33,6 @@ const board: Board = {
   projectId: "p1",
   cards: [
     {
-      id: "c1",
-      kind: "PATH_TO_FIRST_CONTRIBUTION",
-      owner: "AI",
-      position: 0,
-      placedAt: null,
-      content: {
-        kind: "PATH_TO_FIRST_CONTRIBUTION",
-        moments: [{ key: "JOINED", reachedAt: "2026-07-20T09:00:00Z" }],
-        acceptedCount: 0,
-        autonomyReachedAt: null,
-        stalledReason: null,
-      },
-    },
-    {
       id: "c2",
       kind: "OPEN_PULL_REQUESTS",
       owner: "AI",
@@ -79,7 +65,7 @@ describe("BoardPage Accessibility", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByLabelText("Your path here")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Your open pull requests")).toBeInTheDocument());
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

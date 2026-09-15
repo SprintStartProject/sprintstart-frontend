@@ -36,9 +36,9 @@ export const BUDDY_PATH_ACTIONS: readonly string[] = [
 export type ProposedAction = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
-  /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_task_zero"). */
+  /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_goal"). */
   action: string;
-  /** The button text ("Start Task 0"). */
+  /** The button text ("Work toward this task"). */
   label: string;
   /** Carried through only for flag-to-PM: the question the buddy composed. */
   question?: string;
@@ -168,7 +168,7 @@ export type BuddyStreamHandlers = {
   /** Optional: only some turns run a tool, and the surface may not show which. */
   onToolUse?: (tool: string) => void;
   /**
-   * The buddy has *proposed* an action the hire must confirm (e.g. "Start Task 0"). Nothing has
+   * The buddy has *proposed* an action the hire must confirm (e.g. "Work toward this task"). Nothing has
    * changed yet — the surface renders a confirm affordance and only mutates when the hire clicks.
    */
   onActionProposal?: (proposal: {

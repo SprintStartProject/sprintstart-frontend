@@ -5,7 +5,7 @@ export type AttestationState = "REQUESTED" | "ACCEPTED" | "WITHDRAWN";
  * One request for a named colleague to confirm a hire's work.
  *
  * `returnedCount` is shown rather than hidden: work that took three passes is not the same as work
- * that took none, and the autonomy milestone reads exactly this number.
+ * that took none.
  */
 export interface Attestation {
   id: string;

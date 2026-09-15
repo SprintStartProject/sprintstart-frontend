@@ -81,7 +81,6 @@ describe("highlights on a card the board re-reads", () => {
           title: "Ship the importer",
           summary: "Roll it out behind a feature flag first.",
           url: null,
-          chosen: true,
         }}
         card={card}
       />,

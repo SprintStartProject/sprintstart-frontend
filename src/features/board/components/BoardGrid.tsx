@@ -27,7 +27,6 @@ import { MemoryRecapCard } from "./MemoryRecapCard";
 import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
 import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
-import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { BoardCardContext } from "./boardCardControls";
 import { BoardStageBand } from "./BoardStageBand";
@@ -443,8 +442,6 @@ function BoardCardView({
   // to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
-    case "PATH_TO_FIRST_CONTRIBUTION":
-      return <PathToFirstContributionCard content={card.content} {...props} />;
     case "ARRIVAL_STEPS":
       return <ArrivalStepsCard content={card.content} {...props} />;
     case "OPEN_PULL_REQUESTS":

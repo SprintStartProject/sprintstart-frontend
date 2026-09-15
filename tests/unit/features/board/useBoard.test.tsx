@@ -23,17 +23,11 @@ const board = (cardIds: string[]): Board => ({
   projectId: "p1",
   cards: cardIds.map((id, index) => ({
     id,
-    kind: "PATH_TO_FIRST_CONTRIBUTION",
+    kind: "OPEN_PULL_REQUESTS",
     owner: "AI",
     position: index,
     placedAt: null,
-    content: {
-      kind: "PATH_TO_FIRST_CONTRIBUTION",
-      moments: [],
-      acceptedCount: 0,
-      autonomyReachedAt: null,
-      stalledReason: null,
-    },
+    content: { kind: "OPEN_PULL_REQUESTS", pullRequests: [], attributionMissing: false },
   })),
 });
 
@@ -125,7 +119,7 @@ describe("useBoard", () => {
 
     expect(accepted).toBe(false);
     expect(result.current.writeError).toBe(true);
-    expect(result.current.board?.cards[0].content.kind).toBe("PATH_TO_FIRST_CONTRIBUTION");
+    expect(result.current.board?.cards[0].content.kind).toBe("OPEN_PULL_REQUESTS");
   });
 
   it("keeps the card and surfaces the failure when removal does not go through", async () => {

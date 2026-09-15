@@ -4,7 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
-import { readableTitle } from "../generation/pathToCards";
+import { readableTitle } from "../layout/cardNames";
 import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
@@ -124,8 +124,8 @@ export function ChecklistCard({
   return (
     <BoardCardFrame
       icon={CheckSquare}
-      // Stripped of the marker a generated card carries: it exists so a second generation run can
-      // recognise its own work, and it is never something the hire should read.
+      // Stripped of the invisible marker a card from the retired generator still carries -- see
+      // `layout/cardNames.ts`. It is never something the hire should read.
       title={
         content.title ? (
           // A checklist's name is written by whoever made the list — the generator, or the hire
@@ -244,9 +244,8 @@ export function ChecklistCard({
           highlighted two lines has already said which part they are stuck on. */}
       <AskTheBuddy
         question={questionAboutChecklist(
-          // The readable title, for the same reason the header shows it: the marker is there so a
-          // generation run can recognise its own work, and it has no business in a sentence the
-          // hire is about to send.
+          // The readable title, for the same reason the header shows it: the marker has no
+          // business in a sentence the hire is about to send.
           content.title === null ? null : readableTitle(content.title),
           content.items.filter((item) => !item.done).length,
           marks.map((mark) => mark.text),
