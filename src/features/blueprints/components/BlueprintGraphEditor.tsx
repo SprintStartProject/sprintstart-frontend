@@ -64,6 +64,7 @@ export function BlueprintGraphEditor({
   const [isDetailsSaving, setIsDetailsSaving] = useState(false);
   const [detailsSaveError, setDetailsSaveError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const toast = useToast();
@@ -198,9 +199,31 @@ export function BlueprintGraphEditor({
         onClose={() => setIsDeleteConfirmOpen(false)}
         onConfirm={() => void deletePhase()}
       />
+      <AlertDialog
+        isOpen={isDiscardConfirmOpen}
+        title="Discard your changes?"
+        description={<p>This phase has edits that have not been saved.</p>}
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        variant="danger"
+        onClose={() => setIsDiscardConfirmOpen(false)}
+        onConfirm={() => {
+          if (detailsPhase) setMetadata(metadataOf(detailsPhase));
+          setIsDiscardConfirmOpen(false);
+          setIsDetailsOpen(false);
+        }}
+      />
       <SidePanel
         isOpen={isDetailsOpen && detailsPhaseId !== null}
-        onClose={() => setIsDetailsOpen(false)}
+        onClose={() => {
+          // Without the mode there is no Cancel, so closing is the only way to walk away from an
+          // edit — and it has to say so rather than dropping the work on the floor.
+          if (isDirty) {
+            setIsDiscardConfirmOpen(true);
+            return;
+          }
+          setIsDetailsOpen(false);
+        }}
         title={detailsPhase?.title ?? "Phase details"}
         footer={
           editable && detailsPhase ? (

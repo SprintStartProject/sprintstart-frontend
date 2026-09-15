@@ -119,6 +119,7 @@ export function BlueprintSubGraphEditor({
   const [isStepSaving, setIsStepSaving] = useState(false);
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const toast = useToast();
@@ -326,9 +327,34 @@ export function BlueprintSubGraphEditor({
         onClose={() => setIsDeleteConfirmOpen(false)}
         onConfirm={() => void deleteDetailsNode()}
       />
+      <AlertDialog
+        isOpen={isDiscardConfirmOpen}
+        title="Discard your changes?"
+        description={
+          <p>This {detailsStep ? "step" : "knowledge check"} has edits that have not been saved.</p>
+        }
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        variant="danger"
+        onClose={() => setIsDiscardConfirmOpen(false)}
+        onConfirm={() => {
+          if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
+          if (detailsQuestion) setQuestionMetadata(questionMetadataOf(detailsQuestion));
+          setIsDiscardConfirmOpen(false);
+          setIsDetailsOpen(false);
+        }}
+      />
       <SidePanel
         isOpen={isDetailsOpen && detailsNode !== null}
-        onClose={() => setIsDetailsOpen(false)}
+        onClose={() => {
+          // Without the mode there is no Cancel, so closing is the only way to walk away from an
+          // edit — and it has to say so rather than dropping the work on the floor.
+          if ((detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty)) {
+            setIsDiscardConfirmOpen(true);
+            return;
+          }
+          setIsDetailsOpen(false);
+        }}
         title={detailsNode?.title ?? "Node details"}
         footer={
           (detailsStep || detailsQuestion) && editable ? (
