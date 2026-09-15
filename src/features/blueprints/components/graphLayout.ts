@@ -383,3 +383,73 @@ export function chainPositions(nodes: readonly GraphRuleNode[]): Map<string, Cha
 
   return positions;
 }
+
+/**
+ * Breathing space kept between two drawn cards, on top of the card box itself.
+ *
+ * Small on purpose: this pass moves nodes away from where their author put them, so it should do
+ * the least that stops them sitting on each other.
+ */
+const MIN_NODE_GAP = 12;
+
+/**
+ * The same positions, with any cards that would sit on top of each other pushed apart.
+ *
+ * Needed because overlapping coordinates are a thing the data can simply contain. The seeded
+ * blueprint is the proof: six of its sixteen phases are stored between 226 and 242 apart on x with
+ * almost no difference on y, against a card 248 wide — it was laid out for a narrower card than the
+ * one that draws it, and no amount of care in the card fixes a number in the database.
+ *
+ * **Drawing only.** Nothing here is saved. An author who drags a card onto another gets it nudged
+ * clear rather than stacked, and an author who never touches the graph still sees every card.
+ *
+ * Deterministic: pairs are visited in the order the nodes arrive, each overlap is resolved along
+ * whichever axis needs the smaller push, and the sweep repeats a bounded number of times — so the
+ * same graph always draws the same way, and a knot that cannot be resolved stops rather than spins.
+ */
+export function separateOverlaps(
+  nodes: readonly GraphRuleNode[],
+  positions: GraphPositions,
+): GraphPositions {
+  const ids = nodes.map((node) => node.id).filter((id) => positions[id] !== undefined);
+  const out: GraphPositions = {};
+  for (const id of ids) out[id] = { ...positions[id] };
+
+  const minX = GRAPH_NODE_WIDTH + MIN_NODE_GAP;
+  const minY = GRAPH_NODE_HEIGHT + MIN_NODE_GAP;
+  const MAX_SWEEPS = 24;
+
+  for (let sweep = 0; sweep < MAX_SWEEPS; sweep += 1) {
+    let moved = false;
+
+    for (let i = 0; i < ids.length; i += 1) {
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const a = out[ids[i]];
+        const b = out[ids[j]];
+        const overlapX = minX - Math.abs(b.x - a.x);
+        const overlapY = minY - Math.abs(b.y - a.y);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+
+        moved = true;
+        if (overlapX <= overlapY) {
+          // Two cards dead on top of each other have no axis to be pushed along, so one is picked
+          // — by arrival order, so it is the same one every time.
+          const direction = b.x === a.x ? 1 : Math.sign(b.x - a.x);
+          a.x -= (direction * overlapX) / 2;
+          b.x += (direction * overlapX) / 2;
+        } else {
+          const direction = b.y === a.y ? 1 : Math.sign(b.y - a.y);
+          a.y -= (direction * overlapY) / 2;
+          b.y += (direction * overlapY) / 2;
+        }
+      }
+    }
+
+    if (!moved) break;
+  }
+
+  for (const id of ids) {
+    out[id] = { x: Math.round(out[id].x), y: Math.round(out[id].y) };
+  }
+  return out;
+}

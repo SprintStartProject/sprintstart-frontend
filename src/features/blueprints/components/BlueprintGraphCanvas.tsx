@@ -46,6 +46,7 @@ import {
   chainPositions,
   edgeRefusal,
   entryPointIds,
+  separateOverlaps,
   withFallbackPositions,
   type ChainPosition,
 } from "./graphLayout.ts";
@@ -248,7 +249,9 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
 
   const computedNodes = useMemo<BlueprintFlowNode[]>(
     () => {
-      const positions = withFallbackPositions(placedNodes);
+      // Stored coordinates can overlap — the seeded blueprint's do — so what gets drawn is the
+      // stored arrangement with any collisions pushed apart. Nothing here is written back.
+      const positions = separateOverlaps(placedNodes, withFallbackPositions(placedNodes));
 
       return placedNodes.map((node) => {
         const centre = positions[node.id];
