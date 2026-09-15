@@ -13,9 +13,11 @@ import {
   getSkillsByRoleId,
   updateRoleSkills,
   reactivateSkill,
+  getMySkillLevels,
   getUserSkillLevels,
   saveUserSkillAssessments,
 } from "../../../src/services/teamManagementService";
+import { apiClient } from "../../../src/services/apiClient";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 
@@ -330,5 +332,65 @@ describe("teamManagementService", () => {
         level: "INTERMEDIATE",
       },
     ]);
+  });
+
+  it("getMySkillLevels labels the skills from the roles it is handed", async () => {
+    server.use(
+      http.get("/api/v1/me/skills", () =>
+        HttpResponse.json([
+          { id: "assessment1", userId: "user1", skillId: "skill1", level: "ADVANCED" },
+        ]),
+      ),
+      http.get("/api/v1/skills", () =>
+        HttpResponse.json([
+          { id: "skill1", name: "TypeScript", roleIds: ["role1"], status: "ACTIVE" },
+        ]),
+      ),
+    );
+
+    const levels = await getMySkillLevels([{ id: "role1", name: "Frontend" }]);
+
+    expect(levels).toEqual([
+      {
+        id: "user1-skill1",
+        skillId: "skill1",
+        skillName: "TypeScript",
+        roleName: "Frontend",
+        level: "ADVANCED",
+      },
+    ]);
+  });
+
+  it("getMySkillLevels calls the skill a role the user does not hold unknown", async () => {
+    server.use(
+      http.get("/api/v1/me/skills", () =>
+        HttpResponse.json([
+          { id: "assessment1", userId: "user1", skillId: "skill1", level: "ADVANCED" },
+        ]),
+      ),
+      http.get("/api/v1/skills", () =>
+        HttpResponse.json([
+          { id: "skill1", name: "TypeScript", roleIds: ["role9"], status: "ACTIVE" },
+        ]),
+      ),
+    );
+
+    const levels = await getMySkillLevels([{ id: "role1", name: "Frontend" }]);
+
+    expect(levels[0].roleName).toBe("Unknown role");
+  });
+
+  it("getMySkillLevels never calls the admin-only project roles endpoint", async () => {
+    // The default MSW handler for `/api/v1/projectRoles` answers 200, so a passing test
+    // could still be making the request. Watch the client instead.
+    const fetchSpy = vi.spyOn(apiClient, "fetch");
+
+    await getMySkillLevels([{ id: "role1", name: "Frontend" }]);
+
+    const requestedUrls = fetchSpy.mock.calls.map(([url]) => String(url));
+    fetchSpy.mockRestore();
+
+    expect(requestedUrls).not.toHaveLength(0);
+    expect(requestedUrls.some((url) => url.includes("/projectRoles"))).toBe(false);
   });
 });
