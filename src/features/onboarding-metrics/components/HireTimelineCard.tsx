@@ -33,7 +33,7 @@ function gapHours(from: string | null, to: string | null): number | null {
 }
 
 /**
- * One hire's onboarding timeline: joined → task claimed → work submitted → first
+ * One hire's contribution timeline: joined → task claimed → work submitted → first
  * response → accepted, with the gap between each pair of moments that has actually
  * happened. An unreached moment is a hollow, dashed dot and a dash, never a zero.
  *

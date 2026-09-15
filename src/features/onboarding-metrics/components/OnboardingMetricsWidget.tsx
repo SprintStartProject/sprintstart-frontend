@@ -80,10 +80,10 @@ function AttentionRow({ item }: { item: AttentionItem }) {
 }
 
 /**
- * Compact PM-dashboard summary of onboarding health, a peer card to the other
+ * Compact PM-dashboard summary of how hires get their work in, a peer card to the other
  * Insights widgets (`FaqWidget`, `KnowledgeGapWidget`). It deliberately carries
  * only the two questions a PM answers at a glance — how many hires are stuck, and
- * how fast onboarding reaches a first accepted piece of work — plus a short "who
+ * how fast a hire reaches a first accepted piece of work — plus a short "who
  * needs a human" preview; everything else lives on the full readout it links to.
  *
  * The metrics are derived on request, so "refresh" is a client-side refetch
@@ -125,7 +125,7 @@ export function OnboardingMetricsWidget() {
     try {
       await reloadAttention();
     } catch {
-      toast.error("Couldn't refresh onboarding metrics", { description: "Try again shortly." });
+      toast.error("Couldn't refresh contribution metrics", { description: "Try again shortly." });
     } finally {
       setRefreshing(false);
     }
@@ -144,7 +144,7 @@ export function OnboardingMetricsWidget() {
       <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-app-border bg-app-surface p-6 text-center">
         <AlertCircle className="h-5 w-5 text-app-text-muted" />
         <p className="text-sm text-app-text-muted">
-          Onboarding metrics couldn&apos;t be loaded for this project.
+          Contribution metrics couldn&apos;t be loaded for this project.
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -183,7 +183,7 @@ export function OnboardingMetricsWidget() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-app-brand" />
-          <span className="text-sm font-semibold text-app-text">Onboarding metrics</span>
+          <span className="text-sm font-semibold text-app-text">Contribution metrics</span>
         </div>
         <div className="flex items-center gap-3">
           <Button
