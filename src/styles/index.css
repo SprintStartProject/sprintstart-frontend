@@ -924,3 +924,21 @@ body {
     animation: none;
   }
 }
+
+/* Onboarding graphs: an edge whose blocker is done and whose target is open drifts towards the
+   target, so "this is what you can do now" reads at a glance without another colour. */
+@keyframes journey-edge-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+.journey-edge-flow {
+  animation: journey-edge-flow 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-edge-flow {
+    animation: none;
+  }
+}

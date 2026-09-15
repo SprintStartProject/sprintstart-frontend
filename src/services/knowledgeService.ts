@@ -32,6 +32,23 @@ type UploadResponseItem = {
 
 export const knowledgeService = {
   /**
+   * Whether the project has anything ingested at all -- what an onboarding path is built from.
+   *
+   * Throws when the question cannot be answered, rather than reporting "empty": a failed request
+   * and an empty project are different statements, and callers deciding whether to hide the
+   * onboarding entry treat them differently.
+   *
+   * @param projectId UUID of the project.
+   */
+  async hasIngestedContent(projectId: string): Promise<boolean> {
+    const response = await apiClient.fetch<{ items?: Artifact[] }>(
+      `/api/v1/projects/${projectId}/artifacts?page=1&size=1`,
+    );
+
+    return (response.items?.length ?? 0) > 0;
+  },
+
+  /**
    * Fetches a single short page of project artifacts for at-a-glance views
    * such as the dashboard widget.
    *

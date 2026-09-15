@@ -263,6 +263,14 @@ export interface OnboardingPersonalizeEvent {
   message?: string;
 }
 
+/** GET /projects/{projectId}/onboarding/me/path/generation */
+export interface OnboardingGenerationStatus {
+  running: boolean;
+  runningProjectId?: string | null;
+  startedAt?: string | null;
+  hasActiveBlueprint: boolean;
+}
+
 export interface OnboardingPersonalizeHandlers {
   onStage?: (name: string, detail?: string) => void;
   onPath: (path: OnboardingPathEndpoint) => void;
