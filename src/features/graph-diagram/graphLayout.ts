@@ -146,38 +146,61 @@ export function entryPointIds(nodes: readonly GraphRuleNode[]): Set<string> {
   );
 }
 
+/** Walks one relation from `rootId` and returns everything it reaches, `rootId` excluded. */
+function walk(edges: Map<string, string[]>, rootId: string): Set<string> {
+  const reached = new Set<string>();
+  const queue = [...(edges.get(rootId) ?? [])];
+
+  while (queue.length > 0) {
+    const current = queue.pop() as string;
+    if (current === rootId || reached.has(current)) continue;
+    reached.add(current);
+    queue.push(...(edges.get(current) ?? []));
+  }
+
+  return reached;
+}
+
+function blockerEdges(nodes: readonly GraphRuleNode[]): Map<string, string[]> {
+  return new Map(nodes.map((node) => [node.id, node.blockerIds]));
+}
+
+function dependentEdges(nodes: readonly GraphRuleNode[]): Map<string, string[]> {
+  const edges = new Map<string, string[]>();
+  for (const node of nodes) {
+    for (const blockerId of node.blockerIds) {
+      edges.set(blockerId, [...(edges.get(blockerId) ?? []), node.id]);
+    }
+  }
+  return edges;
+}
+
+/**
+ * Everything `rootId` waits on, however far back — `rootId` itself excluded.
+ *
+ * Kept apart from what waits on it, because the two are different questions and the answers get
+ * different treatment when a reader points at a node. What comes *before* is the constraint: these
+ * are the reasons the node is shut. What comes *after* is the consequence: this is what opening it
+ * would let through. Lit in one colour, a chain says "these are related"; lit in two, it says which
+ * half is holding you up and which half you are holding up.
+ */
+export function blockersBehind(nodes: readonly GraphRuleNode[], rootId: string): Set<string> {
+  return walk(blockerEdges(nodes), rootId);
+}
+
+/** Everything waiting on `rootId`, however far forward — `rootId` itself excluded. */
+export function dependentsAhead(nodes: readonly GraphRuleNode[], rootId: string): Set<string> {
+  return walk(dependentEdges(nodes), rootId);
+}
+
 /**
  * Everything `rootId` waits on, everything that waits on it, and itself.
  *
- * This is what gets lit when a node is selected: the one question a prerequisite graph is asked is
- * "what does this depend on and what depends on this", and answering it by pointing is the reason
- * to draw the graph rather than list it.
+ * The one question a prerequisite graph is asked is "what does this depend on and what depends on
+ * this", and answering it by pointing is the reason to draw the graph rather than list it.
  */
 export function chainFor(nodes: readonly GraphRuleNode[], rootId: string): Set<string> {
-  const blockersById = new Map(nodes.map((node) => [node.id, node.blockerIds]));
-  const dependentsById = new Map<string, string[]>();
-  for (const node of nodes) {
-    for (const blockerId of node.blockerIds) {
-      dependentsById.set(blockerId, [...(dependentsById.get(blockerId) ?? []), node.id]);
-    }
-  }
-
-  const chain = new Set<string>();
-  for (const edges of [blockersById, dependentsById]) {
-    // Visited is per direction: sharing one set across both would stop the second walk at the root,
-    // which is already in the chain by then, and quietly light only half the chain.
-    const visited = new Set<string>();
-    const queue = [rootId];
-    while (queue.length > 0) {
-      const current = queue.pop() as string;
-      if (visited.has(current)) continue;
-      visited.add(current);
-      chain.add(current);
-      queue.push(...(edges.get(current) ?? []));
-    }
-  }
-
-  return chain;
+  return new Set([rootId, ...blockersBehind(nodes, rootId), ...dependentsAhead(nodes, rootId)]);
 }
 
 /** The grid cell a position sits in, so a fallback placement can avoid an occupied one. */

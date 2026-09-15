@@ -180,6 +180,28 @@ describe("BlueprintGraphCanvas", () => {
     expect(onPositionChange).not.toHaveBeenCalled();
   });
 
+  it("counts both halves of a run when a node is pointed at", async () => {
+    renderCanvas([node("a"), node("b", ["a"]), node("c", ["b"])]);
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-b"));
+
+    // The two numbers a picture cannot be counted for, and the ones that decide whether a node is
+    // worth doing early.
+    await waitFor(() => expect(screen.getByText("1 must happen first")).toBeInTheDocument());
+    expect(screen.getByText("Finishing it opens 1")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(screen.getByTestId("graph-node-b"));
+    await waitFor(() => expect(screen.queryByText("1 must happen first")).not.toBeInTheDocument());
+  });
+
+  it("says plainly when a node has nothing on one side, rather than showing a zero", () => {
+    renderCanvas([node("a"), node("b", ["a"])]);
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-a"));
+
+    expect(screen.getByText("Nothing has to happen first")).toBeInTheDocument();
+  });
+
   it("says an empty canvas is empty, not broken", () => {
     const empty = renderCanvas([]);
     expect(screen.getByText("Nothing on the canvas yet")).toBeInTheDocument();

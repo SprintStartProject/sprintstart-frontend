@@ -5,8 +5,10 @@ import {
   MIN_NODE_GAP,
   arrangementFor,
   autoLayoutPositions,
+  blockersBehind,
   blueprintEdgePath,
   canConnect,
+  dependentsAhead,
   edgeSides,
   chainFor,
   chainPositions,
@@ -576,5 +578,44 @@ describe("arrangementFor", () => {
 
     expect(positions.a.x).toBeLessThan(positions.b.x);
     expect(positions.b.x).toBeLessThan(positions.c.x);
+  });
+});
+
+describe("blockersBehind and dependentsAhead", () => {
+  const nodes = [node("a"), node("b", ["a"]), node("c", ["b"]), node("side", ["a"])];
+
+  it("looks all the way back, not one hop", () => {
+    // The reason to split the two walks: one hop back is what a sentence on a card can already
+    // say, and the hop after that is where a reader gets lost.
+    expect(blockersBehind(nodes, "c")).toEqual(new Set(["b", "a"]));
+  });
+
+  it("looks all the way forward, down every branch", () => {
+    expect(dependentsAhead(nodes, "a")).toEqual(new Set(["b", "c", "side"]));
+  });
+
+  it("leaves the node itself out of both, so the two halves never overlap", () => {
+    expect(blockersBehind(nodes, "b").has("b")).toBe(false);
+    expect(dependentsAhead(nodes, "b").has("b")).toBe(false);
+  });
+
+  it("says nothing either way about a node on its own", () => {
+    expect(blockersBehind([node("lonely")], "lonely").size).toBe(0);
+    expect(dependentsAhead([node("lonely")], "lonely").size).toBe(0);
+  });
+
+  it("stops on a ring rather than walking it forever", () => {
+    const ring = [node("x", ["y"]), node("y", ["x"])];
+
+    expect(blockersBehind(ring, "x")).toEqual(new Set(["y"]));
+    expect(dependentsAhead(ring, "x")).toEqual(new Set(["y"]));
+  });
+
+  it("together with the node itself, they are the chain", () => {
+    for (const id of ["a", "b", "c", "side"]) {
+      expect(chainFor(nodes, id)).toEqual(
+        new Set([id, ...blockersBehind(nodes, id), ...dependentsAhead(nodes, id)]),
+      );
+    }
   });
 });

@@ -50,10 +50,11 @@ import {
   autoLayoutPositions,
   blueprintEdgePath,
   canConnect,
-  chainFor,
   chainPositions,
   edgeRefusal,
   edgeSides,
+  blockersBehind,
+  dependentsAhead,
   entryPointIds,
   separateOverlaps,
   EDGE_TONES,
@@ -99,6 +100,13 @@ export type BlueprintGraphCanvasNodeProps = {
   zoom: number;
   /** True when the card is drawn in the library list rather than on the canvas. */
   inLibrary: boolean;
+  /**
+   * True when this is the node the reader is pointing at, whose run is lit.
+   *
+   * The card that started a highlight has to be findable again: on a graph where half the nodes are
+   * lit, "which one did I point at" is a question the lighting cannot answer by itself.
+   */
+  highlighted?: boolean;
   /**
    * Where this node sits in the chain it belongs to, or `undefined` when it belongs to none.
    *
@@ -235,6 +243,14 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   }, [fitView, isFocused]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /**
+   * The node under the pointer, which lights its run without committing to it.
+   *
+   * Selection stays for the node somebody is working on; hover is for the far more common act of
+   * sweeping across a graph asking "what is this one tangled up with". Making that cost a click
+   * meant that on a sixteen-phase graph nobody ever asked.
+   */
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -256,9 +272,25 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
 
   const entryPoints = useMemo(() => entryPointIds(placedNodes), [placedNodes]);
   const chainPositionById = useMemo(() => chainPositions(placedNodes), [placedNodes]);
+  /**
+   * The run being lit, split into the half in front and the half behind.
+   *
+   * Hover wins over selection: the pointer is the more recent statement of interest, and a
+   * selection that refused to give way while somebody swept the graph would be the graph arguing.
+   */
+  const focusId = hoveredId ?? selectedId;
+  const focus = useMemo(() => {
+    if (!focusId) return null;
+    return {
+      id: focusId,
+      behind: blockersBehind(placedNodes, focusId),
+      ahead: dependentsAhead(placedNodes, focusId),
+    };
+  }, [placedNodes, focusId]);
+
   const chainIds = useMemo(
-    () => (selectedId ? chainFor(placedNodes, selectedId) : null),
-    [placedNodes, selectedId],
+    () => (focus ? new Set([focus.id, ...focus.behind, ...focus.ahead]) : null),
+    [focus],
   );
 
   const detail: "full" | "compact" = zoom < COMPACT_DETAIL_ZOOM ? "compact" : "full";
@@ -310,6 +342,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
                 detail,
                 zoom,
                 inLibrary: false,
+                highlighted: node.id === focusId,
                 chainPosition: chainPositionById.get(node.id),
                 onClick: () => onNodeClick(node),
               }),
@@ -341,6 +374,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
       positions,
       entryPoints,
       chainIds,
+      focusId,
       chainPositionById,
       editable,
       selectedId,
@@ -370,6 +404,19 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
           // at right-out/left-in: a card below the one it waits on is reached from below.
           const sides = edgeSides(positions[blockerId], positions[node.id]);
           const tone = EDGE_TONES[edgeTone?.(node, blockerId) ?? "rule"];
+          // Which half of the lit run this arrow belongs to, if either. An arrow behind the focus
+          // is a reason it is shut; one ahead of it is something it is holding up. The arrowhead
+          // already carries the direction — the colour is what makes the two halves separable at a
+          // glance, which is the whole point of pointing at a node in a crowded graph.
+          const direction = !focus
+            ? null
+            : (focus.behind.has(blockerId) || blockerId === focus.id) &&
+                (focus.behind.has(node.id) || node.id === focus.id)
+              ? "behind"
+              : (focus.ahead.has(node.id) || node.id === focus.id) &&
+                  (focus.ahead.has(blockerId) || blockerId === focus.id)
+                ? "ahead"
+                : null;
 
           return {
             id: `${blockerId}->${node.id}`,
@@ -385,24 +432,29 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             style: {
               // React Flow's own stroke is a fixed light grey that vanishes on the dark theme, so
               // the edge carries the brand token and a weight that survives being zoomed out.
-              stroke: "var(--color-app-brand)",
-              strokeWidth: tone.width,
+              stroke:
+                direction === "behind"
+                  ? "var(--color-app-warning-solid)"
+                  : "var(--color-app-brand)",
+              strokeWidth: direction === null ? tone.width : tone.width + 1,
               strokeDasharray: tone.dash,
               strokeLinecap: "round" as const,
-              opacity:
-                chainIds !== null && !(chainIds.has(blockerId) && chainIds.has(node.id)) ? 0.15 : 1,
+              opacity: focus !== null && direction === null ? 0.12 : 1,
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 18,
               height: 18,
-              color: "var(--color-app-brand)",
+              color:
+                direction === "behind"
+                  ? "var(--color-app-warning-solid)"
+                  : "var(--color-app-brand)",
             },
             ariaLabel: `${nodeById.get(blockerId)?.title ?? "A node"} must be finished before ${node.title}${edgeTone ? `, ${tone.said}` : ""}`,
           };
         }),
     );
-  }, [placedNodes, positions, chainIds, editable, edgeTone, nodeById]);
+  }, [placedNodes, positions, focus, editable, edgeTone, nodeById]);
 
   /** Runs one graph mutation, holding the canvas still and surfacing the reason if it fails. */
   const runMutation = useCallback(
@@ -643,6 +695,8 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             onNodesChange={onNodesChange}
             onNodeDragStop={handleNodeDragStop}
             onNodeClick={(_event, node) => setSelectedId(node.id)}
+            onNodeMouseEnter={(_event, node) => setHoveredId(node.id)}
+            onNodeMouseLeave={() => setHoveredId(null)}
             onPaneClick={() => setSelectedId(null)}
             onConnect={handleConnect}
             isValidConnection={isValidConnection}
@@ -704,6 +758,41 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
               nodeColor="var(--color-app-brand)"
               nodeStrokeColor="var(--color-app-border)"
             />
+
+            {focus ? (
+              // What pointing at a node actually told you, in words. The two colours say which
+              // half of the run is which; these say how much of it there is — the number nobody
+              // can count off a picture, and the one that decides whether a node is worth doing
+              // early. "Opens 4" is the difference between a node in the way and a node in a
+              // corner.
+              <Panel position="top-left">
+                <div className="max-w-56 rounded-xl border border-app-border bg-app-surface/95 px-3 py-2 shadow-md">
+                  <p className="truncate text-xs font-semibold text-app-text">
+                    {nodeById.get(focus.id)?.title}
+                  </p>
+                  <p className="mt-1 flex flex-col gap-0.5 text-[11px] text-app-text-muted">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        aria-hidden="true"
+                        className="h-0.5 w-3 shrink-0 rounded-full bg-app-warning-solid"
+                      />
+                      {focus.behind.size === 0
+                        ? "Nothing has to happen first"
+                        : `${focus.behind.size} must happen first`}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        aria-hidden="true"
+                        className="h-0.5 w-3 shrink-0 rounded-full bg-app-brand"
+                      />
+                      {focus.ahead.size === 0
+                        ? "Nothing waits on this"
+                        : `Finishing it opens ${focus.ahead.size}`}
+                    </span>
+                  </p>
+                </div>
+              </Panel>
+            ) : null}
 
             {canAuthor ? (
               <Panel position="top-right">

@@ -16,8 +16,6 @@ export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
   status?: { label: string; variant: BadgeVariant; icon?: LucideIcon };
   /** One line under the title. Dropped at compact detail, where there is no room to read it. */
   meta?: string | null;
-  /** True when this node is the one the surrounding page is currently about. */
-  highlighted?: boolean;
   /**
    * Skill or project-role gates on this node, named.
    *
