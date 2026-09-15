@@ -1,5 +1,6 @@
-import { ArrowLeft, CircleHelp, ListChecks, Minus, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CircleHelp, FilePlus2, ListChecks, Minus, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
@@ -7,10 +8,12 @@ import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
+import { useToast } from "../../../context/useToast.ts";
 import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNodeProps,
 } from "./BlueprintGraphCanvas.tsx";
+import { BlueprintNodeCard } from "./BlueprintNodeCard.tsx";
 import type {
   BlueprintGraphNode,
   BlueprintOption,
@@ -36,6 +39,13 @@ type Props = {
   phase: BlueprintPhase;
   nodes: BlueprintGraphNode[];
   editable: boolean;
+  /**
+   * Asks the page to open a draft, on a version that cannot be edited.
+   *
+   * Without it a published blueprint drew a details panel with no footer at all, which reads as
+   * "this has no actions" rather than "not on this version".
+   */
+  onRequestDraft?: () => void;
   onBack: () => void;
   onPositionChange: (node: BlueprintGraphNode, x: number, y: number) => Promise<void>;
   onRemoveNode: (node: BlueprintGraphNode) => Promise<void>;
@@ -65,6 +75,7 @@ export function BlueprintSubGraphEditor({
   phase,
   nodes,
   editable,
+  onRequestDraft,
   onBack,
   onPositionChange,
   onRemoveNode,
@@ -98,6 +109,12 @@ export function BlueprintSubGraphEditor({
     correctAnswer: null,
   });
   const [isStepEditing, setIsStepEditing] = useState(false);
+  const [isStepSaving, setIsStepSaving] = useState(false);
+  const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const toast = useToast();
   const [stepMetadata, setStepMetadata] = useState<BlueprintStepMetadata>({
     title: "",
     description: "",
@@ -131,20 +148,40 @@ export function BlueprintSubGraphEditor({
     ? (phase.blueprintSteps.find((step) => step.id === detailsNode.id) ?? null)
     : null;
 
-  async function deleteStep() {
-    if (!detailsStep) return;
-    closeNodeDetails();
-    await onDeleteStep(detailsStep);
-  }
+  /**
+   * Deletes whichever of the two the details panel is showing, once it has been confirmed.
+   *
+   * The panel closes after the request, not before: closing first said "gone" before anybody knew,
+   * and left a failure with nowhere to appear.
+   */
+  async function deleteDetailsNode() {
+    const target = detailsStep ?? detailsQuestion;
+    if (!target) return;
+    const isStep = detailsStep !== null;
+    const { title } = target;
 
-  async function deleteQuestion() {
-    if (!detailsQuestion) return;
-    closeNodeDetails();
-    await onDeleteQuestion(detailsQuestion);
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      if (detailsStep) await onDeleteStep(detailsStep);
+      else if (detailsQuestion) await onDeleteQuestion(detailsQuestion);
+      setIsDeleteConfirmOpen(false);
+      closeNodeDetails();
+      toast.success(`${isStep ? "Step" : "Knowledge check"} "${title}" deleted`);
+    } catch (reason) {
+      setDeleteError(
+        reason instanceof Error
+          ? reason.message
+          : `The ${isStep ? "step" : "knowledge check"} could not be deleted.`,
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function beginStepEditing() {
     if (!detailsStep) return;
+    setStepSaveError(null);
     setStepMetadata({
       title: detailsStep.title,
       description: detailsStep.description,
@@ -159,8 +196,19 @@ export function BlueprintSubGraphEditor({
   async function saveStepMetadata(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!detailsStep) return;
-    await onUpdateStep(detailsStep, stepMetadata);
-    setIsStepEditing(false);
+    setIsStepSaving(true);
+    setStepSaveError(null);
+    try {
+      await onUpdateStep(detailsStep, stepMetadata);
+      setIsStepEditing(false);
+      toast.success("Step saved");
+    } catch (reason) {
+      setStepSaveError(
+        reason instanceof Error ? reason.message : "Step metadata could not be saved.",
+      );
+    } finally {
+      setIsStepSaving(false);
+    }
   }
 
   function beginQuestionEditing() {
@@ -184,6 +232,7 @@ export function BlueprintSubGraphEditor({
     try {
       await onUpdateQuestion(detailsQuestion, questionMetadata);
       setIsQuestionEditing(false);
+      toast.success("Knowledge check saved");
     } catch (reason) {
       setQuestionSaveError(
         reason instanceof Error ? reason.message : "Question metadata could not be saved.",
@@ -213,7 +262,11 @@ export function BlueprintSubGraphEditor({
         libraryDescription="Drag steps and knowledge checks onto the canvas. Drop a canvas node here to return it to the library."
         libraryEmptyMessage="All phase content is on the canvas."
         libraryTemplates={[
-          { id: "step", title: "New step", description: "Drop onto the canvas to create a step." },
+          {
+            id: "step",
+            title: "New step",
+            description: "Drop onto the canvas to create a step.",
+          },
           {
             id: "question",
             title: "New knowledge check",
@@ -233,6 +286,34 @@ export function BlueprintSubGraphEditor({
         }}
         renderNode={(node, graphNodeProps) => <SubGraphNodeCard node={node} {...graphNodeProps} />}
       />
+      <AlertDialog
+        isOpen={isDeleteConfirmOpen}
+        title={
+          detailsStep
+            ? `Delete step "${detailsStep.title}"?`
+            : detailsQuestion
+              ? `Delete knowledge check "${detailsQuestion.title}"?`
+              : "Delete this node?"
+        }
+        description={
+          <>
+            <p>
+              {detailsStep
+                ? "Its tasks, resources and every prerequisite pointing at it go with it."
+                : "Its answer options and every prerequisite pointing at it go with it."}{" "}
+              Hires who already have a path built from this blueprint keep theirs.
+            </p>
+            <p className="mt-2">This cannot be undone from here.</p>
+          </>
+        }
+        confirmLabel={detailsStep ? "Delete step" : "Delete knowledge check"}
+        variant="danger"
+        isLoading={isDeleting}
+        loadingLabel="Deleting…"
+        errorMessage={deleteError ?? undefined}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={() => void deleteDetailsNode()}
+      />
       <SidePanel
         isOpen={isDetailsOpen && detailsNode !== null}
         onClose={() => {
@@ -248,7 +329,10 @@ export function BlueprintSubGraphEditor({
                 <Button
                   variant="dangerSoft"
                   icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteStep()}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
                 >
                   Delete
                 </Button>
@@ -256,7 +340,12 @@ export function BlueprintSubGraphEditor({
                   <Button variant="secondary" onClick={() => setIsStepEditing(false)}>
                     Cancel
                   </Button>
-                  <Button variant="primary" type="submit" form="edit-blueprint-step">
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    form="edit-blueprint-step"
+                    loading={isStepSaving}
+                  >
                     Save changes
                   </Button>
                 </div>
@@ -266,7 +355,10 @@ export function BlueprintSubGraphEditor({
                 <Button
                   variant="dangerSoft"
                   icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteStep()}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
                 >
                   Delete
                 </Button>
@@ -281,7 +373,10 @@ export function BlueprintSubGraphEditor({
                 <Button
                   variant="dangerSoft"
                   icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteQuestion()}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
                 >
                   Delete
                 </Button>
@@ -304,7 +399,10 @@ export function BlueprintSubGraphEditor({
                 <Button
                   variant="dangerSoft"
                   icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteQuestion()}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
                 >
                   Delete
                 </Button>
@@ -313,6 +411,19 @@ export function BlueprintSubGraphEditor({
                 </Button>
               </div>
             )
+          ) : onRequestDraft ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-app-text-muted">
+                This version is published, so it is read-only.
+              </p>
+              <Button
+                variant="primary"
+                icon={<FilePlus2 className="h-4 w-4" />}
+                onClick={onRequestDraft}
+              >
+                Edit as draft
+              </Button>
+            </div>
           ) : undefined
         }
       >
@@ -329,6 +440,7 @@ export function BlueprintSubGraphEditor({
             onAddOption={onAddOption}
             onRemoveOption={onRemoveOption}
             isStepEditing={isStepEditing}
+            stepSaveError={stepSaveError}
             stepMetadata={stepMetadata}
             onStepMetadataChange={setStepMetadata}
             onStepSubmit={saveStepMetadata}
@@ -348,44 +460,19 @@ export function BlueprintSubGraphEditor({
 
 function SubGraphNodeCard({
   node,
-  draggable,
-  disabled,
-  onDragStart,
-  onClick,
+  ...cardProps
 }: { node: BlueprintGraphNode } & BlueprintGraphCanvasNodeProps) {
   const isQuestion = node.type === "QUESTION";
+
   return (
-    <div
-      data-graph-node
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
+    <BlueprintNodeCard
+      {...cardProps}
+      title={node.title}
+      kind={{
+        label: isQuestion ? "Knowledge check" : "Step",
+        icon: isQuestion ? CircleHelp : ListChecks,
       }}
-      role="button"
-      tabIndex={0}
-      className={
-        (draggable ? "cursor-grab " : "cursor-default ") +
-        "min-h-20 rounded-xl border border-app-border bg-app-surface p-3 shadow-sm" +
-        (disabled ? " pointer-events-none" : "")
-      }
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 text-sm font-semibold text-app-text">{node.title}</p>
-        {isQuestion ? (
-          <CircleHelp className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
-        ) : (
-          <ListChecks className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
-        )}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge variant="neutral">{isQuestion ? "Knowledge check" : "Step"}</Badge>
-      </div>
-    </div>
+    />
   );
 }
 
@@ -401,6 +488,7 @@ function SubGraphNodeDetails({
   onAddOption,
   onRemoveOption,
   isStepEditing,
+  stepSaveError,
   stepMetadata,
   onStepMetadataChange,
   onStepSubmit,
@@ -423,6 +511,7 @@ function SubGraphNodeDetails({
   onAddOption: (question: BlueprintQuestion, label: string, correct: boolean) => Promise<void>;
   onRemoveOption: (option: BlueprintOption) => Promise<void>;
   isStepEditing: boolean;
+  stepSaveError: string | null;
   stepMetadata: BlueprintStepMetadata;
   onStepMetadataChange: React.Dispatch<React.SetStateAction<BlueprintStepMetadata>>;
   onStepSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
@@ -443,6 +532,7 @@ function SubGraphNodeDetails({
         step={step}
         editable={editable}
         isEditing={isStepEditing}
+        saveError={stepSaveError}
         metadata={stepMetadata}
         onMetadataChange={onStepMetadataChange}
         onSubmit={onStepSubmit}
@@ -476,6 +566,7 @@ function StepDetails({
   step,
   editable,
   isEditing,
+  saveError,
   metadata,
   onMetadataChange,
   onSubmit,
@@ -489,6 +580,7 @@ function StepDetails({
   step: BlueprintStep;
   editable: boolean;
   isEditing: boolean;
+  saveError: string | null;
   metadata: BlueprintStepMetadata;
   onMetadataChange: React.Dispatch<React.SetStateAction<BlueprintStepMetadata>>;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
@@ -510,7 +602,10 @@ function StepDetails({
           <Input
             value={metadata.title}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, title: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                title: event.target.value,
+              }))
             }
             required
           />
@@ -519,7 +614,10 @@ function StepDetails({
           <Textarea
             value={metadata.description}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, description: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                description: event.target.value,
+              }))
             }
             required
           />
@@ -542,7 +640,7 @@ function StepDetails({
         <Field label="Estimated minutes">
           <Input
             type="number"
-            min="0"
+            min="1"
             value={metadata.estimatedMinutes}
             onChange={(event) =>
               onMetadataChange((current) => ({
@@ -556,10 +654,18 @@ function StepDetails({
           <Textarea
             value={metadata.expectedOutcome}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, expectedOutcome: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                expectedOutcome: event.target.value,
+              }))
             }
           />
         </Field>
+        {saveError ? (
+          <p role="alert" className="text-sm text-app-danger-text">
+            {saveError}
+          </p>
+        ) : null}
       </form>
     );
   return (
@@ -741,7 +847,10 @@ function QuestionDetails({
           <Input
             value={metadata.title}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, title: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                title: event.target.value,
+              }))
             }
             required
           />
@@ -764,7 +873,10 @@ function QuestionDetails({
           <Textarea
             value={metadata.question}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, question: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                question: event.target.value,
+              }))
             }
             required
           />
@@ -773,7 +885,10 @@ function QuestionDetails({
           <Textarea
             value={metadata.explanation ?? ""}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, explanation: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                explanation: event.target.value,
+              }))
             }
           />
         </Field>
@@ -781,7 +896,10 @@ function QuestionDetails({
           <Input
             value={metadata.correctAnswer ?? ""}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, correctAnswer: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                correctAnswer: event.target.value,
+              }))
             }
           />
         </Field>

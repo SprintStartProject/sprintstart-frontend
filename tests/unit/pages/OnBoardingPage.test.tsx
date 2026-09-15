@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -155,7 +155,9 @@ describe("OnBoardingPage", () => {
       </MemoryRouter>,
     );
 
-    const startButton = await screen.findByRole("button", { name: "Start personalization" });
+    const startButton = await screen.findByRole("button", {
+      name: "Start personalization",
+    });
     expect(personalize).not.toHaveBeenCalled();
 
     await user.click(startButton);
@@ -309,7 +311,13 @@ describe("OnBoardingPage", () => {
               questions: [],
             },
           ],
-          generationIssues: [{ phaseId: "phase2", title: "Role-specific tasks", status: "FAILED" }],
+          generationIssues: [
+            {
+              phaseId: "phase2",
+              title: "Role-specific tasks",
+              status: "FAILED",
+            },
+          ],
         }),
       ),
     );
@@ -321,7 +329,9 @@ describe("OnBoardingPage", () => {
     );
 
     expect(
-      await screen.findByRole("status", { name: "1 onboarding phase could not be generated" }),
+      await screen.findByRole("status", {
+        name: "1 onboarding phase could not be generated",
+      }),
     ).toBeInTheDocument();
     expect(screen.getByTitle("Role-specific tasks (failed)")).toBeInTheDocument();
   });
@@ -334,7 +344,13 @@ describe("OnBoardingPage", () => {
           userId: "user1",
           createdAt: new Date().toISOString(),
           phases: [],
-          generationIssues: [{ phaseId: "phase1", title: "Role-specific tasks", status: "EMPTY" }],
+          generationIssues: [
+            {
+              phaseId: "phase1",
+              title: "Role-specific tasks",
+              status: "EMPTY",
+            },
+          ],
         }),
       ),
     );
@@ -381,7 +397,9 @@ describe("OnBoardingPage", () => {
     );
 
     expect(
-      await screen.findByRole("status", { name: "1 onboarding phase could not be generated" }),
+      await screen.findByRole("status", {
+        name: "1 onboarding phase could not be generated",
+      }),
     ).toBeInTheDocument();
     expect(screen.getByTitle("Architecture (timed out)")).toBeInTheDocument();
   });
@@ -431,14 +449,22 @@ describe("OnBoardingPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Back to phases" }));
 
-    expect(screen.getByText("Your onboarding graph")).toBeInTheDocument();
+    expect(screen.getByText("Your onboarding path")).toBeInTheDocument();
     expect(screen.queryByText("Create on canvas")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Phase 1 Open phase/ }));
+    // React Flow leaves a node `visibility: hidden` until it has measured it, and jsdom never
+    // lays anything out — so the node is addressed by its test id rather than its role.
+    // `fireEvent` rather than `user.click`: a full pointer sequence reaches React Flow's d3-zoom
+    // pane handler, which reads `event.view.document` — null on a jsdom synthetic event.
+    fireEvent.click(
+      within(screen.getByTestId("graph-node-phase1")).getByRole("button", {
+        hidden: true,
+      }),
+    );
 
     expect(screen.getByRole("button", { name: "Back to phases" })).toBeInTheDocument();
     expect(
-      screen.getByText("Read-only view of this phase's steps and knowledge-check questions."),
+      screen.getByText("What this phase asks of you, and what has to come first."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
   });

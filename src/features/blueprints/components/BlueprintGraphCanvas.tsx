@@ -1,39 +1,53 @@
-import { Minus, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type PointerEvent,
-  type ReactNode,
-} from "react";
+  Background,
+  BackgroundVariant,
+  Controls,
+  Handle,
+  MarkerType,
+  MiniMap,
+  Panel,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useNodesState,
+  useReactFlow,
+  useStore,
+  type Connection,
+  type Edge,
+  type IsValidConnection,
+  type Node,
+  type NodeProps,
+  type NodeTypes,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import {
+  Flag,
+  KeyRound,
+  LayoutGrid,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
+import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
+import { Spinner } from "../../../components/ui/Spinner.tsx";
+import { useFocusMode } from "../../../context/useFocusMode.ts";
 import {
-  routeEdgePath,
-  ROUTING_CLEARANCE,
-  routingSegments,
-  type RoutingObstacle,
-  type RoutingSegment,
-} from "./graphRouting.ts";
-
-type Viewport = { x: number; y: number; zoom: number };
-type CanvasSize = { width: number; height: number };
-type NodeSize = { halfWidth: number; halfHeight: number };
-type Dependency = { blockedNodeId: string; blockerId: string };
-type CanvasPoint = { x: number; y: number };
-type ConnectionDraft = { sourceId: string; start: CanvasPoint; pointer: CanvasPoint };
-type ConnectionSide = "top" | "right" | "bottom" | "left";
-type LibraryTemplate = { id: string; title: string; description: string };
-
-const libraryTemplateMimeType = "application/x-blueprint-library-template";
-
-const fallbackNodeSize: NodeSize = { halfWidth: 96, halfHeight: 44 };
-const PORT_TRUNK_CLEARANCE = 28;
-// SVG markers scale with stroke width by default. At a 2px stroke the arrow extends almost 20px
-// behind its tip, so its final segment needs to remain straight for longer than node clearance.
-const ARROW_TERMINAL_CLEARANCE = 24;
+  COMPACT_DETAIL_ZOOM,
+  EDGE_REFUSAL_MESSAGE,
+  GRAPH_NODE_HEIGHT,
+  GRAPH_NODE_WIDTH,
+  autoLayoutPositions,
+  canConnect,
+  chainFor,
+  chainPositions,
+  edgeRefusal,
+  entryPointIds,
+  withFallbackPositions,
+  type ChainPosition,
+} from "./graphLayout.ts";
 
 /** The common graph fields persisted for both Blueprint phases and phase-subgraph nodes. */
 export type BlueprintGraphCanvasNode = {
@@ -44,14 +58,43 @@ export type BlueprintGraphCanvasNode = {
   blockerIds: string[];
 };
 
-/** Interaction callbacks supplied to a domain-specific graph node card. */
+/** What a domain-specific node card is told about the state it is drawn in. */
 export type BlueprintGraphCanvasNodeProps = {
-  draggable: boolean;
+  /** True while a graph mutation is in flight; the card should not invite another click. */
   disabled: boolean;
-  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  /** Opens this node's details panel. */
   onClick: () => void;
+  /** Drills into this node, on the surfaces that have somewhere to drill to. */
   onOpen?: () => void;
+  /**
+   * How much of the card is worth drawing.
+   *
+   * A sixteen-phase blueprint has to be readable at the zoom where all of it fits, and at that size
+   * a description is a grey smear nobody reads. Cards drop to their title alone below
+   * {@link COMPACT_DETAIL_ZOOM}.
+   */
+  detail: "full" | "compact";
+  /**
+   * The canvas's current zoom, so a compact card can size its title against it.
+   *
+   * Everything on the canvas shrinks with the zoom, which is right for the picture and wrong for
+   * the words in it: at the zoom where sixteen phases fit, a 14px title is under 5px on screen.
+   * A compact card divides by this instead, so its title stays roughly the same size on screen no
+   * matter how far out the reader is — the graph becomes a map with labels rather than a smear.
+   */
+  zoom: number;
+  /** True when the card is drawn in the library list rather than on the canvas. */
+  inLibrary: boolean;
+  /**
+   * Where this node sits in the chain it belongs to, or `undefined` when it belongs to none.
+   *
+   * Absent is the common case and it means something: this node is in no particular order relative
+   * to anything else, and the card says so rather than leaving the reader to guess.
+   */
+  chainPosition?: ChainPosition;
 };
+
+type LibraryTemplate = { id: string; title: string; description: string };
 
 type Props<TNode extends BlueprintGraphCanvasNode> = {
   nodes: TNode[];
@@ -76,91 +119,49 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   renderNode: (node: TNode, props: BlueprintGraphCanvasNodeProps) => ReactNode;
 };
 
-/** Returns which cardinal side of a node most directly faces another node. */
-function nearestConnectionSide(
-  origin: CanvasPoint,
-  target: CanvasPoint,
-  nodeSize: NodeSize,
-): ConnectionSide {
-  const deltaX = target.x - origin.x;
-  const deltaY = target.y - origin.y;
-  if (Math.abs(deltaX) * nodeSize.halfHeight > Math.abs(deltaY) * nodeSize.halfWidth) {
-    return deltaX >= 0 ? "right" : "left";
-  }
-  return deltaY >= 0 ? "bottom" : "top";
-}
+const LIBRARY_NODE_MIME = "application/x-blueprint-node";
+const LIBRARY_TEMPLATE_MIME = "application/x-blueprint-template";
 
-function connectionPointForSide(
-  center: CanvasPoint,
-  nodeSize: NodeSize,
-  side: ConnectionSide,
-  overlap = 0,
-): CanvasPoint {
-  switch (side) {
-    case "top":
-      return { x: center.x, y: center.y - nodeSize.halfHeight + overlap };
-    case "right":
-      return { x: center.x + nodeSize.halfWidth - overlap, y: center.y };
-    case "bottom":
-      return { x: center.x, y: center.y + nodeSize.halfHeight - overlap };
-    case "left":
-      return { x: center.x - nodeSize.halfWidth + overlap, y: center.y };
-  }
-}
+type FlowNodeData = {
+  render: () => ReactNode;
+  ariaLabel: string;
+  dimmed: boolean;
+  isEntryPoint: boolean;
+  hasHandles: boolean;
+  /** Drills into this node's own graph, on the surfaces that have one. */
+  onOpen?: () => void;
+  openLabel: string;
+};
 
-/** Keeps the first and last edge segments perpendicular to the node side they connect to. */
-function connectionLeadPoint(
-  center: CanvasPoint,
-  connection: CanvasPoint,
-  nodeSize: NodeSize,
-  clearance = ROUTING_CLEARANCE,
-): CanvasPoint {
-  if (connection.x !== center.x) {
-    return {
-      x: center.x + Math.sign(connection.x - center.x) * (nodeSize.halfWidth + clearance),
-      y: connection.y,
-    };
-  }
-  return {
-    x: connection.x,
-    y: center.y + Math.sign(connection.y - center.y) * (nodeSize.halfHeight + clearance),
-  };
-}
-
-function polylineMidpoint(points: CanvasPoint[]): CanvasPoint {
-  const segments = routingSegments(points);
-  const totalLength = segments.reduce(
-    (total, segment) =>
-      total + Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y),
-    0,
-  );
-  let remaining = totalLength / 2;
-  for (const segment of segments) {
-    const length =
-      Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y);
-    if (remaining <= length) {
-      const ratio = length === 0 ? 0 : remaining / length;
-      return {
-        x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
-        y: segment.from.y + (segment.to.y - segment.from.y) * ratio,
-      };
-    }
-    remaining -= length;
-  }
-  return points.at(-1) ?? { x: 0, y: 0 };
-}
-
-function svgPolylinePath(points: CanvasPoint[], centerX: number, centerY: number): string {
-  return points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${centerX + point.x} ${centerY + point.y}`)
-    .join(" ");
-}
+type BlueprintFlowNode = Node<FlowNodeData, "blueprint">;
 
 /**
- * Reusable world-space canvas for arranging Blueprint nodes and their prerequisite edges.
- * Domain adapters provide node cards, details behavior, and persistence callbacks.
+ * Reusable canvas for arranging Blueprint nodes and the prerequisites between them.
+ *
+ * Built on React Flow, which is what the rest of this app draws node-link diagrams with
+ * (`features/graph-diagram/DiagramCanvas`) and what the earlier n8n-style card-blueprint canvas
+ * used. That is not only a consistency argument: pan, zoom-to-cursor, fit-to-view, the minimap, the
+ * connection affordances and edge routing are the parts of a canvas that are easy to build badly,
+ * and a graph the author cannot see all of is the complaint this rewrite exists to answer.
+ *
+ * **What an edge means, and what it does not.** An arrow from A to B says B cannot start until A is
+ * finished — a hard lock. Nodes with no arrow between them are not ordered at all; the reader is
+ * free to take them in any order. The legend on the canvas says exactly this, because a graph whose
+ * one relation is unexplained gets read as a suggested route, which is the opposite of what it is.
+ *
+ * **Coordinates are centres, not corners.** That is how they were stored before this canvas existed
+ * and how the backend seed writes them, so they are converted on the way in and back on the way
+ * out rather than reinterpreted — reinterpreting would shift every seeded blueprint by half a card.
  */
-export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
+export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>(props: Props<TNode>) {
+  return (
+    <ReactFlowProvider>
+      <BlueprintGraphSurface {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   nodes,
   title,
   description,
@@ -181,636 +182,450 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   onCreateFromLibrary,
   renderNode,
 }: Props<TNode>) {
-  const panOriginRef = useRef<{
-    x: number;
-    y: number;
-    viewportX: number;
-    viewportY: number;
-  } | null>(null);
-  const [canvasElement, setCanvasElement] = useState<HTMLDivElement | null>(null);
-  const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
-  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
-  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
-  const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null);
-  const [selectedDependency, setSelectedDependency] = useState<Dependency | null>(null);
-  const [isLibraryCollapsed, setIsLibraryCollapsed] = useState(true);
+  const { screenToFlowPosition, fitView } = useReactFlow();
+  const zoom = useStore((state) => state.transform[2]);
+  const { isFocused, setFocused } = useFocusMode();
+
+  // The posture belongs to the canvas, not to the app: leaving the graph — switching to the list
+  // editor, or navigating away — has to give the sidebar and the header band back.
+  useEffect(() => () => setFocused(false), [setFocused]);
+
+  /** Escape is how every mode in this app that took the furniture away gives it back. */
+  useEffect(() => {
+    if (!isFocused) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFocused(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFocused, setFocused]);
+
+  // Refit once the surface has actually changed size: React Flow's own ResizeObserver sees the new
+  // height a frame later, and fitting against the old one wastes the room that was just won.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      void fitView({ padding: 0.15, maxZoom: 1, duration: 240 });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitView, isFocused]);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [nodeSizes, setNodeSizes] = useState<Map<string, NodeSize>>(() => new Map());
-  const [optimisticPositions, setOptimisticPositions] = useState<Map<string, CanvasPoint>>(
-    () => new Map(),
-  );
-  const displayedNodes = useMemo(
-    () =>
-      nodes.map((node) => {
-        const position = optimisticPositions.get(node.id);
-        return position ? { ...node, graphX: position.x, graphY: position.y } : node;
-      }),
-    [nodes, optimisticPositions],
-  );
-  const nodeById = useMemo(
-    () => new Map(displayedNodes.map((node) => [node.id, node])),
-    [displayedNodes],
-  );
+
+  // A surface with no library has nowhere to put an unplaced node, so it draws every node and lets
+  // `withFallbackPositions` find a free cell for the ones the author never dragged. A personalized
+  // path copied from a blueprint whose graph was never opened is exactly that case, and an empty
+  // canvas is the wrong answer to it.
   const placedNodes = useMemo(
-    () => displayedNodes.filter((node) => node.graphX !== null && node.graphY !== null),
-    [displayedNodes],
-  );
-  const nodeSize = useCallback(
-    (nodeId: string) => nodeSizes.get(nodeId) ?? fallbackNodeSize,
-    [nodeSizes],
-  );
-  // Node hit-boxes every edge is routed around, so a long edge no longer cuts through
-  // intermediate nodes and looks like a chain of adjacent connections instead.
-  const obstacleByNodeId = useMemo(
     () =>
-      new Map(
-        placedNodes.map((node) => {
-          const size = nodeSize(node.id);
-          return [
-            node.id,
-            {
-              center: { x: node.graphX!, y: node.graphY! },
-              halfWidth: size.halfWidth,
-              halfHeight: size.halfHeight,
-            } satisfies RoutingObstacle,
-          ];
-        }),
-      ),
-    [placedNodes, nodeSize],
+      showLibrary ? nodes.filter((node) => node.graphX !== null && node.graphY !== null) : nodes,
+    [nodes, showLibrary],
   );
-  const routedDependencies = useMemo(() => {
-    const occupiedSegments: RoutingSegment[] = [];
+  const libraryNodes = useMemo(
+    () => (showLibrary ? nodes.filter((node) => node.graphX === null || node.graphY === null) : []),
+    [nodes, showLibrary],
+  );
+  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+
+  const entryPoints = useMemo(() => entryPointIds(placedNodes), [placedNodes]);
+  const chainPositionById = useMemo(() => chainPositions(placedNodes), [placedNodes]);
+  const chainIds = useMemo(
+    () => (selectedId ? chainFor(placedNodes, selectedId) : null),
+    [placedNodes, selectedId],
+  );
+
+  const detail: "full" | "compact" = zoom < COMPACT_DETAIL_ZOOM ? "compact" : "full";
+
+  // Stable for the life of the canvas: React Flow remounts every node when `nodeTypes` changes
+  // identity, which would end a drag the moment it started.
+  const nodeTypes = useMemo<NodeTypes>(() => ({ blueprint: BlueprintFlowNodeCard }), []);
+
+  const computedNodes = useMemo<BlueprintFlowNode[]>(
+    () => {
+      const positions = withFallbackPositions(placedNodes);
+
+      return placedNodes.map((node) => {
+        const centre = positions[node.id];
+        const isEntryPoint = entryPoints.has(node.id);
+
+        return {
+          id: node.id,
+          type: "blueprint" as const,
+          // Stored centre → React Flow's top-left.
+          position: {
+            x: centre.x - GRAPH_NODE_WIDTH / 2,
+            y: centre.y - GRAPH_NODE_HEIGHT / 2,
+          },
+          deletable: false,
+          draggable: editable,
+          selected: node.id === selectedId,
+          data: {
+            render: () =>
+              renderNode(node, {
+                disabled: isSaving,
+                detail,
+                zoom,
+                inLibrary: false,
+                chainPosition: chainPositionById.get(node.id),
+                onClick: () => onNodeClick(node),
+              }),
+            ariaLabel: [
+              node.title,
+              isEntryPoint ? "nothing has to happen first" : null,
+              node.blockerIds.length > 0
+                ? `waits for ${node.blockerIds
+                    .map((blockerId) => nodeById.get(blockerId)?.title)
+                    .filter(Boolean)
+                    .join(", ")}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(", "),
+            dimmed: chainIds !== null && !chainIds.has(node.id),
+            isEntryPoint,
+            hasHandles: editable,
+            onOpen: onOpenNode ? () => onOpenNode(node) : undefined,
+            openLabel: `Open ${node.title}`,
+          },
+        };
+      });
+    },
+    // `detail` is derived from the zoom but only ever holds two values, so this rebuilds when the
+    // threshold is crossed rather than on every wheel notch.
+    [
+      placedNodes,
+      entryPoints,
+      chainIds,
+      chainPositionById,
+      editable,
+      selectedId,
+      nodeById,
+      detail,
+      zoom,
+      isSaving,
+      renderNode,
+      onNodeClick,
+      onOpenNode,
+    ],
+  );
+
+  // React Flow only moves a node during a drag when it owns the node list, so the derived nodes are
+  // pushed into its state rather than passed straight through.
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<BlueprintFlowNode>(computedNodes);
+  useEffect(() => setFlowNodes(computedNodes), [computedNodes, setFlowNodes]);
+
+  const edges = useMemo<Edge[]>(() => {
+    const drawn = new Set(placedNodes.map((node) => node.id));
+
     return placedNodes.flatMap((node) =>
-      node.blockerIds.flatMap((blockerId) => {
-        const blocker = nodeById.get(blockerId);
-        if (!blocker || blocker.graphX === null || blocker.graphY === null) return [];
-        const sourceCenter = { x: blocker.graphX, y: blocker.graphY };
-        const targetCenter = { x: node.graphX!, y: node.graphY! };
-        const sourceSize = nodeSize(blocker.id);
-        const targetSize = nodeSize(node.id);
-        const preferredSourceSide = nearestConnectionSide(sourceCenter, targetCenter, sourceSize);
-        const preferredTargetSide = nearestConnectionSide(targetCenter, sourceCenter, targetSize);
-        const obstacles = placedNodes.map((candidate) => {
-          const obstacle = obstacleByNodeId.get(candidate.id)!;
-          const terminalClearance =
-            candidate.id === node.id
-              ? ARROW_TERMINAL_CLEARANCE
-              : candidate.id === blockerId
-                ? PORT_TRUNK_CLEARANCE
-                : ROUTING_CLEARANCE;
-          const terminalAllowance = terminalClearance - ROUTING_CLEARANCE;
-          return {
-            ...obstacle,
-            halfWidth: obstacle.halfWidth + terminalAllowance,
-            halfHeight: obstacle.halfHeight + terminalAllowance,
-          };
-        });
-        const sourcePoint = connectionPointForSide(
-          sourceCenter,
-          sourceSize,
-          preferredSourceSide,
-          8,
-        );
-        const targetPoint = connectionPointForSide(targetCenter, targetSize, preferredTargetSide);
-        const sourceLead = connectionLeadPoint(
-          sourceCenter,
-          sourcePoint,
-          sourceSize,
-          PORT_TRUNK_CLEARANCE,
-        );
-        const targetLead = connectionLeadPoint(
-          targetCenter,
-          targetPoint,
-          targetSize,
-          ARROW_TERMINAL_CLEARANCE,
-        );
-        const points = [
-          sourcePoint,
-          sourceLead,
-          ...routeEdgePath(sourceLead, targetLead, obstacles, ROUTING_CLEARANCE, occupiedSegments),
-          targetLead,
-          targetPoint,
-        ];
-        occupiedSegments.push(...routingSegments(points));
-        return [{ blockedNodeId: node.id, blockerId, points }];
-      }),
+      node.blockerIds
+        .filter((blockerId) => drawn.has(blockerId))
+        .map((blockerId) => ({
+          id: `${blockerId}->${node.id}`,
+          source: blockerId,
+          target: node.id,
+          type: "smoothstep" as const,
+          focusable: true,
+          deletable: editable,
+          style: {
+            // React Flow's own stroke is a fixed light grey that vanishes on the dark theme, so
+            // the edge carries the brand token and a weight that survives being zoomed out.
+            stroke: "var(--color-app-brand)",
+            strokeWidth: 2,
+            opacity:
+              chainIds !== null && !(chainIds.has(blockerId) && chainIds.has(node.id)) ? 0.15 : 1,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 18,
+            height: 18,
+            color: "var(--color-app-brand)",
+          },
+          ariaLabel: `${nodeById.get(blockerId)?.title ?? "A node"} must be finished before ${node.title}`,
+        })),
     );
-  }, [nodeById, nodeSize, obstacleByNodeId, placedNodes]);
-  const centerX = canvasSize.width / 2;
-  const centerY = canvasSize.height / 2;
-  const gridLevel = Math.floor(Math.log2(1 / viewport.zoom) + 0.5);
-  const gridTileSize = 44 * viewport.zoom * 2 ** gridLevel;
+  }, [placedNodes, chainIds, editable, nodeById]);
 
-  useEffect(() => {
-    const elements = canvasElement?.querySelectorAll<HTMLDivElement>("[data-graph-node-wrapper]");
-    if (!elements) return;
-    const observers = [...elements].map((element) => {
-      const nodeId = element.dataset.graphNodeWrapper;
-      if (!nodeId) return null;
-      const updateSize = () => {
-        const size = { halfWidth: element.offsetWidth / 2, halfHeight: element.offsetHeight / 2 };
-        setNodeSizes((current) => {
-          const previous = current.get(nodeId);
-          if (previous?.halfWidth === size.halfWidth && previous.halfHeight === size.halfHeight)
-            return current;
-          const next = new Map(current);
-          next.set(nodeId, size);
-          return next;
-        });
-      };
-      updateSize();
-      const observer = new ResizeObserver(updateSize);
-      observer.observe(element);
-      return observer;
-    });
-    return () => observers.forEach((observer) => observer?.disconnect());
-  }, [canvasElement, displayedNodes]);
-
-  const selectedDependencyPosition = useMemo(() => {
-    if (!selectedDependency) return null;
-    const route = routedDependencies.find(
-      (dependency) =>
-        dependency.blockedNodeId === selectedDependency.blockedNodeId &&
-        dependency.blockerId === selectedDependency.blockerId,
-    );
-    if (!route) return null;
-    const midpoint = polylineMidpoint(route.points);
-    return {
-      x: centerX + midpoint.x * viewport.zoom + viewport.x,
-      y: centerY + midpoint.y * viewport.zoom + viewport.y,
-    };
-  }, [centerX, centerY, routedDependencies, selectedDependency, viewport]);
-
-  useEffect(() => {
-    const canvas = canvasElement;
-    if (!canvas) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setCanvasSize({ width: entry.contentRect.width, height: entry.contentRect.height }),
-    );
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, [canvasElement]);
-
-  /** Prevents page scrolling while the cursor is zooming the graph. */
-  useEffect(() => {
-    const canvas = canvasElement;
-    if (!canvas) return;
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      setViewport((current) => ({
-        ...current,
-        zoom: Math.min(1.8, Math.max(0.5, current.zoom + (event.deltaY < 0 ? 0.1 : -0.1))),
-      }));
-    };
-    canvas.addEventListener("wheel", handleWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", handleWheel);
-  }, [canvasElement]);
-
-  function beginDrag(event: DragEvent<HTMLElement>, nodeId: string) {
-    if (!editable || isSaving) return;
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", nodeId);
-    const preview = event.currentTarget.cloneNode(true) as HTMLElement;
-    const sourceBounds = event.currentTarget.getBoundingClientRect();
-    const originatesOnCanvas = canvasElement?.contains(event.currentTarget) ?? false;
-    const sourceZoom = originatesOnCanvas ? viewport.zoom : 1;
-    preview.setAttribute("aria-hidden", "true");
-    // Canvas cards are already viewport-scaled. Restore their unscaled width, then use `zoom`
-    // because Chromium captures it consistently in native drag images (unlike CSS transforms).
-    preview.style.cssText = `position:fixed;top:-1000px;left:-1000px;box-sizing:border-box;width:${sourceBounds.width / sourceZoom}px`;
-    document.body.append(preview);
-    preview.style.zoom = String(sourceZoom * 1.05);
-    const previewBounds = preview.getBoundingClientRect();
-    event.dataTransfer.setDragImage(preview, previewBounds.width / 2, previewBounds.height / 2);
-    requestAnimationFrame(() => preview.remove());
-    setDraggedNodeId(nodeId);
-  }
-
-  function beginTemplateDrag(event: DragEvent<HTMLElement>, templateId: string) {
-    if (!editable || isSaving || !onCreateFromLibrary) return;
-    event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData(libraryTemplateMimeType, templateId);
-  }
-
-  async function placeNode(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    const bounds = canvasElement?.getBoundingClientRect();
-    setDraggedNodeId(null);
-    if (!bounds || !editable || isSaving) return;
-    const position = {
-      x: Math.round((event.clientX - bounds.left - bounds.width / 2 - viewport.x) / viewport.zoom),
-      y: Math.round((event.clientY - bounds.top - bounds.height / 2 - viewport.y) / viewport.zoom),
-    };
-    const templateId = event.dataTransfer.getData(libraryTemplateMimeType);
-    if (templateId && onCreateFromLibrary) {
+  /** Runs one graph mutation, holding the canvas still and surfacing the reason if it fails. */
+  const runMutation = useCallback(
+    async (mutation: () => Promise<void>, fallbackMessage: string) => {
       setIsSaving(true);
       setSaveError(null);
       try {
-        await onCreateFromLibrary(templateId, position.x, position.y);
+        await mutation();
       } catch (reason) {
-        setSaveError(reason instanceof Error ? reason.message : "The node could not be created.");
+        setSaveError(reason instanceof Error ? reason.message : fallbackMessage);
       } finally {
         setIsSaving(false);
       }
-      return;
-    }
-    const node = nodeById.get(event.dataTransfer.getData("text/plain") || "");
-    if (!node) return;
-    setOptimisticPositions((current) => new Map(current).set(node.id, position));
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      await onPositionChange(node, position.x, position.y);
-    } catch (reason) {
-      // The path state is unchanged after a failed request, so removing the local position restores it.
-      setSaveError(
-        reason instanceof Error ? reason.message : "The node position could not be saved.",
+    },
+    [],
+  );
+
+  const isValidConnection = useCallback<IsValidConnection>(
+    (connection) => {
+      const { source, target } = connection;
+      if (!source || !target) return false;
+      return canConnect(placedNodes, target, source);
+    },
+    [placedNodes],
+  );
+
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      const { source, target } = connection;
+      if (!source || !target) return;
+
+      const refusal = edgeRefusal(placedNodes, target, source);
+      if (refusal) {
+        setSaveError(EDGE_REFUSAL_MESSAGE[refusal]);
+        return;
+      }
+
+      const blocked = nodeById.get(target);
+      if (!blocked) return;
+      void runMutation(() => onAddBlocker(blocked, source), "The connection could not be saved.");
+    },
+    [nodeById, onAddBlocker, placedNodes, runMutation],
+  );
+
+  const handleEdgesDelete = useCallback(
+    (deleted: Edge[]) => {
+      for (const edge of deleted) {
+        const blocked = nodeById.get(edge.target);
+        if (!blocked) continue;
+        void runMutation(
+          () => onRemoveBlocker(blocked, edge.source),
+          "The connection could not be removed.",
+        );
+      }
+    },
+    [nodeById, onRemoveBlocker, runMutation],
+  );
+
+  const handleNodeDragStop = useCallback(
+    (_event: unknown, dragged: Node) => {
+      const node = nodeById.get(dragged.id);
+      if (!node) return;
+      void runMutation(
+        () =>
+          onPositionChange(
+            node,
+            Math.round(dragged.position.x + GRAPH_NODE_WIDTH / 2),
+            Math.round(dragged.position.y + GRAPH_NODE_HEIGHT / 2),
+          ),
+        "The node position could not be saved.",
       );
-    } finally {
-      setOptimisticPositions((current) => {
-        const next = new Map(current);
-        next.delete(node.id);
-        return next;
+    },
+    [nodeById, onPositionChange, runMutation],
+  );
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      const templateId = event.dataTransfer.getData(LIBRARY_TEMPLATE_MIME);
+      const nodeId = event.dataTransfer.getData(LIBRARY_NODE_MIME);
+      if (!templateId && !nodeId) return;
+
+      event.preventDefault();
+      // The pointer holds the middle of the card, and the stored coordinate is its centre — so the
+      // drop point is the coordinate, with no corner arithmetic in between.
+      const centre = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
-      setIsSaving(false);
-    }
-  }
+      const x = Math.round(centre.x);
+      const y = Math.round(centre.y);
 
-  async function returnToLibrary(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    const node = nodeById.get(event.dataTransfer.getData("text/plain") || draggedNodeId || "");
-    setDraggedNodeId(null);
-    if (!node || node.graphX === null || node.graphY === null || !editable) return;
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      await onRemoveNode(node);
-      setSelectedDependency(null);
-    } catch (reason) {
-      setSaveError(
-        reason instanceof Error ? reason.message : "The node could not be returned to the library.",
+      if (templateId && onCreateFromLibrary) {
+        void runMutation(
+          () => onCreateFromLibrary(templateId, x, y),
+          "The node could not be created.",
+        );
+        return;
+      }
+
+      const node = nodeById.get(nodeId);
+      if (!node) return;
+      void runMutation(
+        () => onPositionChange(node, x, y),
+        "The node could not be placed on the canvas.",
       );
-    } finally {
-      setIsSaving(false);
-    }
-  }
+    },
+    [nodeById, onCreateFromLibrary, onPositionChange, runMutation, screenToFlowPosition],
+  );
 
-  async function removeDependency() {
-    if (!selectedDependency) return;
-    const node = nodeById.get(selectedDependency.blockedNodeId);
-    if (!node) return;
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      await onRemoveBlocker(node, selectedDependency.blockerId);
-      setSelectedDependency(null);
-    } catch (reason) {
-      setSaveError(
-        reason instanceof Error ? reason.message : "The connection could not be removed.",
+  const handleReturnToLibrary = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      const nodeId = event.dataTransfer.getData(LIBRARY_NODE_MIME);
+      if (!nodeId) return;
+      event.preventDefault();
+      const node = nodeById.get(nodeId);
+      if (!node) return;
+      void runMutation(() => onRemoveNode(node), "The node could not be returned to the library.");
+    },
+    [nodeById, onRemoveNode, runMutation],
+  );
+
+  /** Lays every placed node out again and saves the ones that actually moved. */
+  const handleTidyUp = useCallback(() => {
+    const laidOut = autoLayoutPositions(placedNodes);
+
+    void runMutation(async () => {
+      for (const node of placedNodes) {
+        const target = laidOut[node.id];
+        if (!target) continue;
+        const x = Math.round(target.x);
+        const y = Math.round(target.y);
+        if (node.graphX === x && node.graphY === y) continue;
+        await onPositionChange(node, x, y);
+      }
+      // The nodes have all moved; the view that framed the old arrangement no longer frames this one.
+      window.requestAnimationFrame(
+        () => void fitView({ padding: 0.15, maxZoom: 1, duration: 240 }),
       );
-    } finally {
-      setIsSaving(false);
-    }
-  }
+    }, "The layout could not be saved.");
+  }, [fitView, onPositionChange, placedNodes, runMutation]);
 
-  function canvasPoint(clientX: number, clientY: number): CanvasPoint | null {
-    const bounds = canvasElement?.getBoundingClientRect();
-    if (!bounds) return null;
-    return {
-      x: (clientX - bounds.left - bounds.width / 2 - viewport.x) / viewport.zoom,
-      y: (clientY - bounds.top - bounds.height / 2 - viewport.y) / viewport.zoom,
-    };
-  }
-
-  function beginConnection(event: PointerEvent<HTMLButtonElement>, sourceId: string) {
-    if (!editable || isSaving) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const point = canvasPoint(event.clientX, event.clientY);
-    if (point) setConnectionDraft({ sourceId, start: point, pointer: point });
-  }
-
-  async function endConnection(event: PointerEvent<HTMLButtonElement>, target: TNode) {
-    event.preventDefault();
-    event.stopPropagation();
-    const draft = connectionDraft;
-    if (!draft || draft.sourceId === target.id) {
-      setConnectionDraft(null);
-      return;
-    }
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      if (target.blockerIds.includes(draft.sourceId)) await onRemoveBlocker(target, draft.sourceId);
-      else await onAddBlocker(target, draft.sourceId);
-    } catch (reason) {
-      setSaveError(reason instanceof Error ? reason.message : "The connection could not be saved.");
-    } finally {
-      setIsSaving(false);
-      setConnectionDraft(null);
-    }
-  }
-
-  function beginPan(event: PointerEvent<HTMLDivElement>) {
-    const target = event.target as HTMLElement;
-    if (target.closest("[data-graph-node], [data-graph-edge], [data-graph-control]")) return;
-    setSelectedDependency(null);
-    event.currentTarget.setPointerCapture(event.pointerId);
-    panOriginRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      viewportX: viewport.x,
-      viewportY: viewport.y,
-    };
-  }
-
-  function pan(event: PointerEvent<HTMLDivElement>) {
-    if (connectionDraft) {
-      const point = canvasPoint(event.clientX, event.clientY);
-      if (point) setConnectionDraft((draft) => (draft ? { ...draft, pointer: point } : null));
-      return;
-    }
-    const origin = panOriginRef.current;
-    if (!origin) return;
-    setViewport((current) => ({
-      ...current,
-      x: origin.viewportX + event.clientX - origin.x,
-      y: origin.viewportY + event.clientY - origin.y,
-    }));
-  }
-
-  function endPan(event: PointerEvent<HTMLDivElement>) {
-    if (connectionDraft) {
-      setConnectionDraft(null);
-      return;
-    }
-    panOriginRef.current = null;
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId))
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
-  }
-
-  function clearPanOrigin() {
-    panOriginRef.current = null;
-  }
-
-  const renderNodeProps = (node: TNode): BlueprintGraphCanvasNodeProps => ({
-    draggable: editable && !isSaving,
-    disabled: isSaving,
-    onDragStart: (event) => beginDrag(event, node.id),
-    onClick: () => onNodeClick(node),
-    onOpen: onOpenNode ? () => onOpenNode(node) : undefined,
-  });
+  const canAuthor = editable && !isSaving;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-app-border px-5 py-4">
-        <div>
+    <section
+      className={
+        isFocused
+          ? "flex h-[calc(100vh-4.5rem)] flex-col overflow-hidden bg-app-surface"
+          : "overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm"
+      }
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-app-border px-5 py-4">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold text-app-text">{title}</h2>
           <p className="mt-1 text-sm text-app-text-muted">{description}</p>
-          {editable ? (
-            <p className="mt-1 text-xs text-app-text-subtle">
-              Drag from a node port to a target port. The arrow points to the node that is blocked.
-            </p>
-          ) : null}
         </div>
-        {headerAction}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {headerAction}
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-pressed={isFocused}
+            icon={isFocused ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            onClick={() => setFocused(!isFocused)}
+          >
+            {isFocused ? "Collapse" : "Expand"}
+          </Button>
+        </div>
       </div>
-      <div className="relative min-h-[42rem] overflow-hidden">
+
+      <GraphLegend editable={editable} />
+
+      <div
+        className={`relative flex min-h-0 ${
+          isFocused ? "flex-1" : "h-[clamp(34rem,calc(100vh-21rem),60rem)]"
+        }`}
+      >
         {showLibrary ? (
-          <div
-            className="absolute inset-y-0 left-0 z-20 w-72 transition-transform duration-[400ms] ease-out"
-            style={{ transform: `translateX(${isLibraryCollapsed ? -288 : 0}px)` }}
-          >
-            <aside
-              className="flex h-full w-full flex-col overflow-hidden border-r border-app-border bg-app-surface-muted p-4"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => void returnToLibrary(event)}
-            >
-              <h3 className="text-sm font-semibold text-app-text">{libraryTitle}</h3>
-              <p className="mt-1 text-xs text-app-text-muted">{libraryDescription}</p>
-              <div className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-                {nodes
-                  .filter((node) => node.graphX === null || node.graphY === null)
-                  .map((node) => (
-                    <div key={node.id}>{renderNode(node, renderNodeProps(node))}</div>
-                  ))}
-                {nodes.every((node) => node.graphX !== null && node.graphY !== null) ? (
-                  <p className="text-xs text-app-text-muted">{libraryEmptyMessage}</p>
-                ) : null}
-              </div>
-              {libraryTemplates.length && editable && onCreateFromLibrary ? (
-                <div className="mt-4 border-t border-app-border pt-4">
-                  <p className="text-xs font-medium text-app-text-muted">Create on canvas</p>
-                  <div className="mt-2 space-y-2">
-                    {libraryTemplates.map((template) => (
-                      <div
-                        key={template.id}
-                        draggable={!isSaving}
-                        aria-label={`Drag ${template.title} onto the canvas to create it`}
-                        className="cursor-grab rounded-xl border border-dashed border-app-border bg-app-surface p-3 active:cursor-grabbing"
-                        onDragStart={(event) => beginTemplateDrag(event, template.id)}
-                      >
-                        <p className="text-sm font-semibold text-app-text">{template.title}</p>
-                        <p className="mt-1 text-xs text-app-text-muted">{template.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </aside>
-            <div className="absolute top-3 left-[300px] z-30">
-              <Button
-                variant="secondary"
-                size="sm"
-                iconOnly
-                aria-label={
-                  isLibraryCollapsed
-                    ? `Expand ${libraryTitle.toLowerCase()}`
-                    : `Collapse ${libraryTitle.toLowerCase()}`
-                }
-                aria-expanded={!isLibraryCollapsed}
-                onClick={() => setIsLibraryCollapsed((current) => !current)}
-              >
-                {isLibraryCollapsed ? (
-                  <PanelLeftOpen className="h-4 w-4" />
-                ) : (
-                  <PanelLeftClose className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-        <div
-          ref={setCanvasElement}
-          className="relative min-h-[42rem] cursor-grab touch-none overflow-hidden bg-app-bg select-none active:cursor-grabbing"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => void placeNode(event)}
-          onPointerDown={beginPan}
-          onPointerMove={pan}
-          onPointerUp={endPan}
-          onPointerCancel={endPan}
-          onLostPointerCapture={clearPanOrigin}
-          aria-label={ariaLabel}
-        >
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              backgroundImage:
-                "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)",
-              backgroundPosition: `${centerX + viewport.x}px ${centerY + viewport.y}px`,
-              backgroundSize: `${gridTileSize}px ${gridTileSize}px`,
-            }}
-            aria-hidden="true"
+          <LibraryPanel
+            isOpen={isLibraryOpen}
+            onToggle={() => setIsLibraryOpen((current) => !current)}
+            title={libraryTitle}
+            description={libraryDescription}
+            emptyMessage={libraryEmptyMessage}
+            templates={canAuthor && onCreateFromLibrary ? libraryTemplates : []}
+            nodes={libraryNodes}
+            canAuthor={canAuthor}
+            onReturnToLibrary={handleReturnToLibrary}
+            renderNode={(node) =>
+              renderNode(node, {
+                disabled: isSaving,
+                detail: "full",
+                zoom: 1,
+                inLibrary: true,
+                onClick: () => onNodeClick(node),
+                onOpen: undefined,
+              })
+            }
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-              transformOrigin: "center",
-            }}
+        ) : null}
+
+        <div
+          className="relative min-w-0 flex-1"
+          role="application"
+          aria-label={ariaLabel}
+          data-testid="blueprint-graph-canvas"
+          onDragOver={(event) => {
+            if (!canAuthor) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }}
+          onDrop={handleDrop}
+        >
+          <ReactFlow
+            nodes={flowNodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onNodeDragStop={handleNodeDragStop}
+            onNodeClick={(_event, node) => setSelectedId(node.id)}
+            onPaneClick={() => setSelectedId(null)}
+            onConnect={handleConnect}
+            isValidConnection={isValidConnection}
+            onEdgesDelete={handleEdgesDelete}
+            nodesConnectable={canAuthor}
+            nodesDraggable={canAuthor}
+            elementsSelectable
+            edgesFocusable={editable}
+            // Backspace on a card would delete a phase every hire's path is built from; the
+            // details panel's Delete button asks nothing either, but at least has to be aimed at.
+            // On an edge it undoes a prerequisite, which one drag restores.
+            deleteKeyCode={editable ? ["Backspace", "Delete"] : null}
+            connectionRadius={30}
+            minZoom={0.2}
+            maxZoom={1.8}
+            fitView
+            fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+            proOptions={{ hideAttribution: false }}
           >
-            <svg
-              className="absolute inset-0 h-full w-full overflow-visible"
-              viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
-              aria-hidden="true"
-            >
-              <defs>
-                <marker
-                  id="blueprint-arrow"
-                  markerWidth="10"
-                  markerHeight="10"
-                  refX="9"
-                  refY="3"
-                  orient="auto"
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+            <Controls showInteractive={false} />
+            {/*
+              React Flow's minimap ships a white panel and grey nodes, which on the dark theme is a
+              bright rectangle in the corner. Tokens instead, and small: it is an overview, not a
+              second canvas.
+            */}
+            <MiniMap
+              pannable
+              zoomable
+              ariaLabel="Graph overview"
+              className="!right-3 !bottom-3 !m-0 !h-24 !w-40 overflow-hidden !rounded-xl !border !border-app-border !bg-app-surface shadow-sm"
+              maskColor="var(--color-app-bg)"
+              nodeColor="var(--color-app-brand)"
+              nodeStrokeColor="var(--color-app-border)"
+            />
+
+            {canAuthor ? (
+              <Panel position="top-right">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTidyUp}
+                  icon={<LayoutGrid className="h-4 w-4" aria-hidden="true" />}
                 >
-                  <path d="M0,0 L0,6 L9,3 z" className="fill-app-brand" />
-                </marker>
-              </defs>
-              {routedDependencies.map(({ blockedNodeId, blockerId, points }) => {
-                const d = svgPolylinePath(points, centerX, centerY);
-                const selectConnection = () => {
-                  if (editable) setSelectedDependency({ blockedNodeId, blockerId });
-                };
-                return (
-                  <g key={`${blockedNodeId}-${blockerId}`} data-graph-edge>
-                    <path
-                      d={d}
-                      fill="none"
-                      className="pointer-events-none stroke-app-brand"
-                      strokeWidth="2"
-                      markerEnd="url(#blueprint-arrow)"
-                    />
-                    <path
-                      d={d}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth="14"
-                      className={editable ? "cursor-pointer" : "pointer-events-none"}
-                      onClick={selectConnection}
-                    />
-                  </g>
-                );
-              })}
-              {connectionDraft ? (
-                <path
-                  d={svgPolylinePath(
-                    [
-                      connectionDraft.start,
-                      ...routeEdgePath(connectionDraft.start, connectionDraft.pointer, []),
-                      connectionDraft.pointer,
-                    ],
-                    centerX,
-                    centerY,
-                  )}
-                  fill="none"
-                  className="stroke-app-brand"
-                  strokeWidth="2"
-                  strokeDasharray="6 4"
-                  markerEnd="url(#blueprint-arrow)"
-                />
-              ) : null}
-            </svg>
-            {placedNodes.map((node) => (
-              <div
-                key={node.id}
-                data-graph-node-wrapper={node.id}
-                className="group absolute w-48 -translate-x-1/2 -translate-y-1/2"
-                style={{ left: centerX + node.graphX!, top: centerY + node.graphY! }}
-              >
-                {renderNode(node, renderNodeProps(node))}
-                {editable && !isSaving
-                  ? (["top", "right", "bottom", "left"] as ConnectionSide[]).map((side) => (
-                      <ConnectionHandle
-                        key={side}
-                        side={side}
-                        nodeTitle={node.title}
-                        onPointerDown={(event) => beginConnection(event, node.id)}
-                        onPointerUp={(event) => void endConnection(event, node)}
-                      />
-                    ))
-                  : null}
-              </div>
-            ))}
-          </div>
-          {selectedDependency && selectedDependencyPosition && editable ? (
-            <div
-              data-graph-control
-              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: selectedDependencyPosition.x, top: selectedDependencyPosition.y }}
-            >
-              <Button
-                variant="dangerSoft"
-                size="sm"
-                iconOnly
-                aria-label="Remove selected connection"
-                disabled={isSaving}
-                onClick={() => void removeDependency()}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : null}
-          <div data-graph-control className="absolute top-4 right-4 flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              iconOnly
-              aria-label="Zoom out"
-              onClick={() =>
-                setViewport((current) => ({ ...current, zoom: Math.max(0.5, current.zoom - 0.1) }))
-              }
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconOnly
-              aria-label="Zoom in"
-              onClick={() =>
-                setViewport((current) => ({ ...current, zoom: Math.min(1.8, current.zoom + 0.1) }))
-              }
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
-            >
-              Reset view
-            </Button>
-          </div>
+                  Tidy up
+                </Button>
+              </Panel>
+            ) : null}
+          </ReactFlow>
+
           {isSaving ? (
-            <p className="absolute right-4 bottom-4 rounded-lg bg-app-surface px-3 py-2 text-xs text-app-text-muted shadow-lg">
-              Saving graph…
+            <p className="absolute right-4 bottom-4 z-10 flex items-center gap-2 rounded-lg bg-app-surface px-3 py-2 text-xs text-app-text-muted shadow-lg">
+              <Spinner size="sm" silent /> Saving graph…
             </p>
           ) : null}
           {saveError ? (
             <p
               role="alert"
-              className="absolute right-4 bottom-4 max-w-sm rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
+              className="absolute right-4 bottom-4 z-10 max-w-sm rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
             >
               {saveError}
             </p>
@@ -821,34 +636,247 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   );
 }
 
-/** Enlarged hit areas make the four directional connection ports easy to drag between. */
-function ConnectionHandle({
-  side,
-  nodeTitle,
-  onPointerDown,
-  onPointerUp,
-}: {
-  side: ConnectionSide;
-  nodeTitle: string;
-  onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
-  onPointerUp: (event: PointerEvent<HTMLButtonElement>) => void;
-}) {
-  const positionClasses: Record<ConnectionSide, string> = {
-    top: "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2",
-    right: "top-1/2 right-0 translate-x-1/2 -translate-y-1/2",
-    bottom: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2",
-    left: "top-1/2 left-0 -translate-x-1/2 -translate-y-1/2",
-  };
+/**
+ * What the one relation on this canvas means, spelled out.
+ *
+ * Without it an arrow gets read as a suggested route and the absence of one as "do these in the
+ * order they are drawn" — both wrong, and both invisible until a hire is standing in front of a
+ * locked phase asking why.
+ */
+function GraphLegend({ editable }: { editable: boolean }) {
   return (
-    <button
-      type="button"
-      data-graph-control
-      className={`absolute z-10 flex h-10 w-10 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${positionClasses[side]}`}
-      aria-label={`Connect ${nodeTitle} from the ${side}`}
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-app-border bg-app-surface-muted px-5 py-3 text-xs text-app-text-muted">
+      <span className="flex items-center gap-2">
+        <svg width="34" height="10" aria-hidden="true" className="shrink-0 overflow-visible">
+          <defs>
+            <marker
+              id="legend-arrow"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="2.5"
+              orient="auto"
+            >
+              <path d="M0,0 L0,5 L7,2.5 z" className="fill-app-text-muted" />
+            </marker>
+          </defs>
+          <line
+            x1="0"
+            y1="5"
+            x2="26"
+            y2="5"
+            strokeWidth="1.5"
+            className="stroke-app-text-muted"
+            markerEnd="url(#legend-arrow)"
+          />
+        </svg>
+        An arrow is a lock: the node it points at stays closed until the other is finished.
+      </span>
+      <span className="flex items-center gap-2">
+        <Flag className="h-3.5 w-3.5 shrink-0 text-app-brand" aria-hidden="true" />
+        Nothing has to happen before these — any of them is a place to start.
+      </span>
+      <span className="flex items-center gap-2">
+        <KeyRound className="h-3.5 w-3.5 shrink-0 text-app-text-muted" aria-hidden="true" />
+        &ldquo;Only for &hellip;&rdquo; is the other kind of lock: a skill or role gate, so the node
+        opens for some people and not others.
+      </span>
+      <span>
+        Nodes with no arrow between them are in <strong className="font-semibold">no</strong>{" "}
+        particular order, and say so. &ldquo;2 of 4&rdquo; counts only within one chain.
+      </span>
+      {editable ? (
+        <span className="text-app-text-subtle">
+          Click a node to edit it. Drag right handle → left handle to lock; select an arrow and
+          press Backspace to unlock.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The React Flow wrapper around a domain card: the handles, the entry-point marker and the dimming.
+ *
+ * Kept referentially stable — see the ref dance in the surface above — so a node is never remounted
+ * mid-drag.
+ */
+function BlueprintFlowNodeCard({ id, data, selected }: NodeProps<BlueprintFlowNode>) {
+  // `nodrag` keeps React Flow from starting a node drag when the pointer goes down on the control.
+  const openControl = data.onOpen ? (
+    <span className="nodrag absolute -top-2.5 right-2 z-10 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+      <Button
+        variant="secondary"
+        size="sm"
+        iconOnly
+        aria-label={data.openLabel}
+        title={data.openLabel}
+        onClick={(event) => {
+          event.stopPropagation();
+          data.onOpen?.();
+        }}
+      >
+        <Maximize2 className="h-3.5 w-3.5" />
+      </Button>
+    </span>
+  ) : null;
+
+  return (
+    <div
+      data-testid={`graph-node-${id}`}
+      className={`group relative transition-opacity ${data.dimmed ? "opacity-25" : "opacity-100"}`}
+      style={{ width: GRAPH_NODE_WIDTH }}
+      aria-label={data.ariaLabel}
     >
-      <span className="h-3 w-3 rounded-full border-2 border-app-brand bg-app-surface shadow-sm" />
-    </button>
+      {/*
+        Always rendered, even read-only. React Flow anchors an edge to its handles, so a node
+        without them has nowhere for an arrow to end — which is why the hire's view drew no
+        arrows at all. Read-only hides the dot and refuses connections instead of removing it.
+      */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={data.hasHandles}
+        className={
+          data.hasHandles
+            ? "!h-3 !w-3 !border-2 !border-app-brand !bg-app-surface"
+            : "!h-1 !w-1 !border-0 !bg-transparent !opacity-0"
+        }
+      />
+
+      <div
+        className={
+          selected ? "rounded-xl ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg" : undefined
+        }
+      >
+        {data.render()}
+      </div>
+
+      {openControl}
+
+      {data.isEntryPoint ? (
+        <span className="pointer-events-none absolute -top-2.5 left-3 z-10">
+          <Badge variant="brand" size="sm" className="gap-1 shadow-sm">
+            <Flag className="h-3 w-3" aria-hidden="true" /> Start
+          </Badge>
+        </span>
+      ) : null}
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={data.hasHandles}
+        className={
+          data.hasHandles
+            ? "!h-3 !w-3 !border-2 !border-app-brand !bg-app-surface"
+            : "!h-1 !w-1 !border-0 !bg-transparent !opacity-0"
+        }
+      />
+    </div>
+  );
+}
+
+/** The drawer of nodes that are not on the canvas, and the tiles that create new ones. */
+function LibraryPanel<TNode extends BlueprintGraphCanvasNode>({
+  isOpen,
+  onToggle,
+  title,
+  description,
+  emptyMessage,
+  templates,
+  nodes,
+  canAuthor,
+  onReturnToLibrary,
+  renderNode,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+  title: string;
+  description: string;
+  emptyMessage: string;
+  templates: LibraryTemplate[];
+  nodes: TNode[];
+  canAuthor: boolean;
+  onReturnToLibrary: (event: DragEvent<HTMLElement>) => void;
+  renderNode: (node: TNode) => ReactNode;
+}) {
+  return (
+    <div className="relative z-10 flex shrink-0">
+      <aside
+        className={`flex h-full flex-col overflow-hidden border-r border-app-border bg-app-surface-muted transition-[width] duration-200 ease-out ${
+          isOpen ? "w-72 p-4" : "w-0 p-0"
+        }`}
+        aria-hidden={!isOpen}
+        onDragOver={(event) => {
+          if (!canAuthor) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={onReturnToLibrary}
+      >
+        {isOpen ? (
+          <>
+            <h3 className="text-sm font-semibold text-app-text">{title}</h3>
+            <p className="mt-1 text-xs text-app-text-muted">{description}</p>
+
+            <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              {nodes.length === 0 ? (
+                <p className="text-xs text-app-text-muted">{emptyMessage}</p>
+              ) : (
+                nodes.map((node) => (
+                  <div
+                    key={node.id}
+                    draggable={canAuthor}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData(LIBRARY_NODE_MIME, node.id);
+                    }}
+                    className={canAuthor ? "cursor-grab active:cursor-grabbing" : undefined}
+                  >
+                    {renderNode(node)}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {templates.length > 0 ? (
+              <div className="mt-4 border-t border-app-border pt-4">
+                <p className="text-xs font-medium text-app-text-muted">Create on canvas</p>
+                <div className="mt-2 space-y-2">
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      draggable
+                      aria-label={`Drag ${template.title} onto the canvas to create it`}
+                      className="cursor-grab rounded-xl border border-dashed border-app-border bg-app-surface p-3 active:cursor-grabbing"
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(LIBRARY_TEMPLATE_MIME, template.id);
+                      }}
+                    >
+                      <p className="text-sm font-semibold text-app-text">{template.title}</p>
+                      <p className="mt-1 text-xs text-app-text-muted">{template.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </aside>
+
+      <div className="absolute top-3 left-full z-20 ml-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          iconOnly
+          aria-label={isOpen ? `Collapse ${title.toLowerCase()}` : `Expand ${title.toLowerCase()}`}
+          aria-expanded={isOpen}
+          onClick={onToggle}
+        >
+          {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
   );
 }

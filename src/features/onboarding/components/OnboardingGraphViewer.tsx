@@ -1,11 +1,23 @@
-import { ArrowLeft, CheckCircle2, CircleDot, GitBranch, Lock } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CircleDot,
+  CircleHelp,
+  GitBranch,
+  ListChecks,
+  Lock,
+  RotateCcw,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import { Badge } from "../../../components/ui/Badge.tsx";
+import type { LucideIcon } from "lucide-react";
+import type { BadgeVariant } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNode,
+  type BlueprintGraphCanvasNodeProps,
 } from "../../blueprints/components/BlueprintGraphCanvas.tsx";
+import { BlueprintNodeCard } from "../../blueprints/components/BlueprintNodeCard.tsx";
 import type {
   OnboardingPathEndpoint,
   OnboardingQuestionEndpoint,
@@ -28,17 +40,19 @@ type Props = {
 
 const ignoreGraphMutation = () => Promise.resolve();
 
-function fallbackCoordinate(index: number, count: number) {
-  return {
-    x: (index - (count - 1) / 2) * 280,
-    y: -180,
-  };
-}
-
 /**
- * Read-only projection of a personalized onboarding path onto the blueprint graph canvas.
- * Phase nodes open their copied step/question subgraph; graph authoring controls stay hidden.
- * Questions come embedded in the path, so no separate check request is needed.
+ * Read-only projection of a personalized onboarding path onto the Blueprint graph canvas.
+ *
+ * The same canvas the PM authors on, with `editable` off: the hire reads the picture their PM drew
+ * rather than a second drawing of the same thing that could disagree with it. Phase nodes open
+ * their copied step/question sub-graph; questions come embedded in the path, so no separate check
+ * request is needed.
+ *
+ * **Missing edges stay missing.** An earlier version filled an absent `blockerIds` with "whatever
+ * came before this in the array", which drew a chain through steps and questions that the path
+ * never claimed — and in a graph whose only relation is a hard lock, an invented edge is an
+ * invented reason a hire cannot start something. Absent means no prerequisite, which is also what
+ * the backend means by it.
  */
 export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: Props) {
   // Opens directly on the phase selected in the list view: the viewer is remounted every
@@ -64,24 +78,22 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
 
   const phaseNodes = useMemo<OnboardingGraphNode[]>(
     () =>
-      sortedPhases.map((phase, index) => {
-        const fallback = fallbackCoordinate(index, sortedPhases.length);
-        return {
-          id: phase.id,
-          title: phase.title,
-          kind: "phase",
-          graphX: phase.graphX ?? fallback.x,
-          graphY: phase.graphY ?? fallback.y,
-          blockerIds: phase.blockerIds ?? (index > 0 ? [sortedPhases[index - 1].id] : []),
-          locked: phase.locked,
-          selected: phase.id === selectedPhaseId,
-        };
-      }),
+      sortedPhases.map((phase) => ({
+        id: phase.id,
+        title: phase.title,
+        kind: "phase",
+        graphX: phase.graphX ?? null,
+        graphY: phase.graphY ?? null,
+        blockerIds: phase.blockerIds ?? [],
+        locked: phase.locked,
+        selected: phase.id === selectedPhaseId,
+      })),
     [selectedPhaseId, sortedPhases],
   );
 
   const subGraphNodes = useMemo<OnboardingGraphNode[]>(() => {
     if (!subGraphPhase) return [];
+
     const steps = [...subGraphPhase.steps]
       .sort((left, right) => left.position - right.position)
       .map((step: OnboardingStepEndpoint) => ({
@@ -90,9 +102,9 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
         kind: "step" as const,
         status: step.status,
         locked: step.locked,
-        graphX: step.graphX,
-        graphY: step.graphY,
-        blockerIds: step.blockerIds,
+        graphX: step.graphX ?? null,
+        graphY: step.graphY ?? null,
+        blockerIds: step.blockerIds ?? [],
       }));
     const questions = [...subGraphPhase.questions]
       .sort((left, right) => left.position - right.position)
@@ -102,21 +114,12 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
         kind: "question" as const,
         status: question.status,
         locked: question.status === "LOCKED",
-        graphX: question.graphX,
-        graphY: question.graphY,
-        blockerIds: question.blockerIds,
+        graphX: question.graphX ?? null,
+        graphY: question.graphY ?? null,
+        blockerIds: question.blockerIds ?? [],
       }));
-    const nodes = [...steps, ...questions];
 
-    return nodes.map((node, index) => {
-      const fallback = fallbackCoordinate(index, nodes.length);
-      return {
-        ...node,
-        graphX: node.graphX ?? fallback.x,
-        graphY: node.graphY ?? fallback.y,
-        blockerIds: node.blockerIds ?? (index > 0 ? [nodes[index - 1].id] : []),
-      };
-    });
+    return [...steps, ...questions];
   }, [subGraphPhase]);
 
   function openSubGraphNode(node: OnboardingGraphNode) {
@@ -126,49 +129,43 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
     setSubGraphPhaseId(phase.id);
   }
 
-  function returnToPhaseGraph() {
-    setSubGraphPhaseId(null);
-  }
-
   if (subGraphPhase) {
     return (
-      <div className="space-y-3">
-        <BlueprintGraphCanvas
-          nodes={subGraphNodes}
-          title={subGraphPhase.title}
-          description="Read-only view of this phase's steps and knowledge-check questions."
-          headerAction={
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<ArrowLeft className="h-4 w-4" />}
-              onClick={returnToPhaseGraph}
-            >
-              Back to phases
-            </Button>
-          }
-          libraryTitle="Phase content"
-          libraryDescription=""
-          libraryEmptyMessage=""
-          editable={false}
-          showLibrary={false}
-          ariaLabel={`${subGraphPhase.title} onboarding subgraph`}
-          onNodeClick={() => undefined}
-          onPositionChange={ignoreGraphMutation}
-          onRemoveNode={ignoreGraphMutation}
-          onAddBlocker={ignoreGraphMutation}
-          onRemoveBlocker={ignoreGraphMutation}
-          renderNode={(node) => <SubGraphNodeCard node={node} />}
-        />
-      </div>
+      <BlueprintGraphCanvas
+        nodes={subGraphNodes}
+        title={subGraphPhase.title}
+        description="What this phase asks of you, and what has to come first."
+        headerAction={
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            onClick={() => setSubGraphPhaseId(null)}
+          >
+            Back to phases
+          </Button>
+        }
+        libraryTitle="Phase content"
+        libraryDescription=""
+        libraryEmptyMessage=""
+        editable={false}
+        showLibrary={false}
+        ariaLabel={`${subGraphPhase.title} onboarding subgraph`}
+        onNodeClick={() => undefined}
+        onPositionChange={ignoreGraphMutation}
+        onRemoveNode={ignoreGraphMutation}
+        onAddBlocker={ignoreGraphMutation}
+        onRemoveBlocker={ignoreGraphMutation}
+        renderNode={(node, cardProps) => <OnboardingNodeCard node={node} {...cardProps} />}
+      />
     );
   }
 
   return (
     <BlueprintGraphCanvas
       nodes={phaseNodes}
-      title="Your onboarding graph"
-      description="Select a phase to inspect its steps and knowledge-check dependencies."
+      title="Your onboarding path"
+      description="Open a phase to see its steps and knowledge checks."
       libraryTitle="Phases"
       libraryDescription=""
       libraryEmptyMessage=""
@@ -176,87 +173,77 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
       showLibrary={false}
       ariaLabel="Onboarding phase graph"
       onNodeClick={openSubGraphNode}
-      onOpenNode={openSubGraphNode}
       onPositionChange={ignoreGraphMutation}
       onRemoveNode={ignoreGraphMutation}
       onAddBlocker={ignoreGraphMutation}
       onRemoveBlocker={ignoreGraphMutation}
-      renderNode={(node, graphNodeProps) => (
-        <PhaseGraphNodeCard node={node} onOpen={graphNodeProps.onClick} />
-      )}
+      renderNode={(node, cardProps) => <OnboardingNodeCard node={node} {...cardProps} />}
     />
   );
 }
 
-function PhaseGraphNodeCard({ node, onOpen }: { node: OnboardingGraphNode; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      data-graph-node
-      onClick={onOpen}
-      className={`min-h-20 w-full rounded-xl border p-3 text-left shadow-sm transition-colors ${
-        node.selected
-          ? "border-app-brand bg-app-brand-soft"
-          : "border-app-border bg-app-surface hover:border-app-brand-border-strong"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="line-clamp-2 text-sm font-semibold text-app-text">{node.title}</span>
-        <GitBranch className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
-      </div>
-      <div className="mt-3">
-        {node.locked ? (
-          <Badge variant="neutral" className="gap-1">
-            <Lock className="h-3 w-3" /> Locked
-          </Badge>
-        ) : (
-          <Badge variant="brand">Open phase</Badge>
-        )}
-      </div>
-    </button>
-  );
+/** What each kind of node is called and drawn with, so the three never drift apart. */
+const KIND: Record<OnboardingGraphNode["kind"], { label: string; icon: LucideIcon }> = {
+  phase: { label: "Phase", icon: GitBranch },
+  step: { label: "Step", icon: ListChecks },
+  question: { label: "Knowledge check", icon: CircleHelp },
+};
+
+/**
+ * Where a node stands, as a word and an icon.
+ *
+ * Never colour alone: "locked" and "passed" have to stay apart for a reader who cannot tell the
+ * two chips' colours apart, which is why every one of these carries its own glyph and label.
+ */
+function statusFor(node: OnboardingGraphNode): {
+  label: string;
+  variant: BadgeVariant;
+  icon?: LucideIcon;
+} {
+  if (node.kind === "phase") {
+    return node.locked
+      ? { label: "Locked", variant: "neutral", icon: Lock }
+      : { label: "Open", variant: "brand", icon: CircleDot };
+  }
+
+  if (node.kind === "question") {
+    switch (node.status) {
+      case "PASSED":
+        return { label: "Passed", variant: "success", icon: CheckCircle2 };
+      case "RETRY":
+        return { label: "Try again", variant: "warning", icon: RotateCcw };
+      case "LOCKED":
+        return { label: "Locked", variant: "neutral", icon: Lock };
+      default:
+        return { label: "To do", variant: "brand", icon: CircleDot };
+    }
+  }
+
+  switch (node.status) {
+    case "FINISHED":
+      return { label: "Completed", variant: "success", icon: CheckCircle2 };
+    case "SKIPPED":
+      return { label: "Skipped", variant: "neutral", icon: CheckCircle2 };
+    case "IN_PROGRESS":
+      return { label: "In progress", variant: "brand", icon: CircleDot };
+    default:
+      return node.locked
+        ? { label: "Locked", variant: "neutral", icon: Lock }
+        : { label: "Waiting", variant: "neutral", icon: CircleDot };
+  }
 }
 
-function SubGraphNodeCard({ node }: { node: OnboardingGraphNode }) {
-  const isStep = node.kind === "step";
-  const isComplete = isStep
-    ? node.status === "FINISHED" || node.status === "SKIPPED"
-    : node.status === "PASSED";
-
-  const label = isStep
-    ? node.status === "FINISHED"
-      ? "Completed"
-      : node.status === "SKIPPED"
-        ? "Skipped"
-        : node.status === "IN_PROGRESS"
-          ? "In progress"
-          : node.locked
-            ? "Locked"
-            : "Waiting"
-    : node.status === "PASSED"
-      ? "Passed"
-      : node.status === "RETRY"
-        ? "Try again"
-        : node.locked
-          ? "Locked"
-          : "To do";
-
+function OnboardingNodeCard({
+  node,
+  ...cardProps
+}: { node: OnboardingGraphNode } & BlueprintGraphCanvasNodeProps) {
   return (
-    <div
-      data-graph-node
-      className="min-h-20 rounded-xl border border-app-border bg-app-surface p-3 shadow-sm"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 text-sm font-semibold text-app-text">{node.title}</p>
-        {isComplete ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-app-success-solid" aria-hidden="true" />
-        ) : (
-          <CircleDot className="h-4 w-4 shrink-0 text-app-brand" aria-hidden="true" />
-        )}
-      </div>
-      <div className="mt-3">
-        <Badge variant={isComplete ? "success" : "neutral"}>{label}</Badge>
-      </div>
-    </div>
+    <BlueprintNodeCard
+      {...cardProps}
+      title={node.title}
+      kind={KIND[node.kind]}
+      status={statusFor(node)}
+      highlighted={node.selected}
+    />
   );
 }

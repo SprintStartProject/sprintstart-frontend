@@ -1,5 +1,6 @@
-import { Link2, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { FilePlus2, Layers, Sparkles, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
@@ -7,6 +8,8 @@ import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
+import { useToast } from "../../../context/useToast.ts";
+import { BlueprintNodeCard } from "./BlueprintNodeCard.tsx";
 import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNodeProps,
@@ -24,6 +27,13 @@ type Props = {
   phases: BlueprintPhase[];
   pathTitle: string;
   editable: boolean;
+  /**
+   * Asks the page to open a draft, on a version that cannot be edited.
+   *
+   * Without it a published blueprint drew a details panel with no footer at all, which reads
+   * as "this has no actions" rather than "not on this version".
+   */
+  onRequestDraft?: () => void;
   onPositionChange: (phase: BlueprintPhase, x: number, y: number) => Promise<void>;
   onRemoveNode: (phase: BlueprintPhase) => Promise<void>;
   onAddBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
@@ -39,6 +49,7 @@ export function BlueprintGraphEditor({
   phases,
   pathTitle,
   editable,
+  onRequestDraft,
   onPositionChange,
   onRemoveNode,
   onAddBlocker,
@@ -53,6 +64,10 @@ export function BlueprintGraphEditor({
   const [isDetailsEditing, setIsDetailsEditing] = useState(false);
   const [isDetailsSaving, setIsDetailsSaving] = useState(false);
   const [detailsSaveError, setDetailsSaveError] = useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const toast = useToast();
   const [metadata, setMetadata] = useState<BlueprintPhaseMetadata>({
     title: "",
     description: null,
@@ -69,12 +84,30 @@ export function BlueprintGraphEditor({
     setIsDetailsOpen(true);
   }
 
+  /**
+   * Deletes the phase the details panel is showing, once somebody has said so twice.
+   *
+   * The panel is closed only after the request succeeds. Closing first — which is what this used to
+   * do — told the author the phase was gone before anybody knew whether it was, and a failure then
+   * had nowhere left to be shown.
+   */
   async function deletePhase() {
     if (!detailsPhase) return;
-    setIsDetailsOpen(false);
-    setIsDetailsEditing(false);
-    setDetailsPhaseId(null);
-    await onDeletePhase(detailsPhase);
+    const { title } = detailsPhase;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDeletePhase(detailsPhase);
+      setIsDeleteConfirmOpen(false);
+      setIsDetailsOpen(false);
+      setIsDetailsEditing(false);
+      setDetailsPhaseId(null);
+      toast.success(`Phase "${title}" deleted`);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : "The phase could not be deleted.");
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function beginPhaseEditing() {
@@ -103,6 +136,7 @@ export function BlueprintGraphEditor({
         aiPrompt: metadata.type === "AI_ENHANCED" ? metadata.aiPrompt || null : null,
       });
       setIsDetailsEditing(false);
+      toast.success("Phase saved");
     } catch (reason) {
       setDetailsSaveError(
         reason instanceof Error ? reason.message : "Phase metadata could not be saved.",
@@ -140,6 +174,27 @@ export function BlueprintGraphEditor({
         onCreateFromLibrary={(_templateId, graphX, graphY) => onCreateFromLibrary(graphX, graphY)}
         renderNode={(phase, graphNodeProps) => <GraphNodeCard phase={phase} {...graphNodeProps} />}
       />
+      <AlertDialog
+        isOpen={isDeleteConfirmOpen}
+        title={detailsPhase ? `Delete "${detailsPhase.title}"?` : "Delete this phase?"}
+        description={
+          <>
+            <p>
+              Its steps, knowledge checks and every prerequisite pointing at it go with it. Hires
+              who already have a path built from this blueprint keep theirs — a personalized path is
+              a copy, not a live reference.
+            </p>
+            <p className="mt-2">This cannot be undone from here.</p>
+          </>
+        }
+        confirmLabel="Delete phase"
+        variant="danger"
+        isLoading={isDeleting}
+        loadingLabel="Deleting…"
+        errorMessage={deleteError ?? undefined}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={() => void deletePhase()}
+      />
       <SidePanel
         isOpen={isDetailsOpen && detailsPhaseId !== null}
         onClose={() => {
@@ -154,7 +209,10 @@ export function BlueprintGraphEditor({
                 <Button
                   variant="dangerSoft"
                   icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deletePhase()}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
                 >
                   Delete
                 </Button>
@@ -181,7 +239,10 @@ export function BlueprintGraphEditor({
                 <Button
                   variant="dangerSoft"
                   icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deletePhase()}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
                 >
                   Delete
                 </Button>
@@ -190,6 +251,19 @@ export function BlueprintGraphEditor({
                 </Button>
               </div>
             )
+          ) : onRequestDraft ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-app-text-muted">
+                This version is published, so it is read-only.
+              </p>
+              <Button
+                variant="primary"
+                icon={<FilePlus2 className="h-4 w-4" />}
+                onClick={onRequestDraft}
+              >
+                Edit as draft
+              </Button>
+            </div>
           ) : undefined
         }
       >
@@ -210,72 +284,35 @@ export function BlueprintGraphEditor({
 
 function GraphNodeCard({
   phase,
-  draggable,
-  disabled,
-  onDragStart,
-  onClick,
-  onOpen,
+  ...cardProps
 }: { phase: BlueprintPhase } & BlueprintGraphCanvasNodeProps) {
-  const longPressTimerRef = useRef<number | null>(null);
-  const suppressClickRef = useRef(false);
-
-  function clearLongPress() {
-    if (longPressTimerRef.current === null) return;
-    window.clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-  }
-
-  function openSubGraph() {
-    if (!onOpen || disabled || phase.type !== "FIXED") return;
-    suppressClickRef.current = true;
-    onOpen();
-  }
+  const isAiEnhanced = phase.type === "AI_ENHANCED";
+  const stepCount = phase.blueprintSteps.length;
+  const questionCount = phase.blueprintCheckQuestions.length;
 
   return (
-    <div
-      data-graph-node
-      draggable={draggable}
-      onDragStart={(event) => {
-        clearLongPress();
-        onDragStart(event);
+    <BlueprintNodeCard
+      {...cardProps}
+      title={phase.title}
+      kind={{
+        label: isAiEnhanced ? "AI-enhanced" : "Phase",
+        icon: isAiEnhanced ? Sparkles : Layers,
       }}
-      onClick={() => {
-        if (suppressClickRef.current) {
-          suppressClickRef.current = false;
-          return;
-        }
-        onClick();
-      }}
-      onDoubleClick={openSubGraph}
-      onPointerDown={(event) => {
-        if (event.button !== 0 || !onOpen || disabled || phase.type !== "FIXED") return;
-        longPressTimerRef.current = window.setTimeout(openSubGraph, 600);
-      }}
-      onPointerUp={clearLongPress}
-      onPointerCancel={clearLongPress}
-      onPointerLeave={clearLongPress}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className={
-        (draggable ? "cursor-grab " : "cursor-default ") +
-        "min-h-20 rounded-xl border border-app-border bg-app-surface p-3 shadow-sm" +
-        (disabled ? " pointer-events-none" : "")
+      meta={
+        isAiEnhanced
+          ? "Filled from the project's own material when a path is generated."
+          : `${stepCount} ${stepCount === 1 ? "step" : "steps"} · ${questionCount} ${
+              questionCount === 1 ? "check" : "checks"
+            }`
       }
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 text-sm font-semibold text-app-text">{phase.title}</p>
-        <Link2 className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge variant="neutral">{phase.type}</Badge>
-      </div>
-    </div>
+      requirements={(phase.requirements ?? []).map((requirement) => ({
+        label: requirement.displayName,
+        type: requirement.type,
+      }))}
+      // Only a fixed phase has a sub-graph to open; an AI-enhanced one has no authored content
+      // until a path is generated from it, so offering the drill-in would open an empty canvas.
+      onOpen={isAiEnhanced ? undefined : cardProps.onOpen}
+    />
   );
 }
 
@@ -305,7 +342,10 @@ function PhaseDetails({
           <Input
             value={metadata.title}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, title: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                title: event.target.value,
+              }))
             }
             required
           />
@@ -314,7 +354,10 @@ function PhaseDetails({
           <Textarea
             value={metadata.description ?? ""}
             onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, description: event.target.value }))
+              onMetadataChange((current) => ({
+                ...current,
+                description: event.target.value,
+              }))
             }
           />
         </Field>
@@ -337,7 +380,10 @@ function PhaseDetails({
             <Textarea
               value={metadata.aiPrompt ?? ""}
               onChange={(event) =>
-                onMetadataChange((current) => ({ ...current, aiPrompt: event.target.value }))
+                onMetadataChange((current) => ({
+                  ...current,
+                  aiPrompt: event.target.value,
+                }))
               }
             />
           </Field>
@@ -362,16 +408,31 @@ function PhaseDetails({
         <h3 className="font-semibold text-app-text">AI prompt</h3>
         <p className="mt-1 text-app-text-muted">{phase.aiPrompt || "Not specified."}</p>
       </div>
-      {phase.requirements?.length ? (
-        <div>
-          <h3 className="font-semibold text-app-text">Requirements</h3>
-          <ul className="mt-2 space-y-2 text-app-text-muted">
-            {phase.requirements.map((requirement) => (
-              <li key={requirement.id}>{requirement.displayName}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <div>
+        <h3 className="font-semibold text-app-text">Who this phase is for</h3>
+        {phase.requirements?.length ? (
+          <>
+            <p className="mt-1 text-app-text-muted">
+              Only members who meet all of these are given the phase.
+            </p>
+            <ul className="mt-2 space-y-2">
+              {phase.requirements.map((requirement) => (
+                <li key={requirement.id} className="flex items-center gap-2">
+                  <Badge variant="neutral" size="sm">
+                    {requirement.type === "SKILL" ? "Skill" : "Project role"}
+                  </Badge>
+                  <span className="text-app-text">{requirement.displayName}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="mt-1 text-app-text-muted">
+            Everybody on the project. Add a skill or project-role requirement in the list editor to
+            narrow it.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
