@@ -26,9 +26,12 @@ export type ButtonVariant =
 /**
  * Size scale. `md` is the default and the only size that is guaranteed to meet
  * the 44px touch target, so `sm` is reserved for dense desktop surfaces
- * (table rows, filter bars) where a pointer is a given.
+ * (table rows, filter bars) where a pointer is a given. `xs` is smaller still,
+ * for the quiet actions that hang under a chat message ("Copy", "Keep on my
+ * board", "Send this to your PM") — repeated under every message, so they must
+ * read as part of the thread rather than as a toolbar.
  */
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 type ButtonOwnProps = {
   variant?: ButtonVariant;
@@ -117,6 +120,7 @@ const variantClasses: Record<ButtonVariant, string> = {
  * looks like a box.
  */
 const sizeClasses: Record<ButtonSize, string> = {
+  xs: "h-7 gap-1.5 rounded-md px-2 text-xs",
   sm: "h-9 gap-1.5 rounded-lg px-3 text-xs",
   md: "h-11 gap-2 rounded-xl px-5 text-sm",
   lg: "h-12 gap-2 rounded-xl px-6 text-sm",
@@ -124,6 +128,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 
 /** Square counterparts to {@link sizeClasses} — same heights, no side padding. */
 const iconOnlySizeClasses: Record<ButtonSize, string> = {
+  xs: "h-7 w-7 rounded-md",
   sm: "h-9 w-9 rounded-lg",
   md: "h-11 w-11 rounded-xl",
   lg: "h-12 w-12 rounded-xl",
@@ -131,6 +136,7 @@ const iconOnlySizeClasses: Record<ButtonSize, string> = {
 
 /** Spinner size per button size, so the icon slot does not change width. */
 const spinnerClasses: Record<ButtonSize, string> = {
+  xs: "h-3.5 w-3.5",
   sm: "h-3.5 w-3.5",
   md: "h-4 w-4",
   lg: "h-4 w-4",
