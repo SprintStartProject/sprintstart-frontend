@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { onboardingGraphService } from "../../../../../../src/services/onboardingGraphService";
 import { MemberJourneySection } from "../../../../../../src/features/team-management/components/detail/MemberJourneySection";
 import type {
@@ -95,12 +95,18 @@ function renderSection(overrides: Partial<Parameters<typeof MemberJourneySection
 }
 
 describe("MemberJourneySection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
   it("opens on the phase the member is in, with items in graph order", () => {
     renderSection();
 
-    const list = screen.getByRole("list", { name: "Environment Setup: steps and questions" });
-    const titles = within(list)
-      .getAllByRole("listitem")
+    // One list per stage of the phase graph: clone, then run, then verify.
+    const titles = screen
+      .getAllByRole("list", { name: /^Environment Setup, stage/ })
+      .flatMap((list) => within(list).getAllByRole("listitem"))
       .map((item) => item.textContent ?? "");
     expect(titles[0]).toContain("Clone the repository");
     expect(titles[1]).toContain("Member is here");
@@ -122,9 +128,6 @@ describe("MemberJourneySection", () => {
     const user = userEvent.setup();
     const { onPathChanged } = renderSection();
 
-    // The list has nothing to add a step with any more.
-    expect(screen.queryByRole("button", { name: /Add a step/ })).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Graph" }));
     await user.click(await screen.findByRole("button", { name: /^Phase 1: Environment Setup,/ }));
 
@@ -145,6 +148,32 @@ describe("MemberJourneySection", () => {
     expect(request.step).toMatchObject({ title: "New step", position: 3 });
     expect(request).toMatchObject({ waitsOn: [], unlocks: [] });
     expect(onPathChanged).toHaveBeenCalled();
+  });
+
+  it("adds a blank step in the list, in between an item and what waited on it", async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(screen.getByRole("button", { name: "Add a step after Start the app" }));
+
+    await waitFor(() => expect(onboardingGraphService.createConnectedStep).toHaveBeenCalled());
+    const [phaseId, request] = vi
+      .mocked(onboardingGraphService.createConnectedStep)
+      .mock.calls.at(-1)!;
+    expect(phaseId).toBe("phase1");
+    expect(request).toMatchObject({ waitsOn: ["run"], unlocks: ["verify"] });
+    expect(request.step).toMatchObject({ title: "New step", position: 2 });
+  });
+
+  it("adds a step at the end, after everything nothing else waits on", async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(screen.getByRole("button", { name: "Add a step at the end" }));
+
+    await waitFor(() => expect(onboardingGraphService.createConnectedStep).toHaveBeenCalled());
+    const [, request] = vi.mocked(onboardingGraphService.createConnectedStep).mock.calls.at(-1)!;
+    expect(request).toMatchObject({ waitsOn: ["verify"], unlocks: [] });
   });
 
   it("says so when the member has no path yet", () => {

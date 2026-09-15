@@ -65,6 +65,11 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
+import {
+  HIRE_JOURNEY_VIEW_KEY,
+  readJourneyView,
+  writeJourneyView,
+} from "../features/onboarding/journeyViewMemory";
 
 type LoadingState = "loading" | "empty" | "success" | "error";
 type ViewMode = "list" | "graph";
@@ -134,8 +139,14 @@ export function OnBoardingPage() {
   // A phase picked from the chooser before anything in it was started -- until then nothing else
   // says that this is where the hire wants to be.
   const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(null);
+  // Where the member left the page last time: list or graph, and the phase the graph was zoomed into.
+  // A link to a step always opens the list, since that is where the step unfolds.
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    routeStepId ? "list" : readJourneyView(HIRE_JOURNEY_VIEW_KEY).mode,
+  );
+  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
+    () => readJourneyView(HIRE_JOURNEY_VIEW_KEY).graphPhaseId,
+  );
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
   const [graphItemId, setGraphItemId] = useState<string | null>(null);
@@ -228,6 +239,13 @@ export function OnBoardingPage() {
       .querySelector(`[data-item-id="${target}"]`)
       ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [expandedItemId, loadingState, selectedPhaseId]);
+
+  // A remembered phase that is not in this path (a rebuilt path, another project) opens the map.
+  const openGraphPhaseId = phases.some((phase) => phase.id === graphPhaseId) ? graphPhaseId : null;
+  useEffect(() => {
+    if (loadingState !== "success") return;
+    writeJourneyView(HIRE_JOURNEY_VIEW_KEY, { mode: viewMode, graphPhaseId: openGraphPhaseId });
+  }, [loadingState, openGraphPhaseId, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
@@ -662,7 +680,7 @@ export function OnBoardingPage() {
           ) : (
             <JourneyGraph
               phases={phases}
-              openPhaseId={graphPhaseId}
+              openPhaseId={openGraphPhaseId}
               onOpenPhaseChange={(phaseId) => {
                 setGraphPhaseId(phaseId);
                 setGraphItemId(null);

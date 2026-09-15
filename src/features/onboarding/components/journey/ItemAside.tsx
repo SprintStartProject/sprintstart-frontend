@@ -67,7 +67,7 @@ export function ItemAside({
         </button>
       </div>
 
-      <div className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 text-sm">
+      <div className="app-scrollbar relative min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 text-sm">
         <span
           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
             state === "done"

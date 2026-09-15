@@ -5,14 +5,22 @@ import {
   GitBranch,
   ListChecks,
   Lock,
+  Plus,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { SegmentedTabs } from "../../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../../../../hooks/useHorizontalWheelNavigation";
+import { useToast } from "../../../../context/useToast";
 import { onboardingGraphService } from "../../../../services/onboardingGraphService";
+import { computeRanks } from "../../../onboarding/graph/layout";
+import {
+  MEMBER_JOURNEY_VIEW_KEY,
+  readJourneyView,
+  writeJourneyView,
+} from "../../../onboarding/journeyViewMemory";
 import { ItemAside } from "../../../onboarding/components/journey/ItemAside";
 import {
   JourneyGraph,
@@ -32,6 +40,7 @@ import {
   phaseProgress,
   phaseState,
   sortedPhases,
+  unlockedBy,
   waitingOn,
   type PhaseItem,
 } from "../../../onboarding/journey";
@@ -88,6 +97,7 @@ export function MemberJourneySection({
   onDeleteStep,
   onPathChanged,
 }: Props) {
+  const toast = useToast();
   const firstName = memberName.split(" ")[0] || "this member";
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
   const nextAction = useMemo(() => (path ? resolveNextAction(path) : null), [path]);
@@ -101,10 +111,23 @@ export function MemberJourneySection({
         : null;
 
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => readJourneyView(MEMBER_JOURNEY_VIEW_KEY).mode,
+  );
+  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
+    () => readJourneyView(MEMBER_JOURNEY_VIEW_KEY).graphPhaseId,
+  );
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [freshStepId, setFreshStepId] = useState<string | null>(null);
+
+  // A remembered phase of another member's path is simply not there: that opens the map.
+  const openGraphPhaseId = phases.some((candidate) => candidate.id === graphPhaseId)
+    ? graphPhaseId
+    : null;
+  useEffect(() => {
+    if (phases.length === 0) return;
+    writeJourneyView(MEMBER_JOURNEY_VIEW_KEY, { mode: viewMode, graphPhaseId: openGraphPhaseId });
+  }, [openGraphPhaseId, phases.length, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLElement>({
     order: VIEW_ORDER,
@@ -118,6 +141,62 @@ export function MemberJourneySection({
     phases.find((candidate) => candidate.id === focusPhaseId) ??
     phases.find((candidate) => phaseState(candidate) !== "done") ??
     phases[0];
+
+  /** A blank step the PM names next -- dropped on the graph, or put in between two list rows. */
+  const createBlankStep = useCallback(
+    async (
+      target: OnboardingPhaseEndpoint,
+      placement: {
+        position: number;
+        waitsOn: string[];
+        unlocks: string[];
+        graphX?: number;
+        graphY?: number;
+      },
+    ) => {
+      const created = await onboardingGraphService.createConnectedStep(target.id, {
+        step: {
+          position: Math.min(placement.position, target.steps.length),
+          title: NEW_STEP_TITLE,
+          description: "",
+          type: "TASK",
+          estimatedMinutes: 30,
+          expectedOutcome: "",
+        },
+        waitsOn: placement.waitsOn,
+        unlocks: placement.unlocks,
+        graphX: placement.graphX,
+        graphY: placement.graphY,
+      });
+      await onPathChanged();
+      setFreshStepId(created.id);
+      return created;
+    },
+    [onPathChanged],
+  );
+
+  const addStepInList = async (target: OnboardingPhaseEndpoint, after: PhaseItem | null) => {
+    const items = phaseItems(target);
+    // After an item: in between it and what waited on it. At the end: after everything that nothing
+    // else waits on, so it really comes last.
+    const waitsOn = after
+      ? [after.id]
+      : items
+          .filter((candidate) => !items.some((other) => other.blockerIds.includes(candidate.id)))
+          .map((candidate) => candidate.id);
+    const unlocks = after ? unlockedBy(after, items).map((dependent) => dependent.id) : [];
+    try {
+      await createBlankStep(target, {
+        position: after?.kind === "step" ? after.step.position + 1 : target.steps.length,
+        waitsOn,
+        unlocks,
+      });
+    } catch (error) {
+      toast.error("Couldn't add the step", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
+  };
 
   const editing = useMemo<GraphEditing>(
     () => ({
@@ -155,27 +234,18 @@ export function MemberJourneySection({
       addStep: async (phaseId, point) => {
         const target = phases.find((candidate) => candidate.id === phaseId);
         if (!target) return;
-        // A blank step, connected to nothing: the PM draws its connections and names it next.
-        const created = await onboardingGraphService.createConnectedStep(phaseId, {
-          step: {
-            position: target.steps.length,
-            title: NEW_STEP_TITLE,
-            description: "",
-            type: "TASK",
-            estimatedMinutes: 30,
-            expectedOutcome: "",
-          },
+        // Connected to nothing: the PM draws its connections next.
+        const created = await createBlankStep(target, {
+          position: target.steps.length,
           waitsOn: [],
           unlocks: [],
           graphX: point.x,
           graphY: point.y,
         });
-        await onPathChanged();
-        setFreshStepId(created.id);
         setSelectedItemId(created.id);
       },
     }),
-    [onPathChanged, phases],
+    [createBlankStep, onPathChanged, phases],
   );
 
   const saveLayout = useMemo(
@@ -293,13 +363,28 @@ export function MemberJourneySection({
                         ? onOpenStep(item.id)
                         : onOpenQuestions(phase.id, "results")
                     }
+                    onAddAfter={(item) => void addStepInList(phase, item)}
+                    freshStepId={freshStepId}
+                    renderFreshStep={(item) =>
+                      item.kind === "step" ? (
+                        <StepQuickEdit
+                          key={item.step.id}
+                          step={item.step}
+                          startEditing
+                          onSaved={async () => {
+                            setFreshStepId(null);
+                            await onPathChanged();
+                          }}
+                        />
+                      ) : null
+                    }
                   />
                 </div>
               </div>
             ) : (
               <JourneyGraph
                 phases={phases}
-                openPhaseId={graphPhaseId}
+                openPhaseId={openGraphPhaseId}
                 onOpenPhaseChange={(phaseId) => {
                   setGraphPhaseId(phaseId);
                   if (phaseId) setSelectedPhaseId(phaseId);
@@ -497,102 +582,227 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
   );
 }
 
+/** Groups a phase's items into the rows of its graph: each stage opens once the ones above it are done. */
+function stagesOf(phase: OnboardingPhaseEndpoint): PhaseItem[][] {
+  const ranks = computeRanks(phaseItems(phase));
+  const stages: PhaseItem[][] = [];
+  orderedPhaseItems(phase).forEach((item) => {
+    const rank = ranks.get(item.id) ?? 0;
+    (stages[rank] ??= []).push(item);
+  });
+  return stages.filter(Boolean);
+}
+
 function MemberItemList({
   phase,
   nextItemId,
   stepTaskCounts,
   onOpenItem,
+  onAddAfter,
+  freshStepId,
+  renderFreshStep,
 }: {
   phase: OnboardingPhaseEndpoint;
   nextItemId: string | null;
   stepTaskCounts: Record<string, StepTaskCount>;
   onOpenItem: (item: PhaseItem) => void;
+  /** Adds a blank step after an item, or at the end of the phase for null. */
+  onAddAfter: (item: PhaseItem | null) => void;
+  freshStepId: string | null;
+  renderFreshStep: (item: PhaseItem) => ReactNode;
 }) {
-  const items = orderedPhaseItems(phase);
+  const items = phaseItems(phase);
+  const stages = stagesOf(phase);
+
+  const addAtEnd = (
+    <button
+      type="button"
+      onClick={() => onAddAfter(null)}
+      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-app-border px-4 py-3 text-sm font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:bg-app-brand-soft/30 hover:text-app-brand-text"
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      {items.length === 0 ? "Add the first step" : "Add a step at the end"}
+    </button>
+  );
 
   if (items.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-app-border bg-app-surface-muted px-6 py-10 text-center text-sm text-app-text-muted">
-        This phase has no steps or questions yet. Add one in the graph.
+      <div className="space-y-3">
+        <div className="rounded-3xl border border-dashed border-app-border bg-app-surface-muted px-6 py-10 text-center text-sm text-app-text-muted">
+          This phase has no steps or questions yet.
+        </div>
+        {addAtEnd}
       </div>
     );
   }
 
   return (
-    <ol className="space-y-1.5" aria-label={`${phase.title}: steps and questions`}>
-      {items.map((item) => {
-        const state = itemState(item, phase.locked);
-        const isNext = item.id === nextItemId;
-        const blockers = state === "locked" ? waitingOn(item, items) : [];
-        return (
-          <li key={item.id} className="group/item relative">
-            <div
-              className={`flex items-start gap-4 rounded-2xl border p-3 transition-colors ${
-                item.kind === "question"
-                  ? isNext
-                    ? "border-app-question-solid bg-app-question-bg/60"
-                    : "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
-                  : isNext
-                    ? "border-app-brand bg-app-brand-soft/50"
-                    : "border-transparent hover:border-app-border hover:bg-app-surface"
-              }`}
-            >
-              <span className="mt-0.5">
-                <ItemGlyph item={item} state={state} />
+    <div className="space-y-4">
+      {stages.map((stage, stageIndex) => (
+        <section
+          key={stage[0].id}
+          aria-label={`Stage ${stageIndex + 1}`}
+          className="relative pl-5 before:absolute before:top-7 before:bottom-2 before:left-[7px] before:w-px before:bg-app-border"
+        >
+          <h4 className="relative mb-1.5 -ml-5 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+            <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-app-border bg-app-surface text-[9px] tabular-nums">
+              {stageIndex + 1}
+            </span>
+            {stageIndex === 0 ? "First" : "Then"}
+            {stage.length > 1 ? (
+              <span className="font-normal tracking-normal normal-case">
+                · {stage.length} in any order
               </span>
-              <button
-                type="button"
-                onClick={() => onOpenItem(item)}
-                className="min-w-0 flex-1 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            ) : null}
+          </h4>
+          <ol className="space-y-1" aria-label={`${phase.title}, stage ${stageIndex + 1}`}>
+            {stage.map((item) => (
+              <MemberItemRow
+                key={item.id}
+                item={item}
+                items={items}
+                phase={phase}
+                isNext={item.id === nextItemId}
+                taskCount={stepTaskCounts[item.id]}
+                onOpen={() => onOpenItem(item)}
+                onAddAfter={() => onAddAfter(item)}
+                fresh={item.id === freshStepId ? renderFreshStep(item) : null}
+              />
+            ))}
+          </ol>
+        </section>
+      ))}
+      {addAtEnd}
+    </div>
+  );
+}
+
+function MemberItemRow({
+  item,
+  items,
+  phase,
+  isNext,
+  taskCount,
+  onOpen,
+  onAddAfter,
+  fresh,
+}: {
+  item: PhaseItem;
+  items: PhaseItem[];
+  phase: OnboardingPhaseEndpoint;
+  isNext: boolean;
+  taskCount?: StepTaskCount;
+  onOpen: () => void;
+  onAddAfter: () => void;
+  fresh: ReactNode;
+}) {
+  const state = itemState(item, phase.locked);
+  const blockers = waitingOn(item, items);
+  const allBlockers = items.filter((candidate) => item.blockerIds.includes(candidate.id));
+  const leadsTo = unlockedBy(item, items);
+  const isQuestion = item.kind === "question";
+
+  return (
+    <li className="group/item relative">
+      <div
+        className={`flex items-start gap-4 rounded-2xl border p-3 transition-colors ${
+          fresh
+            ? "border-app-brand-border bg-app-surface shadow-lg"
+            : isQuestion
+              ? isNext
+                ? "border-app-question-solid bg-app-question-bg/60"
+                : "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
+              : isNext
+                ? "border-app-brand bg-app-brand-soft/50"
+                : "border-transparent hover:border-app-border hover:bg-app-surface"
+        }`}
+      >
+        <span className="mt-0.5">
+          <ItemGlyph item={item} state={state} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              {isNext ? (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                    isQuestion ? "bg-app-question-solid" : "bg-app-brand"
+                  }`}
+                >
+                  Member is here
+                </span>
+              ) : null}
+              <span
+                className={`text-sm font-semibold ${
+                  state === "done" || state === "skipped" ? "text-app-text-muted" : "text-app-text"
+                }`}
               >
-                <span className="flex flex-wrap items-center gap-2">
-                  {isNext ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
-                        item.kind === "question" ? "bg-app-question-solid" : "bg-app-brand"
-                      }`}
-                    >
-                      Member is here
-                    </span>
-                  ) : null}
-                  <span
-                    className={`text-sm font-semibold ${
-                      state === "done" || state === "skipped"
-                        ? "text-app-text-muted"
-                        : "text-app-text"
-                    }`}
-                  >
-                    {item.kind === "question" ? item.question.question : item.title}
-                  </span>
+                {isQuestion ? item.question.question : item.title}
+              </span>
+            </span>
+            <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-app-text-subtle">
+              {isQuestion ? (
+                <span className="rounded-full bg-app-question-solid/15 px-2 py-px font-semibold text-app-question-text">
+                  Question · {itemKindLabel(item)}
                 </span>
-                <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-app-text-subtle">
-                  <span className="inline-flex items-center gap-1">
-                    <ItemKindIcon item={item} />
-                    {itemKindLabel(item)}
-                  </span>
-                  {item.kind === "step" && item.step.estimatedMinutes ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" aria-hidden="true" />
-                      {formatMinutes(item.step.estimatedMinutes)}
-                    </span>
-                  ) : null}
-                  <span className="font-medium">{itemStateLabel[state]}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <ItemKindIcon item={item} />
+                  {itemKindLabel(item)}
                 </span>
-                {item.kind === "step" ? (
-                  <span className="mt-2 block">
-                    <StepFacts item={item} taskCount={stepTaskCounts[item.id]} />
-                  </span>
-                ) : null}
-                {blockers.length > 0 ? (
-                  <span className="mt-1.5 block text-xs text-app-text-muted">
-                    Waits on {blockers.map((blocker) => blocker.title).join(", ")}
-                  </span>
-                ) : null}
-              </button>
+              )}
+              {item.kind === "step" && item.step.estimatedMinutes ? (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  {formatMinutes(item.step.estimatedMinutes)}
+                </span>
+              ) : null}
+              <span className="font-medium">{itemStateLabel[state]}</span>
+            </span>
+            {item.kind === "step" ? (
+              <span className="mt-2 block">
+                <StepFacts item={item} taskCount={taskCount} />
+              </span>
+            ) : null}
+            {blockers.length > 0 && state === "locked" ? (
+              <span className="mt-1.5 block text-xs text-app-text-muted">
+                Waits on {blockers.map((blocker) => blocker.title).join(", ")}
+              </span>
+            ) : null}
+          </button>
+          {fresh ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-app-text-muted">
+                {allBlockers.length > 0
+                  ? `Opens after ${allBlockers.map((blocker) => blocker.title).join(", ")}`
+                  : "Open from the start of the phase"}
+                {leadsTo.length > 0
+                  ? ` · leads to ${leadsTo.map((next) => next.title).join(", ")}`
+                  : ""}
+                . Connections can be changed in the graph.
+              </p>
+              {fresh}
             </div>
-          </li>
-        );
-      })}
-    </ol>
+          ) : null}
+        </div>
+      </div>
+      {/* In between this row and the next: where a new step goes. Visible on hover and focus, so the
+          list stays calm while it is only being read. */}
+      <div className="flex h-3 items-center justify-center">
+        <button
+          type="button"
+          onClick={onAddAfter}
+          aria-label={`Add a step after ${item.title}`}
+          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-2.5 py-0.5 text-[11px] font-semibold text-app-brand-text opacity-0 shadow-sm transition-opacity group-hover/item:opacity-100 hover:bg-app-brand-soft focus-visible:opacity-100"
+        >
+          <Plus className="h-3 w-3" aria-hidden="true" />
+          Add step after
+        </button>
+      </div>
+    </li>
   );
 }

@@ -111,7 +111,7 @@ export function PhaseNavigator({
   const done = phases.filter((phase) => phaseState(phase) === "done").length;
 
   const list = (
-    <div className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-2">
+    <div className="app-scrollbar relative min-h-0 flex-1 space-y-4 overflow-y-auto p-2">
       {GROUPS.map((group) => {
         const members = phases.filter((phase) => phaseState(phase) === group.state);
         if (members.length === 0) return null;

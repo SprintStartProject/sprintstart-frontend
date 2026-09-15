@@ -125,6 +125,8 @@ function phaseFixture(id: string, position: number, title: string) {
 describe("OnBoardingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The page remembers list or graph; every test starts from a page never seen before.
+    localStorage.clear();
     projectContextState.selectedProjectId = "proj1";
     projectContextState.isLoading = false;
     projectContextState.isSwitcherEnabled = true;
@@ -659,5 +661,29 @@ describe("OnBoardingPage", () => {
 
     expect(await screen.findByText("Run the tests")).toBeInTheDocument();
     expect(screen.getByText(/Waits on/)).toHaveTextContent("Waits on Set up the repo");
+  });
+  it("comes back to the view and phase it was left in", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1"), phaseFixture("phase2", 2, "Phase 2")],
+        }),
+      ),
+    );
+    localStorage.setItem(
+      "sprintstart.onboarding.view",
+      JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("application", {
+        name: "Graph of the steps and questions in Phase 2",
+      }),
+    ).toBeInTheDocument();
   });
 });

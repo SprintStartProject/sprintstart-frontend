@@ -633,7 +633,7 @@ function ItemFocus({
             </button>
           </div>
         </header>
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        <div className="app-scrollbar relative min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {children}
         </div>
       </motion.section>
