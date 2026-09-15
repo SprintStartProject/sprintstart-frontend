@@ -36,6 +36,8 @@ export type JourneyCameraHandle = {
   zoomIntoNode: (id: string, durationMs?: number) => Promise<void>;
   /** Where the middle of the visible canvas is, in world coordinates. */
   viewCenter: () => GraphPoint;
+  /** Flies back out to the whole graph. */
+  flyToFit: (durationMs?: number) => Promise<void>;
 };
 
 /** How an edge is drawn: satisfied, the one being worked through right now, or still waiting. */
@@ -90,6 +92,8 @@ type Props<TNode extends LayoutNode> = {
   enterFromId?: string | null;
   /** Fades every node but this one -- used while flying into it. */
   spotlightId?: string | null;
+  /** Drawn over the whole canvas, above everything -- a node zoomed into until it is a page. */
+  cover?: ReactNode;
 };
 
 const MIN_ZOOM = 0.2;
@@ -171,6 +175,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   cameraRef,
   enterFromId = null,
   spotlightId = null,
+  cover,
 }: Props<TNode>) {
   const markerId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -363,6 +368,10 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         const target = viewportIntoNode(id);
         if (target) await flyTo(target, durationMs);
       },
+      flyToFit: async (durationMs = 520) => {
+        const target = fitTarget(false);
+        if (target) await flyTo(target, durationMs);
+      },
       viewCenter: () => {
         const current = viewportRef.current;
         return {
@@ -371,7 +380,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         };
       },
     }),
-    [flyTo, size.height, size.width, viewportIntoNode],
+    [fitTarget, flyTo, size.height, size.width, viewportIntoNode],
   );
 
   // Refit when the graph itself changes or the canvas first gets a size -- not on every position
@@ -890,6 +899,12 @@ export function JourneyCanvas<TNode extends LayoutNode>({
           className="pointer-events-none absolute top-3 left-3 z-40 max-w-[calc(100%-1.5rem)]"
         >
           <div className="pointer-events-auto">{overlay}</div>
+        </div>
+      ) : null}
+
+      {cover ? (
+        <div data-canvas-control className="absolute inset-0 z-50">
+          {cover}
         </div>
       ) : null}
 

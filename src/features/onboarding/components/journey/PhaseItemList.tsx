@@ -1,4 +1,5 @@
-import { ChevronRight, Eye, Lock } from "lucide-react";
+import { motion } from "framer-motion";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../../../../components/ui/Button";
 import {
@@ -6,48 +7,40 @@ import {
   itemState,
   orderedPhaseItems,
   waitingOn,
-  type ItemState,
   type PhaseItem,
 } from "../../journey";
-import { ItemKindIcon } from "../../graph/JourneyNodeCards";
+import { ItemGlyph } from "../../graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel, primaryActionLabel } from "../../graph/nodeLabels";
-import { StepOriginBadge } from "../StepOriginBadge";
 import type { OnboardingPhaseEndpoint } from "../../types";
-import { CheckCircle2, PlayCircle, RotateCcw, SkipForward, Sparkles } from "lucide-react";
-
-const markerTone: Record<ItemState, string> = {
-  done: "border-app-success-border bg-app-success-bg text-app-success-text",
-  skipped: "border-app-border bg-app-surface-muted text-app-text-muted",
-  active: "border-app-brand bg-app-brand text-white",
-  open: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
-  retry: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
-  locked: "border-dashed border-app-border bg-app-surface text-app-text-subtle",
-};
-
-const markerIcon: Record<ItemState, ReactNode> = {
-  done: <CheckCircle2 className="h-4 w-4" />,
-  skipped: <SkipForward className="h-4 w-4" />,
-  active: <PlayCircle className="h-4 w-4" />,
-  open: <Sparkles className="h-4 w-4" />,
-  retry: <RotateCcw className="h-4 w-4" />,
-  locked: <Lock className="h-3.5 w-3.5" />,
-};
 
 type Props = {
   phase: OnboardingPhaseEndpoint;
   nextItemId: string | null;
+  /** The item unfolded in place, if any. */
+  expandedItemId: string | null;
+  onToggle: (item: PhaseItem) => void;
+  /** Start, continue or answer: opens the item in place, starting a step that was not started. */
   onPrimary: (item: PhaseItem) => void;
-  onView: (item: PhaseItem) => void;
+  /** What an unfolded item shows -- the step or question itself. */
+  renderExpanded: (item: PhaseItem) => ReactNode;
 };
 
 /**
- * A phase's steps and questions as one list, in the order the phase graph reads.
+ * A phase's steps and questions as one list, in the order the phase graph reads -- and the place
+ * they are worked through.
  *
- * Steps and questions used to be two lists, steps first -- but they are nodes of one graph, and a
- * question often stands between two steps. So they are merged in graph order here, and anything
- * locked says what it is waiting on by name instead of only "Locked".
+ * Every row unfolds in place instead of leading to a page of its own, so the member never loses the
+ * path around the step they are on. Questions are drawn in their own colour and shape, locked or not,
+ * and anything locked says what it is waiting on by name.
  */
-export function PhaseItemList({ phase, nextItemId, onPrimary, onView }: Props) {
+export function PhaseItemList({
+  phase,
+  nextItemId,
+  expandedItemId,
+  onToggle,
+  onPrimary,
+  renderExpanded,
+}: Props) {
   const items = orderedPhaseItems(phase);
 
   if (items.length === 0) {
@@ -59,103 +52,129 @@ export function PhaseItemList({ phase, nextItemId, onPrimary, onView }: Props) {
   }
 
   return (
-    <ol className="relative space-y-2" aria-label={`${phase.title}: steps and questions`}>
-      {/* The spine the markers sit on. */}
-      <span aria-hidden="true" className="absolute top-6 bottom-6 left-[27px] w-px bg-app-border" />
+    <ol className="space-y-2" aria-label={`${phase.title}: steps and questions`}>
       {items.map((item) => {
         const state = itemState(item, phase.locked);
         const isNext = item.id === nextItemId;
+        const isExpanded = item.id === expandedItemId;
+        const isQuestion = item.kind === "question";
         const action = primaryActionLabel(item, state);
         const blockers = state === "locked" ? waitingOn(item, items) : [];
         const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
+        const muted = state === "done" || state === "skipped" || state === "locked";
+        const canUnfold = state !== "locked";
 
         return (
-          <li key={item.id} data-item-id={item.id} className="relative">
-            <div
-              className={`flex gap-4 rounded-2xl border p-3 pr-4 transition-colors sm:items-center ${
-                isNext
-                  ? "border-app-brand bg-app-brand-soft/60"
-                  : state === "locked"
-                    ? "border-transparent"
-                    : "border-transparent hover:border-app-border hover:bg-app-surface"
-              }`}
-            >
-              <span
-                className={`relative z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border sm:mt-0 ${markerTone[state]}`}
-                aria-hidden="true"
+          <li
+            key={item.id}
+            data-item-id={item.id}
+            className={`overflow-hidden rounded-2xl border transition-colors ${
+              isExpanded
+                ? isQuestion
+                  ? "border-app-question-border bg-app-surface shadow-lg"
+                  : "border-app-brand-border bg-app-surface shadow-lg"
+                : isNext
+                  ? isQuestion
+                    ? "border-app-question-solid bg-app-question-bg/60"
+                    : "border-app-brand bg-app-brand-soft/60"
+                  : isQuestion
+                    ? "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
+                    : "border-app-border/70 bg-app-surface/60 hover:bg-app-surface"
+            }`}
+          >
+            <div className="flex items-center gap-3 p-3 pr-4">
+              <button
+                type="button"
+                onClick={() => canUnfold && onToggle(item)}
+                aria-expanded={canUnfold ? isExpanded : undefined}
+                disabled={!canUnfold}
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-default"
               >
-                {markerIcon[state]}
-              </span>
-
-              <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {isNext ? (
-                      <span className="rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">
+                <ItemGlyph item={item} state={state} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {isNext && !isExpanded ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                          isQuestion ? "bg-app-question-solid" : "bg-app-brand"
+                        }`}
+                      >
                         Up next
                       </span>
                     ) : null}
-                    <h3
+                    <span
                       className={`text-sm font-semibold ${
                         state === "done" || state === "skipped"
                           ? "text-app-text-subtle line-through decoration-app-text-subtle/40"
-                          : state === "locked"
+                          : muted
                             ? "text-app-text-muted"
                             : "text-app-text"
                       }`}
                     >
-                      {item.kind === "question" ? item.question.question : item.title}
-                    </h3>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-app-text-subtle">
-                    <span className="inline-flex items-center gap-1">
-                      <ItemKindIcon item={item} className="h-3.5 w-3.5" />
-                      {itemKindLabel(item)}
+                      {isQuestion ? item.question.question : item.title}
                     </span>
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-app-text-subtle">
+                    {isQuestion ? (
+                      <span className="rounded-full bg-app-question-solid/15 px-2 py-px font-semibold text-app-question-text">
+                        Question · {itemKindLabel(item)}
+                      </span>
+                    ) : (
+                      <span>{itemKindLabel(item)}</span>
+                    )}
                     {minutes ? <span>{formatMinutes(minutes)}</span> : null}
-                    <span className="sr-only">{itemStateLabel[state]}</span>
-                    {item.kind === "step" ? <StepOriginBadge step={item.step} /> : null}
-                  </div>
-                  {blockers.length > 0 ? (
-                    <p className="mt-1.5 text-xs text-app-text-muted">
-                      Waits on{" "}
-                      {blockers.map((blocker, index) => (
-                        <span key={blocker.id}>
-                          {index > 0 ? ", " : ""}
-                          <span className="font-medium text-app-text">{blocker.title}</span>
-                        </span>
-                      ))}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="shrink-0">
-                  {action ? (
-                    <Button
-                      size="sm"
-                      variant={isNext ? "primary" : "secondary"}
-                      onClick={() => onPrimary(item)}
-                      trailingIcon={<ChevronRight className="h-4 w-4" />}
-                    >
-                      {action}
-                    </Button>
-                  ) : item.kind === "step" && state !== "locked" ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onView(item)}
-                      icon={<Eye className="h-4 w-4" />}
-                    >
-                      View
-                    </Button>
-                  ) : (
-                    <span className="text-xs font-medium text-app-text-subtle">
+                    <span className={state === "retry" ? "font-medium text-app-warning-text" : ""}>
                       {itemStateLabel[state]}
                     </span>
-                  )}
-                </div>
-              </div>
+                    {blockers.length > 0 ? (
+                      <span className="text-app-text-muted">
+                        Waits on{" "}
+                        {blockers.map((blocker, index) => (
+                          <span key={blocker.id}>
+                            {index > 0 ? ", " : ""}
+                            <span className="font-medium text-app-text">{blocker.title}</span>
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+
+              {action && !isExpanded ? (
+                <Button
+                  size="sm"
+                  variant={isNext ? "primary" : "secondary"}
+                  onClick={() => onPrimary(item)}
+                  trailingIcon={<ChevronRight className="h-4 w-4" />}
+                >
+                  {action}
+                </Button>
+              ) : canUnfold ? (
+                <button
+                  type="button"
+                  onClick={() => onToggle(item)}
+                  aria-label={isExpanded ? `Fold ${item.title}` : `Open ${item.title}`}
+                  className="rounded-lg p-1.5 text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+              ) : null}
             </div>
+
+            {isExpanded ? (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className="border-t border-app-border"
+              >
+                <div className="p-4 sm:px-5">{renderExpanded(item)}</div>
+              </motion.div>
+            ) : null}
           </li>
         );
       })}

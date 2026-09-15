@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Lock,
   Map as MapIcon,
+  Minimize2,
   Move,
   Plus,
 } from "lucide-react";
@@ -25,7 +26,7 @@ import {
   type JourneyCameraHandle,
   type JourneyEdgeTone,
 } from "../../graph/JourneyCanvas";
-import { ItemNodeCard, PhaseNodeCard } from "../../graph/JourneyNodeCards";
+import { ItemGlyph, ItemNodeCard, PhaseNodeCard } from "../../graph/JourneyNodeCards";
 import {
   ITEM_LAYOUT,
   ITEM_NODE_SIZE,
@@ -33,7 +34,7 @@ import {
   PHASE_NODE_SIZE,
   itemGraphLayout,
 } from "../../graph/graphLayouts";
-import { phaseStateLabel } from "../../graph/nodeLabels";
+import { itemKindLabel, itemStateLabel, phaseStateLabel } from "../../graph/nodeLabels";
 import {
   layeredLayout,
   resolveLayout,
@@ -85,6 +86,13 @@ type Props = {
   renderItemAside?: (item: PhaseItem, phase: OnboardingPhaseEndpoint) => ReactNode;
   /** Extra controls in the phase's title card, e.g. the PM's question tools. */
   renderPhaseActions?: (phase: OnboardingPhaseEndpoint) => ReactNode;
+  /**
+   * The item zoomed into until it fills the graph, and how to draw it. Given these, a click on an item
+   * flies into it instead of selecting it -- the hire's way of working through a phase on the graph.
+   */
+  openItemId?: string | null;
+  onOpenItemChange?: (itemId: string | null) => void;
+  renderItemFocus?: (item: PhaseItem, phase: OnboardingPhaseEndpoint) => ReactNode;
   heightClassName?: string;
 };
 
@@ -115,6 +123,9 @@ export function JourneyGraph({
   onOpenItem,
   renderItemAside,
   renderPhaseActions,
+  openItemId = null,
+  onOpenItemChange,
+  renderItemFocus,
   heightClassName = "h-[calc(100vh-15rem)] min-h-[32rem]",
 }: Props) {
   const toast = useToast();
@@ -170,6 +181,37 @@ export function JourneyGraph({
 
   // ── Navigation ─────────────────────────────────────────────
 
+  const [divingIntoItem, setDivingIntoItem] = useState<string | null>(null);
+  const entersItems = !!onOpenItemChange && !!renderItemFocus;
+
+  const enterItem = async (itemId: string) => {
+    if (!onOpenItemChange || divingIntoItem) return;
+    setDivingIntoItem(itemId);
+    await phaseCamera.current?.zoomIntoNode(itemId, 380);
+    setDivingIntoItem(null);
+    onOpenItemChange(itemId);
+  };
+
+  const leaveItem = () => {
+    onOpenItemChange?.(null);
+    void phaseCamera.current?.flyToFit();
+  };
+
+  // Escape steps back out of an item, unless it is being typed into.
+  useEffect(() => {
+    if (!openItemId || !onOpenItemChange) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "Escape" || target?.closest('input, textarea, select, [role="dialog"]')) {
+        return;
+      }
+      onOpenItemChange(null);
+      void phaseCamera.current?.flyToFit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onOpenItemChange, openItemId]);
+
   const dive = async (phaseId: string) => {
     if (divingInto) return;
     setDivingInto(phaseId);
@@ -181,6 +223,7 @@ export function JourneyGraph({
   };
 
   const surface = () => {
+    onOpenItemChange?.(null);
     setSurfacedFrom(openPhaseId);
     setArranging(false);
     onSelectItem(null);
@@ -377,6 +420,7 @@ export function JourneyGraph({
   const state = phaseState(openPhase);
   const waitsOn = blockingPhases(openPhase, phases);
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
+  const focusedItem = entersItems ? (items.find((item) => item.id === openItemId) ?? null) : null;
   const progress = phaseProgress(openPhase);
 
   return (
@@ -396,8 +440,15 @@ export function JourneyGraph({
         nodeLabel={(item) => `${item.kind === "step" ? "Step" : "Question"}: ${item.title}`}
         fitKey={PHASE_KEY(openPhase.id)}
         focusId={nextItemId ?? selectedItemId}
-        selectedId={selectedItemId}
-        onSelect={onSelectItem}
+        selectedId={entersItems ? null : selectedItemId}
+        onSelect={(id) => {
+          if (entersItems) {
+            if (id) void enterItem(id);
+            return;
+          }
+          onSelectItem(id);
+        }}
+        spotlightId={divingIntoItem ?? focusedItem?.id ?? null}
         onOpen={(id) => {
           const item = items.find((candidate) => candidate.id === id);
           if (item) onOpenItem?.(item);
@@ -467,7 +518,23 @@ export function JourneyGraph({
         }
         heightClassName={heightClassName}
         aside={
-          selectedItem && renderItemAside ? renderItemAside(selectedItem, openPhase) : undefined
+          !entersItems && selectedItem && renderItemAside
+            ? renderItemAside(selectedItem, openPhase)
+            : undefined
+        }
+        cover={
+          focusedItem && renderItemFocus ? (
+            <ItemFocus
+              key={focusedItem.id}
+              item={focusedItem}
+              phase={openPhase}
+              phaseIndex={index}
+              onBack={leaveItem}
+              onJourneyMap={surface}
+            >
+              {renderItemFocus(focusedItem, openPhase)}
+            </ItemFocus>
+          ) : undefined
         }
         renderNode={(item, render) => (
           <ItemNodeCard
@@ -479,5 +546,97 @@ export function JourneyGraph({
         )}
       />
     </motion.div>
+  );
+}
+
+/**
+ * A step or question zoomed into until it is the whole graph: the camera flies into the node, and the
+ * node opens up into the thing itself, with the way back out along the top.
+ */
+function ItemFocus({
+  item,
+  phase,
+  phaseIndex,
+  onBack,
+  onJourneyMap,
+  children,
+}: {
+  item: PhaseItem;
+  phase: OnboardingPhaseEndpoint;
+  phaseIndex: number;
+  onBack: () => void;
+  onJourneyMap: () => void;
+  children: ReactNode;
+}) {
+  const state = itemState(item, phase.locked);
+  const isQuestion = item.kind === "question";
+  return (
+    <div className="absolute inset-0 flex items-stretch justify-center bg-app-bg-soft/70 p-3 backdrop-blur-sm sm:p-6">
+      <motion.section
+        aria-label={`${isQuestion ? "Question" : "Step"}: ${item.title}`}
+        initial={{ opacity: 0, scale: 0.9, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 320, damping: 30 }}
+        className={`flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border bg-app-surface shadow-2xl ${
+          isQuestion ? "border-app-question-border" : "border-app-brand-border"
+        }`}
+      >
+        <header
+          className={`border-b px-4 py-3 sm:px-6 ${
+            isQuestion
+              ? "border-app-question-border/60 bg-app-question-bg/50"
+              : "border-app-border bg-app-brand-soft/30"
+          }`}
+        >
+          <nav
+            aria-label="Where you are"
+            className="flex min-w-0 items-center gap-1 text-xs text-app-text-muted"
+          >
+            <button
+              type="button"
+              onClick={onJourneyMap}
+              className="shrink-0 rounded-md px-1.5 py-0.5 hover:bg-app-surface-hover hover:text-app-text"
+            >
+              Journey map
+            </button>
+            <ChevronRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={onBack}
+              className="min-w-0 truncate rounded-md px-1.5 py-0.5 hover:bg-app-surface-hover hover:text-app-text"
+            >
+              {phaseIndex + 1}. {phase.title}
+            </button>
+          </nav>
+          <div className="mt-2 flex items-start gap-3">
+            <ItemGlyph item={item} state={state} />
+            <div className="min-w-0 flex-1">
+              <p
+                className={`text-[11px] font-semibold tracking-wide uppercase ${
+                  isQuestion ? "text-app-question-text" : "text-app-brand-text"
+                }`}
+              >
+                {isQuestion ? "Knowledge question" : itemKindLabel(item)} · {itemStateLabel[state]}
+              </p>
+              <h3 className="mt-0.5 text-lg leading-snug font-bold text-app-text sm:text-xl">
+                {isQuestion ? item.question.question : item.title}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back to the phase"
+              title="Back to the phase (Esc)"
+              className="rounded-xl p-2 text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+            >
+              <Minimize2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          {children}
+        </div>
+      </motion.section>
+    </div>
   );
 }

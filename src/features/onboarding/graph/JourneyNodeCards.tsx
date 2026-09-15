@@ -1,13 +1,13 @@
 import {
+  Check,
   CheckCircle2,
   CircleHelp,
   FileText,
   Link2,
   Lock,
-  PlayCircle,
+  Play,
   RotateCcw,
   SkipForward,
-  Sparkles,
   SquareCheckBig,
   Video,
 } from "lucide-react";
@@ -29,25 +29,32 @@ const stateFrame: Record<ItemState, string> = {
   locked: "border-dashed border-app-border bg-app-surface/70",
 };
 
-const stateIcon: Record<ItemState, { icon: ReactNode; tone: string }> = {
+/** Questions carry their own colour in every state, so a locked one still reads as a question. */
+const questionFrame: Record<ItemState, string> = {
+  done: "border-app-success-border bg-app-question-bg/40",
+  skipped: "border-app-border bg-app-question-bg/40",
+  active: "border-app-question-solid bg-app-question-bg",
+  open: "border-app-question-border bg-app-question-bg",
+  retry: "border-app-warning-border bg-app-question-bg",
+  locked: "border-dashed border-app-question-border/70 bg-app-question-bg/40",
+};
+
+const stateBadge: Record<ItemState, { icon: ReactNode; tone: string } | null> = {
   done: {
-    icon: <CheckCircle2 className="h-4 w-4" />,
-    tone: "bg-app-success-bg text-app-success-text",
+    icon: <Check className="h-2.5 w-2.5" strokeWidth={3} />,
+    tone: "bg-app-success-solid text-white",
   },
-  skipped: {
-    icon: <SkipForward className="h-4 w-4" />,
-    tone: "bg-app-surface-muted text-app-text-muted",
+  skipped: { icon: <SkipForward className="h-2.5 w-2.5" />, tone: "bg-app-text-subtle text-white" },
+  active: {
+    icon: <Play className="h-2.5 w-2.5" fill="currentColor" />,
+    tone: "bg-app-brand text-white",
   },
-  active: { icon: <PlayCircle className="h-4 w-4" />, tone: "bg-app-brand text-white" },
-  open: { icon: <Sparkles className="h-4 w-4" />, tone: "bg-app-brand-soft text-app-brand-text" },
+  open: null,
   retry: {
-    icon: <RotateCcw className="h-4 w-4" />,
-    tone: "bg-app-warning-bg text-app-warning-text",
+    icon: <RotateCcw className="h-2.5 w-2.5" strokeWidth={3} />,
+    tone: "bg-app-warning-solid text-white",
   },
-  locked: {
-    icon: <Lock className="h-3.5 w-3.5" />,
-    tone: "bg-app-surface-muted text-app-text-subtle",
-  },
+  locked: { icon: <Lock className="h-2.5 w-2.5" />, tone: "bg-app-text-subtle text-white" },
 };
 
 export function ItemKindIcon({
@@ -68,6 +75,73 @@ export function ItemKindIcon({
     default:
       return <SquareCheckBig className={className} aria-hidden="true" />;
   }
+}
+
+/**
+ * What an item is, drawn so the two kinds never look alike: a step sits in a circle, a question in a
+ * violet diamond. The state rides along as a small badge in the corner instead of replacing the icon,
+ * which is what used to make a locked question look exactly like a locked step.
+ */
+export function ItemGlyph({
+  item,
+  state,
+  size = "md",
+}: {
+  item: PhaseItem;
+  state: ItemState;
+  size?: "sm" | "md";
+}) {
+  const badge = stateBadge[state];
+  const box = size === "sm" ? "h-7 w-7" : "h-8 w-8";
+  const muted = state === "done" || state === "skipped" || state === "locked";
+  return (
+    <span
+      className={`relative flex shrink-0 items-center justify-center ${box}`}
+      aria-hidden="true"
+    >
+      {item.kind === "question" ? (
+        <span
+          className={`absolute inset-[3px] rotate-45 rounded-md border ${
+            muted
+              ? "border-app-question-border bg-app-question-bg"
+              : "border-app-question-solid bg-app-question-solid"
+          }`}
+        />
+      ) : (
+        <span
+          className={`absolute inset-0 rounded-full border ${
+            state === "active"
+              ? "border-app-brand bg-app-brand"
+              : muted
+                ? "border-app-border bg-app-surface-muted"
+                : "border-app-brand-border bg-app-brand-soft"
+          }`}
+        />
+      )}
+      <span
+        className={`relative ${
+          item.kind === "question"
+            ? muted
+              ? "text-app-question-text"
+              : "text-white"
+            : state === "active"
+              ? "text-white"
+              : muted
+                ? "text-app-text-subtle"
+                : "text-app-brand-text"
+        }`}
+      >
+        <ItemKindIcon item={item} className="h-3.5 w-3.5" />
+      </span>
+      {badge ? (
+        <span
+          className={`absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full ring-2 ring-app-surface ${badge.tone}`}
+        >
+          {badge.icon}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 function emphasisClass({ emphasis, selected, dragging }: JourneyNodeRenderState): string {
@@ -91,27 +165,26 @@ export function ItemNodeCard({
   render: JourneyNodeRenderState;
   isNext?: boolean;
 }) {
-  const icon = stateIcon[state];
   const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
+  const isQuestion = item.kind === "question";
 
   return (
     <div
-      className={`relative flex h-full w-full flex-col justify-between rounded-2xl border p-3 transition-[opacity,box-shadow,transform] duration-200 ${stateFrame[state]} ${emphasisClass(render)}`}
+      className={`relative flex h-full w-full flex-col justify-between overflow-visible rounded-2xl border p-3 transition-[opacity,box-shadow,transform] duration-200 ${
+        isQuestion ? questionFrame[state] : stateFrame[state]
+      } ${emphasisClass(render)}`}
     >
       {isNext ? (
-        <span className="absolute -top-2.5 left-3 rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow">
+        <span
+          className={`absolute -top-2.5 left-3 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow ${
+            isQuestion ? "bg-app-question-solid" : "bg-app-brand"
+          }`}
+        >
           Up next
         </span>
       ) : null}
       <div className="flex items-start gap-2.5">
-        <span
-          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${icon.tone} ${
-            state === "active" ? "motion-safe:animate-pulse" : ""
-          }`}
-          aria-hidden="true"
-        >
-          {icon.icon}
-        </span>
+        <ItemGlyph item={item} state={state} size="sm" />
         <p
           className={`line-clamp-2 text-[13px] leading-snug font-semibold ${
             state === "done" || state === "skipped" || state === "locked"
@@ -124,8 +197,13 @@ export function ItemNodeCard({
       </div>
       <div className="flex items-center justify-between gap-2 pl-[38px] text-[11px] text-app-text-subtle">
         <span className="inline-flex min-w-0 items-center gap-1 truncate">
-          <ItemKindIcon item={item} className="h-3 w-3 shrink-0" />
-          {itemKindLabel(item)}
+          {isQuestion ? (
+            <span className="rounded-full bg-app-question-solid/15 px-1.5 py-px font-semibold text-app-question-text">
+              Question
+            </span>
+          ) : (
+            itemKindLabel(item)
+          )}
           {minutes ? <span aria-hidden="true">·</span> : null}
           {minutes ? formatMinutes(minutes) : null}
         </span>
@@ -270,7 +348,11 @@ function PhaseGraphPreview({ phase }: { phase: OnboardingPhaseEndpoint }) {
             width={ITEM_NODE_SIZE.width}
             height={ITEM_NODE_SIZE.height}
             rx={28}
-            className={previewFill[itemState(item, phase.locked)]}
+            className={
+              item.kind === "question" && itemState(item, phase.locked) !== "done"
+                ? "fill-app-question-solid/55"
+                : previewFill[itemState(item, phase.locked)]
+            }
           />
         );
       })}

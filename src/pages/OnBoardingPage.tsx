@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleHelp,
-  Eye,
   FolderKanban,
   GitBranch,
   ListChecks,
@@ -22,7 +21,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
@@ -32,14 +31,13 @@ import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
-import { ItemAside } from "../features/onboarding/components/journey/ItemAside";
 import { JourneyGraph } from "../features/onboarding/components/journey/JourneyGraph";
 import { PhaseChooser } from "../features/onboarding/components/journey/PhaseChooser";
 import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
 import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
 import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
-import { QuestionModal } from "../features/onboarding/components/QuestionModal";
-import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
+import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
+import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
 import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
@@ -52,6 +50,7 @@ import {
   phaseState,
   phasesUnlockedBy,
   sortedPhases,
+  waitingOn,
   type PhaseItem,
 } from "../features/onboarding/journey";
 import { resolveNextAction } from "../features/onboarding/nextAction";
@@ -59,6 +58,7 @@ import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
+  QuestionAttemptResult,
 } from "../features/onboarding/types";
 import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -77,10 +77,10 @@ type NavigationState = { focusQuestionId?: string; choosePhase?: boolean } | nul
 function initialPhaseId(
   path: OnboardingPathEndpoint,
   phases: OnboardingPhaseEndpoint[],
-  focusQuestionId: string | undefined,
+  focusItemId: string | undefined,
 ): string {
-  const requested = focusQuestionId
-    ? phases.find((phase) => phase.questions.some((question) => question.id === focusQuestionId))
+  const requested = focusItemId
+    ? phases.find((phase) => phaseItems(phase).some((item) => item.id === focusItemId))
     : undefined;
   if (requested) return requested.id;
   const next = resolveNextAction(path);
@@ -107,8 +107,10 @@ function initialPhaseId(
  * leaving the page does not cancel it, and coming back shows its progress again.
  */
 export function OnBoardingPage() {
-  const navigate = useNavigate();
   const location = useLocation();
+  // `/onboarding/:stepId` -- the old address of a step page -- now opens the path with that step
+  // unfolded, so links from the dashboard and the buddy keep landing on the step.
+  const { stepId: routeStepId } = useParams<{ stepId?: string }>();
   const toast = useToast();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
   const {
@@ -123,7 +125,7 @@ export function OnBoardingPage() {
   const navigationState = location.state as NavigationState;
   // Set by the step page when a knowledge-check question is what stands between the user and the
   // rest of their path, so this page can land on the question's phase.
-  const focusQuestionId = navigationState?.focusQuestionId;
+  const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
 
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
@@ -134,12 +136,12 @@ export function OnBoardingPage() {
   const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(null);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  // The item unfolded in the list, and the one zoomed into on the graph.
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
+  const [graphItemId, setGraphItemId] = useState<string | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
-  const [questionToAnswer, setQuestionToAnswer] = useState<{
-    question: OnboardingQuestionEndpoint;
-    phaseTitle: string;
-  } | null>(null);
+  // Set when the page itself moves the member on, so the item they land on is scrolled to.
+  const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
@@ -151,11 +153,11 @@ export function OnBoardingPage() {
       setSelectedPhaseId((current) => {
         const ordered = sortedPhases(next);
         if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
-        return initialPhaseId(next, ordered, focusQuestionId);
+        return initialPhaseId(next, ordered, focusItemId);
       });
       setLoadingState("success");
     },
-    [focusQuestionId],
+    [focusItemId],
   );
 
   // ── Loading ─────────────────────────────────────────────────
@@ -205,25 +207,33 @@ export function OnBoardingPage() {
     };
   }, [applyPath, clearGeneration, generation]);
 
-  // Brings what the user was sent for into view, once per visit.
-  const hasFocusedRef = useRef(false);
+  // Brings the chooser into view when the member was sent to pick a phase, once per visit.
+  const hasShownChooserRef = useRef(false);
   useEffect(() => {
-    if (loadingState !== "success" || hasFocusedRef.current) return;
-    const target = focusQuestionId
-      ? `[data-item-id="${focusQuestionId}"]`
-      : navigationState?.choosePhase
-        ? "#phase-chooser"
-        : null;
-    if (!target) return;
-    hasFocusedRef.current = true;
-    document.querySelector(target)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  }, [loadingState, focusQuestionId, navigationState]);
+    if (loadingState !== "success" || hasShownChooserRef.current || !navigationState?.choosePhase) {
+      return;
+    }
+    hasShownChooserRef.current = true;
+    document
+      .querySelector("#phase-chooser")
+      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [loadingState, navigationState]);
+
+  // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
+  useEffect(() => {
+    const target = scrollToItemRef.current;
+    if (loadingState !== "success" || !target || target !== expandedItemId) return;
+    scrollToItemRef.current = null;
+    document
+      .querySelector(`[data-item-id="${target}"]`)
+      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [expandedItemId, loadingState, selectedPhaseId]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
     value: viewMode,
     onChange: setViewMode,
-    enabled: loadingState === "success" && !questionToAnswer,
+    enabled: loadingState === "success",
   });
 
   // ── Derived ─────────────────────────────────────────────────
@@ -252,36 +262,49 @@ export function OnBoardingPage() {
 
   // ── Actions ─────────────────────────────────────────────────
 
-  const openStep = (stepId: string) => void navigate(`/onboarding/${stepId}`);
-
-  const startStep = async (stepId: string) => {
-    try {
-      await onboardingService.startStep(stepId);
-    } catch (error) {
-      console.error("Failed to start onboarding step:", error);
-    }
-    // The rocket marks a step *beginning*; reopening a started step gets nothing.
-    flyby();
-    openStep(stepId);
-  };
-
   const phaseOf = (item: PhaseItem) =>
     phases.find(
       (phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId),
     );
 
-  const runPrimary = (item: PhaseItem) => {
-    if (item.kind === "question") {
-      setQuestionToAnswer({ question: item.question, phaseTitle: phaseOf(item)?.title ?? "" });
+  /** A step the member opens for the first time is started; reopening one changes nothing. */
+  const beginStepIfWaiting = async (item: PhaseItem) => {
+    if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
+    try {
+      await onboardingService.startStep(item.step.id);
+      // The rocket marks a step *beginning*.
+      flyby();
+      await refreshPath();
+    } catch (error) {
+      console.error("Failed to start onboarding step:", error);
+    }
+  };
+
+  /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
+  const openItem = (item: PhaseItem) => {
+    const phase = phaseOf(item);
+    if (phase) setSelectedPhaseId(phase.id);
+    if (viewMode === "graph") {
+      setGraphPhaseId(phase?.id ?? null);
+      setGraphItemId(item.id);
+    } else {
+      scrollToItemRef.current = item.id;
+      setExpandedItemId(item.id);
+    }
+    void beginStepIfWaiting(item);
+  };
+
+  const toggleItem = (item: PhaseItem) => {
+    if (expandedItemId === item.id) {
+      setExpandedItemId(null);
       return;
     }
-    if (item.step.status === "IN_PROGRESS") openStep(item.step.id);
-    else void startStep(item.step.id);
+    openItem(item);
   };
 
   const selectPhase = (phaseId: string) => {
     setSelectedPhaseId(phaseId);
-    setSelectedItemId(null);
+    setExpandedItemId(null);
   };
 
   const choosePhase = (phaseId: string) => {
@@ -289,29 +312,65 @@ export function OnBoardingPage() {
     selectPhase(phaseId);
   };
 
-  const closeQuestionModal = ({
-    answered,
-    correct,
-    onboardingCompleted,
-  }: {
-    answered: boolean;
-    correct: boolean;
-    onboardingCompleted: boolean;
-  }) => {
-    const answeredQuestion = questionToAnswer;
-    setQuestionToAnswer(null);
+  /** What "continue" does once an item in a phase is behind the member, and what its button says. */
+  const continueAfter = (phaseId: string): { label: string; run: () => void } => {
+    const next = path ? resolveNextAction(path, { preferPhaseId: phaseId }) : null;
+    if (next?.kind === "step" || next?.kind === "question") {
+      const nextId = next.kind === "step" ? next.step.id : next.question.id;
+      const item = phaseItems(next.phase).find((candidate) => candidate.id === nextId);
+      return {
+        label:
+          next.phase.id !== phaseId
+            ? `On to ${next.phase.title}`
+            : next.kind === "question"
+              ? "Next: a question"
+              : "Next step",
+        run: () => {
+          if (item) openItem(item);
+        },
+      };
+    }
+    if (next?.kind === "choose") {
+      return {
+        label: "Choose your next phase",
+        run: () => {
+          setExpandedItemId(null);
+          setGraphItemId(null);
+          setGraphPhaseId(null);
+          window.setTimeout(
+            () =>
+              document
+                .querySelector("#phase-chooser")
+                ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
+            50,
+          );
+        },
+      };
+    }
+    return {
+      label: "Back to your path",
+      run: () => {
+        setExpandedItemId(null);
+        setGraphItemId(null);
+      },
+    };
+  };
 
+  const handleAnswered = async (
+    question: OnboardingQuestionEndpoint,
+    result: QuestionAttemptResult,
+  ) => {
     // The backend decides completion; nothing here is derived from the phase alone.
-    if (onboardingCompleted) {
+    if (result.onboardingCompleted) {
       completeMission();
-    } else if (correct && answeredQuestion) {
+    } else if (result.correct) {
       // Celebrate the phase, not the question: only when this answer finished its last open item.
-      const phase = phases.find((item) => item.id === answeredQuestion.question.phaseId);
+      const phase = phases.find((candidate) => candidate.id === question.phaseId);
       const allStepsDone = phase?.steps.every(
         (step) => step.status === "FINISHED" || step.status === "SKIPPED",
       );
       const allQuestionsPassed = phase?.questions.every(
-        (question) => question.status === "PASSED" || question.id === answeredQuestion.question.id,
+        (candidate) => candidate.status === "PASSED" || candidate.id === question.id,
       );
       if (allStepsDone && allQuestionsPassed) {
         const done = (overall?.phasesDone ?? 0) + 1;
@@ -323,7 +382,55 @@ export function OnBoardingPage() {
         });
       }
     }
-    if (answered) void refreshPath();
+    await refreshPath();
+  };
+
+  /** The item itself: a step to work through, a question to answer, or why it is not open yet. */
+  const renderItemBody = (item: PhaseItem, layout: "inline" | "focus") => {
+    const phase = phaseOf(item);
+    if (!phase) return null;
+    const state = itemState(item, phase.locked);
+    const next = continueAfter(phase.id);
+
+    if (state === "locked") {
+      const blockers = waitingOn(item, phaseItems(phase));
+      const phaseBlockers = phase.locked ? blockingPhases(phase, phases) : [];
+      return (
+        <div className="space-y-3 text-sm text-app-text-muted">
+          {item.kind === "step" && item.step.description ? <p>{item.step.description}</p> : null}
+          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {phaseBlockers.length > 0
+              ? `Opens once ${phaseBlockers.map((blocker) => blocker.title).join(" and ")} ${phaseBlockers.length === 1 ? "is" : "are"} complete.`
+              : blockers.length > 0
+                ? `Opens once you have finished ${blockers.map((blocker) => blocker.title).join(" and ")}.`
+                : "Not open yet."}
+          </p>
+        </div>
+      );
+    }
+
+    if (item.kind === "question") {
+      return (
+        <QuestionWorkspace
+          key={item.id}
+          question={item.question}
+          onAnswered={(result) => handleAnswered(item.question, result)}
+          continueLabel={next.label}
+          onContinue={next.run}
+        />
+      );
+    }
+    return (
+      <StepWorkspace
+        key={item.id}
+        stepId={item.id}
+        layout={layout}
+        onPathChanged={refreshPath}
+        continueLabel={next.label}
+        onContinue={next.run}
+      />
+    );
   };
 
   const requestGeneration = () => {
@@ -478,10 +585,7 @@ export function OnBoardingPage() {
             layoutId="onboarding-view-mode"
             ariaLabel="Onboarding view"
             value={viewMode}
-            onChange={(mode) => {
-              setViewMode(mode);
-              setSelectedItemId(null);
-            }}
+            onChange={setViewMode}
             options={[
               { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
               { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
@@ -523,7 +627,7 @@ export function OnBoardingPage() {
                   phase={nextAction.phase}
                   phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
                   item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
-                  onPrimary={runPrimary}
+                  onPrimary={openItem}
                   onShowPhase={() => selectPhase(nextAction.phase.id)}
                 />
               ) : null}
@@ -547,8 +651,10 @@ export function OnBoardingPage() {
                   <PhaseItemList
                     phase={selectedPhase}
                     nextItemId={nextItemId}
-                    onPrimary={runPrimary}
-                    onView={(item) => openStep(item.id)}
+                    expandedItemId={expandedItemId}
+                    onToggle={toggleItem}
+                    onPrimary={openItem}
+                    renderExpanded={(item) => renderItemBody(item, "inline")}
                   />
                 </section>
               </div>
@@ -559,57 +665,23 @@ export function OnBoardingPage() {
               openPhaseId={graphPhaseId}
               onOpenPhaseChange={(phaseId) => {
                 setGraphPhaseId(phaseId);
+                setGraphItemId(null);
                 if (phaseId) selectPhase(phaseId);
               }}
               focusPhaseId={focusPhaseId}
               nextItemId={nextItemId}
               saveLayout={saveLayout}
-              selectedItemId={selectedItemId}
-              onSelectItem={setSelectedItemId}
-              onOpenItem={(item) => {
-                const phase = phaseOf(item);
-                const state = itemState(item, phase?.locked ?? false);
-                if (primaryActionLabel(item, state)) runPrimary(item);
-                else if (item.kind === "step" && state !== "locked") openStep(item.id);
+              selectedItemId={null}
+              onSelectItem={() => undefined}
+              openItemId={graphItemId}
+              onOpenItemChange={(itemId) => {
+                setGraphItemId(itemId);
+                const item = itemId
+                  ? phases.flatMap(phaseItems).find((candidate) => candidate.id === itemId)
+                  : undefined;
+                if (item) void beginStepIfWaiting(item);
               }}
-              renderItemAside={(item, phase) => {
-                const state = itemState(item, phase.locked);
-                const action = primaryActionLabel(item, state);
-                return (
-                  <ItemAside
-                    item={item}
-                    phase={phase}
-                    onClose={() => setSelectedItemId(null)}
-                    onSelect={setSelectedItemId}
-                    actions={
-                      <>
-                        {action ? (
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => runPrimary(item)}
-                            trailingIcon={<ChevronRight className="h-4 w-4" />}
-                          >
-                            {action}
-                          </Button>
-                        ) : null}
-                        {item.kind === "step" && state !== "locked" ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => openStep(item.id)}
-                            icon={<Eye className="h-4 w-4" />}
-                          >
-                            Open step
-                          </Button>
-                        ) : null}
-                      </>
-                    }
-                  >
-                    {item.kind === "step" ? <StepOriginBadge step={item.step} /> : null}
-                  </ItemAside>
-                );
-              }}
+              renderItemFocus={(item) => renderItemBody(item, "focus")}
             />
           )}
         </SlidingTabPanel>
@@ -629,14 +701,6 @@ export function OnBoardingPage() {
           });
         }}
       />
-
-      {questionToAnswer && (
-        <QuestionModal
-          question={questionToAnswer.question}
-          phaseTitle={questionToAnswer.phaseTitle}
-          onClose={closeQuestionModal}
-        />
-      )}
     </div>
   );
 }

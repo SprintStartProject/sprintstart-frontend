@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { OnBoardingPage } from "../../../src/pages/OnBoardingPage";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
@@ -554,6 +554,72 @@ describe("OnBoardingPage", () => {
     expect(screen.queryByText(/2 phases are open/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start now" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Frontend step" })).toBeInTheDocument();
+  });
+
+  it("opens a step in place, without leaving the path", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () =>
+        HttpResponse.json({ ...phaseFixture("phase1", 1, "Phase 1").steps[0] }),
+      ),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1")],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    renderPage();
+
+    const list = await screen.findByRole("list", { name: "Phase 1: steps and questions" });
+    await user.click(within(list).getByRole("button", { name: /Phase 1 step/, expanded: false }));
+
+    expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
+  });
+
+  it("lands on a step unfolded when opened by its address", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () =>
+        HttpResponse.json({ ...phaseFixture("phase1", 1, "Phase 1").steps[0] }),
+      ),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1")],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding/step-phase1"]}>
+        <OnboardingJourneyContext.Provider
+          value={{
+            generation: { status: "idle" },
+            startGeneration: vi.fn(),
+            clearGeneration: vi.fn(),
+            availability: "path",
+            unavailableReason: null,
+            refreshAvailability: vi.fn(),
+          }}
+        >
+          <Routes>
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+          </Routes>
+        </OnboardingJourneyContext.Provider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
   });
 
   it("names what a locked item is waiting on", async () => {

@@ -1,15 +1,10 @@
 import {
   AlertTriangle,
-  CheckCircle2,
   ClipboardCheck,
   Clock,
   GitBranch,
   ListChecks,
   Lock,
-  PlayCircle,
-  RotateCcw,
-  SkipForward,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -25,7 +20,7 @@ import {
 } from "../../../onboarding/components/journey/JourneyGraph";
 import { PhaseNavigator } from "../../../onboarding/components/journey/PhaseNavigator";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
-import { ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
+import { ItemGlyph, ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel } from "../../../onboarding/graph/nodeLabels";
 import {
   blockingPhases,
@@ -38,7 +33,6 @@ import {
   phaseState,
   sortedPhases,
   waitingOn,
-  type ItemState,
   type PhaseItem,
 } from "../../../onboarding/journey";
 import { resolveNextAction } from "../../../onboarding/nextAction";
@@ -63,24 +57,6 @@ type Props = {
 };
 
 const NEW_STEP_TITLE = "New step";
-
-const markerTone: Record<ItemState, string> = {
-  done: "border-app-success-border bg-app-success-bg text-app-success-text",
-  skipped: "border-app-border bg-app-surface-muted text-app-text-muted",
-  active: "border-app-brand bg-app-brand text-white",
-  open: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
-  retry: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
-  locked: "border-dashed border-app-border bg-app-surface text-app-text-subtle",
-};
-
-const markerIcon: Record<ItemState, ReactNode> = {
-  done: <CheckCircle2 className="h-4 w-4" />,
-  skipped: <SkipForward className="h-4 w-4" />,
-  active: <PlayCircle className="h-4 w-4" />,
-  open: <Sparkles className="h-4 w-4" />,
-  retry: <RotateCcw className="h-4 w-4" />,
-  locked: <Lock className="h-3.5 w-3.5" />,
-};
 
 function actualMinutesOf(item: PhaseItem): number | null {
   if (item.kind !== "step" || !item.step.startedAt || !item.step.completedAt) return null;
@@ -240,7 +216,11 @@ export function MemberJourneySection({
   );
 
   return (
-    <section ref={swipeRef} aria-labelledby="member-journey-title" className="space-y-5">
+    <section
+      ref={swipeRef}
+      aria-labelledby="member-journey-title"
+      className="space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 id="member-journey-title" className="text-xl font-semibold text-app-text">
@@ -539,8 +519,7 @@ function MemberItemList({
   }
 
   return (
-    <ol className="relative space-y-1.5" aria-label={`${phase.title}: steps and questions`}>
-      <span aria-hidden="true" className="absolute top-6 bottom-6 left-[27px] w-px bg-app-border" />
+    <ol className="space-y-1.5" aria-label={`${phase.title}: steps and questions`}>
       {items.map((item) => {
         const state = itemState(item, phase.locked);
         const isNext = item.id === nextItemId;
@@ -549,16 +528,17 @@ function MemberItemList({
           <li key={item.id} className="group/item relative">
             <div
               className={`flex items-start gap-4 rounded-2xl border p-3 transition-colors ${
-                isNext
-                  ? "border-app-brand bg-app-brand-soft/50"
-                  : "border-transparent hover:border-app-border hover:bg-app-surface"
+                item.kind === "question"
+                  ? isNext
+                    ? "border-app-question-solid bg-app-question-bg/60"
+                    : "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
+                  : isNext
+                    ? "border-app-brand bg-app-brand-soft/50"
+                    : "border-transparent hover:border-app-border hover:bg-app-surface"
               }`}
             >
-              <span
-                aria-hidden="true"
-                className={`relative z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${markerTone[state]}`}
-              >
-                {markerIcon[state]}
+              <span className="mt-0.5">
+                <ItemGlyph item={item} state={state} />
               </span>
               <button
                 type="button"
@@ -567,7 +547,11 @@ function MemberItemList({
               >
                 <span className="flex flex-wrap items-center gap-2">
                   {isNext ? (
-                    <span className="rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                        item.kind === "question" ? "bg-app-question-solid" : "bg-app-brand"
+                      }`}
+                    >
                       Member is here
                     </span>
                   ) : null}
