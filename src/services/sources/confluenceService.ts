@@ -1,18 +1,21 @@
 import { apiClient } from "../apiClient.ts";
+import type { GithubScheduleSpec } from "./githubService.ts";
 
 export type CreateConfluenceConnectionRequest = {
   baseUrl: string;
   spaceId: string;
-  email: string;
-  apiToken: string;
+  /** Name of a stored Atlassian credential, shared with the Jira connector. */
+  credentialName: string;
   pageAllowlist?: string[];
   pageDenylist?: string[];
 };
 
-export type ScheduleSpec = {
-  type: "INTERVAL";
-  everyMinutes: number;
-};
+/**
+ * Confluence connections are scheduled through the same shared spec as GitHub
+ * repositories and Jira instances (interval, daily, weekly, monthly or cron),
+ * so the schedule form is shared with them as well.
+ */
+export type ScheduleSpec = GithubScheduleSpec;
 
 export type ConfigureConfluenceScheduleRequest = {
   schedule: ScheduleSpec;
@@ -25,6 +28,8 @@ export type ConfluenceConnectionDto = {
   baseUrl: string;
   spaceId: string;
   spaceKey: string;
+  spaceName: string | null;
+  credentialName: string;
   pageAllowlist: string[];
   pageDenylist: string[];
   credentialsConfigured: boolean;
@@ -33,7 +38,7 @@ export type ConfluenceConnectionDto = {
   version: number;
   sourceEnabled: boolean;
   autoUpdate?: boolean;
-  spec?: ScheduleSpec;
+  spec?: ScheduleSpec | null;
   schedule?: string;
   nextSyncAt?: string | null;
 };
@@ -81,8 +86,7 @@ export const confluenceService = {
         body: JSON.stringify({
           baseUrl: request.baseUrl.trim(),
           spaceId: request.spaceId.trim(),
-          email: request.email.trim(),
-          apiToken: request.apiToken.trim(),
+          credentialName: request.credentialName.trim(),
           pageAllowlist: request.pageAllowlist ?? [],
           pageDenylist: request.pageDenylist ?? [],
         }),
@@ -119,6 +123,20 @@ export const confluenceService = {
       `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}/update`,
       {
         method: "POST",
+      },
+    );
+  },
+
+  /**
+   * Removes one Confluence space connection from a project. The pages already
+   * ingested stay in the knowledge base; only this project stops syncing the
+   * space.
+   */
+  async deleteConnection(projectId: string, connectionId: string): Promise<void> {
+    await apiClient.fetch<void>(
+      `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}`,
+      {
+        method: "DELETE",
       },
     );
   },

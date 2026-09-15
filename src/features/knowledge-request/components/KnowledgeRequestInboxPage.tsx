@@ -6,9 +6,11 @@ import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/S
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
@@ -35,32 +37,33 @@ export function KnowledgeRequestInboxPage() {
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
 
   const [tab, setTab] = useState<Tab>("open");
-  // Bumped after any mutation so both lists reload against the server, keeping the queue and the
-  // durable-answers view honest (an answered request leaves the queue and appears as knowledge).
-  const [refreshKey, setRefreshKey] = useState(0);
-  const reload = () => setRefreshKey((key) => key + 1);
 
   const {
     data: openRequests,
     loading: openLoading,
     error: openError,
-  } = useFetch(
-    () =>
-      selectedProjectId ? knowledgeRequestService.listOpen(selectedProjectId) : Promise.resolve([]),
-    [selectedProjectId, refreshKey],
+    refetch: refetchOpen,
+  } = useQueryFetch(queryKeys.knowledgeRequest.open(selectedProjectId), () =>
+    selectedProjectId ? knowledgeRequestService.listOpen(selectedProjectId) : Promise.resolve([]),
   );
 
   const {
     data: answers,
     loading: answersLoading,
     error: answersError,
-  } = useFetch(
-    () =>
-      selectedProjectId
-        ? knowledgeRequestService.listAnswers(selectedProjectId)
-        : Promise.resolve([]),
-    [selectedProjectId, refreshKey],
+    refetch: refetchAnswers,
+  } = useQueryFetch(queryKeys.knowledgeRequest.answers(selectedProjectId), () =>
+    selectedProjectId
+      ? knowledgeRequestService.listAnswers(selectedProjectId)
+      : Promise.resolve([]),
   );
+
+  // After any mutation, so both lists reload against the server, keeping the queue and the
+  // durable-answers view honest (an answered request leaves the queue and appears as knowledge).
+  const reload = () => {
+    refetchOpen();
+    refetchAnswers();
+  };
 
   // Longest-waiting first — the backend orders this way, but sorting here keeps it true if a
   // future caller doesn't. Oldest createdAt = waited longest.
@@ -99,33 +102,50 @@ export function KnowledgeRequestInboxPage() {
   const answeredCount = orderedAnswers.length;
 
   // Counts stay undefined while their list is loading, so the pill doesn't flash a stale "0".
-  const TAB_OPTIONS: SegmentedTabOption<Tab>[] = [
-    {
-      value: "open",
-      label: "Open",
-      icon: <Inbox className="h-4 w-4" aria-hidden="true" />,
-      count: openLoading ? undefined : openCount,
-    },
-    {
-      value: "answered",
-      label: "Durable answers",
-      icon: <BookCheck className="h-4 w-4" aria-hidden="true" />,
-      count: answersLoading ? undefined : answeredCount,
-    },
-  ];
+  const tabOptions: SegmentedTabOption<Tab>[] = useMemo(
+    () => [
+      {
+        value: "open",
+        label: "Open",
+        icon: <Inbox className="h-4 w-4" aria-hidden="true" />,
+        count: openLoading ? undefined : openCount,
+      },
+      {
+        value: "answered",
+        label: "Durable answers",
+        icon: <BookCheck className="h-4 w-4" aria-hidden="true" />,
+        count: answersLoading ? undefined : answeredCount,
+      },
+    ],
+    [openLoading, openCount, answersLoading, answeredCount],
+  );
+
+  // A two-finger swipe moves between the tabs, the same gesture the other tabbed pages take.
+  // Aiming at the pill is still there for anybody who prefers it; this is the trackpad way in.
+  // The ref goes on the page rather than on `<main>` -- AdminPage's reasoning: `<main>` is only
+  // as tall as its content, so a short queue leaves the bottom half of the viewport dead and the
+  // gesture reads as broken rather than as absent.
+  const swipeRef = useSwipeableTabs<Tab, HTMLElement>({
+    order: TAB_ORDER,
+    value: tab,
+    onChange: setTab,
+  });
 
   return (
     // No root background: the app-wide aurora and cursor-glow canvas sit behind
     // every route, and painting `bg-app-bg` here would hide them — the same
     // choice the dashboard and PM dashboard make. Only the header band and the
     // cards carry their own surfaces.
-    <div className="min-h-screen">
+    <div ref={swipeRef} className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader
             icon={Inbox}
             title="Escalation inbox"
-            subtitle="Questions the buddy could not answer, sent to a person. Answer one once and it becomes durable knowledge the buddy serves to everyone after."
+            // Kept to the length the other pages' subtitles run to: `max-w-2xl` wraps anything
+            // longer onto a third line, and the header band -- and the rule under it -- then
+            // sits lower here than on every page a PM switches between.
+            subtitle="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
           />
         </div>
       </header>
@@ -145,7 +165,7 @@ export function KnowledgeRequestInboxPage() {
                 house look for switching sections, so the inbox shouldn't grow a second one. */}
             <SegmentedTabs
               value={tab}
-              options={TAB_OPTIONS}
+              options={tabOptions}
               onChange={setTab}
               layoutId="knowledge-request-inbox-tab-pill"
               ariaLabel="Inbox views"
@@ -159,6 +179,7 @@ export function KnowledgeRequestInboxPage() {
               {tab === "open" ? (
                 <View
                   loading={openLoading}
+                  loadingLabel="Loading open escalations"
                   error={openError}
                   isEmpty={openCount === 0}
                   empty={
@@ -185,6 +206,7 @@ export function KnowledgeRequestInboxPage() {
               ) : (
                 <View
                   loading={answersLoading}
+                  loadingLabel="Loading durable answers"
                   error={answersError}
                   isEmpty={answeredCount === 0}
                   empty={
@@ -224,12 +246,16 @@ export function KnowledgeRequestInboxPage() {
 
 function View({
   loading,
+  loadingLabel,
   error,
   isEmpty,
   empty,
   children,
 }: {
   loading: boolean;
+  /** What the spinner announces — both tabs share this helper, so naming the
+   *  list being fetched is the caller's job. */
+  loadingLabel: string;
   error: boolean;
   isEmpty: boolean;
   empty: React.ReactNode;
@@ -240,7 +266,7 @@ function View({
     // this replaces left screen readers silent while the page waited.
     return (
       <div className="flex justify-center py-20">
-        <Spinner size="lg" label="Loading escalations" />
+        <Spinner size="lg" label={loadingLabel} />
       </div>
     );
   }

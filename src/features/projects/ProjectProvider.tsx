@@ -109,6 +109,9 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
         manager: null,
         sources: [],
         users: [],
+        industry: project.industry,
+        industryConfidence: project.industryConfidence,
+        industryCustom: project.industryCustom,
       },
       true,
       { memberCount: project.memberCount, sourceCount: null },
@@ -126,6 +129,9 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
           manager: null,
           sources: [],
           users: [],
+          industry: "",
+          industryConfidence: null,
+          industryCustom: false,
         },
         false,
       ),
@@ -151,7 +157,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const permissionGroup = profile?.permissionGroup ?? null;
   const userId = profile?.id ?? null;
-  const isAuthenticated = status !== "unauthenticated" && status !== "loading";
+  const isAuthenticated = status === "authenticated";
 
   const setSelectedProjectId = useCallback((projectId: string) => {
     setSelectedProjectIdState(projectId);
@@ -190,6 +196,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
               manager: null,
               sources: [],
               users: [],
+              industry: "",
+              industryConfidence: null,
+              industryCustom: false,
             },
             false,
           ),

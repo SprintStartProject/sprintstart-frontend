@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
+import { ShortcutHint } from "../../../components/ui/ShortcutHint";
+import { NEW_CONVERSATION_CHORD } from "../../../hooks/useNewConversationShortcut";
 import { useToast } from "../../../context/useToast";
 import { parseApiError } from "../../../services/apiError";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -51,10 +53,10 @@ function groupChats(chats: ChatSidebarProps["chats"]): ChatGroup[] {
  *
  * Displays the list of user chats grouped by date, with a search filter and a
  * relative timestamp on each item. Shows an empty state when no chats exist or
- * when the search query matches nothing. Triggers the provided `setSidebarOpen`
+ * when the search query matches nothing. Calls the provided `onNavigate`
  * callback on mobile to close the drawer after selection.
  */
-export function ChatSidebar({ chats, setSidebarOpen, onDeleteChat }: ChatSidebarProps) {
+export function ChatSidebar({ chats, onNavigate, onDeleteChat }: ChatSidebarProps) {
   const [query, setQuery] = useState("");
   const [chatToDelete, setChatToDelete] = useState<Chat | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -89,11 +91,13 @@ export function ChatSidebar({ chats, setSidebarOpen, onDeleteChat }: ChatSidebar
           to="/chat"
           state={{ newChat: true }}
           data-testid="chat-new"
-          className="flex items-center justify-center gap-2 rounded-lg bg-app-brand p-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          onClick={() => setSidebarOpen(false)}
+          title={`New chat (${NEW_CONVERSATION_CHORD})`}
+          className="group flex items-center justify-center gap-2 rounded-lg bg-app-brand p-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          onClick={onNavigate}
         >
           <Plus size={18} />
           New Chat
+          <ShortcutHint keys={NEW_CONVERSATION_CHORD} className="border-white/40" />
         </NavLink>
 
         {chats.length > 0 && (
@@ -149,7 +153,7 @@ export function ChatSidebar({ chats, setSidebarOpen, onDeleteChat }: ChatSidebar
                     >
                       <NavLink
                         to={`/chat/${chat.id}`}
-                        onClick={() => setSidebarOpen(false)}
+                        onClick={onNavigate}
                         aria-label={chat.title || "Untitled chat"}
                         className={({ isActive }) =>
                           `flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg py-2 pr-3 pl-3 text-sm transition-all focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${

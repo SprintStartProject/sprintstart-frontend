@@ -390,6 +390,8 @@ describe("data-ingestion data helpers", () => {
       baseUrl: "https://myteam.atlassian.net",
       spaceId: "123456",
       spaceKey: "DOCS",
+      spaceName: null,
+      credentialName: "default",
       pageAllowlist: [],
       pageDenylist: [],
       credentialsConfigured: true,
@@ -457,6 +459,26 @@ describe("data-ingestion data helpers", () => {
       expect(source.artifacts).toBe(6);
     });
 
+    it("names the card from spaceName, falling back to spaceKey when there is none", () => {
+      expect(
+        createConfluenceSourceFromConnection({ ...confluenceConn, spaceName: "Docs Space" }).name,
+      ).toBe("Docs Space");
+      expect(
+        createConfluenceSourceFromConnection({ ...confluenceConn, spaceName: null }).name,
+      ).toBe("DOCS");
+    });
+
+    it("carries spaceName and credentialName onto the source's confluenceSpace details", () => {
+      const source = createConfluenceSourceFromConnection({
+        ...confluenceConn,
+        spaceName: "Docs Space",
+        credentialName: "team-cred",
+      });
+
+      expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
+      expect(source.confluenceSpace?.credentialName).toBe("team-cred");
+    });
+
     it("creates Confluence source from status instance", () => {
       const status: SourceInstanceIngestionStatus = {
         sourceSystem: "CONFLUENCE",
@@ -486,6 +508,39 @@ describe("data-ingestion data helpers", () => {
       expect(source.name).toBe("DOCS");
       expect(source.ingestionStatusLabel).toBe("Synced");
       expect(source.artifacts).toBe(12);
+    });
+
+    it("keeps spaceName and credentialName once a status row takes over the card", () => {
+      const status: SourceInstanceIngestionStatus = {
+        sourceSystem: "CONFLUENCE",
+        sourceId: "https://myteam.atlassian.net|123456",
+        displayName: "Docs Space",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://myteam.atlassian.net/wiki/spaces/DOCS",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-08-28T10:00:00Z",
+        ingestedCount: 10,
+        updatedCount: 2,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 12,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      };
+
+      const source = createConfluenceSourceFromInstance(status, {
+        ...confluenceConn,
+        spaceName: "Docs Space",
+        credentialName: "team-cred",
+      });
+
+      expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
+      expect(source.confluenceSpace?.credentialName).toBe("team-cred");
     });
   });
 });

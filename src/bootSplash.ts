@@ -3,6 +3,7 @@ const SPLASH_ID = "boot-splash";
 const READY_CLASS = "is-ready";
 const GREETING_KEY = "sprintstart.boot.greeting";
 const SIGNOUT_KEY = "sprintstart.boot.signout";
+const ROUNDTRIP_KEY = "sprintstart.boot.roundtrip";
 
 /**
  * How long the exit runs before the node is taken out of the DOM.
@@ -16,6 +17,13 @@ declare global {
   interface Window {
     /** Published by the inline boot script; absent in tests and Storybook. */
     __bootSplash?: { start: number; flightMs: number };
+    /**
+     * Set by index.html when this load already knows it won't show a signed-in UI --
+     * a logout return, or a failed silent SSO check (`error=` on the URL) -- so
+     * `AuthProvider` can start `signingOut` instead of `loading` and suppress the
+     * auth loading shell for it.
+     */
+    __bootSigningOut?: boolean;
   }
 }
 
@@ -24,6 +32,31 @@ function remainingFlightMs(): number {
   const boot = window.__bootSplash;
   if (!boot) return 0;
   return Math.max(0, boot.start + boot.flightMs - Date.now());
+}
+
+/**
+ * Forgets that this app redirects through the identity provider on boot.
+ *
+ * The note is what stops the outbound leg from flying (see `index.html`), and it is written
+ * by the leg that comes back from the provider. This is the other half: a load that *stayed*
+ * without ever flying is a load that had no round-trip, so the note is stale and the splash
+ * would sit on the pad on every boot from here on. Clearing it puts the timer back.
+ *
+ * Gated on `"flight"`, which is the app settling on a signed-in user. The other two modes are
+ * both loads that say nothing about whether the app round-trips, and both would otherwise
+ * clear the note wrongly: `main.tsx` dismisses the Keycloak login theme with `"now"` (it boots
+ * from the same document on the same origin and never flies), and `MomentsProvider` dismisses
+ * a signed-out boot with `"now"` too — that one *did* round-trip, it just came back with
+ * nobody signed in.
+ */
+function forgetBootRoundTrip(): void {
+  if (window.__bootSplash?.flightMs !== 0) return;
+
+  try {
+    window.localStorage.removeItem(ROUNDTRIP_KEY);
+  } catch {
+    // Worst case the splash holds the pad for a boot that no longer redirects.
+  }
 }
 
 /**
@@ -54,14 +87,27 @@ export function rememberBootGreeting(firstName: string | null | undefined): void
  * for somebody leaving, cut short a moment later when the app works out that
  * nobody is signed in.
  *
- * In `sessionStorage` rather than `localStorage`, and cleared by the very next
- * load that reads it: it describes one navigation, not a preference.
+ * In `sessionStorage` rather than `localStorage`, and cleared once auth settles
+ * after the SSO round-trip: it describes one logout, not a preference.
  */
 export function markSigningOut(): void {
   try {
     window.sessionStorage.setItem(SIGNOUT_KEY, "1");
   } catch {
     // The splash will briefly show a pad. Not worth failing a sign-out for.
+  }
+}
+
+/** Clears the logout marker once auth settles, so later boots load normally. */
+export function clearSigningOut(): void {
+  // AuthProvider only reads this to pick its initial status; resetting it here
+  // is just hygiene against a stray later read finding a stale `true`.
+  window.__bootSigningOut = false;
+
+  try {
+    window.sessionStorage.removeItem(SIGNOUT_KEY);
+  } catch {
+    // Storage may be unavailable, just as when writing the marker.
   }
 }
 
@@ -96,6 +142,8 @@ export function markSigningOut(): void {
 export function dismissBootSplash(mode: "flight" | "now" | "instant" = "flight"): void {
   const splash = document.getElementById(SPLASH_ID);
   if (!splash || splash.dataset.exiting === "true") return;
+
+  if (mode === "flight") forgetBootRoundTrip();
 
   // "instant" is for the entries that were never being loaded *into* — the
   // Keycloak login theme boots from the same `index.html`, and holding a

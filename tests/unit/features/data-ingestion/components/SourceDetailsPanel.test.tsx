@@ -1,4 +1,4 @@
-import { render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GitBranch } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +67,23 @@ const jiraSource: DataSource = {
     displayName: "Team board",
     credentialName: "default",
     credentialUserEmail: "jira@corp.com",
+  },
+};
+
+const confluenceSource: DataSource = {
+  ...mockSource,
+  sourceId: "https://acme.atlassian.net|123456",
+  sourceSystem: "CONFLUENCE",
+  name: "Engineering",
+  type: "Confluence",
+  githubRepository: null,
+  confluenceSpace: {
+    connectionId: "conn-1",
+    baseUrl: "https://acme.atlassian.net",
+    spaceId: "123456",
+    spaceKey: "ENG",
+    spaceName: "Engineering",
+    credentialName: "default",
   },
 };
 
@@ -181,6 +198,87 @@ describe("SourceDetailsPanel", () => {
     });
   });
 
+  it("renders the Confluence sync schedule and loads it for the connection", async () => {
+    const onLoadConfluenceConfig = vi.fn().mockResolvedValue({
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      nextSyncAt: null,
+    });
+
+    render(
+      <SourceDetailsPanel
+        source={confluenceSource}
+        canManageSyncSettings
+        onLoadConfluenceConfig={onLoadConfluenceConfig}
+        onSaveConfluenceConfig={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Sync Schedule")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(onLoadConfluenceConfig).toHaveBeenCalledWith("conn-1");
+    });
+  });
+
+  it("saves the Confluence sync schedule via onSaveConfluenceConfig", async () => {
+    const user = userEvent.setup();
+    const onLoadConfluenceConfig = vi.fn().mockResolvedValue({
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      nextSyncAt: null,
+    });
+    const onSaveConfluenceConfig = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={confluenceSource}
+        canManageSyncSettings
+        onLoadConfluenceConfig={onLoadConfluenceConfig}
+        onSaveConfluenceConfig={onSaveConfluenceConfig}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(onLoadConfluenceConfig).toHaveBeenCalled());
+
+    const minutes = screen.getByLabelText("Minutes");
+    await user.clear(minutes);
+    await user.type(minutes, "45");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(onSaveConfluenceConfig).toHaveBeenCalledWith(
+        "conn-1",
+        expect.objectContaining({
+          autoUpdate: true,
+          schedule: { type: "INTERVAL", everyMinutes: 45 },
+        }),
+      );
+    });
+  });
+
+  it("leaves the update toasts to the caller for a Confluence space", async () => {
+    const user = userEvent.setup();
+    const onUpdateSource = vi.fn().mockRejectedValue(new Error("Confluence sync failed"));
+
+    render(
+      <SourceDetailsPanel
+        source={confluenceSource}
+        onUpdateSource={onUpdateSource}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Update space/ }));
+
+    await waitFor(() => expect(onUpdateSource).toHaveBeenCalledWith(confluenceSource));
+    // The Confluence sync reports its own outcome, so neither the success nor
+    // the failure copy of this panel may appear.
+    expect(screen.queryByText("Update started")).not.toBeInTheDocument();
+    expect(screen.queryByText("Confluence sync failed")).not.toBeInTheDocument();
+  });
+
   it("renders repository and ingestion details", () => {
     render(<SourceDetailsPanel source={mockSource} onClose={vi.fn()} />);
 
@@ -288,6 +386,33 @@ describe("SourceDetailsPanel", () => {
     await user.click(screen.getByRole("button", { name: /^Remove$/ }));
 
     expect(onUnlinkSource).toHaveBeenCalledWith(jiraSource);
+  });
+
+  it("unlinks a Confluence space after confirming the dialog", async () => {
+    const user = userEvent.setup();
+    const onUnlinkSource = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={confluenceSource}
+        onUnlinkSource={onUnlinkSource}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Remove from project/ }));
+
+    // The Confluence copy calls it a "space", and it must not promise a
+    // re-link: removing the connection deletes it.
+    const dialog = screen.getByRole("alertdialog", { name: /Remove space from project/ });
+    expect(
+      within(dialog).getByText(/Connecting the space again sets it up from scratch/),
+    ).toBeVisible();
+    expect(screen.queryByText(/re-link it later/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Remove$/ }));
+
+    expect(onUnlinkSource).toHaveBeenCalledWith(confluenceSource);
   });
 
   it("surfaces the error message when unlinking fails", async () => {

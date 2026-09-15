@@ -79,7 +79,10 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
   // The greeting is stashed on the way past: the splash renders before any of
   // the app exists, so the only name it can say is one from a previous visit.
   useEffect(() => {
-    if (status === "loading") return;
+    // `signingOut` is a `loading` still settling toward authenticated/unauthenticated
+    // (see `AuthContext`'s `AuthStatus`) -- treated the same here: dismissing the splash
+    // before it resolves would be jumping the gun on which message to show.
+    if (status === "loading" || status === "signingOut") return;
 
     if (status === "authenticated") {
       rememberBootGreeting(profile?.firstName);

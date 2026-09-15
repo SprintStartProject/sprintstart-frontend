@@ -1,8 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Sparkles } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { centralSpringToken } from "../../../styles/tokens";
+import {
+  LAUNCHER_SIZE,
+  isLeftCorner,
+  isTopCorner,
+  launcherPosition,
+  nearestCorner,
+  readCorner,
+  readViewport,
+  useViewportSize,
+  writeCorner,
+  type BuddyCorner,
+} from "../buddyCorner";
 import { onBuddyPageReady } from "../aiBuddyBus";
 import { useBuddy } from "../hooks/useBuddy";
+import { useGreetingReveal } from "../hooks/useGreetingReveal";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
 
@@ -28,6 +44,11 @@ const HANDOFF_FALLBACK_MS = 1200;
  *
  * The widget owns the navigation, so the launcher and the dock stay presentational components
  * handed callbacks — which is also what keeps them testable without a router.
+ *
+ * It also owns *where* the buddy sits. The hire can drag the launcher to any of the four corners
+ * and the dock goes with it: both share one drag offset while the pointer is down, and on release
+ * the offset springs back to zero while both boxes spring to the new corner, so the two motions
+ * add up to one continuous glide. The corner is remembered in `localStorage`.
  */
 export function BuddyWidget() {
   const navigate = useNavigate();
@@ -35,7 +56,13 @@ export function BuddyWidget() {
   const {
     messages,
     isThinking,
+    isStreaming,
+    isOpening,
     activeTool,
+    openerAction,
+    sendMessage,
+    presentedGreetingId,
+    markGreetingPresented,
     isOpen,
     toggleOpen,
     draft,
@@ -49,7 +76,65 @@ export function BuddyWidget() {
     openError,
     retryOpen,
     closeDock,
+    startFreshVisit,
   } = useBuddy();
+
+  // The greeting is usually written before the dock is ever opened; this is what still lets the
+  // hire watch the buddy think and write it — see the hook.
+  const greeting = useGreetingReveal({
+    messages,
+    active: isOpen,
+    presentedGreetingId,
+    markGreetingPresented,
+  });
+
+  const prefersReducedMotion = useReducedMotion();
+  const viewport = useViewportSize();
+  const [corner, setCorner] = useState<BuddyCorner>(readCorner);
+  // The corner the launcher would land in if it were let go now; `null` when nothing is dragged.
+  const [dropTarget, setDropTarget] = useState<BuddyCorner | null>(null);
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+
+  const moveTo = useCallback((next: BuddyCorner) => {
+    setCorner(next);
+    writeCorner(next);
+  }, []);
+
+  /** The corner nearest the launcher's centre, drag offset included. */
+  const cornerUnderLauncher = useCallback(() => {
+    const current = readViewport();
+    const { left, top } = launcherPosition(corner, current);
+    return nearestCorner(
+      left + LAUNCHER_SIZE / 2 + dragX.get(),
+      top + LAUNCHER_SIZE / 2 + dragY.get(),
+      current,
+    );
+  }, [corner, dragX, dragY]);
+
+  const handleDrag = useCallback(() => {
+    const target = cornerUnderLauncher();
+    setDropTarget((previous) => (previous === target ? previous : target));
+  }, [cornerUnderLauncher]);
+
+  const handleDragRelease = useCallback(() => {
+    moveTo(cornerUnderLauncher());
+    setDropTarget(null);
+    // Back to zero while the boxes spring to the new corner — see the comment on the component.
+    const transition = prefersReducedMotion ? { duration: 0 } : centralSpringToken;
+    void animate(dragX, 0, transition);
+    void animate(dragY, 0, transition);
+  }, [cornerUnderLauncher, dragX, dragY, moveTo, prefersReducedMotion]);
+
+  // The keyboard's way to do the same: `Alt` + an arrow moves to the corner on that side.
+  const handleMoveCorner = useCallback(
+    (direction: "up" | "down" | "left" | "right") => {
+      const top = direction === "up" || (direction !== "down" && isTopCorner(corner));
+      const left = direction === "left" || (direction !== "right" && isLeftCorner(corner));
+      moveTo(`${top ? "top" : "bottom"}-${left ? "left" : "right"}`);
+    },
+    [corner, moveTo],
+  );
 
   /**
    * Where the hand-off to `/buddy` has got to.
@@ -182,8 +267,28 @@ export function BuddyWidget() {
         {isOpen && (
           <BuddyDock
             key="buddy-dock"
-            messages={messages}
-            isThinking={isThinking}
+            corner={corner}
+            dragX={dragX}
+            dragY={dragY}
+            messages={greeting.messages}
+            // `isOpening` too, the way `/buddy` passes it: a dock opened while the greeting is
+            // still being written showed an empty window instead of the buddy typing.
+            isThinking={isThinking || isOpening || greeting.isThinking}
+            // The greeting's one suggested next step, which only `/buddy` used to offer.
+            lastMessageFooter={
+              openerAction && !greeting.isRevealing && !messages.some((m) => m.role === "USER") ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="mt-1.5"
+                  icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+                  onClick={() => void sendMessage(openerAction.question)}
+                >
+                  {openerAction.label}
+                </Button>
+              ) : undefined
+            }
+            isStreaming={isStreaming}
             activeTool={activeTool}
             draft={draft}
             setDraft={setDraft}
@@ -193,6 +298,7 @@ export function BuddyWidget() {
             suggestions={suggestions}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={closeDinoGame}
+            startFreshVisit={startFreshVisit}
             openError={openError}
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}
@@ -208,8 +314,41 @@ export function BuddyWidget() {
       {/* Out of the way while the dock is growing into the page: a button hovering over a
                 full-screen expansion is the one thing that would give away that it is still a
                 floating window. */}
+      {/* Where it can go, while it is being dragged: a quiet ring in each corner, and the one it
+                would land in filled. Decorative — the drop works the same without them. */}
+      <AnimatePresence>
+        {dropTarget !== null &&
+          (["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((target) => (
+            <motion.span
+              key={target}
+              aria-hidden="true"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: target === dropTarget ? 1.08 : 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
+              style={launcherPosition(target, viewport)}
+              className={`pointer-events-none fixed z-30 size-16 rounded-full border-2 border-dashed transition-colors ${
+                target === dropTarget
+                  ? "border-app-brand bg-app-brand-soft"
+                  : "border-app-border-strong bg-app-surface/40"
+              }`}
+            />
+          ))}
+      </AnimatePresence>
+
       {handoff === "idle" && (
-        <BuddyLauncher isOpen={isOpen} onToggle={toggleOpen} onOpenFull={openFull} />
+        <BuddyLauncher
+          isOpen={isOpen}
+          onToggle={toggleOpen}
+          onOpenFull={openFull}
+          corner={corner}
+          dragX={dragX}
+          dragY={dragY}
+          onDragStart={handleDrag}
+          onDrag={handleDrag}
+          onDragRelease={handleDragRelease}
+          onMoveCorner={handleMoveCorner}
+        />
       )}
     </>
   );

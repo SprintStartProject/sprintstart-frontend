@@ -2,16 +2,11 @@ import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../setup/vitest.setup";
 import {
-  addJiraCredential,
-  changeJiraCredentialName,
-  changeJiraCredentialToken,
   configureAllJiraInstances,
   configureJiraInstance,
   connectJiraInstance,
-  deleteJiraCredential,
   getAllJiraConfigs,
   getJiraConfig,
-  getMyJiraCredentials,
   getJiraInstances,
   removeJiraInstanceFromProject,
   updateAllJiraInstances,
@@ -133,127 +128,6 @@ describe("jiraService instance endpoints", () => {
 
     expect(responses).toHaveLength(2);
     expect(responses.map((r) => r.transactionId)).toEqual(["tx-1", "tx-2"]);
-  });
-});
-
-describe("jiraService credential endpoints", () => {
-  it("addJiraCredential posts the credential payload", async () => {
-    expect.assertions(1);
-
-    server.use(
-      http.post("/api/v1/jira/credentials", async ({ request }) => {
-        expect(await request.json()).toEqual({
-          userEmail: "pm@example.com",
-          tokenName: "token-a",
-          authToken: "secret",
-        });
-
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    await addJiraCredential({
-      userEmail: "pm@example.com",
-      tokenName: "token-a",
-      authToken: "secret",
-    });
-  });
-
-  it("getMyJiraCredentials lists the authenticated user's credentials", async () => {
-    server.use(
-      http.get("/api/v1/jira/credentials", () =>
-        HttpResponse.json([{ userEmail: "pm+user@example.com", displayName: "token-a" }]),
-      ),
-    );
-
-    const credentials = await getMyJiraCredentials();
-
-    expect(credentials).toHaveLength(1);
-    expect(credentials[0]).toEqual({
-      userEmail: "pm+user@example.com",
-      displayName: "token-a",
-    });
-  });
-  it("deleteJiraCredential sends a DELETE with the credential identity", async () => {
-    expect.assertions(1);
-
-    server.use(
-      http.delete("/api/v1/jira/credentials", async ({ request }) => {
-        expect(await request.json()).toEqual({
-          userEmail: "pm@example.com",
-          tokenName: "token-a",
-        });
-
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    await deleteJiraCredential({
-      userEmail: "pm@example.com",
-      tokenName: "token-a",
-    });
-  });
-
-  it("deleteJiraCredential rejects with an ApiError on 404", async () => {
-    server.use(
-      http.delete("/api/v1/jira/credentials", () =>
-        HttpResponse.json({ message: "unknown credential" }, { status: 404 }),
-      ),
-    );
-
-    await expect(
-      deleteJiraCredential({ userEmail: "pm@example.com", tokenName: "gone" }),
-    ).rejects.toThrow();
-  });
-
-  it("changeJiraCredentialName patches the name and returns the credential", async () => {
-    server.use(
-      http.patch("/api/v1/jira/credentials/patch/name", async ({ request }) => {
-        expect(await request.json()).toEqual({
-          userEmail: "pm@example.com",
-          oldName: "token-a",
-          newName: "token-b",
-        });
-
-        return HttpResponse.json({
-          userEmail: "pm@example.com",
-          displayName: "token-b",
-        });
-      }),
-    );
-
-    const credential = await changeJiraCredentialName({
-      userEmail: "pm@example.com",
-      oldName: "token-a",
-      newName: "token-b",
-    });
-
-    expect(credential.displayName).toBe("token-b");
-  });
-
-  it("changeJiraCredentialToken patches the token secret", async () => {
-    server.use(
-      http.patch("/api/v1/jira/credentials/patch/token", async ({ request }) => {
-        expect(await request.json()).toEqual({
-          userEmail: "pm@example.com",
-          tokenName: "token-a",
-          newToken: "new-secret",
-        });
-
-        return HttpResponse.json({
-          userEmail: "pm@example.com",
-          displayName: "token-a",
-        });
-      }),
-    );
-
-    const credential = await changeJiraCredentialToken({
-      userEmail: "pm@example.com",
-      tokenName: "token-a",
-      newToken: "new-secret",
-    });
-
-    expect(credential.displayName).toBe("token-a");
   });
 });
 

@@ -11,6 +11,17 @@ export type Theme = "light" | "dark" | "system";
 export type StyleMode = "ultra" | "classic";
 
 /**
+ * Bounds and default for the cursor-glow intensity setting.
+ *
+ * Beside the context type rather than in `ThemeProvider`: the settings slider
+ * and the `useTheme` fallback both need the numbers, and neither should have to
+ * import the provider module to get them.
+ */
+export const GLOW_INTENSITY_MIN = 10;
+export const GLOW_INTENSITY_MAX = 100;
+export const GLOW_INTENSITY_DEFAULT = 50;
+
+/**
  * Shape of the theme context.
  */
 export interface ThemeContextType {

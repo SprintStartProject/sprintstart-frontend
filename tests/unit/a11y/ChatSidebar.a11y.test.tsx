@@ -16,11 +16,11 @@ describe("ChatSidebar Accessibility", () => {
         createdAt: "2026-07-04T00:00:00.000Z",
       },
     ];
-    const setSidebarOpen = vi.fn();
+    const onNavigate = vi.fn();
     const { baseElement } = render(
       <MemoryRouter>
         <main>
-          <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} />
+          <ChatSidebar chats={chats} onNavigate={onNavigate} />
         </main>
       </MemoryRouter>,
     );
@@ -44,12 +44,12 @@ describe("ChatSidebar Accessibility", () => {
         createdAt: "2026-07-03T00:00:00.000Z",
       },
     ];
-    const setSidebarOpen = vi.fn();
+    const onNavigate = vi.fn();
     const onDeleteChat = vi.fn();
     const { baseElement } = render(
       <MemoryRouter>
         <main>
-          <ChatSidebar chats={chats} setSidebarOpen={setSidebarOpen} onDeleteChat={onDeleteChat} />
+          <ChatSidebar chats={chats} onNavigate={onNavigate} onDeleteChat={onDeleteChat} />
         </main>
       </MemoryRouter>,
     );

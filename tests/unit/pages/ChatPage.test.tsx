@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ChatPage } from "../../../src/pages/ChatPage";
 import type { ChatMessage } from "../../../src/features/chatbot/types";
 
@@ -45,10 +45,9 @@ const mockChatState = {
   setNewRequest: mockSetNewRequest,
   selectedCitation: null,
   setSelectedCitation: mockSetSelectedCitation,
-  sidebarOpen: false,
-  setSidebarOpen: vi.fn(),
-  desktopSidebarOpen: true,
-  setDesktopSidebarOpen: vi.fn(),
+  isRailOpen: false,
+  setRailOpen: vi.fn(),
+  isRailOverlay: true,
   textareaRef: { current: null },
   bottomRef: { current: null },
   scrollContainerRef: { current: null },
@@ -155,17 +154,70 @@ describe("ChatPage", () => {
     expect(mockHandleSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("does not render Thought Process block when assistant message has no reasoning", () => {
+  /**
+   * `Alt+N`, not `Ctrl+N`: every desktop browser owns that one and opens a window with it, and
+   * a page cannot refuse. `state.newChat` rides along because that flag is what stops `useChat`
+   * redirecting straight back into the most recent conversation.
+   */
+  it("starts a new chat on Alt+N", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/chat/chat1"]}>
+        <Routes>
+          <Route path="/chat/:id" element={<ChatPage />} />
+          <Route path="/chat" element={<p>the new chat</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    expect(await screen.findByText("the new chat")).toBeInTheDocument();
+  });
+
+  /**
+   * The chord belongs to whichever half of the assistant is on screen, and while the panel
+   * slides *both* are mounted — the shell keeps the page being left there for the length of the
+   * animation, and the listener is on `window`. Without the gate one keypress would start a new
+   * conversation in each. A catch-all route at the buddy's URL is that window exactly: the chat
+   * still rendered, the location already the other half's.
+   */
+  it("ignores Alt+N while the buddy is the half on screen", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/buddy"]}>
+        <Routes>
+          <Route path="*" element={<ChatPage />} />
+          <Route path="/chat" element={<p>the new chat</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    expect(screen.queryByText("the new chat")).not.toBeInTheDocument();
+  });
+
+  it("does not render the thought process block when assistant message has no reasoning", () => {
     render(
       <MemoryRouter>
         <ChatPage />
       </MemoryRouter>,
     );
 
-    expect(screen.queryByText("Thought Process")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thought process")).not.toBeInTheDocument();
   });
 
-  it("shows the Thought Process block when an assistant message has reasoning", () => {
+  /**
+   * A turn that already has its answer is a finished turn, and its reasoning is the working
+   * rather than the result — so the panel is there and folded, one click from being read. This
+   * is the rule that stops a long chain of thought becoming the whole chat window; see
+   * `ReasoningPanel`.
+   */
+  it("folds the thought process away once the answer is there, and opens on request", async () => {
+    const user = userEvent.setup();
     mockChatState.messages = [
       ...mockChatState.messages,
       {
@@ -182,7 +234,13 @@ describe("ChatPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Thought Process")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /Thought process/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Let me think...")).not.toBeInTheDocument();
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Let me think...")).toBeInTheDocument();
   });
 });

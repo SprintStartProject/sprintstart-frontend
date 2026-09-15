@@ -117,7 +117,7 @@ export const handlers = [
   // management view mounts every connector at once, so both are needed even in
   // tests that are not about credentials at all.
   http.get("/api/v1/github/pat", () => HttpResponse.json([])),
-  http.get("/api/v1/jira/credentials", () => HttpResponse.json([])),
+  http.get("/api/v1/atlassian/credentials", () => HttpResponse.json([])),
 
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
@@ -530,6 +530,8 @@ export const handlers = [
       baseUrl: "https://example.atlassian.net/wiki",
       spaceId: "123456",
       spaceKey: "EX",
+      spaceName: "Example Space",
+      credentialName: "default",
       pageAllowlist: [],
       pageDenylist: [],
       credentialsConfigured: true,
@@ -553,6 +555,52 @@ export const handlers = [
       failures: [],
       status: "COMPLETED",
     }),
+  ),
+  http.get("/api/v1/confluence/projects/:projectId/connections/:connectionId", ({ params }) =>
+    HttpResponse.json({
+      id: params.connectionId,
+      projectId: params.projectId,
+      baseUrl: "https://example.atlassian.net/wiki",
+      spaceId: "123456",
+      spaceKey: "EX",
+      spaceName: "Example Space",
+      credentialName: "default",
+      pageAllowlist: [],
+      pageDenylist: [],
+      credentialsConfigured: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1,
+      sourceEnabled: true,
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 60 },
+      schedule: "every 60m",
+      nextSyncAt: null,
+    }),
+  ),
+  http.put(
+    "/api/v1/confluence/projects/:projectId/connections/:connectionId/schedule",
+    ({ params }) =>
+      HttpResponse.json({
+        id: params.connectionId,
+        projectId: params.projectId,
+        baseUrl: "https://example.atlassian.net/wiki",
+        spaceId: "123456",
+        spaceKey: "EX",
+        spaceName: "Example Space",
+        credentialName: "default",
+        pageAllowlist: [],
+        pageDenylist: [],
+        credentialsConfigured: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 2,
+        sourceEnabled: true,
+        autoUpdate: true,
+        spec: { type: "INTERVAL", everyMinutes: 60 },
+        schedule: "every 60m",
+        nextSyncAt: null,
+      }),
   ),
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),

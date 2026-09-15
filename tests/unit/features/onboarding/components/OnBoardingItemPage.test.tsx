@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OnBoardingItemPage } from "../../../../../src/features/onboarding/components/OnBoardingItemPage";
+import { queryKeys } from "../../../../../src/services/queryKeys";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", () => ({
@@ -428,5 +430,21 @@ describe("OnBoardingItemPage", () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/onboarding/step2"));
     // Picking a half-finished step back up is a return, not a departure.
     expect(mockFlyby).not.toHaveBeenCalled();
+  });
+  it("invalidates the cached dashboard status after progress changes", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const statusKey = queryKeys.onboarding.myStatus("user1");
+    client.setQueryData(statusKey, { kind: "ready" });
+
+    render(
+      <QueryClientProvider client={client}>
+        <OnBoardingItemPage />
+      </QueryClientProvider>,
+    );
+
+    await user.click(await screen.findByText("1. Install Node"));
+
+    await waitFor(() => expect(client.getQueryState(statusKey)?.isInvalidated).toBe(true));
   });
 });

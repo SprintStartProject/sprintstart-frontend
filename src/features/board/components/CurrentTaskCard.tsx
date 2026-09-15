@@ -1,6 +1,8 @@
 import { ExternalLink, Target } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, CurrentTaskContent } from "../types";
 
@@ -24,6 +26,10 @@ type CurrentTaskCardProps = {
  */
 export function CurrentTaskCard({ content, card, onDismiss, dismissing }: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
+  // A live card, so its highlights are matched by their words rather than written into the text —
+  // see `marks/cardMarks.ts`. The title and the summary are re-read from the tracker on every
+  // board load, and a sentence that survives that stays marked.
+  const marks = useCardMarks().marksFor(card.id);
 
   return (
     <BoardCardFrame
@@ -42,8 +48,14 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
     >
       {hasTask ? (
         <div>
-          <p className="text-sm font-medium text-app-text">{content.title}</p>
-          {content.summary && <p className="mt-1 text-sm text-app-text-muted">{content.summary}</p>}
+          <p className="text-sm font-medium text-app-text">
+            <Marked text={content.title ?? ""} marks={marks} cardId={card.id} />
+          </p>
+          {content.summary && (
+            <p className="mt-1 text-sm text-app-text-muted">
+              <Marked text={content.summary} marks={marks} cardId={card.id} />
+            </p>
+          )}
           {content.url && (
             <a
               href={content.url}

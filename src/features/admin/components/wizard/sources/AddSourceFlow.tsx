@@ -23,9 +23,9 @@ import { ConfluenceConnectStep } from "../../../../data-ingestion/components/Con
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
 import { FileUploadZone } from "../../../../knowledge-base/components/FileUploadZone";
 import { TokenAddForm } from "../../../../settings/components/TokenAddForm";
-import { JiraCredentialAddForm } from "../../../../settings/components/jira/JiraCredentialAddForm";
+import { AtlassianCredentialAddForm } from "../../../../settings/components/atlassian/AtlassianCredentialAddForm";
 import type { SourceSystem } from "../../../../data-ingestion/types";
-import type { JiraCredentialsDto } from "../../../../../services/sources/jiraService";
+import type { AtlassianCredentialDto } from "../../../../../services/sources/atlassianService";
 
 /**
  * Below this width the credential form stays inline (phone/tablet); at or above
@@ -60,7 +60,7 @@ type JiraDetailProps = {
   displayName: string;
   url: string;
   credentialName: string;
-  credentials: JiraCredentialsDto[];
+  credentials: AtlassianCredentialDto[];
   credentialsLoaded: boolean;
   credentialsLoading: boolean;
   credentialsError: string | null;
@@ -72,7 +72,7 @@ type JiraDetailProps = {
   /** Enter in a field stages the source (guarded), matching "Add to list". */
   onSubmit: () => void;
   /** Adds the new credential to the list, selects it, and reconciles with the server. */
-  onCredentialSaved: (credential: JiraCredentialsDto) => Promise<void>;
+  onCredentialSaved: (credential: AtlassianCredentialDto) => Promise<void>;
 };
 
 /** Upload detail — files are staged in memory and uploaded during provisioning. */
@@ -87,14 +87,20 @@ type UploadDetailProps = {
 type ConfluenceDetailProps = {
   baseUrl: string;
   spaceId: string;
-  email: string;
-  apiToken: string;
+  credentialName: string;
+  credentials: AtlassianCredentialDto[];
+  credentialsLoaded: boolean;
+  credentialsLoading: boolean;
+  credentialsError: string | null;
+  /** Prefill for the inline "add credential" form's account-email field. */
+  defaultUserEmail: string | null;
   onBaseUrlChange: (value: string) => void;
   onSpaceIdChange: (value: string) => void;
-  onEmailChange: (value: string) => void;
-  onApiTokenChange: (value: string) => void;
+  onCredentialNameChange: (value: string) => void;
   /** Enter in a field stages the source (guarded), matching "Add to list". */
   onSubmit: () => void;
+  /** Adds the new credential to the list, selects it, and reconciles with the server. */
+  onCredentialSaved: (credential: AtlassianCredentialDto) => Promise<void>;
 };
 
 type AddSourceFlowProps = {
@@ -403,12 +409,12 @@ function JiraDetail({
   return (
     <div className="space-y-4">
       <CredentialSlot
-        buttonLabel="Add Jira credential"
-        panelTitle="New Jira credential"
+        buttonLabel="Add Atlassian credential"
+        panelTitle="New Atlassian credential"
         onCompanionOpenChange={onCompanionOpenChange}
         missingLabel={missingCredential ? "No credential yet" : undefined}
         renderForm={(close, embedded) => (
-          <JiraCredentialAddForm
+          <AtlassianCredentialAddForm
             defaultUserEmail={jira.defaultUserEmail}
             onClose={close}
             onSaved={jira.onCredentialSaved}
@@ -470,27 +476,51 @@ function UploadDetail({ files, onAddFiles, onRemoveFile }: UploadDetailProps) {
   );
 }
 
-/** Confluence detail form for connecting spaces. */
+/** Confluence detail with an "add credential" trigger above the form. */
 function ConfluenceDetail({
   isBusy,
   confluence,
+  onCompanionOpenChange,
 }: {
   isBusy: boolean;
   confluence: ConfluenceDetailProps;
+  onCompanionOpenChange?: (open: boolean) => void;
 }) {
+  // Only hint "nothing stored" once the list has loaded, so the chip does not
+  // flash while credentials are still being fetched.
+  const missingCredential = confluence.credentialsLoaded && confluence.credentials.length === 0;
+
   return (
     <div className="space-y-4">
+      <CredentialSlot
+        buttonLabel="Add Atlassian credential"
+        panelTitle="New Atlassian credential"
+        onCompanionOpenChange={onCompanionOpenChange}
+        missingLabel={missingCredential ? "No credential yet" : undefined}
+        renderForm={(close, embedded) => (
+          <AtlassianCredentialAddForm
+            defaultUserEmail={confluence.defaultUserEmail}
+            onClose={close}
+            onSaved={confluence.onCredentialSaved}
+            embedded={embedded}
+          />
+        )}
+      />
+
       <ConfluenceConnectStep
         baseUrl={confluence.baseUrl}
         spaceId={confluence.spaceId}
-        email={confluence.email}
-        apiToken={confluence.apiToken}
+        credentialName={confluence.credentialName}
+        credentials={confluence.credentials}
+        credentialsLoaded={confluence.credentialsLoaded}
+        credentialsLoading={confluence.credentialsLoading}
+        credentialsError={confluence.credentialsError}
         isBusy={isBusy}
         onBaseUrlChange={confluence.onBaseUrlChange}
         onSpaceIdChange={confluence.onSpaceIdChange}
-        onEmailChange={confluence.onEmailChange}
-        onApiTokenChange={confluence.onApiTokenChange}
+        onCredentialNameChange={confluence.onCredentialNameChange}
         onSubmit={confluence.onSubmit}
+        suppressMissingCredentialNotice
       />
     </div>
   );
@@ -501,8 +531,7 @@ const DETAIL_SUBTITLE: Record<SourceSystem, string> = {
   GITHUB: "Pick the repositories to index, then add them to your source list.",
   JIRA: "Point to your Jira instance and pick a credential, then add it to the list.",
   UPLOAD: "Files are staged now and uploaded right after the project is created.",
-  CONFLUENCE:
-    "Enter your Confluence Cloud details and credentials, then add the space to the list.",
+  CONFLUENCE: "Point to your Confluence space and pick a credential, then add it to the list.",
 };
 
 /**
@@ -575,7 +604,11 @@ export function AddSourceFlow({
         onRemoveFile={upload.onRemoveFile}
       />
     ) : selectedType === "CONFLUENCE" ? (
-      <ConfluenceDetail isBusy={isBusy} confluence={confluence} />
+      <ConfluenceDetail
+        isBusy={isBusy}
+        confluence={confluence}
+        onCompanionOpenChange={onCompanionOpenChange}
+      />
     ) : (
       <GithubDetail isBusy={isBusy} github={github} onCompanionOpenChange={onCompanionOpenChange} />
     );

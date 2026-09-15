@@ -4,6 +4,9 @@ import { arrivalService } from "../../../services/arrivalService";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { useCardMarks } from "../marks/useCardMarks";
+import type { CardMark } from "../marks/cardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { groupByScope } from "../../arrival/scopeGroups";
 import { safeStepHref } from "../../arrival/stepHref";
@@ -39,6 +42,9 @@ export function ArrivalStepsCard({ content, card, onDismiss, dismissing }: Arriv
   // Derived, not synced: the card re-reads on every board load, and a confirmation that has
   // landed should not be undone by a stale prop. Same shape the diagram card uses for `redrawn`.
   const [confirmed, setConfirmed] = useState<Record<string, ArrivalStep>>({});
+  // Steps are authored by whoever set the project up and re-read here, so their highlights are
+  // matched by their words rather than written into the text — see `marks/cardMarks.ts`.
+  const marks = useCardMarks().marksFor(card.id);
   const [rechecked, setRechecked] = useState<ArrivalStep[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -118,6 +124,8 @@ export function ArrivalStepsCard({ content, card, onDismiss, dismissing }: Arriv
                 <StepRow
                   key={step.key}
                   step={step}
+                  marks={marks}
+                  cardId={card.id}
                   pending={pendingKey === step.key}
                   failed={failedKey === step.key}
                   onConfirm={() => void confirm(step)}
@@ -161,11 +169,16 @@ export function ArrivalStepsCard({ content, card, onDismiss, dismissing }: Arriv
  */
 function StepRow({
   step,
+  marks,
+  cardId,
   pending,
   failed,
   onConfirm,
 }: {
   step: ArrivalStep;
+  /** The card's highlights, matched by their words — a step is re-read on every board load. */
+  marks: CardMark[];
+  cardId: string;
   pending: boolean;
   failed: boolean;
   onConfirm: () => void;
@@ -181,10 +194,12 @@ function StepRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={`text-sm ${step.settled ? "text-app-text-muted" : "text-app-text"}`}>
-            {step.title}
+            <Marked text={step.title} marks={marks} cardId={cardId} />
           </p>
           {step.description && (
-            <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>
+            <p className="mt-1 text-xs text-app-text-muted">
+              <Marked text={step.description} marks={marks} cardId={cardId} />
+            </p>
           )}
           {step.settled && <SettledNote step={step} />}
           {failed && (

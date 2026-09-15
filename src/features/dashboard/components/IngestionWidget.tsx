@@ -1,7 +1,8 @@
 import { Database } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getIngestionSourceStatuses } from "../../../services/ingestionService";
+import { queryKeys } from "../../../services/queryKeys";
 import { createSourceFromInstance, formatNumber } from "../../data-ingestion/data";
 import type { DataSource } from "../../data-ingestion/types";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -139,9 +140,9 @@ function SourceColumn({
 export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
   const { selectedProjectId } = useProjectContext();
 
-  const { data, loading, error } = useFetch(
+  const { data, loading, error } = useQueryFetch(
+    queryKeys.ingestion.sourceStatuses(selectedProjectId),
     () => fetchSources(selectedProjectId),
-    [selectedProjectId],
   );
 
   const sources = data ?? [];

@@ -13,18 +13,22 @@ import {
 import {
   addDraftSource,
   connectDraftSources,
+  connectOutcomeDescription,
   createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
   createUploadDraft,
   hasFailedSources,
+  isValidConfluenceSpaceId,
   removeDraftSource,
+  setDraftSourceOwner,
   type DraftSource,
 } from "../projectSourcesDraft";
+import { sortOwnerOptions } from "../sourceOwners";
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
-import { useJiraCredentials } from "../../settings/hooks/useJiraCredentials";
-import type { JiraCredentialsDto } from "../../../services/sources/jiraService";
+import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials";
+import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
 import type { AdminUser } from "../types";
@@ -105,6 +109,7 @@ export function CreateProjectWizard({
   // be stale). Cleared as soon as the name is edited.
   const [nameServerError, setNameServerError] = useState("");
   const [description, setDescription] = useState("");
+  const [industry, setIndustry] = useState("");
   const [managerId, setManagerId] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
 
@@ -142,8 +147,7 @@ export function CreateProjectWizard({
 
   const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
   const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
-  const [confluenceEmail, setConfluenceEmail] = useState("");
-  const [confluenceApiToken, setConfluenceApiToken] = useState("");
+  const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
 
   // Upload files staged in memory; uploaded during provisioning once a project
   // id exists.
@@ -185,6 +189,9 @@ export function CreateProjectWizard({
   };
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
+  const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
+  // Jira and Confluence share the same Atlassian credential store, so one
+  // instance of the hook backs both detail screens' pickers.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
@@ -192,7 +199,7 @@ export function CreateProjectWizard({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useJiraCredentials(isOpen && isJiraDetail);
+  } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail));
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -206,13 +213,21 @@ export function CreateProjectWizard({
     });
   }, [effectiveTokenNames]);
 
-  // Same adoption pattern for the Jira credential picker: select the first
-  // stored credential once the list arrives, keeping a still-valid choice.
+  // Same adoption pattern for the Jira and Confluence credential pickers:
+  // select the first stored credential once the list arrives, keeping a
+  // still-valid choice. Both fields share the list, so a credential just added
+  // from either detail screen is adopted here too.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
     void Promise.resolve().then(() => {
       setJiraCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+      setConfluenceCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
         return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
@@ -247,8 +262,7 @@ export function CreateProjectWizard({
   const resetConfluenceDraftFields = () => {
     setConfluenceBaseUrl("");
     setConfluenceSpaceId("");
-    setConfluenceEmail("");
-    setConfluenceApiToken("");
+    setConfluenceCredentialName("");
   };
 
   const resetWizard = () => {
@@ -258,6 +272,7 @@ export function CreateProjectWizard({
     setNameServerError("");
     setConfirmingClose(false);
     setDescription("");
+    setIndustry("");
     setManagerId("");
     setSelectedUserIds(new Set());
     setSources([]);
@@ -297,6 +312,7 @@ export function CreateProjectWizard({
   const isDirty =
     trimmedName.length > 0 ||
     description.trim().length > 0 ||
+    industry.trim().length > 0 ||
     Boolean(managerId) ||
     selectedUserIds.size > 0 ||
     sources.length > 0;
@@ -356,6 +372,23 @@ export function CreateProjectWizard({
 
   const memberCount = selectedUserIds.size + (managerId && !selectedUserIds.has(managerId) ? 1 : 0);
 
+  /*
+    Who a staged repository can be handed to: the people this project is being created with.
+    The whole directory would be the wrong list — an owner who is not on the project cannot be
+    told about the gap, and the Members step is right behind this one, so a missing name is a
+    step back rather than a dead end. The manager is included even when they were not ticked as
+    a member, because setting them as manager makes them one.
+  */
+  const ownerOptions = useMemo(
+    () =>
+      sortOwnerOptions(
+        users
+          .filter((user) => selectedUserIds.has(user.id) || user.id === managerId)
+          .map((user) => ({ value: user.id, label: getDisplayName(user) })),
+      ),
+    [users, selectedUserIds, managerId],
+  );
+
   // --- Add-source sub-flow ---
 
   const openAddSource = () => {
@@ -393,14 +426,24 @@ export function CreateProjectWizard({
     await loadTokenNames();
   };
 
-  const handleCredentialSaved = async (credential: JiraCredentialsDto) => {
+  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
     addCredentialLocally(credential);
     setJiraCredentialName(credential.displayName);
     await reloadJiraCredentials();
   };
 
+  const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
+    addCredentialLocally(credential);
+    setConfluenceCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
+  );
+
+  const selectedConfluenceCredential = jiraCredentials.find(
+    (credential) => credential.displayName === confluenceCredentialName,
   );
 
   const canAddSource =
@@ -413,9 +456,8 @@ export function CreateProjectWizard({
           : addType === "CONFLUENCE"
             ? Boolean(
                 confluenceBaseUrl.trim() &&
-                confluenceSpaceId.trim() &&
-                confluenceEmail.trim() &&
-                confluenceApiToken.trim(),
+                isValidConfluenceSpaceId(confluenceSpaceId) &&
+                selectedConfluenceCredential,
               )
             : false;
 
@@ -445,15 +487,14 @@ export function CreateProjectWizard({
     } else if (addType === "UPLOAD") {
       const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
       setSources((current) => addDraftSource(current, createUploadDraft(displayName, uploadFiles)));
-    } else if (addType === "CONFLUENCE") {
+    } else if (addType === "CONFLUENCE" && selectedConfluenceCredential) {
       setSources((current) =>
         addDraftSource(
           current,
           createConfluenceDraft({
             baseUrl: confluenceBaseUrl.trim(),
             spaceId: confluenceSpaceId.trim(),
-            email: confluenceEmail.trim(),
-            apiToken: confluenceApiToken.trim(),
+            credentialName: selectedConfluenceCredential.displayName,
           }),
         ),
       );
@@ -469,9 +510,12 @@ export function CreateProjectWizard({
   const ensureProject = async (): Promise<string> => {
     if (createdProjectId) return createdProjectId;
 
+    const trimmedIndustry = industry.trim();
+
     const project = await projectService.createProject({
       name: trimmedName,
       description: description.trim() || undefined,
+      industry: trimmedIndustry || undefined,
     });
 
     // Members before the manager: assigning a manager also makes them a member,
@@ -532,7 +576,7 @@ export function CreateProjectWizard({
         });
       } else {
         toast.success("Project created", {
-          description: "Initial ingestion is running in the background.",
+          description: connectOutcomeDescription(connected),
         });
       }
     } catch (error) {
@@ -572,7 +616,9 @@ export function CreateProjectWizard({
       if (hasFailedSources(retried)) {
         toast.error("Couldn't connect the source.");
       } else {
-        toast.success("Source connected");
+        toast.success("Source connected", {
+          description: connectOutcomeDescription(retried),
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -757,6 +803,7 @@ export function CreateProjectWizard({
               name={name}
               nameError={nameError}
               description={description}
+              industry={industry}
               managerId={managerId}
               managerCandidates={managerCandidates}
               isLoadingCandidates={isLoadingCandidates}
@@ -764,6 +811,7 @@ export function CreateProjectWizard({
               onNameChange={handleNameChange}
               onNameBlur={() => setNameTouched(true)}
               onDescriptionChange={setDescription}
+              onIndustryChange={setIndustry}
               onManagerChange={setManagerId}
               onSubmit={goForward}
             />
@@ -822,13 +870,17 @@ export function CreateProjectWizard({
                 confluence={{
                   baseUrl: confluenceBaseUrl,
                   spaceId: confluenceSpaceId,
-                  email: confluenceEmail,
-                  apiToken: confluenceApiToken,
+                  credentialName: confluenceCredentialName,
+                  credentials: jiraCredentials,
+                  credentialsLoaded: jiraCredentialsLoaded,
+                  credentialsLoading: jiraCredentialsLoading,
+                  credentialsError: jiraCredentialsError,
+                  defaultUserEmail: null,
                   onBaseUrlChange: setConfluenceBaseUrl,
                   onSpaceIdChange: setConfluenceSpaceId,
-                  onEmailChange: setConfluenceEmail,
-                  onApiTokenChange: setConfluenceApiToken,
+                  onCredentialNameChange: setConfluenceCredentialName,
                   onSubmit: commitAddSource,
+                  onCredentialSaved: handleConfluenceCredentialSaved,
                 }}
               />
             ) : (
@@ -836,6 +888,10 @@ export function CreateProjectWizard({
                 sources={sources}
                 onRemove={(sourceId) =>
                   setSources((current) => removeDraftSource(current, sourceId))
+                }
+                ownerOptions={ownerOptions}
+                onOwnerChange={(sourceId, ownerUserId) =>
+                  setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
                 }
                 onAddSource={openAddSource}
               />
@@ -845,6 +901,7 @@ export function CreateProjectWizard({
             <WizardReviewStep
               name={name}
               description={description}
+              industry={industry}
               manager={reviewManager}
               members={reviewMembers}
               sources={sources}

@@ -8,6 +8,12 @@ import { BuddyWidget } from "../../../src/features/buddy/components/BuddyWidget"
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { server } from "../setup/vitest.setup";
 
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
+
 // The dock's per-question escalation trigger reads the selected project.
 vi.mock("../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =

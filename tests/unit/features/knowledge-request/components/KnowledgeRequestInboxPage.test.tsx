@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { KnowledgeRequestInboxPage } from "../../../../../src/features/knowledge-request/components/KnowledgeRequestInboxPage";
@@ -64,6 +64,8 @@ describe("KnowledgeRequestInboxPage", () => {
         createdAt: "2026-08-20T10:00:00Z",
         answeredAt: null,
         answer: null,
+        // The asker's row is `RequestCard.test.tsx`'s subject; null keeps this render router-free.
+        hire: null,
       },
     ]);
     mockedService.listAnswers.mockResolvedValue([]);
@@ -113,6 +115,8 @@ describe("KnowledgeRequestInboxPage", () => {
         createdAt: "2026-08-20T10:00:00Z",
         answeredAt: null,
         answer: null,
+        // The asker's row is `RequestCard.test.tsx`'s subject; null keeps this render router-free.
+        hire: null,
       },
     ]);
     mockedService.listAnswers.mockResolvedValue([]);
@@ -121,6 +125,38 @@ describe("KnowledgeRequestInboxPage", () => {
 
     expect(await screen.findByRole("button", { name: "Answer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
+  });
+
+  it("moves between the tabs on a two-finger swipe, like the other tabbed pages", async () => {
+    mockedService.listOpen.mockResolvedValue([]);
+    mockedService.listAnswers.mockResolvedValue([]);
+
+    render(<KnowledgeRequestInboxPage />);
+    await screen.findByText(/No open escalations/i);
+
+    // Fired on the header, not on `<main>`: the gesture belongs to the whole page, and a short
+    // queue leaves half the viewport outside `<main>`. jsdom has no layout, so that empty band
+    // below the content cannot be aimed at -- the header is the same case, outside `<main>` and
+    // inside the page, and it fails the same way if the listener sits on the panel again.
+    fireEvent.wheel(screen.getByRole("banner"), { deltaX: 60, deltaY: 0 });
+
+    expect(await screen.findByText(/No durable answers yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /durable answers/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("leaves a vertical scroll alone", async () => {
+    mockedService.listOpen.mockResolvedValue([]);
+    mockedService.listAnswers.mockResolvedValue([]);
+
+    render(<KnowledgeRequestInboxPage />);
+    await screen.findByText(/No open escalations/i);
+
+    fireEvent.wheel(screen.getByRole("main"), { deltaX: 4, deltaY: 80 });
+
+    expect(screen.getByText(/No open escalations/i)).toBeInTheDocument();
   });
 
   describe("when the user is HR (read-only)", () => {

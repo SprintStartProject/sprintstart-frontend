@@ -1,6 +1,8 @@
 import { Brain } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, MemoryRecapContent } from "../types";
 
@@ -25,6 +27,7 @@ type MemoryRecapCardProps = {
  */
 export function MemoryRecapCard({ content, card, onDismiss, dismissing }: MemoryRecapCardProps) {
   const { memory, messagesRemembered } = content;
+  const marks = useCardMarks().marksFor(card.id);
 
   return (
     <BoardCardFrame
@@ -42,7 +45,11 @@ export function MemoryRecapCard({ content, card, onDismiss, dismissing }: Memory
       {memory ? (
         <>
           <blockquote className="border-l-2 border-app-border pl-3 text-sm whitespace-pre-wrap text-app-text-muted italic">
-            {memory}
+            {/* The recap is rewritten every time the buddy folds a visit, so its highlights are
+                matched by their words rather than by where they were — see `marks/cardMarks.ts`.
+                A sentence that survives the rewrite stays marked; one that does not, quietly
+                stops being. */}
+            <Marked text={memory} marks={marks} cardId={card.id} />
           </blockquote>
           <p className="mt-2 text-xs text-app-text-muted">
             Your buddy&apos;s own notes, not a record — it picks up from these next time you talk.

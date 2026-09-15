@@ -289,12 +289,17 @@ export function createConfluenceSourceFromInstance(
     failedItems: status.failedItems,
     githubRepository: null,
     jiraInstance: null,
+    // Same shape as the connection-built card below: the details drawer only
+    // renders the space name and credential rows when they are present, and a
+    // card must not lose them just because a status row exists for it.
     confluenceSpace: connection
       ? {
           connectionId: connection.id,
           baseUrl: connection.baseUrl,
           spaceId: connection.spaceId,
           spaceKey: connection.spaceKey,
+          spaceName: connection.spaceName,
+          credentialName: connection.credentialName,
         }
       : null,
     lastCommitsSyncAt: null,
@@ -332,7 +337,7 @@ export function createConfluenceSourceFromConnection(
   return {
     sourceId: connection.id,
     sourceSystem: "CONFLUENCE",
-    name: connection.spaceKey || connection.spaceId,
+    name: connection.spaceName ?? connection.spaceKey ?? connection.spaceId,
     type: meta.type,
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
@@ -369,6 +374,8 @@ export function createConfluenceSourceFromConnection(
       baseUrl: connection.baseUrl,
       spaceId: connection.spaceId,
       spaceKey: connection.spaceKey,
+      spaceName: connection.spaceName,
+      credentialName: connection.credentialName,
     },
     lastCommitsSyncAt: null,
     lastIssuesSyncAt: null,
@@ -671,11 +678,13 @@ export function getSourceLabel(sourceSystem: SourceSystem) {
 }
 
 /**
- * The host of a Jira instance URL without the scheme, e.g.
+ * The host of an instance URL without the scheme, e.g.
  * `"acme.atlassian.net"` for `"https://acme.atlassian.net"`. Falls back to
  * stripping the scheme/trailing slash by hand if the value is not a valid URL.
+ *
+ * Used for the Jira instance and the Confluence base URL alike.
  */
-export function formatJiraInstanceDomain(instanceUrl: string): string {
+export function formatInstanceDomain(instanceUrl: string): string {
   try {
     return new URL(instanceUrl).host;
   } catch {

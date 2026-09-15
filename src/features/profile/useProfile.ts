@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../context/useAuth";
 import { userService } from "../../services/userService";
+import { queryKeys } from "../../services/queryKeys";
 import type { UserProfile } from "../../services/types";
 
 /**
@@ -8,36 +9,25 @@ import type { UserProfile } from "../../services/types";
  * also refreshes the global {@link AuthProvider} profile (so the sidebar /
  * avatar update immediately). Shared by the settings profile section and the
  * legacy profile layout so behaviour stays identical.
+ *
+ * Keyed by `profile.id` from {@link useAuth}, which the app already has by the
+ * time a settings page is reachable — this hook does not duplicate that fetch,
+ * it just asks the shared cache for the richer read.
  */
 export function useProfile() {
-  const { refetchProfile } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { profile: authProfile, refetchProfile } = useAuth();
+  const queryClient = useQueryClient();
+  const userId = authProfile?.id ?? "";
 
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    userService
-      .getProfile()
-      .then((data) => {
-        if (!mountedRef.current) return;
-        if (data) {
-          setProfile(data);
-        }
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        console.error("Failed to load profile", err);
-        if (!mountedRef.current) return;
-        setError("Failed to load profile data.");
-        setIsLoading(false);
-      });
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  const {
+    data: profile,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: queryKeys.profile.mine(userId),
+    queryFn: () => userService.getProfile(),
+    enabled: Boolean(userId),
+  });
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     try {
@@ -48,9 +38,7 @@ export function useProfile() {
         projectIds: profile?.projectIds ?? [],
       };
       const updatedProfile = await userService.updateProfile(payload);
-      if (mountedRef.current) {
-        setProfile(updatedProfile);
-      }
+      queryClient.setQueryData(queryKeys.profile.mine(userId), updatedProfile);
       await refetchProfile();
     } catch (error) {
       console.error("Failed to update profile", error);
@@ -58,5 +46,10 @@ export function useProfile() {
     }
   };
 
-  return { profile, isLoading, error, updateProfile };
+  return {
+    profile: profile ?? null,
+    isLoading: Boolean(userId) && isLoading,
+    error: isError ? "Failed to load profile data." : null,
+    updateProfile,
+  };
 }

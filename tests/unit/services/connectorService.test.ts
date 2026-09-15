@@ -107,6 +107,26 @@ describe("connectorService", () => {
     expect(response.sources[0].enabled).toBe(false);
   });
 
+  it("patchConnectorSources scopes the update to a project when one is given", async () => {
+    let requestUrl: string | null = null;
+
+    server.use(
+      http.patch("/api/v1/connectors/confluence/sources/status", ({ request }) => {
+        requestUrl = request.url;
+
+        return HttpResponse.json({ connectorId: "confluence", sources: [] });
+      }),
+    );
+
+    await connectorService.patchConnectorSources(
+      "confluence",
+      [{ sourceId: "11111111-1111-1111-1111-111111111111", enabled: false }],
+      "proj-1",
+    );
+
+    expect(requestUrl).toContain("projectId=proj-1");
+  });
+
   it("patchConnectorSources rejects with an ApiError on 400", async () => {
     server.use(
       http.patch("/api/v1/connectors/github/sources/status", () =>

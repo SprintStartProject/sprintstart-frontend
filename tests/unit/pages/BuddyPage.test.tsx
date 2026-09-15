@@ -1,11 +1,26 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
+import { AssistantShell } from "../../../src/components/layout/AssistantShell";
+import { mockResizableViewport } from "../setup/matchMedia";
 
 const projectState = { selectedProjectId: "p1" };
+
+/**
+ * Whether this hire has ever escalated anything. Mutable, because the two branches lead to
+ * different layouts: with replies the rail toggle reserves the floating control's room on its
+ * own, and without them the buddy's own control is the only thing that ever asks for it.
+ */
+const pmRepliesState = { hasAny: true };
+
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "u1", firstName: "Test", lastName: "User", profileIcon: null },
+  }),
+}));
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
@@ -49,7 +64,7 @@ vi.mock("../../../src/features/buddy/hooks/usePmReplies", () => ({
     ],
     waiting: [],
     dismissed: [],
-    hasAny: true,
+    hasAny: pmRepliesState.hasAny,
   }),
 }));
 
@@ -83,17 +98,66 @@ function renderPage() {
     <MemoryRouter initialEntries={["/buddy"]}>
       {/* The conversation belongs to the provider, not to the page — the page is one of two
                 views of it. Rendering the page without one is not a supported arrangement, and
-                `useBuddySession` says so rather than quietly making a second conversation. */}
+                `useBuddySession` says so rather than quietly making a second conversation.
+
+                Under `AssistantShell`, because that is the arrangement the app runs: the page
+                is a panel inside a layout route that owns the header, the switch between the
+                two assistants, and "New chat". Testing the page bare would leave the controls
+                it depends on untested from either side. */}
       <BuddyProvider>
-        <BuddyPage />
+        <Routes>
+          <Route element={<AssistantShell />}>
+            <Route path="/buddy" element={<BuddyPage />} />
+          </Route>
+        </Routes>
       </BuddyProvider>
     </MemoryRouter>,
   );
 }
 
+/**
+ * Reports a viewport at or above `md`, where the rail is a column beside the conversation
+ * rather than a drawer over it.
+ *
+ * jsdom answers `false` to every media query, so a test that means "on a desktop" is otherwise
+ * quietly running on a phone — and the rail's remembered state is deliberately a desktop-only
+ * thing, so that is the difference between asserting the behaviour and asserting its opposite.
+ * Returns the undo, because the override outlives the test that set it.
+ */
+function reportDesktopViewport(): () => void {
+  const original = window.matchMedia;
+
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: query === "(min-width: 768px)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+
+  return () => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: original,
+    });
+  };
+}
+
 describe("BuddyPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pmRepliesState.hasAny = true;
+    // The rail's collapsed state is remembered per browser, so one test's choice would
+    // otherwise decide the next one's starting layout.
+    window.localStorage.clear();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     projectState.selectedProjectId = "p1";
     // `clearAllMocks` drops the module mock's resolved values too, so the default — an empty
@@ -146,7 +210,7 @@ describe("BuddyPage", () => {
    * `buddy_messages` and the buddy's durable memory note, which the next greeting is written
    * from, is untouched.
    */
-  it("starts a fresh visit without losing what the buddy has learned", async () => {
+  it("starts a fresh visit from the divider, without losing what the buddy has learned", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -159,7 +223,9 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /New chat/ }));
+    // The control lives on the line that already says "everything above here is the last
+    // conversation", so it only exists once there is such a line.
+    await user.click(await screen.findByTestId("buddy-clear-previous"));
 
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
@@ -169,27 +235,297 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * The rail and its toggle were both `hidden … xl:*`, which put a hire on anything narrower
-   * than 1280px out of reach of their PM's answer entirely — the one thing `FlagToPmButton`
-   * promises will show up here. jsdom computes no layout, so this asserts the contract that
-   * carries it: the toggle is not breakpoint-gated, and the replies have a placement that
-   * survives below `xl`.
+   * The third way to start over, and the only one that is simply visible. The divider carries
+   * the same action but is only drawn once there is a previous conversation above the line, and
+   * `Alt+N` is invisible to anybody who was never told about it — so a hire looking for "start
+   * again" on a first visit had nothing on screen to find.
    */
-  it("keeps the PM's answer reachable on a narrow screen", async () => {
+  it("offers a standing control once there is a conversation to leave behind", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
     renderPage();
 
-    // Neither the rail nor the control that opens it may be gated on a breakpoint.
+    expect(
+      await screen.findByRole("button", { name: "Start a new conversation" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps it off a visit nobody has spoken in — that visit is already the fresh one", async () => {
+    vi.mocked(getMessages).mockResolvedValue([]);
+
+    renderPage();
+
+    expect(await screen.findByText("Welcome back!")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("starts the fresh visit from it, and says which chord does the same", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    const control = await screen.findByRole("button", { name: "Start a new conversation" });
+    expect(control).toHaveAttribute(
+      "title",
+      "Start a new conversation (Alt + N) — your buddy keeps what it has learned about you",
+    );
+
+    await user.click(control);
+
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
+    expect(streamOpenBuddy).toHaveBeenCalled();
+  });
+
+  /**
+   * The button withdraws mid-turn; the room it withdraws from must not.
+   *
+   * Below `md` the two clearances differ by 24px, and a hire with no PM replies has no other
+   * reason to reserve any — so tying the space to the button meant the whole transcript slid
+   * down and back on every turn. Visible precisely while the transcript is shorter than the
+   * viewport, which is the first few turns this control exists for.
+   */
+  it("keeps the room the floating control needs, even while the control is withdrawn", async () => {
+    // No PM replies, so the rail toggle is not there to reserve the room on the button's
+    // behalf — which is the ordinary hire, and the only configuration where this can be seen.
+    pmRepliesState.hasAny = false;
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+    vi.mocked(streamMessage).mockReturnValue(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    renderPage();
+
+    const framed = () =>
+      screen.getByTestId("buddy-transcript").querySelector(".app-page-frame") as HTMLElement;
+
+    expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
+    expect(framed().className).toContain("pt-14");
+
+    await user.type(screen.getByLabelText("Message"), "and after that?");
+    await user.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+    });
+    // The control is gone and the padding it stands in has not moved.
+    expect(framed().className).toContain("pt-14");
+  });
+
+  /**
+   * All three routes withdraw together while a reply is in flight, and they have to: they call
+   * one function. `startFreshVisit` clears the thread and greets, but cannot call back the
+   * request already streaming into it — that stream's callbacks hold the shared session, so its
+   * tool events land under the brand-new greeting and its completion clears the greeting's own
+   * thinking state. Leaving any one of the three live mid-turn would be a door onto that bug.
+   */
+  it("withdraws every way of starting over while a reply is still arriving", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
+    // A turn that starts and never finishes: `isThinking` stays true for the rest of the test.
+    vi.mocked(streamMessage).mockReturnValue(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
+    expect(await screen.findByTestId("buddy-clear-previous")).toBeVisible();
+
+    await user.type(screen.getByLabelText("Message"), "and after that?");
+    await user.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+    });
+    expect(screen.queryByTestId("buddy-clear-previous")).toBeNull();
+
+    // The chord is gated on the same condition, so it is not a way around the other two.
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    expect(screen.getByText("where do I start?")).toBeInTheDocument();
+  });
+
+  /**
+   * `Alt+N` rather than `Ctrl+N`, which every desktop browser owns. It fires while the composer
+   * has focus on purpose — halfway through typing into the wrong conversation is exactly when
+   * somebody reaches for it.
+   */
+  it("starts a fresh visit on Alt+N", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The chord belongs to whichever half is on screen, and while the panel slides *both* are
+   * mounted — `AssistantShell` keeps the page being left there for the length of the animation,
+   * and this listener is on `window`. Without the gate one keypress started a new conversation
+   * in each. Mounted under a catch-all route at the chat's URL, which is that window exactly:
+   * the buddy still rendered, the location already the other half's.
+   */
+  it("ignores Alt+N while the chat is the half on screen", async () => {
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+    ]);
+
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/chat"]}>
+        <BuddyProvider>
+          <Routes>
+            <Route element={<AssistantShell />}>
+              <Route path="*" element={<BuddyPage />} />
+            </Route>
+          </Routes>
+        </BuddyProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+
+    await user.keyboard("{Alt>}n{/Alt}");
+
+    // Still there: the visit was not restarted under the half the hire is actually looking at.
+    expect(screen.getByText("where do I start?")).toBeInTheDocument();
+  });
+
+  /**
+   * The load path refuses to restore an overlay below `md`; this is the same rule for the window
+   * crossing that breakpoint afterwards. A rail opened as a column used to survive the narrowing
+   * and become a drawer over the conversation, backdrop and all, that nobody had asked for.
+   */
+  it("puts the rail away when the window narrows past the breakpoint", async () => {
+    const viewport = mockResizableViewport();
+
+    try {
+      renderPage();
+
+      // A column, and an answer is waiting, so it opens itself.
+      const rail = await screen.findByRole("complementary", {
+        name: "What you sent to your PM",
+      });
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "false"));
+
+      act(() => viewport.setDesktop(false));
+
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
+
+      // Put away, not taken away: the control that brings it back is on screen, with the count
+      // read from the same list the rail is holding.
+      expect(screen.getByTitle("What you sent to your PM")).toBeInTheDocument();
+    } finally {
+      viewport.restore();
+    }
+  });
+
+  /**
+   * The rail and its toggle were both `hidden … xl:*` once, which put a hire on anything
+   * narrower than 1280px out of reach of their PM's answer entirely — the one thing
+   * `FlagToPmButton` promises will show up here. It works like the chat's history rail now: a
+   * column beside the conversation from `md` up, a drawer over it below that, one element
+   * either way. jsdom computes no layout, so this asserts the contract that carries it —
+   * neither piece is gated on a breakpoint.
+   */
+  it("keeps the PM's answer reachable on a narrow screen", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
     const toggle = await screen.findByTitle("What you sent to your PM");
     expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
 
-    const rail = await screen.findByRole("complementary", {
-      name: "Questions you sent to your PM",
-    });
-    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+    await user.click(toggle);
 
-    // Open by itself, because an answer is waiting — and present exactly once. Laying it out
-    // twice and hiding one per breakpoint would put the same answer in the document twice.
-    expect(screen.getByText("Ask in #platform.")).toBeInTheDocument();
+    const rail = await screen.findByRole("complementary", { name: "What you sent to your PM" });
+    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+  });
+
+  /**
+   * The same preference the chat's rail keeps, for the same reason: it says how much room this
+   * window has to spare. Which is why it is a *column* the page remembers — see the drawer's
+   * own case below.
+   */
+  it("remembers the rail being closed, where it is a column", async () => {
+    const restoreViewport = reportDesktopViewport();
+
+    try {
+      const user = userEvent.setup();
+      const first = renderPage();
+
+      // A column, and there is an answer waiting: the rail opens itself, which is the promise
+      // `FlagToPmButton` makes. Closing it is therefore the choice worth remembering here.
+      const rail = await screen.findByRole("complementary", {
+        name: "What you sent to your PM",
+      });
+      // Scoped to the rail: the drawer backdrop says the same words, and below `md` it is the
+      // one you press. jsdom computes no layout, so both are in the document here.
+      await user.click(within(rail).getByRole("button", { name: "Close the PM replies" }));
+
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
+
+      first.unmount();
+      renderPage();
+
+      // Back to the control that reopens it, rather than to the rail deciding again. The rail
+      // itself stays mounted — that is what keeps its scroll — but out of the tree while shut.
+      expect(await screen.findByTitle("What you sent to your PM")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("complementary", { name: "What you sent to your PM" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  /**
+   * Below `md` the rail is a drawer over the conversation, with a backdrop. Somebody opens one
+   * to read an answer and dismisses it again — that is not a hire saying how they want the page
+   * laid out, and restoring it would land them behind their own PM replies on every visit. So
+   * the preference is neither written nor honoured at this width; jsdom's default viewport is
+   * already below it, which is what makes this the plain case.
+   */
+  it("does not reopen the drawer by itself on a phone", async () => {
+    const user = userEvent.setup();
+    const first = renderPage();
+
+    await user.click(await screen.findByTitle("What you sent to your PM"));
+    expect(
+      await screen.findByRole("complementary", { name: "What you sent to your PM" }),
+    ).toBeInTheDocument();
+
+    first.unmount();
+    renderPage();
+
+    // Still mounted — the rail never unmounts, so its list keeps its scroll — but shut, and
+    // the control that brings it back is the one on screen.
+    expect(await screen.findByTitle("What you sent to your PM")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("complementary", { name: "What you sent to your PM" }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens the mentor for a hire on a project", async () => {
@@ -278,31 +614,6 @@ describe("BuddyPage", () => {
     renderPage();
 
     expect(await screen.findByText("Find me a task")).toBeInTheDocument();
-  });
-
-  /**
-   * Closing a conversation should put you back where you were, not on a page you never chose.
-   * `location.key` is `"default"` only on the entry the app was loaded at — a hard reload onto
-   * `/buddy`, or a link from outside — where stepping back would leave the app entirely. The
-   * board is where a hire belongs instead, and it is the durable half of this same conversation.
-   */
-  it("falls back to the board when there is no history to close back into", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter initialEntries={["/buddy"]}>
-        <BuddyProvider>
-          <Routes>
-            <Route path="/buddy" element={<BuddyPage />} />
-            <Route path="/board" element={<p>the board</p>} />
-          </Routes>
-        </BuddyProvider>
-      </MemoryRouter>,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "Close the conversation" }));
-
-    expect(await screen.findByText("the board")).toBeInTheDocument();
   });
 
   it("lets the hire type before the greeting has arrived", async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
@@ -17,6 +17,36 @@ import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
+
+/** Placeholder for one `ArtifactCard`, matching its icon box, title/badge row and meta row. */
+function ArtifactCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-app-border bg-app-surface p-4">
+      <div className="flex items-start gap-4">
+        <SkeletonBlock className="h-9 w-9 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <SkeletonLine className="w-1/3" />
+            <SkeletonLine className="h-4 w-12" />
+          </div>
+          <SkeletonLine className="mt-2 w-1/2" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactListSkeleton() {
+  return (
+    <SkeletonGroup label="Loading artifacts" className="space-y-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <ArtifactCardSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
 
 /** Roles allowed to delete uploaded artifacts. Pattern A gate mirroring
  *  the backend `@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")` — keeps
@@ -64,15 +94,25 @@ export function KnowledgeBasePage() {
   } = useKnowledgeBase(projectId);
 
   const isLoading = isProjectLoading || isArtifactsLoading;
+  const showLoadingSkeleton = useDelayedFlag(isLoading);
 
   /*
-    `?artifact=<id>` opens a document straight away, which is what the dashboard's knowledge-base
-    card links to — before this, every row on that card landed on the bare page and the reader
-    had to find the document again themselves.
+    `?artifact=<id>` says which document is open, and it is in the URL the whole time one is.
 
-    It is a hand-off rather than a permanent part of the URL: the id seeds the state once and the
-    parameter is then stripped, so the drawer state stays local (as it already was) and coming
-    back to the page later does not reopen a document the user has since closed.
+    It began as a one-way hand-off: the dashboard's knowledge-base card linked to it, the id seeded
+    the drawer once, and the parameter was then stripped again so the drawer state stayed local.
+    That was fine while the only thing that ever *sent* somebody here was a link somebody else had
+    built — and wrong as soon as something wanted to describe where a reader currently *is*.
+
+    The board's cards do. A note kept from a paragraph in a document records the page it came from
+    so it can offer the way back, and with the parameter stripped every one of those trails pointed
+    at `/knowledge-base` — the list, not the document, with the highlighted paragraph three clicks
+    further in. The reader was returned to the room and left to find the page again.
+
+    So the parameter now follows the drawer in both directions: opening a document puts it there,
+    closing one takes it away. `replace` throughout, so reading four documents does not leave four
+    entries in the back button. The original intent survives it — a URL captured after the drawer is
+    closed carries no id, so coming back later still does not reopen a document somebody shut.
   */
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(() =>
@@ -80,18 +120,17 @@ export function KnowledgeBasePage() {
   );
   const [prevProjectId, setPrevProjectId] = useState(projectId);
 
-  const artifactParamConsumed = useRef(false);
-
   useEffect(() => {
-    if (artifactParamConsumed.current) return;
-    artifactParamConsumed.current = true;
-
-    if (!searchParams.has("artifact")) return;
+    // Compared before writing, because this effect's own write comes back to it as a new
+    // `searchParams`: without the guard that is a loop rather than a synchronisation.
+    if ((searchParams.get("artifact") ?? null) === selectedArtifactId) return;
 
     const next = new URLSearchParams(searchParams);
-    next.delete("artifact");
+    if (selectedArtifactId) next.set("artifact", selectedArtifactId);
+    else next.delete("artifact");
+
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [selectedArtifactId, searchParams, setSearchParams]);
 
   // Reset active drawer selection whenever the project scope changes.
   if (prevProjectId !== projectId) {
@@ -115,22 +154,23 @@ export function KnowledgeBasePage() {
   return (
     <div className="flex min-h-screen flex-col text-app-text">
       <header className="border-b border-app-border bg-app-bg">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="app-page-frame py-6"
-        >
+        <div className="app-page-frame py-6">
           <PageHeader
             icon={BookOpen}
             title="Knowledge Base"
             subtitle="Explore unified project documentation, code runbooks, and artifacts."
           />
-        </motion.div>
+        </div>
       </header>
 
       <main
         ref={swipeRef}
-        className="app-page-frame flex flex-1 flex-col overflow-y-auto py-6 sm:space-y-10 lg:py-8"
+        // Unlike Access Management, nothing above this page caps its height (the wrapper
+        // and App's own <main> are both `min-h-screen`), so `overflow-y-auto` never actually
+        // engages -- the document scrolls. No `SCROLL_CONTAINER_ATTRIBUTE` here for that
+        // reason: marking this element would point scroll restoration and the dialog scroll
+        // lock at something whose `scrollTop` never moves, both silently doing nothing.
+        className="app-page-frame flex flex-1 flex-col py-6 sm:space-y-10 lg:py-8"
       >
         <div className="mx-auto w-full max-w-7xl">
           {!projectId && !isLoading ? (
@@ -195,11 +235,9 @@ export function KnowledgeBasePage() {
                 </div>
               )}
 
-              {isLoading ? (
-                <div className="flex justify-center p-12" aria-busy="true" aria-live="polite">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-app-brand border-t-transparent"></div>
-                </div>
-              ) : fetchError ? null : (
+              {showLoadingSkeleton ? (
+                <ArtifactListSkeleton />
+              ) : isLoading ? null : fetchError ? null : (
                 // Only the list slides; the loading and error
                 // states above are not tabs and would otherwise
                 // animate on their way in too.

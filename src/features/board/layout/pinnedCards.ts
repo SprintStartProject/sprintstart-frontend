@@ -1,3 +1,5 @@
+import { notifyBoardStorageWritten } from "./boardStorage";
+
 /**
  * Which of a board's cards the hire has pinned to the top, between visits.
  *
@@ -54,4 +56,6 @@ export function writePinnedCards(boardId: string, ids: Set<string>): void {
   } catch {
     // Nothing to do and nothing to say: the pin still holds for this visit.
   }
+
+  notifyBoardStorageWritten();
 }

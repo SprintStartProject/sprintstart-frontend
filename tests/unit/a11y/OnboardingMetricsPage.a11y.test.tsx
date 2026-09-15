@@ -4,8 +4,10 @@ import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { OnboardingMetricsPage } from "../../../src/features/onboarding-metrics/components/OnboardingMetricsPage";
 
-vi.mock("../../../src/hooks/useFetch", () => ({
-  useFetch: () => ({
+vi.mock("../../../src/hooks/useQueryFetch", () => ({
+  useQueryFetch: () => ({
+    isFetching: false,
+    refetch: vi.fn(),
     data: {
       projectId: "proj1",
       memberCount: 2,

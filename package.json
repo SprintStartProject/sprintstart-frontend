@@ -24,6 +24,7 @@
     "@keycloakify/login-ui": "~250004.7.2",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/react-query": "^5.102.8",
     "@types/d3-force": "^3.0.10",
     "@xyflow/react": "^12.11.3",
     "boring-avatars": "^2.0.4",

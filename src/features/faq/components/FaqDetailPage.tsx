@@ -9,13 +9,14 @@ import type { FAQQuestion, FAQDocument } from "../../../features/faq/types";
 import { insightsService } from "../../../services/faqService";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
-import { useFetch } from "../../../hooks/useFetch";
+import { PageShell } from "../../../components/layout/PageShell";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { TrendBadge } from "./TrendBadge";
 import { formatAskedAt } from "../format";
 
 import {
-  ArrowLeft,
   ShieldAlert,
   FileText,
   Loader2,
@@ -38,74 +39,35 @@ export function FaqDetailPage() {
     data: detail,
     loading,
     error,
-  } = useFetch(
-    () => insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
-    // The project is part of what is being fetched, so switching it has to
-    // refetch -- otherwise the page keeps showing the previous project's entry.
-    [selectedProjectId, groupId],
+  } = useQueryFetch(queryKeys.faq.detail(selectedProjectId, groupId ?? ""), () =>
+    insightsService.fetchFAQGroup(selectedProjectId, groupId ?? ""),
   );
 
-  // ── LOADING ──────────────────────────────────────────────
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-          <p className="text-sm">Loading group details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ERROR ────────────────────────────────────────────────
-
-  if (error || !detail) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load group</h2>
-          <p className="mb-6 text-sm text-app-text-muted">This FAQ group may no longer exist.</p>
-          <Button variant="primary" onClick={() => void navigate(-1)}>
-            Go back
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   // ── RENDER ───────────────────────────────────────────────
+  // The title/subtitle are the fetched group's own text, so there is nothing
+  // real to show for them until it loads — a generic placeholder stands in
+  // rather than leaving the header without one, but the band itself (and the
+  // back button) is present from the first frame regardless of loading state.
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      {/* ── HEADER ────────────────────────────────────────── */}
-      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-content py-4">
-          <Button
-            variant="ghost"
-            onClick={() => void navigate(-1)}
-            icon={<ArrowLeft className="h-4 w-4" />}
-            className="mb-4"
-          >
-            Back
-          </Button>
-
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-xl leading-snug font-semibold text-app-text sm:text-2xl">
-                {detail.title}
-              </h1>
-              {/* The wording users actually use, under the summary. */}
-              <p className="mt-1 text-sm text-app-text-muted">{detail.question}</p>
-            </div>
-            <Badge variant="success" className="shrink-0 gap-1.5">
-              <ArrowUp className="h-3 w-3" />
-              {detail.count} times asked
-            </Badge>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+    <PageShell
+      icon={MessageSquareMore}
+      title={detail?.title ?? "Recurring question"}
+      subtitle={detail?.question ?? ""}
+      frame="content"
+      back={{ label: "Back", onClick: () => void navigate(-1) }}
+      actions={
+        detail && (
+          <Badge variant="success" className="shrink-0 gap-1.5">
+            <ArrowUp className="h-3 w-3" />
+            {detail.count} times asked
+          </Badge>
+        )
+      }
+      bandExtra={
+        detail &&
+        (detail.trend || detail.lastAskedAt) && (
+          <div className="flex flex-wrap items-center gap-2">
             {detail.trend && <TrendBadge trend={detail.trend} recentCount={detail.recentCount} />}
             {detail.lastAskedAt && (
               <span className="text-xs text-app-text-muted">
@@ -113,12 +75,30 @@ export function FaqDetailPage() {
               </span>
             )}
           </div>
+        )
+      }
+      mainClassName="space-y-6 py-8 pb-24"
+    >
+      {loading ? (
+        <div className="flex min-h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-app-text-muted">
+            <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+            <p className="text-sm">Loading group details...</p>
+          </div>
         </div>
-      </div>
-
-      {/* ── CONTENT ───────────────────────────────────────── */}
-      <main className="app-page-content space-y-6 py-8 pb-24">
-        {/* PM detail section */}
+      ) : error || !detail ? (
+        <div className="flex min-h-96 items-center justify-center p-8">
+          <div className="max-w-md text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+            <h2 className="mb-2 text-lg font-semibold text-app-text">Could not load group</h2>
+            <p className="mb-6 text-sm text-app-text-muted">This FAQ group may no longer exist.</p>
+            <Button variant="primary" onClick={() => void navigate(-1)}>
+              Go back
+            </Button>
+          </div>
+        </div>
+      ) : (
+        // PM detail section
         <div className="rounded-2xl border border-app-border bg-app-surface p-6">
           <div className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-widest text-app-brand uppercase">
             <ShieldAlert className="h-3.5 w-3.5" />
@@ -175,7 +155,7 @@ export function FaqDetailPage() {
             ))}
           </div>
         </div>
-      </main>
-    </div>
+      )}
+    </PageShell>
   );
 }

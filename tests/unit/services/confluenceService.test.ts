@@ -13,6 +13,8 @@ const mockConnection: ConfluenceConnectionDto = {
   baseUrl: "https://example.atlassian.net/wiki",
   spaceId: "SPACE-1",
   spaceKey: "SP",
+  spaceName: "Sprint Planning",
+  credentialName: "default",
   pageAllowlist: [],
   pageDenylist: [],
   credentialsConfigured: true,
@@ -32,8 +34,7 @@ describe("confluenceService", () => {
         expect(body).toEqual({
           baseUrl: "https://example.atlassian.net/wiki",
           spaceId: "SPACE-1",
-          email: "user@example.com",
-          apiToken: "secret-token",
+          credentialName: "default",
           pageAllowlist: [],
           pageDenylist: [],
         });
@@ -45,8 +46,7 @@ describe("confluenceService", () => {
     const result = await confluenceService.createConnection("proj-1", {
       baseUrl: "https://example.atlassian.net/wiki",
       spaceId: "SPACE-1",
-      email: "user@example.com",
-      apiToken: "secret-token",
+      credentialName: "default",
     });
 
     expect(result).toEqual(mockConnection);
@@ -106,6 +106,20 @@ describe("confluenceService", () => {
     const result = await confluenceService.syncConnection("proj-1", "conn-123");
     expect(result.status).toBe("COMPLETED");
     expect(result.created).toBe(10);
+  });
+
+  it("deleteConnection calls DELETE /api/v1/confluence/projects/:projectId/connections/:connectionId", async () => {
+    expect.assertions(1);
+
+    server.use(
+      http.delete("/api/v1/confluence/projects/proj-1/connections/conn-123", ({ request }) => {
+        expect(request.method).toBe("DELETE");
+
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await confluenceService.deleteConnection("proj-1", "conn-123");
   });
 
   it("configureSchedule calls PUT /api/v1/confluence/projects/:projectId/connections/:connectionId/schedule", async () => {

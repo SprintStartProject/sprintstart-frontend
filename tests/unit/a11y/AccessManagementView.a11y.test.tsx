@@ -21,17 +21,17 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   deleteGithubPat: vi.fn(),
 }));
 
-vi.mock("../../../src/services/sources/jiraService", () => ({
-  getMyJiraCredentials: vi.fn(),
-  addJiraCredential: vi.fn(),
-  changeJiraCredentialName: vi.fn(),
-  changeJiraCredentialToken: vi.fn(),
-  deleteJiraCredential: vi.fn(),
+vi.mock("../../../src/services/sources/atlassianService", () => ({
+  getMyAtlassianCredentials: vi.fn(),
+  addAtlassianCredential: vi.fn(),
+  changeAtlassianCredentialName: vi.fn(),
+  changeAtlassianCredentialToken: vi.fn(),
+  deleteAtlassianCredential: vi.fn(),
 }));
 
 import { useAuth } from "../../../src/context/useAuth";
 import { getGithubPatNames } from "../../../src/services/sources/githubService";
-import { getMyJiraCredentials } from "../../../src/services/sources/jiraService";
+import { getMyAtlassianCredentials } from "../../../src/services/sources/atlassianService";
 
 function ViewHost() {
   const [sourceFilter, setSourceFilter] = useState<string>(DEFAULT_ACCESS_SOURCE_FILTER);
@@ -65,8 +65,8 @@ describe("AccessManagementView Accessibility", () => {
   it("has no axe violations while listing sources, filtering and adding", async () => {
     const user = userEvent.setup();
     vi.mocked(getGithubPatNames).mockResolvedValue(["gh-default"]);
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([
-      { userEmail: "user@corp.com", displayName: "jira-default" },
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([
+      { userEmail: "user@corp.com", displayName: "atlassian-default" },
     ]);
 
     const { baseElement } = renderView();
@@ -75,7 +75,7 @@ describe("AccessManagementView Accessibility", () => {
     expect(await axe(baseElement)).toHaveNoViolations();
 
     await user.click(screen.getByRole("combobox", { name: "Filter access by source" }));
-    expect(await screen.findByRole("option", { name: "Jira" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Atlassian" })).toBeInTheDocument();
     /*
       `region` is switched off for this one assertion, and only while a dropdown is open.
 
@@ -104,7 +104,7 @@ describe("AccessManagementView Accessibility", () => {
 
   it("has no axe violations in the fully empty state", async () => {
     vi.mocked(getGithubPatNames).mockResolvedValue([]);
-    vi.mocked(getMyJiraCredentials).mockResolvedValue([]);
+    vi.mocked(getMyAtlassianCredentials).mockResolvedValue([]);
 
     const { baseElement } = renderView();
 

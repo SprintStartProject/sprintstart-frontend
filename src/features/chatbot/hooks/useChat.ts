@@ -1,6 +1,9 @@
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChatContext } from "../../../context/ChatContext";
+import { RAIL_DESKTOP_QUERY } from "../../../components/layout/ConversationRail";
+import { useMediaQuery } from "../../../hooks/useMediaQuery";
+import { useRailOverlayGuard } from "../../../hooks/useRailOverlayGuard";
 
 /**
  * localStorage key prefix for per-chat draft persistence (E10). Each chat's
@@ -19,6 +22,26 @@ const DRAFT_KEY = (chatId: string | undefined) => `chatDraft.${chatId ?? "__new_
 const DRAFT_UNINITIALIZED = Symbol("draftUninitialized");
 
 /**
+ * Where the conversation rail's collapsed state lives between visits.
+ *
+ * Not per chat and not per user: it is a statement about how much room this browser window has
+ * to spare, and re-opening a rail somebody closed on every reload is the app forgetting a
+ * preference it was told twice.
+ */
+const SIDEBAR_OPEN_KEY = "chatSidebarOpen";
+
+/** Open unless it was explicitly closed — a first visit should see the conversations it has. */
+function readSidebarOpen(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_OPEN_KEY) !== "false";
+  } catch {
+    // Private modes can refuse storage outright. A preference that cannot be read is not a
+    // reason to fail to render a sidebar.
+    return true;
+  }
+}
+
+/**
  * Consumes the global {@link ChatContext} and combines it with router params
  * (`chatId`) and component-local UI state (sidebar toggle, DOM refs, scroll
  * behavior). The heavy lifting — message state, streaming, filters — lives in
@@ -34,8 +57,48 @@ export function useChat() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+  /**
+   * Whether the rail is currently a drawer *over* the conversation rather than a column beside
+   * it. One `ConversationRail` covers both, so this is what tells the page which of the two
+   * it is looking at — see `onNavigate` below.
+   */
+  const isRailOverlay = !useMediaQuery(RAIL_DESKTOP_QUERY);
+
+  // One state for both widths, because there is one rail now. The stored preference is only
+  // honoured where the rail is a column: restoring an *overlay* on load would put the app
+  // behind its own conversation list on every visit from a phone.
+  const [isRailOpen, setIsRailOpen] = useState(() => readSidebarOpen() && !isRailOverlay);
+
+  // The same rule for the window narrowing after load as the one the initial state applies on
+  // the way in. `setIsRailOpen` rather than `setRailOpen`: a rail put away because the column
+  // stopped fitting is not a preference, and writing it through would let one resize decide how
+  // the next desktop visit opened.
+  useRailOverlayGuard(isRailOverlay, () => setIsRailOpen(false));
+
+  /**
+   * Writes the rail's state through as it changes, rather than in an effect watching it.
+   *
+   * The write belongs to the act of opening or closing it, and doing it here keeps the stored
+   * value and the state in step even across a render React throws away.
+   *
+   * **Only from the column, never from the drawer**, which is the same width the read is gated
+   * on. Below `md` the rail closes itself every time a chat is picked — that is the drawer
+   * getting out of the way, not somebody saying they want less of it — and letting that write
+   * through meant a routine tap on a phone decided how the next desktop visit opened.
+   */
+  const setRailOpen = useCallback(
+    (open: boolean) => {
+      setIsRailOpen(open);
+      if (isRailOverlay) return;
+
+      try {
+        localStorage.setItem(SIDEBAR_OPEN_KEY, String(open));
+      } catch {
+        // Nothing to do: the rail still opens and closes, it just will not be remembered.
+      }
+    },
+    [isRailOverlay],
+  );
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -337,11 +400,9 @@ export function useChat() {
 
     messages,
 
-    sidebarOpen,
-    setSidebarOpen,
-
-    desktopSidebarOpen,
-    setDesktopSidebarOpen,
+    isRailOpen,
+    setRailOpen,
+    isRailOverlay,
 
     handleSubmit,
     addMessage,

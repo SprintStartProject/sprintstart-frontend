@@ -7,6 +7,7 @@ import { ChatProvider } from "../../../../src/context/ChatProvider";
 import { ChatContext } from "../../../../src/context/ChatContext";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
+import { mockViewport } from "../../setup/matchMedia";
 
 const mockNavigate = vi.fn();
 
@@ -105,10 +106,54 @@ describe("useChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // Back to the narrowest viewport between tests: `mockViewport` writes to `window`, so a
+    // test that pinned a desktop width would otherwise decide the layout of every one after it.
+    mockViewport(false);
     routerState.params = { id: "chat1" };
     routerState.location = { pathname: "/" };
     projectState.selectedProjectId = "proj1";
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+
+  /**
+   * Collapsing the conversation rail is a statement about how much room this window has to
+   * spare, and it survived exactly until the next reload. It is remembered per browser rather
+   * than per chat or per user for the same reason: it is about the window, not the content.
+   */
+  it("remembers the conversation rail being collapsed", () => {
+    // The preference only applies where the rail is a column. jsdom reports the narrowest
+    // viewport by default, which is the width where it is a drawer instead.
+    mockViewport(true);
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    expect(result.current.isRailOpen).toBe(true);
+
+    act(() => result.current.setRailOpen(false));
+
+    expect(result.current.isRailOpen).toBe(false);
+
+    // A fresh mount, the way a reload arrives.
+    expect(renderHook(() => useChat(), { wrapper }).result.current.isRailOpen).toBe(false);
+  });
+
+  /**
+   * The same preference, deliberately not honoured on a phone: there the rail is a drawer over
+   * the conversation, and restoring it on load would put the app behind its own chat list on
+   * every visit.
+   */
+  it("does not reopen the rail over the conversation on a narrow screen", () => {
+    mockViewport(true);
+    const wide = renderHook(() => useChat(), { wrapper });
+
+    act(() => wide.result.current.setRailOpen(true));
+    expect(wide.result.current.isRailOpen).toBe(true);
+
+    mockViewport(false);
+    const narrow = renderHook(() => useChat(), { wrapper });
+
+    expect(narrow.result.current.isRailOverlay).toBe(true);
+    expect(narrow.result.current.isRailOpen).toBe(false);
   });
 
   it("fetches chats and user profile on mount", async () => {
@@ -879,5 +924,127 @@ describe("useChat", () => {
     });
     // The stale response must have been dropped, not written over proj2's list.
     expect(result.current.chats).toEqual([{ id: "fresh-chat", userId: "user1" }]);
+  });
+
+  it("inserts a paragraph break between tool preamble and post-tool answer tokens", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"reasoning","reasoning":"Planning the search."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"token","content":"Let me look. "}\n\n'));
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Blockers were the auth work."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () =>
+          new HttpResponse(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+      ),
+      http.post("/api/v1/chats/me", () =>
+        HttpResponse.json({
+          id: "newChatId",
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    await act(async () => {
+      await result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+    });
+
+    const aiMsg = result.current.messages[1];
+    expect(aiMsg.role).toBe("ASSISTANT");
+    expect(aiMsg.content).toBe("Let me look.\n\nBlockers were the auth work.");
+  });
+
+  it("separates each tool round in a multi-tool turn", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"type":"token","content":"Let me look."}\n\n'));
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Found the retro."}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"grep","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Auth work blocked us."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    await act(async () => {
+      await result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+    });
+
+    // The flag re-arms on every `tool_use`, so both rounds get their own break.
+    expect(result.current.messages[1].content).toBe(
+      "Let me look.\n\nFound the retro.\n\nAuth work blocked us.",
+    );
   });
 });

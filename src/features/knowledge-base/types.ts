@@ -24,15 +24,21 @@ export interface Artifact {
   sourceUrl: string | null;
   mime: string | null;
   language: string | null;
+  /** When the artifact was first imported. Never moves on later updates. */
   ingestedAt: string;
-  createdAtSource: string | null;
-  updatedAtSource: string | null;
+  /**
+   * When ingestion last saw the artifact's content change, or null while it still
+   * matches what was first imported.
+   */
+  lastChangedAt: string | null;
   contentHash: string | null;
   ingestionRunId: string | null;
   /**
-   * Backend-supplied metadata as a JSON string (always present, default `"{}"` for
-   * artifacts without metadata). For {@link ArtifactType.ORG_METADATA} it carries
-   * the GitHub org profile, teams and members — see
+   * Backend-supplied metadata as a JSON string. Optional here rather than
+   * required: the backend defaults it to `"{}"`, but older artifacts predating
+   * the field — and every fixture that omits it — must stay assignable.
+   * For `ORG_METADATA` artifacts it carries the GitHub org profile, teams and
+   * members — see
    * [`parseOrgMetadata`](./orgMetadata). The artifact *content* endpoint
    * (`GET /artifacts/{id}/content`) is a 302 redirect to the org's GitHub page for
    * this type and holds no stored bytes, so org artifacts must be rendered purely

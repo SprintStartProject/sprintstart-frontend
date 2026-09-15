@@ -1,6 +1,8 @@
 import { ExternalLink, Sparkles } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
@@ -28,6 +30,10 @@ export function SuggestedTasksCard({
   onDismiss,
   dismissing,
 }: SuggestedTasksCardProps) {
+  // Matched by their words: this list is re-ranked on every board read, so a highlight cannot be
+  // pinned to a position. A reason the hire marked stays marked while it is still being given.
+  const marks = useCardMarks().marksFor(card.id);
+
   return (
     <BoardCardFrame
       icon={Sparkles}
@@ -47,7 +53,9 @@ export function SuggestedTasksCard({
           {content.tasks.map((task) => (
             <li key={task.taskId} className="rounded-xl border border-app-border p-3">
               <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 text-sm font-medium text-app-text">{task.title}</p>
+                <p className="min-w-0 text-sm font-medium text-app-text">
+                  <Marked text={task.title} marks={marks} cardId={card.id} />
+                </p>
                 {task.url && (
                   <a
                     href={task.url}
@@ -71,7 +79,7 @@ export function SuggestedTasksCard({
                 <ul className="mt-1.5 space-y-0.5">
                   {task.reasons.map((reason) => (
                     <li key={reason} className="text-xs text-app-text-muted">
-                      · {reason}
+                      · <Marked text={reason} marks={marks} cardId={card.id} />
                     </li>
                   ))}
                 </ul>

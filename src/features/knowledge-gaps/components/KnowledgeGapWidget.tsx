@@ -17,6 +17,7 @@ import { EmptyStateIcon } from "./EmptyStateIcon";
 import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Button } from "../../../components/ui/Button";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 import { ShieldAlert, ArrowRight, Clock, RefreshCw } from "lucide-react";
@@ -37,9 +38,8 @@ export function KnowledgeGapWidget() {
     loading,
     error,
     refresh,
-  } = useLiveFetch(
-    () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [selectedProjectId],
+  } = useLiveFetch(queryKeys.knowledgeGaps.overview(selectedProjectId), () =>
+    knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
   );
 
   // The backend rescans on its own once new documentation is indexed; while it

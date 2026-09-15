@@ -1,3 +1,4 @@
+import type { BoardDocumentWire } from "../features/board/sync/boardDocument";
 import { apiClient } from "./apiClient";
 import type {
   AuthoredCardRequest,
@@ -70,6 +71,39 @@ export const boardService = {
     return await apiClient.fetch<BoardCard>(
       `${BASE}/me/board/cards?projectId=${encodeURIComponent(projectId)}`,
       { method: "POST", body: JSON.stringify(request) },
+    );
+  },
+
+  /**
+   * How this hire has arranged this board — stages, sequences, areas, folds, pins, widths, where a
+   * card came from and what is highlighted in it.
+   *
+   * Separate from the board read on purpose. The cards are read live from half the onboarding
+   * module on every load; the arrangement is a small document the client owns and the server only
+   * keeps. Folding it into the board response would make one slow read out of one slow and one
+   * instant one, and would send the whole arrangement back on every poll of the live cards.
+   *
+   * A board nobody has arranged answers with an empty arrangement rather than a 404.
+   */
+  async fetchStructure(projectId: string): Promise<BoardDocumentWire> {
+    const response = await apiClient.fetch<{ structure: BoardDocumentWire }>(
+      `${BASE}/me/board/structure?projectId=${encodeURIComponent(projectId)}`,
+    );
+
+    return response.structure;
+  },
+
+  /**
+   * Stores the whole arrangement.
+   *
+   * Sent whole rather than as a patch, the same call `reorder` makes: an arrangement is a statement
+   * about the board, and a patch language for "this card is `LATER` now and also that area was
+   * renamed" would be more machinery than the thing it describes.
+   */
+  async saveStructure(projectId: string, structure: BoardDocumentWire): Promise<void> {
+    await apiClient.fetch<unknown>(
+      `${BASE}/me/board/structure?projectId=${encodeURIComponent(projectId)}`,
+      { method: "PUT", body: JSON.stringify({ structure }) },
     );
   },
 

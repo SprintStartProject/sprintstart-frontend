@@ -8,13 +8,15 @@ import { starterWorkService } from "../../../../src/services/starterWorkService"
 import { userService } from "../../../../src/services/userService";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 
+const selectedProjectId = vi.hoisted(() => ({ current: "p1" }));
+
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
     await import("../../setup/projectContext");
   return {
     useProjectContext: () =>
       createProjectContextValue({
-        selectedProjectId: "p1",
+        selectedProjectId: selectedProjectId.current,
         projects: [createSelectableProject({ id: "p1", name: "Project One" })],
         selectedProject: createSelectableProject({ id: "p1", name: "Project One" }),
       }),
@@ -47,6 +49,7 @@ describe("StarterWorkPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     permissionGroup.current = "PM";
+    selectedProjectId.current = "p1";
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [task] });
     // The page loads the live pool for the overview alongside the review queue. Stub it (and the
     // caller's projects) so these tests stay about the review queue.
@@ -64,13 +67,16 @@ describe("StarterWorkPage", () => {
     ]);
     render(<StarterWorkPage />);
 
-    const poolCard = (await screen.findByText("Available to new hires")).parentElement;
+    // The KPI cards render on the very first pass regardless of load state (their value defaults
+    // to 0), so the count itself — not just the static label — has to be the awaited condition;
+    // otherwise this can observe either card before its own query has settled.
+    const poolCard = screen.getByText("Available to new hires").parentElement;
     const reviewedCard = screen.getByText("Vouched for by your team").parentElement;
 
     expect(poolCard).toHaveTextContent("In the pool");
-    expect(poolCard).toHaveTextContent("2");
+    await waitFor(() => expect(poolCard).toHaveTextContent("2"));
     expect(reviewedCard).toHaveTextContent("Reviewed");
-    expect(reviewedCard).toHaveTextContent("1");
+    await waitFor(() => expect(reviewedCard).toHaveTextContent("1"));
     expect(screen.queryByText("Skills exercised")).not.toBeInTheDocument();
     expect(screen.queryByText("Linked to a source")).not.toBeInTheDocument();
   });
@@ -194,7 +200,7 @@ describe("StarterWorkPage", () => {
   });
 
   it("shows generated work as a success toast", async () => {
-    vi.spyOn(starterWorkService, "generate").mockResolvedValue({
+    const generateSpy = vi.spyOn(starterWorkService, "generate").mockResolvedValue({
       status: "COMPLETED",
       tasksProposed: 2,
       notes: [],
@@ -205,6 +211,14 @@ describe("StarterWorkPage", () => {
     await user.click(await screen.findByTestId("generate-starter-work"));
 
     expect(await screen.findByText("2 tasks added")).toBeInTheDocument();
+    expect(generateSpy).toHaveBeenCalledWith("p1");
+  });
+
+  it("disables mining without a selected project", async () => {
+    selectedProjectId.current = "";
+    render(<StarterWorkPage />);
+
+    expect(await screen.findByTestId("generate-starter-work")).toBeDisabled();
   });
 
   it("surfaces a failed load", async () => {

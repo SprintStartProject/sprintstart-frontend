@@ -5,7 +5,7 @@ import { AlertDialog } from "../components/ui/AlertDialog";
 import { Button } from "../components/ui/Button";
 import { EggModalShell } from "../features/easter-eggs/components/EggModalShell";
 import { useRepeatClicks } from "../features/easter-eggs/hooks/useRepeatClicks";
-import { AddWidgetModal } from "../features/dashboard/components/AddWidgetModal";
+import { WidgetPickerModal } from "../features/dashboard/components/WidgetPickerModal";
 import { DashboardGrid } from "../features/dashboard/components/DashboardGrid";
 import { useDashboardLayout } from "../features/dashboard/layout/useDashboardLayout";
 
@@ -24,6 +24,10 @@ import { useDashboardLayout } from "../features/dashboard/layout/useDashboardLay
  */
 export function DashboardPage() {
   const controller = useDashboardLayout();
+
+  // The picker needs the board as a set, both to tick what is already there and to work out
+  // what the reader has changed since they opened it.
+  const placedIds = new Set(controller.layout.map((item) => item.id));
 
   const [isEditing, setIsEditing] = useState(false);
   const [isPickerOpen, setPickerOpen] = useState(false);
@@ -47,19 +51,21 @@ export function DashboardPage() {
             eggHint
             subtitle={
               isEditing
-                ? "Drag a widget to move it, change its size, or add another one."
+                ? "Drag a widget to move it, change its size, or pick which ones you want."
                 : "Your central workspace — arrange it however you work."
             }
             actions={
               isEditing ? (
                 <>
+                  {/* Never disabled: the picker is where widgets are taken off the board as
+                      well as put on it, so "everything is already placed" is not a reason to
+                      close the door. */}
                   <Button
                     variant="secondary"
                     onClick={() => setPickerOpen(true)}
-                    disabled={controller.addableWidgets.length === 0}
                     icon={<Plus className="h-4 w-4" />}
                   >
-                    Add widget
+                    Widgets
                   </Button>
 
                   {controller.isCustomized && (
@@ -106,10 +112,11 @@ export function DashboardPage() {
         />
       </main>
 
-      <AddWidgetModal
+      <WidgetPickerModal
         isOpen={isPickerOpen}
-        widgets={controller.addableWidgets}
-        onAdd={controller.addWidget}
+        widgets={controller.availableWidgets}
+        placedIds={placedIds}
+        onApply={controller.setPlacedWidgets}
         onClose={() => setPickerOpen(false)}
       />
 

@@ -104,8 +104,7 @@ function makeArtifact(overrides: Partial<Artifact> = {}): Artifact {
     mime: "text/markdown",
     language: null,
     ingestedAt: "2024-01-01",
-    createdAtSource: null,
-    updatedAtSource: "2024-01-01",
+    lastChangedAt: "2024-01-01",
     contentHash: null,
     ingestionRunId: null,
     ...overrides,
@@ -198,7 +197,10 @@ describe("KnowledgeBasePage", () => {
       </MemoryRouter>,
     );
 
-    expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    // The skeleton only appears after a short delay, so it never flashes on a fast load.
+    await waitFor(() => {
+      expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    });
     expect(screen.queryByText("No project available")).not.toBeInTheDocument();
   });
 

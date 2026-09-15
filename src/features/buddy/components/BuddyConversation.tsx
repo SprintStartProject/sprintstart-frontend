@@ -2,7 +2,12 @@ import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
+import { BuddyReplyActions } from "./BuddyReplyActions";
+import { MessagesSquare } from "lucide-react";
+import { SaveToBoard } from "../../board/save/SaveToBoard";
+import { transcriptNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import { RAIL_TOGGLE_CLEARANCE } from "../../../components/layout/ConversationRail";
 
 type BuddyConversationProps = {
   messages: BuddyMessageView[];
@@ -30,6 +35,19 @@ type BuddyConversationProps = {
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
+  /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
+  onStartFreshVisit?: () => void;
+  /** The chord named in that control's tooltip, where the caller has actually bound one. */
+  freshVisitShortcut?: string;
+  /**
+   * Leaves room at the top of the thread for a control floating over it.
+   *
+   * The rail's reopen button hangs in that corner rather than sitting in a bar of its own, so
+   * without this the first message starts underneath it. Only when there is one: 40px of empty
+   * page above every conversation to make room for a button most hires never see would be the
+   * wrong way round.
+   */
+  hasFloatingControl?: boolean;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
   /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
@@ -74,6 +92,9 @@ export function BuddyConversation({
   aboveComposer,
   openError,
   onRetryOpen,
+  onStartFreshVisit,
+  freshVisitShortcut,
+  hasFloatingControl = false,
   focusComposerOnMount = false,
   dinoGameActive = false,
   onDinoGameExit,
@@ -88,8 +109,43 @@ export function BuddyConversation({
         data-testid="buddy-transcript"
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
-        <div className="app-page-frame flex min-w-0 flex-col gap-4 py-6">
+        <div
+          className={`app-page-frame flex min-w-0 flex-col gap-4 pb-6 ${
+            hasFloatingControl ? RAIL_TOGGLE_CLEARANCE : "pt-8"
+          }`}
+        >
+          {/* The conversation as a whole, kept as one folded note.
+              Above the thread rather than at the end of it, because the end of a conversation moves
+              every time the buddy answers — an action that walks down the page as you talk is one
+              you have to find again each time you want it.
+
+              Only once the buddy has actually said something. A window holding the hire's question
+              and nothing else is not a conversation worth freezing, and the buddy is often still
+              typing the first answer when the page opens. */}
+          {messages.some((message) => message.role === "ASSISTANT" && message.content !== "") && (
+            <div className="flex justify-end">
+              <SaveToBoard
+                request={() =>
+                  transcriptNote(
+                    messages
+                      .filter((message) => message.content !== "")
+                      .map((message) => ({
+                        speaker: message.role === "USER" ? "You" : "Buddy",
+                        content: message.content,
+                      })),
+                    "You",
+                  )
+                }
+                label="Keep this conversation"
+                savedLabel="On your board"
+                description="The whole thread, as one note you can fold open."
+                icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
+              />
+            </div>
+          )}
+
           <BuddyThread
+            renderReplyAction={(reply) => <BuddyReplyActions reply={reply} />}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}
@@ -103,6 +159,8 @@ export function BuddyConversation({
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
+            onStartFreshVisit={onStartFreshVisit}
+            freshVisitShortcut={freshVisitShortcut}
           />
         </div>
       </div>

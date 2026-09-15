@@ -9,7 +9,9 @@
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { onboardingService } from "../../../services/onboardingService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useToast } from "../../../context/useToast";
 import { Modal } from "../../../components/ui/Modal";
 import type {
@@ -40,6 +42,7 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
   const [answers, setAnswers] = useState<Record<string, DraftAnswer>>({});
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [result, setResult] = useState<ReviewCheckResult | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
@@ -107,7 +110,9 @@ export function ReviewCheckModal({ onClose }: ReviewCheckModalProps) {
       const payload: PhaseCheckAnswerSubmission[] = answeredQuestions.map((question) =>
         toSubmission(question, getDraft(question.id)),
       );
-      setResult(await onboardingService.submitReviewCheck(payload));
+      const reviewResult = await onboardingService.submitReviewCheck(payload);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
+      setResult(reviewResult);
       setHasSubmitted(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't submit the review.");

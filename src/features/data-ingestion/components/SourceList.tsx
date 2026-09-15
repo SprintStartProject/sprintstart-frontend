@@ -11,7 +11,7 @@ import { Button } from "../../../components/ui/Button.tsx";
 import {
   deriveConnectionStatus,
   deriveSyncStatus,
-  formatJiraInstanceDomain,
+  formatInstanceDomain,
   formatNumber,
 } from "../data.ts";
 import type { DataSource } from "../types.ts";
@@ -107,7 +107,13 @@ export function SourceList({
 
                     {source.jiraInstance?.instanceUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatJiraInstanceDomain(source.jiraInstance.instanceUrl)}
+                        {formatInstanceDomain(source.jiraInstance.instanceUrl)}
+                      </p>
+                    )}
+
+                    {source.confluenceSpace?.baseUrl && (
+                      <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
+                        {formatInstanceDomain(source.confluenceSpace.baseUrl)}
                       </p>
                     )}
                   </div>

@@ -40,20 +40,9 @@ export function TeamManagementTabSwitcher({
       onChange={onChange}
       layoutId="team-management-tab-pill"
       ariaLabel="Team management sections"
-      // These two labels are long enough that the hover magnification
-      // pushes past the bar's 4px padding, and the global slim
-      // scrollbar then draws a stray line under the tabs. Nothing here
-      // ever needs to scroll -- both options always fit -- so the
-      // scrollbar is hidden rather than the overflow removed, which
-      // would clip the magnified option on narrow screens.
-      //
-      // `!important` is required, not defensive: the global rule is
-      // `* { scrollbar-width: thin }` and sits outside any cascade
-      // layer, so it beats every Tailwind utility no matter how
-      // specific. The webkit rule is the fallback for Chrome below 121,
-      // which does not support `scrollbar-width` at all; newer Chrome
-      // ignores `::-webkit-scrollbar` once `scrollbar-width` is set.
-      className="w-full [scrollbar-width:none]! sm:w-auto [&::-webkit-scrollbar]:hidden"
+      // Hiding the scrollbar used to live here; `SegmentedTabs` does it for
+      // every bar now. Only the width is this bar's own business.
+      className="w-full sm:w-auto"
     />
   );
 }

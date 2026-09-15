@@ -47,6 +47,10 @@ Thumbs.db
 # Temporary files
 *.sw?
 
+# Python bytecode from local helper scripts
+__pycache__/
+*.pyc
+
 # Agent instructions (per-developer, not shared)
 GEMINI.md
 CLAUDE.md

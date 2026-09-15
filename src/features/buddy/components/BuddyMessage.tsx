@@ -5,6 +5,7 @@ import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { BotGlyph } from "../../chatbot/components/BotGlyph";
 import { DinoGame } from "../../chatbot/components/DinoGame";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { useAuth } from "../../../context/useAuth";
 
 /** Who is talking. Three, because a hire's PM really does answer in here. */
 export type BuddySpeaker = "BUDDY" | "YOU" | "PM";
@@ -28,6 +29,17 @@ type BuddyMessageProps = {
    * column is narrow and the avatars are two apart rather than twenty.
    */
   showName?: boolean;
+  /**
+   * The dock's layout: no face beside the hire's own messages, and the buddy's bubble runs to the
+   * edge.
+   *
+   * With a face on both sides, a 400px window lost ~80px to avatars, and the two sides' columns
+   * were capped at 85% of what was left — so the hire's bubbles ended short of the right edge and
+   * the buddy's started indented from the left, staggered against each other. Everybody knows
+   * which messages in a small chat window are their own; the side and the colour carry it there,
+   * and the name is still on the page.
+   */
+  compact?: boolean;
   /** A quiet line under the bubble — a timestamp, or who answered and when. */
   meta?: ReactNode;
   /**
@@ -69,6 +81,7 @@ export function BuddyMessage({
   speaker,
   children,
   showName = false,
+  compact = false,
   meta,
   error,
   footer,
@@ -90,16 +103,26 @@ export function BuddyMessage({
       {...entrance}
       className={`flex w-full min-w-0 gap-2.5 ${isYou ? "flex-row-reverse" : "flex-row"}`}
     >
-      <div className="flex size-8 shrink-0 items-center justify-center">
-        <SpeakerAvatar speaker={speaker} isStreaming={isStreaming} />
-      </div>
+      {!(compact && isYou) && (
+        <div className="flex size-8 shrink-0 items-center justify-center">
+          <SpeakerAvatar speaker={speaker} isStreaming={isStreaming} />
+        </div>
+      )}
 
       <div
         // The reading measure lives here, not on the thread's column. The page runs the full
         // `app-page-frame` width like its siblings, and the bubble is what keeps a line short
         // enough to track back to: it hugs its speaker's edge and stops at 46rem. Capping the
         // column instead would have put the narrow centred layout back under another name.
-        className={`flex max-w-[min(85%,46rem)] min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"}`}
+        //
+        // The buddy's own column then *fills* that measure rather than hugging its contents,
+        // because the buddy's turn is the one that streams: a box re-measured on every token
+        // widens word by word and snaps back whenever a re-parse changes the rendered markdown,
+        // which is unreadable while it is being written. Everyone else's turns arrive whole and
+        // still hug. Same rule, and the same reason, as `MessageRow` in the chat.
+        className={`flex min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"} ${
+          compact && !isYou ? "flex-1" : "max-w-[min(85%,46rem)]"
+        } ${speaker === "BUDDY" ? "w-full" : ""}`}
       >
         {showName && (
           <p className="px-1 text-xs font-medium text-app-text-muted">{SPEAKER_NAME[speaker]}</p>
@@ -107,7 +130,9 @@ export function BuddyMessage({
 
         {children !== undefined && (
           <div
-            className={`max-w-full min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words shadow-sm ${bubbleClasses(speaker)}`}
+            className={`max-w-full min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words shadow-sm ${
+              speaker === "BUDDY" ? "w-full" : ""
+            } ${bubbleClasses(speaker)}`}
           >
             {children}
           </div>
@@ -149,10 +174,28 @@ function bubbleClasses(speaker: BuddySpeaker): string {
   return "rounded-tl-sm border border-app-border-muted bg-app-surface text-app-text";
 }
 
-/** The face beside the bubble. */
+/**
+ * The face beside the bubble.
+ *
+ * The hire's own face is the one they picked in their settings, read from the profile here
+ * rather than passed in: `BuddyMessage` is rendered from three places (the page, the dock and
+ * the thread's own map), and threading the same three profile fields through all of them to
+ * reach one leaf is more moving parts than a context read. It was `fallbackName="You"` with no
+ * profile at all, which seeded `boring-avatars` with the literal word "You" — so every hire got
+ * the same generated face, and a different one from the one the chat shows them.
+ */
 function SpeakerAvatar({ speaker, isStreaming }: { speaker: BuddySpeaker; isStreaming: boolean }) {
+  const { profile } = useAuth();
+
   if (speaker === "YOU") {
-    return <UserAvatar fallbackName="You" size={32} />;
+    return (
+      <UserAvatar
+        profileIcon={profile?.profileIcon ?? undefined}
+        fallbackName={profile ? `${profile.firstName} ${profile.lastName}`.trim() : "You"}
+        seed={profile?.id ?? undefined}
+        size={32}
+      />
+    );
   }
 
   if (speaker === "PM") {

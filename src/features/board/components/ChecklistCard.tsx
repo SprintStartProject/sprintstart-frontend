@@ -4,7 +4,13 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
+import { readableTitle } from "../generation/pathToCards";
+import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
+import { Marked } from "./Marked";
+import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { questionAboutChecklist } from "../generation/cardQuestion";
+import { useCardMarks } from "../marks/useCardMarks";
 import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
 
 type ChecklistCardProps = {
@@ -14,6 +20,19 @@ type ChecklistCardProps = {
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
 };
+
+/**
+ * How many lines a checklist shows before it starts counting the rest.
+ *
+ * A twenty-line list is a card three screens tall, and a board of those is a board nobody scrolls
+ * to the bottom of — one long card pushes everything after it out of sight, which is the same
+ * clutter as ten short ones and harder to see coming. Six is enough to tell what the list is about
+ * and what is next on it; the rest are one click away and counted, so nothing is hidden silently.
+ *
+ * Done lines sink to the bottom, so a list that is half ticked off spends its six on the half that
+ * is still to do.
+ */
+const VISIBLE_ITEMS = 6;
 
 /** The items, as the server needs them back: existing ones keep their id, so a tick lands on a line. */
 function toRequest(content: ChecklistContent, items: ChecklistItem[]): AuthoredCardRequest {
@@ -46,14 +65,26 @@ export function ChecklistCard({
   dismissing,
   onEdit,
 }: ChecklistCardProps) {
+  // A checklist's lines are written by the generator and read back from the server, so a highlight
+  // on one is kept beside the card rather than inside its text. See `marks/cardMarks.ts`.
+  const marks = useCardMarks().marksFor(card.id);
   const [newItem, setNewItem] = useState("");
+  const [showingAll, setShowingAll] = useState(false);
   const done = content.items.filter((item) => item.done).length;
 
+  // A card the hire pulled wide has room for more of the list before it starts counting: the same
+  // six lines in twice the width would be half a card of white space beside them.
+  const { size } = useBoardCardControls();
+  const limit = size?.width === "wide" ? VISIBLE_ITEMS * 2 : VISIBLE_ITEMS;
+
   // `sort` is stable, so within each half the hire's own order survives.
-  const shown = useMemo(
+  const ordered = useMemo(
     () => [...content.items].sort((a, b) => Number(a.done) - Number(b.done)),
     [content.items],
   );
+
+  const overflow = showingAll ? 0 : Math.max(ordered.length - limit, 0);
+  const shown = overflow > 0 ? ordered.slice(0, limit) : ordered;
 
   const toggle = (itemId: string) => {
     onEdit?.(
@@ -93,7 +124,18 @@ export function ChecklistCard({
   return (
     <BoardCardFrame
       icon={CheckSquare}
-      title={content.title ?? "Checklist"}
+      // Stripped of the marker a generated card carries: it exists so a second generation run can
+      // recognise its own work, and it is never something the hire should read.
+      title={
+        content.title ? (
+          // A checklist's name is written by whoever made the list — the generator, or the hire
+          // editing it — so it is text worth marking, the same as its lines.
+          <Marked text={readableTitle(content.title)} marks={marks} cardId={card.id} />
+        ) : (
+          "Checklist"
+        )
+      }
+      controlLabel="checklist"
       card={card}
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
       onDismiss={onDismiss}
@@ -131,7 +173,7 @@ export function ChecklistCard({
                   item.done ? "text-app-text-muted line-through" : "text-app-text"
                 }`}
               >
-                {item.text}
+                <Marked text={item.text} marks={marks} cardId={card.id} />
                 {!onEdit && (
                   <span className="sr-only">{item.done ? " — done" : " — not done"}</span>
                 )}
@@ -152,6 +194,18 @@ export function ChecklistCard({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Counted, and it opens in place — a list that just stopped at six would have the card
+          quietly lying about how long it is. */}
+      {overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowingAll(true)}
+          className="mt-2 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        >
+          {overflow} more {overflow === 1 ? "line" : "lines"}
+        </button>
       )}
 
       {onEdit && (
@@ -185,6 +239,19 @@ export function ChecklistCard({
           </Button>
         </div>
       )}
+
+      {/* What the hire marked in the list seeds the question ahead of the list itself: somebody who
+          highlighted two lines has already said which part they are stuck on. */}
+      <AskTheBuddy
+        question={questionAboutChecklist(
+          // The readable title, for the same reason the header shows it: the marker is there so a
+          // generation run can recognise its own work, and it has no business in a sentence the
+          // hire is about to send.
+          content.title === null ? null : readableTitle(content.title),
+          content.items.filter((item) => !item.done).length,
+          marks.map((mark) => mark.text),
+        )}
+      />
     </BoardCardFrame>
   );
 }

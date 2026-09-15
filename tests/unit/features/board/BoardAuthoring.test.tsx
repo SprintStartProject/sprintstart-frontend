@@ -1,7 +1,10 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { BoardGrid } from "../../../../src/features/board/components/BoardGrid";
-import { AddCardForm } from "../../../../src/features/board/components/AddCardForm";
+import {
+  AddCardForm,
+  AddCardTriggers,
+} from "../../../../src/features/board/components/AddCardForm";
 import type { Board, BoardCard, BoardCardContent } from "../../../../src/features/board/types";
 
 function board(cards: BoardCardContent[]): Board {
@@ -34,8 +37,8 @@ describe("the cards the hire writes", () => {
   it("claims nothing about who added a card the hire wrote", () => {
     render(<BoardGrid board={board([note()])} />);
 
-    expect(screen.queryByText("Buddy added this")).not.toBeInTheDocument();
-    expect(screen.queryByText("Kept for you")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your buddy added this card")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kept up to date for you")).not.toBeInTheDocument();
   });
 
   it("heads a note with its own first line and keeps the rest beneath", () => {
@@ -69,6 +72,27 @@ describe("the cards the hire writes", () => {
     expect(onEdit).toHaveBeenCalledWith("c0", {
       kind: "NOTE",
       text: "Deploys\nare on Wednesdays",
+    });
+  });
+
+  it("opens the editor on the note as it is now, not as it was when the card mounted", () => {
+    const onEdit = vi.fn();
+    const { rerender } = render(
+      <BoardGrid board={board([note("Deploys\nare on Thursdays")])} onEdit={onEdit} />,
+    );
+
+    // What highlighting does to a note: the `==` live in its own text, so marking a sentence
+    // rewrites the card under an editor nobody has opened yet.
+    rerender(<BoardGrid board={board([note("Deploys\nare on ==Thursdays==")])} onEdit={onEdit} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /edit this note/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // Drafts seeded once, at mount, would put the pre-highlight version back here — the mark
+    // would disappear on the next edit, and nothing would say why.
+    expect(onEdit).toHaveBeenCalledWith("c0", {
+      kind: "NOTE",
+      text: "Deploys\nare on ==Thursdays==",
     });
   });
 
@@ -259,9 +283,8 @@ describe("folding and pinning", () => {
 describe("AddCardForm", () => {
   it("adds a note once it would say something", () => {
     const onAdd = vi.fn().mockResolvedValue(true);
-    render(<AddCardForm onAdd={onAdd} />);
+    render(<AddCardForm kind="NOTE" onAdd={onAdd} onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /note/i }));
     fireEvent.change(screen.getByLabelText(/what do you want to remember/i), {
       target: { value: "deploys are on Thursdays" },
     });
@@ -271,26 +294,21 @@ describe("AddCardForm", () => {
   });
 
   it("waits until a note has content", () => {
-    render(<AddCardForm onAdd={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /note/i }));
+    render(<AddCardForm kind="NOTE" onAdd={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: /add to my board/i })).toBeDisabled();
   });
 
   it("lets an empty checklist be made — that is a list about to be filled in", () => {
-    render(<AddCardForm onAdd={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /checklist/i }));
+    render(<AddCardForm kind="CHECKLIST" onAdd={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: /add to my board/i })).toBeEnabled();
   });
 
   it("keeps a link label optional", () => {
     const onAdd = vi.fn().mockResolvedValue(true);
-    render(<AddCardForm onAdd={onAdd} />);
+    render(<AddCardForm kind="LINK" onAdd={onAdd} onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /link/i }));
     fireEvent.change(screen.getByLabelText(/which link do you want to keep/i), {
       target: { value: "https://example.test" },
     });
@@ -301,5 +319,20 @@ describe("AddCardForm", () => {
       url: "https://example.test",
       label: null,
     });
+  });
+});
+
+describe("the three offers", () => {
+  it("names them in the row above the board and shows only glyphs in the margin rail", () => {
+    const onPick = vi.fn();
+    const { rerender } = render(<AddCardTriggers onPick={onPick} active={null} />);
+    expect(screen.getByRole("button", { name: "Note" })).toBeInTheDocument();
+
+    // The rail lives in a 10rem page margin, which three words do not fit into — and it runs down
+    // that margin rather than across it, so the glyphs stack.
+    rerender(<AddCardTriggers onPick={onPick} active={null} compact vertical />);
+    fireEvent.click(screen.getByRole("button", { name: /add a note/i }));
+
+    expect(onPick).toHaveBeenCalledWith("NOTE");
   });
 });
