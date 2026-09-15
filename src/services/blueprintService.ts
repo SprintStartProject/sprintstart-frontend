@@ -271,21 +271,6 @@ export const blueprintService = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
-  /** Stores a step's graph-canvas coordinates. */
-  updateStepGraphPosition: (scope: BlueprintScope, stepId: string, input: GraphPositionUpdate) =>
-    apiClient.fetch<GraphPositionUpdate>(`${blueprintBase(scope)}/steps/${stepId}/graph-position`, {
-      method: "PUT",
-      body: JSON.stringify(input),
-    }),
-  /** Removes a step from the graph canvas while preserving the step in its phase. */
-  removeStepGraphPosition: (scope: BlueprintScope, stepId: string, revision: number) =>
-    apiClient.fetch<{ revision: number }>(
-      `${blueprintBase(scope)}/steps/${stepId}/graph-position`,
-      {
-        method: "DELETE",
-        body: JSON.stringify({ revision }),
-      },
-    ),
   /** Stores a phase's top-level graph-canvas coordinates. */
   updateGraphNodePosition: (scope: BlueprintScope, nodeId: string, input: GraphPositionUpdate) =>
     apiClient.fetch<GraphPositionUpdate>(
@@ -357,21 +342,6 @@ export const blueprintService = {
       `${blueprintBase(scope)}/sub-graph-nodes/${nodeId}/blockers/${blockerId}`,
       { method: "DELETE", body: JSON.stringify({ revision }) },
     ),
-  /** Adds a prerequisite edge: the step cannot start until blockerId is complete. */
-  addStepBlocker: (scope: BlueprintScope, stepId: string, blockerId: string, revision: number) =>
-    apiClient.fetch<BlockerUpdate>(
-      `${blueprintBase(scope)}/steps/${stepId}/blockers/${blockerId}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ revision }),
-      },
-    ),
-  /** Removes a prerequisite edge from a step. */
-  removeStepBlocker: (scope: BlueprintScope, stepId: string, blockerId: string, revision: number) =>
-    apiClient.fetch<BlockerUpdate>(`${blueprintBase(scope)}/steps/${stepId}/blocker/${blockerId}`, {
-      method: "DELETE",
-      body: JSON.stringify({ revision }),
-    }),
   /** Adds a task to a Blueprint step. */
   createTask: (scope: BlueprintScope, stepId: string, input: TaskInput) =>
     apiClient.fetch(`${blueprintBase(scope)}/steps/${stepId}/task`, {
