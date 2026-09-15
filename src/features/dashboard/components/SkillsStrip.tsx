@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { GraduationCap } from "lucide-react";
+import { useAuth } from "../../../context/useAuth";
 import { Badge } from "../../../components/ui/Badge";
 import { getMySkillLevels, getMyTeamOverview } from "../../../services/teamManagementService";
 import type { UserSkillLevel } from "../../../services/teamManagementService";
@@ -61,9 +62,18 @@ function SkillPill({ skill, large }: { skill: UserSkillLevel; large: boolean }) 
  * a fixed-height cell.
  */
 export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
+  const { profile } = useAuth();
   const [roles, setRoles] = useState<ProjectRole[]>([]);
   const [skills, setSkills] = useState<UserSkillLevel[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /*
+    The role names that label each skill come from the user's own profile roles rather
+    than from `/api/v1/projectRoles`: that endpoint is ADMIN/PM/HR-only, so asking for it
+    here produced a 403 on every regular user's dashboard and fell back to fixture data.
+    `/users/me` already carries the same role IDs the skills point at.
+  */
+  const profileRoles = profile?.projectRoles;
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -71,7 +81,7 @@ export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
     async function loadProfile() {
       const [overview, skillLevels] = await Promise.all([
         getMyTeamOverview().catch(() => null),
-        getMySkillLevels(),
+        getMySkillLevels(profileRoles ?? []),
       ]);
 
       if (!isCurrentRequest) return;
@@ -86,7 +96,7 @@ export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
     return () => {
       isCurrentRequest = false;
     };
-  }, []);
+  }, [profileRoles]);
 
   if (loading) return null;
 
