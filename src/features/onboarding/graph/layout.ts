@@ -38,10 +38,7 @@ export type NodeFootprint = { width: number; height: number };
 function blockersInGraph(nodes: readonly LayoutNode[]): Map<string, string[]> {
   const ids = new Set(nodes.map((node) => node.id));
   return new Map(
-    nodes.map((node) => [
-      node.id,
-      node.blockerIds.filter((id) => ids.has(id) && id !== node.id),
-    ]),
+    nodes.map((node) => [node.id, node.blockerIds.filter((id) => ids.has(id) && id !== node.id)]),
   );
 }
 
@@ -106,7 +103,8 @@ function arrangeRows(nodes: readonly LayoutNode[]): string[][] {
       row.map((id) => {
         const neighbours = neighboursOf(id).filter((neighbour) => column.has(neighbour));
         const barycentre = neighbours.length
-          ? neighbours.reduce((sum, neighbour) => sum + column.get(neighbour)!, 0) / neighbours.length
+          ? neighbours.reduce((sum, neighbour) => sum + column.get(neighbour)!, 0) /
+            neighbours.length
           : column.get(id)!;
         return [id, barycentre];
       }),
@@ -179,7 +177,10 @@ export function hasStoredLayout(nodes: readonly LayoutNode[]): boolean {
 }
 
 /** Whether any two stored nodes would be drawn overlapping at the given footprint. */
-export function storedLayoutOverlaps(nodes: readonly LayoutNode[], footprint: NodeFootprint): boolean {
+export function storedLayoutOverlaps(
+  nodes: readonly LayoutNode[],
+  footprint: NodeFootprint,
+): boolean {
   for (let left = 0; left < nodes.length; left += 1) {
     for (let right = left + 1; right < nodes.length; right += 1) {
       const a = nodes[left];

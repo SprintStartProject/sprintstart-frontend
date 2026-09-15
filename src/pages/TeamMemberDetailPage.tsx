@@ -490,7 +490,9 @@ export function TeamMemberDetailPage() {
   async function handleCreateCustomStep() {
     if (!stepInsertTarget || !customStepTitle.trim()) return;
 
-    const targetPhase = onboardingPath?.phases.find((phase) => phase.id === stepInsertTarget.phaseId);
+    const targetPhase = onboardingPath?.phases.find(
+      (phase) => phase.id === stepInsertTarget.phaseId,
+    );
 
     if (!targetPhase) return;
 
@@ -507,7 +509,11 @@ export function TeamMemberDetailPage() {
       .filter((position): position is number => position !== undefined);
     const position = Math.min(
       targetPhase.steps.length,
-      after.length ? Math.max(...after) + 1 : before.length ? Math.min(...before) : targetPhase.steps.length,
+      after.length
+        ? Math.max(...after) + 1
+        : before.length
+          ? Math.min(...before)
+          : targetPhase.steps.length,
     );
 
     try {
@@ -772,189 +778,189 @@ export function TeamMemberDetailPage() {
         {/* Below the journey rather than beside it: the graph needs the width, and these read fine
             as two cards side by side. items-start keeps each card at its own height. */}
         <aside aria-label="Member insights" className="mt-6 grid items-start gap-4 lg:grid-cols-2">
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-              <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
+          <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+            <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
 
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquareText className="h-4 w-4 text-app-text-muted" />
-                    <p className="text-sm font-semibold text-app-text">Open items</p>
-                  </div>
-
-                  {(unreadFeedback.length > 0 || pendingSkip) && (
-                    <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
-                      {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
-                    </span>
-                  )}
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquareText className="h-4 w-4 text-app-text-muted" />
+                  <p className="text-sm font-semibold text-app-text">Open items</p>
                 </div>
 
-                {pendingSkip && (
-                  <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 gap-3">
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                          <SkipForward className="h-4 w-4" />
-                        </span>
-
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-app-text">Skip request</p>
-                            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                              Pending
-                            </span>
-                          </div>
-
-                          {user.currentStep?.title && (
-                            <p className="mt-1 text-xs text-app-text-muted">
-                              {user.currentStep.title}
-                            </p>
-                          )}
-
-                          <p className="mt-2 text-sm text-app-text">{pendingSkip.reason}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void handleSkipReview("accept")}
-                          disabled={reviewingSkipAction !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-app-success-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-app-success-solid/90 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {reviewingSkipAction === "accept" ? "Accepting..." : "Accept"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleSkipReview("deny")}
-                          disabled={reviewingSkipAction !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          {reviewingSkipAction === "deny" ? "Denying..." : "Deny"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                {(unreadFeedback.length > 0 || pendingSkip) && (
+                  <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
+                    {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
+                  </span>
                 )}
+              </div>
 
-                {loadingFeedback ? (
-                  <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                    Loading feedback...
-                  </p>
-                ) : unreadFeedback.length > 0 ? (
-                  unreadFeedback.map((feedback) => {
-                    const isUnread = feedback.read !== true && !feedback.readAt;
-
-                    return (
-                      <div
-                        key={feedback.id}
-                        className={`rounded-2xl border p-4 ${
-                          isUnread
-                            ? "border-app-warning-border bg-app-warning-bg"
-                            : "border-app-border bg-app-surface-muted"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 gap-3">
-                            <span
-                              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                isUnread
-                                  ? "bg-app-surface text-app-warning-text"
-                                  : "bg-app-surface text-app-text-muted"
-                              }`}
-                            >
-                              <MessageSquareText className="h-4 w-4" />
-                            </span>
-
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-app-text">Feedback</p>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                    isUnread
-                                      ? "bg-app-surface text-app-warning-text"
-                                      : "bg-app-border-muted text-app-text-muted"
-                                  }`}
-                                >
-                                  {isUnread ? "Unread" : "Read"}
-                                </span>
-                              </div>
-
-                              <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
-
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
-                                {feedback.stepTitle && (
-                                  <span className="rounded-full bg-app-surface px-2 py-0.5">
-                                    {feedback.stepTitle}
-                                  </span>
-                                )}
-                                {feedback.createdAt && (
-                                  <span>
-                                    {new Date(feedback.createdAt).toLocaleDateString("en-US", {
-                                      year: "numeric",
-                                      month: "short",
-                                      day: "numeric",
-                                    })}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {isUnread && (
-                            <button
-                              type="button"
-                              onClick={() => void handleMarkFeedbackRead(feedback.id)}
-                              disabled={markingFeedbackId === feedback.id}
-                              className="shrink-0 rounded-lg border border-app-warning-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-warning-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {markingFeedbackId === feedback.id ? "Marking..." : "Mark read"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : user.hasFeedback && feedbackItems.length === 0 ? (
-                  <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                    <div className="flex items-start gap-3">
+              {pendingSkip && (
+                <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 gap-3">
                       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                        <MessageSquareText className="h-4 w-4" />
+                        <SkipForward className="h-4 w-4" />
                       </span>
-                      <div className="min-w-0 flex-1">
+
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-app-text">Feedback</p>
+                          <p className="text-sm font-semibold text-app-text">Skip request</p>
                           <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                            Unread
+                            Pending
                           </span>
                         </div>
-                        <p className="mt-2 text-sm text-app-text">
-                          {user.firstname} has left feedback on their onboarding path.
-                        </p>
+
+                        {user.currentStep?.title && (
+                          <p className="mt-1 text-xs text-app-text-muted">
+                            {user.currentStep.title}
+                          </p>
+                        )}
+
+                        <p className="mt-2 text-sm text-app-text">{pendingSkip.reason}</p>
                       </div>
                     </div>
-                  </div>
-                ) : !pendingSkip ? (
-                  <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                    No open feedback or skip requests.
-                  </p>
-                ) : null}
 
-                {feedbackError && <p className="text-xs text-app-danger-text">{feedbackError}</p>}
-              </div>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleSkipReview("accept")}
+                        disabled={reviewingSkipAction !== null}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-app-success-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-app-success-solid/90 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        {reviewingSkipAction === "accept" ? "Accepting..." : "Accept"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleSkipReview("deny")}
+                        disabled={reviewingSkipAction !== null}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        {reviewingSkipAction === "deny" ? "Denying..." : "Deny"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {loadingFeedback ? (
+                <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
+                  Loading feedback...
+                </p>
+              ) : unreadFeedback.length > 0 ? (
+                unreadFeedback.map((feedback) => {
+                  const isUnread = feedback.read !== true && !feedback.readAt;
+
+                  return (
+                    <div
+                      key={feedback.id}
+                      className={`rounded-2xl border p-4 ${
+                        isUnread
+                          ? "border-app-warning-border bg-app-warning-bg"
+                          : "border-app-border bg-app-surface-muted"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 gap-3">
+                          <span
+                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                              isUnread
+                                ? "bg-app-surface text-app-warning-text"
+                                : "bg-app-surface text-app-text-muted"
+                            }`}
+                          >
+                            <MessageSquareText className="h-4 w-4" />
+                          </span>
+
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-app-text">Feedback</p>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  isUnread
+                                    ? "bg-app-surface text-app-warning-text"
+                                    : "bg-app-border-muted text-app-text-muted"
+                                }`}
+                              >
+                                {isUnread ? "Unread" : "Read"}
+                              </span>
+                            </div>
+
+                            <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
+                              {feedback.stepTitle && (
+                                <span className="rounded-full bg-app-surface px-2 py-0.5">
+                                  {feedback.stepTitle}
+                                </span>
+                              )}
+                              {feedback.createdAt && (
+                                <span>
+                                  {new Date(feedback.createdAt).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isUnread && (
+                          <button
+                            type="button"
+                            onClick={() => void handleMarkFeedbackRead(feedback.id)}
+                            disabled={markingFeedbackId === feedback.id}
+                            className="shrink-0 rounded-lg border border-app-warning-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-warning-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {markingFeedbackId === feedback.id ? "Marking..." : "Mark read"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : user.hasFeedback && feedbackItems.length === 0 ? (
+                <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
+                      <MessageSquareText className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-app-text">Feedback</p>
+                        <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
+                          Unread
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-app-text">
+                        {user.firstname} has left feedback on their onboarding path.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : !pendingSkip ? (
+                <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
+                  No open feedback or skip requests.
+                </p>
+              ) : null}
+
+              {feedbackError && <p className="text-xs text-app-danger-text">{feedbackError}</p>}
             </div>
-            <MemberGapsPanel
-              skillLevels={skillLevels}
-              skillGaps={skillGaps}
-              knowledgeGaps={topKnowledgeGaps}
-              onOpenKnowledgeGap={(gapId) => {
-                void navigate(`/insights/knowledge-gaps/${gapId}`);
-              }}
-            />
-          </aside>
+          </div>
+          <MemberGapsPanel
+            skillLevels={skillLevels}
+            skillGaps={skillGaps}
+            knowledgeGaps={topKnowledgeGaps}
+            onOpenKnowledgeGap={(gapId) => {
+              void navigate(`/insights/knowledge-gaps/${gapId}`);
+            }}
+          />
+        </aside>
       </main>
 
       <Modal

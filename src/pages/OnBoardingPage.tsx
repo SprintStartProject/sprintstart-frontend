@@ -35,10 +35,8 @@ import {
   PathGraphExplorer,
   type GraphScope,
 } from "../features/onboarding/components/journey/PathGraphExplorer";
-import {
-  PhaseItemList,
-  primaryActionLabel,
-} from "../features/onboarding/components/journey/PhaseItemList";
+import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
+import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
 import { PhaseRail } from "../features/onboarding/components/journey/PhaseRail";
 import { QuestionModal } from "../features/onboarding/components/QuestionModal";
 import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
@@ -86,8 +84,12 @@ export function OnBoardingPage() {
   const location = useLocation();
   const toast = useToast();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
-  const { selectedProjectId, isLoading: isProjectLoading, isSwitcherEnabled, canManageSelected } =
-    useProjectContext();
+  const {
+    selectedProjectId,
+    isLoading: isProjectLoading,
+    isSwitcherEnabled,
+    canManageSelected,
+  } = useProjectContext();
   const journey = useOnboardingJourney();
   const { generation, startGeneration, clearGeneration } = journey;
 
@@ -122,7 +124,9 @@ export function OnBoardingPage() {
         const ordered = sortedPhases(next);
         if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
         const requested = focusQuestionId
-          ? ordered.find((phase) => phase.questions.some((question) => question.id === focusQuestionId))
+          ? ordered.find((phase) =>
+              phase.questions.some((question) => question.id === focusQuestionId),
+            )
           : undefined;
         const active = ordered[findActivePhaseIndex({ ...next, phases: ordered })];
         return requested?.id ?? active?.id ?? "";
@@ -161,17 +165,23 @@ export function OnBoardingPage() {
     }
   }, [applyPath]);
 
-  // A generation that finished -- here or while the user was elsewhere -- hands its path over.
+  // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
+  // Read fresh rather than taken from the generation: the hire may have started working on it before
+  // coming back here, and the stream's copy knows nothing of that.
   useEffect(() => {
     if (generation.status !== "done") return;
-    clearGeneration();
-    if (generation.path) {
-      applyPath(generation.path, { keepSelection: false });
-      setSelectedItemId(null);
-    } else {
-      void refreshPath();
-    }
-  }, [applyPath, clearGeneration, generation, refreshPath]);
+    let cancelled = false;
+    onboardingService
+      .fetchPath()
+      .then((next) => {
+        if (!cancelled) applyPath(next, { keepSelection: false });
+      })
+      .catch((error: unknown) => console.error("Failed to load the new onboarding path:", error))
+      .finally(() => clearGeneration());
+    return () => {
+      cancelled = true;
+    };
+  }, [applyPath, clearGeneration, generation]);
 
   // Brings the question the user was sent for into view, once per visit.
   const hasFocusedQuestionRef = useRef(false);
@@ -205,7 +215,10 @@ export function OnBoardingPage() {
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
   const generationIssueSummary = generationIssues
-    .map((issue) => `${issue.title} (${issue.status === "TIMED_OUT" ? "timed out" : issue.status.toLowerCase()})`)
+    .map(
+      (issue) =>
+        `${issue.title} (${issue.status === "TIMED_OUT" ? "timed out" : issue.status.toLowerCase()})`,
+    )
     .join(", ");
 
   // ── Actions ─────────────────────────────────────────────────
@@ -223,7 +236,10 @@ export function OnBoardingPage() {
     openStep(stepId);
   };
 
-  const phaseOf = (item: PhaseItem) => phases.find((phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId));
+  const phaseOf = (item: PhaseItem) =>
+    phases.find(
+      (phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId),
+    );
 
   const runPrimary = (item: PhaseItem) => {
     if (item.kind === "question") {
@@ -331,7 +347,9 @@ export function OnBoardingPage() {
         hasProject={!!selectedProjectId}
         isSwitcherEnabled={isSwitcherEnabled}
         canManage={canManageSelected}
-        unavailableReason={journey.availability === "unavailable" ? journey.unavailableReason : null}
+        unavailableReason={
+          journey.availability === "unavailable" ? journey.unavailableReason : null
+        }
         lastError={generation.status === "error" ? generation.message : null}
         onStart={requestGeneration}
       />
@@ -386,7 +404,9 @@ export function OnBoardingPage() {
         <div className="app-page-content flex flex-col gap-5 py-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-5">
             <ProgressRing value={overall?.percentage ?? 0} size={72} stroke={6}>
-              <span className="text-lg font-bold text-app-text tabular-nums">{overall?.percentage ?? 0}%</span>
+              <span className="text-lg font-bold text-app-text tabular-nums">
+                {overall?.percentage ?? 0}%
+              </span>
             </ProgressRing>
             <div className="min-w-0">
               <p className="text-xs font-semibold tracking-[0.14em] text-app-brand-text uppercase">
@@ -406,7 +426,8 @@ export function OnBoardingPage() {
                 </span>
                 {overall && overall.remainingMinutes > 0 ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" aria-hidden="true" />~{formatMinutes(overall.remainingMinutes)} left
+                    <Clock className="h-4 w-4" aria-hidden="true" />~
+                    {formatMinutes(overall.remainingMinutes)} left
                   </span>
                 ) : null}
               </div>
@@ -445,14 +466,16 @@ export function OnBoardingPage() {
           <UpNextCard
             phase={nextAction.phase}
             phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
-            item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)!}
+            item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
             onPrimary={runPrimary}
           />
         ) : null}
 
         <div
           className={`grid items-start gap-6 transition-[grid-template-columns] duration-300 ${
-            isRailCollapsed ? "lg:grid-cols-[4.25rem_minmax(0,1fr)]" : "lg:grid-cols-[18rem_minmax(0,1fr)]"
+            isRailCollapsed
+              ? "lg:grid-cols-[4.25rem_minmax(0,1fr)]"
+              : "lg:grid-cols-[18rem_minmax(0,1fr)]"
           }`}
         >
           <PhaseRail
@@ -473,13 +496,19 @@ export function OnBoardingPage() {
               <div className="min-w-0">
                 <p className="text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
                   Phase {selectedPhaseIndex + 1} of {phases.length}
-                  {selectedPhase.locked ? " · Locked" : openInPhase > 0 ? ` · ${openInPhase} ready` : ""}
+                  {selectedPhase.locked
+                    ? " · Locked"
+                    : openInPhase > 0
+                      ? ` · ${openInPhase} ready`
+                      : ""}
                 </p>
                 <h2 id="phase-title" className="mt-1 text-xl font-semibold text-app-text">
                   {selectedPhase.title}
                 </h2>
                 {selectedPhase.description ? (
-                  <p className="mt-1 max-w-2xl text-sm text-app-text-muted">{selectedPhase.description}</p>
+                  <p className="mt-1 max-w-2xl text-sm text-app-text-muted">
+                    {selectedPhase.description}
+                  </p>
                 ) : null}
                 <div className="mt-3 flex items-center gap-3">
                   <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
@@ -512,7 +541,8 @@ export function OnBoardingPage() {
             {selectedPhase.locked ? (
               <div className="flex items-center gap-3 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
                 <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                This phase opens once the phases before it are complete. You can look around already.
+                This phase opens once the phases before it are complete. You can look around
+                already.
               </div>
             ) : null}
 
@@ -628,7 +658,13 @@ function CenteredState({ children }: { children: ReactNode }) {
   );
 }
 
-function StateIcon({ tone, children }: { tone: "brand" | "warning" | "danger"; children: ReactNode }) {
+function StateIcon({
+  tone,
+  children,
+}: {
+  tone: "brand" | "warning" | "danger";
+  children: ReactNode;
+}) {
   const toneClass =
     tone === "danger"
       ? "bg-app-danger-bg text-app-danger-text"
@@ -636,7 +672,10 @@ function StateIcon({ tone, children }: { tone: "brand" | "warning" | "danger"; c
         ? "bg-app-warning-bg text-app-warning-text"
         : "bg-app-brand-soft text-app-brand-text";
   return (
-    <span className={`flex h-16 w-16 items-center justify-center rounded-3xl ${toneClass}`} aria-hidden="true">
+    <span
+      className={`flex h-16 w-16 items-center justify-center rounded-3xl ${toneClass}`}
+      aria-hidden="true"
+    >
       {children}
     </span>
   );
@@ -675,18 +714,20 @@ function UpNextCard({
           </span>
           <div className="min-w-0">
             <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
-              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} · Phase{" "}
-              {phaseIndex + 1}: {phase.title}
+              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} ·
+              Phase {phaseIndex + 1}: {phase.title}
             </p>
             <h2 className="mt-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
               {isQuestion ? item.question.question : item.title}
             </h2>
             {item.kind === "step" && item.step.description ? (
-              <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-app-text-muted">{item.step.description}</p>
+              <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-app-text-muted">
+                {item.step.description}
+              </p>
             ) : isQuestion ? (
               <p className="mt-1 text-sm text-app-text-muted">
                 {state === "retry"
-                  ? "You got this one wrong before -- answer it correctly to move on."
+                  ? "You got this one wrong before — answer it correctly to move on."
                   : "Answer this question to move on in your onboarding."}
               </p>
             ) : null}
@@ -749,13 +790,17 @@ function EmptyJourney({
           {noBlueprint ? <GitBranch className="h-7 w-7" /> : <BookOpen className="h-7 w-7" />}
         </StateIcon>
         <h2 className="mt-5 text-xl font-semibold text-app-text">
-          {noBlueprint ? "Onboarding isn't set up for this project yet" : "There's nothing to learn from yet"}
+          {noBlueprint
+            ? "Onboarding isn't set up for this project yet"
+            : "There's nothing to learn from yet"}
         </h2>
         <p className="mt-2 max-w-md text-sm text-app-text-muted">
           {noBlueprint
             ? "An onboarding path is built from the project's published blueprint, and this project doesn't have one."
             : "An onboarding path is built from the project's knowledge base, and nothing has been added to it yet."}{" "}
-          {canManage ? "" : "Your project manager can set this up -- your path will be ready to build afterwards."}
+          {canManage
+            ? ""
+            : "Your project manager can set this up — your path will be ready to build afterwards."}
         </p>
         {canManage ? (
           <Link
@@ -777,16 +822,26 @@ function EmptyJourney({
       </StateIcon>
       <h2 className="mt-5 text-2xl font-bold text-app-text">Build your onboarding path</h2>
       <p className="mt-2 max-w-md text-sm text-app-text-muted">
-        Your path is put together from your project's blueprint and knowledge base: phases, steps and
-        a few questions to check what stuck. It takes a few minutes and keeps running in the background.
+        Your path is put together from your project’s blueprint and knowledge base: phases, steps
+        and a few questions to check what stuck. It takes a few minutes and keeps running in the
+        background.
       </p>
       {lastError ? (
-        <div role="alert" className="mt-5 flex max-w-md items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-left text-sm text-app-danger-text">
+        <div
+          role="alert"
+          className="mt-5 flex max-w-md items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-left text-sm text-app-danger-text"
+        >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {lastError}
         </div>
       ) : null}
-      <Button className="mt-6" variant="primary" size="lg" onClick={onStart} icon={<PlayCircle className="h-4 w-4" />}>
+      <Button
+        className="mt-6"
+        variant="primary"
+        size="lg"
+        onClick={onStart}
+        icon={<PlayCircle className="h-4 w-4" />}
+      >
         {lastError ? "Try again" : "Start personalization"}
       </Button>
     </CenteredState>

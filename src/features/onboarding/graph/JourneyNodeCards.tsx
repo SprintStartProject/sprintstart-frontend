@@ -15,9 +15,7 @@ import type { ReactNode } from "react";
 import type { ItemState, PhaseItem, PhaseState, Progress } from "../journey";
 import { formatMinutes } from "../journey";
 import type { JourneyNodeRenderState } from "./JourneyCanvas";
-
-export const ITEM_NODE_SIZE = { width: 248, height: 92 };
-export const PHASE_NODE_SIZE = { width: 252, height: 108 };
+import { itemKindLabel, itemStateLabel, phaseStateLabel } from "./nodeLabels";
 
 const stateFrame: Record<ItemState, string> = {
   done: "border-app-success-border bg-app-surface",
@@ -30,24 +28,33 @@ const stateFrame: Record<ItemState, string> = {
 };
 
 const stateIcon: Record<ItemState, { icon: ReactNode; tone: string }> = {
-  done: { icon: <CheckCircle2 className="h-4 w-4" />, tone: "bg-app-success-bg text-app-success-text" },
-  skipped: { icon: <SkipForward className="h-4 w-4" />, tone: "bg-app-surface-muted text-app-text-muted" },
+  done: {
+    icon: <CheckCircle2 className="h-4 w-4" />,
+    tone: "bg-app-success-bg text-app-success-text",
+  },
+  skipped: {
+    icon: <SkipForward className="h-4 w-4" />,
+    tone: "bg-app-surface-muted text-app-text-muted",
+  },
   active: { icon: <PlayCircle className="h-4 w-4" />, tone: "bg-app-brand text-white" },
   open: { icon: <Sparkles className="h-4 w-4" />, tone: "bg-app-brand-soft text-app-brand-text" },
-  retry: { icon: <RotateCcw className="h-4 w-4" />, tone: "bg-app-warning-bg text-app-warning-text" },
-  locked: { icon: <Lock className="h-3.5 w-3.5" />, tone: "bg-app-surface-muted text-app-text-subtle" },
+  retry: {
+    icon: <RotateCcw className="h-4 w-4" />,
+    tone: "bg-app-warning-bg text-app-warning-text",
+  },
+  locked: {
+    icon: <Lock className="h-3.5 w-3.5" />,
+    tone: "bg-app-surface-muted text-app-text-subtle",
+  },
 };
 
-export const itemStateLabel: Record<ItemState, string> = {
-  done: "Done",
-  skipped: "Skipped",
-  active: "In progress",
-  open: "Ready",
-  retry: "Try again",
-  locked: "Locked",
-};
-
-export function ItemKindIcon({ item, className = "h-3.5 w-3.5" }: { item: PhaseItem; className?: string }) {
+export function ItemKindIcon({
+  item,
+  className = "h-3.5 w-3.5",
+}: {
+  item: PhaseItem;
+  className?: string;
+}) {
   if (item.kind === "question") return <CircleHelp className={className} aria-hidden="true" />;
   switch (item.step.type) {
     case "VIDEO":
@@ -58,22 +65,6 @@ export function ItemKindIcon({ item, className = "h-3.5 w-3.5" }: { item: PhaseI
       return <Link2 className={className} aria-hidden="true" />;
     default:
       return <SquareCheckBig className={className} aria-hidden="true" />;
-  }
-}
-
-export function itemKindLabel(item: PhaseItem): string {
-  if (item.kind === "question") {
-    return item.question.type === "MULTIPLE_CHOICE" ? "Multiple choice" : "Short answer";
-  }
-  switch (item.step.type) {
-    case "VIDEO":
-      return "Video";
-    case "DOCUMENT":
-      return "Reading";
-    case "LINK":
-      return "Link";
-    default:
-      return "Task";
   }
 }
 
@@ -160,11 +151,25 @@ export function ProgressRing({
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - Math.min(100, Math.max(0, value)) / 100);
   const toneClass =
-    tone === "success" ? "stroke-app-success-solid" : tone === "muted" ? "stroke-app-text-subtle" : "stroke-app-brand";
+    tone === "success"
+      ? "stroke-app-success-solid"
+      : tone === "muted"
+        ? "stroke-app-text-subtle"
+        : "stroke-app-brand";
   return (
-    <span className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
+    <span
+      className="relative inline-flex shrink-0 items-center justify-center"
+      style={{ width: size, height: size }}
+    >
       <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className="stroke-app-border" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          className="stroke-app-border"
+        />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -177,7 +182,9 @@ export function ProgressRing({
           className={`${toneClass} transition-[stroke-dashoffset] duration-700 ease-out`}
         />
       </svg>
-      {children ? <span className="absolute inset-0 flex items-center justify-center">{children}</span> : null}
+      {children ? (
+        <span className="absolute inset-0 flex items-center justify-center">{children}</span>
+      ) : null}
     </span>
   );
 }
@@ -188,13 +195,6 @@ const phaseFrame: Record<PhaseState, string> = {
     "border-app-brand bg-app-surface shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-app-brand)_18%,transparent),0_18px_40px_-20px_var(--color-app-brand)]",
   open: "border-app-brand-border bg-app-surface",
   locked: "border-dashed border-app-border bg-app-surface/70",
-};
-
-export const phaseStateLabel: Record<PhaseState, string> = {
-  done: "Complete",
-  current: "You are here",
-  open: "Open",
-  locked: "Locked",
 };
 
 /** One phase on the journey map. */

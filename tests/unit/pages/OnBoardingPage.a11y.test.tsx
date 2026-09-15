@@ -93,7 +93,7 @@ describe("OnBoardingPage Accessibility", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your onboarding journey")).toBeInTheDocument();
+      expect(screen.getByText("Your path into the project")).toBeInTheDocument();
     });
 
     expect(

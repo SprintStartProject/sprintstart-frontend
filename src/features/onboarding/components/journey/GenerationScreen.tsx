@@ -82,18 +82,27 @@ export function GenerationScreen({
               <Sparkles className="h-7 w-7" aria-hidden="true" />
             </span>
           </span>
-          <h1 className="mt-6 text-2xl font-bold text-app-text sm:text-3xl">Building your onboarding path</h1>
+          <h1 className="mt-6 text-2xl font-bold text-app-text sm:text-3xl">
+            Building your onboarding path
+          </h1>
           <p className="mx-auto mt-2 max-w-xl text-sm text-app-text-muted">
-            Each phase is put together from your project's knowledge base. This keeps running in the
-            background -- feel free to{" "}
-            <Link to="/" className="font-medium text-app-brand-text underline-offset-2 hover:underline">
+            Each phase is put together from your project’s knowledge base. This keeps running in the
+            background — feel free to{" "}
+            <Link
+              to="/"
+              className="font-medium text-app-brand-text underline-offset-2 hover:underline"
+            >
               look around
             </Link>
-            , we'll let you know when it's ready.
+            , we’ll let you know when it’s ready.
           </p>
         </div>
 
-        <div className="mt-8 rounded-3xl border border-app-border bg-app-surface p-5 sm:p-6" role="status" aria-live="polite">
+        <div
+          className="mt-8 rounded-3xl border border-app-border bg-app-surface p-5 sm:p-6"
+          role="status"
+          aria-live="polite"
+        >
           <div className="flex items-center justify-between gap-4 text-sm">
             <span className="font-semibold text-app-text">
               {total > 0 ? `${done} of ${total} phases assembled` : "Starting up…"}
@@ -136,7 +145,9 @@ export function GenerationScreen({
                     )}
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-app-text">{phase.name}</span>
+                    <span className="block truncate text-sm font-medium text-app-text">
+                      {phase.name}
+                    </span>
                     <span className="block truncate text-xs text-app-text-subtle">
                       {phase.state === "done"
                         ? "Ready"

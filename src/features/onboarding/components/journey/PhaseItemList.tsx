@@ -1,8 +1,16 @@
 import { ChevronRight, Eye, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../../../../components/ui/Button";
-import { formatMinutes, itemState, orderedPhaseItems, waitingOn, type ItemState, type PhaseItem } from "../../journey";
-import { ItemKindIcon, itemKindLabel, itemStateLabel } from "../../graph/JourneyNodeCards";
+import {
+  formatMinutes,
+  itemState,
+  orderedPhaseItems,
+  waitingOn,
+  type ItemState,
+  type PhaseItem,
+} from "../../journey";
+import { ItemKindIcon } from "../../graph/JourneyNodeCards";
+import { itemKindLabel, itemStateLabel, primaryActionLabel } from "../../graph/nodeLabels";
 import { StepOriginBadge } from "../StepOriginBadge";
 import type { OnboardingPhaseEndpoint } from "../../types";
 import { CheckCircle2, PlayCircle, RotateCcw, SkipForward, Sparkles } from "lucide-react";
@@ -24,18 +32,6 @@ const markerIcon: Record<ItemState, ReactNode> = {
   retry: <RotateCcw className="h-4 w-4" />,
   locked: <Lock className="h-3.5 w-3.5" />,
 };
-
-/** What the primary button of an item says, or null for items that only open read-only. */
-export function primaryActionLabel(item: PhaseItem, state: ItemState): string | null {
-  if (item.kind === "question") {
-    if (state === "retry") return "Try again";
-    if (state === "open") return "Answer";
-    return null;
-  }
-  if (state === "active") return "Continue";
-  if (state === "open") return "Start";
-  return null;
-}
 
 type Props = {
   phase: OnboardingPhaseEndpoint;
@@ -153,7 +149,9 @@ export function PhaseItemList({ phase, nextItemId, onPrimary, onView }: Props) {
                       View
                     </Button>
                   ) : (
-                    <span className="text-xs font-medium text-app-text-subtle">{itemStateLabel[state]}</span>
+                    <span className="text-xs font-medium text-app-text-subtle">
+                      {itemStateLabel[state]}
+                    </span>
                   )}
                 </div>
               </div>

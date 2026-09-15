@@ -1,7 +1,8 @@
 import { CheckCircle2, ChevronDown, Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { phaseItems, phaseProgress, phaseState, itemState, type PhaseState } from "../../journey";
-import { ProgressRing, phaseStateLabel } from "../../graph/JourneyNodeCards";
+import { ProgressRing } from "../../graph/JourneyNodeCards";
+import { phaseStateLabel } from "../../graph/nodeLabels";
 import type { OnboardingPhaseEndpoint } from "../../types";
 
 type Props = {
@@ -22,7 +23,8 @@ function openCounts(phase: OnboardingPhaseEndpoint) {
   const items = phaseItems(phase).map((item) => itemState(item, phase.locked));
   return {
     openQuestions: phase.questions.filter((question) => question.status !== "PASSED").length,
-    ready: items.filter((state) => state === "open" || state === "active" || state === "retry").length,
+    ready: items.filter((state) => state === "open" || state === "active" || state === "retry")
+      .length,
   };
 }
 
@@ -50,10 +52,12 @@ function RailRow({
         type="button"
         aria-pressed={selected}
         aria-label={`Phase ${index + 1}: ${phase.title}, ${phaseStateLabel[state]}`}
-        title={`${index + 1}. ${phase.title} -- ${progress.completed}/${progress.total}`}
+        title={`${index + 1}. ${phase.title} · ${progress.completed}/${progress.total}`}
         onClick={onSelect}
         className={`flex w-full items-center justify-center rounded-2xl border py-2 transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-          selected ? "border-app-brand bg-app-brand-soft" : "border-transparent hover:bg-app-surface-hover"
+          selected
+            ? "border-app-brand bg-app-brand-soft"
+            : "border-transparent hover:bg-app-surface-hover"
         }`}
       >
         <ProgressRing
@@ -197,7 +201,9 @@ export function PhaseRail({
             <span className="block text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
               Phase {selectedIndex + 1} of {phases.length}
             </span>
-            <span className="block truncate text-sm font-semibold text-app-text">{selected?.title}</span>
+            <span className="block truncate text-sm font-semibold text-app-text">
+              {selected?.title}
+            </span>
           </span>
           <ChevronDown
             className={`h-4 w-4 shrink-0 text-app-text-muted transition-transform ${open ? "rotate-180" : ""}`}
@@ -233,7 +239,11 @@ export function PhaseRail({
               title={collapsed ? "Expand phase list" : "Collapse phase list"}
               className="rounded-lg p-1.5 text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
             >
-              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              {collapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
             </button>
           ) : null}
         </div>

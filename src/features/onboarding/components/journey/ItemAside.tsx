@@ -1,7 +1,8 @@
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatMinutes, itemState, phaseItems, unlockedBy, type PhaseItem } from "../../journey";
-import { ItemKindIcon, itemKindLabel, itemStateLabel } from "../../graph/JourneyNodeCards";
+import { ItemKindIcon } from "../../graph/JourneyNodeCards";
+import { itemKindLabel, itemStateLabel } from "../../graph/nodeLabels";
 import type { OnboardingPhaseEndpoint } from "../../types";
 
 /**
@@ -48,7 +49,9 @@ export function ItemAside({
           <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
             <ItemKindIcon item={item} className="h-3.5 w-3.5" />
             {itemKindLabel(item)}
-            {item.kind === "step" && item.step.estimatedMinutes ? ` · ${formatMinutes(item.step.estimatedMinutes)}` : ""}
+            {item.kind === "step" && item.step.estimatedMinutes
+              ? ` · ${formatMinutes(item.step.estimatedMinutes)}`
+              : ""}
           </p>
           <h3 className="mt-1 text-base leading-snug font-semibold text-app-text">
             {item.kind === "question" ? item.question.question : item.title}
@@ -88,7 +91,7 @@ export function ItemAside({
           icon={<ArrowUp className="h-3.5 w-3.5" />}
           items={blockers}
           phase={phase}
-          empty="Nothing -- it is open as soon as its phase is."
+          empty="Nothing — it is open as soon as its phase is."
           onSelect={onSelect}
         />
         <Neighbours
@@ -101,7 +104,9 @@ export function ItemAside({
         />
       </div>
 
-      {actions ? <div className="flex flex-wrap gap-2 border-t border-app-border px-4 py-3">{actions}</div> : null}
+      {actions ? (
+        <div className="flex flex-wrap gap-2 border-t border-app-border px-4 py-3">{actions}</div>
+      ) : null}
     </aside>
   );
 }

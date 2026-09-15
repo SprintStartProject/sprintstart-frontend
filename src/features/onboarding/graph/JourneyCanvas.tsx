@@ -148,8 +148,24 @@ export function JourneyCanvas<TNode extends LayoutNode>({
 
   // Gesture bookkeeping lives in a ref: it changes on every pointer move, and none of it is drawn.
   const gestureRef = useRef<
-    | { kind: "pan"; pointerId: number; startX: number; startY: number; origin: Viewport; moved: boolean; nodeId: string | null }
-    | { kind: "node"; pointerId: number; startX: number; startY: number; nodeId: string; origin: GraphPoint; moved: boolean }
+    | {
+        kind: "pan";
+        pointerId: number;
+        startX: number;
+        startY: number;
+        origin: Viewport;
+        moved: boolean;
+        nodeId: string | null;
+      }
+    | {
+        kind: "node";
+        pointerId: number;
+        startX: number;
+        startY: number;
+        nodeId: string;
+        origin: GraphPoint;
+        moved: boolean;
+      }
     | { kind: "connect"; pointerId: number; sourceId: string }
     | null
   >(null);
@@ -342,7 +358,11 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     gesture.moved = true;
 
     if (gesture.kind === "pan") {
-      setViewport({ ...gesture.origin, x: gesture.origin.x + deltaX, y: gesture.origin.y + deltaY });
+      setViewport({
+        ...gesture.origin,
+        x: gesture.origin.x + deltaX,
+        y: gesture.origin.y + deltaY,
+      });
       return;
     }
 
@@ -403,7 +423,10 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     }
     if (onCanvasDoubleClick) {
       const world = toWorld(event.clientX, event.clientY);
-      onCanvasDoubleClick({ x: Math.round(world.x / SNAP) * SNAP, y: Math.round(world.y / SNAP) * SNAP });
+      onCanvasDoubleClick({
+        x: Math.round(world.x / SNAP) * SNAP,
+        y: Math.round(world.y / SNAP) * SNAP,
+      });
     }
   };
 
@@ -498,7 +521,10 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     const height = 104;
     const graphWidth = bounds.maxX - bounds.minX;
     const graphHeight = bounds.maxY - bounds.minY;
-    const scale = Math.min((width - 12) / Math.max(graphWidth, 1), (height - 12) / Math.max(graphHeight, 1));
+    const scale = Math.min(
+      (width - 12) / Math.max(graphWidth, 1),
+      (height - 12) / Math.max(graphHeight, 1),
+    );
     const offsetX = (width - graphWidth * scale) / 2 - bounds.minX * scale;
     const offsetY = (height - graphHeight * scale) / 2 - bounds.minY * scale;
     return { width, height, scale, offsetX, offsetY };
@@ -512,11 +538,16 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         expanded ? "h-full" : heightClassName
       }`}
     >
+      {/* The canvas is one focusable widget: it takes the pointer gestures and the zoom keys, and its
+          nodes are the focusable buttons inside it. `application` is the role for exactly that, but the
+          a11y lint only knows it as non-interactive. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         ref={containerRef}
         role="application"
         aria-label={ariaLabel}
         aria-roledescription="graph"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
         className="absolute inset-0 cursor-grab touch-none select-none focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset active:cursor-grabbing"
         style={{
@@ -571,7 +602,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                     fill="none"
                     strokeWidth={edge.inChain || isSelected ? 2.75 : 2}
                     strokeLinecap="round"
-                    strokeDasharray={edge.tone === "waiting" ? "6 6" : edge.tone === "active" ? "10 8" : undefined}
+                    strokeDasharray={
+                      edge.tone === "waiting" ? "6 6" : edge.tone === "active" ? "10 8" : undefined
+                    }
                     markerEnd={`url(#${markerId}-${edge.tone})`}
                     className={`transition-opacity duration-200 ${toneStroke[edge.tone]} ${
                       edge.tone === "active" ? "journey-edge-flow" : ""
@@ -636,7 +669,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                   height: nodeSize.height,
                 }}
                 onPointerEnter={() => setHoveredId(node.id)}
-                onPointerLeave={() => setHoveredId((current) => (current === node.id ? null : current))}
+                onPointerLeave={() =>
+                  setHoveredId((current) => (current === node.id ? null : current))
+                }
                 onFocus={() => setHoveredId(node.id)}
                 onBlur={() => setHoveredId((current) => (current === node.id ? null : current))}
               >
@@ -660,8 +695,12 @@ export function JourneyCanvas<TNode extends LayoutNode>({
             data-canvas-control
             className="absolute z-40 -translate-x-1/2 -translate-y-1/2"
             style={{
-              left: edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to).x * viewport.zoom + viewport.x,
-              top: edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to).y * viewport.zoom + viewport.y,
+              left:
+                edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to).x * viewport.zoom +
+                viewport.x,
+              top:
+                edgeMidpoint(selectedEdgeData.from, selectedEdgeData.to).y * viewport.zoom +
+                viewport.y,
             }}
           >
             <button
@@ -680,13 +719,19 @@ export function JourneyCanvas<TNode extends LayoutNode>({
       </div>
 
       {overlay ? (
-        <div data-canvas-control className="pointer-events-none absolute top-3 left-3 z-40 max-w-[calc(100%-1.5rem)]">
+        <div
+          data-canvas-control
+          className="pointer-events-none absolute top-3 left-3 z-40 max-w-[calc(100%-1.5rem)]"
+        >
           <div className="pointer-events-auto">{overlay}</div>
         </div>
       ) : null}
 
       {aside ? (
-        <div data-canvas-control className="absolute top-3 right-3 bottom-16 z-40 w-[min(22rem,calc(100%-1.5rem))]">
+        <div
+          data-canvas-control
+          className="absolute top-3 right-3 bottom-16 z-40 w-[min(22rem,calc(100%-1.5rem))]"
+        >
           {aside}
         </div>
       ) : null}
@@ -789,7 +834,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     <>
       <div className={`${heightClassName} rounded-3xl border border-dashed border-app-border`} />
       {createPortal(
-        <div className="fixed inset-0 z-[70] bg-app-overlay p-3 backdrop-blur-sm sm:p-6">{canvas}</div>,
+        <div className="fixed inset-0 z-[70] bg-app-overlay p-3 backdrop-blur-sm sm:p-6">
+          {canvas}
+        </div>,
         document.body,
       )}
     </>

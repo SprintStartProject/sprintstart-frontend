@@ -12,13 +12,14 @@ import {
   type PhaseItem,
 } from "../../journey";
 import { CanvasButton, JourneyCanvas, type JourneyEdgeTone } from "../../graph/JourneyCanvas";
+import { ItemNodeCard, PhaseNodeCard } from "../../graph/JourneyNodeCards";
+import { ITEM_NODE_SIZE, PHASE_NODE_SIZE } from "../../graph/nodeLabels";
 import {
-  ITEM_NODE_SIZE,
-  ItemNodeCard,
-  PHASE_NODE_SIZE,
-  PhaseNodeCard,
-} from "../../graph/JourneyNodeCards";
-import { layeredLayout, resolveLayout, wouldCreateCycle, type GraphPoint } from "../../graph/layout";
+  layeredLayout,
+  resolveLayout,
+  wouldCreateCycle,
+  type GraphPoint,
+} from "../../graph/layout";
 import type { OnboardingPhaseEndpoint } from "../../types";
 import type { GraphNodePosition } from "../../../../services/onboardingGraphService";
 
@@ -154,11 +155,13 @@ export function PathGraphExplorer({
       [graphKey]: { ...(current[graphKey] ?? {}), ...Object.fromEntries(next) },
     }));
     if (!saveLayout) return;
-    const nodes = (isAutomatic || changedIds.length === 0 ? [...next.keys()] : changedIds).map((id) => ({
-      id,
-      graphX: next.get(id)!.x,
-      graphY: next.get(id)!.y,
-    }));
+    const nodes = (isAutomatic || changedIds.length === 0 ? [...next.keys()] : changedIds).map(
+      (id) => ({
+        id,
+        graphX: next.get(id)!.x,
+        graphY: next.get(id)!.y,
+      }),
+    );
     try {
       if (scope === "journey") await saveLayout.path(nodes);
       else if (phase) await saveLayout.phase(phase.id, nodes);
@@ -280,7 +283,9 @@ export function PathGraphExplorer({
         onMove={handleMove}
         canConnect={!!editing && arranging}
         onConnect={(blockerId, nodeId) => void connect(blockerId, nodeId)}
-        onDisconnect={editing ? (blockerId, nodeId) => void disconnect(blockerId, nodeId) : undefined}
+        onDisconnect={
+          editing ? (blockerId, nodeId) => void disconnect(blockerId, nodeId) : undefined
+        }
         overlay={scopeSwitch}
         toolbar={toolbar}
         heightClassName={heightClassName}
@@ -333,7 +338,9 @@ export function PathGraphExplorer({
       overlay={scopeSwitch}
       toolbar={toolbar}
       heightClassName={heightClassName}
-      aside={selectedItem && phase && renderItemAside ? renderItemAside(selectedItem, phase) : undefined}
+      aside={
+        selectedItem && phase && renderItemAside ? renderItemAside(selectedItem, phase) : undefined
+      }
       renderNode={(item, render) => (
         <ItemNodeCard
           item={item}

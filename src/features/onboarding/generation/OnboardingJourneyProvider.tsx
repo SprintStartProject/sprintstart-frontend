@@ -72,85 +72,83 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
   // Stop watching when the provider goes away (sign-out). The backend keeps building regardless.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const startGeneration = useCallback(
-    (projectId: string) => {
-      if (runningRef.current) return;
-      runningRef.current = true;
-      const controller = new AbortController();
-      abortRef.current = controller;
-      let builtPath: OnboardingPathEndpoint | null = null;
+  const startGeneration = useCallback((projectId: string) => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let builtPath: OnboardingPathEndpoint | null = null;
 
-      setGeneration({ status: "running", projectId, startedAt: Date.now(), phases: [] });
+    setGeneration({ status: "running", projectId, startedAt: Date.now(), phases: [] });
 
-      const finish = (next: OnboardingGeneration) => {
-        runningRef.current = false;
-        setGeneration(next);
-      };
+    const finish = (next: OnboardingGeneration) => {
+      runningRef.current = false;
+      setGeneration(next);
+    };
 
-      void onboardingService
-        .personalizePath(
-          projectId,
-          {
-            onStage: (name, detail) => {
-              if (!name) return;
-              setGeneration((current) => {
-                if (current.status !== "running") return current;
-                const phases = [...current.phases];
-                const index = phases.findIndex((phase) => phase.name === name);
-                const entry: GenerationPhaseProgress = {
-                  name,
-                  detail: detail ?? "",
-                  state: phaseStateOf(detail ?? ""),
-                };
-                // A finished phase stays finished: late progress lines from its stream do not reopen it.
-                if (index >= 0) {
-                  if (phases[index].state === "done" || phases[index].state === "failed") return current;
-                  phases[index] = entry;
-                } else {
-                  phases.push(entry);
-                }
-                return { ...current, phases };
-              });
-            },
-            onPath: (path) => {
-              builtPath = path;
-            },
-            onDone: () => {
-              finish({ status: "done", path: builtPath });
-              setAvailability("path");
-              setUnavailableReason(null);
-              if (!pathnameRef.current.startsWith("/onboarding")) {
-                toastRef.current.success("Your onboarding path is ready", {
-                  description: "Every phase has been put together for you.",
-                  action: { label: "Open", onClick: () => void navigateRef.current("/onboarding") },
-                });
+    void onboardingService
+      .personalizePath(
+        projectId,
+        {
+          onStage: (name, detail) => {
+            if (!name) return;
+            setGeneration((current) => {
+              if (current.status !== "running") return current;
+              const phases = [...current.phases];
+              const index = phases.findIndex((phase) => phase.name === name);
+              const entry: GenerationPhaseProgress = {
+                name,
+                detail: detail ?? "",
+                state: phaseStateOf(detail ?? ""),
+              };
+              // A finished phase stays finished: late progress lines from its stream do not reopen it.
+              if (index >= 0) {
+                if (phases[index].state === "done" || phases[index].state === "failed")
+                  return current;
+                phases[index] = entry;
+              } else {
+                phases.push(entry);
               }
-            },
-            onError: (message) => {
-              const readable = describeGenerationError(message);
-              finish({ status: "error", message: readable });
-              if (!pathnameRef.current.startsWith("/onboarding")) {
-                toastRef.current.error("Your onboarding path could not be built", {
-                  description: readable,
-                });
-              }
-            },
+              return { ...current, phases };
+            });
           },
-          controller.signal,
-        )
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) {
-            runningRef.current = false;
-            return;
-          }
-          finish({
-            status: "error",
-            message: describeGenerationError(error instanceof Error ? error.message : ""),
-          });
+          onPath: (path) => {
+            builtPath = path;
+          },
+          onDone: () => {
+            finish({ status: "done", path: builtPath });
+            setAvailability("path");
+            setUnavailableReason(null);
+            if (!pathnameRef.current.startsWith("/onboarding")) {
+              toastRef.current.success("Your onboarding path is ready", {
+                description: "Every phase has been put together for you.",
+                action: { label: "Open", onClick: () => void navigateRef.current("/onboarding") },
+              });
+            }
+          },
+          onError: (message) => {
+            const readable = describeGenerationError(message);
+            finish({ status: "error", message: readable });
+            if (!pathnameRef.current.startsWith("/onboarding")) {
+              toastRef.current.error("Your onboarding path could not be built", {
+                description: readable,
+              });
+            }
+          },
+        },
+        controller.signal,
+      )
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          runningRef.current = false;
+          return;
+        }
+        finish({
+          status: "error",
+          message: describeGenerationError(error instanceof Error ? error.message : ""),
         });
-    },
-    [],
-  );
+      });
+  }, []);
 
   const clearGeneration = useCallback(() => {
     if (runningRef.current) return;
@@ -235,8 +233,18 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
       unavailableReason: isAccessible ? unavailableReason : null,
       refreshAvailability,
     }),
-    [availability, clearGeneration, generation, isAccessible, refreshAvailability, startGeneration, unavailableReason],
+    [
+      availability,
+      clearGeneration,
+      generation,
+      isAccessible,
+      refreshAvailability,
+      startGeneration,
+      unavailableReason,
+    ],
   );
 
-  return <OnboardingJourneyContext.Provider value={value}>{children}</OnboardingJourneyContext.Provider>;
+  return (
+    <OnboardingJourneyContext.Provider value={value}>{children}</OnboardingJourneyContext.Provider>
+  );
 }

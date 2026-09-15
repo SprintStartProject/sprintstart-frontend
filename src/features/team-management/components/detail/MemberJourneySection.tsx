@@ -27,7 +27,8 @@ import {
 } from "../../../onboarding/components/journey/PathGraphExplorer";
 import { PhaseRail } from "../../../onboarding/components/journey/PhaseRail";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
-import { ItemKindIcon, itemKindLabel, itemStateLabel } from "../../../onboarding/graph/JourneyNodeCards";
+import { ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
+import { itemKindLabel, itemStateLabel } from "../../../onboarding/graph/nodeLabels";
 import type { GraphPoint } from "../../../onboarding/graph/layout";
 import {
   formatMinutes,
@@ -231,10 +232,11 @@ export function MemberJourneySection({
             Onboarding journey
           </p>
           <h2 id="member-journey-title" className="mt-1 text-xl font-semibold text-app-text">
-            {memberName}'s path
+            {memberName}’s path
           </h2>
           <p className="mt-1 text-sm text-app-text-muted">
-            Changes here apply to {memberName.split(" ")[0] || "this member"}'s copy only, never to the blueprint.
+            Changes here apply to {memberName.split(" ")[0] || "this member"}’s copy only, never to
+            the blueprint.
           </p>
         </div>
         {overall ? (
@@ -253,13 +255,15 @@ export function MemberJourneySection({
 
       {!path || phases.length === 0 || !phase ? (
         <div className="mt-6 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-10 text-center text-sm text-app-text-muted">
-          {memberName.split(" ")[0] || "This member"} has no onboarding path yet. It appears here once
-          they build it from the project's blueprint.
+          {memberName.split(" ")[0] || "This member"} has no onboarding path yet. It appears here
+          once they build it from the project’s blueprint.
         </div>
       ) : (
         <div
           className={`mt-6 grid items-start gap-5 ${
-            isRailCollapsed ? "lg:grid-cols-[4.25rem_minmax(0,1fr)]" : "lg:grid-cols-[17rem_minmax(0,1fr)]"
+            isRailCollapsed
+              ? "lg:grid-cols-[4.25rem_minmax(0,1fr)]"
+              : "lg:grid-cols-[17rem_minmax(0,1fr)]"
           }`}
         >
           <PhaseRail
@@ -296,7 +300,9 @@ export function MemberJourneySection({
                   nextItemId={nextItemId}
                   stepTaskCounts={stepTaskCounts}
                   onOpenItem={(item) =>
-                    item.kind === "step" ? onOpenStep(item.id) : onOpenQuestions(phase.id, "results")
+                    item.kind === "step"
+                      ? onOpenStep(item.id)
+                      : onOpenQuestions(phase.id, "results")
                   }
                   onAddAfter={addAfter}
                 />
@@ -317,13 +323,16 @@ export function MemberJourneySection({
                   selectedItemId={selectedItemId}
                   onSelectItem={setSelectedItemId}
                   onOpenItem={(item) =>
-                    item.kind === "step" ? onOpenStep(item.id) : onOpenQuestions(phase.id, "results")
+                    item.kind === "step"
+                      ? onOpenStep(item.id)
+                      : onOpenQuestions(phase.id, "results")
                   }
                   heightClassName="h-[min(44rem,75vh)]"
                   hint={
                     <>
                       <PenLine className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-                      Arrange to move nodes and drag from a node's port to connect. Double click to add a step.
+                      Arrange to move nodes and drag from a node’s port to connect. Double click to
+                      add a step.
                     </>
                   }
                   renderItemAside={(item, asidePhase) => {
@@ -337,7 +346,11 @@ export function MemberJourneySection({
                         actions={
                           <>
                             {item.kind === "step" ? (
-                              <Button size="sm" variant="primary" onClick={() => onOpenStep(item.id)}>
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => onOpenStep(item.id)}
+                              >
                                 Details & tasks
                               </Button>
                             ) : (
@@ -387,7 +400,15 @@ export function MemberJourneySection({
   );
 }
 
-function Metric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+function Metric({
+  label,
+  value,
+  warning = false,
+}: {
+  label: string;
+  value: string;
+  warning?: boolean;
+}) {
   return (
     <div
       className={`min-w-24 rounded-2xl border px-3 py-2 ${
@@ -395,7 +416,9 @@ function Metric({ label, value, warning = false }: { label: string; value: strin
       }`}
     >
       <p className="text-[11px] text-app-text-muted">{label}</p>
-      <p className={`mt-0.5 text-sm font-semibold tabular-nums ${warning ? "text-app-warning-text" : "text-app-text"}`}>
+      <p
+        className={`mt-0.5 text-sm font-semibold tabular-nums ${warning ? "text-app-warning-text" : "text-app-text"}`}
+      >
         {value}
       </p>
     </div>
@@ -449,7 +472,9 @@ function PhaseHeader({
             </span>
             <span className="inline-flex items-center gap-1">
               <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              {questions.length === 0 ? "No questions" : `${passed}/${questions.length} questions passed`}
+              {questions.length === 0
+                ? "No questions"
+                : `${passed}/${questions.length} questions passed`}
             </span>
           </div>
         </div>
@@ -573,7 +598,9 @@ function MemberItemList({
                   ) : null}
                   <span
                     className={`text-sm font-semibold ${
-                      state === "done" || state === "skipped" ? "text-app-text-muted" : "text-app-text"
+                      state === "done" || state === "skipped"
+                        ? "text-app-text-muted"
+                        : "text-app-text"
                     }`}
                   >
                     {item.kind === "question" ? item.question.question : item.title}

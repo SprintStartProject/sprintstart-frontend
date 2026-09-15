@@ -85,7 +85,9 @@ function PlacementPicker({
                 disabled={isDisabled}
                 onClick={() =>
                   onChange(
-                    isSelected ? selected.filter((id) => id !== option.id) : [...selected, option.id],
+                    isSelected
+                      ? selected.filter((id) => id !== option.id)
+                      : [...selected, option.id],
                   )
                 }
                 className={`max-w-full truncate rounded-full border px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -184,7 +186,7 @@ export function AddCustomStepModal({
             />
             <PlacementPicker
               label="Leads to"
-              hint="These wait on the new step from now on -- a direct connection between both sides is routed through it."
+              hint="These wait on the new step from now on — a direct connection between both sides is routed through it."
               icon={<ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />}
               options={placement.options}
               selected={placement.unlocks}
@@ -192,7 +194,9 @@ export function AddCustomStepModal({
               onChange={placement.onUnlocksChange}
             />
             {placement.pinned ? (
-              <p className="text-xs text-app-text-muted">It is placed where you double-clicked the graph.</p>
+              <p className="text-xs text-app-text-muted">
+                It is placed where you double-clicked the graph.
+              </p>
             ) : null}
           </div>
         ) : null}

@@ -136,7 +136,10 @@ export function sortedPhases(path: OnboardingPathEndpoint): OnboardingPhaseEndpo
   return [...path.phases].sort((left, right) => left.position - right.position);
 }
 
-export function phaseState(phase: OnboardingPhaseEndpoint, currentPhaseId: string | null): PhaseState {
+export function phaseState(
+  phase: OnboardingPhaseEndpoint,
+  currentPhaseId: string | null,
+): PhaseState {
   if (!isPhaseOpen(phase) && (phase.steps.length > 0 || phase.questions.length > 0)) return "done";
   if (phase.locked) return "locked";
   return phase.id === currentPhaseId ? "current" : "open";
@@ -147,7 +150,9 @@ export function waitingOn(item: PhaseItem, items: readonly PhaseItem[]): PhaseIt
   const byId = new Map(items.map((candidate) => [candidate.id, candidate]));
   return item.blockerIds
     .map((id) => byId.get(id))
-    .filter((blocker): blocker is PhaseItem => !!blocker && !isItemComplete(itemState(blocker, false)));
+    .filter(
+      (blocker): blocker is PhaseItem => !!blocker && !isItemComplete(itemState(blocker, false)),
+    );
 }
 
 /** Items that wait on this one directly. */

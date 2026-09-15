@@ -6,6 +6,10 @@ import { OnBoardingPage } from "../../../src/pages/OnBoardingPage";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 import { onboardingService } from "../../../src/services/onboardingService";
+import {
+  OnboardingJourneyContext,
+  type OnboardingJourneyValue,
+} from "../../../src/features/onboarding/generation/OnboardingJourneyContext";
 
 const { projectContextState } = vi.hoisted(() => ({
   projectContextState: {
@@ -64,6 +68,27 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
       }),
   };
 });
+
+type JourneyOverrides = Partial<OnboardingJourneyValue>;
+
+function renderPage(overrides: JourneyOverrides = {}) {
+  const value: OnboardingJourneyValue = {
+    generation: { status: "idle" },
+    startGeneration: vi.fn(),
+    clearGeneration: vi.fn(),
+    availability: "buildable",
+    unavailableReason: null,
+    refreshAvailability: vi.fn(),
+    ...overrides,
+  };
+  return render(
+    <MemoryRouter>
+      <OnboardingJourneyContext.Provider value={value}>
+        <OnBoardingPage />
+      </OnboardingJourneyContext.Provider>
+    </MemoryRouter>,
+  );
+}
 
 // Minimal phase payload matching the `/api/v1/onboarding/me/path` contract — enough for
 // the phase tabs and graph viewer to render, without duplicating the MSW mock's verbosity.
@@ -142,28 +167,63 @@ describe("OnBoardingPage", () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () => new HttpResponse(null, { status: 404 })),
     );
-    const personalize = vi
-      .spyOn(onboardingService, "personalizePath")
-      .mockImplementation((_projectId, handlers) => {
-        handlers.onStage?.("Enhancing phases", "Phase 1 of 3");
-        return Promise.resolve();
-      });
+    const startGeneration = vi.fn();
 
-    render(
-      <MemoryRouter>
-        <OnBoardingPage />
-      </MemoryRouter>,
-    );
+    renderPage({ startGeneration });
 
     const startButton = await screen.findByRole("button", { name: "Start personalization" });
-    expect(personalize).not.toHaveBeenCalled();
+    expect(startGeneration).not.toHaveBeenCalled();
 
     await user.click(startButton);
 
-    expect(personalize).toHaveBeenCalledTimes(1);
-    expect(personalize).toHaveBeenCalledWith("proj1", expect.any(Object));
-    expect(await screen.findByText("Enhancing phases")).toBeInTheDocument();
-    expect(screen.getByText("Phase 1 of 3")).toBeInTheDocument();
+    // The generation belongs to the app-wide provider, so it survives leaving this page.
+    expect(startGeneration).toHaveBeenCalledTimes(1);
+    expect(startGeneration).toHaveBeenCalledWith("proj1");
+  });
+
+  it("shows every phase of a running generation, even after coming back to the page", async () => {
+    renderPage({
+      generation: {
+        status: "running",
+        projectId: "proj1",
+        startedAt: Date.now(),
+        phases: [
+          { name: "Project Overview", detail: "Completed", state: "done" },
+          { name: "Architecture", detail: "Searching the project for: ADRs", state: "working" },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Building your onboarding path")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 phases assembled")).toBeInTheDocument();
+    expect(screen.getByText("Searching the project for: ADRs")).toBeInTheDocument();
+  });
+
+  it("explains why no path can be built instead of offering a generation that would fail", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => new HttpResponse(null, { status: 404 })),
+    );
+
+    renderPage({ availability: "unavailable", unavailableReason: "no-content" });
+
+    expect(await screen.findByText(/nothing to learn from yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start personalization" })).not.toBeInTheDocument();
+  });
+
+  it("shows why the last generation failed next to the retry", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => new HttpResponse(null, { status: 404 })),
+    );
+
+    renderPage({
+      generation: {
+        status: "error",
+        message: "This project has no published onboarding blueprint yet.",
+      },
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("no published onboarding blueprint");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("asks for a project instead of offering personalization without one", async () => {
@@ -195,7 +255,7 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your onboarding journey")).toBeInTheDocument();
+      expect(screen.getByText("Your path into the project")).toBeInTheDocument();
     });
 
     expect(screen.getAllByText("Phase 1").length).toBeGreaterThan(0);
@@ -283,7 +343,7 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your onboarding journey")).toBeInTheDocument();
+      expect(screen.getByText("Your path into the project")).toBeInTheDocument();
     });
 
     expect(screen.getAllByText("33%").length).toBeGreaterThan(0);
@@ -415,35 +475,29 @@ describe("OnBoardingPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("switches to the read-only graph and opens a phase subgraph", async () => {
+  it("switches to the graph with the view slider and back to the list", async () => {
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <OnBoardingPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Graph view" }));
+    await user.click(await screen.findByRole("button", { name: "Graph" }));
 
-    // The graph opens directly on the selected phase's subgraph.
-    expect(await screen.findByRole("heading", { name: "Phase 1" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Back to phases" }));
-
-    expect(screen.getByText("Your onboarding graph")).toBeInTheDocument();
-    expect(screen.queryByText("Create on canvas")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Phase 1 Open phase/ }));
-
-    expect(screen.getByRole("button", { name: "Back to phases" })).toBeInTheDocument();
     expect(
-      screen.getByText("Read-only view of this phase's steps and knowledge-check questions."),
+      await screen.findByRole("application", {
+        name: "Graph of the steps and questions in Phase 1",
+      }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+    // The hire reads and arranges their graph; nothing here rewires it.
+    expect(screen.queryByTitle("Drag to what this unlocks")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "List" }));
+
+    expect(
+      await screen.findByRole("list", { name: "Phase 1: steps and questions" }),
+    ).toBeInTheDocument();
   });
 
-  it("re-targets the subgraph when a different phase is picked in the header", async () => {
+  it("follows the phase rail in the graph, and opens a phase from the journey map", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
@@ -456,21 +510,67 @@ describe("OnBoardingPage", () => {
     );
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <OnBoardingPage />
-      </MemoryRouter>,
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Graph" }));
+    expect(
+      await screen.findByRole("application", {
+        name: "Graph of the steps and questions in Phase 1",
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: /Phase 2/ })[0]);
+    expect(
+      await screen.findByRole("application", {
+        name: "Graph of the steps and questions in Phase 2",
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Journey map" }));
+    expect(
+      await screen.findByRole("application", { name: "Journey map of all onboarding phases" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Phase 1: Phase 1, \d+% complete/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("names what a locked item is waiting on", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [
+            {
+              ...phaseFixture("phase1", 1, "Phase 1"),
+              steps: [
+                {
+                  ...phaseFixture("phase1", 1, "Phase 1").steps[0],
+                  id: "a",
+                  title: "Set up the repo",
+                  status: "IN_PROGRESS",
+                },
+                {
+                  ...phaseFixture("phase1", 1, "Phase 1").steps[0],
+                  id: "b",
+                  position: 2,
+                  title: "Run the tests",
+                  status: "WAITING",
+                  locked: true,
+                  blockerIds: ["a"],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
     );
 
-    // The graph opens directly on the active phase's subgraph.
-    await user.click(await screen.findByRole("button", { name: "Graph view" }));
-    expect(await screen.findByRole("heading", { name: "Phase 1" })).toBeInTheDocument();
+    renderPage();
 
-    // Inside Phase 1's subgraph, a header phase-tab click must switch the drill-down —
-    // previously the viewer kept rendering the stale phase's subgraph.
-    await user.click(screen.getByRole("button", { name: /^Phase 2/ }));
-
-    expect(await screen.findByRole("heading", { name: "Phase 2" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Phase 1" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Run the tests")).toBeInTheDocument();
+    expect(screen.getByText(/Waits on/)).toHaveTextContent("Waits on Set up the repo");
   });
 });
