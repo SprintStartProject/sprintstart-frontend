@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Layers } from "lucide-react";
 import {
@@ -149,6 +149,34 @@ describe("BlueprintGraphCanvas", () => {
 
     renderCanvas([node("a")], { editable: false, showLibrary: false });
     expect(screen.queryByRole("button", { name: "Tidy up" })).not.toBeInTheDocument();
+  });
+
+  it("offers a new arrangement rather than applying one, because nothing else here can be undone", async () => {
+    const onPositionChange = vi.fn(() => Promise.resolve());
+    renderCanvas([node("a"), node("b", ["a"])], { onPositionChange, onCreateFromLibrary: noop });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tidy up" }));
+
+    expect(screen.getByText("Laid out by prerequisite")).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is saved yet/)).toBeInTheDocument();
+    expect(onPositionChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep this" }));
+
+    await waitFor(() => expect(onPositionChange).toHaveBeenCalled());
+  });
+
+  it("puts the old arrangement back, and saves nothing on the way", async () => {
+    const onPositionChange = vi.fn(() => Promise.resolve());
+    renderCanvas([node("a"), node("b", ["a"])], { onPositionChange, onCreateFromLibrary: noop });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tidy up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Put it back" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Tidy up" })).toBeInTheDocument(),
+    );
+    expect(onPositionChange).not.toHaveBeenCalled();
   });
 
   it("says an empty canvas is empty, not broken", () => {

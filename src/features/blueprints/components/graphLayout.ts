@@ -48,6 +48,15 @@ export type GraphRuleNode = {
   graphY: number | null;
   /** Nodes that must be finished before this one opens. */
   blockerIds: string[];
+  /**
+   * The order this node is listed in, which is a suggestion and not a rule.
+   *
+   * Never drawn and never used to sequence anything — the arrows are the only order this model
+   * has. It is read in one place only: as the order nodes are handed to the layout, so that two
+   * phases nothing sequences come out in the order their author listed them rather than in
+   * whatever order the algorithm happened to settle on.
+   */
+  position?: number;
 };
 
 export type GraphPoint = { x: number; y: number };
@@ -217,6 +226,23 @@ export function withFallbackPositions(nodes: readonly GraphRuleNode[]): GraphPos
 }
 
 /**
+ * Where the canvas draws a set of nodes before anybody has dragged anything.
+ *
+ * Two cases, and the difference between them is whether there is an arrangement to respect. Once
+ * one node has coordinates somebody put them there, so the stored arrangement is kept and anything
+ * without coordinates falls into a free grid cell beside it. When *nothing* has coordinates there
+ * is nothing to preserve, and a grid that knows no dependencies is strictly worse than a layout
+ * that does — so the graph is laid out properly instead. That is the common case in the hire's
+ * read-only view of a path copied from a blueprint whose author never opened the graph.
+ *
+ * Drawing only, either way. Nothing here is written back.
+ */
+export function arrangementFor(nodes: readonly GraphRuleNode[]): GraphPositions {
+  const anyStored = nodes.some((node) => node.graphX !== null && node.graphY !== null);
+  return anyStored ? withFallbackPositions(nodes) : autoLayoutPositions(nodes);
+}
+
+/**
  * Everything laid out from scratch, chains running left to right.
  *
  * The button behind this is an escape hatch, not a mode. Nothing calls it on its own: an
@@ -232,11 +258,18 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
   if (nodes.length === 0) return {};
 
   const ids = new Set(nodes.map((node) => node.id));
+  // The order nodes are handed to dagre seeds its own ordering pass, so it decides which of two
+  // phases in the same rank sits on top. Left alone that is an implementation detail nobody can
+  // predict; seeded with the author's own listing order it is at least the answer they expect.
+  const inListOrder = [...nodes].sort(
+    (left, right) =>
+      (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER),
+  );
   const hasDrawnEdge = (node: GraphRuleNode) =>
     node.blockerIds.some((blockerId) => ids.has(blockerId)) ||
     nodes.some((other) => other.blockerIds.includes(node.id));
-  const connected = nodes.filter(hasDrawnEdge);
-  const loose = nodes.filter((node) => !hasDrawnEdge(node));
+  const connected = inListOrder.filter(hasDrawnEdge);
+  const loose = inListOrder.filter((node) => !hasDrawnEdge(node));
 
   const positions: GraphPositions = {};
   let looseTop = 0;
@@ -245,6 +278,10 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
     const graph = new dagre.graphlib.Graph();
     graph.setGraph({
       rankdir: "LR",
+      // Ranks line up at the top rather than being centred on each other. Centred ranks put a
+      // one-node rank halfway down beside a four-node one, which reads as a position that means
+      // something; aligned, a rank is a column and the eye can follow it.
+      align: "UL",
       // Generous on both axes, because the edges are curves now and a curve needs room to be one:
       // packed ranks turn every connection into a short straight dash between two borders.
       ranksep: 150,
@@ -291,9 +328,21 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
       Math.max(...Object.values(positions).map((position) => position.y)) + ROW_STEP + ROW_STEP / 2;
   }
 
+  // Unsequenced nodes go in a block under the chains, as wide as the chains are: a fixed four
+  // columns either left a narrow graph with a block sticking out past it, or stacked eight loose
+  // phases into a tall tower beside a wide layout.
+  const chainWidth =
+    connected.length > 0 ? Math.max(...Object.values(positions).map((point) => point.x)) : 0;
+  const looseColumns = Math.max(
+    1,
+    Math.min(loose.length, Math.round(chainWidth / COLUMN_STEP) + 1),
+  );
+
   loose.forEach((node, index) => {
-    const cell = cellPosition(index);
-    positions[node.id] = { x: cell.x, y: looseTop + cell.y };
+    positions[node.id] = {
+      x: (index % looseColumns) * COLUMN_STEP,
+      y: looseTop + Math.floor(index / looseColumns) * ROW_STEP,
+    };
   });
 
   return positions;

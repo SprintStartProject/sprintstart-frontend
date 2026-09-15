@@ -45,6 +45,7 @@ import {
   EDGE_REFUSAL_MESSAGE,
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
+  arrangementFor,
   autoLayoutPositions,
   blueprintEdgePath,
   canConnect,
@@ -54,8 +55,8 @@ import {
   edgeSides,
   entryPointIds,
   separateOverlaps,
-  withFallbackPositions,
   type ChainPosition,
+  type GraphPositions,
   type GraphSide,
 } from "./graphLayout.ts";
 
@@ -256,12 +257,22 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   const nodeTypes = useMemo<NodeTypes>(() => ({ blueprint: BlueprintFlowNodeCard }), []);
   const edgeTypes = useMemo<EdgeTypes>(() => ({ blueprint: BlueprintFlowEdge }), []);
 
-  // Stored coordinates can overlap — the seeded blueprint's do — so what gets drawn is the stored
+  /**
+   * A proposed arrangement, held on the canvas and not yet saved.
+   *
+   * "Tidy up" moves every card at once and is the only thing in this editor with no way back, so
+   * it shows its result and asks. Until it is accepted, this is what the canvas draws and what a
+   * drag edits — so an author can lay the graph out, nudge two cards, and still throw all of it
+   * away.
+   */
+  const [preview, setPreview] = useState<GraphPositions | null>(null);
+
+  // Stored coordinates can overlap — the seeded blueprint's do — so what gets drawn is the
   // arrangement with any collisions pushed apart. Nothing here is written back. Shared with the
   // edges, which pick the side of each card they attach to from where the two cards ended up.
   const positions = useMemo(
-    () => separateOverlaps(placedNodes, withFallbackPositions(placedNodes)),
-    [placedNodes],
+    () => separateOverlaps(placedNodes, preview ?? arrangementFor(placedNodes)),
+    [placedNodes, preview],
   );
 
   const computedNodes = useMemo<BlueprintFlowNode[]>(
@@ -441,17 +452,26 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     (_event: unknown, dragged: Node) => {
       const node = nodeById.get(dragged.id);
       if (!node) return;
+
+      const centre = {
+        x: Math.round(dragged.position.x + GRAPH_NODE_WIDTH / 2),
+        y: Math.round(dragged.position.y + GRAPH_NODE_HEIGHT / 2),
+      };
+
+      // A drag while an arrangement is being reviewed edits that arrangement rather than saving on
+      // its own: saving one card out of a layout the author has not accepted would leave the graph
+      // half in each.
+      if (preview) {
+        setPreview({ ...preview, [node.id]: centre });
+        return;
+      }
+
       void runMutation(
-        () =>
-          onPositionChange(
-            node,
-            Math.round(dragged.position.x + GRAPH_NODE_WIDTH / 2),
-            Math.round(dragged.position.y + GRAPH_NODE_HEIGHT / 2),
-          ),
+        () => onPositionChange(node, centre.x, centre.y),
         "The node position could not be saved.",
       );
     },
-    [nodeById, onPositionChange, runMutation],
+    [nodeById, onPositionChange, preview, runMutation],
   );
 
   const handleDrop = useCallback(
@@ -500,25 +520,35 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     [nodeById, onRemoveNode, runMutation],
   );
 
-  /** Lays every placed node out again and saves the ones that actually moved. */
+  /** Lays every placed node out again and shows the result, without saving any of it. */
   const handleTidyUp = useCallback(() => {
-    const laidOut = autoLayoutPositions(placedNodes);
+    setPreview(autoLayoutPositions(placedNodes));
+    // Every card has moved; the view that framed the old arrangement no longer frames this one.
+    window.requestAnimationFrame(() => void fitView({ padding: 0.15, maxZoom: 1, duration: 240 }));
+  }, [fitView, placedNodes]);
+
+  /** Writes the proposed arrangement back, one card at a time, and only where it differs. */
+  const handleAcceptPreview = useCallback(() => {
+    if (!preview) return;
+    const accepted = preview;
 
     void runMutation(async () => {
       for (const node of placedNodes) {
-        const target = laidOut[node.id];
+        const target = accepted[node.id];
         if (!target) continue;
         const x = Math.round(target.x);
         const y = Math.round(target.y);
         if (node.graphX === x && node.graphY === y) continue;
         await onPositionChange(node, x, y);
       }
-      // The nodes have all moved; the view that framed the old arrangement no longer frames this one.
-      window.requestAnimationFrame(
-        () => void fitView({ padding: 0.15, maxZoom: 1, duration: 240 }),
-      );
+      setPreview(null);
     }, "The layout could not be saved.");
-  }, [fitView, onPositionChange, placedNodes, runMutation]);
+  }, [onPositionChange, placedNodes, preview, runMutation]);
+
+  const handleDiscardPreview = useCallback(() => {
+    setPreview(null);
+    window.requestAnimationFrame(() => void fitView({ padding: 0.15, maxZoom: 1, duration: 240 }));
+  }, [fitView]);
 
   const canAuthor = editable && !isSaving;
 
@@ -664,14 +694,35 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
 
             {canAuthor ? (
               <Panel position="top-right">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleTidyUp}
-                  icon={<LayoutGrid className="h-4 w-4" aria-hidden="true" />}
-                >
-                  Tidy up
-                </Button>
+                {preview ? (
+                  // The proposal states what it did and what happens next, because "Tidy up" has
+                  // already redrawn the canvas by the time this is read: without the sentence, an
+                  // author cannot tell an applied change from an offered one.
+                  <div className="flex max-w-xs flex-col gap-2 rounded-xl border border-app-brand-border bg-app-surface p-3 shadow-app-brand-lift">
+                    <p className="text-sm font-semibold text-app-text">Laid out by prerequisite</p>
+                    <p className="text-xs text-app-text-muted">
+                      Nothing is saved yet. Drag any card to adjust it first, or put the old
+                      arrangement back.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="primary" size="sm" onClick={handleAcceptPreview}>
+                        Keep this
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleDiscardPreview}>
+                        Put it back
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTidyUp}
+                    icon={<LayoutGrid className="h-4 w-4" aria-hidden="true" />}
+                  >
+                    Tidy up
+                  </Button>
+                )}
               </Panel>
             ) : null}
           </ReactFlow>

@@ -3,6 +3,7 @@ import {
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
   MIN_NODE_GAP,
+  arrangementFor,
   autoLayoutPositions,
   blueprintEdgePath,
   canConnect,
@@ -514,5 +515,66 @@ describe("blueprintEdgePath", () => {
     const second = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 }, ACROSS);
 
     expect(second).toBe(first);
+  });
+});
+
+describe("autoLayoutPositions ordering", () => {
+  it("hands the layout the author's own listing order, so a rank is not shuffled at random", () => {
+    const listed = (ids: string[]) =>
+      ids.map((id, index) => ({ ...node(id, ["root"]), position: index }));
+    const nodes = [node("root"), ...listed(["a", "b", "c"])];
+
+    const positions = autoLayoutPositions(nodes);
+    const reversed = autoLayoutPositions([node("root"), ...listed(["a", "b", "c"]).reverse()]);
+
+    // Same listing order either way, so the same arrangement — the order the array happens to be
+    // in does not decide who sits on top.
+    expect(reversed).toEqual(positions);
+    expect(positions.a.y).toBeLessThan(positions.b.y);
+    expect(positions.b.y).toBeLessThan(positions.c.y);
+  });
+
+  it("puts the unsequenced block under the chains, no wider than they are", () => {
+    const nodes = [
+      node("a"),
+      node("b", ["a"]),
+      ...["one", "two", "three", "four", "five", "six"].map((id) => node(id)),
+    ];
+
+    const positions = autoLayoutPositions(nodes);
+    const chainRight = Math.max(positions.a.x, positions.b.x);
+    const looseRight = Math.max(
+      ...["one", "two", "three", "four", "five", "six"].map((id) => positions[id].x),
+    );
+
+    expect(looseRight).toBeLessThanOrEqual(chainRight + GRAPH_NODE_WIDTH);
+    expect(positions.one.y).toBeGreaterThan(Math.max(positions.a.y, positions.b.y));
+  });
+});
+
+describe("arrangementFor", () => {
+  it("keeps a stored arrangement, and drops what has no coordinates into a free cell beside it", () => {
+    const nodes = [node("placed", [], 500, 500), { ...node("new"), graphX: null, graphY: null }];
+
+    const positions = arrangementFor(nodes);
+
+    expect(positions.placed).toEqual({ x: 500, y: 500 });
+    expect(positions.new).toBeDefined();
+    expect(positions.new).not.toEqual(positions.placed);
+  });
+
+  it("lays a graph out properly when nothing has been arranged at all", () => {
+    // The hire's read-only view of a path copied from a blueprint nobody opened the graph of: a
+    // grid that knows no prerequisites is strictly worse than a layout that does.
+    const nodes = ["a", "b", "c"].map((id, index) => ({
+      ...node(id, index === 0 ? [] : [["a", "b"][index - 1]]),
+      graphX: null,
+      graphY: null,
+    }));
+
+    const positions = arrangementFor(nodes);
+
+    expect(positions.a.x).toBeLessThan(positions.b.x);
+    expect(positions.b.x).toBeLessThan(positions.c.x);
   });
 });
