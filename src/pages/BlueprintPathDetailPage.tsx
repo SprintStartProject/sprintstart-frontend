@@ -193,7 +193,12 @@ function DetailStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The two editors, in the order the bar draws them — shared with the swipe gesture. */
+/**
+ * The two ways of looking at a blueprint, in the order the bar draws them.
+ *
+ * Both are editable, which is why neither is called "the editor": the outline is the whole thing
+ * written out in order, the graph is the same content arranged by what waits on what.
+ */
 const EDITOR_MODE_ORDER = ["list", "graph"] as const;
 type EditorMode = (typeof EDITOR_MODE_ORDER)[number];
 
@@ -1196,7 +1201,7 @@ export function BlueprintPathDetailPage() {
     }
   }
 
-  /** Switching editors, from the bar or from a two-finger swipe — the two must not disagree. */
+  /** Switching views, from the bar or from a two-finger swipe — the two must not disagree. */
   function changeEditorMode(mode: EditorMode) {
     if (mode === editorMode) return;
     if (mode === "graph") {
@@ -1869,18 +1874,18 @@ export function BlueprintPathDetailPage() {
         options={[
           {
             value: "list",
-            label: "List editor",
+            label: "Outline",
             icon: <ListChecks className="h-4 w-4" />,
           },
           {
             value: "graph",
-            label: "Graph editor",
+            label: "Graph",
             icon: <Link className="h-4 w-4" />,
           },
         ]}
         onChange={changeEditorMode}
         layoutId="blueprint-editor-mode-pill"
-        ariaLabel="Blueprint editor mode"
+        ariaLabel="Blueprint view"
       />
       {editorMode === "graph" ? (
         subGraphPhase ? (

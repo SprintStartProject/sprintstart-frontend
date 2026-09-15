@@ -1,4 +1,13 @@
-import { ArrowLeft, CircleHelp, FilePlus2, ListChecks, Minus, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  CircleHelp,
+  FilePlus2,
+  ListChecks,
+  Minus,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
@@ -98,7 +107,6 @@ export function BlueprintSubGraphEditor({
 }: Props) {
   const [detailsNodeId, setDetailsNodeId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isQuestionEditing, setIsQuestionEditing] = useState(false);
   const [isQuestionSaving, setIsQuestionSaving] = useState(false);
   const [questionSaveError, setQuestionSaveError] = useState<string | null>(null);
   const [questionMetadata, setQuestionMetadata] = useState<BlueprintQuestionMetadata>({
@@ -108,7 +116,6 @@ export function BlueprintSubGraphEditor({
     explanation: null,
     correctAnswer: null,
   });
-  const [isStepEditing, setIsStepEditing] = useState(false);
   const [isStepSaving, setIsStepSaving] = useState(false);
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -125,18 +132,43 @@ export function BlueprintSubGraphEditor({
   });
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
+  /** Each entity as it is stored, which is what "changed" is measured against. */
+  function stepMetadataOf(step: BlueprintStep): BlueprintStepMetadata {
+    return {
+      title: step.title,
+      description: step.description,
+      type: step.type,
+      aiAssisted: step.aiAssisted,
+      estimatedMinutes: step.estimatedMinutes,
+      expectedOutcome: step.expectedOutcome,
+    };
+  }
+
+  function questionMetadataOf(question: BlueprintQuestion): BlueprintQuestionMetadata {
+    return {
+      title: question.title,
+      type: question.type,
+      question: question.question,
+      explanation: question.explanation,
+      correctAnswer: question.correctAnswer,
+    };
+  }
+
   function openNodeDetails(node: BlueprintGraphNode) {
     setDetailsNodeId(node.id);
-    setIsQuestionEditing(false);
-    setIsStepEditing(false);
     setQuestionSaveError(null);
+    setStepSaveError(null);
+
+    const step = phase.blueprintSteps.find((item) => item.id === node.id);
+    if (step) setStepMetadata(stepMetadataOf(step));
+    const question = phase.blueprintCheckQuestions.find((item) => item.id === node.id);
+    if (question) setQuestionMetadata(questionMetadataOf(question));
+
     setIsDetailsOpen(true);
   }
 
   function closeNodeDetails() {
     setIsDetailsOpen(false);
-    setIsQuestionEditing(false);
-    setIsStepEditing(false);
     setDetailsNodeId(null);
   }
 
@@ -179,19 +211,13 @@ export function BlueprintSubGraphEditor({
     }
   }
 
-  function beginStepEditing() {
-    if (!detailsStep) return;
-    setStepSaveError(null);
-    setStepMetadata({
-      title: detailsStep.title,
-      description: detailsStep.description,
-      type: detailsStep.type,
-      aiAssisted: detailsStep.aiAssisted,
-      estimatedMinutes: detailsStep.estimatedMinutes,
-      expectedOutcome: detailsStep.expectedOutcome,
-    });
-    setIsStepEditing(true);
-  }
+  /** Whether what is on screen differs from what is stored, per entity. */
+  const isStepDirty =
+    detailsStep !== null &&
+    JSON.stringify(stepMetadata) !== JSON.stringify(stepMetadataOf(detailsStep));
+  const isQuestionDirty =
+    detailsQuestion !== null &&
+    JSON.stringify(questionMetadata) !== JSON.stringify(questionMetadataOf(detailsQuestion));
 
   async function saveStepMetadata(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -200,7 +226,6 @@ export function BlueprintSubGraphEditor({
     setStepSaveError(null);
     try {
       await onUpdateStep(detailsStep, stepMetadata);
-      setIsStepEditing(false);
       toast.success("Step saved");
     } catch (reason) {
       setStepSaveError(
@@ -211,19 +236,6 @@ export function BlueprintSubGraphEditor({
     }
   }
 
-  function beginQuestionEditing() {
-    if (!detailsQuestion) return;
-    setQuestionMetadata({
-      title: detailsQuestion.title,
-      type: detailsQuestion.type,
-      question: detailsQuestion.question,
-      explanation: detailsQuestion.explanation,
-      correctAnswer: detailsQuestion.correctAnswer,
-    });
-    setQuestionSaveError(null);
-    setIsQuestionEditing(true);
-  }
-
   async function saveQuestionMetadata(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!detailsQuestion) return;
@@ -231,7 +243,6 @@ export function BlueprintSubGraphEditor({
     setQuestionSaveError(null);
     try {
       await onUpdateQuestion(detailsQuestion, questionMetadata);
-      setIsQuestionEditing(false);
       toast.success("Knowledge check saved");
     } catch (reason) {
       setQuestionSaveError(
@@ -317,101 +328,54 @@ export function BlueprintSubGraphEditor({
       />
       <SidePanel
         isOpen={isDetailsOpen && detailsNode !== null}
-        onClose={() => {
-          setIsDetailsOpen(false);
-          setIsQuestionEditing(false);
-          setIsStepEditing(false);
-        }}
+        onClose={() => setIsDetailsOpen(false)}
         title={detailsNode?.title ?? "Node details"}
         footer={
-          detailsStep && editable ? (
-            isStepEditing ? (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                >
-                  Delete
-                </Button>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setIsStepEditing(false)}>
-                    Cancel
+          (detailsStep || detailsQuestion) && editable ? (
+            /*
+              No edit mode, and so nothing to cancel: the fields are live and the footer says
+              whether what is on screen has reached the server. Pressing Edit to change a field and
+              Cancel to stop was two decisions about a mode on top of the one real decision.
+            */
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="dangerSoft"
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => {
+                  setDeleteError(null);
+                  setIsDeleteConfirmOpen(true);
+                }}
+              >
+                Delete
+              </Button>
+              {(detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty) ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => {
+                      if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
+                      if (detailsQuestion) setQuestionMetadata(questionMetadataOf(detailsQuestion));
+                    }}
+                  >
+                    Discard
                   </Button>
                   <Button
                     variant="primary"
                     type="submit"
-                    form="edit-blueprint-step"
-                    loading={isStepSaving}
+                    form={detailsStep ? "edit-blueprint-step" : "edit-blueprint-question"}
+                    loading={detailsStep ? isStepSaving : isQuestionSaving}
                   >
                     Save changes
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                >
-                  Delete
-                </Button>
-                <Button variant="secondary" onClick={beginStepEditing}>
-                  Edit
-                </Button>
-              </div>
-            )
-          ) : detailsQuestion && editable ? (
-            isQuestionEditing ? (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                >
-                  Delete
-                </Button>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setIsQuestionEditing(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    form="edit-blueprint-question"
-                    loading={isQuestionSaving}
-                  >
-                    Save changes
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                >
-                  Delete
-                </Button>
-                <Button variant="secondary" onClick={beginQuestionEditing}>
-                  Edit
-                </Button>
-              </div>
-            )
+              ) : (
+                <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
+                  <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
+                  Saved
+                </p>
+              )}
+            </div>
           ) : onRequestDraft ? (
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-app-text-muted">
@@ -433,14 +397,14 @@ export function BlueprintSubGraphEditor({
             node={detailsNode}
             phase={phase}
             editable={editable}
-            isQuestionEditing={isQuestionEditing}
+            isQuestionEditing={editable}
             questionMetadata={questionMetadata}
             questionSaveError={questionSaveError}
             onQuestionMetadataChange={setQuestionMetadata}
             onQuestionSubmit={saveQuestionMetadata}
             onAddOption={onAddOption}
             onRemoveOption={onRemoveOption}
-            isStepEditing={isStepEditing}
+            isStepEditing={editable}
             stepSaveError={stepSaveError}
             stepMetadata={stepMetadata}
             onStepMetadataChange={setStepMetadata}
@@ -592,90 +556,95 @@ function StepDetails({
   onEditTask: (task: BlueprintStep["blueprintTasks"][number]) => void;
   onEditResource: (resource: BlueprintStep["blueprintResources"][number]) => void;
 }) {
-  if (isEditing)
-    return (
-      <form
-        id="edit-blueprint-step"
-        className="space-y-5"
-        onSubmit={(event) => void onSubmit(event)}
-      >
-        <Field label="Title" required>
-          <Input
-            value={metadata.title}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                title: event.target.value,
-              }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Description" required>
-          <Textarea
-            value={metadata.description}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                description: event.target.value,
-              }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Step type">
-          <Select
-            value={metadata.type}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                type: event.target.value as BlueprintStep["type"],
-              }))
-            }
-          >
-            <option value="DOCUMENT">Document</option>
-            <option value="VIDEO">Video</option>
-            <option value="TASK">Task</option>
-          </Select>
-        </Field>
-        <Field label="Estimated minutes">
-          <Input
-            type="number"
-            min="1"
-            value={metadata.estimatedMinutes}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                estimatedMinutes: Number(event.target.value),
-              }))
-            }
-          />
-        </Field>
-        <Field label="Expected outcome">
-          <Textarea
-            value={metadata.expectedOutcome}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                expectedOutcome: event.target.value,
-              }))
-            }
-          />
-        </Field>
-        {saveError ? (
-          <p role="alert" className="text-sm text-app-danger-text">
-            {saveError}
-          </p>
-        ) : null}
-      </form>
-    );
+  // Fields and lists both, always. They used to be two branches of an edit mode, so on a draft —
+  // where the form is what you get — there was no way to reach the tasks or the resources at all.
+  const form = (
+    <form id="edit-blueprint-step" className="space-y-5" onSubmit={(event) => void onSubmit(event)}>
+      <Field label="Title" required>
+        <Input
+          value={metadata.title}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              title: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Description" required>
+        <Textarea
+          value={metadata.description}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              description: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Step type">
+        <Select
+          value={metadata.type}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              type: event.target.value as BlueprintStep["type"],
+            }))
+          }
+        >
+          <option value="DOCUMENT">Document</option>
+          <option value="VIDEO">Video</option>
+          <option value="TASK">Task</option>
+        </Select>
+      </Field>
+      <Field label="Estimated minutes">
+        <Input
+          type="number"
+          min="1"
+          value={metadata.estimatedMinutes}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              estimatedMinutes: Number(event.target.value),
+            }))
+          }
+        />
+      </Field>
+      <Field label="Expected outcome">
+        <Textarea
+          value={metadata.expectedOutcome}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              expectedOutcome: event.target.value,
+            }))
+          }
+        />
+      </Field>
+      {saveError ? (
+        <p role="alert" className="text-sm text-app-danger-text">
+          {saveError}
+        </p>
+      ) : null}
+    </form>
+  );
+
   return (
-    <div className="space-y-5 text-sm">
-      <dl className="grid grid-cols-2 gap-3">
-        <Detail label="Type" value={step.type} />
-        <Detail label="Duration" value={`${step.estimatedMinutes} minutes`} />
-      </dl>
-      <Detail label="Expected outcome" value={step.expectedOutcome || "Not specified."} />
+    <div className="space-y-6 text-sm">
+      {isEditing ? (
+        form
+      ) : (
+        <div className="space-y-5">
+          <p className="text-app-text-muted">{step.description || "No description yet."}</p>
+          <dl className="grid grid-cols-2 gap-3">
+            <Detail label="Type" value={step.type} />
+            <Detail label="Duration" value={`${step.estimatedMinutes} minutes`} />
+          </dl>
+          <Detail label="Expected outcome" value={step.expectedOutcome || "Not specified."} />
+        </div>
+      )}
       <DetailList
         title="Tasks"
         action={
@@ -837,89 +806,94 @@ function QuestionDetails({
     }
   }
 
-  if (isEditing)
-    return (
-      <form
-        id="edit-blueprint-question"
-        className="space-y-5"
-        onSubmit={(event) => void onSubmit(event)}
-      >
-        <Field label="Title" required>
-          <Input
-            value={metadata.title}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                title: event.target.value,
-              }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Question type">
-          <Select
-            value={metadata.type}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                type: event.target.value as BlueprintQuestion["type"],
-              }))
-            }
-          >
-            <option value="MULTIPLE_CHOICE">Multiple choice</option>
-            <option value="SHORT_TEXT">Short text</option>
-          </Select>
-        </Field>
-        <Field label="Question" required>
-          <Textarea
-            value={metadata.question}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                question: event.target.value,
-              }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Explanation">
-          <Textarea
-            value={metadata.explanation ?? ""}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                explanation: event.target.value,
-              }))
-            }
-          />
-        </Field>
-        <Field label="Correct answer">
-          <Input
-            value={metadata.correctAnswer ?? ""}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                correctAnswer: event.target.value,
-              }))
-            }
-          />
-        </Field>
-        {saveError ? (
-          <p role="alert" className="text-sm text-app-danger-text">
-            {saveError}
-          </p>
-        ) : null}
-      </form>
-    );
+  const form = (
+    <form
+      id="edit-blueprint-question"
+      className="space-y-5"
+      onSubmit={(event) => void onSubmit(event)}
+    >
+      <Field label="Title" required>
+        <Input
+          value={metadata.title}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              title: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Question type">
+        <Select
+          value={metadata.type}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              type: event.target.value as BlueprintQuestion["type"],
+            }))
+          }
+        >
+          <option value="MULTIPLE_CHOICE">Multiple choice</option>
+          <option value="SHORT_TEXT">Short text</option>
+        </Select>
+      </Field>
+      <Field label="Question" required>
+        <Textarea
+          value={metadata.question}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              question: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Explanation">
+        <Textarea
+          value={metadata.explanation ?? ""}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              explanation: event.target.value,
+            }))
+          }
+        />
+      </Field>
+      <Field label="Correct answer">
+        <Input
+          value={metadata.correctAnswer ?? ""}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              correctAnswer: event.target.value,
+            }))
+          }
+        />
+      </Field>
+      {saveError ? (
+        <p role="alert" className="text-sm text-app-danger-text">
+          {saveError}
+        </p>
+      ) : null}
+    </form>
+  );
 
   return (
-    <div className="space-y-5 text-sm">
-      <dl className="grid grid-cols-2 gap-3">
-        <Detail label="Type" value={question.type} />
-        <Detail label="Options" value={String(question.blueprintCheckOptions.length)} />
-      </dl>
-      <Detail label="Question" value={question.question} />
-      <Detail label="Explanation" value={question.explanation || "Not specified."} />
+    <div className="space-y-6 text-sm">
+      {isEditing ? (
+        form
+      ) : (
+        <div className="space-y-5">
+          <dl className="grid grid-cols-2 gap-3">
+            <Detail label="Type" value={question.type.replace("_", " ")} />
+            <Detail label="Options" value={String(question.blueprintCheckOptions.length)} />
+          </dl>
+          <Detail label="Question" value={question.question} />
+          <Detail label="Explanation" value={question.explanation || "Not specified."} />
+        </div>
+      )}
       <section>
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold text-app-text">Options</h3>

@@ -1,4 +1,4 @@
-import { FilePlus2, Layers, Sparkles, Trash2 } from "lucide-react";
+import { Check, FilePlus2, Layers, Sparkles, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
@@ -61,7 +61,6 @@ export function BlueprintGraphEditor({
 }: Props) {
   const [detailsPhaseId, setDetailsPhaseId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isDetailsEditing, setIsDetailsEditing] = useState(false);
   const [isDetailsSaving, setIsDetailsSaving] = useState(false);
   const [detailsSaveError, setDetailsSaveError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -77,9 +76,19 @@ export function BlueprintGraphEditor({
   const phaseById = useMemo(() => new Map(phases.map((phase) => [phase.id, phase])), [phases]);
   const detailsPhase = detailsPhaseId ? (phaseById.get(detailsPhaseId) ?? null) : null;
 
+  /** The phase as it is stored, which is what "changed" is measured against. */
+  function metadataOf(phase: BlueprintPhase): BlueprintPhaseMetadata {
+    return {
+      title: phase.title,
+      description: phase.description,
+      type: phase.type,
+      aiPrompt: phase.aiPrompt,
+    };
+  }
+
   function openPhaseDetails(phase: BlueprintPhase) {
     setDetailsPhaseId(phase.id);
-    setIsDetailsEditing(false);
+    setMetadata(metadataOf(phase));
     setDetailsSaveError(null);
     setIsDetailsOpen(true);
   }
@@ -100,7 +109,6 @@ export function BlueprintGraphEditor({
       await onDeletePhase(detailsPhase);
       setIsDeleteConfirmOpen(false);
       setIsDetailsOpen(false);
-      setIsDetailsEditing(false);
       setDetailsPhaseId(null);
       toast.success(`Phase "${title}" deleted`);
     } catch (reason) {
@@ -110,18 +118,9 @@ export function BlueprintGraphEditor({
     }
   }
 
-  function beginPhaseEditing() {
-    const phase = detailsPhaseId ? phaseById.get(detailsPhaseId) : null;
-    if (!phase) return;
-    setMetadata({
-      title: phase.title,
-      description: phase.description,
-      type: phase.type,
-      aiPrompt: phase.aiPrompt,
-    });
-    setDetailsSaveError(null);
-    setIsDetailsEditing(true);
-  }
+  /** Whether anything in the panel differs from what is stored. */
+  const isDirty =
+    detailsPhase !== null && JSON.stringify(metadata) !== JSON.stringify(metadataOf(detailsPhase));
 
   async function savePhaseMetadata(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,12 +129,15 @@ export function BlueprintGraphEditor({
     setIsDetailsSaving(true);
     setDetailsSaveError(null);
     try {
-      await onUpdatePhase(phase, {
+      const saved = {
         ...metadata,
         description: metadata.description || null,
         aiPrompt: metadata.type === "AI_ENHANCED" ? metadata.aiPrompt || null : null,
-      });
-      setIsDetailsEditing(false);
+      };
+      await onUpdatePhase(phase, saved);
+      // Re-seeded from what was actually sent, so the panel reads as saved rather than still dirty
+      // on a field the save normalised (an empty description becomes null on the way out).
+      setMetadata(saved);
       toast.success("Phase saved");
     } catch (reason) {
       setDetailsSaveError(
@@ -198,32 +200,35 @@ export function BlueprintGraphEditor({
       />
       <SidePanel
         isOpen={isDetailsOpen && detailsPhaseId !== null}
-        onClose={() => {
-          setIsDetailsOpen(false);
-          setIsDetailsEditing(false);
-        }}
+        onClose={() => setIsDetailsOpen(false)}
         title={detailsPhase?.title ?? "Phase details"}
         footer={
           editable && detailsPhase ? (
-            isDetailsEditing ? (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                >
-                  Delete
-                </Button>
-                <div className="flex gap-2">
+            /*
+              No edit mode, and so nothing to cancel. The fields are simply live, and the footer
+              says whether what is on screen has reached the server yet. The old arrangement made
+              somebody press Edit to change a field and Cancel to stop — two decisions about a mode,
+              on top of the one decision they actually had, which is what the phase should say.
+            */
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="dangerSoft"
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => {
+                  setDeleteError(null);
+                  setIsDeleteConfirmOpen(true);
+                }}
+              >
+                Delete
+              </Button>
+              {isDirty ? (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="secondary"
                     type="button"
-                    onClick={() => setIsDetailsEditing(false)}
+                    onClick={() => setMetadata(metadataOf(detailsPhase))}
                   >
-                    Cancel
+                    Discard
                   </Button>
                   <Button
                     variant="primary"
@@ -234,24 +239,13 @@ export function BlueprintGraphEditor({
                     Save changes
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                >
-                  Delete
-                </Button>
-                <Button variant="secondary" onClick={beginPhaseEditing}>
-                  Edit
-                </Button>
-              </div>
-            )
+              ) : (
+                <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
+                  <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
+                  Saved
+                </p>
+              )}
+            </div>
           ) : onRequestDraft ? (
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-app-text-muted">
@@ -268,10 +262,10 @@ export function BlueprintGraphEditor({
           ) : undefined
         }
       >
-        {detailsPhaseId && phaseById.get(detailsPhaseId) ? (
+        {detailsPhase ? (
           <PhaseDetails
-            phase={phaseById.get(detailsPhaseId)!}
-            isEditing={isDetailsEditing}
+            phase={detailsPhase}
+            isEditing={editable}
             metadata={metadata}
             saveError={detailsSaveError}
             onMetadataChange={setMetadata}
@@ -317,6 +311,14 @@ function GraphNodeCard({
   );
 }
 
+/**
+ * Everything the panel says about one phase: its fields, and the things about it that are not
+ * fields.
+ *
+ * The fields and the facts used to be two branches of an edit mode, so a draft showed the form and
+ * nothing else — the step and check counts, and who the phase is for, were only visible on a
+ * version you could not change. They are the context somebody needs *while* editing.
+ */
 function PhaseDetails({
   phase,
   isEditing,
@@ -332,83 +334,79 @@ function PhaseDetails({
   onMetadataChange: React.Dispatch<React.SetStateAction<BlueprintPhaseMetadata>>;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
-  if (isEditing)
-    return (
-      <form
-        id="edit-blueprint-phase"
-        className="space-y-5"
-        onSubmit={(event) => void onSubmit(event)}
-      >
-        <Field label="Title" required>
-          <Input
-            value={metadata.title}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                title: event.target.value,
-              }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Description">
-          <Textarea
-            value={metadata.description ?? ""}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                description: event.target.value,
-              }))
-            }
-          />
-        </Field>
-        <Field label="Phase type">
-          <Select
-            value={metadata.type}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                type: event.target.value as BlueprintPhaseType,
-              }))
-            }
-          >
-            <option value="FIXED">Fixed</option>
-            <option value="AI_ENHANCED">AI-enhanced</option>
-          </Select>
-        </Field>
-        {metadata.type === "AI_ENHANCED" ? (
-          <Field label="AI prompt">
-            <Textarea
-              value={metadata.aiPrompt ?? ""}
+  return (
+    <div className="space-y-6 text-sm">
+      {isEditing ? (
+        <form
+          id="edit-blueprint-phase"
+          className="space-y-5"
+          onSubmit={(event) => void onSubmit(event)}
+        >
+          <Field label="Title" required>
+            <Input
+              value={metadata.title}
               onChange={(event) =>
-                onMetadataChange((current) => ({
-                  ...current,
-                  aiPrompt: event.target.value,
-                }))
+                onMetadataChange((current) => ({ ...current, title: event.target.value }))
+              }
+              required
+            />
+          </Field>
+          <Field label="Description">
+            <Textarea
+              value={metadata.description ?? ""}
+              onChange={(event) =>
+                onMetadataChange((current) => ({ ...current, description: event.target.value }))
               }
             />
           </Field>
-        ) : null}
-        {saveError ? (
-          <p role="alert" className="text-sm text-app-danger-text">
-            {saveError}
-          </p>
-        ) : null}
-      </form>
-    );
+          <Field label="Phase type">
+            <Select
+              value={metadata.type}
+              onChange={(event) =>
+                onMetadataChange((current) => ({
+                  ...current,
+                  type: event.target.value as BlueprintPhaseType,
+                }))
+              }
+            >
+              <option value="FIXED">Fixed</option>
+              <option value="AI_ENHANCED">AI-enhanced</option>
+            </Select>
+          </Field>
+          {metadata.type === "AI_ENHANCED" ? (
+            <Field label="AI prompt">
+              <Textarea
+                value={metadata.aiPrompt ?? ""}
+                onChange={(event) =>
+                  onMetadataChange((current) => ({ ...current, aiPrompt: event.target.value }))
+                }
+              />
+            </Field>
+          ) : null}
+          {saveError ? (
+            <p role="alert" className="text-sm text-app-danger-text">
+              {saveError}
+            </p>
+          ) : null}
+        </form>
+      ) : (
+        <div className="space-y-5">
+          <p className="text-app-text-muted">{phase.description || "No description yet."}</p>
+          <div>
+            <h3 className="font-semibold text-app-text">AI prompt</h3>
+            <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
+              {phase.aiPrompt || "Not specified."}
+            </p>
+          </div>
+        </div>
+      )}
 
-  return (
-    <div className="space-y-5 text-sm">
-      <p className="text-app-text-muted">{phase.description || "No description yet."}</p>
-      <dl className="grid grid-cols-2 gap-3">
-        <Detail label="Type" value={phase.type} />
+      <dl className="grid grid-cols-3 gap-3">
+        <Detail label="Type" value={phase.type === "AI_ENHANCED" ? "AI-enhanced" : "Fixed"} />
         <Detail label="Steps" value={String(phase.blueprintSteps.length)} />
-        <Detail label="Knowledge checks" value={String(phase.blueprintCheckQuestions.length)} />
+        <Detail label="Checks" value={String(phase.blueprintCheckQuestions.length)} />
       </dl>
-      <div>
-        <h3 className="font-semibold text-app-text">AI prompt</h3>
-        <p className="mt-1 text-app-text-muted">{phase.aiPrompt || "Not specified."}</p>
-      </div>
+
       <div>
         <h3 className="font-semibold text-app-text">Who this phase is for</h3>
         {phase.requirements?.length ? (
@@ -429,8 +427,7 @@ function PhaseDetails({
           </>
         ) : (
           <p className="mt-1 text-app-text-muted">
-            Everybody on the project. Add a skill or project-role requirement in the list editor to
-            narrow it.
+            Everybody on the project. Requirements are added from the outline.
           </p>
         )}
       </div>
