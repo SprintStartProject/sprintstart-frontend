@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNo
 import {
   Background,
   BackgroundVariant,
+  BaseEdge,
+  ConnectionLineType,
   Controls,
   Handle,
   MarkerType,
@@ -15,6 +17,8 @@ import {
   useStore,
   type Connection,
   type Edge,
+  type EdgeProps,
+  type EdgeTypes,
   type IsValidConnection,
   type Node,
   type NodeProps,
@@ -41,6 +45,7 @@ import {
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
   autoLayoutPositions,
+  blueprintEdgePath,
   canConnect,
   chainFor,
   chainPositions,
@@ -246,6 +251,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   // Stable for the life of the canvas: React Flow remounts every node when `nodeTypes` changes
   // identity, which would end a drag the moment it started.
   const nodeTypes = useMemo<NodeTypes>(() => ({ blueprint: BlueprintFlowNodeCard }), []);
+  const edgeTypes = useMemo<EdgeTypes>(() => ({ blueprint: BlueprintFlowEdge }), []);
 
   const computedNodes = useMemo<BlueprintFlowNode[]>(
     () => {
@@ -333,7 +339,9 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
           id: `${blockerId}->${node.id}`,
           source: blockerId,
           target: node.id,
-          type: "smoothstep" as const,
+          // Our own curve — see `blueprintEdgePath`. The library's shapes are a staircase or a
+          // bezier too shy to read as one across a sixteen-phase graph.
+          type: "blueprint" as const,
           focusable: true,
           deletable: editable,
           style: {
@@ -341,6 +349,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             // the edge carries the brand token and a weight that survives being zoomed out.
             stroke: "var(--color-app-brand)",
             strokeWidth: 2,
+            strokeLinecap: "round" as const,
             opacity:
               chainIds !== null && !(chainIds.has(blockerId) && chainIds.has(node.id)) ? 0.15 : 1,
           },
@@ -571,6 +580,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             nodes={flowNodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={handleNodeDragStop}
             onNodeClick={(_event, node) => setSelectedId(node.id)}
@@ -586,6 +596,14 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             // details panel's Delete button asks nothing either, but at least has to be aimed at.
             // On an edge it undoes a prerequisite, which one drag restores.
             deleteKeyCode={editable ? ["Backspace", "Delete"] : null}
+            // The line under the pointer while an edge is being drawn is the same curve, in the
+            // same colour, as the edge it will become — so what is being aimed at is what lands.
+            connectionLineType={ConnectionLineType.Bezier}
+            connectionLineStyle={{
+              stroke: "var(--color-app-brand)",
+              strokeWidth: 2,
+              strokeLinecap: "round",
+            }}
             connectionRadius={30}
             minZoom={0.2}
             maxZoom={1.8}
@@ -701,12 +719,12 @@ function GraphLegend({ editable }: { editable: boolean }) {
               <path d="M0,0 L0,5 L7,2.5 z" className="fill-app-text-muted" />
             </marker>
           </defs>
-          <line
-            x1="0"
-            y1="5"
-            x2="26"
-            y2="5"
+          {/* The same curve the canvas draws, so the legend explains what is actually on screen. */}
+          <path
+            d="M0,9 C10,9 16,1 26,1"
+            fill="none"
             strokeWidth="1.5"
+            strokeLinecap="round"
             className="stroke-app-text-muted"
             markerEnd="url(#legend-arrow)"
           />
@@ -733,6 +751,33 @@ function GraphLegend({ editable }: { editable: boolean }) {
         </span>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * An edge, drawn on the geometry in `graphLayout` rather than on one of React Flow's own shapes.
+ *
+ * `BaseEdge` is the library's own path element, so selection, focus and the Backspace-to-unlock
+ * handling keep working; only the `d` is ours. The interaction stroke is widened well past the
+ * visible one, because a two-pixel curve is not a thing anybody can click.
+ */
+function BlueprintFlowEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  markerEnd,
+  style,
+}: EdgeProps) {
+  return (
+    <BaseEdge
+      id={id}
+      path={blueprintEdgePath({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })}
+      markerEnd={markerEnd}
+      style={style}
+      interactionWidth={20}
+    />
   );
 }
 

@@ -75,14 +75,16 @@ export function BlueprintNodeCard({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "flex w-full flex-col overflow-hidden rounded-xl border bg-app-surface text-left",
+        "flex w-full flex-col overflow-hidden rounded-xl bg-app-surface text-left",
         "transition-[box-shadow,transform,border-color,background-color] duration-150",
         "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
         isCompact ? "justify-center" : "p-3",
-        // On the canvas the card has to hold its own outline against a dotted surface and a
-        // vignette, so it takes the strong border and a shadow that reads at a distance. In the
-        // library it sits on a plain panel next to other list rows, where that would shout.
-        inLibrary ? "shadow-sm" : "shadow-md",
+        // In the library the card sits on a plain panel beside other list rows, where a loud
+        // outline would shout. On the canvas it has to hold its own against a field of dots under
+        // a vignette, so it takes two pixels of the strong border and a shadow that still reads at
+        // the zoom where the whole graph fits. A ring of canvas colour outside it was the other
+        // candidate and would have clipped the arrowheads that land on the border.
+        inLibrary ? "border shadow-sm" : "border-2 shadow-md",
         highlighted
           ? "border-app-brand bg-app-brand-soft"
           : inLibrary
@@ -90,9 +92,11 @@ export function BlueprintNodeCard({
             : "border-app-border-strong",
         disabled
           ? "cursor-default opacity-70"
-          : // Depth is what tells a card from the surface it sits on: it lifts a little and casts
-            // further as the pointer comes to it, and settles back when it leaves.
-            "hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg motion-reduce:hover:translate-y-0",
+          : // Depth is what tells a card from the surface it sits on: it lifts, its border comes up
+            // to the brand colour, and the house's brand lift — a bloom cast *under* the card
+            // rather than a halo around it — says which one the pointer is on without a highlight
+            // that would compete with the selection ring.
+            "hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0",
         inLibrary ? "min-h-16" : "",
       ].join(" ")}
       style={{

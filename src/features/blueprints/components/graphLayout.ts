@@ -245,8 +245,10 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
     const graph = new dagre.graphlib.Graph();
     graph.setGraph({
       rankdir: "LR",
-      ranksep: 96,
-      nodesep: 40,
+      // Generous on both axes, because the edges are curves now and a curve needs room to be one:
+      // packed ranks turn every connection into a short straight dash between two borders.
+      ranksep: 150,
+      nodesep: 64,
       marginx: 0,
       marginy: 0,
     });
@@ -387,10 +389,12 @@ export function chainPositions(nodes: readonly GraphRuleNode[]): Map<string, Cha
 /**
  * Breathing space kept between two drawn cards, on top of the card box itself.
  *
- * Small on purpose: this pass moves nodes away from where their author put them, so it should do
- * the least that stops them sitting on each other.
+ * Modest on purpose: this pass moves nodes away from where their author put them, so it should do
+ * the least that works. But "works" is more than not touching — an edge between two cards a dozen
+ * pixels apart is a stub with nowhere to curve, so the gap is wide enough for the arrow between
+ * them to be drawn as one.
  */
-const MIN_NODE_GAP = 12;
+export const MIN_NODE_GAP = 48;
 
 /**
  * The same positions, with any cards that would sit on top of each other pushed apart.
@@ -452,4 +456,58 @@ export function separateOverlaps(
     out[id] = { x: Math.round(out[id].x), y: Math.round(out[id].y) };
   }
   return out;
+}
+
+/** How far a control point reaches out of a handle, at the very least. */
+const EDGE_MIN_REACH = 72;
+/** And at the very most, so a long edge sweeps rather than loops off the canvas. */
+const EDGE_MAX_REACH = 260;
+/** Below this vertical difference an edge counts as flat and is bowed rather than left straight. */
+const EDGE_FLAT_THRESHOLD = 28;
+
+/**
+ * The shape of an edge: one cubic curve from the source handle to the target handle.
+ *
+ * React Flow's own edge types are a staircase (`smoothstep`) or a bezier whose control points reach
+ * out by a quarter of the gap — enough to round a corner, not enough to read as a curve. Two cards
+ * on the same row got a dead straight dash, and several of those running parallel are hard to tell
+ * apart at a glance. So the geometry is ours:
+ *
+ * - **Reach** grows with the distance the edge has to cover, bounded at both ends: a short hop still
+ *   leaves its handle horizontally, and a long one sweeps instead of looping off the canvas.
+ * - **A flat edge is bowed.** When the two handles sit at nearly the same height there is no
+ *   direction for a curve to take, so both control points are pushed down by an amount that scales
+ *   with the span. That is the swing on an otherwise straight run, and it separates two parallel
+ *   edges that would otherwise be one line.
+ * - **A backwards edge** (a target left of its source) falls out of the same rule as a wide loop
+ *   out and back, which is what makes it visible as the exception it is.
+ *
+ * Pure geometry, so what the canvas draws can be checked without mounting a canvas.
+ */
+export function blueprintEdgePath(source: GraphPoint, target: GraphPoint): string {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+
+  const span = Math.abs(dx);
+  const wanted = Math.max(EDGE_MIN_REACH, span * 0.55 + Math.abs(dy) * 0.25);
+  // A forward edge's control points never pass each other: past halfway they sit behind each
+  // other's handles and the curve doubles back on itself, which on a short hop between two
+  // neighbouring cards reads as a kink rather than a connection. The bow below is what gives a
+  // short edge its shape instead. A backwards edge keeps the full reach — there the loop is the
+  // point, and it is what makes an edge running against the flow visible as one.
+  const reach = Math.min(EDGE_MAX_REACH, dx > 0 ? Math.min(wanted, span * 0.5) : wanted);
+
+  // Both control points are offset the same way, which bows the curve rather than tilting it.
+  // Proportional, with no floor: a long flat run gets a real swing, and a short hop between two
+  // neighbouring cards stays nearly flat rather than kinking over the few pixels it has.
+  const bow = Math.abs(dy) < EDGE_FLAT_THRESHOLD ? Math.min(44, span * 0.16) : 0;
+
+  const round = (value: number) => Math.round(value * 100) / 100;
+
+  return [
+    `M ${round(source.x)},${round(source.y)}`,
+    `C ${round(source.x + reach)},${round(source.y + bow)}`,
+    `${round(target.x - reach)},${round(target.y + bow)}`,
+    `${round(target.x)},${round(target.y)}`,
+  ].join(" ");
 }

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
+  MIN_NODE_GAP,
   autoLayoutPositions,
+  blueprintEdgePath,
   canConnect,
   chainFor,
   chainPositions,
@@ -369,9 +371,10 @@ describe("separateOverlaps", () => {
 
     const positions = separateOverlaps(nodes, withFallbackPositions(nodes));
 
-    // The pair needs 260 between them and has 226, so neither card moves further than that gap.
-    expect(Math.abs(positions.a.x)).toBeLessThanOrEqual(34);
-    expect(Math.abs(positions.b.x - 226)).toBeLessThanOrEqual(34);
+    // Neither card moves further than the distance the pair was short of a clear gap.
+    const shortfall = GRAPH_NODE_WIDTH + MIN_NODE_GAP - 226;
+    expect(Math.abs(positions.a.x)).toBeLessThanOrEqual(shortfall);
+    expect(Math.abs(positions.b.x - 226)).toBeLessThanOrEqual(shortfall);
   });
 
   it("ignores a node with nowhere to be", () => {
@@ -381,5 +384,75 @@ describe("separateOverlaps", () => {
 
     expect(positions.gone).toBeUndefined();
     expect(positions.a).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("blueprintEdgePath", () => {
+  /** The four control values of a cubic `M sx,sy C c1x,c1y c2x,c2y tx,ty`. */
+  function parse(path: string) {
+    const numbers = path.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    expect(numbers).toHaveLength(8);
+    const [sx, sy, c1x, c1y, c2x, c2y, tx, ty] = numbers;
+    return { sx, sy, c1x, c1y, c2x, c2y, tx, ty };
+  }
+
+  it("draws one cubic curve, from the source handle to the target handle", () => {
+    const path = blueprintEdgePath({ x: 0, y: 0 }, { x: 400, y: 120 });
+    const { sx, sy, tx, ty } = parse(path);
+
+    expect(path.startsWith("M 0,0 C ")).toBe(true);
+    expect([sx, sy]).toEqual([0, 0]);
+    expect([tx, ty]).toEqual([400, 120]);
+  });
+
+  it("leaves each handle horizontally, which is the direction the handle faces", () => {
+    const { sx, c1x, c2x, tx } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 400, y: 120 }));
+
+    expect(c1x).toBeGreaterThan(sx);
+    expect(c2x).toBeLessThan(tx);
+  });
+
+  it("reaches further the further it has to go, so a long edge sweeps", () => {
+    const short = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 260, y: 120 }));
+    const long = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 700, y: 120 }));
+
+    expect(long.c1x - long.sx).toBeGreaterThan(short.c1x - short.sx);
+  });
+
+  it("stops reaching before a very long edge loops off the canvas", () => {
+    const { sx, c1x } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 4000, y: 0 }));
+
+    expect(c1x - sx).toBeLessThanOrEqual(260);
+  });
+
+  it("bows an edge between two handles at the same height, rather than drawing a dash", () => {
+    // Nothing tilts a curve between two points on one line, so without this the seeded blueprint's
+    // rows are straight horizontal strokes — several of them parallel and hard to tell apart.
+    const { sy, c1y, c2y, ty } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 320, y: 0 }));
+
+    expect(c1y).toBeGreaterThan(sy);
+    expect(c2y).toBeGreaterThan(ty);
+    expect(c1y).toBe(c2y);
+  });
+
+  it("does not bow an edge that already has a direction to curve in", () => {
+    const { sy, c1y, ty, c2y } = parse(blueprintEdgePath({ x: 0, y: 0 }, { x: 320, y: 200 }));
+
+    expect(c1y).toBe(sy);
+    expect(c2y).toBe(ty);
+  });
+
+  it("swings a backwards edge wide, so the exception is visible as one", () => {
+    const { sx, c1x, tx, c2x } = parse(blueprintEdgePath({ x: 600, y: 0 }, { x: 0, y: 40 }));
+
+    expect(c1x).toBeGreaterThan(sx);
+    expect(c2x).toBeLessThan(tx);
+  });
+
+  it("draws the same edge the same way every time", () => {
+    const first = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 });
+    const second = blueprintEdgePath({ x: 12, y: 30 }, { x: 350, y: 96 });
+
+    expect(second).toBe(first);
   });
 });
