@@ -52,8 +52,9 @@ function releaseGameSlot(host: symbol): void {
  * the game is not already open, pressing Space opens it — unless the user
  * is typing in a field, in which case Space stays a space.
  *
- * Returns whether the game should be shown; hosts close it themselves
- * when their wait ends (or when the unlock flag flips off).
+ * Returns whether the game should be shown, plus a way to close it early.
+ * The game belongs to the wait it was opened under, so it closes by itself
+ * the moment `armed` flips off — a host never has to watch that itself.
  */
 export function useSpaceOpensDino(armed: boolean, isUnlocked: boolean): [boolean, () => void] {
   const [gameActive, setGameActive] = useState(false);
@@ -92,6 +93,22 @@ export function useSpaceOpensDino(armed: boolean, isUnlocked: boolean): [boolean
   if (prevUnlocked !== isUnlocked) {
     setPrevUnlocked(isUnlocked);
     if (!isUnlocked) {
+      releaseGameSlot(host);
+      setGameActive(false);
+    }
+  }
+
+  // The other half of "this game belongs to this wait": when the wait ends,
+  // the game is over. Closing here is not a nicety — the game's DOM belongs
+  // to the host's waiting state, so it disappears on its own when the answer
+  // arrives, and without this the shared slot would stay claimed by a game
+  // nobody can see (the onboarding generation step has no close of its own,
+  // which is how a finished generation used to eat the trigger for the rest
+  // of the visit). Same render-phase pattern as the lock above.
+  const [prevArmed, setPrevArmed] = useState(armed);
+  if (prevArmed !== armed) {
+    setPrevArmed(armed);
+    if (!armed) {
       releaseGameSlot(host);
       setGameActive(false);
     }

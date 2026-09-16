@@ -45,13 +45,6 @@ export function useBuddyConversation() {
   // or when the cogwheel unlock flag flips off.
   const dinoUnlocked = useDinoUnlocked();
   const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
-  const [prevBuddyBusy, setPrevBuddyBusy] = useState(false);
-  if (prevBuddyBusy !== (isThinking || isStreaming)) {
-    setPrevBuddyBusy(isThinking || isStreaming);
-    if (!isThinking && !isStreaming && dinoGameActive) {
-      closeDinoGame();
-    }
-  }
 
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);

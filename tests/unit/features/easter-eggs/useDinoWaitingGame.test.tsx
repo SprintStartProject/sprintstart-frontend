@@ -92,5 +92,34 @@ describe("useDinoWaitingGame hooks", () => {
       rerender({ unlocked: false });
       expect(result.current[0]).toBe(false);
     });
+
+    it("closes when the wait ends and frees the slot for the next surface", () => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+      const first = renderHook(({ armed }) => useSpaceOpensDino(armed, true), {
+        initialProps: { armed: true },
+      });
+
+      act(() => {
+        fireEvent.keyDown(window, { code: "Space" });
+      });
+      expect(first.result.current[0]).toBe(true);
+
+      // The wait ended (the answer arrived, the path was generated): the game
+      // goes with it — its DOM already did.
+      first.rerender({ armed: false });
+      expect(first.result.current[0]).toBe(false);
+
+      // And the shared slot is free again: a second armed host can open its
+      // own game. Before, the finished wait kept the slot claimed and Space
+      // did nothing for the rest of the visit.
+      const second = renderHook(() => useSpaceOpensDino(true, true));
+      act(() => {
+        fireEvent.keyDown(window, { code: "Space" });
+      });
+      expect(second.result.current[0]).toBe(true);
+
+      second.unmount();
+      first.unmount();
+    });
   });
 });

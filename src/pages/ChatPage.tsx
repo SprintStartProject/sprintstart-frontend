@@ -148,18 +148,9 @@ export function ChatPage() {
   const dinoUnlocked = useDinoUnlocked();
   const [gameActive, closeGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
 
-  // Close the game as soon as the answer arrives. Uses React's documented
-  // "adjust state when a value changes" pattern (guarded setState during
-  // render) instead of an effect — avoids cascading renders and the
-  // set-state-in-effect lint rule. See:
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  const [prevIsThinking, setPrevIsThinking] = useState(isThinking);
-  if (prevIsThinking !== isThinking) {
-    setPrevIsThinking(isThinking);
-    if (!isThinking && gameActive) {
-      closeGame();
-    }
-  }
+  // The game closes itself and hands the shared slot back the moment
+  // `isThinking` flips off — see `useSpaceOpensDino`. `closeGame` is only
+  // for an exit from inside the game.
 
   // Dino easter egg phrase matching happens in `handleChatSubmit` below.
 
