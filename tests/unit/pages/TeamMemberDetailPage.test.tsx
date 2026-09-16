@@ -15,13 +15,13 @@ vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
-    useParams: () => ({ userId: "user1" }),
     useNavigate: () => vi.fn(),
   };
 });
 
 const {
   mockGetTeamMember,
+  mockGetTeamOverview,
   mockGetProjectRoles,
   mockGetUserSkillLevels,
   mockGetUserOnboardingPath,
@@ -33,6 +33,7 @@ const {
   mockDenyOnboardingSkipRequest,
 } = vi.hoisted(() => ({
   mockGetTeamMember: vi.fn(),
+  mockGetTeamOverview: vi.fn(),
   mockGetProjectRoles: vi.fn(),
   mockGetUserSkillLevels: vi.fn(),
   mockGetUserOnboardingPath: vi.fn(),
@@ -46,6 +47,8 @@ const {
 
 vi.mock("../../../src/services/teamManagementService", () => ({
   getTeamMember: mockGetTeamMember,
+  // The roster behind the previous/next member links.
+  getTeamOverview: mockGetTeamOverview,
   getProjectRoles: mockGetProjectRoles,
   getUserSkillLevels: mockGetUserSkillLevels,
   getUserOnboardingPath: mockGetUserOnboardingPath,
@@ -146,6 +149,7 @@ describe("TeamMemberDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetTeamMember.mockResolvedValue(createMockUser());
+    mockGetTeamOverview.mockResolvedValue([createMockUser()]);
     mockGetProjectRoles.mockResolvedValue(mockRoles);
     mockGetUserSkillLevels.mockResolvedValue([]);
     mockGetUserOnboardingPath.mockResolvedValue({
@@ -165,40 +169,40 @@ describe("TeamMemberDetailPage", () => {
   it("loads and displays member details", async () => {
     render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Alice Smith" })).toBeInTheDocument();
     });
 
     expect(mockGetTeamMember).toHaveBeenCalledWith("user1");
-    expect(screen.getByText("Backend")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Backend" })).toBeInTheDocument();
   });
 
   it("opens the roles modal and adds a new role", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Alice Smith" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Backend"));
+    await user.click(screen.getByRole("button", { name: "Backend" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Manage Roles")).toBeInTheDocument();
+      expect(screen.getByText("Manage roles")).toBeInTheDocument();
     });
 
-    const select = screen.getByRole("combobox");
-    await user.selectOptions(select, "role2");
+    await user.click(screen.getByRole("combobox", { name: "Choose a role to add" }));
+    await user.click(await screen.findByRole("option", { name: "Frontend" }));
 
-    await user.click(screen.getByRole("button", { name: /Add/ }));
+    await user.click(screen.getByRole("button", { name: /^Add$/ }));
 
     await waitFor(() => {
       expect(mockAssignProjectRoleToUser).toHaveBeenCalledWith("user1", "role2");
@@ -209,18 +213,18 @@ describe("TeamMemberDetailPage", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Alice Smith" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Backend"));
+    await user.click(screen.getByRole("button", { name: "Backend" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Manage Roles")).toBeInTheDocument();
+      expect(screen.getByText("Manage roles")).toBeInTheDocument();
     });
 
     const removeButton = screen.getByLabelText("Remove Backend");
@@ -241,15 +245,12 @@ describe("TeamMemberDetailPage", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Skip request")).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole("button", { name: "Accept" }));
+    // Approve, not Accept: the same list, and the same words, as the member side panel.
+    await user.click(await screen.findByRole("button", { name: "Approve" }));
 
     await waitFor(() => {
       expect(mockAcceptOnboardingSkipRequest).toHaveBeenCalledWith("skip1");
@@ -260,15 +261,11 @@ describe("TeamMemberDetailPage", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Skip request")).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole("button", { name: "Deny" }));
+    await user.click(await screen.findByRole("button", { name: "Deny" }));
 
     await waitFor(() => {
       expect(mockDenyOnboardingSkipRequest).toHaveBeenCalledWith("skip1");
@@ -294,7 +291,7 @@ describe("TeamMemberDetailPage", () => {
 
     render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 

@@ -183,7 +183,7 @@ describe("SideBar", () => {
     expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
   });
 
-  it("shows the escalation inbox to a PM managing the selected project", () => {
+  it("leaves the escalation inbox to the PM dashboard instead of giving it an entry", () => {
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
       profile: { ...mockProfile, permissionGroup: PermissionGroup.PM },
@@ -194,9 +194,10 @@ describe("SideBar", () => {
 
     renderWithProviders(<SideBar />);
 
-    // The project context is mocked with `canManageSelected: true`, so the
-    // manager-assignment gate passes and the entry renders.
-    expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
+    // The inbox is a section of the PM dashboard now: a managing PM reaches it through the
+    // dashboard's entry, and a separate entry would light up beside it.
+    expect(screen.getAllByText("PM Dashboard").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
   });
 
   it("hides the escalation inbox from a PM who only has member access to the selected project", () => {
@@ -216,7 +217,7 @@ describe("SideBar", () => {
     expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
   });
 
-  it("activates only the Escalation Inbox entry on its own route", () => {
+  it("activates the PM Dashboard entry, and only that one, inside the escalations section", () => {
     const pmProfile = {
       ...mockProfile,
       permissionGroup: PermissionGroup.PM,
@@ -230,10 +231,8 @@ describe("SideBar", () => {
     });
 
     // The framer-motion test mock surfaces `layoutId` as `data-layout-id`,
-    // rendered once per active entry. Two active entries here (the Escalation
-    // Inbox via NavLink match plus a force-active PM Dashboard) would each
-    // mount one pill sharing the same id. `initialEntries` (instead of the
-    // helper's default `/` location) is what puts the route in the inbox.
+    // rendered once per active entry. `initialEntries` (instead of the helper's
+    // default `/` location) is what puts the route in the inbox section.
     render(
       <MemoryRouter initialEntries={["/insights/knowledge-requests"]}>
         <ThemeProvider>
@@ -241,8 +240,6 @@ describe("SideBar", () => {
         </ThemeProvider>
       </MemoryRouter>,
     );
-
-    expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
 
     // The sidebar mounts twice (desktop + mobile drawer), so there are two
     // pills in total -- but each instance must carry exactly ONE. A second
@@ -259,7 +256,7 @@ describe("SideBar", () => {
       .find((link) => desktopNav.contains(link));
     // The pill is what the sidebar highlights *with* — the same `[data-layout-id]` counted
     // above — so asserting on it survives any restyling of the entry itself.
-    expect(pmDashboardEntry?.querySelector("[data-layout-id]")).toBeNull();
+    expect(pmDashboardEntry?.querySelector("[data-layout-id]")).not.toBeNull();
   });
 
   /**

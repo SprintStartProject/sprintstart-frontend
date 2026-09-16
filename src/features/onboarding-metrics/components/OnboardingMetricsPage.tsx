@@ -268,7 +268,7 @@ export function OnboardingMetricsPage() {
   );
 
   return (
-    <div>
+    <section aria-label="Onboarding metrics">
       <PmSectionHeader
         title="Onboarding metrics"
         description="Each hire's path from joining to their first accepted contribution."
@@ -388,6 +388,6 @@ export function OnboardingMetricsPage() {
           </>
         )}
       </div>
-    </div>
+    </section>
   );
 }

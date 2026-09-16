@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { KnowledgeRequestInboxPage } from "../../../../../src/features/knowledge-request/components/KnowledgeRequestInboxPage";
@@ -47,6 +48,18 @@ function mockProject(selectedProjectId: string | null) {
   );
 }
 
+/**
+ * The inbox is a section of the PM workspace and keeps its tab in the URL (`?view=answered`),
+ * so it needs a router around it.
+ */
+function renderInbox(url = "/insights/knowledge-requests") {
+  return render(
+    <MemoryRouter initialEntries={[url]}>
+      <KnowledgeRequestInboxPage />
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockProject("proj1");
@@ -70,7 +83,7 @@ describe("KnowledgeRequestInboxPage", () => {
     ]);
     mockedService.listAnswers.mockResolvedValue([]);
 
-    render(<KnowledgeRequestInboxPage />);
+    renderInbox();
 
     await waitFor(() => {
       expect(screen.getByText("Why does npm test hang?")).toBeInTheDocument();
@@ -87,7 +100,7 @@ describe("KnowledgeRequestInboxPage", () => {
     mockedService.listOpen.mockResolvedValue([]);
     mockedService.listAnswers.mockResolvedValue([]);
 
-    render(<KnowledgeRequestInboxPage />);
+    renderInbox();
 
     // Default tab is Open; its empty state body.
     expect(await screen.findByText(/No open escalations/i)).toBeInTheDocument();
@@ -99,7 +112,7 @@ describe("KnowledgeRequestInboxPage", () => {
     mockedService.listOpen.mockReturnValue(new Promise(() => {}));
     mockedService.listAnswers.mockResolvedValue([]);
 
-    render(<KnowledgeRequestInboxPage />);
+    renderInbox();
 
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
@@ -121,42 +134,25 @@ describe("KnowledgeRequestInboxPage", () => {
     ]);
     mockedService.listAnswers.mockResolvedValue([]);
 
-    render(<KnowledgeRequestInboxPage />);
+    renderInbox();
 
     expect(await screen.findByRole("button", { name: "Answer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
   });
 
-  it("moves between the tabs on a two-finger swipe, like the other tabbed pages", async () => {
+  // The two-finger swipe between the tabs is the PM workspace's now (see PmWorkspace.test);
+  // what the section owes it is reading its tab from the URL.
+  it("opens on the durable answers when the URL asks for them", async () => {
     mockedService.listOpen.mockResolvedValue([]);
     mockedService.listAnswers.mockResolvedValue([]);
 
-    render(<KnowledgeRequestInboxPage />);
-    await screen.findByText(/No open escalations/i);
-
-    // Fired on the header, not on `<main>`: the gesture belongs to the whole page, and a short
-    // queue leaves half the viewport outside `<main>`. jsdom has no layout, so that empty band
-    // below the content cannot be aimed at -- the header is the same case, outside `<main>` and
-    // inside the page, and it fails the same way if the listener sits on the panel again.
-    fireEvent.wheel(screen.getByRole("banner"), { deltaX: 60, deltaY: 0 });
+    renderInbox("/insights/knowledge-requests?view=answered");
 
     expect(await screen.findByText(/No durable answers yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /durable answers/i })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-  });
-
-  it("leaves a vertical scroll alone", async () => {
-    mockedService.listOpen.mockResolvedValue([]);
-    mockedService.listAnswers.mockResolvedValue([]);
-
-    render(<KnowledgeRequestInboxPage />);
-    await screen.findByText(/No open escalations/i);
-
-    fireEvent.wheel(screen.getByRole("main"), { deltaX: 4, deltaY: 80 });
-
-    expect(screen.getByText(/No open escalations/i)).toBeInTheDocument();
   });
 
   describe("when the user is HR (read-only)", () => {
@@ -183,7 +179,7 @@ describe("KnowledgeRequestInboxPage", () => {
       ]);
 
       const user = userEvent.setup();
-      render(<KnowledgeRequestInboxPage />);
+      renderInbox();
 
       await user.click(screen.getByRole("button", { name: /durable answers/i }));
 

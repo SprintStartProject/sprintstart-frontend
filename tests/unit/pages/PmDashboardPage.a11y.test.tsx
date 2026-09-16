@@ -19,20 +19,58 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   };
 });
 
-vi.mock("../../../src/context/useAuth", () => ({
-  useAuth: () => ({ profile: { id: "user1", firstName: "Test", lastName: "User" } }),
+vi.mock("../../../src/services/teamManagementService", () => ({
+  getTeamOverview: vi.fn(() =>
+    Promise.resolve([
+      {
+        userId: "bob",
+        firstname: "Bob",
+        lastname: "Builder",
+        projects: [],
+        roles: [],
+        skills: [],
+        progressPercentage: 0.5,
+        currentPhase: { id: "p1", title: "Setup" },
+        currentStep: {
+          id: "s1",
+          title: "Set up CI",
+          startedAt: new Date().toISOString(),
+          skip: null,
+        },
+        hasFeedback: true,
+      },
+    ]),
+  ),
 }));
 
-vi.mock("../../../src/features/team-management/components/TeamManagementWidget", () => ({
-  TeamManagementWidget: () => <div data-testid="team-management-widget">Team Management</div>,
+vi.mock("../../../src/services/onboardingMetricsService", () => ({
+  onboardingMetricsService: {
+    fetchProjectMetrics: vi.fn(() =>
+      Promise.resolve({ medianHoursToFirstAcceptedContribution: 30, hires: [], memberCount: 1 }),
+    ),
+  },
 }));
 
-vi.mock("../../../src/features/faq/components/FaqWidget", () => ({
-  FaqWidget: () => <div data-testid="faq-widget">FAQ</div>,
+vi.mock("../../../src/features/onboarding-metrics/hooks/useAttention", () => ({
+  useAttention: () => ({ attention: null, isLoading: false, error: null, reload: vi.fn() }),
 }));
 
-vi.mock("../../../src/features/knowledge-gaps/components/KnowledgeGapWidget", () => ({
-  KnowledgeGapWidget: () => <div data-testid="knowledge-gap-widget">Knowledge Gaps</div>,
+vi.mock("../../../src/features/knowledge-request/useOpenEscalationCount", () => ({
+  useOpenEscalationCount: () => 2,
+}));
+
+vi.mock("../../../src/features/pm-area/components/overview/InsightCards", () => ({
+  OnboardingHealthCard: () => <section aria-label="Onboarding health" />,
+  QuestionsCard: () => <section aria-label="Recurring questions" />,
+  KnowledgeGapsCard: () => <section aria-label="Knowledge gaps" />,
+}));
+
+vi.mock("../../../src/features/data-ingestion/components/IngestionStatusWidget", () => ({
+  IngestionStatusWidget: () => <section aria-label="Data ingestion" />,
+}));
+
+vi.mock("../../../src/features/projects/industry/ProjectIndustryWidget", () => ({
+  ProjectIndustryWidget: () => <section aria-label="Industry" />,
 }));
 
 describe("PmDashboardPage Accessibility", () => {
@@ -43,7 +81,7 @@ describe("PmDashboardPage Accessibility", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("PM Dashboard")).toBeInTheDocument();
+    expect((await screen.findAllByText("Bob Builder")).length).toBeGreaterThan(0);
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

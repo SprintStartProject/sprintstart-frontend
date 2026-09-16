@@ -58,7 +58,7 @@ export function PmDashboardPage() {
   const figuresReady = !rosterLoading && !rosterError;
 
   return (
-    <div className="space-y-5">
+    <section aria-label="Overview" className="space-y-5">
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <PmStat
           icon={Users}
@@ -116,6 +116,6 @@ export function PmDashboardPage() {
         <IngestionStatusWidget />
         <ProjectIndustryWidget />
       </div>
-    </div>
+    </section>
   );
 }

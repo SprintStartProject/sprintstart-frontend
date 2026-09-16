@@ -581,7 +581,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   // member loads.
   if (loading || !user) {
     return (
-      <div>
+      <section aria-label="Team member">
         <BackToTeam onBack={goBack} />
         {loading ? (
           <div className="flex min-h-96 items-center justify-center">
@@ -592,7 +592,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
             <p className="text-sm text-app-text">Team member not found.</p>
           </div>
         )}
-      </div>
+      </section>
     );
   }
 
@@ -659,7 +659,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
 
   return (
     <>
-      <div>
+      <section aria-label={`${user.firstname} ${user.lastname}`}>
         <BackToTeam onBack={goBack} />
         <div className="mb-5 space-y-4">
           <h2 className="text-lg leading-tight font-semibold text-app-text">
@@ -734,7 +734,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
             />
           </aside>
         </div>
-      </div>
+      </section>
       <Modal
         isOpen={rolesModalOpen}
         title="Manage roles"

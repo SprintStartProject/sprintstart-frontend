@@ -1,8 +1,27 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { TeamManagementPage } from "../../../src/pages/TeamManagementPage";
+
+vi.mock("../../../src/features/projects/useProjectContext", async () => {
+  const { createProjectContextValue, createSelectableProject } =
+    await import("../setup/projectContext");
+  const project = createSelectableProject({ id: "project-1" });
+  return {
+    useProjectContext: () =>
+      createProjectContextValue({
+        projects: [project],
+        selectedProject: project,
+        selectedProjectId: "project-1",
+        canManageSelected: true,
+      }),
+  };
+});
+
+vi.mock("../../../src/features/onboarding-metrics/hooks/useAttention", () => ({
+  useAttention: () => ({ attention: null, isLoading: false, error: null, reload: vi.fn() }),
+}));
 
 describe("TeamManagementPage Accessibility", () => {
   it("should not have any a11y violations", async () => {

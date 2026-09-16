@@ -12,12 +12,25 @@ vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
-    useParams: () => ({ userId: "user1" }),
     useNavigate: () => vi.fn(),
   };
 });
 
+const member = vi.hoisted(() => ({
+  userId: "user1",
+  firstname: "Alice",
+  lastname: "Smith",
+  roles: [{ id: "role1", name: "Backend", description: "Backend developer" }],
+  skills: [],
+  progressPercentage: 0.5,
+  currentPhase: { id: "p1", title: "Phase 1" },
+  currentStep: null,
+  hasFeedback: false,
+  projects: [],
+}));
+
 vi.mock("../../../src/services/teamManagementService", () => ({
+  getTeamOverview: vi.fn().mockResolvedValue([member]),
   getTeamMember: vi.fn().mockResolvedValue({
     userId: "user1",
     firstname: "Alice",
@@ -92,12 +105,12 @@ describe("TeamMemberDetailPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <TeamMemberDetailPage />
+        <TeamMemberDetailPage userId="user1" />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Alice Smith" })).toBeInTheDocument();
     });
 
     expect(await axe(baseElement)).toHaveNoViolations();

@@ -29,9 +29,9 @@ import { MemberPeekPanel } from "./components/MemberPeekPanel";
 import { INBOX_VIEW_PARAM, TEAM_TAB_PARAM } from "./pmWorkspacePaths";
 import { MEMBER_PEEK_PARAM } from "./useMemberPeek";
 
-export type PmSection = "overview" | "team" | "onboarding" | "questions" | "gaps" | "escalations";
+type PmSection = "overview" | "team" | "onboarding" | "questions" | "gaps" | "escalations";
 
-export const PM_SECTION_ORDER: readonly PmSection[] = [
+const PM_SECTION_ORDER: readonly PmSection[] = [
   "overview",
   "team",
   "onboarding",
@@ -83,8 +83,8 @@ function currentStopId(section: PmSection, searchParams: URLSearchParams): strin
   return (stop ?? SWIPE_STOPS.find((candidate) => candidate.section === section))?.id ?? "overview";
 }
 
-/** Where each section lives. The first path is the one the tab bar navigates to. */
-export const PM_SECTION_PATHS: Record<PmSection, string> = {
+/** Where each section lives: the path its tab navigates to. */
+const PM_SECTION_PATHS: Record<PmSection, string> = {
   overview: "/pm-dashboard",
   team: "/team-management",
   onboarding: "/insights/onboarding",

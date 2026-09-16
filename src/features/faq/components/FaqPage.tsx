@@ -164,24 +164,26 @@ export function FaqPage({ groupId }: { groupId?: string }) {
         </span>
       )}
       {revalidating && <Spinner size="sm" label="Updating" />}
-      <Button
-        variant="secondary"
-        onClick={() => setRebuildDialogOpen(true)}
-        loading={rebuilding}
-        disabled={loading || error}
-        icon={<RefreshCw className="h-4 w-4" />}
-        className="shrink-0"
-        title="Regroup every question from scratch"
-      >
-        {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
-      </Button>
+      {/* Nothing to rebuild from while the current state is unknown. */}
+      {!loading && !error && (
+        <Button
+          variant="secondary"
+          onClick={() => setRebuildDialogOpen(true)}
+          loading={rebuilding}
+          icon={<RefreshCw className="h-4 w-4" />}
+          className="shrink-0"
+          title="Regroup every question from scratch"
+        >
+          {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
+        </Button>
+      )}
     </>
   );
 
   const hasData = !loading && !error && overview !== null;
 
   return (
-    <div>
+    <section aria-label={PAGE_TITLE}>
       <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
       <div className="space-y-5">
         <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -255,7 +257,10 @@ export function FaqPage({ groupId }: { groupId?: string }) {
             </div>
           ) : totalGroups === 0 ? (
             <div className="p-6">
-              <EmptyState icon={<MessageSquareMore className="h-8 w-8" />} title="No questions yet">
+              <EmptyState
+                icon={<MessageSquareMore className="h-8 w-8" />}
+                title="No recurring questions yet"
+              >
                 They appear here as soon as someone asks a question in the chat.
               </EmptyState>
             </div>
@@ -335,6 +340,6 @@ export function FaqPage({ groupId }: { groupId?: string }) {
       />
 
       <FaqGroupPanel groupId={groupId ?? null} group={selectedGroup} onClose={closeGroup} />
-    </div>
+    </section>
   );
 }

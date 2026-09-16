@@ -214,7 +214,7 @@ export function TeamManagementPage() {
   const hasNarrowing = normalizedQuery !== "" || roleId !== "all" || statusFilter !== "all";
 
   return (
-    <div>
+    <section aria-label="Team">
       <PmSectionHeader
         title="Team"
         description="Everybody on this project, where they are in their onboarding, and the roles they hold."
@@ -390,6 +390,6 @@ export function TeamManagementPage() {
           )}
         </SlidingTabPanel>
       </div>
-    </div>
+    </section>
   );
 }

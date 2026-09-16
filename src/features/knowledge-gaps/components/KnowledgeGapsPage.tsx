@@ -166,7 +166,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const empty = isEmpty ? describeEmptyState(overview, error) : null;
 
   return (
-    <div>
+    <section aria-label={PAGE_TITLE}>
       <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
       <div className="space-y-4">
         {gaps.length > 0 && <SeveritySummaryBar gaps={gaps} />}
@@ -351,6 +351,6 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
         gap={selectedGap}
         onClose={() => void navigate("/insights/knowledge-gaps")}
       />
-    </div>
+    </section>
   );
 }

@@ -268,7 +268,7 @@ describe("FaqPage", () => {
   it("reports a failed load as an error rather than an empty FAQ", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, error: true });
     renderPage();
-    expect(screen.getByText(/could not load the recurring questions/i)).toBeInTheDocument();
+    expect(screen.getByText(/recurring questions couldn.t be loaded/i)).toBeInTheDocument();
     expect(screen.queryByText(/No recurring questions yet/)).not.toBeInTheDocument();
     // Nothing to rebuild from when the current state is unknown.
     expect(screen.queryByRole("button", { name: /rebuild/i })).not.toBeInTheDocument();
