@@ -67,19 +67,9 @@ const FaqPage = lazy(() =>
     default: module.FaqPage,
   })),
 );
-const FaqDetailPage = lazy(() =>
-  import("../features/faq/components/FaqDetailPage.tsx").then((module) => ({
-    default: module.FaqDetailPage,
-  })),
-);
 const KnowledgeGapsPage = lazy(() =>
   import("../features/knowledge-gaps/components/KnowledgeGapsPage.tsx").then((module) => ({
     default: module.KnowledgeGapsPage,
-  })),
-);
-const KnowledgeGapsDetailPage = lazy(() =>
-  import("../features/knowledge-gaps/components/KnowledgeGapsDetailPage.tsx").then((module) => ({
-    default: module.KnowledgeGapsDetailPage,
   })),
 );
 const KnowledgeRequestInboxPage = lazy(() =>
@@ -170,10 +160,11 @@ export function AppRouter() {
               }
             />
             <Route path="/admin" element={<AdminPage />} />
-            <Route path="/insights/faq" element={<FaqPage />} />
-            <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
-            <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
-            <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
+            {/* One route each, with the detail as an optional segment: the detail is a side panel
+              over the list now, and a single route keeps the list mounted (and scrolled) while
+              the panel opens and closes. */}
+            <Route path="/insights/faq/:groupId?" element={<FaqPage />} />
+            <Route path="/insights/knowledge-gaps/:gapId?" element={<KnowledgeGapsPage />} />
             <Route
               path="/insights/knowledge-requests"
               element={

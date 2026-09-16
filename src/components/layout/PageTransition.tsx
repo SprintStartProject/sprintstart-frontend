@@ -8,9 +8,17 @@ import { pageTransitionToken } from "../../styles/tokens";
  * exists so `/chat` and `/buddy` keep one header across the crossing between them; keying
  * by the raw pathname here would remount that shared layout on every switch, undoing
  * exactly what it was built to avoid.
+ *
+ * The PM insights lists open their details as side panels under a path segment of their own
+ * (`/insights/faq/:groupId`); those stay keyed to the list, or opening a panel would fade the
+ * whole page out and back in underneath it.
  */
+const PANEL_ROUTE_PREFIXES = ["/insights/faq", "/insights/knowledge-gaps"] as const;
+
 function transitionKey(pathname: string): string {
-  return pathname.startsWith("/chat") || pathname === "/buddy" ? "assistant-shell" : pathname;
+  if (pathname.startsWith("/chat") || pathname === "/buddy") return "assistant-shell";
+
+  return PANEL_ROUTE_PREFIXES.find((prefix) => pathname.startsWith(prefix)) ?? pathname;
 }
 
 /**

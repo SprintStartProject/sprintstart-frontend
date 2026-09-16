@@ -275,25 +275,56 @@ function MemberPeekContent({ userId }: { userId: string }) {
   );
 }
 
-function PeekHeaderBadges({ userId }: { userId: string }) {
-  const { data: roster } = useTeamRoster();
-  const member = roster?.find((candidate) => candidate.userId === userId);
-  if (!member) return null;
+function PeekHeaderBadges({ roles }: { roles: { id: string; name: string }[] }) {
+  if (roles.length === 0) {
+    return (
+      <Badge variant="neutral" size="sm">
+        No role yet
+      </Badge>
+    );
+  }
 
   return (
     <>
-      {member.roles.length > 0 ? (
-        member.roles.map((role) => (
-          <Badge key={role.id} variant="brand" size="sm">
-            {role.name}
-          </Badge>
-        ))
-      ) : (
-        <Badge variant="neutral" size="sm">
-          No role yet
+      {roles.map((role) => (
+        <Badge key={role.id} variant="brand" size="sm">
+          {role.name}
         </Badge>
-      )}
+      ))}
     </>
+  );
+}
+
+/** Split from {@link MemberPeekPanel} so nothing is fetched while the panel is closed. */
+function MemberPeekSidePanel({ userId, onClose }: { userId: string; onClose: () => void }) {
+  const { data: roster } = useTeamRoster();
+  const member = roster?.find((candidate) => candidate.userId === userId);
+  const name = member ? memberName(member) : "Team member";
+
+  return (
+    <SidePanel
+      isOpen
+      onClose={onClose}
+      title={name}
+      leading={
+        <UserAvatar profileIcon={member?.profileIcon} fallbackName={name} seed={userId} size={48} />
+      }
+      badge={member ? <PeekHeaderBadges roles={member.roles} /> : undefined}
+      actions={
+        <Link
+          to={`/team/${userId}`}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-app-border px-3 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        >
+          Full profile
+          <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+        </Link>
+      }
+      widthClassName="w-full sm:w-[34rem]"
+      contentClassName="px-4 py-5 sm:px-6"
+      closeAriaLabel="Close member panel"
+    >
+      <MemberPeekContent userId={userId} />
+    </SidePanel>
   );
 }
 
@@ -307,46 +338,10 @@ function PeekHeaderBadges({ userId }: { userId: string }) {
  */
 export function MemberPeekPanel() {
   const { memberId, closeMember } = useMemberPeek();
-  const { data: roster } = useTeamRoster();
 
   return (
     <PanelPresence value={memberId}>
-      {(userId) => {
-        const member = roster?.find((candidate) => candidate.userId === userId);
-        const name = member ? memberName(member) : "Team member";
-
-        return (
-          <SidePanel
-            isOpen
-            onClose={closeMember}
-            title={name}
-            leading={
-              <UserAvatar
-                profileIcon={member?.profileIcon}
-                fallbackName={name}
-                seed={userId}
-                size={48}
-              />
-            }
-            badge={<PeekHeaderBadges userId={userId} />}
-            actions={
-              <Link
-                to={`/team/${userId}`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-app-border px-3 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-              >
-                Full profile
-                <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
-              </Link>
-            }
-            widthClassName="w-full sm:w-[34rem]"
-            panelBackgroundClassName="bg-app-bg"
-            contentClassName="px-4 py-5 sm:px-6"
-            closeAriaLabel="Close member panel"
-          >
-            <MemberPeekContent userId={userId} />
-          </SidePanel>
-        );
-      }}
+      {(userId) => <MemberPeekSidePanel userId={userId} onClose={closeMember} />}
     </PanelPresence>
   );
 }

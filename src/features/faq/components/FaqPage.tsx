@@ -1,36 +1,36 @@
 import { useState } from "react";
-import { Spinner } from "../../../components/ui/Spinner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  AlertCircle,
+  ChevronRight,
+  FileText,
+  Filter,
+  MessageSquareMore,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
 
 import type { FAQGroup, FAQRebuildScope } from "../types";
 import { insightsService } from "../../../services/faqService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
-import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
-import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
-import { TrendBadge } from "./TrendBadge";
-import { RebuildFaqDialog } from "./RebuildFaqDialog";
-import { formatAskedAt } from "../format";
-
-import {
-  TrendingUp,
-  FileText,
-  AlertCircle,
-  Filter,
-  MessageSquareMore,
-  RefreshCw,
-} from "lucide-react";
-import { PageShell } from "../../../components/layout/PageShell";
+import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { Spinner } from "../../../components/ui/Spinner";
 import { queryKeys } from "../../../services/queryKeys";
+import { PmPageShell } from "../../pm-area/components/PmPageShell";
+import { PmStat } from "../../pm-area/components/PmCard";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { formatAskedAt } from "../format";
+import { FaqGroupPanel } from "./FaqGroupPanel";
+import { RebuildFaqDialog } from "./RebuildFaqDialog";
+import { TrendBadge } from "./TrendBadge";
 
-const PAGE_ICON = MessageSquareMore;
 const PAGE_TITLE = "Recurring Questions";
-const PAGE_SUBTITLE = "Ranked by frequency and updated as questions are asked.";
-const PAGE_BACK = { label: "Back to PM-Dashboard", to: "/pm-dashboard" } as const;
+const PAGE_SUBTITLE = "What people keep asking the chat, ranked by frequency and kept up to date.";
 
 type FaqSortOption = "count" | "recent" | "trend" | "title";
 
@@ -62,50 +62,31 @@ const SORTERS: Record<FaqSortOption, (a: FAQGroup, b: FAQGroup) => number> = {
   title: (a, b) => a.title.localeCompare(b.title),
 };
 
-/** Placeholder for one recurring-question row, matching its title/count and tag-badge rows. */
-function FaqGroupRowSkeleton() {
+function FaqListSkeleton() {
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-4">
-      <div className="mb-2 flex items-start justify-between gap-4">
-        <SkeletonLine className="w-1/2" />
-        <SkeletonLine className="h-6 w-8" />
-      </div>
-      <SkeletonLine className="w-1/3" />
-    </div>
-  );
-}
-
-/** Matches the four-tile stats grid in {@link FaqPage}'s header band. */
-function FaqStatsGridSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-xl border border-app-border bg-app-surface p-3">
-          <div className="flex items-center gap-3">
-            <SkeletonBlock className="h-5 w-5" />
-            <div className="space-y-1.5">
-              <SkeletonLine className="h-6 w-10" />
-              <SkeletonLine className="w-20" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FaqOverviewSkeleton() {
-  return (
-    <SkeletonGroup label="Loading recurring questions" className="space-y-3">
+    <SkeletonGroup label="Loading recurring questions" className="space-y-2 p-3">
       {Array.from({ length: 6 }).map((_, index) => (
-        <FaqGroupRowSkeleton key={index} />
+        <div key={index} className="flex items-center gap-4 px-2 py-3">
+          <div className="flex-1 space-y-2">
+            <SkeletonLine className="w-1/2" />
+            <SkeletonLine className="w-1/3" />
+          </div>
+          <SkeletonLine className="h-6 w-10" />
+        </div>
       ))}
     </SkeletonGroup>
   );
 }
 
+/**
+ * The recurring questions, as one ranked list with the detail in a side panel.
+ *
+ * `/insights/faq/:groupId` renders this same page with that group's panel open, so a link to a
+ * single question still works — it just no longer costs the reader the list.
+ */
 export function FaqPage() {
   const { selectedProjectId } = useProjectContext();
+  const { groupId } = useParams<{ groupId?: string }>();
   const navigate = useNavigate();
 
   const [sortBy, setSortBy] = useState<FaqSortOption>("count");
@@ -130,10 +111,7 @@ export function FaqPage() {
   // Closes first, then works. A rebuild takes as long as an AI call and there is
   // nothing to watch — holding the dialog open would pin the PM to a spinner for
   // no information, so the button carries the progress and the page stays usable.
-  //
-  // Which is also why the outcome is reported as a toast: by the time it lands,
-  // the PM may be anywhere on the page, and an inline message next to the button
-  // was only ever rendered in the empty state.
+  // Which is also why the outcome is reported as a toast.
   const handleRebuild = (scope: FAQRebuildScope) => {
     setRebuildDialogOpen(false);
     setRebuilding(true);
@@ -143,7 +121,7 @@ export function FaqPage() {
       .then((result) => {
         refresh();
         // Taken from the rebuild's own result rather than from the reloaded
-        // panel: useLiveFetch keeps the previous entries on screen while it
+        // list: useLiveFetch keeps the previous entries on screen while it
         // revalidates, so no render marks the moment the new result arrived.
         if (result.groupCount === 0) {
           toast.info("Nothing to group yet", {
@@ -158,95 +136,7 @@ export function FaqPage() {
       .finally(() => setRebuilding(false));
   };
 
-  const openRebuildDialog = () => setRebuildDialogOpen(true);
-
-  // The FAQ now updates itself as questions are asked, so this is a rebuild of
-  // the whole grouping rather than the only way to see new questions — and it
-  // is destructive, so it asks first.
-  const rebuildButton = (
-    <Button
-      variant="secondary"
-      onClick={openRebuildDialog}
-      loading={rebuilding}
-      icon={<RefreshCw className="h-4 w-4" />}
-      className="shrink-0"
-      title="Regroup every question from scratch"
-    >
-      {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
-    </Button>
-  );
-
-  const rebuildDialog = (
-    <RebuildFaqDialog
-      isOpen={isRebuildDialogOpen}
-      projectId={selectedProjectId}
-      onClose={() => setRebuildDialogOpen(false)}
-      onConfirm={handleRebuild}
-    />
-  );
-
-  if (showLoadingSkeleton || loading) {
-    // Nothing to rebuild from until the fetch resolves, same as the error state below.
-    return (
-      <PageShell
-        icon={PAGE_ICON}
-        title={PAGE_TITLE}
-        subtitle={PAGE_SUBTITLE}
-        frame="content"
-        back={PAGE_BACK}
-        bandExtra={showLoadingSkeleton ? <FaqStatsGridSkeleton /> : undefined}
-        mainClassName="py-8"
-      >
-        {showLoadingSkeleton && <FaqOverviewSkeleton />}
-      </PageShell>
-    );
-  }
-
-  if (error || !overview) {
-    // Separate from the empty list below: a FAQ nobody has filled yet and a FAQ
-    // that could not be loaded look identical on screen but mean opposite
-    // things, and only one of them is worth waiting for.
-    return (
-      <PageShell
-        icon={PAGE_ICON}
-        title={PAGE_TITLE}
-        subtitle={PAGE_SUBTITLE}
-        frame="content"
-        back={PAGE_BACK}
-      >
-        <div className="flex flex-col items-center gap-3 py-20">
-          <AlertCircle className="h-5 w-5 text-app-danger-text" />
-          <p className="max-w-md text-center text-app-text-muted">
-            Could not load the recurring questions. Is the backend reachable?
-          </p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  if (overview.groups.length === 0) {
-    return (
-      <PageShell
-        icon={PAGE_ICON}
-        title={PAGE_TITLE}
-        subtitle={PAGE_SUBTITLE}
-        frame="content"
-        back={PAGE_BACK}
-        actions={rebuildButton}
-      >
-        <div className="flex flex-col items-center gap-3 py-20">
-          <AlertCircle className="h-5 w-5 text-app-text-muted" />
-          <p className="max-w-md text-center text-app-text-muted">
-            No recurring questions yet. They appear here as soon as someone asks a question in the
-            chat.
-          </p>
-        </div>
-        {rebuildDialog}
-      </PageShell>
-    );
-  }
-
-  const allGroups = overview.groups;
+  const allGroups = overview?.groups ?? [];
   const totalGroups = allGroups.length;
   const totalQuestions = allGroups.reduce((sum, group) => sum + group.count, 0);
   const risingCount = allGroups.filter((group) => group.trend === "RISING").length;
@@ -256,23 +146,35 @@ export function FaqPage() {
   const oneOffCount = allGroups.filter((group) => group.count <= 1).length;
 
   // A question asked once is not yet a recurring question — it is noise in a
-  // panel whose whole subject is repetition, and at the entry ceiling it is
-  // most of what fills the list.
+  // list whose whole subject is repetition.
   const visible = hideOneOffs ? allGroups.filter((group) => group.count > 1) : allGroups;
   const sorted = [...visible].sort(SORTERS[sortBy]);
+  const selectedGroup = allGroups.find((group) => group.groupId === groupId) ?? null;
 
-  const goToDetail = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
+  const openGroup = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
+  const closeGroup = () => void navigate("/insights/faq");
 
+  // Destructive, so it asks first — the FAQ updates itself as questions are asked,
+  // this regroups everything from scratch.
   const headerActions = (
-    <div className="flex shrink-0 flex-col items-end gap-0.5">
+    <div className="flex shrink-0 flex-col items-end gap-1">
       <div className="flex items-center gap-3">
         {revalidating && <Spinner size="sm" label="Updating" />}
-        {rebuildButton}
+        <Button
+          variant="secondary"
+          onClick={() => setRebuildDialogOpen(true)}
+          loading={rebuilding}
+          disabled={loading || error}
+          icon={<RefreshCw className="h-4 w-4" />}
+          className="shrink-0"
+          title="Regroup every question from scratch"
+        >
+          {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
+        </Button>
       </div>
-      {/* How current the panel is, in the only terms that mean anything
-          here: the FAQ follows the chat, so its freshness *is* the
-          last question someone asked. */}
-      {overview.lastAskedAt && (
+      {/* How current the list is, in the only terms that mean anything here: the FAQ
+          follows the chat, so its freshness *is* the last question someone asked. */}
+      {overview?.lastAskedAt && (
         <span className="text-xs text-app-text-muted">
           Last question {formatAskedAt(overview.lastAskedAt)}
         </span>
@@ -280,132 +182,164 @@ export function FaqPage() {
     </div>
   );
 
-  const statsGrid = (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-      <div className="rounded-xl border border-app-border bg-app-surface p-3">
-        <div className="flex items-center gap-3">
-          <MessageSquareMore className="h-5 w-5 text-app-brand" />
-          <div>
-            <div className="text-2xl font-semibold text-app-brand">{totalGroups}</div>
-            <div className="text-xs text-app-text-muted">Questions tracked</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-app-border bg-app-surface p-3">
-        <div className="flex items-center gap-3">
-          <MessageSquareMore className="h-5 w-5 text-app-success-solid" />
-          <div>
-            <div className="text-2xl font-semibold text-app-success-solid">{totalQuestions}</div>
-            <div className="text-xs text-app-text-muted">Times asked</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-app-border bg-app-surface p-3">
-        <div className="flex items-center gap-3">
-          <TrendingUp className="h-5 w-5 text-app-danger-solid" />
-          <div>
-            <div className="text-2xl font-semibold text-app-danger-solid">{risingCount}</div>
-            <div className="text-xs text-app-text-muted">Picking up</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-app-border bg-app-surface p-3">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-app-warning-solid" />
-          <div>
-            <div className="text-2xl font-semibold text-app-warning-solid">{totalDocuments}</div>
-            <div className="text-xs text-app-text-muted">Linked documents</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const hasData = !loading && !error && overview !== null;
 
   return (
-    <PageShell
-      icon={PAGE_ICON}
+    <PmPageShell
+      icon={MessageSquareMore}
       title={PAGE_TITLE}
       subtitle={PAGE_SUBTITLE}
-      frame="content"
-      back={PAGE_BACK}
       actions={headerActions}
-      bandExtra={statsGrid}
-      mainClassName="py-8"
     >
-      <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Button
-          variant={hideOneOffs ? "primary" : "secondary"}
-          size="sm"
-          onClick={() => setHideOneOffs((hidden) => !hidden)}
-          icon={<Filter className="h-3.5 w-3.5" />}
-          aria-pressed={hideOneOffs}
-        >
-          Asked more than once
-        </Button>
-        <span className="text-xs text-app-text-muted">
-          {hideOneOffs
-            ? `${oneOffCount} one-off ${oneOffCount === 1 ? "question" : "questions"} hidden`
-            : `${sorted.length} of ${totalGroups} shown`}
-        </span>
+      <div className="space-y-5">
+        <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <PmStat
+            icon={MessageSquareMore}
+            label="Questions tracked"
+            value={hasData ? totalGroups : "—"}
+            hint={hasData ? `${oneOffCount} asked only once` : "Loading"}
+          />
+          <PmStat
+            icon={MessageSquareMore}
+            label="Times asked"
+            value={hasData ? totalQuestions : "—"}
+            hint="Across every wording"
+          />
+          <PmStat
+            icon={TrendingUp}
+            label="Picking up"
+            value={hasData ? risingCount : "—"}
+            hint={risingCount > 0 ? "Asked more often lately" : "Nothing on the rise"}
+            attention={risingCount > 0}
+          />
+          <PmStat
+            icon={FileText}
+            label="Linked documents"
+            value={hasData ? totalDocuments : "—"}
+            hint="That answer these questions"
+          />
+        </section>
 
-        <FilterSelect
-          label="Sort recurring questions"
-          value={sortBy}
-          options={SORT_OPTIONS}
-          onChange={setSortBy}
-          className="ml-auto"
-        />
+        {hasData && totalGroups > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Button
+              variant={hideOneOffs ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setHideOneOffs((hidden) => !hidden)}
+              icon={<Filter className="h-3.5 w-3.5" />}
+              aria-pressed={hideOneOffs}
+            >
+              Asked more than once
+            </Button>
+            <span className="text-xs text-app-text-muted">
+              {hideOneOffs
+                ? `${oneOffCount} one-off ${oneOffCount === 1 ? "question" : "questions"} hidden`
+                : `${sorted.length} of ${totalGroups} shown`}
+            </span>
+
+            <FilterSelect
+              label="Sort recurring questions"
+              value={sortBy}
+              options={SORT_OPTIONS}
+              onChange={setSortBy}
+              className="ml-auto w-48"
+            />
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+          {showLoadingSkeleton ? (
+            <FaqListSkeleton />
+          ) : loading ? null : error || !overview ? (
+            // Separate from the empty list below: a FAQ nobody has filled yet and a FAQ
+            // that could not be loaded look alike but mean opposite things.
+            <div className="p-6">
+              <EmptyState icon={<AlertCircle className="h-8 w-8" />} title="Could not load">
+                The recurring questions could not be loaded. Is the backend reachable?
+              </EmptyState>
+            </div>
+          ) : totalGroups === 0 ? (
+            <div className="p-6">
+              <EmptyState icon={<MessageSquareMore className="h-8 w-8" />} title="No questions yet">
+                They appear here as soon as someone asks a question in the chat.
+              </EmptyState>
+            </div>
+          ) : sorted.length === 0 ? (
+            <p className="p-8 text-center text-sm text-app-text-muted">
+              Every question here has only been asked once so far.
+            </p>
+          ) : (
+            <ul className="divide-y divide-app-border-muted px-3 py-1.5">
+              {sorted.map((group) => {
+                const selected = group.groupId === groupId;
+
+                return (
+                  <li key={group.groupId} className="py-0.5">
+                    <button
+                      type="button"
+                      onClick={() => openGroup(group)}
+                      aria-current={selected ? "true" : undefined}
+                      className={`group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                        selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm leading-snug font-semibold text-app-text">
+                          {group.title}
+                        </span>
+                        {/* The wording users actually use, under the summary. */}
+                        <span className="mt-0.5 block truncate text-sm text-app-text-muted">
+                          {group.question}
+                        </span>
+                        <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {group.trend && (
+                            <TrendBadge trend={group.trend} recentCount={group.recentCount} />
+                          )}
+                          {group.topDocuments.slice(0, 2).map((doc) => (
+                            <span
+                              key={doc.id}
+                              className="inline-flex max-w-56 items-center gap-1 rounded-full bg-app-surface-muted px-2 py-0.5 text-[11px] text-app-text-muted"
+                            >
+                              <FileText aria-hidden="true" className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{doc.title}</span>
+                            </span>
+                          ))}
+                          {group.lastAskedAt && (
+                            <span className="text-[11px] text-app-text-subtle">
+                              Last asked {formatAskedAt(group.lastAskedAt)}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+
+                      <span className="flex shrink-0 flex-col items-end">
+                        <span className="text-2xl leading-none font-bold text-app-text tabular-nums">
+                          {group.count}
+                        </span>
+                        <span className="mt-1 text-[11px] text-app-text-subtle">asked</span>
+                      </span>
+
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="h-4 w-4 shrink-0 text-app-text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-app-text"
+                      />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
-      {sorted.length === 0 && (
-        <p className="py-12 text-center text-sm text-app-text-muted">
-          Every question here has only been asked once so far.
-        </p>
-      )}
+      <RebuildFaqDialog
+        isOpen={isRebuildDialogOpen}
+        projectId={selectedProjectId}
+        onClose={() => setRebuildDialogOpen(false)}
+        onConfirm={handleRebuild}
+      />
 
-      <div className="space-y-3">
-        {sorted.map((group) => (
-          <button
-            key={group.groupId}
-            onClick={() => goToDetail(group)}
-            // 1.01 rather than the 1.02 used on grid cards: these rows span
-            // the full content column, so the same percentage travels much
-            // further.
-            className="w-full rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-all duration-200 hover:scale-[1.01] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:scale-100"
-          >
-            <div className="mb-2 flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-base leading-snug font-semibold text-app-text">{group.title}</p>
-                {/* The wording users actually use, under the summary. */}
-                <p className="mt-0.5 truncate text-sm text-app-text-muted">{group.question}</p>
-              </div>
-              <span className="shrink-0 text-2xl leading-none font-semibold text-app-brand">
-                {group.count}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              {group.trend && <TrendBadge trend={group.trend} recentCount={group.recentCount} />}
-              {group.topDocuments.map((doc) => (
-                <Badge key={doc.id} variant="neutral" size="sm" className="gap-1">
-                  <FileText className="h-3 w-3" />
-                  {doc.title}
-                </Badge>
-              ))}
-              {group.lastAskedAt && (
-                <span className="ml-auto text-xs text-app-text-muted">
-                  Last asked {formatAskedAt(group.lastAskedAt)}
-                </span>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {rebuildDialog}
-    </PageShell>
+      <FaqGroupPanel groupId={groupId ?? null} group={selectedGroup} onClose={closeGroup} />
+    </PmPageShell>
   );
 }
