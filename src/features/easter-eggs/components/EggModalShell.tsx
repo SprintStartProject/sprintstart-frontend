@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScrollLock } from "../../../components/ui/useScrollLock";
@@ -49,22 +49,29 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
 
   // Close on Escape while focus is outside the iframe (header bar, close
   // button, or before the frame has loaded). Canvas games handle Escape
-  // themselves via `onExit`. The ref keeps the latest callback without
-  // re-subscribing; calling it inside the handler (not during render)
-  // stays clear of the set-state-in-effect rule.
+  // themselves via `onExit` — but only from the moment they mount, and the
+  // chunk behind them arrives asynchronously: until then nothing else can
+  // close the modal from the keyboard, so the shell takes the key for
+  // exactly that window (`gameLoading` is raised by the fallback below,
+  // which is mounted only while the chunk is still on the wire). The ref
+  // keeps the latest callback without re-subscribing; calling it inside the
+  // handler (not during render) stays clear of the set-state-in-effect rule.
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
 
+  const [gameLoading, setGameLoading] = useState(false);
+  const shellOwnsEscape = egg?.kind === "iframe" || gameLoading;
+
   useEffect(() => {
-    if (!open || !egg || egg.kind !== "iframe") return;
+    if (!open || !egg || !shellOwnsEscape) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCloseRef.current();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, egg]);
+  }, [open, egg, shellOwnsEscape]);
 
   if (!egg) return null;
 
@@ -96,7 +103,7 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
           >
             {/* One Suspense around every branch: all registry components are
                 lazy, and an unsuspended lazy child would tear down the tree. */}
-            <Suspense fallback={<div className="h-64 w-[680px]" aria-hidden="true" />}>
+            <Suspense fallback={<EggLoadingFallback onLoadingChange={setGameLoading} />}>
               {egg.kind === "iframe" ? (
                 <>
                   {/* Header bar for the iframe game (canvas games draw their own chrome). */}
@@ -123,4 +130,22 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
       )}
     </AnimatePresence>
   );
+}
+
+/**
+ * The Suspense fallback: an empty box exactly the size the games reserve.
+ *
+ * Its only other job is telling the shell that the chunk is still loading —
+ * it is mounted precisely while `lazy()` is unresolved, which is the window
+ * where Escape is still the shell's key to handle (see above). It reports
+ * through the setter itself: a fresh closure per render would re-run this
+ * component's effect and loop.
+ */
+function EggLoadingFallback({ onLoadingChange }: { onLoadingChange: (loading: boolean) => void }) {
+  useEffect(() => {
+    onLoadingChange(true);
+    return () => onLoadingChange(false);
+  }, [onLoadingChange]);
+
+  return <div className="h-64 w-[680px]" aria-hidden="true" />;
 }
