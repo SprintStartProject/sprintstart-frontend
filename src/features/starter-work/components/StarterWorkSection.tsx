@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  CheckCircle2,
-  ListChecks,
-  Loader2,
-  PackageOpen,
-  Plus,
-  Sparkles,
-  Target,
-  type LucideIcon,
-} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, Plus, Sparkles, Target } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { Badge } from "../../../components/ui/Badge";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
@@ -17,6 +9,8 @@ import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
+import { queryKeys } from "../../../services/queryKeys";
+import { starterWorkService } from "../../../services/starterWorkService";
 import { PermissionGroup } from "../../../services/types";
 import { StarterWorkTaskCard } from "./StarterWorkTaskCard";
 import { StarterWorkTaskDetails } from "./StarterWorkTaskDetails";
@@ -91,23 +85,21 @@ export function StarterWorkSection() {
     reject,
   } = useStarterWorkReview();
 
-  // The pool shown on the right of the overview. Reloaded after every decision so it stays in step
-  // with the queue on the left.
+  // The whole pool, shown as-is: every LIVE task is claimable the moment it lands, so there is
+  // nothing here to hold back. Reloaded after every decision so it stays in step with the queue.
   const {
     pool,
     isLoading: isPoolLoading,
     error: poolError,
     reload: reloadPool,
   } = useStarterWorkPool();
-  // The right column is the pool minus whatever is still awaiting review on the left. The backend
-  // pool response carries no per-task "reviewed" flag, so the split is computed by id against the
-  // unreviewed queue rather than read off the task — and reviewing one drops it from the queue,
-  // which is exactly what moves it across to the right.
-  const queueIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
-  const pooledTasks = useMemo(
-    () => pool.filter((task) => !queueIds.has(task.id)),
-    [pool, queueIds],
-  );
+  // The backend pool response carries no per-task "reviewed" flag, so which pool tasks nobody has
+  // looked at yet is read by cross-referencing the unreviewed queue's ids instead — and reviewing
+  // one drops it from that queue, which is exactly what marks it seen here too.
+  const unseenIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
+
+  const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -216,6 +208,38 @@ export function StarterWorkSection() {
     [reject, reloadPool, toast],
   );
 
+  // Brings the pool back in line with its trackers right now, rather than waiting for the next
+  // scheduled or event-driven pass. Every affected surface reads from the same three query keys,
+  // so invalidating them is what makes the pool, the review queue and the corpus browser agree
+  // with what the sync just found -- no separate reload calls to keep in sync with this one.
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const outcome = await starterWorkService.reconcile();
+      const changes = [
+        outcome.markedStale > 0 ? `${outcome.markedStale} closed` : null,
+        outcome.revived > 0 ? `${outcome.revived} reopened` : null,
+        outcome.assigneeChanged > 0 ? `${outcome.assigneeChanged} reassigned` : null,
+      ].filter((part): part is string => part !== null);
+      toast.success("Pool synced", {
+        description: changes.length > 0 ? changes.join(", ") : "Nothing changed.",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.starterWork.pool() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.starterWork.review() }),
+        // Partial match: catches the corpus query for whichever project is selected, without this
+        // component needing to know its id.
+        queryClient.invalidateQueries({ queryKey: ["starter-work", "corpus"] }),
+      ]);
+    } catch (err) {
+      toast.error("Sync failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [queryClient, toast]);
+
   // Two-finger swipe between the sections, matching the Data Ingestion page. Every section is
   // readable by every role now, so the order is fixed rather than built from the role.
   const swipeRef = useSwipeableTabs<StarterWorkSection, HTMLElement>({
@@ -229,31 +253,13 @@ export function StarterWorkSection() {
     label: SECTION_LABELS[key],
     // The review queue and the pool each carry a page-level count; the other sections own their own
     // data, so their tabs stay countless rather than showing a wrong number.
-    count: key === "review" ? tasks.length : key === "pool" ? pooledTasks.length : undefined,
+    count: key === "review" ? tasks.length : key === "pool" ? pool.length : undefined,
   }));
 
   const showOverview = activeSection === "overview";
-  const hasOpenReviews = tasks.length > 0;
-  const poolUsesFullWidth = !hasOpenReviews;
-  // A short queue beside a taller pool leaves a gap under the review column. It is filled with empty
-  // dashed card slots that read as "room for more" rather than dead space, topping the column up to
-  // three slots: two placeholders under a single review, one under two. Three or more reviews fill
-  // the column on their own, so no placeholder shows.
-  const reviewFillerCount = hasOpenReviews && tasks.length <= 2 ? 3 - tasks.length : 0;
   const showReviewTab = activeSection === "review";
   const showPoolTab = activeSection === "pool";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
-
-  // At-a-glance workflow snapshot: how much work is live, and how much of it has
-  // already been vouched for. Both values come from the same pool rendered below.
-  const overview = useMemo(
-    () => ({
-      awaiting: tasks.length,
-      total: pool.length,
-      reviewed: pooledTasks.length,
-    }),
-    [pool.length, pooledTasks.length, tasks.length],
-  );
 
   const handleCreate = async (
     input: CreateStarterWorkTaskInput,
@@ -336,78 +342,25 @@ export function StarterWorkSection() {
         >
           {showOverview && (
             <>
-              <section aria-label="Overview" className="grid gap-3.5 sm:grid-cols-3">
-                <Kpi
-                  label="Awaiting review"
-                  value={overview.awaiting}
-                  foot={overview.awaiting > 0 ? "Rank or remove, optional" : "All caught up"}
-                  icon={ListChecks}
-                />
-                <Kpi
-                  label="In the pool"
-                  value={overview.total}
-                  foot="Available to new hires"
-                  icon={PackageOpen}
-                />
-                <Kpi
-                  label="Reviewed"
-                  value={overview.reviewed}
-                  foot="Vouched for by your team"
-                  icon={CheckCircle2}
-                />
-              </section>
-
-              <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
-                {hasOpenReviews && (
-                  <div data-testid="overview-review-column">
-                    <ReviewQueue
-                      tasks={tasks}
-                      isLoading={isLoading}
-                      canAct={canAct}
-                      selectedTaskId={selectedTask?.id ?? null}
-                      onToggle={toggleSelectedTask}
-                      onApprove={handleApprove}
-                      onReject={handleReject}
-                    />
-                    {reviewFillerCount > 0 && (
-                      // Empty card-shaped slots that fill the gap left by a short queue, xl only,
-                      // where the side-by-side split creates it. Decorative, so hidden from a11y.
-                      <div
-                        aria-hidden="true"
-                        data-testid="overview-review-filler"
-                        className="mt-3 hidden space-y-3 xl:block"
-                      >
-                        {Array.from({ length: reviewFillerCount }).map((_, index) => (
-                          <div
-                            key={index}
-                            className="flex min-h-28 items-center justify-center rounded-2xl border border-dashed border-app-border px-6 text-center"
-                          >
-                            {/* The line sits in the topmost slot only, so it stays right under the
-                                queue with one review and reads as the last row with two. */}
-                            {index === 0 && (
-                              <p className="text-xs text-app-text-subtle">
-                                New tasks land here for review.
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+              {tasks.length > 0 && (
                 <div
-                  data-testid="overview-pool-column"
-                  className={poolUsesFullWidth ? "xl:col-span-2" : undefined}
+                  data-testid="unreviewed-hint"
+                  className="rounded-2xl border border-app-border bg-app-surface px-5 py-4 text-sm text-app-text"
                 >
-                  <StarterWorkPoolCloud
-                    tasks={pooledTasks}
-                    isLoading={isPoolLoading}
-                    error={poolError}
-                    canAct={canAct}
-                    fullWidth={poolUsesFullWidth}
-                  />
+                  {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
                 </div>
-              </div>
+              )}
+
+              <StarterWorkPoolCloud
+                tasks={pool}
+                unseenIds={unseenIds}
+                isLoading={isPoolLoading}
+                error={poolError}
+                canAct={canAct}
+                fullWidth
+                onSync={() => void handleSync()}
+                isSyncing={isSyncing}
+              />
             </>
           )}
 
@@ -434,15 +387,18 @@ export function StarterWorkSection() {
             />
           )}
 
-          {/* The pool on its own, the same surface the overview shows on the right. PM/ADMIN edit a
+          {/* The pool on its own, the same surface the overview shows above. PM/ADMIN edit a
               task's orientation inline from its card here; HR reads it. */}
           {showPoolTab && (
             <StarterWorkPoolCloud
-              tasks={pooledTasks}
+              tasks={pool}
+              unseenIds={unseenIds}
               isLoading={isPoolLoading}
               error={poolError}
               canAct={canAct}
               fullWidth
+              onSync={() => void handleSync()}
+              isSyncing={isSyncing}
             />
           )}
         </SlidingTabPanel>
@@ -571,30 +527,6 @@ function SectionHeading({
         )}
         <InfoHint text={description} label={`About ${title}`} />
       </div>
-    </div>
-  );
-}
-
-/** One at-a-glance overview tile, matching the Data Ingestion overview band. */
-function Kpi({
-  label,
-  value,
-  foot,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  foot: string;
-  icon: LucideIcon;
-}) {
-  return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">
-      <div className="flex items-center justify-between">
-        <span className="text-[12.5px] text-app-text-muted">{label}</span>
-        <Icon size={20} className="shrink-0 text-app-brand-text" aria-hidden="true" />
-      </div>
-      <p className="mt-2.5 text-3xl font-bold tracking-tight text-app-text tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-app-text-subtle">{foot}</p>
     </div>
   );
 }

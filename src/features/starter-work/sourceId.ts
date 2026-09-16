@@ -39,7 +39,18 @@ export type ParsedSource = {
   trackerCode: string;
   /** Whether `trackerCode` is one we recognise, so number and repo are safe to show as badges. */
   hasKnownTracker: boolean;
+  /**
+   * What groups this source with the other issues from the same place: `owner/repo` for GitHub,
+   * a Jira project key (`ONB` from `ONB-2`) for Jira, or null when the id carries neither —
+   * a hand-authored task, say, which belongs to no project's corpus.
+   */
+  groupKey: string | null;
 };
+
+/** The Jira project key prefixing an issue key (`ONB` from `ONB-2`), or null when it doesn't match. */
+function jiraProjectKey(issueKey: string): string | null {
+  return /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(issueKey)?.[1] ?? null;
+}
 
 export function parseCandidateSource(sourceId: string): ParsedSource {
   const parts = sourceId.split(":");
@@ -60,12 +71,15 @@ export function parseCandidateSource(sourceId: string): ParsedSource {
     numberLabel = /^\d+$/.test(last) ? `#${last}` : last;
   }
 
+  const repoLabel = owner && repo ? `${owner}/${repo}` : repoSegment;
+
   return {
     numberLabel,
     owner,
     repo,
-    repoLabel: owner && repo ? `${owner}/${repo}` : repoSegment,
+    repoLabel,
     trackerCode,
     hasKnownTracker: isKnownTracker(trackerCode),
+    groupKey: repoLabel ?? (numberLabel ? jiraProjectKey(numberLabel) : null),
   };
 }

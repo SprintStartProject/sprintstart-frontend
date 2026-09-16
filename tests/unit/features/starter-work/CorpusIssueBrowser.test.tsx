@@ -201,6 +201,7 @@ describe("CorpusIssueBrowser", () => {
       competencyKeys: [],
       status: "LIVE",
       reviewed: true,
+      taskZeroEligible: false,
     });
     const onPromoted = vi.fn();
     const user = userEvent.setup();
@@ -235,6 +236,7 @@ describe("CorpusIssueBrowser", () => {
       competencyKeys: [],
       status: "LIVE",
       reviewed: true,
+      taskZeroEligible: false,
     });
     const onPromoted = vi.fn();
     const user = userEvent.setup();

@@ -29,6 +29,7 @@ function task(id: string, summary: string | null): StarterWorkTask {
     competencyKeys: [],
     status: "LIVE",
     reviewed: true,
+    taskZeroEligible: false,
   };
 }
 

@@ -38,6 +38,7 @@ const task: StarterWorkTask = {
   competencyKeys: ["kotlin", "auth"],
   status: "LIVE",
   reviewed: false,
+  taskZeroEligible: false,
 };
 
 const candidate: StarterWorkCandidate = {
@@ -82,7 +83,7 @@ describe("StarterWorkSection Accessibility", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Available to new hires")).toBeInTheDocument();
+      expect(screen.getByTestId("starter-work-pool")).toHaveTextContent("Fix the login redirect");
     });
 
     expect(await axe(container)).toHaveNoViolations();

@@ -33,6 +33,12 @@ function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);
 }
 
+/** Switches to a section tab; the review cards and their actions only render under "Review" now. */
+async function openTab(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const tabs = await screen.findByRole("group", { name: "Filter sections" });
+  await user.click(within(tabs).getByText(name));
+}
+
 const task: StarterWorkTask = {
   id: "task-1",
   sourceId: "github:acme/repo:ISSUE:42",
@@ -43,6 +49,7 @@ const task: StarterWorkTask = {
   competencyKeys: ["kotlin", "auth"],
   status: "LIVE",
   reviewed: false,
+  taskZeroEligible: false,
 };
 
 describe("StarterWorkSection", () => {
@@ -60,30 +67,27 @@ describe("StarterWorkSection", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
-  it("summarizes the live pool and its reviewed work", async () => {
+  it("shows every live pool task in the overview, and how many are still unreviewed", async () => {
     vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([
       task,
-      { ...task, id: "task-2", title: "Document the auth flow", reviewed: true },
+      { ...task, id: "task-2", title: "Document the auth flow" },
     ]);
     render(<StarterWorkSection />);
 
-    // The KPI cards render on the very first pass regardless of load state (their value defaults
-    // to 0), so the count itself — not just the static label — has to be the awaited condition;
-    // otherwise this can observe either card before its own query has settled.
-    const poolCard = screen.getByText("Available to new hires").parentElement;
-    const reviewedCard = screen.getByText("Vouched for by your team").parentElement;
-
-    expect(poolCard).toHaveTextContent("In the pool");
-    await waitFor(() => expect(poolCard).toHaveTextContent("2"));
-    expect(reviewedCard).toHaveTextContent("Reviewed");
-    await waitFor(() => expect(reviewedCard).toHaveTextContent("1"));
-    expect(screen.queryByText("Skills exercised")).not.toBeInTheDocument();
-    expect(screen.queryByText("Linked to a source")).not.toBeInTheDocument();
+    // Only "task" (task-1) is also in the unreviewed queue (the default `fetchUnreviewed` mock),
+    // so the hint counts it alone even though the pool itself holds both.
+    expect(await screen.findByTestId("unreviewed-hint")).toHaveTextContent(
+      "1 task nobody has looked at yet",
+    );
+    const pool = await screen.findByTestId("starter-work-pool");
+    expect(within(pool).getByText("Fix the login redirect")).toBeInTheDocument();
+    expect(within(pool).getByText("Document the auth flow")).toBeInTheDocument();
   });
 
   it("shows the AI scope-safety rationale in the task detail", async () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
+    await openTab(user, "Review");
 
     // The list stays compact; the rationale — the claim a PM is checking — opens with the detail.
     await user.click(
@@ -102,7 +106,9 @@ describe("StarterWorkSection", () => {
   });
 
   it("lists the competencies that become prerequisites", async () => {
+    const user = userEvent.setup();
     render(<StarterWorkSection />);
+    await openTab(user, "Review");
 
     await screen.findByText("Fix the login redirect");
     expect(screen.getByText("kotlin")).toBeInTheDocument();
@@ -115,6 +121,7 @@ describe("StarterWorkSection", () => {
       .spyOn(starterWorkService, "markReviewed")
       .mockResolvedValue({ ...task, status: "LIVE", reviewed: true });
     render(<StarterWorkSection />);
+    await openTab(user, "Review");
 
     await user.click(await screen.findByTestId("approve-task-task-1"));
 
@@ -145,58 +152,21 @@ describe("StarterWorkSection", () => {
 
   it("lets HR read the queue but not decide on it", async () => {
     permissionGroup.current = "HR";
+    const user = userEvent.setup();
     render(<StarterWorkSection />);
+    await openTab(user, "Review");
 
     expect(await screen.findByText("Fix the login redirect")).toBeInTheDocument();
     expect(screen.queryByTestId("approve-task-task-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reject-task-task-1")).not.toBeInTheDocument();
   });
 
-  it("hides the overview review section and expands the pool when no reviews are open", async () => {
+  it("hides the hint banner once nothing is unreviewed", async () => {
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [] });
     render(<StarterWorkSection />);
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("overview-review-column")).not.toBeInTheDocument(),
-    );
-    expect(screen.queryByText(/nothing here needs a look/i)).not.toBeInTheDocument();
-    expect(screen.getByTestId("overview-pool-column")).toHaveClass("xl:col-span-2");
-  });
-
-  it("fills the gap under a single review with two dashed placeholder slots", async () => {
-    // Default mock is a single review, so the column tops up to three slots: one card, two dashes.
-    render(<StarterWorkSection />);
-
-    await screen.findByText("Fix the login redirect");
-    const filler = screen.getByTestId("overview-review-filler");
-    expect(filler.children).toHaveLength(2);
-    // The hint sits in the topmost slot only, so it appears exactly once.
-    expect(filler).toHaveTextContent("New tasks land here for review.");
-    expect(screen.getAllByText("New tasks land here for review.")).toHaveLength(1);
-  });
-
-  it("fills the gap under two reviews with one dashed placeholder slot", async () => {
-    vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({
-      tasks: [task, { ...task, id: "task-2", title: "Document the auth flow" }],
-    });
-    render(<StarterWorkSection />);
-
-    await screen.findByText("Document the auth flow");
-    expect(screen.getByTestId("overview-review-filler").children).toHaveLength(1);
-  });
-
-  it("drops the placeholder once the review queue is long enough to fill the column", async () => {
-    vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({
-      tasks: [
-        task,
-        { ...task, id: "task-2", title: "Document the auth flow" },
-        { ...task, id: "task-3", title: "Tidy the onboarding README" },
-      ],
-    });
-    render(<StarterWorkSection />);
-
-    await screen.findByText("Fix the login redirect");
-    expect(screen.queryByTestId("overview-review-filler")).not.toBeInTheDocument();
+    await screen.findByTestId("starter-work-pool");
+    expect(screen.queryByTestId("unreviewed-hint")).not.toBeInTheDocument();
   });
 
   it("shows generated work as a success toast", async () => {
@@ -316,7 +286,7 @@ describe("StarterWorkSection", () => {
     permissionGroup.current = "HR";
     render(<StarterWorkSection />);
 
-    await screen.findByText("Fix the login redirect");
+    await screen.findByTestId("starter-work-pool");
     expect(screen.queryByTestId("add-starter-task")).not.toBeInTheDocument();
   });
 });

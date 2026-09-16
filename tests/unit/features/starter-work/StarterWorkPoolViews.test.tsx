@@ -1,9 +1,10 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 import { orientationService } from "../../../../src/services/orientationService";
+import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
 
@@ -30,6 +31,7 @@ function task(index: number): StarterWorkTask {
     competencyKeys: ["react", "testing"],
     status: "LIVE",
     reviewed: true,
+    taskZeroEligible: false,
   };
 }
 
@@ -39,6 +41,7 @@ describe("StarterWorkPoolCloud views", () => {
     window.localStorage.clear();
     // The pool offers its cloud view from `sm` up, so pin a desktop viewport for these view tests.
     mockViewport();
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
   it("chooses a different one of the five cloud layouts whenever the page changes", async () => {
@@ -104,5 +107,24 @@ describe("StarterWorkPoolCloud views", () => {
 
     await waitFor(() => expect(fetchOrientation).toHaveBeenCalledWith("task-1", "p1"));
     expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
+  });
+
+  it("marks an unseen task with a dashed row and a dot in list view too", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        unseenIds={new Set(["task-1"])}
+        isLoading={false}
+        error={null}
+        canAct
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "List view" }));
+
+    const row = screen.getByTestId("pool-list-task-task-1");
+    expect(row.querySelector(".border-dashed")).toBeInTheDocument();
+    expect(within(row).getByLabelText("Not looked at yet")).toBeInTheDocument();
   });
 });

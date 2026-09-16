@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  CheckCircle2,
   ChevronRight,
   Cloud,
   List as ListIcon,
   Loader2,
   PackageOpen,
   PencilLine,
+  RefreshCw,
 } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -19,12 +22,25 @@ import { useToast } from "../../../context/useToast";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { orientationService } from "../../../services/orientationService";
+import { queryKeys } from "../../../services/queryKeys";
+import { starterWorkService } from "../../../services/starterWorkService";
 import { centralSpringToken } from "../../../styles/tokens";
 import { OrientationEditor } from "../../orientation/components/OrientationEditor";
 import type { MyOrientation } from "../../orientation/types";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
+
+const NO_UNSEEN_IDS: ReadonlySet<string> = new Set();
+
+type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
+
+const STATUS_FILTER_OPTIONS: { value: PoolStatusFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "unseen", label: "Not looked at" },
+  { value: "seen", label: "Looked at" },
+  { value: "taskZero", label: "Task 0" },
+];
 
 /** Cloud cards need more breathing room than the compact issue-style list rows. */
 const CLOUD_PAGE_SIZE = 5;
@@ -124,11 +140,17 @@ type CloudSlotStyle = CSSProperties & {
 };
 
 type StarterWorkPoolCloudProps = {
-  /** Reviewed tasks shown in the pool; the page removes the still-unreviewed queue first. */
+  /** The whole live pool — reviewed and not. */
   tasks: StarterWorkTask[];
+  /**
+   * Ids of tasks nobody has looked at yet, from the unreviewed queue. Unseen tasks sort first and
+   * are marked; the rest read as looked at. Defaults to empty, so a caller with no queue at hand
+   * (or none of its own concern) still gets a working pool.
+   */
+  unseenIds?: ReadonlySet<string>;
   isLoading: boolean;
   error: string | null;
-  /** HR reads the pool; only PM/ADMIN can open the orientation editor. */
+  /** HR reads the pool; only PM/ADMIN can open the orientation editor or sync it. */
   canAct: boolean;
   /**
    * Whether the pool spans the full content width (its own tab, or the overview with no open
@@ -136,10 +158,14 @@ type StarterWorkPoolCloudProps = {
    * single stacked column, and pages six at a time to fill a 2×3 grid.
    */
   fullWidth?: boolean;
+  /** Reconciles the pool against its trackers now. Omitted hides the sync control entirely. */
+  onSync?: () => void;
+  isSyncing?: boolean;
 };
 
 type PoolTaskProps = {
   task: StarterWorkTask;
+  unseen: boolean;
   canOpen: boolean;
   isOpening: boolean;
   isBusy: boolean;
@@ -185,18 +211,49 @@ function PoolTaskMeta({ task }: { task: StarterWorkTask }) {
           {parsed.repo}
         </span>
       )}
+      {task.taskZeroEligible && (
+        <Badge variant="purple" size="sm">
+          Task 0
+        </Badge>
+      )}
     </div>
   );
 }
 
+/**
+ * Whether nobody has looked at this task yet (a dot) or somebody has (a checkmark). Purely a
+ * marker — the pool itself decides who counts as "looked at" by cross-referencing the unreviewed
+ * queue, not this component.
+ */
+function PoolTaskStatusMarker({ unseen }: { unseen: boolean }) {
+  if (unseen) {
+    return (
+      <span
+        role="img"
+        aria-label="Not looked at yet"
+        title="Not looked at yet"
+        className="h-2 w-2 shrink-0 rounded-full bg-app-brand"
+      />
+    );
+  }
+
+  return (
+    <CheckCircle2
+      role="img"
+      aria-label="Looked at"
+      className="h-4 w-4 shrink-0 text-app-success-text"
+    />
+  );
+}
+
 /** A cloud card whose stretched button makes the entire surface open the orientation drawer. */
-function PoolCloudCard({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+function PoolCloudCard({ task, unseen, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
   const description = task.summary?.trim();
 
   return (
     <SpotlightCard
       roundedClassName="rounded-2xl"
-      className="h-full focus-within:ring-2 focus-within:ring-app-focus"
+      className={`h-full focus-within:ring-2 focus-within:ring-app-focus ${unseen ? "border-dashed" : ""}`}
     >
       {canOpen && (
         <button
@@ -210,6 +267,7 @@ function PoolCloudCard({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskPro
 
       <article className="pointer-events-none relative z-10 flex h-full flex-col gap-2 p-4">
         <div className="flex items-start gap-2">
+          <PoolTaskStatusMarker unseen={unseen} />
           <h3
             className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-semibold text-app-text"
             title={task.title}
@@ -242,7 +300,7 @@ function PoolCloudCard({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskPro
 }
 
 /** Pool task in the same compact row language as the issue browser directly below it. */
-function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+function PoolListRow({ task, unseen, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
   const description = task.summary?.trim();
 
   return (
@@ -259,7 +317,12 @@ function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps
 
       {/* h-full so that side by side in the full-width grid, the row's two cards match the taller
           one's height; in the single stacked column it is a no-op. */}
-      <div className="pointer-events-none relative z-10 flex h-full items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong">
+      <div
+        className={`pointer-events-none relative z-10 flex h-full items-start gap-3 rounded-2xl border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong ${
+          unseen ? "border-dashed border-app-border" : "border-app-border"
+        }`}
+      >
+        <PoolTaskStatusMarker unseen={unseen} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold text-app-text" title={task.title}>
             {task.title}
@@ -298,12 +361,15 @@ function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps
  */
 export function StarterWorkPoolCloud({
   tasks,
+  unseenIds = NO_UNSEEN_IDS,
   isLoading,
   error,
   canAct,
   fullWidth = false,
+  onSync,
+  isSyncing = false,
 }: StarterWorkPoolCloudProps) {
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, selectedProject } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
   const { error: showErrorToast } = useToast();
   const showLoadingSkeleton = useDelayedFlag(isLoading);
@@ -316,6 +382,8 @@ export function StarterWorkPoolCloud({
     orientation: MyOrientation;
   } | null>(null);
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>("all");
+  const [onlyProject, setOnlyProject] = useState(false);
 
   // The cloud only reads as a cloud once there is room to scatter its cards. Below `sm` there is
   // not, so the pool falls back to the list regardless of the picked view, and the view toggle is
@@ -323,14 +391,59 @@ export function StarterWorkPoolCloud({
   const isSmUp = useIsSmUp();
   const effectiveView: PoolView = isSmUp ? view : "list";
 
+  // The same project-scoped query `CorpusIssueBrowser` fetches, read here purely to know which
+  // repos/Jira projects belong to the selected project's corpus — sharing the cache key means a
+  // browser already open on this project costs this chip nothing extra.
+  const { data: candidates } = useQuery({
+    queryKey: queryKeys.starterWork.corpusIssues(selectedProjectId),
+    queryFn: () => starterWorkService.fetchCandidates(selectedProjectId),
+    enabled: Boolean(selectedProjectId),
+  });
+
+  const projectGroupKeys = useMemo(() => {
+    const keys = new Set<string>();
+    (candidates ?? []).forEach((candidate) => {
+      const groupKey = parseCandidateSource(candidate.sourceId).groupKey;
+      if (groupKey) keys.add(groupKey);
+    });
+    return keys;
+  }, [candidates]);
+
+  // Unseen tasks sort first, within an otherwise stable order — a page change never has to explain
+  // why a task moved for no reason a reader can see.
+  const sortedTasks = useMemo(() => {
+    const withUnseenFirst = [...tasks];
+    withUnseenFirst.sort((a, b) => {
+      const aUnseen = unseenIds.has(a.id);
+      const bUnseen = unseenIds.has(b.id);
+      return aUnseen === bUnseen ? 0 : aUnseen ? -1 : 1;
+    });
+    return withUnseenFirst;
+  }, [tasks, unseenIds]);
+
+  const filteredTasks = useMemo(
+    () =>
+      sortedTasks.filter((task) => {
+        if (statusFilter === "unseen" && !unseenIds.has(task.id)) return false;
+        if (statusFilter === "seen" && unseenIds.has(task.id)) return false;
+        if (statusFilter === "taskZero" && !task.taskZeroEligible) return false;
+        if (onlyProject) {
+          const groupKey = parseCandidateSource(task.sourceId).groupKey;
+          if (!groupKey || !projectGroupKeys.has(groupKey)) return false;
+        }
+        return true;
+      }),
+    [sortedTasks, statusFilter, unseenIds, onlyProject, projectGroupKeys],
+  );
+
   const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
   const cloudPageSize = fullWidth ? CLOUD_PAGE_SIZE_WIDE : CLOUD_PAGE_SIZE;
   const pageSize = effectiveView === "cloud" ? cloudPageSize : listPageSize;
-  const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
-    () => tasks.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [tasks, safePage, pageSize],
+    () => filteredTasks.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredTasks, safePage, pageSize],
   );
 
   useEffect(() => {
@@ -358,6 +471,16 @@ export function StarterWorkPoolCloud({
     setPage(1);
   };
 
+  const changeStatusFilter = (nextFilter: PoolStatusFilter) => {
+    setStatusFilter(nextFilter);
+    setPage(1);
+  };
+
+  const toggleOnlyProject = () => {
+    setOnlyProject((current) => !current);
+    setPage(1);
+  };
+
   const changePage = (nextPage: number) => {
     if (nextPage === safePage) return;
     setPage(nextPage);
@@ -380,34 +503,76 @@ export function StarterWorkPoolCloud({
           text="Every pooled task stays claimable. Review lifts its rank; edit orientation to write the guide."
         />
 
-        <div
-          className="ml-auto hidden items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1 sm:flex"
-          role="group"
-          aria-label="Pool view"
-        >
-          <Button
-            variant={view === "cloud" ? "secondary" : "ghost"}
-            size="sm"
-            iconOnly
-            aria-label="Cloud view"
-            aria-pressed={view === "cloud"}
-            title="Cloud view"
-            onClick={() => changeView("cloud")}
+        <div className="ml-auto flex items-center gap-2">
+          {canAct && onSync && (
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={isSyncing}
+              onClick={onSync}
+              icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+            >
+              {isSyncing ? "Syncing…" : "Sync"}
+            </Button>
+          )}
+
+          <div
+            className="hidden items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1 sm:flex"
+            role="group"
+            aria-label="Pool view"
           >
-            <Cloud className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant={view === "list" ? "secondary" : "ghost"}
-            size="sm"
-            iconOnly
-            aria-label="List view"
-            aria-pressed={view === "list"}
-            title="List view"
-            onClick={() => changeView("list")}
-          >
-            <ListIcon className="h-4 w-4" aria-hidden="true" />
-          </Button>
+            <Button
+              variant={view === "cloud" ? "secondary" : "ghost"}
+              size="sm"
+              iconOnly
+              aria-label="Cloud view"
+              aria-pressed={view === "cloud"}
+              title="Cloud view"
+              onClick={() => changeView("cloud")}
+            >
+              <Cloud className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant={view === "list" ? "secondary" : "ghost"}
+              size="sm"
+              iconOnly
+              aria-label="List view"
+              aria-pressed={view === "list"}
+              title="List view"
+              onClick={() => changeView("list")}
+            >
+              <ListIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
+      </div>
+
+      <div
+        className="mb-4 flex flex-wrap items-center gap-1.5"
+        role="group"
+        aria-label="Filter pool tasks"
+      >
+        {STATUS_FILTER_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            variant={statusFilter === option.value ? "secondary" : "ghost"}
+            size="sm"
+            aria-pressed={statusFilter === option.value}
+            onClick={() => changeStatusFilter(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
+        {selectedProject && projectGroupKeys.size > 0 && (
+          <Button
+            variant={onlyProject ? "secondary" : "ghost"}
+            size="sm"
+            aria-pressed={onlyProject}
+            onClick={toggleOnlyProject}
+          >
+            Only {selectedProject.name}
+          </Button>
+        )}
       </div>
 
       {showLoadingSkeleton ? (
@@ -423,7 +588,11 @@ export function StarterWorkPoolCloud({
         </SkeletonGroup>
       ) : isLoading ? null : tasks.length === 0 ? (
         <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
-          Nothing has been vouched for yet. Review a task on the left and it lands here.
+          Nothing here yet. Mine or add a task and it lands here, claimable right away.
+        </EmptyState>
+      ) : filteredTasks.length === 0 ? (
+        <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
+          No tasks match this filter.
         </EmptyState>
       ) : (
         <>
@@ -479,6 +648,7 @@ export function StarterWorkPoolCloud({
                       >
                         <PoolCloudCard
                           task={task}
+                          unseen={unseenIds.has(task.id)}
                           canOpen={canOpenTask}
                           isOpening={openingId === task.id}
                           isBusy={openingId !== null}
@@ -502,6 +672,7 @@ export function StarterWorkPoolCloud({
                 <PoolListRow
                   key={task.id}
                   task={task}
+                  unseen={unseenIds.has(task.id)}
                   canOpen={canOpenTask}
                   isOpening={openingId === task.id}
                   isBusy={openingId !== null}

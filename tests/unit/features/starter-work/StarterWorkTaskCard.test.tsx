@@ -14,6 +14,7 @@ const task: StarterWorkTask = {
   competencyKeys: ["auth"],
   status: "LIVE",
   reviewed: false,
+  taskZeroEligible: false,
 };
 
 describe("StarterWorkTaskCard", () => {

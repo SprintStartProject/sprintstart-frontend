@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
 
@@ -29,6 +30,7 @@ function task(index: number): StarterWorkTask {
     competencyKeys: ["react", "testing"],
     status: "LIVE",
     reviewed: true,
+    taskZeroEligible: false,
   };
 }
 
@@ -38,6 +40,7 @@ describe("StarterWorkPoolCloud density", () => {
     window.localStorage.clear();
     // The cloud view (and its wide ten-card page) only exists from `sm` up, so pin a desktop viewport.
     mockViewport();
+    vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
   it("shows at most three issue-style rows on each list page", async () => {
@@ -120,5 +123,33 @@ describe("StarterWorkPoolCloud density", () => {
 
     expect(screen.queryByText("react")).not.toBeInTheDocument();
     expect(screen.queryByText("testing")).not.toBeInTheDocument();
+  });
+
+  it("returns to the first page when a filter narrows a later page down", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        // Only the first task is flagged for Task 0; the other six fill up the list's first
+        // full-width page (6 per page), pushing it onto page 2.
+        tasks={Array.from({ length: 7 }, (_, index) =>
+          index === 0 ? { ...task(1), taskZeroEligible: true } : task(index + 1),
+        )}
+        isLoading={false}
+        error={null}
+        canAct
+        fullWidth
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "List view" }));
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("Starter task 7")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Task 0" }));
+
+    // Page 2 no longer exists once the filter leaves a single match — the view lands back on
+    // page 1 and shows it, rather than a blank page 2.
+    expect(await screen.findByText("Starter task 1")).toBeInTheDocument();
+    expect(screen.queryByText("Starter task 7")).not.toBeInTheDocument();
   });
 });
