@@ -1,4 +1,13 @@
-import { Check, FilePlus2, Layers, Sparkles, Trash2 } from "lucide-react";
+import {
+  Check,
+  CircleHelp,
+  FilePlus2,
+  Layers,
+  ListChecks,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
@@ -9,6 +18,8 @@ import { Select } from "../../../components/ui/Select.tsx";
 import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
 import { useToast } from "../../../context/useToast.ts";
+import { canConnect } from "../../graph-diagram/graphLayout.ts";
+import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
 import { BlueprintNodeCard } from "./BlueprintNodeCard.tsx";
 import {
   BlueprintGraphCanvas,
@@ -35,10 +46,9 @@ type Props = {
    */
   onRequestDraft?: () => void;
   onPositionChange: (phase: BlueprintPhase, x: number, y: number) => Promise<void>;
-  onRemoveNode: (phase: BlueprintPhase) => Promise<void>;
   onAddBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
   onRemoveBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
-  onCreateFromLibrary: (graphX: number, graphY: number) => Promise<void>;
+  onCreateNode: (graphX: number, graphY: number) => Promise<void>;
   onDeletePhase: (phase: BlueprintPhase) => Promise<void>;
   onOpenSubGraph: (phase: BlueprintPhase) => void;
   onUpdatePhase: (phase: BlueprintPhase, metadata: BlueprintPhaseMetadata) => Promise<void>;
@@ -51,10 +61,9 @@ export function BlueprintGraphEditor({
   editable,
   onRequestDraft,
   onPositionChange,
-  onRemoveNode,
   onAddBlocker,
   onRemoveBlocker,
-  onCreateFromLibrary,
+  onCreateNode,
   onDeletePhase,
   onOpenSubGraph,
   onUpdatePhase,
@@ -155,27 +164,17 @@ export function BlueprintGraphEditor({
         nodes={phases}
         title={pathTitle}
         description="Arrange the phases in this blueprint and connect their prerequisites."
-        libraryTitle="Phases"
-        libraryDescription="Drag nodes onto the canvas. Drop a canvas node here to return it to the library."
-        libraryEmptyMessage="All phases are on the canvas."
         emptyTitle="No phases on the canvas yet"
-        libraryTemplates={[
-          {
-            id: "phase",
-            title: "New phase",
-            description: "Drop onto the canvas to create a phase.",
-          },
-        ]}
+        createKinds={[{ id: "phase", label: "New phase" }]}
         editable={editable}
         onNodeClick={openPhaseDetails}
         onOpenNode={(phase) => {
           if (phase.type === "FIXED") onOpenSubGraph(phase);
         }}
         onPositionChange={onPositionChange}
-        onRemoveNode={onRemoveNode}
         onAddBlocker={onAddBlocker}
         onRemoveBlocker={onRemoveBlocker}
-        onCreateFromLibrary={(_templateId, graphX, graphY) => onCreateFromLibrary(graphX, graphY)}
+        onCreateNode={(_kindId, graphX, graphY) => onCreateNode(graphX, graphY)}
         renderNode={(phase, graphNodeProps) => <GraphNodeCard phase={phase} {...graphNodeProps} />}
       />
       <AlertDialog
@@ -214,6 +213,10 @@ export function BlueprintGraphEditor({
         }}
       />
       <SidePanel
+        // Wider than the house default. What this panel holds is not a few fields: it is a form
+        // plus the nested lists the node owns, and at 34rem every one of those wrapped onto three
+        // lines while the canvas behind it kept two thirds of a screen nobody was reading.
+        widthClassName="w-full sm:w-[min(48rem,60vw)] sm:max-w-none"
         isOpen={isDetailsOpen && detailsPhaseId !== null}
         onClose={() => {
           // Without the mode there is no Cancel, so closing is the only way to walk away from an
@@ -288,11 +291,14 @@ export function BlueprintGraphEditor({
         {detailsPhase ? (
           <PhaseDetails
             phase={detailsPhase}
+            phases={phases}
             isEditing={editable}
             metadata={metadata}
             saveError={detailsSaveError}
             onMetadataChange={setMetadata}
             onSubmit={savePhaseMetadata}
+            onAddBlocker={onAddBlocker}
+            onRemoveBlocker={onRemoveBlocker}
           />
         ) : null}
       </SidePanel>
@@ -316,12 +322,21 @@ function GraphNodeCard({
         label: isAiEnhanced ? "AI-enhanced" : "Phase",
         icon: isAiEnhanced ? Sparkles : Layers,
       }}
-      meta={
+      // The one distinction between two phases that changes what they are: an AI-enhanced phase has
+      // no content of its own until a path is generated from it. Worth a colour, where "this phase
+      // has four steps and that one has six" is not.
+      accent={isAiEnhanced ? "purple" : "brand"}
+      metrics={
         isAiEnhanced
-          ? "Filled from the project's own material when a path is generated."
-          : `${stepCount} ${stepCount === 1 ? "step" : "steps"} · ${questionCount} ${
-              questionCount === 1 ? "check" : "checks"
-            }`
+          ? undefined
+          : [
+              { icon: ListChecks, value: stepCount, label: stepCount === 1 ? "step" : "steps" },
+              {
+                icon: CircleHelp,
+                value: questionCount,
+                label: questionCount === 1 ? "check" : "checks",
+              },
+            ]
       }
       requirements={(phase.requirements ?? []).map((requirement) => ({
         label: requirement.displayName,
@@ -344,11 +359,14 @@ function GraphNodeCard({
  */
 function PhaseDetails({
   phase,
+  phases,
   isEditing,
   metadata,
   saveError,
   onMetadataChange,
   onSubmit,
+  onAddBlocker,
+  onRemoveBlocker,
 }: {
   phase: BlueprintPhase;
   isEditing: boolean;
@@ -356,9 +374,19 @@ function PhaseDetails({
   saveError: string | null;
   onMetadataChange: React.Dispatch<React.SetStateAction<BlueprintPhaseMetadata>>;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  phases: BlueprintPhase[];
+  onAddBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
+  onRemoveBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
 }) {
   return (
     <div className="space-y-6 text-sm">
+      <PhasePrerequisites
+        phase={phase}
+        phases={phases}
+        editable={isEditing}
+        onAdd={onAddBlocker}
+        onRemove={onRemoveBlocker}
+      />
       {isEditing ? (
         <form
           id="edit-blueprint-phase"
@@ -464,5 +492,103 @@ function Detail({ label, value }: { label: string; value: string }) {
       <dt className="text-xs text-app-text-muted">{label}</dt>
       <dd className="mt-1 font-medium text-app-text">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * What this phase waits on, as a list that can be added to and taken from.
+ *
+ * The canvas could draw a prerequisite and nothing else could. That made the one relation in this
+ * model reachable by dragging and by no other means — no keyboard, no way to check what a phase
+ * waits on without finding it on the canvas and following the arrows out of it by eye, and no way
+ * at all on a touch screen. An arrow is a fact about a phase, so it belongs on the phase.
+ *
+ * The same refusals as the canvas, from the same function: a phase cannot wait for itself, cannot
+ * wait twice for the same thing, and cannot join a ring. Refused options are not offered rather
+ * than offered and rejected — a menu that lists what it will not accept is a menu that lies.
+ */
+function PhasePrerequisites({
+  phase,
+  phases,
+  editable,
+  onAdd,
+  onRemove,
+}: {
+  phase: BlueprintPhase;
+  phases: BlueprintPhase[];
+  editable: boolean;
+  onAdd: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
+  onRemove: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+  const byId = useMemo(() => new Map(phases.map((item) => [item.id, item])), [phases]);
+  const blockers = phase.blockerIds
+    .map((id) => byId.get(id))
+    .filter((item): item is BlueprintPhase => item !== undefined);
+
+  const addable = useMemo(
+    () => phases.filter((other) => canConnect(phases, phase.id, other.id)),
+    [phase.id, phases],
+  );
+
+  async function run(work: () => Promise<void>) {
+    setIsSaving(true);
+    try {
+      await work();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h3 className="font-semibold text-app-text">Waits for</h3>
+      <p className="text-xs text-app-text-muted">{LOCK_SENTENCE}</p>
+
+      {blockers.length === 0 ? (
+        <p className="text-app-text-muted">Nothing — this phase is a place a hire can start.</p>
+      ) : (
+        <ul className="flex flex-wrap gap-1.5">
+          {blockers.map((blocker) => (
+            <li key={blocker.id}>
+              <Badge variant="brand" size="sm" className="gap-1">
+                {blocker.title}
+                {editable ? (
+                  <button
+                    type="button"
+                    aria-label={`Stop waiting for ${blocker.title}`}
+                    disabled={isSaving}
+                    onClick={() => void run(() => onRemove(phase, blocker.id))}
+                    className="rounded-full transition-colors hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  >
+                    <X className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                ) : null}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {editable && addable.length > 0 ? (
+        <Select
+          size="sm"
+          value=""
+          aria-label={`Add something ${phase.title} waits for`}
+          disabled={isSaving}
+          onChange={(event) => {
+            const blockerId = event.target.value;
+            if (blockerId) void run(() => onAdd(phase, blockerId));
+          }}
+        >
+          <option value="">Add one…</option>
+          {addable.map((other) => (
+            <option key={other.id} value={other.id}>
+              {other.title}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+    </section>
   );
 }

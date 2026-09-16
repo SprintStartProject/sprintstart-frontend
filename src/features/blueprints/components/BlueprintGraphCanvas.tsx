@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import {
   Background,
   BackgroundVariant,
@@ -32,17 +40,19 @@ import {
   LayoutGrid,
   Maximize2,
   Minimize2,
-  PanelLeftClose,
-  PanelLeftOpen,
+  Info,
+  Plus,
+  Search,
   Waypoints,
+  X,
 } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
 import { useFocusMode } from "../../../context/useFocusMode.ts";
+import { SWIPE_IGNORE_ATTRIBUTE } from "../../../hooks/useHorizontalWheelNavigation.ts";
 import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
 import {
-  COMPACT_DETAIL_ZOOM,
   EDGE_REFUSAL_MESSAGE,
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
@@ -58,7 +68,11 @@ import {
   entryPointIds,
   separateOverlaps,
   EDGE_TONES,
+  detailForZoom,
+  keyboardNeighbour,
   type ChainPosition,
+  type GraphDirection,
+  type GraphDetail,
   type GraphEdgeTone,
   type GraphPositions,
   type GraphSide,
@@ -85,10 +99,9 @@ export type BlueprintGraphCanvasNodeProps = {
    * How much of the card is worth drawing.
    *
    * A sixteen-phase blueprint has to be readable at the zoom where all of it fits, and at that size
-   * a description is a grey smear nobody reads. Cards drop to their title alone below
-   * {@link COMPACT_DETAIL_ZOOM}.
+   * a description is a grey smear nobody reads. See {@link detailForZoom} for where the lines are.
    */
-  detail: "full" | "compact";
+  detail: GraphDetail;
   /**
    * The canvas's current zoom, so a compact card can size its title against it.
    *
@@ -116,30 +129,39 @@ export type BlueprintGraphCanvasNodeProps = {
   chainPosition?: ChainPosition;
 };
 
-type LibraryTemplate = { id: string; title: string; description: string };
-
 type Props<TNode extends BlueprintGraphCanvasNode> = {
   nodes: TNode[];
   title: string;
   description: string;
   headerAction?: ReactNode;
-  libraryTitle: string;
-  libraryDescription: string;
-  libraryEmptyMessage: string;
-  libraryTemplates?: LibraryTemplate[];
   editable: boolean;
-  /** Hides the authoring library when the canvas is reused as a read-only viewer. */
-  showLibrary?: boolean;
+  /**
+   * How tall the canvas makes itself.
+   *
+   * `"page"` is a surface that owns its share of the screen: it takes most of the viewport height
+   * and never less than about 34rem, which is what an editor wants. `"fill"` takes exactly the box
+   * it is given, which is what anything embedded wants — a strip on a board, a panel about one
+   * card. Getting this wrong is not a cosmetic error: a `"page"` canvas inside a 10rem box does not
+   * shrink, it overflows, and paints itself over everything under it.
+   */
+  height?: "page" | "fill";
   ariaLabel?: string;
   /** Headline for the overlay drawn when nothing is placed. */
   emptyTitle?: string;
   onNodeClick: (node: TNode) => void;
   onOpenNode?: (node: TNode) => void;
   onPositionChange: (node: TNode, x: number, y: number) => Promise<void>;
-  onRemoveNode: (node: TNode) => Promise<void>;
   onAddBlocker: (node: TNode, blockerId: string) => Promise<void>;
   onRemoveBlocker: (node: TNode, blockerId: string) => Promise<void>;
-  onCreateFromLibrary?: (templateId: string, x: number, y: number) => Promise<void>;
+  /**
+   * What this canvas can make, and what each one is called on the button that makes it.
+   *
+   * A path graph has one kind of node; a phase's sub-graph has two. Empty on a canvas that only
+   * shows what is already there.
+   */
+  createKinds?: { id: string; label: string }[];
+  /** Makes one, at a point on the canvas. */
+  onCreateNode?: (kindId: string, x: number, y: number) => Promise<void>;
   renderNode: (node: TNode, props: BlueprintGraphCanvasNodeProps) => ReactNode;
   /**
    * Who put this arrow here, where that is a question the graph can answer.
@@ -150,8 +172,8 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   edgeTone?: (node: TNode, blockerId: string) => GraphEdgeTone;
 };
 
-const LIBRARY_NODE_MIME = "application/x-blueprint-node";
-const LIBRARY_TEMPLATE_MIME = "application/x-blueprint-template";
+/** What a dragged "make one of these" button carries. */
+const CREATE_KIND_MIME = "application/x-blueprint-create-kind";
 
 type FlowNodeData = {
   render: () => ReactNode;
@@ -197,25 +219,23 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
   title,
   description,
   headerAction,
-  libraryTitle,
-  libraryDescription,
-  libraryEmptyMessage,
-  libraryTemplates = [],
   editable,
-  showLibrary = true,
+  height = "page",
   ariaLabel = "Blueprint graph canvas",
   emptyTitle = "Nothing on the canvas yet",
   onNodeClick,
   onOpenNode,
   onPositionChange,
-  onRemoveNode,
   onAddBlocker,
   onRemoveBlocker,
-  onCreateFromLibrary,
+  createKinds = [],
+  onCreateNode,
   renderNode,
   edgeTone,
 }: Props<TNode>) {
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition, fitView, getNode, getViewport, setCenter } = useReactFlow();
+  /** The pane's own box, for deciding whether a node is already on screen. */
+  const paneRef = useRef<HTMLDivElement | null>(null);
   const zoom = useStore((state) => state.transform[2]);
   const { isFocused, setFocused } = useFocusMode();
 
@@ -251,24 +271,52 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
    * meant that on a sixteen-phase graph nobody ever asked.
    */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  /**
+   * Hides everything outside the lit run instead of dimming it.
+   *
+   * Dimming answers "which of these matter" on a graph somebody can see all of. On forty nodes it
+   * leaves forty ghosts, and the run being looked at is still buried in them.
+   */
+  const [chainOnly, setChainOnly] = useState(false);
 
   // A surface with no library has nowhere to put an unplaced node, so it draws every node and lets
   // `withFallbackPositions` find a free cell for the ones the author never dragged. A personalized
   // path copied from a blueprint whose graph was never opened is exactly that case, and an empty
   // canvas is the wrong answer to it.
-  const placedNodes = useMemo(
-    () =>
-      showLibrary ? nodes.filter((node) => node.graphX !== null && node.graphY !== null) : nodes,
-    [nodes, showLibrary],
-  );
-  const libraryNodes = useMemo(
-    () => (showLibrary ? nodes.filter((node) => node.graphX === null || node.graphY === null) : []),
-    [nodes, showLibrary],
-  );
+  /**
+   * Every node, drawn.
+   *
+   * There used to be a second list — the ones with no stored coordinate, held in a panel beside the
+   * canvas. It read as a staging area for things not yet in the blueprint, and that was false:
+   * a phase with no coordinate is in the blueprint, has its steps, and reaches every hire exactly
+   * like the ones on the canvas. All the panel really held was the fact that nobody had dragged
+   * them anywhere, which is not a fact about the blueprint at all.
+   *
+   * Nothing is hidden now. A node without a coordinate gets a free grid cell from
+   * {@link arrangementFor}, the same way the hire's read-only view has always drawn them.
+   */
+  const placedNodes = nodes;
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+
+  /**
+   * The nodes whose titles match what was typed, or null when nothing was.
+   *
+   * Matching rather than filtering: a node that matches is lit and the rest go quiet, so the
+   * *shape* of the graph stays on screen. Removing the others would answer "where is the one about
+   * deployment" by throwing away the thing that says where it sits.
+   */
+  const matchIds = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (needle === "") return null;
+    return new Set(
+      placedNodes
+        .filter((node) => node.title.toLowerCase().includes(needle))
+        .map((node) => node.id),
+    );
+  }, [placedNodes, query]);
 
   const entryPoints = useMemo(() => entryPointIds(placedNodes), [placedNodes]);
   const chainPositionById = useMemo(() => chainPositions(placedNodes), [placedNodes]);
@@ -279,6 +327,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
    * selection that refused to give way while somebody swept the graph would be the graph arguing.
    */
   const focusId = hoveredId ?? selectedId;
+
   const focus = useMemo(() => {
     if (!focusId) return null;
     return {
@@ -293,7 +342,7 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     [focus],
   );
 
-  const detail: "full" | "compact" = zoom < COMPACT_DETAIL_ZOOM ? "compact" : "full";
+  const detail = detailForZoom(zoom);
 
   // Stable for the life of the canvas: React Flow remounts every node when `nodeTypes` changes
   // identity, which would end a drag the moment it started.
@@ -309,6 +358,14 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
    * away.
    */
   const [preview, setPreview] = useState<GraphPositions | null>(null);
+  /**
+   * The furniture a canvas carries is furniture for a canvas somebody works in.
+   *
+   * In a strip a few hundred pixels tall, a minimap, a zoom column and a legend panel cover the
+   * thing they are meant to help with. What is left there is the graph.
+   */
+  const isEmbedded = height === "fill";
+  const [isLegendOpen, setIsLegendOpen] = useState(!isEmbedded);
 
   // Stored coordinates can overlap — the seeded blueprint's do — so what gets drawn is the
   // arrangement with any collisions pushed apart. Nothing here is written back. Shared with the
@@ -320,7 +377,12 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
 
   const computedNodes = useMemo<BlueprintFlowNode[]>(
     () => {
-      return placedNodes.map((node) => {
+      const drawnNodes =
+        chainOnly && chainIds !== null
+          ? placedNodes.filter((node) => chainIds.has(node.id))
+          : placedNodes;
+
+      return drawnNodes.map((node) => {
         const centre = positions[node.id];
         const isEntryPoint = entryPoints.has(node.id);
 
@@ -358,7 +420,11 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             ]
               .filter(Boolean)
               .join(", "),
-            dimmed: chainIds !== null && !chainIds.has(node.id),
+            // Two reasons a node goes quiet, and they stack: it is outside the run being looked at,
+            // or it does not match what was typed.
+            dimmed:
+              (chainIds !== null && !chainIds.has(node.id)) ||
+              (matchIds !== null && !matchIds.has(node.id)),
             isEntryPoint,
             hasHandles: editable,
             onOpen: onOpenNode ? () => onOpenNode(node) : undefined,
@@ -374,6 +440,8 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
       positions,
       entryPoints,
       chainIds,
+      chainOnly,
+      matchIds,
       focusId,
       chainPositionById,
       editable,
@@ -439,7 +507,10 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
               strokeWidth: direction === null ? tone.width : tone.width + 1,
               strokeDasharray: tone.dash,
               strokeLinecap: "round" as const,
-              opacity: focus !== null && direction === null ? 0.12 : 1,
+              // A twelfth was erasing rather than quieting: the point of dimming is that the rest
+              // of the graph stays legible as context, and at that opacity it was gone. A third is
+              // what the journey graph on `feature/onboarding-path-rework` settled on, and it reads.
+              opacity: focus !== null && direction === null ? 0.35 : 1,
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
@@ -499,6 +570,38 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     [nodeById, onAddBlocker, placedNodes, runMutation],
   );
 
+  /**
+   * Moves one end of an existing arrow to another node.
+   *
+   * A prerequisite set on the wrong node could only be cut and drawn again — two gestures and a
+   * moment where the graph says something false. Dragging the end of an arrow is how every other
+   * graph editor moves one, and the same refusals apply as when drawing it: the new edge is
+   * checked before the old one is dropped, so a move that would make a ring leaves the arrow alone.
+   */
+  const handleReconnect = useCallback(
+    (previous: Edge, next: Connection) => {
+      const { source, target } = next;
+      if (!source || !target) return;
+      if (source === previous.source && target === previous.target) return;
+
+      const refusal = edgeRefusal(placedNodes, target, source);
+      if (refusal) {
+        setSaveError(EDGE_REFUSAL_MESSAGE[refusal]);
+        return;
+      }
+
+      const wasBlocked = nodeById.get(previous.target);
+      const nowBlocked = nodeById.get(target);
+      if (!wasBlocked || !nowBlocked) return;
+
+      void runMutation(async () => {
+        await onAddBlocker(nowBlocked, source);
+        await onRemoveBlocker(wasBlocked, previous.source);
+      }, "The connection could not be moved.");
+    },
+    [nodeById, onAddBlocker, onRemoveBlocker, placedNodes, runMutation],
+  );
+
   const handleEdgesDelete = useCallback(
     (deleted: Edge[]) => {
       for (const edge of deleted) {
@@ -539,50 +642,34 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     [nodeById, onPositionChange, preview, runMutation],
   );
 
-  const handleDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      const templateId = event.dataTransfer.getData(LIBRARY_TEMPLATE_MIME);
-      const nodeId = event.dataTransfer.getData(LIBRARY_NODE_MIME);
-      if (!templateId && !nodeId) return;
-
-      event.preventDefault();
-      // The pointer holds the middle of the card, and the stored coordinate is its centre — so the
-      // drop point is the coordinate, with no corner arithmetic in between.
-      const centre = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      const x = Math.round(centre.x);
-      const y = Math.round(centre.y);
-
-      if (templateId && onCreateFromLibrary) {
-        void runMutation(
-          () => onCreateFromLibrary(templateId, x, y),
-          "The node could not be created.",
-        );
-        return;
-      }
-
-      const node = nodeById.get(nodeId);
-      if (!node) return;
+  /**
+   * Makes a node at a point on the canvas.
+   *
+   * Three ways in, all of which say *where* the node goes: a double-click puts it under the
+   * pointer, the toolbar button puts it in the middle of what is on screen, and a kind can be
+   * dragged onto the spot it belongs. The old way — dragging a tile out of a panel that starts
+   * closed, in a product where nothing else is made by dragging — was the only one.
+   */
+  const createAt = useCallback(
+    (kindId: string, screenX: number, screenY: number) => {
+      if (!onCreateNode) return;
+      const centre = screenToFlowPosition({ x: screenX, y: screenY });
       void runMutation(
-        () => onPositionChange(node, x, y),
-        "The node could not be placed on the canvas.",
+        () => onCreateNode(kindId, Math.round(centre.x), Math.round(centre.y)),
+        "The node could not be created.",
       );
     },
-    [nodeById, onCreateFromLibrary, onPositionChange, runMutation, screenToFlowPosition],
+    [onCreateNode, runMutation, screenToFlowPosition],
   );
 
-  const handleReturnToLibrary = useCallback(
-    (event: DragEvent<HTMLElement>) => {
-      const nodeId = event.dataTransfer.getData(LIBRARY_NODE_MIME);
-      if (!nodeId) return;
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      const kindId = event.dataTransfer.getData(CREATE_KIND_MIME);
+      if (!kindId) return;
       event.preventDefault();
-      const node = nodeById.get(nodeId);
-      if (!node) return;
-      void runMutation(() => onRemoveNode(node), "The node could not be returned to the library.");
+      createAt(kindId, event.clientX, event.clientY);
     },
-    [nodeById, onRemoveNode, runMutation],
+    [createAt],
   );
 
   /** Lays every placed node out again and shows the result, without saving any of it. */
@@ -615,77 +702,152 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
     window.requestAnimationFrame(() => void fitView({ padding: 0.15, maxZoom: 1, duration: 240 }));
   }, [fitView]);
 
+  /**
+   * Brings a node fully into view, and only when it is not already.
+   *
+   * Centring on every selection would move the graph under somebody who clicked a node they were
+   * already looking at — the most common case by far, and the one where a camera move reads as the
+   * page having lost its place. So the camera only travels when it has to, and when it does it
+   * travels rather than cuts.
+   */
+  const bringIntoView = useCallback(
+    (nodeId: string) => {
+      const node = getNode(nodeId);
+      const pane = paneRef.current;
+      if (!node || !pane) return;
+
+      const { x, y, zoom: scale } = getViewport();
+      const rect = pane.getBoundingClientRect();
+      const left = node.position.x * scale + x;
+      const top = node.position.y * scale + y;
+      const margin = 24;
+
+      const fullyVisible =
+        left >= margin &&
+        top >= margin &&
+        left + GRAPH_NODE_WIDTH * scale <= rect.width - margin &&
+        top + GRAPH_NODE_HEIGHT * scale <= rect.height - margin;
+      if (fullyVisible) return;
+
+      void setCenter(
+        node.position.x + GRAPH_NODE_WIDTH / 2,
+        node.position.y + GRAPH_NODE_HEIGHT / 2,
+        { zoom: scale, duration: 420 },
+      );
+    },
+    [getNode, getViewport, setCenter],
+  );
+
+  /**
+   * Arrow keys move between nodes; Escape lets go of the one being looked at.
+   *
+   * Listened for on the pane rather than on a node, because the node that has focus is a React Flow
+   * concern and the direction is ours. See {@link keyboardNeighbour} for what "left" means.
+   */
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const directions: Record<string, GraphDirection> = {
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        ArrowUp: "up",
+        ArrowDown: "down",
+      };
+      const direction = directions[event.key];
+      if (!direction) return;
+      // Inside a field, an arrow key is a cursor.
+      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select")) {
+        return;
+      }
+
+      const from = selectedId ?? [...entryPoints][0] ?? placedNodes[0]?.id;
+      if (!from) return;
+
+      const next =
+        selectedId === null ? from : keyboardNeighbour(placedNodes, positions, from, direction);
+      if (!next) return;
+
+      event.preventDefault();
+      setSelectedId(next);
+      bringIntoView(next);
+    },
+    [bringIntoView, entryPoints, placedNodes, positions, selectedId],
+  );
+
   const canAuthor = editable && !isSaving;
 
   return (
     <section
       className={
         isFocused
-          ? "flex h-[calc(100vh-4.5rem)] flex-col overflow-hidden bg-app-surface"
-          : "overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm"
+          ? // Out of the page's column entirely. "Expand" used to hide the app's furniture and
+            // leave the canvas exactly as wide as the page's content column — the graph ended up
+            // centred with more empty room around it, which is the opposite of the ask. Fixed to
+            // the viewport it is as big as the screen allows.
+            "fixed inset-0 z-40 flex flex-col overflow-hidden bg-app-bg"
+          : height === "fill"
+            ? // No border and no surface of its own: something that fits a box it was handed is
+              // something whose container has already decided what it sits in.
+              "flex h-full flex-col overflow-hidden"
+            : "overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm"
       }
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-app-border px-5 py-4">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold text-app-text">{title}</h2>
-          <p className="mt-1 text-sm text-app-text-muted">{description}</p>
+      {/*
+        Only where there is something to head. A canvas embedded in something that has already
+        named it — a strip on a board, a panel about one card — was drawing an empty `h2` and an
+        empty paragraph above itself: sixty pixels of nothing in a two-hundred-pixel strip, and a
+        heading with no text in it, which is a heading a screen reader announces and cannot read.
+      */}
+      {title || headerAction ? (
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-app-border px-5 py-4">
+          <div className="min-w-0">
+            {title ? <h2 className="text-base font-semibold text-app-text">{title}</h2> : null}
+            {description ? <p className="mt-1 text-sm text-app-text-muted">{description}</p> : null}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {headerAction}
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-pressed={isFocused}
+              icon={
+                isFocused ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />
+              }
+              onClick={() => setFocused(!isFocused)}
+            >
+              {isFocused ? "Collapse" : "Expand"}
+            </Button>
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {headerAction}
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-pressed={isFocused}
-            icon={isFocused ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            onClick={() => setFocused(!isFocused)}
-          >
-            {isFocused ? "Collapse" : "Expand"}
-          </Button>
-        </div>
-      </div>
-
-      <GraphLegend editable={editable} />
+      ) : null}
 
       <div
         className={`relative flex min-h-0 ${
-          isFocused ? "flex-1" : "h-[clamp(34rem,calc(100vh-21rem),60rem)]"
+          isFocused || height === "fill" ? "flex-1" : "h-[clamp(34rem,calc(100vh-21rem),60rem)]"
         }`}
       >
-        {showLibrary ? (
-          <LibraryPanel
-            isOpen={isLibraryOpen}
-            onToggle={() => setIsLibraryOpen((current) => !current)}
-            title={libraryTitle}
-            description={libraryDescription}
-            emptyMessage={libraryEmptyMessage}
-            templates={canAuthor && onCreateFromLibrary ? libraryTemplates : []}
-            nodes={libraryNodes}
-            canAuthor={canAuthor}
-            onReturnToLibrary={handleReturnToLibrary}
-            renderNode={(node) =>
-              renderNode(node, {
-                disabled: isSaving,
-                detail: "full",
-                zoom: 1,
-                inLibrary: true,
-                onClick: () => onNodeClick(node),
-                onOpen: undefined,
-              })
-            }
-          />
-        ) : null}
-
+        {/*
+          eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions --
+          `role="application"` is a widget role, and this element is focusable: the arrow keys
+          below are exactly what that role exists to declare. The rule files `application` under
+          non-interactive, which is where it disagrees with ARIA rather than with this code.
+        */}
         <div
+          ref={paneRef}
           className="relative min-w-0 flex-1"
           role="application"
           aria-label={ariaLabel}
           data-testid="blueprint-graph-canvas"
+          // A two-finger horizontal swipe here pans the graph. Without this it would also switch
+          // the tab the graph is on, which is the one thing nobody panning a graph wants.
+          {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}
           onDragOver={(event) => {
             if (!canAuthor) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
           }}
           onDrop={handleDrop}
+          onKeyDown={handleKeyDown}
+          tabIndex={-1}
         >
           <ReactFlow
             nodes={flowNodes}
@@ -694,11 +856,27 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={handleNodeDragStop}
-            onNodeClick={(_event, node) => setSelectedId(node.id)}
+            onNodeClick={(_event, node) => {
+              setSelectedId(node.id);
+              bringIntoView(node.id);
+            }}
             onNodeMouseEnter={(_event, node) => setHoveredId(node.id)}
             onNodeMouseLeave={() => setHoveredId(null)}
             onPaneClick={() => setSelectedId(null)}
             onConnect={handleConnect}
+            onReconnect={handleReconnect}
+            edgesReconnectable={canAuthor}
+            onDoubleClick={(event) => {
+              // Only on the pane itself: a double-click that landed on a card would otherwise make
+              // a node on top of the one somebody was aiming at.
+              if (!canAuthor) return;
+              const target = event.target as HTMLElement;
+              if (!target.classList.contains("react-flow__pane")) return;
+              // The first kind, on a surface that has more than one: the toolbar names them all,
+              // and a double-click cannot ask which.
+              const first = createKinds[0];
+              if (first) createAt(first.id, event.clientX, event.clientY);
+            }}
             isValidConnection={isValidConnection}
             onEdgesDelete={handleEdgesDelete}
             nodesConnectable={canAuthor}
@@ -722,6 +900,9 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
               strokeWidth: 2,
               strokeLinecap: "round",
             }}
+            // Double-clicking the canvas makes a node now, so it must not also zoom: doing both
+            // leaves a new node under a viewport that just jumped away from it.
+            zoomOnDoubleClick={!canAuthor}
             connectionRadius={30}
             minZoom={0.2}
             maxZoom={1.8}
@@ -743,21 +924,58 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
                   "radial-gradient(120% 80% at 50% 35%, transparent 40%, var(--color-app-bg) 100%)",
               }}
             />
-            <Controls showInteractive={false} />
+            {isEmbedded ? null : <Controls showInteractive={false} />}
             {/*
               React Flow's minimap ships a white panel and grey nodes, which on the dark theme is a
               bright rectangle in the corner. Tokens instead, and small: it is an overview, not a
               second canvas.
             */}
-            <MiniMap
-              pannable
-              zoomable
-              ariaLabel="Graph overview"
-              className="!right-3 !bottom-3 !m-0 !h-24 !w-40 overflow-hidden !rounded-xl !border !border-app-border !bg-app-surface shadow-sm"
-              maskColor="var(--color-app-bg)"
-              nodeColor="var(--color-app-brand)"
-              nodeStrokeColor="var(--color-app-border)"
-            />
+            {isEmbedded ? null : (
+              <MiniMap
+                pannable
+                zoomable
+                ariaLabel="Graph overview"
+                className="!right-3 !bottom-3 !m-0 !h-24 !w-40 overflow-hidden !rounded-xl !border !border-app-border !bg-app-surface shadow-sm"
+                maskColor="var(--color-app-bg)"
+                nodeColor="var(--color-app-brand)"
+                nodeStrokeColor="var(--color-app-border)"
+              />
+            )}
+
+            {/*
+              Inside the canvas rather than in a bar above it. A legend is read once and consulted
+              rarely, and a full-width row spending a tenth of the height on something in that
+              category is the canvas paying rent for it forever. Closable, and it comes back from
+              the toolbar.
+            */}
+            {isLegendOpen ? (
+              <Panel position="bottom-left" className="!mb-3 !ml-3">
+                <GraphLegend editable={editable} onClose={() => setIsLegendOpen(false)} />
+              </Panel>
+            ) : null}
+
+            {/*
+              The search sits on the canvas rather than in the header: what it does happens here,
+              and a control whose effect is three inches away from it reads as a page filter rather
+              than as a way of looking at this graph.
+            */}
+            {placedNodes.length > 4 && !isEmbedded ? (
+              <Panel position="top-left" className="!mt-3 !ml-3">
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-app-text-subtle"
+                    aria-hidden="true"
+                  />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Find a node"
+                    aria-label="Find a node on the canvas"
+                    className="h-8 w-44 rounded-lg border border-app-border bg-app-surface/95 pr-2 pl-8 text-xs text-app-text shadow-sm backdrop-blur placeholder:text-app-text-subtle focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  />
+                </div>
+              </Panel>
+            ) : null}
 
             {focus ? (
               // What pointing at a node actually told you, in words. The two colours say which
@@ -816,14 +1034,78 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
                     </div>
                   </div>
                 ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTidyUp}
-                    icon={<LayoutGrid className="h-4 w-4" aria-hidden="true" />}
-                  >
-                    Tidy up
-                  </Button>
+                  <div className="flex gap-2">
+                    {onCreateNode
+                      ? createKinds.map((kind) => (
+                          // Draggable as well as clickable: clicking puts it in the middle of what
+                          // is on screen, which is right when the graph has room and wrong when
+                          // somebody already knows the spot they want. The drag sits on the wrapper
+                          // because the house Button does not forward drag handlers.
+                          <span
+                            key={kind.id}
+                            draggable
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = "copy";
+                              event.dataTransfer.setData(CREATE_KIND_MIME, kind.id);
+                            }}
+                          >
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={(event) => {
+                                const pane = (event.currentTarget as HTMLElement)
+                                  .closest("[data-testid='blueprint-graph-canvas']")
+                                  ?.getBoundingClientRect();
+                                if (!pane) return;
+                                createAt(
+                                  kind.id,
+                                  pane.left + pane.width / 2,
+                                  pane.top + pane.height / 2,
+                                );
+                              }}
+                              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+                            >
+                              {kind.label}
+                            </Button>
+                          </span>
+                        ))
+                      : null}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      iconOnly
+                      aria-label={
+                        chainOnly ? "Show the whole graph again" : "Show only the selected run"
+                      }
+                      title={
+                        chainOnly ? "Show the whole graph again" : "Show only the selected run"
+                      }
+                      aria-pressed={chainOnly}
+                      disabled={chainIds === null}
+                      onClick={() => setChainOnly((only) => !only)}
+                    >
+                      <Waypoints className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      iconOnly
+                      aria-label={isLegendOpen ? "Hide the legend" : "What the symbols mean"}
+                      title={isLegendOpen ? "Hide the legend" : "What the symbols mean"}
+                      aria-pressed={isLegendOpen}
+                      onClick={() => setIsLegendOpen((open) => !open)}
+                    >
+                      <Info className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleTidyUp}
+                      icon={<LayoutGrid className="h-4 w-4" aria-hidden="true" />}
+                    >
+                      Tidy up
+                    </Button>
+                  </div>
                 )}
               </Panel>
             ) : null}
@@ -840,10 +1122,8 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
                 <Waypoints className="mx-auto h-8 w-8 text-app-text-disabled" aria-hidden="true" />
                 <p className="mt-3 text-sm font-semibold text-app-text">{emptyTitle}</p>
                 <p className="mt-1 text-sm text-app-text-muted">
-                  {editable
-                    ? libraryNodes.length > 0
-                      ? "Open the panel on the left and drag one onto the canvas."
-                      : "Open the panel on the left and drag a new one onto the canvas."
+                  {canAuthor && createKinds.length > 0
+                    ? "Double-click anywhere here to make one, or use the button above."
                     : "Nothing has been placed here yet."}
                 </p>
               </div>
@@ -876,9 +1156,17 @@ function BlueprintGraphSurface<TNode extends BlueprintGraphCanvasNode>({
  * order they are drawn" — both wrong, and both invisible until a hire is standing in front of a
  * locked phase asking why.
  */
-function GraphLegend({ editable }: { editable: boolean }) {
+function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-app-border bg-app-surface-muted px-5 py-3 text-xs text-app-text-muted">
+    <div className="relative flex max-w-96 flex-col gap-2 rounded-xl border border-app-border bg-app-surface/95 p-3 pr-8 text-[11px] leading-snug text-app-text-muted shadow-md backdrop-blur">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Hide the legend"
+        className="absolute top-2 right-2 rounded p-0.5 text-app-text-subtle transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
       <span className="flex items-center gap-2">
         <svg width="34" height="10" aria-hidden="true" className="shrink-0 overflow-visible">
           <defs>
@@ -920,9 +1208,10 @@ function GraphLegend({ editable }: { editable: boolean }) {
       </span>
       {editable ? (
         <span className="text-app-text-subtle">
-          Click a node to edit it. To lock one behind another, drag from a dot on the edge of the
-          first to the second — any of the four sides. Select an arrow and press Backspace to
-          unlock.
+          Click a node to edit it, double-click the canvas to make one. To lock one behind another,
+          drag from a dot on the edge of the first to the second — any of the four sides. An arrow
+          can be dragged by either end onto a different node, or selected and removed with
+          Backspace.
         </span>
       ) : null}
     </div>
@@ -962,22 +1251,57 @@ function BlueprintFlowEdge({
   targetPosition,
   markerEnd,
   style,
+  selected,
 }: EdgeProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const path = blueprintEdgePath(
+    { x: sourceX, y: sourceY },
+    { x: targetX, y: targetY },
+    { source: SIDE_BY_POSITION[sourcePosition], target: SIDE_BY_POSITION[targetPosition] },
+  );
+
+  const width = typeof style?.strokeWidth === "number" ? style.strokeWidth : 2;
+  const emphasised = selected === true || isHovered;
+
   return (
-    <BaseEdge
-      id={id}
-      path={blueprintEdgePath(
-        { x: sourceX, y: sourceY },
-        { x: targetX, y: targetY },
-        {
-          source: SIDE_BY_POSITION[sourcePosition],
-          target: SIDE_BY_POSITION[targetPosition],
-        },
-      )}
-      markerEnd={markerEnd}
-      style={style}
-      interactionWidth={20}
-    />
+    <g>
+      {/*
+        A wash of the edge's own colour under it, drawn only while the edge is the one being
+        pointed at or worked on. A line that answers a hover by getting one pixel thicker has not
+        answered it — this is wide enough to see from the other end of the arrow, which is where
+        somebody looking for where it goes is looking.
+      */}
+      {emphasised ? (
+        <path
+          d={path}
+          fill="none"
+          stroke={style?.stroke}
+          strokeWidth={width + 7}
+          strokeLinecap="round"
+          opacity={0.2}
+          style={{ pointerEvents: "none" }}
+        />
+      ) : null}
+
+      <BaseEdge
+        id={id}
+        path={path}
+        markerEnd={markerEnd}
+        style={{ ...style, strokeWidth: emphasised ? width + 1 : width }}
+        interactionWidth={20}
+      />
+
+      {/* The hit area, wider than the line. A two-pixel curve is not a thing anybody can hover. */}
+      <path
+        d={path}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={22}
+        style={{ pointerEvents: "stroke", cursor: "pointer" }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      />
+    </g>
   );
 }
 
@@ -1010,7 +1334,9 @@ function BlueprintFlowNodeCard({ id, data, selected }: NodeProps<BlueprintFlowNo
   return (
     <div
       data-testid={`graph-node-${id}`}
-      className={`group relative transition-opacity ${data.dimmed ? "opacity-25" : "opacity-100"}`}
+      className={`group relative transition-opacity duration-200 ${
+        data.dimmed ? "opacity-35" : "opacity-100"
+      }`}
       style={{ width: GRAPH_NODE_WIDTH }}
       aria-label={data.ariaLabel}
     >
@@ -1060,111 +1386,6 @@ function BlueprintFlowNodeCard({ id, data, selected }: NodeProps<BlueprintFlowNo
           </Badge>
         </span>
       ) : null}
-    </div>
-  );
-}
-
-/** The drawer of nodes that are not on the canvas, and the tiles that create new ones. */
-function LibraryPanel<TNode extends BlueprintGraphCanvasNode>({
-  isOpen,
-  onToggle,
-  title,
-  description,
-  emptyMessage,
-  templates,
-  nodes,
-  canAuthor,
-  onReturnToLibrary,
-  renderNode,
-}: {
-  isOpen: boolean;
-  onToggle: () => void;
-  title: string;
-  description: string;
-  emptyMessage: string;
-  templates: LibraryTemplate[];
-  nodes: TNode[];
-  canAuthor: boolean;
-  onReturnToLibrary: (event: DragEvent<HTMLElement>) => void;
-  renderNode: (node: TNode) => ReactNode;
-}) {
-  return (
-    <div className="relative z-10 flex shrink-0">
-      <aside
-        className={`flex h-full flex-col overflow-hidden border-r border-app-border bg-app-surface-muted transition-[width] duration-200 ease-out ${
-          isOpen ? "w-72 p-4" : "w-0 p-0"
-        }`}
-        aria-hidden={!isOpen}
-        onDragOver={(event) => {
-          if (!canAuthor) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-        }}
-        onDrop={onReturnToLibrary}
-      >
-        {isOpen ? (
-          <>
-            <h3 className="text-sm font-semibold text-app-text">{title}</h3>
-            <p className="mt-1 text-xs text-app-text-muted">{description}</p>
-
-            <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {nodes.length === 0 ? (
-                <p className="text-xs text-app-text-muted">{emptyMessage}</p>
-              ) : (
-                nodes.map((node) => (
-                  <div
-                    key={node.id}
-                    draggable={canAuthor}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData(LIBRARY_NODE_MIME, node.id);
-                    }}
-                    className={canAuthor ? "cursor-grab active:cursor-grabbing" : undefined}
-                  >
-                    {renderNode(node)}
-                  </div>
-                ))
-              )}
-            </div>
-
-            {templates.length > 0 ? (
-              <div className="mt-4 border-t border-app-border pt-4">
-                <p className="text-xs font-medium text-app-text-muted">Create on canvas</p>
-                <div className="mt-2 space-y-2">
-                  {templates.map((template) => (
-                    <div
-                      key={template.id}
-                      draggable
-                      aria-label={`Drag ${template.title} onto the canvas to create it`}
-                      className="cursor-grab rounded-xl border border-dashed border-app-border bg-app-surface p-3 active:cursor-grabbing"
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "copy";
-                        event.dataTransfer.setData(LIBRARY_TEMPLATE_MIME, template.id);
-                      }}
-                    >
-                      <p className="text-sm font-semibold text-app-text">{template.title}</p>
-                      <p className="mt-1 text-xs text-app-text-muted">{template.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </aside>
-
-      <div className="absolute top-3 left-full z-20 ml-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          iconOnly
-          aria-label={isOpen ? `Collapse ${title.toLowerCase()}` : `Expand ${title.toLowerCase()}`}
-          aria-expanded={isOpen}
-          onClick={onToggle}
-        >
-          {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-        </Button>
-      </div>
     </div>
   );
 }

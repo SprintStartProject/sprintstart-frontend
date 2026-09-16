@@ -17,7 +17,10 @@ import {
   type BlueprintGraphCanvasNode,
   type BlueprintGraphCanvasNodeProps,
 } from "../../blueprints/components/BlueprintGraphCanvas.tsx";
-import { BlueprintNodeCard } from "../../blueprints/components/BlueprintNodeCard.tsx";
+import {
+  BlueprintNodeCard,
+  type NodeAccent,
+} from "../../blueprints/components/BlueprintNodeCard.tsx";
 import type {
   OnboardingPathEndpoint,
   OnboardingQuestionEndpoint,
@@ -145,15 +148,10 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
             Back to phases
           </Button>
         }
-        libraryTitle="Phase content"
-        libraryDescription=""
-        libraryEmptyMessage=""
         editable={false}
-        showLibrary={false}
         ariaLabel={`${subGraphPhase.title} onboarding subgraph`}
         onNodeClick={() => undefined}
         onPositionChange={ignoreGraphMutation}
-        onRemoveNode={ignoreGraphMutation}
         onAddBlocker={ignoreGraphMutation}
         onRemoveBlocker={ignoreGraphMutation}
         renderNode={(node, cardProps) => <OnboardingNodeCard node={node} {...cardProps} />}
@@ -166,15 +164,10 @@ export function OnboardingGraphViewer({ path, selectedPhaseId, onSelectPhase }: 
       nodes={phaseNodes}
       title="Your onboarding path"
       description="Open a phase to see its steps and knowledge checks."
-      libraryTitle="Phases"
-      libraryDescription=""
-      libraryEmptyMessage=""
       editable={false}
-      showLibrary={false}
       ariaLabel="Onboarding phase graph"
       onNodeClick={openSubGraphNode}
       onPositionChange={ignoreGraphMutation}
-      onRemoveNode={ignoreGraphMutation}
       onAddBlocker={ignoreGraphMutation}
       onRemoveBlocker={ignoreGraphMutation}
       renderNode={(node, cardProps) => <OnboardingNodeCard node={node} {...cardProps} />}
@@ -233,6 +226,28 @@ function statusFor(node: OnboardingGraphNode): {
   }
 }
 
+/** The accent that matches the state {@link statusFor} names, so the two never disagree. */
+function accentFor(node: OnboardingGraphNode): NodeAccent {
+  if (node.locked) return "warning";
+
+  switch (node.status) {
+    case "FINISHED":
+    case "PASSED":
+      return "success";
+    case "IN_PROGRESS":
+      return "brand";
+    case "RETRY":
+      return "warning";
+    case "SKIPPED":
+    case "LOCKED":
+      return "neutral";
+    default:
+      // A phase carries no status of its own — it is open or it is locked, and locked is already
+      // answered above.
+      return node.kind === "phase" ? "brand" : "neutral";
+  }
+}
+
 function OnboardingNodeCard({
   node,
   ...cardProps
@@ -243,6 +258,11 @@ function OnboardingNodeCard({
       title={node.title}
       kind={KIND[node.kind]}
       status={statusFor(node)}
+      // On a hire's own path the useful grouping is not what kind of node this is — they will work
+      // through all of them — but where each one stands. So the colour follows the state: finished,
+      // underway, locked, or simply not started.
+      accent={accentFor(node)}
+      glyph={node.kind === "question" ? "diamond" : "round"}
       highlighted={node.selected}
     />
   );

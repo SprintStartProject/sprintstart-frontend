@@ -800,41 +800,6 @@ export function BlueprintPathDetailPage() {
     updateGraphPhase(phase.id, response);
   }
 
-  async function removeGraphNode(phase: BlueprintPhase) {
-    const response = await blueprintService.removeGraphNodePosition(
-      blueprintScope,
-      phase.id,
-      phase.revision,
-    );
-    const revisionsById = new Map(
-      response.changedNodes.map((changedNode) => [changedNode.id, changedNode.revision]),
-    );
-    setPath((current) =>
-      current
-        ? {
-            ...current,
-            blueprintPhases: current.blueprintPhases.map((item) => {
-              const revision = revisionsById.get(item.id);
-              if (revision === undefined) return item;
-              return item.id === phase.id
-                ? {
-                    ...item,
-                    revision,
-                    graphX: null,
-                    graphY: null,
-                    blockerIds: [],
-                  }
-                : {
-                    ...item,
-                    revision,
-                    blockerIds: item.blockerIds.filter((blockerId) => blockerId !== phase.id),
-                  };
-            }),
-          }
-        : current,
-    );
-  }
-
   async function addGraphBlocker(phase: BlueprintPhase, blockerId: string) {
     const response = await blueprintService.addGraphNodeBlocker(
       blueprintScope,
@@ -997,67 +962,6 @@ export function BlueprintPathDetailPage() {
                 blueprintCheckQuestions: phase.blueprintCheckQuestions.map((question) =>
                   question.id === node.id ? { ...question, revision: response.revision } : question,
                 ),
-              };
-            }),
-          }
-        : current,
-    );
-  }
-
-  async function removeSubGraphNode(node: BlueprintGraphNode) {
-    const response = await blueprintService.removeSubGraphNodePosition(
-      blueprintScope,
-      node.id,
-      node.revision,
-    );
-    const revisionsById = new Map(
-      response.updatedNodes.map((updatedNode) => [updatedNode.id, updatedNode.revision]),
-    );
-    const phaseId = node.blueprintPhaseId ?? subGraphPhaseId;
-
-    setSubGraphNodes((current) =>
-      current.map((item) => {
-        const revision = revisionsById.get(item.id);
-        if (revision === undefined) return item;
-        return item.id === node.id
-          ? { ...item, revision, graphX: null, graphY: null, blockerIds: [] }
-          : {
-              ...item,
-              revision,
-              blockerIds: item.blockerIds.filter((blockerId) => blockerId !== node.id),
-            };
-      }),
-    );
-    if (!phaseId) return;
-    setPath((current) =>
-      current
-        ? {
-            ...current,
-            blueprintPhases: current.blueprintPhases.map((phase) => {
-              if (phase.id !== phaseId) return phase;
-              return {
-                ...phase,
-                blueprintSteps: phase.blueprintSteps.map((step) => {
-                  const revision = revisionsById.get(step.id);
-                  if (revision === undefined) return step;
-                  return step.id === node.id
-                    ? {
-                        ...step,
-                        revision,
-                        graphX: null,
-                        graphY: null,
-                        blockerIds: [],
-                      }
-                    : {
-                        ...step,
-                        revision,
-                        blockerIds: step.blockerIds.filter((blockerId) => blockerId !== node.id),
-                      };
-                }),
-                blueprintCheckQuestions: phase.blueprintCheckQuestions.map((question) => {
-                  const revision = revisionsById.get(question.id);
-                  return revision === undefined ? question : { ...question, revision };
-                }),
               };
             }),
           }
@@ -1896,10 +1800,9 @@ export function BlueprintPathDetailPage() {
             onRequestDraft={() => whenEditable(() => undefined)}
             onBack={() => void returnToTopLevelGraph()}
             onPositionChange={saveSubGraphPosition}
-            onRemoveNode={removeSubGraphNode}
             onAddBlocker={addSubGraphBlocker}
             onRemoveBlocker={removeSubGraphBlocker}
-            onCreateFromLibrary={(kind, graphX, graphY) => {
+            onCreateNode={(kind, graphX, graphY) => {
               openCreate(
                 kind,
                 subGraphPhase.id,
@@ -1933,10 +1836,9 @@ export function BlueprintPathDetailPage() {
             editable={path.status === "DRAFT"}
             onRequestDraft={() => whenEditable(() => undefined)}
             onPositionChange={saveGraphPosition}
-            onRemoveNode={removeGraphNode}
             onAddBlocker={addGraphBlocker}
             onRemoveBlocker={removeGraphBlocker}
-            onCreateFromLibrary={(graphX, graphY) => {
+            onCreateNode={(graphX: number, graphY: number) => {
               openCreate("phase", path.id, path.blueprintPhases.length, {
                 graphX,
                 graphY,
@@ -1950,6 +1852,25 @@ export function BlueprintPathDetailPage() {
         )
       ) : (
         <section className="space-y-5">
+          {/*
+            At the top as well as the bottom. A sixteen-phase blueprint is several screens of
+            outline, and the only way to add a phase was to scroll past all of it — so adding one
+            cost a journey through everything already written. Kept at the bottom too, because
+            somebody who has just read to the end is also somebody about to add one.
+          */}
+          {path.blueprintPhases.length > 0 && path.status === "DRAFT" ? (
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Plus className="h-4 w-4" />}
+                onClick={() => openCreate("phase", path.id, path.blueprintPhases.length)}
+              >
+                Add phase
+              </Button>
+            </div>
+          ) : null}
+
           {path.blueprintPhases.length === 0 ? (
             <EmptyState
               icon={<Milestone className="h-8 w-8" />}

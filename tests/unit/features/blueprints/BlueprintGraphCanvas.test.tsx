@@ -34,9 +34,6 @@ function renderCanvas(
     nodes,
     title: "Path graph",
     description: "Arrange the phases.",
-    libraryTitle: "Phases",
-    libraryDescription: "Drag nodes onto the canvas.",
-    libraryEmptyMessage: "All phases are on the canvas.",
     editable: true,
     onNodeClick: vi.fn(),
     onPositionChange: noop,
@@ -77,15 +74,17 @@ describe("BlueprintGraphCanvas", () => {
     expect(screen.getByTestId("graph-node-b")).toBeInTheDocument();
   });
 
-  it("keeps an unplaced node in the library rather than on the canvas", () => {
+  it("draws a node that has never been placed, rather than hiding it in a panel", () => {
+    // A phase with no stored coordinate is in the blueprint and reaches every hire. The panel that
+    // used to hold these read as a staging area for things that were not, which was false.
     renderCanvas([node("a"), node("b", [], false)]);
 
     expect(screen.getByTestId("graph-node-a")).toBeInTheDocument();
-    expect(screen.queryByTestId("graph-node-b")).not.toBeInTheDocument();
+    expect(screen.getByTestId("graph-node-b")).toBeInTheDocument();
   });
 
   it("draws a node with no library to put it in, so a read-only graph is never empty", () => {
-    renderCanvas([node("a", [], false)], { editable: false, showLibrary: false });
+    renderCanvas([node("a", [], false)], { editable: false });
 
     expect(screen.getByTestId("graph-node-a")).toBeInTheDocument();
   });
@@ -97,12 +96,14 @@ describe("BlueprintGraphCanvas", () => {
     expect(within(screen.getByTestId("graph-node-b")).queryByText("Start")).not.toBeInTheDocument();
   });
 
-  it("says a node is in no particular order when nothing sequences it", () => {
+  it("says nothing at all about order when nothing sequences a node", () => {
+    // "No fixed order" used to sit on every card of every graph nobody had connected, which is to
+    // say on all of them. A badge that never varies distinguishes nothing and cost a row to say so.
     renderCanvas([node("a"), node("loner")]);
 
     expect(
-      within(screen.getByTestId("graph-node-loner")).getByText("No fixed order"),
-    ).toBeInTheDocument();
+      within(screen.getByTestId("graph-node-loner")).queryByText(/of \d+$/),
+    ).not.toBeInTheDocument();
   });
 
   it("numbers a node inside the chain it belongs to", () => {
@@ -124,7 +125,7 @@ describe("BlueprintGraphCanvas", () => {
     expect(screen.getByText(/Click a node to edit it/)).toBeInTheDocument();
     unmount();
 
-    renderCanvas([node("a")], { editable: false, showLibrary: false });
+    renderCanvas([node("a")], { editable: false });
     expect(screen.queryByText(/Click a node to edit it/)).not.toBeInTheDocument();
   });
 
@@ -144,17 +145,17 @@ describe("BlueprintGraphCanvas", () => {
   });
 
   it("offers the tools that change the graph only while it can be changed", () => {
-    const { unmount } = renderCanvas([node("a")], { onCreateFromLibrary: noop });
+    const { unmount } = renderCanvas([node("a")], { onCreateNode: noop });
     expect(screen.getByRole("button", { name: "Tidy up" })).toBeInTheDocument();
     unmount();
 
-    renderCanvas([node("a")], { editable: false, showLibrary: false });
+    renderCanvas([node("a")], { editable: false });
     expect(screen.queryByRole("button", { name: "Tidy up" })).not.toBeInTheDocument();
   });
 
   it("offers a new arrangement rather than applying one, because nothing else here can be undone", async () => {
     const onPositionChange = vi.fn(() => Promise.resolve());
-    renderCanvas([node("a"), node("b", ["a"])], { onPositionChange, onCreateFromLibrary: noop });
+    renderCanvas([node("a"), node("b", ["a"])], { onPositionChange, onCreateNode: noop });
 
     fireEvent.click(screen.getByRole("button", { name: "Tidy up" }));
 
@@ -169,7 +170,7 @@ describe("BlueprintGraphCanvas", () => {
 
   it("puts the old arrangement back, and saves nothing on the way", async () => {
     const onPositionChange = vi.fn(() => Promise.resolve());
-    renderCanvas([node("a"), node("b", ["a"])], { onPositionChange, onCreateFromLibrary: noop });
+    renderCanvas([node("a"), node("b", ["a"])], { onPositionChange, onCreateNode: noop });
 
     fireEvent.click(screen.getByRole("button", { name: "Tidy up" }));
     fireEvent.click(screen.getByRole("button", { name: "Put it back" }));
@@ -202,16 +203,79 @@ describe("BlueprintGraphCanvas", () => {
     expect(screen.getByText("Nothing has to happen first")).toBeInTheDocument();
   });
 
-  it("says an empty canvas is empty, not broken", () => {
-    const empty = renderCanvas([]);
+  it("moves between nodes from the keyboard, which is the only way some people can", async () => {
+    renderCanvas([node("a"), node("b", ["a"]), node("c", ["b"])]);
+
+    const pane = screen.getByTestId("blueprint-graph-canvas");
+    // The first press picks a node up rather than moving from nowhere.
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(screen.getByText("Nothing has to happen first")).toBeInTheDocument(),
+    );
+
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    await waitFor(() => expect(screen.getByText("1 must happen first")).toBeInTheDocument());
+  });
+
+  it("leaves an arrow key alone inside a field, where it is a cursor", async () => {
+    renderCanvas([node("a"), node("b", ["a"]), node("c"), node("d"), node("e")], {
+      onCreateNode: noop,
+    });
+
+    const search = screen.getByRole("textbox", { name: "Find a node on the canvas" });
+    fireEvent.keyDown(search, { key: "ArrowRight" });
+
+    await waitFor(() => expect(screen.queryByText(/must happen first/)).not.toBeInTheDocument());
+  });
+
+  it("offers a way through a crowded graph, and does not clutter a small one", () => {
+    const { unmount } = renderCanvas([node("a"), node("b"), node("c"), node("d"), node("e")]);
+    expect(screen.getByRole("textbox", { name: "Find a node on the canvas" })).toBeInTheDocument();
+    unmount();
+
+    renderCanvas([node("a"), node("b")]);
+    expect(
+      screen.queryByRole("textbox", { name: "Find a node on the canvas" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("fits the box it is given rather than overflowing it", () => {
+    // The bug this prop exists for: a canvas that insists on 34rem inside a 10rem strip does not
+    // shrink, it overflows — and paints itself over every card under it on the board.
+    const { unmount } = renderCanvas([node("a")], { height: "fill" });
+    const surface = screen.getByTestId("blueprint-graph-canvas").parentElement as HTMLElement;
+    expect(surface.className).toContain("flex-1");
+    expect(surface.className).not.toContain("clamp");
+    unmount();
+
+    renderCanvas([node("a")]);
+    expect(
+      (screen.getByTestId("blueprint-graph-canvas").parentElement as HTMLElement).className,
+    ).toContain("clamp");
+  });
+
+  it("leaves its furniture behind when it is embedded in something else", () => {
+    // A minimap, a zoom column and a legend panel in a strip a few hundred pixels tall cover the
+    // thing they are there to help with.
+    renderCanvas([node("a"), node("b", ["a"])], { height: "fill" });
+
+    expect(screen.queryByRole("button", { name: "Graph overview" })).not.toBeInTheDocument();
+    expect(screen.queryByText(LOCK_SENTENCE)).not.toBeInTheDocument();
+  });
+
+  it("says an empty canvas is empty, not broken, and says what to do about it", () => {
+    const empty = renderCanvas([], {
+      onCreateNode: noop,
+      createKinds: [{ id: "phase", label: "New phase" }],
+    });
     expect(screen.getByText("Nothing on the canvas yet")).toBeInTheDocument();
-    expect(screen.getByText(/drag a new one onto the canvas/)).toBeInTheDocument();
+    expect(screen.getByText(/Double-click anywhere here/)).toBeInTheDocument();
     empty.unmount();
 
-    // With something already in the library, the way forward is that, not creating another.
-    const withLibrary = renderCanvas([node("a", [], false)]);
-    expect(screen.getByText(/drag one onto the canvas/)).toBeInTheDocument();
-    withLibrary.unmount();
+    // A reader cannot make one, so telling them how would be an instruction they cannot follow.
+    const readOnly = renderCanvas([], { editable: false });
+    expect(screen.getByText("Nothing has been placed here yet.")).toBeInTheDocument();
+    readOnly.unmount();
 
     renderCanvas([node("a")]);
     expect(screen.queryByText("Nothing on the canvas yet")).not.toBeInTheDocument();

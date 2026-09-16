@@ -57,10 +57,9 @@ type Props = {
   onRequestDraft?: () => void;
   onBack: () => void;
   onPositionChange: (node: BlueprintGraphNode, x: number, y: number) => Promise<void>;
-  onRemoveNode: (node: BlueprintGraphNode) => Promise<void>;
   onAddBlocker: (node: BlueprintGraphNode, blockerId: string) => Promise<void>;
   onRemoveBlocker: (node: BlueprintGraphNode, blockerId: string) => Promise<void>;
-  onCreateFromLibrary: (kind: "step" | "question", graphX: number, graphY: number) => Promise<void>;
+  onCreateNode: (kind: "step" | "question", graphX: number, graphY: number) => Promise<void>;
   onDeleteStep: (step: BlueprintStep) => Promise<void>;
   onDeleteQuestion: (question: BlueprintQuestion) => Promise<void>;
   onUpdateQuestion: (
@@ -87,10 +86,9 @@ export function BlueprintSubGraphEditor({
   onRequestDraft,
   onBack,
   onPositionChange,
-  onRemoveNode,
   onAddBlocker,
   onRemoveBlocker,
-  onCreateFromLibrary,
+  onCreateNode,
   onDeleteStep,
   onDeleteQuestion,
   onUpdateQuestion,
@@ -270,33 +268,19 @@ export function BlueprintSubGraphEditor({
             Back to phases
           </Button>
         }
-        libraryTitle="Phase content"
-        libraryDescription="Drag steps and knowledge checks onto the canvas. Drop a canvas node here to return it to the library."
-        libraryEmptyMessage="All phase content is on the canvas."
         emptyTitle="No steps or knowledge checks on the canvas yet"
-        libraryTemplates={[
-          {
-            id: "step",
-            title: "New step",
-            description: "Drop onto the canvas to create a step.",
-          },
-          {
-            id: "question",
-            title: "New knowledge check",
-            description: "Drop onto the canvas to create a knowledge check.",
-          },
+        createKinds={[
+          { id: "step", label: "New step" },
+          { id: "question", label: "New check" },
         ]}
         editable={editable}
         onNodeClick={openNodeDetails}
         onPositionChange={onPositionChange}
-        onRemoveNode={onRemoveNode}
         onAddBlocker={onAddBlocker}
         onRemoveBlocker={onRemoveBlocker}
-        onCreateFromLibrary={(templateId, graphX, graphY) => {
-          if (templateId !== "step" && templateId !== "question")
-            return Promise.reject(new Error("Unknown Blueprint node template."));
-          return onCreateFromLibrary(templateId, graphX, graphY);
-        }}
+        onCreateNode={(kindId, graphX, graphY) =>
+          onCreateNode(kindId === "question" ? "question" : "step", graphX, graphY)
+        }
         renderNode={(node, graphNodeProps) => <SubGraphNodeCard node={node} {...graphNodeProps} />}
       />
       <AlertDialog
@@ -345,6 +329,10 @@ export function BlueprintSubGraphEditor({
         }}
       />
       <SidePanel
+        // Wider than the house default. What this panel holds is not a few fields: it is a form
+        // plus the nested lists the node owns, and at 34rem every one of those wrapped onto three
+        // lines while the canvas behind it kept two thirds of a screen nobody was reading.
+        widthClassName="w-full sm:w-[min(48rem,60vw)] sm:max-w-none"
         isOpen={isDetailsOpen && detailsNode !== null}
         onClose={() => {
           // Without the mode there is no Cancel, so closing is the only way to walk away from an
@@ -463,6 +451,13 @@ function SubGraphNodeCard({
         label: isQuestion ? "Knowledge check" : "Step",
         icon: isQuestion ? CircleHelp : ListChecks,
       }}
+      // Two kinds on one canvas, and the difference is what the hire is asked to *do*: work through
+      // something, or answer for it. That is the distinction the colour carries here.
+      accent={isQuestion ? "orange" : "brand"}
+      // A diamond for a check, a circle for a step. Two kinds on one canvas have to stay apart for
+      // a reader who cannot tell two small colours apart, and at the zoom where a whole phase fits
+      // the outline is all there is left of either.
+      glyph={isQuestion ? "diamond" : "round"}
     />
   );
 }

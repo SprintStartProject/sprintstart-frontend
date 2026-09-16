@@ -24,9 +24,15 @@ import dagre from "dagre";
  * context, a requirements line and a row of chips came to about 180px against an assumed 116, so
  * every gap the layout left was too small and cards sat on top of each other. Both the geometry and
  * the card now read this, so they cannot drift apart again.
+ *
+ * It has come down twice since, both times because the card was made to say less rather than
+ * because the box was squeezed. What is on it now is a title, what kind of thing it is, and two
+ * numbers — everything else was either prose a glance cannot read or a badge that appeared on every
+ * card and so distinguished nothing. A canvas of half-empty boxes fits fewer of them on screen for
+ * nothing, and on a graph the number that fit *is* the feature.
  */
-export const GRAPH_NODE_WIDTH = 248;
-export const GRAPH_NODE_HEIGHT = 168;
+export const GRAPH_NODE_WIDTH = 224;
+export const GRAPH_NODE_HEIGHT = 108;
 
 /** The grid an unplaced node falls into, and the spacing "tidy up" lays chains out on. */
 const COLUMN_STEP = GRAPH_NODE_WIDTH + 80;
@@ -34,12 +40,25 @@ const ROW_STEP = GRAPH_NODE_HEIGHT + 56;
 const COLUMNS_PER_ROW = 4;
 
 /**
- * Below this zoom a card stops trying to say everything and shows only its title.
+ * How much a card says, by how far away it is being read from.
  *
- * A sixteen-phase blueprint has to be readable at a zoom where the whole thing fits, and at that
- * size a three-line description is a grey smear that costs layout work to produce.
+ * Two tiers, and the second one was tried and dropped. A middle step that kept the counts and left
+ * the prose behind looked almost exactly like the full card — on most nodes it *was* the full card,
+ * because most of them carry no prose — so it bought a threshold, a state and a transition to show
+ * the same thing twice. A distinction nobody can see is not a distinction.
+ *
+ * What is left is the one that earns itself: a card near enough to read says everything, and a card
+ * too far to read anything becomes a label on a map instead of a grey smear. The full card appears
+ * as soon as there is room for it, rather than waiting for a second threshold nobody asked for.
  */
-export const COMPACT_DETAIL_ZOOM = 0.62;
+export type GraphDetail = "far" | "near";
+
+/** Below this, a card is a map label: an icon and its title, sized to stay legible. */
+export const FAR_DETAIL_ZOOM = 0.45;
+
+export function detailForZoom(zoom: number): GraphDetail {
+  return zoom < FAR_DETAIL_ZOOM ? "far" : "near";
+}
 
 /** What the canvas rules need to know about a node. Both graph levels satisfy this. */
 export type GraphRuleNode = {
@@ -354,12 +373,16 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
   // Unsequenced nodes go in a block under the chains, as wide as the chains are: a fixed four
   // columns either left a narrow graph with a block sticking out past it, or stacked eight loose
   // phases into a tall tower beside a wide layout.
+  //
+  // With no chains at all there is nothing to be as wide as, and "as wide as nothing" comes out as
+  // one column — which is how a blueprint whose author never drew a single arrow got tidied into
+  // one tall stack. A square-ish block is the honest shape for a set of things in no order.
   const chainWidth =
     connected.length > 0 ? Math.max(...Object.values(positions).map((point) => point.x)) : 0;
-  const looseColumns = Math.max(
-    1,
-    Math.min(loose.length, Math.round(chainWidth / COLUMN_STEP) + 1),
-  );
+  const looseColumns =
+    connected.length === 0
+      ? Math.max(1, Math.ceil(Math.sqrt(loose.length)))
+      : Math.max(1, Math.min(loose.length, Math.round(chainWidth / COLUMN_STEP) + 1));
 
   loose.forEach((node, index) => {
     positions[node.id] = {
@@ -376,10 +399,11 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
  *
  * Divides by the zoom, so the result is roughly constant *on screen*: at the zoom where sixteen
  * phases fit at once, this is a label somebody can read instead of a five-pixel smear. Capped at
- * both ends — below 13 there is nothing to correct, and past 40 the title outgrows its own card.
+ * both ends — below 13 there is nothing to correct, and past the upper cap a title stops fitting
+ * across a card 248 wide and starts being cut off mid-word, which is worse than being small.
  */
 export function compactTitlePx(zoom: number): number {
-  return Math.min(40, Math.max(13, 13 / zoom));
+  return Math.min(26, Math.max(13, 13 / zoom));
 }
 
 /** Where a node sits inside the one chain it belongs to. */
@@ -659,3 +683,94 @@ export const EDGE_TONES: Record<GraphEdgeTone, { dash?: string; width: number; s
   suggestion: { width: 2, dash: "7 5", said: "suggested by the buddy" },
   own: { width: 1.5, dash: "2 4", said: "arranged by you" },
 };
+
+/** The four ways a reader moves through a graph from the keyboard. */
+export type GraphDirection = "left" | "right" | "up" | "down";
+
+/**
+ * The node an arrow key should move to, or null when there is nowhere to go.
+ *
+ * The canvas was reachable by pointer and by nothing else: a chain could only be seen by hovering
+ * one, and a prerequisite could only be set by dragging. Tab alone does not fix that — it walks the
+ * nodes in whatever order they happen to be in the DOM, which on a graph is no order at all.
+ *
+ * **Edges first, geometry second.** Left and right follow the one relation the model has: left goes
+ * to what this waits on, right to what waits on it. That is what "onward" means here, and following
+ * it is how somebody reads a chain without seeing it. When there is no arrow that way — a node at
+ * the end of its run, or a graph nobody has connected yet — the key falls back to the nearest node
+ * in that direction on screen, because a key that does nothing teaches somebody the canvas is
+ * broken. Up and down are always geometric: the model has nothing vertical to follow.
+ *
+ * Ties are broken by how far off the straight line a candidate sits, then by id, so the same key
+ * from the same node always lands in the same place.
+ */
+export function keyboardNeighbour(
+  nodes: readonly GraphRuleNode[],
+  positions: GraphPositions,
+  fromId: string,
+  direction: GraphDirection,
+): string | null {
+  const from = positions[fromId];
+  if (!from) return null;
+
+  const placed = nodes.filter((node) => node.id !== fromId && positions[node.id] !== undefined);
+
+  if (direction === "left" || direction === "right") {
+    const linked =
+      direction === "left"
+        ? placed.filter((node) =>
+            nodes.find((item) => item.id === fromId)?.blockerIds.includes(node.id),
+          )
+        : placed.filter((node) => node.blockerIds.includes(fromId));
+
+    const nearest = closest(linked, positions, from, null);
+    if (nearest) return nearest;
+  }
+
+  const wanted =
+    direction === "left"
+      ? (point: GraphPoint) => point.x < from.x
+      : direction === "right"
+        ? (point: GraphPoint) => point.x > from.x
+        : direction === "up"
+          ? (point: GraphPoint) => point.y < from.y
+          : (point: GraphPoint) => point.y > from.y;
+
+  const axis = direction === "left" || direction === "right" ? "y" : "x";
+  return closest(
+    placed.filter((node) => wanted(positions[node.id])),
+    positions,
+    from,
+    axis,
+  );
+}
+
+/**
+ * The candidate nearest to `from`, counting distance off the straight line twice.
+ *
+ * Doubling the sideways component is what makes the key feel like a direction rather than a jump:
+ * a node dead ahead and far away is a better answer to "right" than one just beside it.
+ */
+function closest(
+  candidates: readonly GraphRuleNode[],
+  positions: GraphPositions,
+  from: GraphPoint,
+  offAxis: "x" | "y" | null,
+): string | null {
+  let best: { id: string; score: number } | null = null;
+
+  for (const node of candidates) {
+    const point = positions[node.id];
+    const dx = Math.abs(point.x - from.x);
+    const dy = Math.abs(point.y - from.y);
+    const score =
+      offAxis === "y" ? dx + dy * 2 : offAxis === "x" ? dy + dx * 2 : Math.hypot(dx, dy);
+
+    // Ties go to the lower id, so the same key from the same node always lands in the same place.
+    if (!best || score < best.score || (score === best.score && node.id < best.id)) {
+      best = { id: node.id, score };
+    }
+  }
+
+  return best?.id ?? null;
+}

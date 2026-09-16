@@ -15,6 +15,7 @@ import {
   compactTitlePx,
   edgeRefusal,
   entryPointIds,
+  keyboardNeighbour,
   separateOverlaps,
   withFallbackPositions,
   type GraphRuleNode,
@@ -292,7 +293,9 @@ describe("compactTitlePx", () => {
   });
 
   it("stops before the title outgrows its own card", () => {
-    expect(compactTitlePx(0.05)).toBe(40);
+    // Past this a long phase name stops fitting across a 248-wide card and gets cut mid-word,
+    // which is a worse answer than being a little small.
+    expect(compactTitlePx(0.05)).toBe(26);
   });
 
   it("never shrinks below the normal size", () => {
@@ -418,10 +421,14 @@ describe("edgeSides", () => {
   });
 
   it("judges the axis against the card's shape, not in bare pixels", () => {
-    // 200 to the right and 200 down are the same number and not the same displacement: the card is
-    // 248 wide and 168 tall, so 200 down clears it and 200 across does not.
-    expect(edgeSides({ x: 0, y: 0 }, { x: 200, y: 200 }).source).toBe("bottom");
-    expect(edgeSides({ x: 0, y: 0 }, { x: 400, y: 200 }).source).toBe("right");
+    // The same number of pixels is not the same displacement on the two axes, because the card is
+    // wider than it is tall. Written against the box rather than against the numbers it happened to
+    // have: this rule is about the proportions, and the proportions have changed twice.
+    const across = { x: GRAPH_NODE_WIDTH * 2, y: GRAPH_NODE_HEIGHT };
+    const down = { x: GRAPH_NODE_WIDTH, y: GRAPH_NODE_HEIGHT * 2 };
+
+    expect(edgeSides({ x: 0, y: 0 }, across).source).toBe("right");
+    expect(edgeSides({ x: 0, y: 0 }, down).source).toBe("bottom");
   });
 
   it("gives the same pair of cards the same sides every time", () => {
@@ -536,6 +543,17 @@ describe("autoLayoutPositions ordering", () => {
     expect(positions.b.y).toBeLessThan(positions.c.y);
   });
 
+  it("lays a graph with no arrows at all into a block rather than a tower", () => {
+    // "As wide as the chains above" is one column when there are no chains, which is how a
+    // blueprint nobody has drawn an arrow in got tidied into a single tall stack.
+    const positions = autoLayoutPositions(["a", "b", "c", "d", "e", "f"].map((id) => node(id)));
+    const columns = new Set(Object.values(positions).map((point) => point.x));
+    const rows = new Set(Object.values(positions).map((point) => point.y));
+
+    expect(columns.size).toBeGreaterThan(1);
+    expect(rows.size).toBeGreaterThan(1);
+  });
+
   it("puts the unsequenced block under the chains, no wider than they are", () => {
     const nodes = [
       node("a"),
@@ -617,5 +635,54 @@ describe("blockersBehind and dependentsAhead", () => {
         new Set([id, ...blockersBehind(nodes, id), ...dependentsAhead(nodes, id)]),
       );
     }
+  });
+});
+
+describe("keyboardNeighbour", () => {
+  const nodes = [node("start"), node("next", ["start"]), node("other", ["start"]), node("loose")];
+  const positions = {
+    start: { x: 0, y: 0 },
+    next: { x: 400, y: 0 },
+    other: { x: 400, y: 300 },
+    loose: { x: 0, y: 600 },
+  };
+
+  it("follows the arrow rather than the geometry, which is what onward means here", () => {
+    expect(keyboardNeighbour(nodes, positions, "start", "right")).toBe("next");
+    expect(keyboardNeighbour(nodes, positions, "next", "left")).toBe("start");
+  });
+
+  it("prefers the node dead ahead when two are linked", () => {
+    // Both `next` and `other` wait on `start`; `next` is on the same line.
+    expect(keyboardNeighbour(nodes, positions, "start", "right")).toBe("next");
+  });
+
+  it("falls back to what is on screen when there is no arrow that way", () => {
+    // `loose` waits on nothing and nothing waits on it — a key that did nothing here would teach
+    // somebody the canvas is broken.
+    expect(keyboardNeighbour(nodes, positions, "loose", "right")).toBe("other");
+    expect(keyboardNeighbour(nodes, positions, "loose", "up")).toBe("start");
+  });
+
+  it("moves up and down by where things are, because the model has nothing vertical in it", () => {
+    expect(keyboardNeighbour(nodes, positions, "next", "down")).toBe("other");
+    expect(keyboardNeighbour(nodes, positions, "other", "up")).toBe("next");
+  });
+
+  it("says there is nowhere to go rather than wrapping around", () => {
+    expect(keyboardNeighbour(nodes, positions, "start", "up")).toBeNull();
+    expect(keyboardNeighbour([node("only")], { only: { x: 0, y: 0 } }, "only", "right")).toBeNull();
+  });
+
+  it("answers the same way every time", () => {
+    for (const direction of ["left", "right", "up", "down"] as const) {
+      expect(keyboardNeighbour(nodes, positions, "start", direction)).toBe(
+        keyboardNeighbour(nodes, positions, "start", direction),
+      );
+    }
+  });
+
+  it("ignores a node that is not on the canvas", () => {
+    expect(keyboardNeighbour(nodes, { start: { x: 0, y: 0 } }, "start", "right")).toBeNull();
   });
 });
