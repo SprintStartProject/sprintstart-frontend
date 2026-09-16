@@ -9,6 +9,7 @@ import {
   ListChecks,
   Loader2,
   PencilLine,
+  Search,
   Sparkles,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -22,6 +23,10 @@ import { Field } from "../components/ui/Field.tsx";
 import { Input } from "../components/ui/Input.tsx";
 import { Modal } from "../components/ui/Modal.tsx";
 import { Textarea } from "../components/ui/Textarea.tsx";
+import { BlueprintShapeStrip } from "../features/blueprints/components/BlueprintShapeStrip.tsx";
+import { BlueprintVersionRail } from "../features/blueprints/components/BlueprintVersionRail.tsx";
+import { groupBlueprints, type BlueprintRow } from "../features/blueprints/pathLifecycle.ts";
+import { pathShape, shapeWord, type PathShape } from "../features/blueprints/pathShape.ts";
 import type { BlueprintPath, BlueprintPathOverview } from "../features/blueprints/types.ts";
 import { blueprintService, type BlueprintScope } from "../services/blueprintService.ts";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
@@ -30,40 +35,28 @@ import { useAuth } from "../context/useAuth.ts";
 /** Left-to-right order of the scope bar, shared by the bar and the swipe gesture. */
 const BLUEPRINT_SCOPE_ORDER = ["project", "global"] as const;
 
-/**
- * The order the groups are read in: what needs finishing, what is in service, what is history.
- *
- * A flat grid sorted by nothing put an archived version somebody reverted from last month beside
- * the draft they are in the middle of writing.
- */
-const STATUS_GROUPS = [
-  {
-    status: "DRAFT" as const,
-    title: "Drafts",
-    hint: "Not reaching anybody yet. Publishing one replaces the version in service.",
-  },
-  {
-    status: "ACTIVE" as const,
-    title: "Published",
-    hint: "What a new hire on this project is given.",
-  },
-  {
-    status: "ARCHIVED" as const,
-    title: "Archived",
-    hint: "Kept as they were. Hires who were given one keep their copy.",
-  },
-];
-
-/** What a blueprint turns out to contain, once its nested content has been read. */
+/** What a blueprint turns out to contain and be shaped like, once it has been read. */
 type PathContents = {
   phases: number;
   aiPhases: number;
   steps: number;
   questions: number;
   gatedPhases: number;
+  /** The graph as a thumbnail, or null when there is nothing to draw. */
+  shape: PathShape | null;
+  /** The same fact in words, for anybody the picture is not for. */
+  shapeWord: string;
 };
 
 function summarise(path: BlueprintPath): PathContents {
+  const nodes = path.blueprintPhases.map((phase) => ({
+    id: phase.id,
+    graphX: phase.graphX,
+    graphY: phase.graphY,
+    blockerIds: phase.blockerIds,
+    position: phase.position,
+  }));
+
   return {
     phases: path.blueprintPhases.length,
     aiPhases: path.blueprintPhases.filter((phase) => phase.type === "AI_ENHANCED").length,
@@ -74,11 +67,9 @@ function summarise(path: BlueprintPath): PathContents {
     ),
     gatedPhases: path.blueprintPhases.filter((phase) => (phase.requirements?.length ?? 0) > 0)
       .length,
+    shape: pathShape(nodes),
+    shapeWord: shapeWord(nodes),
   };
-}
-
-function statusVariant(status: BlueprintPathOverview["status"]) {
-  return status === "ACTIVE" ? "success" : status === "DRAFT" ? "warning" : "neutral";
 }
 
 /**
@@ -91,7 +82,20 @@ function statusVariant(status: BlueprintPathOverview["status"]) {
  */
 const CONTENTS_FETCH_LIMIT = 24;
 
-/** Lists the authoring blueprint paths for a scope and starts the path-creation flow. */
+/**
+ * Every blueprint in a scope, as things with a life rather than as rows with a status.
+ *
+ * The page this replaced sorted by the status of each blueprint's newest version, which is not a
+ * fact about the blueprint. Open a draft of a live blueprint and its newest version is a draft, so
+ * the blueprint left the "Published" section and appeared under "Drafts" — while every hire on the
+ * project carried on being given it. The page said the opposite of what was true, at the exact
+ * moment somebody was making a change and most needed to know what was still live.
+ *
+ * So the grouping is what hires get, not what the newest row says: in service, not in service yet,
+ * retired. A draft is an attribute of a blueprint, drawn on it, never a place it goes. And each
+ * blueprint carries its own graph as a thumbnail, because the question under "which of these do I
+ * want" is what shape the thing is, and counts cannot answer it.
+ */
 export function BlueprintPathsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -112,6 +116,7 @@ export function BlueprintPathsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [query, setQuery] = useState("");
   /** Guards against a scope switch landing the previous scope's answers. */
   const loadToken = useRef(0);
 
@@ -197,12 +202,18 @@ export function BlueprintPathsPage() {
     enabled: isAdmin,
   });
 
-  const groups = STATUS_GROUPS.map((group) => ({
-    ...group,
-    items: paths.filter((path) => path.status === group.status),
-  })).filter((group) => group.items.length > 0);
+  // Matched on title and description together: somebody looking for "the one about deployments"
+  // is as likely to have written that word in the description as in the title.
+  const matches = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (needle === "") return paths;
+    return paths.filter((path) =>
+      `${path.title} ${path.description ?? ""}`.toLowerCase().includes(needle),
+    );
+  }, [paths, query]);
 
-  const draftCount = paths.filter((path) => path.status === "DRAFT").length;
+  const groups = useMemo(() => groupBlueprints(matches), [matches]);
+  const openCount = paths.filter((path) => path.status === "DRAFT").length;
 
   return (
     // The swipe listens on the page rather than on the bar: having to be over the control to change
@@ -224,18 +235,38 @@ export function BlueprintPathsPage() {
         }
       />
 
-      {isAdmin ? (
-        <SegmentedTabs
-          value={isGlobal ? "global" : "project"}
-          options={[
-            { value: "project", label: "Project blueprints" },
-            { value: "global", label: "Global blueprints" },
-          ]}
-          onChange={(next) => setSearchParams(next === "global" ? { scope: "global" } : {})}
-          layoutId="blueprint-scope-pill"
-          ariaLabel="Blueprint scope"
-        />
-      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        {isAdmin ? (
+          <SegmentedTabs
+            value={isGlobal ? "global" : "project"}
+            options={[
+              { value: "project", label: "Project blueprints" },
+              { value: "global", label: "Global blueprints" },
+            ]}
+            onChange={(next) => setSearchParams(next === "global" ? { scope: "global" } : {})}
+            layoutId="blueprint-scope-pill"
+            ariaLabel="Blueprint scope"
+          />
+        ) : null}
+
+        {/* Shown from the first blueprint rather than past some threshold: a filter that appears
+            only once a page is already hard to read is a filter nobody knows exists. */}
+        {paths.length > 0 ? (
+          <div className="relative ml-auto min-w-52 flex-1 sm:max-w-64 sm:flex-none">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-app-text-subtle"
+              aria-hidden="true"
+            />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Find a blueprint"
+              aria-label="Find a blueprint"
+              className="pl-9"
+            />
+          </div>
+        ) : null}
+      </div>
 
       {error ? (
         <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
@@ -255,36 +286,42 @@ export function BlueprintPathsPage() {
         <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No blueprint paths yet">
           Create the first reusable onboarding path to begin authoring.
         </EmptyState>
+      ) : groups.length === 0 ? (
+        <EmptyState icon={<Search className="h-8 w-8" />} title="Nothing matches that">
+          No blueprint has &ldquo;{query}&rdquo; in its title or description.
+        </EmptyState>
       ) : (
         <>
           <p className="text-sm text-app-text-muted">
             {paths.length} {paths.length === 1 ? "blueprint" : "blueprints"} in this scope
-            {draftCount > 0
-              ? ` · ${draftCount} ${draftCount === 1 ? "draft waiting" : "drafts waiting"} to be published`
+            {openCount > 0
+              ? ` · ${openCount} with ${openCount === 1 ? "a draft" : "drafts"} open`
               : ""}
             .
           </p>
 
           {groups.map((group) => (
-            <section key={group.status} className="space-y-3">
+            <section key={group.key} className="space-y-3">
               <div>
                 <h2 className="text-sm font-semibold tracking-wide text-app-text uppercase">
                   {group.title}
                   <span className="ml-2 font-normal text-app-text-muted normal-case">
-                    ({group.items.length})
+                    ({group.rows.length})
                   </span>
                 </h2>
                 <p className="mt-0.5 text-xs text-app-text-muted">{group.hint}</p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {group.items.map((path) => (
-                  <BlueprintCard
-                    key={path.id}
-                    path={path}
-                    contents={contents[path.id]}
+              <div className="space-y-3">
+                {group.rows.map((row) => (
+                  <BlueprintRowCard
+                    key={row.latest.id}
+                    row={row}
+                    contents={contents[row.latest.id]}
                     onOpen={() =>
-                      void navigate(`/blueprints/${path.id}${isGlobal ? "?scope=global" : ""}`)
+                      void navigate(
+                        `/blueprints/${row.lifecycle.openId}${isGlobal ? "?scope=global" : ""}`,
+                      )
                     }
                   />
                 ))}
@@ -332,91 +369,123 @@ export function BlueprintPathsPage() {
 }
 
 /**
- * One blueprint, with enough on it to choose between two of them without opening either.
+ * One blueprint: its shape, what it holds, where it stands, and the way in.
  *
- * The card used to carry a title, a version number and a status chip, which answers none of the
- * questions somebody scanning this page actually has: how big is it, is any of it AI-assembled, is
- * it gated to particular roles, and — for a draft — what is running while this one is written.
+ * A wide row rather than a tile in a grid. Two tiles side by side are compared by eye across a gap;
+ * rows stack, and the things worth comparing — how big, what shape, is anything pending — land in
+ * the same column on every one of them, which is what makes a page of them scannable rather than
+ * merely tidy.
  */
-function BlueprintCard({
-  path,
+function BlueprintRowCard({
+  row,
   contents,
   onOpen,
 }: {
-  path: BlueprintPathOverview;
+  row: BlueprintRow;
   contents?: PathContents;
   onOpen: () => void;
 }) {
-  const isDraft = path.status === "DRAFT";
+  const { latest, lifecycle } = row;
+  const hasDraft = lifecycle.draft !== null;
 
   return (
-    <article className="flex min-w-0 flex-col rounded-2xl border border-app-border bg-app-surface p-5 shadow-sm transition-shadow hover:shadow-lg">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 truncate text-lg font-semibold text-app-text">{path.title}</h3>
-        <Badge variant={statusVariant(path.status)}>
-          {path.status === "ACTIVE" ? "Published" : path.status === "DRAFT" ? "Draft" : "Archived"}{" "}
-          · v{path.version}
-        </Badge>
+    <article
+      className={[
+        "relative flex min-w-0 flex-col gap-4 rounded-2xl border bg-app-surface p-5 transition-shadow sm:flex-row sm:items-start",
+        "shadow-sm hover:shadow-app-brand-lift",
+        // A pending draft is the one thing on this page waiting on the reader, so it is the one
+        // thing given a border of its own.
+        hasDraft ? "border-app-warning-border" : "border-app-border",
+      ].join(" ")}
+    >
+      {/* The portrait, at a fixed size so every row's shape is drawn at the same scale to compare. */}
+      <div className="flex h-20 w-full shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface-muted p-2 sm:w-44">
+        {contents?.shape ? (
+          <BlueprintShapeStrip shape={contents.shape} className="h-full w-full" />
+        ) : (
+          <span className="text-[11px] text-app-text-subtle">
+            {contents ? "Nothing in it yet" : "Reading…"}
+          </span>
+        )}
       </div>
 
-      {/*
-        A draft opened from a published version is numbered one above it (the backend copies
-        `active.version + 1`), and a path that was never published starts at 0 — so what is in
-        service while this draft is written can be said without asking for the history.
-      */}
-      {isDraft ? (
-        <p className="mt-1 text-sm text-app-warning-text">
-          {path.version > 0
-            ? `Version ${path.version - 1} stays published until you publish this one.`
-            : "Never published — no hire has been given this yet."}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+          {/*
+            The title is the control, and its own `::after` is stretched over the whole row — so
+            clicking anywhere opens the blueprint, while what a keyboard reaches and what a screen
+            reader announces is still one button with the blueprint's name on it. A card that looks
+            openable and only opens from a button in its corner has taught somebody to aim.
+          */}
+          <h3 className="min-w-0 text-lg font-semibold text-app-text">
+            <button
+              type="button"
+              onClick={onOpen}
+              className="text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
+            >
+              {latest.title}
+            </button>
+          </h3>
+          {lifecycle.retired ? (
+            <Badge variant="neutral">Retired</Badge>
+          ) : lifecycle.inService !== null ? (
+            <Badge variant="success">Hires get this</Badge>
+          ) : (
+            <Badge variant="warning">Nobody has this yet</Badge>
+          )}
+        </div>
+
+        <p className="line-clamp-2 text-sm leading-6 text-app-text-subtle">
+          {latest.description || "No description yet."}
         </p>
-      ) : null}
 
-      <p className="mt-3 line-clamp-3 min-h-15 text-sm leading-6 text-app-text-subtle">
-        {path.description || "No description yet."}
-      </p>
+        <BlueprintVersionRail lifecycle={lifecycle} />
 
-      {contents ? (
-        <dl className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-app-text-muted">
-          <Stat icon={Layers} label="phases" value={contents.phases} />
-          <Stat icon={ListChecks} label="steps" value={contents.steps} />
-          <Stat icon={CircleHelp} label="knowledge checks" value={contents.questions} />
-          {contents.aiPhases > 0 ? (
-            <Stat
-              icon={Sparkles}
-              label={`AI-enhanced ${contents.aiPhases === 1 ? "phase" : "phases"}`}
-              value={contents.aiPhases}
-            />
-          ) : null}
-          {contents.gatedPhases > 0 ? (
-            <Stat
-              icon={KeyRound}
-              label={`gated ${contents.gatedPhases === 1 ? "phase" : "phases"}`}
-              value={contents.gatedPhases}
-            />
-          ) : null}
-        </dl>
-      ) : (
-        // A count that has not arrived is left blank rather than shown as zero: "0 phases" and
-        // "not read yet" are very different things to somebody deciding which blueprint to open.
-        <p className="mt-4 text-xs text-app-text-subtle">Reading contents…</p>
-      )}
+        {contents ? (
+          <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-app-text-muted">
+            <Stat icon={Layers} label="phases" value={contents.phases} />
+            <Stat icon={ListChecks} label="steps" value={contents.steps} />
+            <Stat icon={CircleHelp} label="knowledge checks" value={contents.questions} />
+            {contents.aiPhases > 0 ? (
+              <Stat
+                icon={Sparkles}
+                label={`AI-enhanced ${contents.aiPhases === 1 ? "phase" : "phases"}`}
+                value={contents.aiPhases}
+              />
+            ) : null}
+            {contents.gatedPhases > 0 ? (
+              <Stat
+                icon={KeyRound}
+                label={`gated ${contents.gatedPhases === 1 ? "phase" : "phases"}`}
+                value={contents.gatedPhases}
+              />
+            ) : null}
+            {/* The picture's fact, said. It is also the more useful half for a reader in a hurry. */}
+            <span className="text-app-text-subtle">{contents.shapeWord}</span>
+          </dl>
+        ) : (
+          // A count that has not arrived is left blank rather than shown as zero: "0 phases" and
+          // "not read yet" are very different things to somebody deciding which blueprint to open.
+          <p className="text-xs text-app-text-subtle">Reading contents…</p>
+        )}
 
-      {contents && contents.phases > 0 && contents.aiPhases === contents.phases ? (
-        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
-          <Sparkles className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-          Every phase is AI-enhanced, so this blueprint has no content of its own to fall back on if
-          the project&rsquo;s material cannot support it.
-        </p>
-      ) : null}
+        {contents && contents.phases > 0 && contents.aiPhases === contents.phases ? (
+          <p className="flex items-start gap-1.5 rounded-lg bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
+            <Sparkles className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+            Every phase is AI-enhanced, so this blueprint has no content of its own to fall back on
+            if the project&rsquo;s material cannot support it.
+          </p>
+        ) : null}
+      </div>
 
+      {/* Above the stretched title, so it stays its own target rather than part of the row. */}
       <Button
-        className="mt-5 self-start"
-        variant={isDraft ? "primary" : "secondary"}
+        className="relative shrink-0 self-start"
+        variant={hasDraft ? "primary" : "secondary"}
         icon={<PencilLine className="h-4 w-4" />}
         onClick={onOpen}
       >
-        {isDraft ? "Continue draft" : "Open blueprint"}
+        {hasDraft ? "Continue draft" : lifecycle.retired ? "Read it" : "Open"}
       </Button>
     </article>
   );

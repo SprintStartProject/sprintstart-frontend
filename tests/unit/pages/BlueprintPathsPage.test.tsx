@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { BlueprintPathsPage } from "../../../src/pages/BlueprintPathsPage.tsx";
@@ -117,11 +117,11 @@ describe("BlueprintPathsPage", () => {
     mocks.getPath.mockResolvedValue(pathWith([]));
   });
 
-  it("groups by status, drafts first, so what needs finishing is read first", async () => {
+  it("groups by what hires get, not by the status of the newest version", async () => {
     mocks.getPaths.mockResolvedValue([
-      overview({ id: "a", title: "Archived one", status: "ARCHIVED", version: 1 }),
-      overview({ id: "b", title: "Live one", status: "ACTIVE", version: 2 }),
-      overview({ id: "c", title: "Draft one", status: "DRAFT", version: 3 }),
+      overview({ id: "a", title: "Retired one", status: "ARCHIVED", version: 1 }),
+      overview({ id: "b", title: "Never published", status: "DRAFT", version: 0 }),
+      overview({ id: "c", title: "Live one", status: "ACTIVE", version: 2 }),
     ]);
 
     renderPage();
@@ -129,9 +129,22 @@ describe("BlueprintPathsPage", () => {
     const headings = (await screen.findAllByRole("heading", { level: 2 })).map(
       (heading) => heading.textContent,
     );
-    expect(headings[0]).toContain("Drafts");
-    expect(headings[1]).toContain("Published");
-    expect(headings[2]).toContain("Archived");
+    expect(headings[0]).toContain("In service");
+    expect(headings[1]).toContain("Not in service yet");
+    expect(headings[2]).toContain("Retired");
+  });
+
+  it("keeps a blueprint in service while a draft of it is being written", async () => {
+    // The whole reason this page was restructured: the newest version of this blueprint is a
+    // draft, and every hire on the project is still being given version 3.
+    mocks.getPaths.mockResolvedValue([overview({ status: "DRAFT", version: 4 })]);
+
+    renderPage();
+
+    const heading = await screen.findByRole("heading", { level: 2 });
+    expect(heading.textContent).toContain("In service");
+    expect(screen.getByText("v3 in service")).toBeInTheDocument();
+    expect(screen.getByText("v4 being written")).toBeInTheDocument();
   });
 
   it("leaves a group out entirely when nothing is in it", async () => {
@@ -144,27 +157,46 @@ describe("BlueprintPathsPage", () => {
     );
 
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toContain("Published");
+    expect(headings[0]).toContain("In service");
   });
 
-  it("names the version that stays in service while a draft is written", async () => {
-    mocks.getPaths.mockResolvedValue([overview({ status: "DRAFT", version: 4 })]);
-
-    renderPage();
-
-    expect(
-      await screen.findByText("Version 3 stays published until you publish this one."),
-    ).toBeInTheDocument();
-  });
-
-  it("says a draft that was never published has reached nobody", async () => {
+  it("says plainly when nobody has ever been given a blueprint", async () => {
     mocks.getPaths.mockResolvedValue([overview({ status: "DRAFT", version: 0 })]);
 
     renderPage();
 
-    expect(
-      await screen.findByText("Never published — no hire has been given this yet."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Nobody has this yet")).toBeInTheDocument();
+    // The rail says what is live, and for this blueprint nothing is — so it says nothing at all
+    // rather than naming a version that reaches no one.
+    expect(screen.queryByText(/v\d+ in service/)).not.toBeInTheDocument();
+  });
+
+  it("says what shape a blueprint is, not only how much of it there is", async () => {
+    mocks.getPaths.mockResolvedValue([overview()]);
+    mocks.getPath.mockResolvedValue(pathWith([{}, {}, {}]));
+
+    renderPage();
+
+    // Three phases with nothing sequencing them is a very different thing to be handed than three
+    // in a row, and no count on the card can tell them apart.
+    expect(await screen.findByText("No order between any of them")).toBeInTheDocument();
+  });
+
+  it("narrows the page to what somebody is looking for", async () => {
+    mocks.getPaths.mockResolvedValue([
+      overview({ id: "a", title: "Backend onboarding" }),
+      overview({ id: "b", title: "Design onboarding" }),
+    ]);
+
+    renderPage();
+    await screen.findByRole("heading", { name: "Backend onboarding" });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Find a blueprint" }), {
+      target: { value: "design" },
+    });
+
+    expect(screen.queryByRole("heading", { name: "Backend onboarding" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Design onboarding" })).toBeInTheDocument();
   });
 
   it("counts what is in a blueprint once it has been read", async () => {
