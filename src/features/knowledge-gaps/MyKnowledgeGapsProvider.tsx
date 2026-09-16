@@ -19,7 +19,7 @@ import { readSeenComponents, storeSeenComponents } from "./ownerAnnouncement";
  *
  * Nothing is requested until there is a signed-in user *and* a selected project the loaded
  * project list confirms — the endpoint is scoped to a project, answers `400` without one, and
- * would otherwise be asked about a selection restored from storage that may not be this user's.
+ * a `?projectId=` deep link can name a project this user cannot reach.
  */
 export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
   const { status, profile } = useAuth();
@@ -27,8 +27,8 @@ export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
 
   const userId = profile?.id ?? "";
 
-  // Asks only about a selection the loaded project list confirms. A restored ID is non-empty
-  // long before that list arrives, and it may name a project this user has no access to.
+  // Asks only about a selection the loaded project list confirms: a `?projectId=` deep link can
+  // name a project this user has no access to.
   const hasSelectedProject = selectedProject !== null;
   const canAsk = status === "authenticated" && hasSelectedProject;
 

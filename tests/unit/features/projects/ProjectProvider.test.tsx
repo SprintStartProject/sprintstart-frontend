@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { useContext } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProjectProvider } from "../../../../src/features/projects/ProjectProvider";
@@ -115,6 +115,63 @@ describe("ProjectProvider selection storage", () => {
 
     await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("none"));
     expect(window.localStorage.getItem(`${BASE_KEY}:user-a`)).toBeNull();
+  });
+
+  it("publishes nothing until the loaded list confirms the selection it restores", async () => {
+    window.localStorage.setItem(`${BASE_KEY}:user-a`, "p2");
+
+    let releaseProjects: ((projects: AdminProject[]) => void) | undefined;
+    vi.mocked(projectService.getProjects).mockReturnValue(
+      new Promise<AdminProject[]>((resolve) => {
+        releaseProjects = resolve;
+      }),
+    );
+
+    render(
+      <ProjectProvider>
+        <Probe />
+      </ProjectProvider>,
+    );
+
+    // The stored ID is on disk, but no loaded list has vouched for it yet: it must not reach a
+    // consumer, which is what used to send requests out for a project this user cannot reach.
+    await waitFor(() => expect(projectService.getProjects).toHaveBeenCalled());
+    expect(screen.getByTestId("selection")).toHaveTextContent("none");
+
+    await act(async () => {
+      releaseProjects?.([project("p1", "Alpha"), project("p2", "Beta")]);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("p2"));
+  });
+
+  it("drops the selection when the session goes away", async () => {
+    window.localStorage.setItem(`${BASE_KEY}:user-a`, "p2");
+
+    const view = render(
+      <ProjectProvider>
+        <Probe />
+      </ProjectProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("p2"));
+
+    auth.userId = "";
+    auth.permissionGroup = "";
+    auth.status = "unauthenticated";
+
+    await act(async () => {
+      view.rerender(
+        <ProjectProvider>
+          <Probe />
+        </ProjectProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    // The selection belongs to a user, so it does not outlive the session that held it.
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("none"));
   });
 
   it("still boots to a project when storage refuses to answer", async () => {

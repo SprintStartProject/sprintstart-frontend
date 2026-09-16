@@ -129,17 +129,19 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
  * the authenticated user's permission group. The selection is persisted to
  * localStorage under the signed-in user's own key, and healed on load when the
  * stored project is no longer reachable (deleted, or access revoked).
+ *
+ * A stored ID is never published on its own: it is read inside `loadProjects` and
+ * checked against the loaded list before it reaches the context, so consumers never
+ * see a selection no list has vouched for.
  */
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { profile, status } = useAuth();
   const [projects, setProjects] = useState<SelectableProject[]>([]);
 
   /*
-    Starts empty rather than reading storage during the first render: the stored key is scoped
-    to the signed-in user, and at mount there is no user yet. The effect below fills the state
-    in as soon as `profile` arrives — which is before the project list resolves, so a reload
-    restores the previous selection before anything reads it, and the healed value written
-    further down cannot race it.
+    Empty until the loaded project list vouches for a value. The stored key is scoped to the
+    signed-in user, so it cannot be read at mount — there is no user yet — and restoring it into
+    state as soon as one arrives would publish an ID that no loaded list has confirmed.
   */
   const [selectedProjectId, setSelectedProjectIdState] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -158,25 +160,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   );
 
   /*
-    Restores this user's own selection and drops the unscoped entry older versions of the app
-    left behind — never adopting its value, since it cannot be attributed to the person now
-    signed in. Runs per user; signing out leaves the state alone, and the next sign-in
-    overwrites it here.
-
-    Deferred to a microtask for the same reason `loadProjects` is: setting state straight from
-    the effect body would cascade a render. It still lands before the project list resolves,
-    which is the only race that matters.
+    Drops the unscoped entry older versions of the app left behind — never adopting its value,
+    since it cannot be attributed to the person now signed in. Runs once a user is known, because
+    until then there is no way to tell whose selection it was.
   */
   useEffect(() => {
-    if (!userId) return;
-
-    dropLegacySelection();
-    void Promise.resolve().then(() => setSelectedProjectIdState(readStoredProjectId(userId)));
+    if (userId) dropLegacySelection();
   }, [userId]);
 
   const loadProjects = useCallback(async () => {
     if (!isAuthenticated || !permissionGroup || !userId) {
       setProjects([]);
+      // The selection belongs to a user, so there is nothing to keep it for without one.
+      setSelectedProjectIdState("");
       setIsLoading(false);
       setErrorMessage(null);
       return;
@@ -218,10 +214,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const sortedProjects = sortProjects(nextProjects);
       setProjects(sortedProjects);
 
-      setSelectedProjectIdState((currentProjectId) => {
-        const hasCurrentProject = sortedProjects.some((project) => project.id === currentProjectId);
+      // Read here rather than on mount: this is the first point at which the stored ID can be
+      // checked against the projects this user actually reaches, and an unconfirmed ID must not
+      // be published to the consumers that read the context.
+      const storedProjectId = readStoredProjectId(userId);
 
-        const nextProjectId = hasCurrentProject ? currentProjectId : (sortedProjects[0]?.id ?? "");
+      setSelectedProjectIdState((currentProjectId) => {
+        // A selection made in this session — a switcher pick, or a `?projectId=` deep link —
+        // wins over the stored one, which is the fallback for a fresh page load.
+        const preferredProjectId = currentProjectId || storedProjectId;
+        const hasPreferredProject = sortedProjects.some(
+          (project) => project.id === preferredProjectId,
+        );
+
+        const nextProjectId = hasPreferredProject
+          ? preferredProjectId
+          : (sortedProjects[0]?.id ?? "");
 
         storeProjectId(userId, nextProjectId);
         return nextProjectId;

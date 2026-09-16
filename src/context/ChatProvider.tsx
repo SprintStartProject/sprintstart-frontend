@@ -60,9 +60,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // screen while the sidebar has already moved on.
   const { selectedProject, selectedProjectId } = useProjectContext();
 
-  // Chats are asked for only once the loaded project list confirms the selection. A restored ID
-  // is non-empty before that list arrives, which is exactly when a request for a project this
-  // user cannot access used to go out.
+  // Chats are asked for only once the loaded project list confirms the selection. The provider
+  // never publishes a stored ID on its own, but a `?projectId=` deep link can still name a
+  // project this user cannot reach, so the gate stays here.
   const hasSelectedProject = selectedProject !== null;
 
   const [chats, setChats] = useState<Chat[]>([]);
@@ -217,8 +217,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
    * Loads the user's chats for the selected project once auth is ready.
    * Gated on `userId` so the fetch doesn't fire before Keycloak has
    * initialized — which would 401 and trigger a login redirect loop — and on
-   * `hasSelectedProject`, because the listing is project-scoped and the ID
-   * restored from storage is not yet known to name a project this user reaches.
+   * `hasSelectedProject`, because the listing is project-scoped and only a
+   * project the loaded list contains is known to be one this user reaches.
    * Resets all chat state when either changes, so neither a previous user's nor
    * a previous project's messages are ever visible afterwards.
    */
