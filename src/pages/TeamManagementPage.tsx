@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Search, Shield, Users, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
@@ -152,11 +153,9 @@ export function TeamManagementPage() {
     );
   };
 
-  const { data: roster, loading, error, refetch: refetchRoster } = useTeamRoster();
-  const {
-    data: roles,
-    refetch: refetchRoles,
-  } = useQueryFetch(queryKeys.projectRoles.byProject(selectedProjectId), getProjectRoles);
+  const queryClient = useQueryClient();
+  const { data: roster, loading, error } = useTeamRoster();
+  const { data: roles } = useQueryFetch(queryKeys.projectRoles.byProject(selectedProjectId), getProjectRoles);
   const { attention } = useAttention(selectedProjectId);
 
   const showLoadingSkeleton = useDelayedFlag(loading);
@@ -369,9 +368,17 @@ export function TeamManagementPage() {
             <RoleManagementTab
               roles={roles ?? []}
               users={members}
-              onDataChanged={() => {
-                refetchRoster();
-                refetchRoles();
+              // Awaited by the tab (it opens a freshly created role right after), so this waits
+              // for both reads to land rather than only asking for them.
+              onDataChanged={async () => {
+                await Promise.all([
+                  queryClient.refetchQueries({
+                    queryKey: queryKeys.teamOverview.filtered(selectedProjectId || null),
+                  }),
+                  queryClient.refetchQueries({
+                    queryKey: queryKeys.projectRoles.byProject(selectedProjectId),
+                  }),
+                ]);
               }}
             />
           )}

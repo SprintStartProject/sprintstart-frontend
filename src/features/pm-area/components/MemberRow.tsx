@@ -19,24 +19,25 @@ export function MemberProgressBar({
   className?: string;
 }) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <div
+    // Spans throughout: the bar is drawn inside row buttons, which only take phrasing content.
+    <span className={`flex items-center gap-2 ${className}`}>
+      <span
         role="progressbar"
         aria-label="Onboarding progress"
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="h-1.5 flex-1 overflow-hidden rounded-full bg-app-progress-track"
+        className="block h-1.5 flex-1 overflow-hidden rounded-full bg-app-progress-track"
       >
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-[width] duration-500"
+        <span
+          className="block h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-[width] duration-500"
           style={{ width: `${percent}%` }}
         />
-      </div>
+      </span>
       <span className="w-9 shrink-0 text-right text-xs font-medium text-app-text tabular-nums">
         {percent}%
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -105,7 +106,6 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
     <button
       type="button"
       onClick={() => onOpen(member.userId)}
-      aria-label={`Open ${name}`}
       aria-current={selected ? "true" : undefined}
       className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
