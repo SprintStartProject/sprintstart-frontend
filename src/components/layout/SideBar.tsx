@@ -18,7 +18,6 @@ import {
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
-  InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
@@ -55,18 +54,17 @@ type SidebarContentProps = {
 };
 
 /**
- * The escalation inbox's route, named because three things have to agree on it:
- * the nav entry, the access check that decides whether to read the count, and
- * the entry the count is handed to.
+ * The escalation inbox's route. It has no entry of its own any more -- it is a section of the PM
+ * dashboard -- but the access check that decides whether to read the open count is still the
+ * inbox's own, and the count now rides on the PM dashboard's entry.
  */
 const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
 /**
  * What the number on the inbox entry counts, for a screen reader.
  *
- * Handed only to that entry rather than to every one of them: the wording is
- * this entry's, and a future counted entry inheriting it would quietly announce
- * its own total as escalations.
+ * Handed only to the PM dashboard entry rather than to every one of them: a future counted
+ * entry inheriting it would quietly announce its own total as escalations.
  */
 const describeOpenEscalations = (open: number) =>
   `${open} open ${open === 1 ? "escalation" : "escalations"}`;
@@ -125,15 +123,6 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Starter Work",
     path: "/starter-work",
     icon: StarterWorkIcon,
-  },
-  // The escalation inbox, surfaced as its own entry while it is being evaluated
-  // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
-  // already hides it from hires: the route is PM/HR/ADMIN-only, and for a PM it
-  // additionally requires managing the selected project.
-  {
-    label: "Escalation Inbox",
-    path: ESCALATION_INBOX_PATH,
-    icon: InboxIcon,
   },
 ];
 
@@ -199,9 +188,6 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
-  // `/insights/knowledge-requests` is deliberately absent: it has its own
-  // sidebar entry, so listing it here would leave two entries active at once
-  // -- including two active pills sharing one Framer Motion `layoutId`.
   /**
    * The buddy is the other half of the chat's page, not a page of its own: one header, one
    * switch, two conversations. So the entry that leads there lights up for both — without it
@@ -222,7 +208,8 @@ function SidebarContent({
     location.pathname.startsWith("/team/") ||
     location.pathname.startsWith("/insights/faq") ||
     location.pathname.startsWith("/insights/knowledge-gaps") ||
-    location.pathname.startsWith("/insights/onboarding");
+    location.pathname.startsWith("/insights/onboarding") ||
+    location.pathname.startsWith(ESCALATION_INBOX_PATH);
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },
@@ -310,10 +297,8 @@ function SidebarContent({
                       ? "A component has been assigned to you"
                       : "Open skip requests or unread feedback"
                   }
-                  count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
-                  countLabel={
-                    item.path === ESCALATION_INBOX_PATH ? describeOpenEscalations : undefined
-                  }
+                  count={item.path === "/pm-dashboard" ? openEscalationCount : 0}
+                  countLabel={item.path === "/pm-dashboard" ? describeOpenEscalations : undefined}
                   onNavigate={onNavigate}
                 />
               ))}

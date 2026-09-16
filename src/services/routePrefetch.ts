@@ -10,8 +10,7 @@ import { loadKnowledgeBaseArtifacts } from "../features/knowledge-base/hooks/use
 import { loadStarterWorkReviewQueue } from "../features/starter-work/hooks/useStarterWorkReview";
 
 /**
- * Route → cache warm-up, fired from the sidebar on `pointerdown` (see `SidebarNavLink`) and from
- * the PM area's section bar (see `PmAreaNav`).
+ * Route → cache warm-up, fired from the sidebar on `pointerdown` (see `SidebarNavLink`).
  *
  * Every sidebar route warms its lazy page module. Routes with one dominant, migrated read
  * also warm that query; pages assembled from several widgets, or still owning their data by
@@ -40,20 +39,14 @@ function prefetchRouteModule(path: string): void {
     case "/onboarding":
       void import("../pages/OnBoardingPage");
       return;
+    // Every PM section ships in the workspace's one chunk.
     case "/pm-dashboard":
-      void import("../pages/PmDashboardPage");
-      return;
     case "/team-management":
-      void import("../pages/TeamManagementPage");
-      return;
     case "/insights/faq":
-      void import("../features/faq/components/FaqPage");
-      return;
     case "/insights/knowledge-gaps":
-      void import("../features/knowledge-gaps/components/KnowledgeGapsPage");
-      return;
     case "/insights/onboarding":
-      void import("../features/onboarding-metrics/components/OnboardingMetricsPage");
+    case "/insights/knowledge-requests":
+      void import("../features/pm-area/PmWorkspace");
       return;
     case "/data-ingestion":
       void import("../pages/DataIngestionPage");
@@ -63,9 +56,6 @@ function prefetchRouteModule(path: string): void {
       return;
     case "/starter-work":
       void import("../pages/StarterWorkPage");
-      return;
-    case "/insights/knowledge-requests":
-      void import("../features/knowledge-request/components/KnowledgeRequestInboxPage");
       return;
     case "/admin":
       void import("../pages/AdminPage");

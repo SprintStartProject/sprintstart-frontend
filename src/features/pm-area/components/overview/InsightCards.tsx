@@ -1,4 +1,12 @@
-import { Clock, Gauge, Hourglass, MessageSquareMore, Rocket, ShieldAlert, TrendingDown } from "lucide-react";
+import {
+  Clock,
+  Gauge,
+  Hourglass,
+  MessageSquareMore,
+  Rocket,
+  ShieldAlert,
+  TrendingDown,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../../../../components/ui/EmptyState";
@@ -68,9 +76,11 @@ export function QuestionsCard() {
       {loading ? (
         <CardSkeleton label="Loading recurring questions" />
       ) : error || !overview ? (
-        <EmptyState size="sm">The recurring questions could not be loaded.</EmptyState>
+        <EmptyState size="sm">No recurring questions to show right now.</EmptyState>
       ) : visible.length === 0 ? (
-        <EmptyState size="sm">No recurring questions yet — they appear as the chat is used.</EmptyState>
+        <EmptyState size="sm">
+          No recurring questions yet — they appear as the chat is used.
+        </EmptyState>
       ) : (
         <ul className="space-y-1">
           {visible.map((group) => (
@@ -138,7 +148,7 @@ export function KnowledgeGapsCard() {
       {loading ? (
         <CardSkeleton label="Loading knowledge gaps" />
       ) : error || !overview ? (
-        <EmptyState size="sm">The knowledge gaps could not be loaded.</EmptyState>
+        <EmptyState size="sm">No knowledge gaps to show right now.</EmptyState>
       ) : gaps.length === 0 ? (
         <EmptyState size="sm">Nothing needs documenting right now.</EmptyState>
       ) : (
@@ -195,7 +205,9 @@ function HealthRow({
       <span
         aria-hidden="true"
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-          attention ? "bg-app-warning-bg text-app-warning-text" : "bg-app-brand-soft text-app-brand-text"
+          attention
+            ? "bg-app-warning-bg text-app-warning-text"
+            : "bg-app-brand-soft text-app-brand-text"
         }`}
       >
         <Icon className="h-4 w-4" />
@@ -231,7 +243,9 @@ export function OnboardingHealthCard() {
       {loading ? (
         <CardSkeleton label="Loading onboarding metrics" />
       ) : error || !metrics ? (
-        <EmptyState size="sm">Onboarding metrics could not be loaded for this project.</EmptyState>
+        <EmptyState size="sm">No onboarding metrics for this project yet.</EmptyState>
+      ) : metrics.memberCount === 0 ? (
+        <EmptyState size="sm">No hires on this project yet.</EmptyState>
       ) : (
         <ul className="-my-2 divide-y divide-app-border-muted">
           <HealthRow

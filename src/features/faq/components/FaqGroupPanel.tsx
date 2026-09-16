@@ -59,13 +59,15 @@ function GroupDetail({ groupId }: { groupId: string }) {
           <MessageSquareMore aria-hidden="true" className="h-3.5 w-3.5" />
           How it is asked
           <span className="font-normal tracking-normal normal-case">
-            · {detail.questions.length}{" "}
-            {detail.questions.length === 1 ? "wording" : "wordings"}
+            · {detail.questions.length} {detail.questions.length === 1 ? "wording" : "wordings"}
           </span>
         </h3>
         <ul className="space-y-2">
           {detail.questions.map((question) => (
-            <li key={question.id} className="rounded-xl border border-app-border bg-app-surface p-3.5">
+            <li
+              key={question.id}
+              className="rounded-xl border border-app-border bg-app-surface p-3.5"
+            >
               <p className="text-sm leading-snug text-app-text">
                 {question.text}
                 {/* Repeats collapse into a multiplier rather than repeating the line: ten
@@ -93,9 +95,7 @@ function GroupDetail({ groupId }: { groupId: string }) {
           Answering documents
         </h3>
         {detail.answeringDocuments.length === 0 ? (
-          <EmptyState size="sm">
-            No document answers this yet — worth writing one down.
-          </EmptyState>
+          <EmptyState size="sm">No document answers this yet — worth writing one down.</EmptyState>
         ) : (
           <ul className="divide-y divide-app-border-muted rounded-xl border border-app-border bg-app-surface">
             {detail.answeringDocuments.map((doc) => (

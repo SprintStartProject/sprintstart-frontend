@@ -1,6 +1,6 @@
-import { Inbox, Plus, Users, X } from "lucide-react";
+import { ArrowLeft, Inbox, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
   OnboardingPathEndpoint,
@@ -44,7 +44,6 @@ import { Modal } from "../components/ui/Modal";
 import { MemberHero } from "../features/pm-area/components/MemberHero";
 import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
 import { PmCard, PmCardHeader } from "../features/pm-area/components/PmCard";
-import { PmPageShell } from "../features/pm-area/components/PmPageShell";
 import { waitingOn } from "../features/pm-area/memberStatus";
 import { useMemberOpenItems } from "../features/pm-area/useMemberOpenItems";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
@@ -60,6 +59,20 @@ import {
 } from "../features/team-management/components/detail/PhaseCheckAdminModal";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
 import { useProjectContext } from "../features/projects/useProjectContext";
+
+function BackToTeam({ onBack }: { onBack: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onBack}
+      icon={<ArrowLeft className="h-4 w-4" />}
+      className="mb-3 -ml-2"
+    >
+      Team
+    </Button>
+  );
+}
 
 function formatMinutes(minutes?: number | null): string {
   if (!minutes || minutes <= 0) return "No estimate";
@@ -100,9 +113,11 @@ function getStepStatusStyles(status: string) {
   return "border-app-border bg-app-surface-muted text-app-text-muted";
 }
 
-export function TeamMemberDetailPage() {
+/**
+ * A member's full profile, shown inside the PM workspace's Team section (`/team/:userId`).
+ */
+export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const { selectedProjectId } = useProjectContext();
-  const { userId } = useParams<{ userId: string }>();
 
   const navigate = useNavigate();
 
@@ -556,19 +571,18 @@ export function TeamMemberDetailPage() {
     }
   }
 
+  // Always to the roster, not back through history: the button says "Team", and history could
+  // just as well lead to the overview or to the previous member.
   function goBack() {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      void navigate(-1);
-    } else {
-      void navigate("/team-management");
-    }
+    void navigate("/team-management");
   }
 
-  // Loading and not-found share the shell with the success render below, so the band (and the
-  // section bar in it) never disappears and reappears while the member loads.
+  // Loading and not-found keep the back button, so it never disappears and reappears while the
+  // member loads.
   if (loading || !user) {
     return (
-      <PmPageShell icon={Users} title="Team member" subtitle="">
+      <div>
+        <BackToTeam onBack={goBack} />
         {loading ? (
           <div className="flex min-h-96 items-center justify-center">
             <p className="text-sm text-app-text-muted">Loading team member...</p>
@@ -578,7 +592,7 @@ export function TeamMemberDetailPage() {
             <p className="text-sm text-app-text">Team member not found.</p>
           </div>
         )}
-      </PmPageShell>
+      </div>
     );
   }
 
@@ -645,19 +659,18 @@ export function TeamMemberDetailPage() {
 
   return (
     <>
-      <PmPageShell
-        icon={Users}
-        title={`${user.firstname} ${user.lastname}`}
-        subtitle="Their onboarding path, open requests, skills and gaps in one place."
-        back={{ label: "Back", onClick: goBack }}
-        bandExtra={
+      <div>
+        <BackToTeam onBack={goBack} />
+        <div className="mb-5 space-y-4">
+          <h2 className="text-lg leading-tight font-semibold text-app-text">
+            {user.firstname} {user.lastname}
+          </h2>
           <MemberHero
             member={user}
             roster={roster ?? []}
             onEditRoles={() => setRolesModalOpen(true)}
           />
-        }
-      >
+        </div>
         <div className="space-y-5">
           {/* Only while something is open: an empty "waiting on you" card at the top of every
               profile would push the path down to say nothing. */}
@@ -721,7 +734,7 @@ export function TeamMemberDetailPage() {
             />
           </aside>
         </div>
-      </PmPageShell>
+      </div>
       <Modal
         isOpen={rolesModalOpen}
         title="Manage roles"

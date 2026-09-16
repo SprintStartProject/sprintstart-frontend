@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ChevronRight,
@@ -21,8 +21,7 @@ import { FilterSelect, type FilterSelectOption } from "../../../components/ui/Fi
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { Spinner } from "../../../components/ui/Spinner";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmPageShell } from "../../pm-area/components/PmPageShell";
-import { PmStat } from "../../pm-area/components/PmCard";
+import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { formatAskedAt } from "../format";
 import { FaqGroupPanel } from "./FaqGroupPanel";
@@ -84,9 +83,8 @@ function FaqListSkeleton() {
  * `/insights/faq/:groupId` renders this same page with that group's panel open, so a link to a
  * single question still works — it just no longer costs the reader the list.
  */
-export function FaqPage() {
+export function FaqPage({ groupId }: { groupId?: string }) {
   const { selectedProjectId } = useProjectContext();
-  const { groupId } = useParams<{ groupId?: string }>();
   const navigate = useNavigate();
 
   const [sortBy, setSortBy] = useState<FaqSortOption>("count");
@@ -157,21 +155,7 @@ export function FaqPage() {
   // Destructive, so it asks first — the FAQ updates itself as questions are asked,
   // this regroups everything from scratch.
   const headerActions = (
-    <div className="flex shrink-0 flex-col items-end gap-1">
-      <div className="flex items-center gap-3">
-        {revalidating && <Spinner size="sm" label="Updating" />}
-        <Button
-          variant="secondary"
-          onClick={() => setRebuildDialogOpen(true)}
-          loading={rebuilding}
-          disabled={loading || error}
-          icon={<RefreshCw className="h-4 w-4" />}
-          className="shrink-0"
-          title="Regroup every question from scratch"
-        >
-          {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
-        </Button>
-      </div>
+    <>
       {/* How current the list is, in the only terms that mean anything here: the FAQ
           follows the chat, so its freshness *is* the last question someone asked. */}
       {overview?.lastAskedAt && (
@@ -179,18 +163,26 @@ export function FaqPage() {
           Last question {formatAskedAt(overview.lastAskedAt)}
         </span>
       )}
-    </div>
+      {revalidating && <Spinner size="sm" label="Updating" />}
+      <Button
+        variant="secondary"
+        onClick={() => setRebuildDialogOpen(true)}
+        loading={rebuilding}
+        disabled={loading || error}
+        icon={<RefreshCw className="h-4 w-4" />}
+        className="shrink-0"
+        title="Regroup every question from scratch"
+      >
+        {rebuilding ? "Rebuilding…" : "Rebuild grouping"}
+      </Button>
+    </>
   );
 
   const hasData = !loading && !error && overview !== null;
 
   return (
-    <PmPageShell
-      icon={MessageSquareMore}
-      title={PAGE_TITLE}
-      subtitle={PAGE_SUBTITLE}
-      actions={headerActions}
-    >
+    <div>
+      <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
       <div className="space-y-5">
         <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <PmStat
@@ -254,8 +246,11 @@ export function FaqPage() {
             // Separate from the empty list below: a FAQ nobody has filled yet and a FAQ
             // that could not be loaded look alike but mean opposite things.
             <div className="p-6">
-              <EmptyState icon={<AlertCircle className="h-8 w-8" />} title="Could not load">
-                The recurring questions could not be loaded. Is the backend reachable?
+              <EmptyState
+                icon={<AlertCircle className="h-8 w-8" />}
+                title="Not available right now"
+              >
+                The recurring questions couldn&apos;t be loaded. Try again in a moment.
               </EmptyState>
             </div>
           ) : totalGroups === 0 ? (
@@ -340,6 +335,6 @@ export function FaqPage() {
       />
 
       <FaqGroupPanel groupId={groupId ?? null} group={selectedGroup} onClose={closeGroup} />
-    </PmPageShell>
+    </div>
   );
 }

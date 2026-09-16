@@ -14,7 +14,11 @@ import { useProjectContext } from "../projects/useProjectContext";
 export function useTeamRoster() {
   const { selectedProjectId } = useProjectContext();
 
-  return useQueryFetch(queryKeys.teamOverview.filtered(selectedProjectId || null), () =>
-    getTeamOverview(undefined, undefined, selectedProjectId ? [selectedProjectId] : undefined),
+  // Nothing to ask without a project: the unfiltered read would answer with every project's
+  // people, which is not "this project's team".
+  return useQueryFetch(
+    queryKeys.teamOverview.filtered(selectedProjectId || null),
+    () => getTeamOverview(undefined, undefined, [selectedProjectId]),
+    { enabled: Boolean(selectedProjectId) },
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Clock, FileText, Filter, RefreshCw, ShieldAlert, User, X } from "lucide-react";
+import { ChevronRight, Clock, FileText, Filter, RefreshCw, User, X } from "lucide-react";
 
 import type { KnowledgeGapSeverity } from "../types";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -18,7 +18,7 @@ import { Button } from "../../../components/ui/Button";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmPageShell } from "../../pm-area/components/PmPageShell";
+import { PmSectionHeader } from "../../pm-area/components/PmCard";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 type GapSortOption = "severity" | "date" | "component";
@@ -55,9 +55,8 @@ function GapsOverviewSkeleton() {
  * `/insights/knowledge-gaps/:gapId` renders this same page with that gap's panel open, so links
  * to one gap keep working.
  */
-export function KnowledgeGapsPage() {
+export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const { selectedProjectId } = useProjectContext();
-  const { gapId } = useParams<{ gapId?: string }>();
   const navigate = useNavigate();
 
   const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([...SEVERITIES]);
@@ -112,7 +111,16 @@ export function KnowledgeGapsPage() {
   const lastAnalyzedAt = overview?.refreshedAt ?? gaps[0]?.refreshedAt ?? null;
 
   const headerActions = (
-    <div className="flex shrink-0 flex-col items-end gap-1">
+    <>
+      {/* Both, because they answer different questions: how old the documentation is,
+          and how old this reading of it is. */}
+      {(lastIngestedAt || lastAnalyzedAt) && gaps.length > 0 && (
+        <span className="text-xs text-app-text-muted">
+          {lastIngestedAt && `Last ingested ${formatRelativeDate(lastIngestedAt)}`}
+          {lastIngestedAt && lastAnalyzedAt && " · "}
+          {lastAnalyzedAt && `Last analyzed ${formatRelativeDate(lastAnalyzedAt)}`}
+        </span>
+      )}
       <Button
         variant="primary"
         onClick={() => void handleRefresh()}
@@ -123,16 +131,7 @@ export function KnowledgeGapsPage() {
       >
         {refreshing || rescanning ? "Scanning…" : "Rescan now"}
       </Button>
-      {/* Both, because they answer different questions: how old the documentation is,
-          and how old this reading of it is. */}
-      {(lastIngestedAt || lastAnalyzedAt) && gaps.length > 0 && (
-        <span className="text-right text-xs text-app-text-muted">
-          {lastIngestedAt && `Last ingested ${formatRelativeDate(lastIngestedAt)}`}
-          {lastIngestedAt && lastAnalyzedAt && " · "}
-          {lastAnalyzedAt && `Last analyzed ${formatRelativeDate(lastAnalyzedAt)}`}
-        </span>
-      )}
-    </div>
+    </>
   );
 
   const filtered = gaps
@@ -167,20 +166,11 @@ export function KnowledgeGapsPage() {
   const empty = isEmpty ? describeEmptyState(overview, error) : null;
 
   return (
-    <PmPageShell
-      icon={ShieldAlert}
-      title={PAGE_TITLE}
-      subtitle={PAGE_SUBTITLE}
-      actions={headerActions}
-      bandExtra={
-        showLoadingSkeleton ? (
-          <SkeletonLine className="h-2 w-full rounded-full" />
-        ) : gaps.length > 0 ? (
-          <SeveritySummaryBar gaps={gaps} />
-        ) : undefined
-      }
-    >
+    <div>
+      <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
       <div className="space-y-4">
+        {gaps.length > 0 && <SeveritySummaryBar gaps={gaps} />}
+
         {gaps.length > 0 && (
           // Always visible rather than behind a disclosure: there are only four controls,
           // and hiding them made the active filter state invisible.
@@ -361,6 +351,6 @@ export function KnowledgeGapsPage() {
         gap={selectedGap}
         onClose={() => void navigate("/insights/knowledge-gaps")}
       />
-    </PmPageShell>
+    </div>
   );
 }

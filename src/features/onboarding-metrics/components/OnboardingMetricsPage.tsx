@@ -21,8 +21,7 @@ import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
-import { PmPageShell } from "../../pm-area/components/PmPageShell";
-import { PmStat } from "../../pm-area/components/PmCard";
+import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
 import { useMemberPeek } from "../../pm-area/useMemberPeek";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
@@ -148,8 +147,6 @@ export function OnboardingMetricsPage() {
   // Set when a manual refresh is in flight, so the completion effect can tell the
   // user what the refetch turned up without also firing on the first load.
   const pendingRefreshRef = useRef(false);
-  // One load-error toast per failed load, reset once a load succeeds again.
-  const errorToastRef = useRef(false);
   // The project we last warned about missing GitHub logins for, so the warning
   // fires once per selection rather than on every refetch.
   const warnedProjectRef = useRef<string | null>(null);
@@ -197,20 +194,8 @@ export function OnboardingMetricsPage() {
     }
   }, [isFetching, error, refetchError, metrics, toast]);
 
-  // A load failure that wasn't a manual refresh still deserves a toast, once.
-  useEffect(() => {
-    if (isFetching) return;
-    if (!error) {
-      errorToastRef.current = false;
-      return;
-    }
-    if (!errorToastRef.current && !pendingRefreshRef.current) {
-      errorToastRef.current = true;
-      toast.error("Couldn't load onboarding metrics", {
-        description: "The onboarding metrics couldn't be loaded. Try again shortly.",
-      });
-    }
-  }, [isFetching, error, toast]);
+  // No toast for a failed load: the section already says so in place, and a toast on top
+  // reported the same thing twice — loudly, on every visit to a project with nothing in it.
 
   // Warn once per project when some hires have no GitHub login, since their work
   // can't be attributed and the numbers below quietly exclude it.
@@ -283,12 +268,12 @@ export function OnboardingMetricsPage() {
   );
 
   return (
-    <PmPageShell
-      icon={Gauge}
-      title="Onboarding metrics"
-      subtitle="Each new hire's path from joining to their first accepted contribution, and where they get held up."
-      actions={refreshButton}
-    >
+    <div>
+      <PmSectionHeader
+        title="Onboarding metrics"
+        description="Each hire's path from joining to their first accepted contribution."
+        actions={refreshButton}
+      />
       <div className="space-y-8">
         {!projectsLoading && projects.length === 0 ? (
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No projects">
@@ -297,11 +282,8 @@ export function OnboardingMetricsPage() {
         ) : showLoadingSkeleton ? (
           <OnboardingMetricsSkeleton />
         ) : loading ? null : error ? (
-          <EmptyState
-            icon={<AlertCircle className="h-8 w-8 text-app-danger-solid" />}
-            title="Couldn't load metrics"
-          >
-            The onboarding metrics couldn&apos;t be loaded. Try again shortly.
+          <EmptyState icon={<AlertCircle className="h-8 w-8" />} title="Not available right now">
+            The onboarding metrics couldn&apos;t be loaded. Try again in a moment.
           </EmptyState>
         ) : !metrics || metrics.memberCount === 0 ? (
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No hires yet">
@@ -406,6 +388,6 @@ export function OnboardingMetricsPage() {
           </>
         )}
       </div>
-    </PmPageShell>
+    </div>
   );
 }

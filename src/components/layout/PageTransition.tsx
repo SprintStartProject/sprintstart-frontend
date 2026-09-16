@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation } from "react-router-dom";
+import { isPmWorkspacePath } from "../../features/pm-area/pmWorkspacePaths";
 import { pageTransitionToken } from "../../styles/tokens";
 
 /**
@@ -9,16 +10,14 @@ import { pageTransitionToken } from "../../styles/tokens";
  * by the raw pathname here would remount that shared layout on every switch, undoing
  * exactly what it was built to avoid.
  *
- * The PM insights lists open their details as side panels under a path segment of their own
- * (`/insights/faq/:groupId`); those stay keyed to the list, or opening a panel would fade the
- * whole page out and back in underneath it.
+ * The PM workspace is the same arrangement: one layout route for all of its sections, which
+ * slide between each other on their own.
  */
-const PANEL_ROUTE_PREFIXES = ["/insights/faq", "/insights/knowledge-gaps"] as const;
-
 function transitionKey(pathname: string): string {
   if (pathname.startsWith("/chat") || pathname === "/buddy") return "assistant-shell";
+  if (isPmWorkspacePath(pathname)) return "pm-workspace";
 
-  return PANEL_ROUTE_PREFIXES.find((prefix) => pathname.startsWith(prefix)) ?? pathname;
+  return pathname;
 }
 
 /**

@@ -32,7 +32,7 @@ export function describeEmptyState(
   if (error || !overview) {
     return {
       state: "error",
-      message: "Could not load knowledge gaps. Is the backend reachable?",
+      message: "Could not load knowledge gaps right now. Try again in a moment.",
       scannedAt: null,
     };
   }

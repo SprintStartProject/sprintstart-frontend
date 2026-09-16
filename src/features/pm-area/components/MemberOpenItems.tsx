@@ -37,7 +37,8 @@ export function MemberOpenItems({
   onReviewSkip,
   onMarkRead,
 }: MemberOpenItemsProps) {
-  const pendingSkip = member.currentStep?.skip?.status === "PENDING" ? member.currentStep.skip : null;
+  const pendingSkip =
+    member.currentStep?.skip?.status === "PENDING" ? member.currentStep.skip : null;
   const unread = feedback.filter(isUnread);
   const isEmpty = !pendingSkip && unread.length === 0 && !feedbackLoading;
 

@@ -100,7 +100,8 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
   const stepLine =
     stage === "done"
       ? "Onboarding complete"
-      : (member.currentStep?.title ?? (stage === "not-started" ? "Not started yet" : "No current step"));
+      : (member.currentStep?.title ??
+        (stage === "not-started" ? "Not started yet" : "No current step"));
 
   return (
     <button
@@ -149,9 +150,7 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
         </span>
       )}
 
-      {isFull && (
-        <MemberProgressBar percent={percent} className="col-span-2 md:col-span-1" />
-      )}
+      {isFull && <MemberProgressBar percent={percent} className="col-span-2 md:col-span-1" />}
 
       <span className="col-start-2 row-start-1 flex items-center gap-2 md:col-start-auto md:row-start-auto">
         {!isFull && <MemberFlags member={member} />}

@@ -49,7 +49,7 @@ export function TeamPulseCard({ roster, loading, error, onOpenMember }: TeamPuls
           ))}
         </SkeletonGroup>
       ) : error ? (
-        <EmptyState size="sm">The team overview could not be loaded.</EmptyState>
+        <EmptyState size="sm">The team isn&apos;t available right now.</EmptyState>
       ) : roster.length === 0 ? (
         <EmptyState size="sm">Nobody is on this project yet.</EmptyState>
       ) : (

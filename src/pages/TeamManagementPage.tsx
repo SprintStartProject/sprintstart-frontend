@@ -13,7 +13,7 @@ import { useQueryFetch } from "../hooks/useQueryFetch";
 import { useAttention } from "../features/onboarding-metrics/hooks/useAttention";
 import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
 import { MemberRow } from "../features/pm-area/components/MemberRow";
-import { PmPageShell } from "../features/pm-area/components/PmPageShell";
+import { PmSectionHeader } from "../features/pm-area/components/PmCard";
 import {
   daysOnStep,
   isAtRisk,
@@ -155,14 +155,18 @@ export function TeamManagementPage() {
 
   const queryClient = useQueryClient();
   const { data: roster, loading, error } = useTeamRoster();
-  const { data: roles } = useQueryFetch(queryKeys.projectRoles.byProject(selectedProjectId), getProjectRoles);
+  const { data: roles } = useQueryFetch(
+    queryKeys.projectRoles.byProject(selectedProjectId),
+    getProjectRoles,
+  );
   const { attention } = useAttention(selectedProjectId);
 
   const showLoadingSkeleton = useDelayedFlag(loading);
 
   const members = useMemo(() => roster ?? [], [roster]);
   const attentionIds = useMemo(
-    () => new Set(buildAttentionQueue(members, attention?.items ?? []).map((entry) => entry.userId)),
+    () =>
+      new Set(buildAttentionQueue(members, attention?.items ?? []).map((entry) => entry.userId)),
     [members, attention],
   );
 
@@ -209,34 +213,35 @@ export function TeamManagementPage() {
   const hasNarrowing = normalizedQuery !== "" || roleId !== "all" || statusFilter !== "all";
 
   return (
-    <PmPageShell
-      icon={Users}
-      title="Team"
-      subtitle="Everybody on this project, where they are in their onboarding, and the roles they hold."
-    >
+    <div>
+      <PmSectionHeader
+        title="Team"
+        description="Everybody on this project, where they are in their onboarding, and the roles they hold."
+        actions={
+          <SegmentedTabs
+            value={activeTab}
+            onChange={changeTab}
+            layoutId="team-management-tab-pill"
+            ariaLabel="Team management sections"
+            options={TEAM_MANAGEMENT_TAB_ORDER.map((tab) =>
+              tab === "members"
+                ? {
+                    value: tab,
+                    label: "Members",
+                    icon: <Users className="h-4 w-4" />,
+                    count: roster ? members.length : undefined,
+                  }
+                : {
+                    value: tab,
+                    label: "Roles",
+                    icon: <Shield className="h-4 w-4" />,
+                    count: roles ? roles.length : undefined,
+                  },
+            )}
+          />
+        }
+      />
       <div className="space-y-5">
-        <SegmentedTabs
-          value={activeTab}
-          onChange={changeTab}
-          layoutId="team-management-tab-pill"
-          ariaLabel="Team management sections"
-          options={TEAM_MANAGEMENT_TAB_ORDER.map((tab) =>
-            tab === "members"
-              ? {
-                  value: tab,
-                  label: "Members",
-                  icon: <Users className="h-4 w-4" />,
-                  count: roster ? members.length : undefined,
-                }
-              : {
-                  value: tab,
-                  label: "Roles",
-                  icon: <Shield className="h-4 w-4" />,
-                  count: roles ? roles.length : undefined,
-                },
-          )}
-        />
-
         <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
           {activeTab === "members" ? (
             <div className="space-y-4">
@@ -325,7 +330,7 @@ export function TeamManagementPage() {
                   <RosterSkeleton />
                 ) : loading ? null : error ? (
                   <div className="p-6">
-                    <EmptyState size="sm">The team overview could not be loaded.</EmptyState>
+                    <EmptyState size="sm">The team isn&apos;t available right now.</EmptyState>
                   </div>
                 ) : visibleMembers.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 p-8 text-center">
@@ -384,6 +389,6 @@ export function TeamManagementPage() {
           )}
         </SlidingTabPanel>
       </div>
-    </PmPageShell>
+    </div>
   );
 }

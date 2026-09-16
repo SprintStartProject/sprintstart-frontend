@@ -105,7 +105,10 @@ export function MemberHero({ member, roster, onEditRoles }: MemberHeroProps) {
                 <ChevronLeft aria-hidden="true" className="h-4 w-4" />
               </Link>
             ) : (
-              <span className={`${stepperClassName} pointer-events-none opacity-40`} aria-hidden="true">
+              <span
+                className={`${stepperClassName} pointer-events-none opacity-40`}
+                aria-hidden="true"
+              >
                 <ChevronLeft className="h-4 w-4" />
               </span>
             )}
@@ -122,7 +125,10 @@ export function MemberHero({ member, roster, onEditRoles }: MemberHeroProps) {
                 <ChevronRight aria-hidden="true" className="h-4 w-4" />
               </Link>
             ) : (
-              <span className={`${stepperClassName} pointer-events-none opacity-40`} aria-hidden="true">
+              <span
+                className={`${stepperClassName} pointer-events-none opacity-40`}
+                aria-hidden="true"
+              >
                 <ChevronRight className="h-4 w-4" />
               </span>
             )}
@@ -135,7 +141,9 @@ export function MemberHero({ member, roster, onEditRoles }: MemberHeroProps) {
           <MemberProgressBar percent={percent} className="mt-1" />
         </HeroFact>
         <HeroFact icon={Route} label="Phase">
-          <p className="truncate">{stage === "done" ? "Completed" : (member.currentPhase?.title ?? "—")}</p>
+          <p className="truncate">
+            {stage === "done" ? "Completed" : (member.currentPhase?.title ?? "—")}
+          </p>
         </HeroFact>
         <HeroFact icon={Clock} label="Current step">
           <p className="truncate">

@@ -1,16 +1,15 @@
 import { useMemo, useState } from "react";
 import { AlertCircle, BookCheck, FolderKanban, Inbox } from "lucide-react";
-import { PageHeader } from "../../../components/layout/PageHeader";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
-import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { queryKeys } from "../../../services/queryKeys";
+import { PmSectionHeader } from "../../pm-area/components/PmCard";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
@@ -25,7 +24,8 @@ const TAB_ORDER: Tab[] = ["open", "answered"];
  * dismisses a one-off. The "Durable answers" tab shows the knowledge that has accumulated, editable
  * when reality changes. PM/HR read; only PM/ADMIN write (enforced server-side too).
  *
- * Per-project, since escalations belong to a project; a switcher scopes it. Empty states separate
+ * Lives in the PM workspace as its own section (it used to be a sidebar entry and a page of its
+ * own). Per-project, since escalations belong to a project; a switcher scopes it. Empty states separate
  * "no project" from "inbox clear" — a clear inbox is a good state, not a missing one.
  */
 export function KnowledgeRequestInboxPage() {
@@ -120,37 +120,26 @@ export function KnowledgeRequestInboxPage() {
     [openLoading, openCount, answersLoading, answeredCount],
   );
 
-  // A two-finger swipe moves between the tabs, the same gesture the other tabbed pages take.
-  // Aiming at the pill is still there for anybody who prefers it; this is the trackpad way in.
-  // The ref goes on the page rather than on `<main>` -- AdminPage's reasoning: `<main>` is only
-  // as tall as its content, so a short queue leaves the bottom half of the viewport dead and the
-  // gesture reads as broken rather than as absent.
-  const swipeRef = useSwipeableTabs<Tab, HTMLElement>({
-    order: TAB_ORDER,
-    value: tab,
-    onChange: setTab,
-  });
-
   return (
-    // No root background: the app-wide aurora and cursor-glow canvas sit behind
-    // every route, and painting `bg-app-bg` here would hide them — the same
-    // choice the dashboard and PM dashboard make. Only the header band and the
-    // cards carry their own surfaces.
-    <div ref={swipeRef} className="min-h-screen">
-      <header className="border-b border-app-border bg-app-bg">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={Inbox}
-            title="Escalation inbox"
-            // Kept to the length the other pages' subtitles run to: `max-w-2xl` wraps anything
-            // longer onto a third line, and the header band -- and the rule under it -- then
-            // sits lower here than on every page a PM switches between.
-            subtitle="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
+    // A section of the PM workspace, which owns the page header and the section-level swipe.
+    // The open/answered switch sits in this section's own header row rather than as a second
+    // pill bar under the workspace's.
+    <div>
+      <PmSectionHeader
+        title="Escalations"
+        description="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
+        actions={
+          <SegmentedTabs
+            value={tab}
+            options={tabOptions}
+            onChange={setTab}
+            layoutId="knowledge-request-inbox-tab-pill"
+            ariaLabel="Inbox views"
           />
-        </div>
-      </header>
+        }
+      />
 
-      <main className="app-page-frame space-y-6 py-6 lg:py-8">
+      <div className="space-y-6">
         {!projectsLoading && projects.length === 0 ? (
           <EmptyState
             icon={<FolderKanban className="h-8 w-8 text-app-text-disabled" />}
@@ -160,17 +149,6 @@ export function KnowledgeRequestInboxPage() {
           </EmptyState>
         ) : (
           <>
-            {/* The app's shared segmented control rather than a tab bar of this page's own —
-                same reason ArrivalStepsPage cites: the sliding pill and hover magnify are the
-                house look for switching sections, so the inbox shouldn't grow a second one. */}
-            <SegmentedTabs
-              value={tab}
-              options={tabOptions}
-              onChange={setTab}
-              layoutId="knowledge-request-inbox-tab-pill"
-              ariaLabel="Inbox views"
-            />
-
             {/* Directional slide matches the sibling pages' tab panels; the key/index pair
                 derives travel direction from the tab order.
                 tabIndex must be ≥ 0 — TAB_ORDER must stay in sync with the Tab type, or
@@ -239,7 +217,7 @@ export function KnowledgeRequestInboxPage() {
             </SlidingTabPanel>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

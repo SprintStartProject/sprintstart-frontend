@@ -72,13 +72,22 @@ export function PmCardLink({ to, children }: { to: string; children: ReactNode }
       className="group flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       {children}
-      <ArrowRight aria-hidden="true" className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+      <ArrowRight
+        aria-hidden="true"
+        className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+      />
     </Link>
   );
 }
 
 /** Small uppercase label that opens a group inside a card. */
-export function PmEyebrow({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function PmEyebrow({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <p
       className={`text-[10px] font-semibold tracking-widest text-app-brand-text uppercase ${className}`}
@@ -104,7 +113,15 @@ type PmStatProps = {
  * One headline figure. The row of these is the first thing on every PM page, so a manager
  * reads the same shape — label, number, what it is measured against — wherever they land.
  */
-export function PmStat({ icon: Icon, label, value, hint, attention = false, to, onClick }: PmStatProps) {
+export function PmStat({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  attention = false,
+  to,
+  onClick,
+}: PmStatProps) {
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
@@ -112,7 +129,9 @@ export function PmStat({ icon: Icon, label, value, hint, attention = false, to, 
         <span
           aria-hidden="true"
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-            attention ? "bg-app-warning-bg text-app-warning-text" : "bg-app-brand-soft text-app-brand-text"
+            attention
+              ? "bg-app-warning-bg text-app-warning-text"
+              : "bg-app-brand-soft text-app-brand-text"
           }`}
         >
           <Icon className="h-3.5 w-3.5" />
@@ -146,4 +165,33 @@ export function PmStat({ icon: Icon, label, value, hint, attention = false, to, 
   }
 
   return <div className={className}>{body}</div>;
+}
+
+/**
+ * The first row of a PM section: its name, one line on what it shows, and the section's own
+ * controls on the right.
+ *
+ * The controls used to sit in the page header, and each section put different things there —
+ * a rebuild button, a rescan button with two timestamps under it — so the header changed
+ * height as you moved between them. The header is shared now; what belongs to one section
+ * lives in that section.
+ */
+export function PmSectionHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="mb-5 flex flex-col gap-3 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <h2 className="text-lg leading-tight font-semibold text-app-text">{title}</h2>
+        <p className="mt-0.5 text-sm text-app-text-muted">{description}</p>
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
+    </div>
+  );
 }

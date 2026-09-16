@@ -60,7 +60,7 @@ export function IngestionStatusWidget() {
           <Spinner size="lg" label="Loading" />
         </div>
       ) : error || !sources ? (
-        <EmptyState size="sm">Could not load ingestion status.</EmptyState>
+        <EmptyState size="sm">No ingestion status to show right now.</EmptyState>
       ) : sources.length === 0 ? (
         <EmptyState size="sm">No sources connected yet.</EmptyState>
       ) : (

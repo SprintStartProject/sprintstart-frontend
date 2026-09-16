@@ -27,7 +27,10 @@ export function isUnread(feedback: OnboardingFeedback): boolean {
  * Both actions already fire `onPmAttentionChanged`, which invalidates the team overview; the
  * profile page reads its member through a different call, so it passes `onChanged` to reload.
  */
-export function useMemberOpenItems(userId: string | null, onChanged?: () => Promise<unknown> | void) {
+export function useMemberOpenItems(
+  userId: string | null,
+  onChanged?: () => Promise<unknown> | void,
+) {
   const toast = useToast();
   const [reviewingSkip, setReviewingSkip] = useState<SkipDecision | null>(null);
   const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);

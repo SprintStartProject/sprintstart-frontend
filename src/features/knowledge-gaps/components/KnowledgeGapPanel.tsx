@@ -59,7 +59,8 @@ function GapDetail({ gapId }: { gapId: string }) {
 
   const { data: teamUsers } = useQueryFetch(
     queryKeys.teamOverview.filtered(selectedProjectId || null),
-    () => getTeamOverview(undefined, undefined, selectedProjectId ? [selectedProjectId] : undefined),
+    () =>
+      getTeamOverview(undefined, undefined, selectedProjectId ? [selectedProjectId] : undefined),
   );
 
   if (loading) {
