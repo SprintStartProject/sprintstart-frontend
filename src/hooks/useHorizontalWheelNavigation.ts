@@ -38,14 +38,24 @@ type UseHorizontalWheelNavigationOptions = {
 };
 
 /**
+ * Marks a subtree the gesture must keep its hands off.
+ *
+ * Put on anything that reads a horizontal two-finger swipe as its own — a graph canvas pans with
+ * it — where switching the surrounding view instead would be the opposite of what was asked for.
+ */
+export const SWIPE_IGNORE_ATTRIBUTE = "data-swipe-ignore";
+
+/**
  * Reports whether the gesture started inside something that scrolls sideways
  * on its own -- a tab bar that overflows, a wide table. Those keep their own
- * gesture; stealing it would make them unreachable on a trackpad.
+ * gesture; stealing it would make them unreachable on a trackpad. Anything
+ * marked {@link SWIPE_IGNORE_ATTRIBUTE} counts the same way.
  */
 function startedInHorizontalScroller(target: EventTarget | null, boundary: HTMLElement): boolean {
   let node = target instanceof HTMLElement ? target : null;
 
   while (node && node !== boundary) {
+    if (node.hasAttribute(SWIPE_IGNORE_ATTRIBUTE)) return true;
     // A few pixels of overflow is rounding, not a scroller. Treating it as
     // one would silently swallow gestures over ordinary content.
     if (node.scrollWidth - node.clientWidth > 4) {
@@ -93,6 +103,20 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
   useEffect(() => {
     if (!element || !enabled) return;
 
+    /**
+     * Listened for on the window rather than on the element that opted in.
+     *
+     * The element is a page's content, and a page's content is as tall as it happens to be — on a
+     * short page most of what somebody sees, and most of where their pointer is, is the empty room
+     * below it. A gesture there never reached the element at all, which is why the swipe worked on
+     * a page filled by a canvas and did nothing on a page holding four cards.
+     *
+     * The element is still what decides *whether* the gesture counts: the walk below stops at the
+     * body, so a swipe that starts inside a horizontal scroller or anything marked
+     * `data-swipe-ignore` is left to whatever owns it.
+     */
+    const boundary = element.ownerDocument.body;
+
     let travelled = 0;
     /** -1 previous, 1 next, 0 nothing yet -- for this gesture. */
     let lastFired = 0;
@@ -109,7 +133,7 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
       // gesture and losing the travel accumulated so far.
       if (!horizontalGesture) {
         if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
-        if (startedInHorizontalScroller(event.target, element)) return;
+        if (startedInHorizontalScroller(event.target, boundary)) return;
 
         horizontalGesture = true;
       }
@@ -158,10 +182,10 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
       }
     }
 
-    element.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("wheel", handleWheel, { passive: false });
 
     return () => {
-      element.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("wheel", handleWheel);
       window.clearTimeout(endTimer);
     };
   }, [element, enabled]);
