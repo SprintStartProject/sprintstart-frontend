@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowLeft,
   Clock,
   FolderKanban,
   Gauge,
   Hourglass,
   Inbox,
-  LayoutGrid,
   RefreshCw,
   Rocket,
   Search,
-  Users,
 } from "lucide-react";
-import { PageHeader } from "../../../components/layout/PageHeader";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
@@ -26,9 +21,11 @@ import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { PmPageShell } from "../../pm-area/components/PmPageShell";
+import { PmStat } from "../../pm-area/components/PmCard";
+import { useMemberPeek } from "../../pm-area/useMemberPeek";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
-import { StatTile } from "./StatTile";
 import { formatDuration } from "../format";
 import { isAwaitingFirstResponse } from "../hireStatus";
 import type { HireTimeline } from "../types";
@@ -135,14 +132,13 @@ function OnboardingMetricsSkeleton() {
  * global project switcher scopes it; PM/HR/ADMIN only. Empty states separate "no hires yet"
  * from "no data yet".
  *
- * Reached from the PM Dashboard "Insights" group; the frame matches its sibling insights
- * pages (`FaqPage`, `KnowledgeGapsPage`): a centered column, a Back button, a header Refresh
- * that refetches (the metrics are derived on request, so there is no pipeline to trigger),
- * and toast feedback.
+ * One of the PM area's sections, on the shared PM page shell: a header Refresh that refetches
+ * (the metrics are derived on request, so there is no pipeline to trigger), toast feedback, and
+ * each hire's name opening the member side panel.
  */
 export function OnboardingMetricsPage() {
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
-  const navigate = useNavigate();
+  const { openMember } = useMemberPeek();
   const toast = useToast();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -287,30 +283,13 @@ export function OnboardingMetricsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
-        <div className="app-page-content py-8">
-          <Button
-            variant="ghost"
-            onClick={() => void navigate("/pm-dashboard")}
-            icon={<ArrowLeft className="h-4 w-4" />}
-            className="mb-4"
-          >
-            Back to PM-Dashboard
-          </Button>
-
-          <div className="flex items-start justify-between gap-4">
-            <PageHeader
-              icon={Gauge}
-              title="Onboarding metrics"
-              subtitle="Track each new hire's path from joining to their first accepted contribution, and where they get held up."
-            />
-            {refreshButton}
-          </div>
-        </div>
-      </section>
-
-      <main className="app-page-content space-y-6 py-8">
+    <PmPageShell
+      icon={Gauge}
+      title="Onboarding metrics"
+      subtitle="Each new hire's path from joining to their first accepted contribution, and where they get held up."
+      actions={refreshButton}
+    >
+      <div className="space-y-8">
         {!projectsLoading && projects.length === 0 ? (
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No projects">
             There are no projects to report on yet.
@@ -336,72 +315,74 @@ export function OnboardingMetricsPage() {
         ) : (
           <>
             {/* Aggregates. Medians throughout so one outlier can't move the number. */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="h-4 w-4 text-app-brand" aria-hidden="true" />
-                <h2 className="text-lg font-semibold tracking-tight text-app-text">Overview</h2>
-              </div>
+            <section aria-labelledby="metrics-overview-heading" className="space-y-3">
+              <h2
+                id="metrics-overview-heading"
+                className="text-xs font-semibold tracking-wider text-app-text-muted uppercase"
+              >
+                Overview
+              </h2>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatTile
-                  icon={<Rocket size={18} />}
-                  accent="brand"
+                <PmStat
+                  icon={Rocket}
                   label="Median time to first accepted work"
                   value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
                   hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
                 />
-                <StatTile
-                  icon={<Clock size={18} />}
-                  accent="brand"
+                <PmStat
+                  icon={Clock}
                   label="Median first-review wait"
                   value={formatDuration(metrics.medianHoursToFirstResponse)}
                   hint="Opened → first response"
                 />
-                <StatTile
-                  icon={<Hourglass size={18} />}
-                  accent="warning"
+                <PmStat
+                  icon={Hourglass}
                   label="90th-percentile review wait"
                   value={formatDuration(metrics.p90HoursToFirstResponse)}
                   hint="The slow tail, where the barrier bites"
+                  attention={metrics.p90HoursToFirstResponse !== null}
                 />
-                <StatTile
-                  icon={<Inbox size={18} />}
-                  accent={metrics.waitingOnResponseCount > 0 ? "warning" : "neutral"}
+                <PmStat
+                  icon={Inbox}
                   label="Waiting on a review"
                   value={metrics.waitingOnResponseCount}
+                  attention={metrics.waitingOnResponseCount > 0}
                   hint={
                     metrics.unattributableMemberCount > 0
                       ? `${metrics.unattributableMemberCount} unattributable (no GitHub login)`
-                      : undefined
+                      : "Contributions nobody has answered"
                   }
                 />
               </div>
             </section>
 
             {/* Per-hire timelines, stalled first. */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-app-brand" aria-hidden="true" />
-                <h2 className="text-lg font-semibold tracking-tight text-app-text">
+            <section aria-labelledby="metrics-hires-heading" className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <h2
+                  id="metrics-hires-heading"
+                  className="text-xs font-semibold tracking-wider text-app-text-muted uppercase"
+                >
                   Per-hire timelines
                 </h2>
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  size="sm"
-                  icon={<Search className="h-4 w-4" />}
-                  aria-label="Search hires by name"
-                  placeholder="Search hires…"
-                  value={search}
-                  onChange={(event) => handleSearchChange(event.target.value)}
-                  className="min-w-0 flex-1"
-                />
-                <FilterSelect
-                  label="Filter hires"
-                  value={hireFilter}
-                  options={hireFilterOptions}
-                  onChange={handleFilterChange}
-                  className="w-56 shrink-0"
-                />
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <Input
+                    size="sm"
+                    icon={<Search className="h-4 w-4" />}
+                    aria-label="Search hires by name"
+                    placeholder="Search hires…"
+                    value={search}
+                    onChange={(event) => handleSearchChange(event.target.value)}
+                    className="min-w-0 flex-1 sm:w-56"
+                  />
+                  <FilterSelect
+                    label="Filter hires"
+                    value={hireFilter}
+                    options={hireFilterOptions}
+                    onChange={handleFilterChange}
+                    className="w-52 shrink-0"
+                  />
+                </div>
               </div>
               {filteredHires.length === 0 ? (
                 <EmptyState size="sm">
@@ -410,21 +391,21 @@ export function OnboardingMetricsPage() {
                     : "No hires need attention right now."}
                 </EmptyState>
               ) : (
-                <>
+                <div className="space-y-3">
                   {pagedHires.map((hire) => (
-                    <HireTimelineCard key={hire.userId} hire={hire} />
+                    <HireTimelineCard key={hire.userId} hire={hire} onOpenMember={openMember} />
                   ))}
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={setPage}
                   />
-                </>
+                </div>
               )}
             </section>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </PmPageShell>
   );
 }

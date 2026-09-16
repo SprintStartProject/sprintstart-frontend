@@ -1,36 +1,17 @@
 import { CONTRIBUTION_WORDING } from "../../../config/contributionWording";
-import {
-  Check,
-  Clock,
-  GitMerge,
-  GitPullRequest,
-  Hand,
-  MessageSquare,
-  UserPlus,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Check, ChevronRight, Clock, GitMerge } from "lucide-react";
 import type { HireTimeline } from "../types";
 import { Badge } from "../../../components/ui/Badge";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { formatDuration, formatMoment } from "../format";
 import { isAwaitingFirstResponse } from "../hireStatus";
+import { gapHours, hireMoments } from "../moments";
 
 type HireTimelineCardProps = {
   hire: HireTimeline;
+  /** Opens the hire in the PM area's member side panel; without it the name is plain text. */
+  onOpenMember?: (userId: string) => void;
 };
-
-type Moment = { label: string; at: string | null; icon: LucideIcon };
-
-/** Track nouns arrive bare ("change", "facilitated") so a slot at the start of a label capitalises. */
-function capitalise(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1);
-}
-
-/** Hours between two moments, when both have happened. */
-function gapHours(from: string | null, to: string | null): number | null {
-  if (!from || !to) return null;
-  return Math.max(0, (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60));
-}
 
 /**
  * One hire's onboarding timeline: joined → task claimed → work submitted → first
@@ -49,27 +30,13 @@ function gapHours(from: string | null, to: string | null): number | null {
  * Known contract gaps: there is no "environment ready" moment, and the timeline carries no
  * reviewer identity, so the wait is attributed to "a reviewer" generically rather than by name.
  */
-export function HireTimelineCard({ hire }: HireTimelineCardProps) {
+export function HireTimelineCard({ hire, onOpenMember }: HireTimelineCardProps) {
   const {
     noun: contributionNoun,
     nounPlural: contributionNounPlural,
     verbPast: contributionVerbPast,
   } = CONTRIBUTION_WORDING;
-  const moments: Moment[] = [
-    { label: "Joined", at: hire.joinedAt, icon: UserPlus },
-    { label: "Task claimed", at: hire.firstTaskClaimedAt, icon: Hand },
-    {
-      label: `${capitalise(contributionNoun)} started`,
-      at: hire.firstContributionOpenedAt,
-      icon: GitPullRequest,
-    },
-    { label: "First response", at: hire.firstResponseAt, icon: MessageSquare },
-    {
-      label: capitalise(contributionVerbPast),
-      at: hire.firstContributionAcceptedAt,
-      icon: GitMerge,
-    },
-  ];
+  const moments = hireMoments(hire);
 
   // Something is in flight, was started, but nobody has responded: the wait is on somebody else.
   const awaitingReview = isAwaitingFirstResponse(hire);
@@ -78,8 +45,8 @@ export function HireTimelineCard({ hire }: HireTimelineCardProps) {
     <div
       className={`rounded-2xl border p-5 transition-colors ${
         hire.stalled
-          ? "border-app-warning-border/40 bg-app-warning-bg/20"
-          : "border-app-border bg-app-surface hover:border-app-brand-border-strong"
+          ? "border-app-orange-border bg-app-surface"
+          : "border-app-border bg-app-surface"
       }`}
     >
       {/* Two columns: everything about the hire on the left, the status badges
@@ -92,7 +59,24 @@ export function HireTimelineCard({ hire }: HireTimelineCardProps) {
               <UserAvatar size={40} fallbackName={hire.displayName} seed={hire.userId} />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-app-text">{hire.displayName}</p>
+              {onOpenMember ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenMember(hire.userId)}
+                  className="group inline-flex max-w-full items-center gap-1 rounded-md text-left text-base font-semibold text-app-text hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                >
+                  <span className="truncate">{hire.displayName}</span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 text-app-text-subtle transition-transform group-hover:translate-x-0.5"
+                  />
+                </button>
+              ) : (
+                <p className="truncate text-base font-semibold text-app-text">{hire.displayName}</p>
+              )}
+              {hire.stalled && hire.stalledReason && (
+                <p className="text-xs font-medium text-app-orange-text">{hire.stalledReason}</p>
+              )}
               {hire.githubLogin ? (
                 <p className="text-xs text-app-text-muted">@{hire.githubLogin}</p>
               ) : (
