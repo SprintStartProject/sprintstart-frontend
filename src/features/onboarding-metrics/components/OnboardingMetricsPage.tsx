@@ -67,7 +67,7 @@ function hasActivity(hires: HireTimeline[]): boolean {
   );
 }
 
-/** Matches the `grid grid-cols-2 gap-3 lg:grid-cols-4` layout of {@link StatTile}. */
+/** Matches one `PmStat` in the `grid grid-cols-2 gap-3 lg:grid-cols-4` overview row. */
 function StatTileSkeleton() {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">

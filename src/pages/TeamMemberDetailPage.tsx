@@ -648,11 +648,7 @@ export function TeamMemberDetailPage() {
       <PmPageShell
         icon={Users}
         title={`${user.firstname} ${user.lastname}`}
-        subtitle={
-          user.roles.length > 0
-            ? `${user.roles.map((role) => role.name).join(", ")} · full profile`
-            : "Full profile"
-        }
+        subtitle="Their onboarding path, open requests, skills and gaps in one place."
         back={{ label: "Back", onClick: goBack }}
         bandExtra={
           <MemberHero

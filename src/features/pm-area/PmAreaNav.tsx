@@ -1,6 +1,9 @@
 import { Gauge, LayoutDashboard, MessageSquareMore, ShieldAlert, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
+import { prefetchRoute } from "../../services/routePrefetch";
+import { useProjectContext } from "../projects/useProjectContext";
 
 type PmSection = {
   to: string;
@@ -40,6 +43,8 @@ function isActive(section: PmSection, pathname: string): boolean {
  */
 export function PmAreaNav() {
   const { pathname } = useLocation();
+  const queryClient = useQueryClient();
+  const { selectedProjectId } = useProjectContext();
 
   return (
     <nav
@@ -55,6 +60,9 @@ export function PmAreaNav() {
             key={section.to}
             to={section.to}
             aria-current={active ? "page" : undefined}
+            // Warms the page's code and its main read on press, like the sidebar does, so the
+            // switch between sections lands on a filled page rather than a skeleton.
+            onPointerDown={() => prefetchRoute(queryClient, section.to, selectedProjectId || null)}
             className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               active
                 ? "bg-app-brand text-white shadow-[0_6px_18px_-8px_var(--color-app-brand)]"

@@ -28,7 +28,7 @@ export type ProjectInsights = {
 /**
  * A member counts as stalled after this long on the same step.
  *
- * Same threshold `TeamMemberCard` uses for its at-risk marker, so the card and
+ * Same threshold as `AT_RISK_AFTER_DAYS` in the PM area's member status, so the roster and
  * the project summary never disagree about who is stuck.
  */
 export const STALLED_AFTER_DAYS = 5;

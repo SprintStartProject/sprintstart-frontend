@@ -1,12 +1,17 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
 import { knowledgeRequestService } from "./knowledgeRequestService";
+import { insightsService } from "./faqService";
+import { knowledgeGapService } from "./knowledgeGapService";
+import { onboardingMetricsService } from "./onboardingMetricsService";
+import { getTeamOverview } from "./teamManagementService";
 import { loadBoard } from "../features/board/hooks/useBoard";
 import { loadKnowledgeBaseArtifacts } from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { loadStarterWorkReviewQueue } from "../features/starter-work/hooks/useStarterWorkReview";
 
 /**
- * Route → cache warm-up, fired from the sidebar on `pointerdown` (see `SidebarNavLink`).
+ * Route → cache warm-up, fired from the sidebar on `pointerdown` (see `SidebarNavLink`) and from
+ * the PM area's section bar (see `PmAreaNav`).
  *
  * Every sidebar route warms its lazy page module. Routes with one dominant, migrated read
  * also warm that query; pages assembled from several widgets, or still owning their data by
@@ -37,6 +42,18 @@ function prefetchRouteModule(path: string): void {
       return;
     case "/pm-dashboard":
       void import("../pages/PmDashboardPage");
+      return;
+    case "/team-management":
+      void import("../pages/TeamManagementPage");
+      return;
+    case "/insights/faq":
+      void import("../features/faq/components/FaqPage");
+      return;
+    case "/insights/knowledge-gaps":
+      void import("../features/knowledge-gaps/components/KnowledgeGapsPage");
+      return;
+    case "/insights/onboarding":
+      void import("../features/onboarding-metrics/components/OnboardingMetricsPage");
       return;
     case "/data-ingestion":
       void import("../pages/DataIngestionPage");
@@ -85,6 +102,39 @@ export function prefetchRoute(
       void queryClient.prefetchQuery({
         queryKey: queryKeys.starterWork.review(),
         queryFn: loadStarterWorkReviewQueue,
+      });
+      return;
+
+    case "/pm-dashboard":
+    case "/team-management":
+      // Both lead with the project's roster; same key and call as `useTeamRoster`.
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.teamOverview.filtered(projectId),
+        queryFn: () => getTeamOverview(undefined, undefined, projectId ? [projectId] : undefined),
+      });
+      return;
+
+    case "/insights/faq":
+      if (!projectId) return;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.faq.groups(projectId),
+        queryFn: () => insightsService.fetchFAQGroups(projectId),
+      });
+      return;
+
+    case "/insights/knowledge-gaps":
+      if (!projectId) return;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.knowledgeGaps.overview(projectId),
+        queryFn: () => knowledgeGapService.fetchKnowledgeGaps(projectId),
+      });
+      return;
+
+    case "/insights/onboarding":
+      if (!projectId) return;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.onboardingMetrics.project(projectId),
+        queryFn: () => onboardingMetricsService.fetchProjectMetrics(projectId),
       });
       return;
 
