@@ -11,7 +11,6 @@ import { DataIngestionPage } from "../pages/DataIngestionPage.tsx";
 import { OnBoardingPage } from "../pages/OnBoardingPage";
 import { BlueprintPathsPage } from "../pages/BlueprintPathsPage.tsx";
 import { BlueprintPathDetailPage } from "../pages/BlueprintPathDetailPage.tsx";
-import { OnBoardingItemPage } from "../features/onboarding/components/OnBoardingItemPage";
 import { LoginPage } from "../pages/LoginPage";
 import { AuthGuard } from "./AuthGuard";
 import { SkillWizardPage } from "../pages/SkillWizardPage";
@@ -78,7 +77,7 @@ export function AppRouter() {
         <Route path="/blueprints" element={<BlueprintPathsPage />} />
         <Route path="/blueprints/:pathId" element={<BlueprintPathDetailPage />} />
         <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-        <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
+        <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
         <Route
           path="/data-ingestion"
           element={

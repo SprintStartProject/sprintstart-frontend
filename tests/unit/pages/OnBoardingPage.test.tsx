@@ -1,11 +1,15 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { OnBoardingPage } from "../../../src/pages/OnBoardingPage";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 import { onboardingService } from "../../../src/services/onboardingService";
+import {
+  OnboardingJourneyContext,
+  type OnboardingJourneyValue,
+} from "../../../src/features/onboarding/generation/OnboardingJourneyContext";
 
 const { projectContextState } = vi.hoisted(() => ({
   projectContextState: {
@@ -65,6 +69,27 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   };
 });
 
+type JourneyOverrides = Partial<OnboardingJourneyValue>;
+
+function renderPage(overrides: JourneyOverrides = {}) {
+  const value: OnboardingJourneyValue = {
+    generation: { status: "idle" },
+    startGeneration: vi.fn(),
+    clearGeneration: vi.fn(),
+    availability: "buildable",
+    unavailableReason: null,
+    refreshAvailability: vi.fn(),
+    ...overrides,
+  };
+  return render(
+    <MemoryRouter>
+      <OnboardingJourneyContext.Provider value={value}>
+        <OnBoardingPage />
+      </OnboardingJourneyContext.Provider>
+    </MemoryRouter>,
+  );
+}
+
 // Minimal phase payload matching the `/api/v1/onboarding/me/path` contract — enough for
 // the phase tabs and graph viewer to render, without duplicating the MSW mock's verbosity.
 function phaseFixture(id: string, position: number, title: string) {
@@ -100,6 +125,8 @@ function phaseFixture(id: string, position: number, title: string) {
 describe("OnBoardingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The page remembers list or graph; every test starts from a page never seen before.
+    localStorage.clear();
     projectContextState.selectedProjectId = "proj1";
     projectContextState.isLoading = false;
     projectContextState.isSwitcherEnabled = true;
@@ -142,30 +169,63 @@ describe("OnBoardingPage", () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () => new HttpResponse(null, { status: 404 })),
     );
-    const personalize = vi
-      .spyOn(onboardingService, "personalizePath")
-      .mockImplementation((_projectId, handlers) => {
-        handlers.onStage?.("Enhancing phases", "Phase 1 of 3");
-        return Promise.resolve();
-      });
+    const startGeneration = vi.fn();
 
-    render(
-      <MemoryRouter>
-        <OnBoardingPage />
-      </MemoryRouter>,
-    );
+    renderPage({ startGeneration });
 
-    const startButton = await screen.findByRole("button", {
-      name: "Start personalization",
-    });
-    expect(personalize).not.toHaveBeenCalled();
+    const startButton = await screen.findByRole("button", { name: "Start personalization" });
+    expect(startGeneration).not.toHaveBeenCalled();
 
     await user.click(startButton);
 
-    expect(personalize).toHaveBeenCalledTimes(1);
-    expect(personalize).toHaveBeenCalledWith("proj1", expect.any(Object));
-    expect(await screen.findByText("Enhancing phases")).toBeInTheDocument();
-    expect(screen.getByText("Phase 1 of 3")).toBeInTheDocument();
+    // The generation belongs to the app-wide provider, so it survives leaving this page.
+    expect(startGeneration).toHaveBeenCalledTimes(1);
+    expect(startGeneration).toHaveBeenCalledWith("proj1");
+  });
+
+  it("shows every phase of a running generation, even after coming back to the page", async () => {
+    renderPage({
+      generation: {
+        status: "running",
+        projectId: "proj1",
+        startedAt: Date.now(),
+        phases: [
+          { name: "Project Overview", detail: "Completed", state: "done" },
+          { name: "Architecture", detail: "Searching the project for: ADRs", state: "working" },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Building your onboarding path")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 phases assembled")).toBeInTheDocument();
+    expect(screen.getByText("Searching the project for: ADRs")).toBeInTheDocument();
+  });
+
+  it("explains why no path can be built instead of offering a generation that would fail", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => new HttpResponse(null, { status: 404 })),
+    );
+
+    renderPage({ availability: "unavailable", unavailableReason: "no-content" });
+
+    expect(await screen.findByText(/nothing to learn from yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start personalization" })).not.toBeInTheDocument();
+  });
+
+  it("shows why the last generation failed next to the retry", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => new HttpResponse(null, { status: 404 })),
+    );
+
+    renderPage({
+      generation: {
+        status: "error",
+        message: "This project has no published onboarding blueprint yet.",
+      },
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("no published onboarding blueprint");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("asks for a project instead of offering personalization without one", async () => {
@@ -197,7 +257,7 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your onboarding journey")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
     });
 
     expect(screen.getAllByText("Phase 1").length).toBeGreaterThan(0);
@@ -285,11 +345,12 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your onboarding journey")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
     });
 
     expect(screen.getAllByText("33%").length).toBeGreaterThan(0);
-    expect(screen.getByText("1/3 items")).toBeInTheDocument();
+    expect(screen.getByText("0 of 1 phases complete")).toBeInTheDocument();
+    expect(screen.getByText(/1 step done/)).toBeInTheDocument();
   });
 
   it("shows a warning beside regeneration when a generated phase was hidden", async () => {
@@ -311,13 +372,7 @@ describe("OnBoardingPage", () => {
               questions: [],
             },
           ],
-          generationIssues: [
-            {
-              phaseId: "phase2",
-              title: "Role-specific tasks",
-              status: "FAILED",
-            },
-          ],
+          generationIssues: [{ phaseId: "phase2", title: "Role-specific tasks", status: "FAILED" }],
         }),
       ),
     );
@@ -329,9 +384,7 @@ describe("OnBoardingPage", () => {
     );
 
     expect(
-      await screen.findByRole("status", {
-        name: "1 onboarding phase could not be generated",
-      }),
+      await screen.findByRole("status", { name: "1 onboarding phase could not be generated" }),
     ).toBeInTheDocument();
     expect(screen.getByTitle("Role-specific tasks — Could not be reached")).toBeInTheDocument();
   });
@@ -344,13 +397,7 @@ describe("OnBoardingPage", () => {
           userId: "user1",
           createdAt: new Date().toISOString(),
           phases: [],
-          generationIssues: [
-            {
-              phaseId: "phase1",
-              title: "Role-specific tasks",
-              status: "EMPTY",
-            },
-          ],
+          generationIssues: [{ phaseId: "phase1", title: "Role-specific tasks", status: "EMPTY" }],
         }),
       ),
     );
@@ -398,9 +445,7 @@ describe("OnBoardingPage", () => {
     );
 
     expect(
-      await screen.findByRole("status", {
-        name: "1 onboarding phase could not be generated",
-      }),
+      await screen.findByRole("status", { name: "1 onboarding phase could not be generated" }),
     ).toBeInTheDocument();
     expect(screen.getByTitle("Architecture — Took too long")).toBeInTheDocument();
   });
@@ -433,43 +478,27 @@ describe("OnBoardingPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("switches to the read-only graph and opens a phase subgraph", async () => {
+  it("switches to the graph with the view slider and back to the list", async () => {
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <OnBoardingPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Graph view" }));
+    await user.click(await screen.findByRole("button", { name: "Graph" }));
 
-    // The graph opens directly on the selected phase's subgraph.
-    expect(await screen.findByRole("heading", { name: "Phase 1" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Back to phases" }));
-
-    expect(screen.getByText("Your onboarding path")).toBeInTheDocument();
-    expect(screen.queryByText("Create on canvas")).not.toBeInTheDocument();
-
-    // React Flow leaves a node `visibility: hidden` until it has measured it, and jsdom never
-    // lays anything out — so the node is addressed by its test id rather than its role.
-    // `fireEvent` rather than `user.click`: a full pointer sequence reaches React Flow's d3-zoom
-    // pane handler, which reads `event.view.document` — null on a jsdom synthetic event.
-    fireEvent.click(
-      within(screen.getByTestId("graph-node-phase1")).getByRole("button", {
-        hidden: true,
-      }),
-    );
-
-    expect(screen.getByRole("button", { name: "Back to phases" })).toBeInTheDocument();
     expect(
-      screen.getByText("What this phase asks of you, and what has to come first."),
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+    // The hire reads and arranges their graph; nothing here rewires it.
+    expect(screen.queryByTitle("Drag to what this unlocks")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "List" }));
+
+    expect(
+      await screen.findByRole("list", { name: "Phase 1: steps and questions" }),
+    ).toBeInTheDocument();
   });
 
-  it("re-targets the subgraph when a different phase is picked in the header", async () => {
+  it("steps into a phase from the journey map, and back out", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
@@ -482,21 +511,179 @@ describe("OnBoardingPage", () => {
     );
     const user = userEvent.setup();
 
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Graph" }));
+    await user.click(await screen.findByRole("button", { name: /^Phase 2: Phase 2,/ }));
+
+    expect(
+      await screen.findByRole("application", {
+        name: "Graph of the steps and questions in Phase 2",
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Journey map" }));
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("lets the hire pick the next phase when several open at once", async () => {
+    const finished = phaseFixture("phase1", 1, "Basics");
+    finished.steps[0].status = "FINISHED";
+    const left = phaseFixture("phase2", 2, "Backend");
+    left.steps[0].status = "WAITING";
+    const right = phaseFixture("phase3", 3, "Frontend");
+    right.steps[0].status = "WAITING";
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [finished, left, right],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    renderPage();
+
+    expect(await screen.findByText(/2 phases are open/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Phase 3\s*Frontend/ }));
+
+    expect(screen.queryByText(/2 phases are open/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start now" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Frontend step" })).toBeInTheDocument();
+  });
+
+  it("opens a step in place, without leaving the path", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () =>
+        HttpResponse.json({ ...phaseFixture("phase1", 1, "Phase 1").steps[0] }),
+      ),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1")],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    renderPage();
+
+    const list = await screen.findByRole("list", { name: "Phase 1: steps and questions" });
+    await user.click(within(list).getByRole("button", { name: /Phase 1 step/, expanded: false }));
+
+    expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
+  });
+
+  it("lands on a step unfolded when opened by its address", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () =>
+        HttpResponse.json({ ...phaseFixture("phase1", 1, "Phase 1").steps[0] }),
+      ),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1")],
+        }),
+      ),
+    );
+
     render(
-      <MemoryRouter>
-        <OnBoardingPage />
+      <MemoryRouter initialEntries={["/onboarding/step-phase1"]}>
+        <OnboardingJourneyContext.Provider
+          value={{
+            generation: { status: "idle" },
+            startGeneration: vi.fn(),
+            clearGeneration: vi.fn(),
+            availability: "path",
+            unavailableReason: null,
+            refreshAvailability: vi.fn(),
+          }}
+        >
+          <Routes>
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+          </Routes>
+        </OnboardingJourneyContext.Provider>
       </MemoryRouter>,
     );
 
-    // The graph opens directly on the active phase's subgraph.
-    await user.click(await screen.findByRole("button", { name: "Graph view" }));
-    expect(await screen.findByRole("heading", { name: "Phase 1" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
+  });
 
-    // Inside Phase 1's subgraph, a header phase-tab click must switch the drill-down —
-    // previously the viewer kept rendering the stale phase's subgraph.
-    await user.click(screen.getByRole("button", { name: /^Phase 2/ }));
+  it("names what a locked item is waiting on", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [
+            {
+              ...phaseFixture("phase1", 1, "Phase 1"),
+              steps: [
+                {
+                  ...phaseFixture("phase1", 1, "Phase 1").steps[0],
+                  id: "a",
+                  title: "Set up the repo",
+                  status: "IN_PROGRESS",
+                },
+                {
+                  ...phaseFixture("phase1", 1, "Phase 1").steps[0],
+                  id: "b",
+                  position: 2,
+                  title: "Run the tests",
+                  status: "WAITING",
+                  locked: true,
+                  blockerIds: ["a"],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
 
-    expect(await screen.findByRole("heading", { name: "Phase 2" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Phase 1" })).not.toBeInTheDocument();
+    renderPage();
+
+    expect(await screen.findByText("Run the tests")).toBeInTheDocument();
+    expect(screen.getByText(/Waits on/)).toHaveTextContent("Waits on Set up the repo");
+  });
+  it("comes back to the view and phase it was left in", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1"), phaseFixture("phase2", 2, "Phase 2")],
+        }),
+      ),
+    );
+    localStorage.setItem(
+      "sprintstart.onboarding.view",
+      JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("application", {
+        name: "Graph of the steps and questions in Phase 2",
+      }),
+    ).toBeInTheDocument();
   });
 });

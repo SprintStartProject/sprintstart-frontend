@@ -9,6 +9,7 @@ import type {
   OnboardingResourceEndpoint,
   OnboardingPersonalizeEvent,
   OnboardingPersonalizeHandlers,
+  OnboardingGenerationStatus,
   StepStatus,
   QuestionAttemptSubmission,
   QuestionAttemptResult,
@@ -37,12 +38,20 @@ export const onboardingService = {
    * Triggers AI generation of the current user's onboarding path and streams
    * progress over SSE. Replaces any existing path once the `path` event arrives.
    *
+   * The generation runs on the backend independently of this stream: aborting it
+   * (via `signal`) or losing the connection only stops watching. Calling this while
+   * a generation is already running attaches to that one instead of starting another.
+   *
    * `projectId` is interpolated into the URL because path generation is
    * project-scoped: the path is copied from the active blueprint of the project
    * the user has selected. Hook it to the selected project so the generated
    * path matches the project the user is looking at.
    */
-  async personalizePath(projectId: string, handlers: OnboardingPersonalizeHandlers): Promise<void> {
+  async personalizePath(
+    projectId: string,
+    handlers: OnboardingPersonalizeHandlers,
+    signal?: AbortSignal,
+  ): Promise<void> {
     try {
       if (keycloak.authenticated) {
         await keycloak.updateToken(30);
@@ -58,6 +67,7 @@ export const onboardingService = {
       headers: {
         Authorization: `Bearer ${keycloak.token}`,
       },
+      signal,
     });
 
     if (!res.ok) {
@@ -90,6 +100,16 @@ export const onboardingService = {
     }
 
     handlers.onDone();
+  },
+
+  /**
+   * Whether a path generation is running for the current user -- started in another tab, or in
+   * this one before a reload -- and whether the project has the active blueprint a new one needs.
+   */
+  async fetchGenerationStatus(projectId: string): Promise<OnboardingGenerationStatus> {
+    return await apiClient.fetch<OnboardingGenerationStatus>(
+      `/api/v1/projects/${projectId}/onboarding/me/path/generation`,
+    );
   },
 
   // ── STEP ─────────────────────────────────────────────────

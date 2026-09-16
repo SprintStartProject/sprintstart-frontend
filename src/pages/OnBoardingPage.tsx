@@ -2,613 +2,584 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect, useRef } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  CircleHelp,
+  FolderKanban,
+  GitBranch,
+  ListChecks,
+  Loader2,
+  Lock,
+  PlayCircle,
+  RefreshCw,
+  Rocket,
+  Sparkles,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { PageHeader } from "../components/layout/PageHeader";
+import { AlertDialog } from "../components/ui/AlertDialog";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { SegmentedTabs } from "../components/ui/SegmentedTabs";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { useToast } from "../context/useToast";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
+import { JourneyGraph } from "../features/onboarding/components/journey/JourneyGraph";
+import { PhaseChooser } from "../features/onboarding/components/journey/PhaseChooser";
+import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
+import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
+import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
+import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
+import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
+import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
+import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
+import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
+import {
+  blockingPhases,
+  itemState,
+  pathProgress,
+  phaseItems,
+  phaseProgress,
+  phaseState,
+  phasesUnlockedBy,
+  sortedPhases,
+  waitingOn,
+  type PhaseItem,
+} from "../features/onboarding/journey";
+import { resolveNextAction } from "../features/onboarding/nextAction";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
-  OnboardingStepEndpoint,
+  QuestionAttemptResult,
 } from "../features/onboarding/types";
-import { findActivePhaseIndex } from "../features/onboarding/activePhase";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { onboardingService } from "../services/onboardingService";
-import { ApiError } from "../services/apiClient";
-import { useProjectContext } from "../features/projects/useProjectContext";
-import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
-
-import {
-  CheckCircle2,
-  Circle,
-  CircleDot,
-  ChevronRight,
-  Sparkles,
-  PlayCircle,
-  Loader2,
-  AlertCircle,
-  AlertTriangle,
-  CircleArrowRight,
-  CircleHelp,
-  Lock,
-  Eye,
-  RefreshCw,
-  GitBranch,
-  ListChecks,
-} from "lucide-react";
-import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary.tsx";
-import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues.ts";
-import { PageHeader } from "../components/layout/PageHeader";
-import { DinoGame } from "../features/chatbot/components/DinoGame";
-import { QuestionModal } from "../features/onboarding/components/QuestionModal";
 import { useMoments } from "../features/moments";
-import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
-import { OnboardingGraphViewer } from "../features/onboarding/components/OnboardingGraphViewer.tsx";
+import { useProjectContext } from "../features/projects/useProjectContext";
+import { ApiError } from "../services/apiClient";
+import { onboardingGraphService } from "../services/onboardingGraphService";
+import { onboardingService } from "../services/onboardingService";
+import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary";
+import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
+import {
+  HIRE_JOURNEY_VIEW_KEY,
+  readJourneyView,
+  writeJourneyView,
+} from "../features/onboarding/journeyViewMemory";
 
-type LoadingState = "idle" | "loading" | "empty" | "generating" | "success" | "error";
+type LoadingState = "loading" | "empty" | "success" | "error";
+type ViewMode = "list" | "graph";
 
-// ─────────────────────────────────────────────────────────────
-// HELPER COMPONENT: ProgressBar
-// ─────────────────────────────────────────────────────────────
+const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
 
-interface ProgressBarProps {
-  value: number; // e.g. 3 (completed tasks)
-  max: number; // e.g. 5 (total tasks)
-}
+type NavigationState = { focusQuestionId?: string; choosePhase?: boolean } | null;
 
-function ProgressBar({ value, max }: ProgressBarProps) {
-  const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
-
+/** The phase a visit opens on: what the member was sent for, else where they are, else a choice. */
+function initialPhaseId(
+  path: OnboardingPathEndpoint,
+  phases: OnboardingPhaseEndpoint[],
+  focusItemId: string | undefined,
+): string {
+  const requested = focusItemId
+    ? phases.find((phase) => phaseItems(phase).some((item) => item.id === focusItemId))
+    : undefined;
+  if (requested) return requested.id;
+  const next = resolveNextAction(path);
+  if (next.kind === "step" || next.kind === "question") return next.phase.id;
+  if (next.kind === "choose") return next.phases[0].id;
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-app-border-muted">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
-        style={{ width: `${percentage}%` }}
-      />
-    </div>
+    (phases.find((phase) => phaseState(phase) !== "done") ?? phases[phases.length - 1])?.id ?? ""
   );
 }
-
-// ─────────────────────────────────────────────────────────────
-// MAIN COMPONENT: OnBoardingPage
-// ─────────────────────────────────────────────────────────────
 
 /**
- * Displays the user's personalized onboarding path hierarchy.
- * Fetches and tracks progress through phases, steps and knowledge-check
- * questions. Questions are first-class nodes alongside the steps and are
- * answered one at a time in a per-question modal.
+ * The hire's onboarding path.
+ *
+ * Two ways through the same path, switched by the page's slider (or a two-finger swipe):
+ *
+ * - **List** -- the phases on the left, grouped by where the hire stands with them, and the selected
+ *   phase's steps and questions on the right. Phases are not a queue: a blueprint opens several at
+ *   once, so the page shows them as a choice, and "up next" follows the phase the hire is working in
+ *   rather than the lowest phase number.
+ * - **Graph** -- the journey map of all phases. Clicking a phase flies into it and shows the graph of
+ *   its steps; "Journey map" flies back out.
+ *
+ * Building a path is not this page's job: `OnboardingJourneyProvider` owns the generation, so
+ * leaving the page does not cancel it, and coming back shows its progress again.
  */
 export function OnBoardingPage() {
-  // Selected phase index
-  const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number>(0);
-  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
+  const location = useLocation();
+  // `/onboarding/:stepId` -- the old address of a step page -- now opens the path with that step
+  // unfolded, so links from the dashboard and the buddy keep landing on the step.
+  const { stepId: routeStepId } = useParams<{ stepId?: string }>();
+  const toast = useToast();
+  const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
+  const {
+    selectedProjectId,
+    isLoading: isProjectLoading,
+    isSwitcherEnabled,
+    canManageSelected,
+  } = useProjectContext();
+  const journey = useOnboardingJourney();
+  const { generation, startGeneration, clearGeneration } = journey;
 
-  // Onboarding data (null = not loaded yet)
-  const [OnBoardingPathEndpoint, setOnBoardingPath] = useState<OnboardingPathEndpoint | null>(null);
+  const navigationState = location.state as NavigationState;
+  // Set by the step page when a knowledge-check question is what stands between the user and the
+  // rest of their path, so this page can land on the question's phase.
+  const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
 
-  // Loading state: 'idle' (before load), 'loading' (while loading), 'success' (loaded), 'error' (error)
-  const [loadingState, setLoadingState] = useState<LoadingState>("idle");
+  const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
+  const [loadingState, setLoadingState] = useState<LoadingState>("loading");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [selectedPhaseId, setSelectedPhaseId] = useState("");
+  // A phase picked from the chooser before anything in it was started -- until then nothing else
+  // says that this is where the hire wants to be.
+  const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
+  // Where the member left the page last time: list or graph, and the phase the graph was zoomed into.
+  // A link to a step always opens the list, since that is where the step unfolds.
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    routeStepId ? "list" : readJourneyView(HIRE_JOURNEY_VIEW_KEY).mode,
+  );
+  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
+    () => readJourneyView(HIRE_JOURNEY_VIEW_KEY).graphPhaseId,
+  );
+  // The item unfolded in the list, and the one zoomed into on the graph.
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
+  const [graphItemId, setGraphItemId] = useState<string | null>(null);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  // Set when the page itself moves the member on, so the item they land on is scrolled to.
+  const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
 
-  // Error message for error state
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  usePathRevealMoment(loadingState === "success" ? path : null);
 
-  // Current AI generation stage, shown while loadingState === "generating"
-  const [generationStage, setGenerationStage] = useState<{ name: string; detail?: string } | null>(
-    null,
+  const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
+
+  const applyPath = useCallback(
+    (next: OnboardingPathEndpoint, { keepSelection }: { keepSelection: boolean }) => {
+      setPath(next);
+      setSelectedPhaseId((current) => {
+        const ordered = sortedPhases(next);
+        if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
+        return initialPhaseId(next, ordered, focusItemId);
+      });
+      setLoadingState("success");
+    },
+    [focusItemId],
   );
 
-  // Dino easter egg: pressing Space while the path is being generated starts a
-  // tiny endless runner. It unmounts by itself once generation finishes.
-  const [gameActive, setGameActive] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(localStorage.getItem("dinoUnlocked") === "true");
+  // ── Loading ─────────────────────────────────────────────────
 
-  // The question currently open in the answer modal, paired with its phase title.
-  const [questionToAnswer, setQuestionToAnswer] = useState<{
-    question: OnboardingQuestionEndpoint;
-    phaseTitle: string;
-  } | null>(null);
-
-  // The "on board" finale lives in the moments layer, so that it can take over
-  // the screen rather than render inside this page's tree.
-  const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
-
-  // The reveal of a freshly built path, the first time its owner sees it.
-  // Handed the path only once the page is showing it: whichever way the user
-  // got here — waiting out the generator or opening onboarding days after it
-  // finished — this is the moment the path first exists for them.
-  usePathRevealMoment(loadingState === "success" ? OnBoardingPathEndpoint : null);
-
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // The project the user currently has selected. Path generation is
-  // project-scoped, so a regenerated path is rebuilt from this project's active
-  // blueprint — never from the wrong project's.
-  const { selectedProjectId, isLoading: isProjectLoading, isSwitcherEnabled } = useProjectContext();
-
-  // Set by the step page when a knowledge-check question is what stands between the
-  // user and the rest of their path, so this page can land on the question's phase.
-  const focusQuestionId = (location.state as { focusQuestionId?: string } | null)?.focusQuestionId;
-
-  // The question list of the focused phase, so the page can scroll to it.
-  const questionListRef = useRef<HTMLDivElement>(null);
-  const hasFocusedQuestionRef = useRef(false);
-
-  // The horizontal list of phase tabs in the header.
-  const phaseTabsRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * A vertical mouse wheel over the phase tabs scrolls the row horizontally instead of the
-   * page. The listener is non-passive so the event is captured while the pointer is over it.
-   * Both axes feed the row: a vertical wheel pans it sideways, and a trackpad's horizontal
-   * two-finger swipe (deltaX) scrolls it directly.
-   */
-  useEffect(() => {
-    const phaseTabs = phaseTabsRef.current;
-    if (!phaseTabs) return;
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      phaseTabs.scrollLeft += event.deltaY + event.deltaX;
-    };
-    phaseTabs.addEventListener("wheel", handleWheel, { passive: false });
-    return () => phaseTabs.removeEventListener("wheel", handleWheel);
-  }, [loadingState]);
-
-  /**
-   * Brings the question list into view when the user was sent here because of a question.
-   *
-   * Fires once per visit: the list is the reason for the navigation, and without this the
-   * user would land above it and not see what they were sent to do. Later phase switches
-   * must not drag the view back down, hence the ref.
-   */
-  useEffect(() => {
-    if (loadingState !== "success" || !focusQuestionId || hasFocusedQuestionRef.current) return;
-    hasFocusedQuestionRef.current = true;
-    questionListRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  }, [loadingState, focusQuestionId]);
-
-  // Silently re-fetches the path, e.g. after a question attempt changed lock states.
-  const refreshPath = async () => {
-    try {
-      const path = await onboardingService.fetchPath();
-      setOnBoardingPath(path);
-    } catch (err) {
-      console.error("Failed to refresh onboarding path:", err);
-    }
-  };
-
-  const closeQuestionModal = ({
-    answered,
-    correct,
-    onboardingCompleted,
-  }: {
-    answered: boolean;
-    correct: boolean;
-    onboardingCompleted: boolean;
-  }) => {
-    const phases = OnBoardingPathEndpoint?.phases ?? [];
-    setQuestionToAnswer(null);
-
-    // The backend decides completion; nothing here is derived from the phase alone.
-    if (onboardingCompleted) {
-      completeMission();
-    } else if (correct && questionToAnswer) {
-      // Celebrate the phase, not the question: only when the correct answer finished off
-      // the last open step or question does the whole phase count as complete. The local
-      // path is still stale here, so the question just answered counts as passed.
-      const phase = phases.find((item) => item.id === questionToAnswer.question.phaseId);
-      const phaseIndex = phases.findIndex((item) => item.id === questionToAnswer.question.phaseId);
-      const allStepsDone = phase?.steps.every(
-        (step) => step.status === "FINISHED" || step.status === "SKIPPED",
-      );
-      const allQuestionsPassed = phase?.questions.every(
-        (question) => question.status === "PASSED" || question.id === questionToAnswer.question.id,
-      );
-      if (allStepsDone && allQuestionsPassed) {
-        celebrateMoment({
-          tone: "milestone",
-          title: "Phase completed",
-          message: phase ? `You completed the ${phase.title} phase.` : "You completed the phase.",
-          progress:
-            phaseIndex >= 0 && phases.length > 0
-              ? { current: phaseIndex + 1, total: phases.length }
-              : undefined,
-        });
-      }
-    }
-    if (answered) {
-      void refreshPath();
-    }
-  };
-
-  // State updates do not disable a button until React renders again. This ref
-  // closes that tiny gap as well, so a double click cannot open two streams.
-  const generationInFlightRef = useRef(false);
-
-  /** Triggers AI path generation only in response to an explicit user action. */
-  const generatePath = async () => {
-    if (generationInFlightRef.current) return;
-    generationInFlightRef.current = true;
-    setLoadingState("generating");
-    setGenerationStage(null);
-    setGameActive(false);
-    if (!selectedProjectId) {
-      generationInFlightRef.current = false;
-      setLoadingState("error");
-      setErrorMessage(
-        "No project selected. Choose a project before generating your onboarding path.",
-      );
-      return;
-    }
-    try {
-      await onboardingService.personalizePath(selectedProjectId, {
-        onStage: (name, detail) => setGenerationStage({ name, detail }),
-        onPath: (path) => {
-          setOnBoardingPath(path);
-          setSelectedPhaseIndex(findActivePhaseIndex(path));
-        },
-        onDone: () => setLoadingState("success"),
-        onError: (message) => {
-          setLoadingState("error");
-          setErrorMessage(message);
-        },
-      });
-    } catch (error) {
-      setLoadingState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Path generation failed");
-    } finally {
-      generationInFlightRef.current = false;
-    }
-  };
-
-  // Keep isUnlocked state perfectly in sync with localStorage and close game if locked
-  useEffect(() => {
-    const handleUnlockChange = () => {
-      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
-      setIsUnlocked(unlocked);
-      if (!unlocked) {
-        setGameActive(false);
-      }
-    };
-    window.addEventListener("dinoUnlockChanged", handleUnlockChange);
-    window.addEventListener("storage", handleUnlockChange);
-    return () => {
-      window.removeEventListener("dinoUnlockChanged", handleUnlockChange);
-      window.removeEventListener("storage", handleUnlockChange);
-    };
-  }, []);
-
-  // Easter egg trigger: Space starts the game while the path is generating.
-  useEffect(() => {
-    if (loadingState !== "generating" || gameActive || !isUnlocked) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-
-      // Don't hijack space while the user is typing somewhere.
-      const active = document.activeElement;
-      const typing =
-        active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable);
-      if (typing) return;
-
-      e.preventDefault();
-      setGameActive(true);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [loadingState, gameActive, isUnlocked]);
-
-  // ── DATA FETCHING using useEffect ─────────────────────────────
-
-  // Guards the initial GET against StrictMode's development-only effect replay.
   const hasLoadedRef = useRef(false);
-
   useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
-
-    const loadOnBoardingPath = async () => {
-      setLoadingState("loading");
+    void (async () => {
       try {
-        const path = await onboardingService.fetchPath();
-        setOnBoardingPath(path);
-        // Land on the phase the user is actually working on, not always phase 1. A phase
-        // the step page pointed us at wins, since an earlier phase can still be open while
-        // the question being waited on belongs to a later one.
-        const requestedIndex = focusQuestionId
-          ? path.phases.findIndex((phase) =>
-              phase.questions.some((question) => question.id === focusQuestionId),
-            )
-          : -1;
-        setSelectedPhaseIndex(requestedIndex >= 0 ? requestedIndex : findActivePhaseIndex(path));
-        setLoadingState("success");
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) {
-          // Absence is a normal state. Generation starts only when the user asks
-          // for it, preventing mounts, reloads and duplicate tabs from spawning
-          // competing personalization requests.
-          setOnBoardingPath(null);
+        applyPath(await onboardingService.fetchPath(), { keepSelection: false });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          // Absence is a normal state; a path is only built when the user asks for one.
           setLoadingState("empty");
           return;
         }
         setLoadingState("error");
-        setErrorMessage(err instanceof Error ? err.message : "Unknown error");
+        setErrorMessage(error instanceof Error ? error.message : "Unknown error");
       }
-    };
-    void loadOnBoardingPath();
-    // The flag comes from the navigation that mounted this page, so it is fixed for the
-    // visit; listing it keeps the effect honest about what it reads, and `hasLoadedRef`
-    // makes a re-run a no-op anyway.
-  }, [focusQuestionId]);
+    })();
+  }, [applyPath]);
 
-  const currentPhase = OnBoardingPathEndpoint?.phases[selectedPhaseIndex] ?? null;
-  const generationIssues = OnBoardingPathEndpoint?.generationIssues ?? [];
-
-  // Helper function for phase progress — steps and questions both count.
-  const getPhaseProgress = (phase: OnboardingPhaseEndpoint) => {
-    const questions = phase.questions ?? [];
-    const completed =
-      phase.steps.filter((step) => step.status === "FINISHED" || step.status === "SKIPPED").length +
-      questions.filter((question) => question.status === "PASSED").length;
-    return {
-      completed,
-      total: phase.steps.length + questions.length,
-      percentage:
-        phase.steps.length + questions.length > 0
-          ? Math.round((completed / (phase.steps.length + questions.length)) * 100)
-          : 0,
-    };
-  };
-
-  // Total progress across all phases
-  const totalProgress = OnBoardingPathEndpoint?.phases.reduce(
-    (acc, phase) => {
-      const p = getPhaseProgress(phase);
-      return {
-        completed: acc.completed + p.completed,
-        total: acc.total + p.total,
-      };
-    },
-    { completed: 0, total: 0 },
-  ) ?? { completed: 0, total: 0 };
-
-  const totalPercentage =
-    totalProgress.total > 0 ? Math.round((totalProgress.completed / totalProgress.total) * 100) : 0;
-
-  // Recommended next item: the first open, unlocked step across the unlocked phases,
-  // falling back to the first open question. Neither can be recommended from a locked phase.
-  const recommendedStep =
-    OnBoardingPathEndpoint?.phases
-      .filter((phase) => !phase.locked)
-      .flatMap((phase) => phase.steps)
-      .find((step) => step.status !== "FINISHED" && step.status !== "SKIPPED" && !step.locked) ??
-    null;
-
-  const recommendedQuestion =
-    !recommendedStep &&
-    (OnBoardingPathEndpoint?.phases
-      .filter((phase) => !phase.locked)
-      .flatMap((phase) => phase.questions.map((question) => ({ phase, question })))
-      .find(({ question }) => question.status !== "PASSED" && question.status !== "LOCKED") ??
-      null);
-
-  // How a single step in the list should behave:
-  //  - "completed": FINISHED or SKIPPED  -> read-only, can be reopened to look at it
-  //  - "active":    the recommended next step -> can be started / continued
-  //  - "locked":    a later, not-yet-reachable step (or any step in a locked phase)
-  type StepMode = "completed" | "active" | "locked";
-  const getStepMode = (step: OnboardingStepEndpoint, phaseLocked: boolean): StepMode => {
-    if (step.status === "FINISHED" || step.status === "SKIPPED") return "completed";
-    if (step.locked || phaseLocked) return "locked";
-    if (recommendedStep && step.id === recommendedStep.id) return "active";
-    return "locked";
-  };
-
-  // Open a step's detail page (read-only for completed steps, continue for started ones).
-  const openStep = (stepId: string) => void navigate(`/onboarding/${stepId}`);
-
-  // Start the step (records startedAt + sets IN_PROGRESS the first time) and open it.
-  const startStep = async (stepId: string) => {
+  const refreshPath = useCallback(async () => {
     try {
-      await onboardingService.startStep(stepId);
-    } catch (err) {
-      console.error("Failed to start onboarding step:", err);
+      applyPath(await onboardingService.fetchPath(), { keepSelection: true });
+    } catch (error) {
+      console.error("Failed to refresh onboarding path:", error);
     }
-    // The rocket marks a step *beginning*, so it rides on the start rather than
-    // on the navigation. Reopening a step you already started is not a new
-    // journey and gets nothing — `handleActiveStep` routes those to `openStep`.
-    flyby();
-    openStep(stepId);
+  }, [applyPath]);
+
+  // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
+  // Read fresh rather than taken from the generation: the hire may have started working on it before
+  // coming back here, and the stream's copy knows nothing of that.
+  useEffect(() => {
+    if (generation.status !== "done") return;
+    let cancelled = false;
+    onboardingService
+      .fetchPath()
+      .then((next) => {
+        if (!cancelled) applyPath(next, { keepSelection: false });
+      })
+      .catch((error: unknown) => console.error("Failed to load the new onboarding path:", error))
+      .finally(() => clearGeneration());
+    return () => {
+      cancelled = true;
+    };
+  }, [applyPath, clearGeneration, generation]);
+
+  // Brings the chooser into view when the member was sent to pick a phase, once per visit.
+  const hasShownChooserRef = useRef(false);
+  useEffect(() => {
+    if (loadingState !== "success" || hasShownChooserRef.current || !navigationState?.choosePhase) {
+      return;
+    }
+    hasShownChooserRef.current = true;
+    document
+      .querySelector("#phase-chooser")
+      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [loadingState, navigationState]);
+
+  // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
+  useEffect(() => {
+    const target = scrollToItemRef.current;
+    if (loadingState !== "success" || !target || target !== expandedItemId) return;
+    scrollToItemRef.current = null;
+    document
+      .querySelector(`[data-item-id="${target}"]`)
+      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [expandedItemId, loadingState, selectedPhaseId]);
+
+  // A remembered phase that is not in this path (a rebuilt path, another project) opens the map.
+  const openGraphPhaseId = phases.some((phase) => phase.id === graphPhaseId) ? graphPhaseId : null;
+  useEffect(() => {
+    if (loadingState !== "success") return;
+    writeJourneyView(HIRE_JOURNEY_VIEW_KEY, { mode: viewMode, graphPhaseId: openGraphPhaseId });
+  }, [loadingState, openGraphPhaseId, viewMode]);
+
+  const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
+    order: VIEW_ORDER,
+    value: viewMode,
+    onChange: setViewMode,
+    enabled: loadingState === "success",
+  });
+
+  // ── Derived ─────────────────────────────────────────────────
+
+  const nextAction = useMemo(
+    () => (path ? resolveNextAction(path, { preferPhaseId: chosenPhaseId }) : null),
+    [chosenPhaseId, path],
+  );
+  const nextItemId =
+    nextAction?.kind === "step"
+      ? nextAction.step.id
+      : nextAction?.kind === "question"
+        ? nextAction.question.id
+        : null;
+  const focusPhaseId =
+    nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
+  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
+  const overall = path ? pathProgress(path) : null;
+  const generationIssues = path?.generationIssues ?? [];
+  const generationIssueSummary = generationIssues
+    .map((issue) => `${issue.title} — ${issueStatusLabel(issue.status)}`)
+    .join("\n");
+
+  // ── Actions ─────────────────────────────────────────────────
+
+  const phaseOf = (item: PhaseItem) =>
+    phases.find(
+      (phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId),
+    );
+
+  /** A step the member opens for the first time is started; reopening one changes nothing. */
+  const beginStepIfWaiting = async (item: PhaseItem) => {
+    if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
+    try {
+      await onboardingService.startStep(item.step.id);
+      // The rocket marks a step *beginning*.
+      flyby();
+      await refreshPath();
+    } catch (error) {
+      console.error("Failed to start onboarding step:", error);
+    }
   };
 
-  // Action for the recommended step's primary button: "Continue" if already started,
-  // otherwise "Start now" (which triggers the start call).
-  const handleActiveStep = (step: OnboardingStepEndpoint) => {
-    if (step.status === "IN_PROGRESS") openStep(step.id);
-    else void startStep(step.id);
+  /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
+  const openItem = (item: PhaseItem) => {
+    const phase = phaseOf(item);
+    if (phase) setSelectedPhaseId(phase.id);
+    if (viewMode === "graph") {
+      setGraphPhaseId(phase?.id ?? null);
+      setGraphItemId(item.id);
+    } else {
+      scrollToItemRef.current = item.id;
+      setExpandedItemId(item.id);
+    }
+    void beginStepIfWaiting(item);
   };
 
-  const openQuestion = (question: OnboardingQuestionEndpoint) =>
-    setQuestionToAnswer({ question, phaseTitle: currentPhase?.title ?? "" });
+  const toggleItem = (item: PhaseItem) => {
+    if (expandedItemId === item.id) {
+      setExpandedItemId(null);
+      return;
+    }
+    openItem(item);
+  };
 
-  // How a single question card in the list should behave: passed ones are read-only,
-  // anything the phase and the blocker graph leaves open can be answered, the rest is locked.
-  const questionMode = (
+  const selectPhase = (phaseId: string) => {
+    setSelectedPhaseId(phaseId);
+    setExpandedItemId(null);
+  };
+
+  const choosePhase = (phaseId: string) => {
+    setChosenPhaseId(phaseId);
+    selectPhase(phaseId);
+  };
+
+  /** What "continue" does once an item in a phase is behind the member, and what its button says. */
+  const continueAfter = (phaseId: string): { label: string; run: () => void } => {
+    const next = path ? resolveNextAction(path, { preferPhaseId: phaseId }) : null;
+    if (next?.kind === "step" || next?.kind === "question") {
+      const nextId = next.kind === "step" ? next.step.id : next.question.id;
+      const item = phaseItems(next.phase).find((candidate) => candidate.id === nextId);
+      return {
+        label:
+          next.phase.id !== phaseId
+            ? `On to ${next.phase.title}`
+            : next.kind === "question"
+              ? "Next: a question"
+              : "Next step",
+        run: () => {
+          if (item) openItem(item);
+        },
+      };
+    }
+    if (next?.kind === "choose") {
+      return {
+        label: "Choose your next phase",
+        run: () => {
+          setExpandedItemId(null);
+          setGraphItemId(null);
+          setGraphPhaseId(null);
+          window.setTimeout(
+            () =>
+              document
+                .querySelector("#phase-chooser")
+                ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
+            50,
+          );
+        },
+      };
+    }
+    return {
+      label: "Back to your path",
+      run: () => {
+        setExpandedItemId(null);
+        setGraphItemId(null);
+      },
+    };
+  };
+
+  const handleAnswered = async (
     question: OnboardingQuestionEndpoint,
-  ): "completed" | "active" | "locked" => {
-    if (question.status === "PASSED") return "completed";
-    if (question.status === "LOCKED" || currentPhase?.locked) return "locked";
-    return "active";
+    result: QuestionAttemptResult,
+  ) => {
+    // The backend decides completion; nothing here is derived from the phase alone.
+    if (result.onboardingCompleted) {
+      completeMission();
+    } else if (result.correct) {
+      // Celebrate the phase, not the question: only when this answer finished its last open item.
+      const phase = phases.find((candidate) => candidate.id === question.phaseId);
+      const allStepsDone = phase?.steps.every(
+        (step) => step.status === "FINISHED" || step.status === "SKIPPED",
+      );
+      const allQuestionsPassed = phase?.questions.every(
+        (candidate) => candidate.status === "PASSED" || candidate.id === question.id,
+      );
+      if (allStepsDone && allQuestionsPassed) {
+        const done = (overall?.phasesDone ?? 0) + 1;
+        celebrateMoment({
+          tone: "milestone",
+          title: "Phase completed",
+          message: phase ? `You completed the ${phase.title} phase.` : "You completed the phase.",
+          progress: { current: Math.min(done, phases.length), total: phases.length },
+        });
+      }
+    }
+    await refreshPath();
   };
 
-  // ── RENDER: LOADING STATE ──────────────────────────────────
-  if (
-    loadingState === "loading" ||
-    loadingState === "idle" ||
-    (loadingState === "empty" && isProjectLoading)
-  ) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-          <p className="text-sm">Loading onboarding path...</p>
-        </div>
-      </div>
-    );
-  }
+  /** The item itself: a step to work through, a question to answer, or why it is not open yet. */
+  const renderItemBody = (item: PhaseItem, layout: "inline" | "focus") => {
+    const phase = phaseOf(item);
+    if (!phase) return null;
+    const state = itemState(item, phase.locked);
+    const next = continueAfter(phase.id);
 
-  // ── RENDER: GENERATING STATE ───────────────────────────────
-  if (loadingState === "generating") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className={gameActive ? "w-full max-w-2xl text-center" : "max-w-md text-center"}>
-          <Sparkles className="mx-auto mb-4 h-10 w-10 animate-pulse text-app-brand" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">
-            Generating your personalized onboarding path...
-          </h2>
-          <p className="mb-2 text-sm text-app-text-muted">
-            {generationStage?.name ?? "Starting up"}
-          </p>
-          {generationStage?.detail && (
-            <p className="mb-6 text-xs text-app-text-subtle">{generationStage.detail}</p>
-          )}
-
-          {gameActive ? (
-            <div className="mt-6">
-              <DinoGame onExit={() => setGameActive(false)} />
-            </div>
-          ) : (
-            <Loader2 className="mx-auto mt-4 h-6 w-6 animate-spin text-app-brand" />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── RENDER: ERROR STATE ────────────────────────────────────
-  if (loadingState === "error") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">
-            Onboarding could not be loaded
-          </h2>
-          <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
-          <Button variant="primary" onClick={() => window.location.reload()}>
-            Try again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── RENDER: NO PATH YET ──────────────────────────────────
-  if (loadingState === "empty") {
-    if (!selectedProjectId) {
+    if (state === "locked") {
+      const blockers = waitingOn(item, phaseItems(phase));
+      const phaseBlockers = phase.locked ? blockingPhases(phase, phases) : [];
       return (
-        <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-          <div className="max-w-md text-center">
-            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-warning-text" />
-            <h2 className="mb-2 text-xl font-semibold text-app-text">No project selected</h2>
-            <p className="text-sm text-app-text-muted">
-              {isSwitcherEnabled
-                ? "Select a project from the project switcher before creating your personalized onboarding path."
-                : "You need to be assigned to a project before a personalized onboarding path can be created. Ask your project manager or administrator for access."}
-            </p>
-          </div>
+        <div className="space-y-3 text-sm text-app-text-muted">
+          {item.kind === "step" && item.step.description ? <p>{item.step.description}</p> : null}
+          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {phaseBlockers.length > 0
+              ? `Opens once ${phaseBlockers.map((blocker) => blocker.title).join(" and ")} ${phaseBlockers.length === 1 ? "is" : "are"} complete.`
+              : blockers.length > 0
+                ? `Opens once you have finished ${blockers.map((blocker) => blocker.title).join(" and ")}.`
+                : "Not open yet."}
+          </p>
         </div>
       );
     }
 
+    if (item.kind === "question") {
+      return (
+        <QuestionWorkspace
+          key={item.id}
+          question={item.question}
+          onAnswered={(result) => handleAnswered(item.question, result)}
+          continueLabel={next.label}
+          onContinue={next.run}
+        />
+      );
+    }
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <Sparkles className="mx-auto mb-4 h-12 w-12 text-app-brand" />
-          <h2 className="mb-2 text-xl font-semibold text-app-text">Build your onboarding path</h2>
-          <p className="mb-6 text-sm text-app-text-muted">
-            Your personalized project path has not been created yet. Start it when you are ready.
-          </p>
-          <Button
-            variant="primary"
-            onClick={() => void generatePath()}
-            icon={<PlayCircle className="h-4 w-4" />}
-          >
-            Start personalization
-          </Button>
-        </div>
-      </div>
+      <StepWorkspace
+        key={item.id}
+        stepId={item.id}
+        layout={layout}
+        onPathChanged={refreshPath}
+        continueLabel={next.label}
+        onContinue={next.run}
+      />
+    );
+  };
+
+  const requestGeneration = () => {
+    if (!selectedProjectId) return;
+    setConfirmRegenerate(false);
+    startGeneration(selectedProjectId);
+  };
+
+  const saveLayout = useMemo(
+    () => ({
+      phase: async (phaseId: string, nodes: { id: string; graphX: number; graphY: number }[]) => {
+        await onboardingGraphService.arrangeMyPhase(phaseId, nodes);
+        void refreshPath();
+      },
+      path: async (nodes: { id: string; graphX: number; graphY: number }[]) => {
+        await onboardingGraphService.arrangeMyPath(nodes);
+        void refreshPath();
+      },
+    }),
+    [refreshPath],
+  );
+
+  // ── Render: generating ──────────────────────────────────────
+
+  if (generation.status === "running") {
+    return <GenerationScreen phases={generation.phases} startedAt={generation.startedAt} />;
+  }
+
+  // ── Render: loading ─────────────────────────────────────────
+
+  if (loadingState === "loading" || (loadingState === "empty" && isProjectLoading)) {
+    return (
+      <CenteredState>
+        <Loader2 className="h-8 w-8 animate-spin text-app-brand" aria-hidden="true" />
+        <p className="mt-4 text-sm text-app-text-muted">Loading onboarding path...</p>
+      </CenteredState>
     );
   }
 
-  // ── RENDER: EMPTY STATE ────────────────────────────────────
-  if (!OnBoardingPathEndpoint) {
+  if (loadingState === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <p className="text-sm text-app-text-muted">No onboarding path found.</p>
-      </div>
+      <CenteredState>
+        <StateIcon tone="danger">
+          <AlertCircle className="h-7 w-7" />
+        </StateIcon>
+        <h2 className="mt-5 text-xl font-semibold text-app-text">Onboarding could not be loaded</h2>
+        <p className="mt-2 max-w-md text-sm text-app-text-muted">{errorMessage}</p>
+        <Button className="mt-6" variant="primary" onClick={() => window.location.reload()}>
+          Try again
+        </Button>
+      </CenteredState>
     );
   }
 
-  if (!currentPhase) {
+  // ── Render: no path yet ─────────────────────────────────────
+
+  if (loadingState === "empty" || !path) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="w-full max-w-lg text-center">
-          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-app-warning-text" />
-          <h2 className="mb-2 text-xl font-semibold text-app-text">
-            {generationIssues.length > 0
-              ? "No onboarding phases were generated"
-              : "No onboarding phases are available"}
-          </h2>
-          <p className="mb-5 text-sm text-app-text-muted">
-            {generationIssues.length > 0
-              ? "Every phase in this blueprint is written by the AI service when your path is built, and none of them could be. Nothing has been left half-finished — the journey is simply empty until one of them lands."
-              : "This onboarding path does not contain any phases for your current role and skills."}
-          </p>
-          {generationIssues.length > 0 ? (
-            <>
-              <GenerationIssueSummary issues={generationIssues} />
-              {/*
-                Retrying a phase that was skipped for lack of material changes nothing, so when
-                that is all there is, the button says so rather than inviting the same answer.
-              */}
-              <p className="mt-5 mb-3 text-xs text-app-text-subtle">
-                {retryCouldHelp(generationIssues)
-                  ? "Trying again re-runs assembly for every phase."
-                  : "Another run will produce the same result until the project has more material."}
-              </p>
-            </>
-          ) : null}
-          <Button
-            variant={
-              generationIssues.length === 0 || retryCouldHelp(generationIssues)
-                ? "primary"
-                : "secondary"
-            }
-            onClick={() => void generatePath()}
-            icon={<RefreshCw className="h-4 w-4" />}
-          >
-            Try generation again
-          </Button>
-        </div>
-      </div>
+      <EmptyJourney
+        hasProject={!!selectedProjectId}
+        isSwitcherEnabled={isSwitcherEnabled}
+        canManage={canManageSelected}
+        unavailableReason={
+          journey.availability === "unavailable" ? journey.unavailableReason : null
+        }
+        lastError={generation.status === "error" ? generation.message : null}
+        onStart={requestGeneration}
+      />
     );
   }
 
-  // ── RENDER: SUCCESS STATE ──────────────────────────────────
+  if (!selectedPhase) {
+    return (
+      <CenteredState>
+        <StateIcon tone="warning">
+          <AlertTriangle className="h-7 w-7" />
+        </StateIcon>
+        <h2 className="mt-5 text-xl font-semibold text-app-text">
+          {generationIssues.length > 0
+            ? "No onboarding phases were generated"
+            : "No onboarding phases are available"}
+        </h2>
+        <p className="mt-2 mb-5 max-w-lg text-sm text-app-text-muted">
+          {generationIssues.length > 0
+            ? "Every phase in this blueprint is written by the AI service when your path is built, and none of them could be. Nothing has been left half-finished — the journey is simply empty until one of them lands."
+            : "This onboarding path does not contain any phases for your current role and skills."}
+        </p>
+        {generationIssues.length > 0 ? (
+          <div className="w-full max-w-lg">
+            <GenerationIssueSummary issues={generationIssues} />
+            {/* Retrying a phase that was skipped for lack of material changes nothing, so when that
+                is all there is, the button says so rather than inviting the same answer. */}
+            <p className="mt-5 text-xs text-app-text-subtle">
+              {retryCouldHelp(generationIssues)
+                ? "Trying again re-runs assembly for every phase."
+                : "Another run will produce the same result until the project has more material."}
+            </p>
+          </div>
+        ) : null}
+        <Button
+          className="mt-6"
+          variant={
+            generationIssues.length === 0 || retryCouldHelp(generationIssues)
+              ? "primary"
+              : "secondary"
+          }
+          onClick={requestGeneration}
+          icon={<RefreshCw className="h-4 w-4" />}
+          disabled={!selectedProjectId}
+        >
+          Try generation again
+        </Button>
+      </CenteredState>
+    );
+  }
+
+  // ── Render: the journey ─────────────────────────────────────
+
+  const isFinished = nextAction?.kind === "done";
+
   return (
-    <div className="min-h-screen bg-app-bg">
-      {/* ── HEADER ───────────────────────────────────────── */}
-      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-content py-4">
+    <div className="min-h-screen" ref={swipeRef}>
+      <header className="border-b border-app-border bg-app-bg">
+        <div className="app-page-frame py-6">
           <PageHeader
-            icon={Sparkles}
-            title="Your onboarding journey"
-            subtitle="Follow your personalized path, continue the next task and review completed steps."
-            className="mb-4"
+            icon={Rocket}
+            title="Onboarding"
+            subtitle={
+              isFinished
+                ? "You made it through every phase. Everything stays here to look back on."
+                : "Your path into the project. Phases that are open can be done in any order."
+            }
             actions={
               <>
                 {generationIssues.length > 0 && (
@@ -616,13 +587,7 @@ export function OnBoardingPage() {
                     role="status"
                     aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
                   >
-                    <Badge
-                      variant="warning"
-                      size="sm"
-                      title={generationIssues
-                        .map((issue) => `${issue.title} — ${issueStatusLabel(issue.status)}`)
-                        .join("\n")}
-                    >
+                    <Badge variant="warning" size="sm" title={generationIssueSummary}>
                       <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                       {generationIssues.length}
                     </Badge>
@@ -630,383 +595,446 @@ export function OnBoardingPage() {
                 )}
                 <Button
                   variant="secondary"
-                  iconOnly
-                  onClick={() => void generatePath()}
+                  onClick={() => setConfirmRegenerate(true)}
+                  icon={<RefreshCw className="h-4 w-4" />}
                   aria-label="Regenerate path with AI"
                   title="Regenerate path with AI"
+                  disabled={!selectedProjectId}
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  Rebuild
                 </Button>
-
-                <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
-                  <div className="text-3xl font-bold text-app-brand">{totalPercentage}%</div>
-                  <div className="text-xs font-medium text-app-brand-text">overall</div>
-                </div>
               </>
             }
           />
-
-          {/* Total progress bar */}
-          <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
-
-          {/* Phase tabs */}
-          <div
-            ref={phaseTabsRef}
-            className="mt-4 flex w-full max-w-full min-w-0 gap-3 overflow-x-auto pb-2"
-            aria-label="Onboarding phases"
-          >
-            {OnBoardingPathEndpoint.phases.map((phase, index) => {
-              const progress = getPhaseProgress(phase);
-              const isSelected = selectedPhaseIndex === index;
-
-              return (
-                <button
-                  key={phase.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => setSelectedPhaseIndex(index)}
-                  className={`min-w-64 flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
-                    isSelected
-                      ? "border-app-brand bg-app-brand-soft"
-                      : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
-                  }`}
-                >
-                  <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-app-text">
-                    {phase.locked && (
-                      <Lock className="h-3.5 w-3.5 shrink-0 text-app-text-disabled" />
-                    )}
-                    <span className="truncate">{phase.title}</span>
-                  </div>
-                  <ProgressBar value={progress.completed} max={progress.total} />
-                  <div className="mt-2 flex justify-between">
-                    <span className="text-xs text-app-text-muted">
-                      {progress.completed}/{progress.total} items
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        progress.percentage === 100
-                          ? "bg-app-success-bg text-app-success-text"
-                          : "bg-app-surface-muted text-app-text-muted"
-                      }`}
-                    >
-                      {progress.percentage}%
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
         </div>
-      </div>
+      </header>
 
-      {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main className="app-page-content py-6 pt-8 pb-24">
-        <div className="mb-6 flex flex-wrap gap-2" aria-label="Onboarding view">
-          <Button
-            size="sm"
-            variant={viewMode === "list" ? "primary" : "secondary"}
-            aria-pressed={viewMode === "list"}
-            icon={<ListChecks className="h-4 w-4" />}
-            onClick={() => setViewMode("list")}
-          >
-            List view
-          </Button>
-          <Button
-            size="sm"
-            variant={viewMode === "graph" ? "primary" : "secondary"}
-            aria-pressed={viewMode === "graph"}
-            icon={<GitBranch className="h-4 w-4" />}
-            onClick={() => setViewMode("graph")}
-          >
-            Graph view
-          </Button>
-        </div>
-
-        {viewMode === "graph" ? (
-          <OnboardingGraphViewer
-            path={OnBoardingPathEndpoint}
-            selectedPhaseId={currentPhase.id}
-            onSelectPhase={(phaseId) => {
-              const phaseIndex = OnBoardingPathEndpoint.phases.findIndex(
-                (phase) => phase.id === phaseId,
-              );
-              if (phaseIndex >= 0) setSelectedPhaseIndex(phaseIndex);
-            }}
+      <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <SegmentedTabs
+            layoutId="onboarding-view-mode"
+            ariaLabel="Onboarding view"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
+              { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
+            ]}
           />
-        ) : (
-          <>
-            {/* "Up Next" banner — the recommended step, or the recommended question when
-                no step is left before it */}
-            {recommendedStep && (
-              <div className="relative mb-6 overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8">
-                <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
-                <div className="relative z-10">
-                  <Badge variant="brand" className="mb-4 gap-2">
-                    <PlayCircle className="h-3.5 w-3.5" />
-                    {recommendedStep.status === "IN_PROGRESS" ? "In progress" : "Up Next"}
-                  </Badge>
-                  <h2 className="text-2xl font-bold text-app-text sm:text-3xl">
-                    {recommendedStep.title}
-                  </h2>
-                  <div className="mt-3">
-                    <StepOriginBadge step={recommendedStep} />
-                  </div>
-                  <p className="mt-2 max-w-2xl text-app-text-muted">
-                    {recommendedStep.description}
-                  </p>
-                  <div className="mt-6 flex flex-wrap items-center gap-4">
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      onClick={() => handleActiveStep(recommendedStep)}
-                      trailingIcon={<ChevronRight className="h-4 w-4" />}
-                    >
-                      {recommendedStep.status === "IN_PROGRESS" ? "Continue" : "Start now"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {!recommendedStep && recommendedQuestion && (
-              <div className="relative mb-6 overflow-hidden rounded-2xl border border-app-brand-border bg-app-surface p-6 sm:p-8">
-                <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
-                <div className="relative z-10">
-                  <Badge variant="brand" className="mb-4 gap-2">
-                    <CircleHelp className="h-3.5 w-3.5" />
-                    Knowledge question
-                  </Badge>
-                  <h2 className="text-2xl font-bold text-app-text sm:text-3xl">
-                    {recommendedQuestion.question.question}
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-app-text-muted">
-                    {recommendedQuestion.question.status === "RETRY"
-                      ? "You got this one wrong before — answer it correctly to move on."
-                      : "Answer this question to move on in your onboarding."}
-                  </p>
-                  <div className="mt-6 flex flex-wrap items-center gap-4">
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      onClick={() => openQuestion(recommendedQuestion.question)}
-                      trailingIcon={<ChevronRight className="h-4 w-4" />}
-                    >
-                      {recommendedQuestion.question.status === "RETRY" ? "Try again" : "Answer now"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Phase description */}
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-app-text">{currentPhase.title}</h2>
-              <p className="mt-1 text-sm text-app-text-muted">{currentPhase.description}</p>
-            </div>
-
-            {/* Locked phase notice */}
-            {currentPhase.locked && (
-              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4">
-                <Lock className="h-5 w-5 shrink-0 text-app-text-muted" />
-                <p className="text-sm text-app-text-muted">
-                  This phase unlocks once all its prerequisite phases are complete.
+          {overall ? (
+            <div className="flex items-center gap-3">
+              <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
+                <span className="text-[11px] font-bold text-app-text tabular-nums">
+                  {overall.percentage}%
+                </span>
+              </ProgressRing>
+              <div className="text-sm leading-tight">
+                <p className="font-semibold text-app-text tabular-nums">
+                  {overall.phasesDone} of {phases.length} phases complete
+                </p>
+                <p className="text-xs text-app-text-muted tabular-nums">
+                  {overall.stepsDone} {overall.stepsDone === 1 ? "step" : "steps"} done
+                  {overall.phasesDone > 0 ? " — keep it up" : ""}
                 </p>
               </div>
-            )}
-
-            {/* Task list */}
-            <div className="space-y-4">
-              {currentPhase.steps.map((step) => {
-                const mode = getStepMode(step, currentPhase.locked);
-                return (
-                  <div
-                    key={step.id}
-                    // Completed and locked steps stay still on purpose: nothing
-                    // happens when you click them, and magnifying them would
-                    // promise an interaction that is not there.
-                    className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${
-                      mode === "completed"
-                        ? "border-app-border opacity-60"
-                        : mode === "locked"
-                          ? "border-app-border opacity-75"
-                          : "border-app-border hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg"
-                    }`}
-                  >
-                    <div className="p-5">
-                      <div className="flex gap-4">
-                        <div className="shrink-0 pt-0.5">
-                          {step.status === "FINISHED" ? (
-                            <CheckCircle2 className="h-5 w-5 text-app-success-solid" />
-                          ) : step.status === "SKIPPED" ? (
-                            <CircleArrowRight className="h-5 w-5 text-app-danger-solid" />
-                          ) : step.status === "IN_PROGRESS" ? (
-                            <CircleDot className="h-5 w-5 text-app-brand" />
-                          ) : mode === "locked" ? (
-                            <Lock className="h-5 w-5 text-app-text-disabled" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-app-text-disabled" />
-                          )}
-                        </div>
-
-                        {/* Content */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            {/* Text */}
-                            <div>
-                              <h3
-                                className={`text-base font-semibold ${
-                                  mode === "completed"
-                                    ? "text-app-text-subtle line-through"
-                                    : "text-app-text"
-                                }`}
-                              >
-                                {step.title}
-                              </h3>
-                              <div className="mt-2">
-                                <StepOriginBadge step={step} />
-                              </div>
-                              <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
-                                {step.description}
-                              </p>
-                            </div>
-
-                            {/* Action depends on the step's mode:
-                                active -> start/continue, completed -> status + read-only view,
-                                locked -> status chip only (cannot be started yet) */}
-                            <div className="shrink-0 self-start sm:self-center">
-                              {mode === "active" ? (
-                                <Button
-                                  variant="primary"
-                                  onClick={() => handleActiveStep(step)}
-                                  trailingIcon={<ChevronRight className="h-4 w-4" />}
-                                >
-                                  {step.status === "IN_PROGRESS" ? "Continue" : "Start now"}
-                                </Button>
-                              ) : mode === "completed" ? (
-                                <div className="flex items-center gap-3">
-                                  <span
-                                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                      step.status === "FINISHED"
-                                        ? "bg-app-success-bg text-app-success-text"
-                                        : "bg-app-surface-muted text-app-text-muted"
-                                    }`}
-                                  >
-                                    {step.status === "FINISHED" ? "Completed" : "Skipped"}
-                                  </span>
-                                  <button
-                                    onClick={() => openStep(step.id)}
-                                    className="flex items-center gap-2 rounded-xl border border-app-border px-4 py-2 text-sm font-medium text-app-text-muted transition-all hover:border-app-border-strong hover:text-app-text"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                    View
-                                  </button>
-                                </div>
-                              ) : (
-                                <Badge variant="neutral" className="gap-1.5">
-                                  <Lock className="h-3.5 w-3.5" />
-                                  Locked
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Questions — first-class nodes listed after the steps */}
-              {currentPhase.questions.length > 0 && (
-                <div ref={questionListRef} className="space-y-4">
-                  <div className="flex items-center gap-2 pt-4">
-                    <CircleHelp className="h-5 w-5 text-app-brand" />
-                    <h3 className="text-base font-semibold text-app-text">Knowledge questions</h3>
-                  </div>
-                  {currentPhase.questions.map((question) => {
-                    const mode = questionMode(question);
-                    return (
-                      <div
-                        key={question.id}
-                        className={`group rounded-2xl border bg-app-surface transition-all duration-200 motion-reduce:hover:scale-100 ${
-                          mode === "completed"
-                            ? "border-app-border opacity-60"
-                            : mode === "locked"
-                              ? "border-app-border opacity-75"
-                              : "border-app-border hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg"
-                        }`}
-                      >
-                        <div className="p-5">
-                          <div className="flex gap-4">
-                            <div className="shrink-0 pt-0.5">
-                              {mode === "completed" ? (
-                                <CheckCircle2 className="h-5 w-5 text-app-success-solid" />
-                              ) : mode === "locked" ? (
-                                <Lock className="h-5 w-5 text-app-text-disabled" />
-                              ) : (
-                                <CircleHelp className="h-5 w-5 text-app-brand" />
-                              )}
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                  <h3
-                                    className={`text-base font-semibold ${
-                                      mode === "completed"
-                                        ? "text-app-text-subtle line-through"
-                                        : "text-app-text"
-                                    }`}
-                                  >
-                                    {question.question}
-                                  </h3>
-                                  <p className="mt-1 text-sm leading-relaxed text-app-text-muted">
-                                    {question.type === "MULTIPLE_CHOICE"
-                                      ? "Multiple choice"
-                                      : "Short text answer"}
-                                  </p>
-                                </div>
-
-                                <div className="shrink-0 self-start sm:self-center">
-                                  {mode === "completed" ? (
-                                    <Badge variant="success">Passed</Badge>
-                                  ) : mode === "locked" ? (
-                                    <Badge variant="neutral" className="gap-1.5">
-                                      <Lock className="h-3.5 w-3.5" />
-                                      Locked
-                                    </Badge>
-                                  ) : (
-                                    <Button
-                                      variant="primary"
-                                      onClick={() => openQuestion(question)}
-                                      trailingIcon={<ChevronRight className="h-4 w-4" />}
-                                    >
-                                      {question.status === "RETRY" ? "Try again" : "Answer"}
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
-          </>
-        )}
+          ) : null}
+        </div>
+
+        <SlidingTabPanel activeKey={viewMode} index={VIEW_ORDER.indexOf(viewMode)}>
+          {viewMode === "list" ? (
+            <div className="space-y-5">
+              {nextAction?.kind === "choose" ? (
+                <div id="phase-chooser">
+                  <PhaseChooser
+                    phases={nextAction.phases}
+                    allPhases={phases}
+                    onChoose={choosePhase}
+                  />
+                </div>
+              ) : nextAction && (nextAction.kind === "step" || nextAction.kind === "question") ? (
+                <UpNextCard
+                  phase={nextAction.phase}
+                  phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
+                  item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
+                  onPrimary={openItem}
+                  onShowPhase={() => selectPhase(nextAction.phase.id)}
+                />
+              ) : null}
+
+              <div className="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+                <PhaseNavigator
+                  phases={phases}
+                  selectedPhaseId={selectedPhase.id}
+                  focusPhaseId={focusPhaseId}
+                  onSelect={selectPhase}
+                  className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-[44rem]"
+                />
+
+                <section aria-labelledby="phase-title" className="min-w-0 space-y-4">
+                  <PhaseHeaderCard
+                    phase={selectedPhase}
+                    phases={phases}
+                    isFocus={selectedPhase.id === focusPhaseId}
+                    onSelectPhase={selectPhase}
+                  />
+                  <PhaseItemList
+                    phase={selectedPhase}
+                    nextItemId={nextItemId}
+                    expandedItemId={expandedItemId}
+                    onToggle={toggleItem}
+                    onPrimary={openItem}
+                    renderExpanded={(item) => renderItemBody(item, "inline")}
+                  />
+                </section>
+              </div>
+            </div>
+          ) : (
+            <JourneyGraph
+              phases={phases}
+              openPhaseId={openGraphPhaseId}
+              onOpenPhaseChange={(phaseId) => {
+                setGraphPhaseId(phaseId);
+                setGraphItemId(null);
+                if (phaseId) selectPhase(phaseId);
+              }}
+              focusPhaseId={focusPhaseId}
+              nextItemId={nextItemId}
+              saveLayout={saveLayout}
+              selectedItemId={null}
+              onSelectItem={() => undefined}
+              openItemId={graphItemId}
+              onOpenItemChange={(itemId) => {
+                setGraphItemId(itemId);
+                const item = itemId
+                  ? phases.flatMap(phaseItems).find((candidate) => candidate.id === itemId)
+                  : undefined;
+                if (item) void beginStepIfWaiting(item);
+              }}
+              renderItemFocus={(item) => renderItemBody(item, "focus")}
+            />
+          )}
+        </SlidingTabPanel>
       </main>
 
-      {/* Per-question answer modal */}
-      {questionToAnswer && (
-        <QuestionModal
-          question={questionToAnswer.question}
-          phaseTitle={questionToAnswer.phaseTitle}
-          onClose={closeQuestionModal}
-        />
-      )}
+      <AlertDialog
+        isOpen={confirmRegenerate}
+        title="Rebuild your onboarding path?"
+        description="Your path is put together again from the project's current blueprint and knowledge base. Progress on the current path is replaced."
+        confirmLabel="Rebuild path"
+        variant="danger"
+        onClose={() => setConfirmRegenerate(false)}
+        onConfirm={() => {
+          requestGeneration();
+          toast.info("Rebuilding your onboarding path", {
+            description: "This runs in the background; you can keep using the app.",
+          });
+        }}
+      />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pieces
+// ─────────────────────────────────────────────────────────────
+
+function CenteredState({ children }: { children: ReactNode }) {
+  return (
+    <div className="app-page-frame flex min-h-screen flex-col items-center justify-center py-12 text-center">
+      {children}
+    </div>
+  );
+}
+
+function StateIcon({
+  tone,
+  children,
+}: {
+  tone: "brand" | "warning" | "danger";
+  children: ReactNode;
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "bg-app-danger-bg text-app-danger-text"
+      : tone === "warning"
+        ? "bg-app-warning-bg text-app-warning-text"
+        : "bg-app-brand-soft text-app-brand-text";
+  return (
+    <span
+      className={`flex h-16 w-16 items-center justify-center rounded-3xl ${toneClass}`}
+      aria-hidden="true"
+    >
+      {children}
+    </span>
+  );
+}
+
+function PhaseLinks({
+  label,
+  phases,
+  onSelect,
+}: {
+  label: string;
+  phases: OnboardingPhaseEndpoint[];
+  onSelect: (phaseId: string) => void;
+}) {
+  if (phases.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-app-text-subtle">{label}</span>
+      {phases.map((phase) => (
+        <button
+          key={phase.id}
+          type="button"
+          onClick={() => onSelect(phase.id)}
+          className="inline-flex items-center gap-1 rounded-full border border-app-border px-2.5 py-1 font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-text"
+        >
+          {phase.title}
+          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The selected phase: what it is, how far along, and how it hangs together with the others. */
+function PhaseHeaderCard({
+  phase,
+  phases,
+  isFocus,
+  onSelectPhase,
+}: {
+  phase: OnboardingPhaseEndpoint;
+  phases: OnboardingPhaseEndpoint[];
+  isFocus: boolean;
+  onSelectPhase: (phaseId: string) => void;
+}) {
+  const state = phaseState(phase);
+  const progress = phaseProgress(phase);
+  const waitsOn = blockingPhases(phase, phases);
+  const unlocks = phasesUnlockedBy(phase, phases);
+
+  return (
+    <div className="rounded-3xl border border-app-border bg-app-surface p-5">
+      <p className="text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
+        Phase {phases.indexOf(phase) + 1} of {phases.length}
+        {isFocus ? <span className="text-app-brand-text"> · You are here</span> : null}
+      </p>
+      <h2 id="phase-title" className="mt-1 text-xl font-semibold text-app-text">
+        {phase.title}
+      </h2>
+      {phase.description ? (
+        <p className="mt-1 max-w-3xl text-sm text-app-text-muted">{phase.description}</p>
+      ) : null}
+      <div className="mt-3 flex items-center gap-3">
+        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-[width] duration-500"
+            style={{ width: `${progress.percentage}%` }}
+          />
+        </div>
+        <span className="text-xs text-app-text-muted tabular-nums">
+          {progress.completed}/{progress.total} done
+        </span>
+      </div>
+
+      {state === "locked" ? (
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5 text-sm text-app-text-muted">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            Opens once {waitsOn.map((blocker) => blocker.title).join(" and ")}{" "}
+            {waitsOn.length === 1 ? "is" : "are"} complete. You can look around already.
+          </span>
+        </div>
+      ) : state === "done" ? (
+        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-app-success-border bg-app-success-bg px-3 py-2.5 text-sm text-app-success-text">
+          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Phase complete.
+        </div>
+      ) : null}
+
+      {waitsOn.length > 0 || unlocks.length > 0 ? (
+        <div className="mt-4 space-y-2 border-t border-app-border pt-3">
+          <PhaseLinks label="Waits on" phases={waitsOn} onSelect={onSelectPhase} />
+          <PhaseLinks label="Leads to" phases={unlocks} onSelect={onSelectPhase} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The one thing to do next, on top of everything else.
+ */
+function UpNextCard({
+  phase,
+  phaseIndex,
+  item,
+  onPrimary,
+  onShowPhase,
+}: {
+  phase: OnboardingPhaseEndpoint;
+  phaseIndex: number;
+  item: PhaseItem | undefined;
+  onPrimary: (item: PhaseItem) => void;
+  onShowPhase: () => void;
+}) {
+  if (!item) return null;
+  const state = itemState(item, phase.locked);
+  const action = primaryActionLabel(item, state) ?? "Open";
+  const isQuestion = item.kind === "question";
+
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface">
+      <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
+      <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex min-w-0 items-start gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-app-brand text-white shadow-[0_10px_30px_-10px_var(--color-app-brand)]">
+            {isQuestion ? (
+              <CircleHelp className="h-6 w-6" aria-hidden="true" />
+            ) : (
+              <PlayCircle className="h-6 w-6" aria-hidden="true" />
+            )}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
+              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} ·{" "}
+              <button
+                type="button"
+                onClick={onShowPhase}
+                className="uppercase underline-offset-2 hover:underline"
+              >
+                Phase {phaseIndex + 1}: {phase.title}
+              </button>
+            </p>
+            <h2 className="mt-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
+              {isQuestion ? item.question.question : item.title}
+            </h2>
+            {item.kind === "step" && item.step.description ? (
+              <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-app-text-muted">
+                {item.step.description}
+              </p>
+            ) : isQuestion ? (
+              <p className="mt-1 text-sm text-app-text-muted">
+                {state === "retry"
+                  ? "You got this one wrong before — answer it correctly to move on."
+                  : "Answer this question to move on in your onboarding."}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <Button
+          variant="primary"
+          size="lg"
+          className="shrink-0 self-start sm:self-center"
+          onClick={() => onPrimary(item)}
+          trailingIcon={<ChevronRight className="h-4 w-4" />}
+        >
+          {action === "Start" ? "Start now" : action === "Answer" ? "Answer now" : action}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * No path yet: either a clear way to build one, or a clear reason there is none -- never a raw
+ * error from a generation that could only fail.
+ */
+function EmptyJourney({
+  hasProject,
+  isSwitcherEnabled,
+  canManage,
+  unavailableReason,
+  lastError,
+  onStart,
+}: {
+  hasProject: boolean;
+  isSwitcherEnabled: boolean;
+  canManage: boolean;
+  unavailableReason: "no-project" | "no-blueprint" | "no-content" | null;
+  lastError: string | null;
+  onStart: () => void;
+}) {
+  if (!hasProject || unavailableReason === "no-project") {
+    return (
+      <CenteredState>
+        <StateIcon tone="warning">
+          <FolderKanban className="h-7 w-7" />
+        </StateIcon>
+        <h2 className="mt-5 text-xl font-semibold text-app-text">No project selected</h2>
+        <p className="mt-2 max-w-md text-sm text-app-text-muted">
+          {isSwitcherEnabled
+            ? "Select a project from the project switcher before creating your personalized onboarding path."
+            : "You need to be assigned to a project before a personalized onboarding path can be created. Ask your project manager or administrator for access."}
+        </p>
+      </CenteredState>
+    );
+  }
+
+  if (unavailableReason === "no-blueprint" || unavailableReason === "no-content") {
+    const noBlueprint = unavailableReason === "no-blueprint";
+    return (
+      <CenteredState>
+        <StateIcon tone="brand">
+          {noBlueprint ? <GitBranch className="h-7 w-7" /> : <BookOpen className="h-7 w-7" />}
+        </StateIcon>
+        <h2 className="mt-5 text-xl font-semibold text-app-text">
+          {noBlueprint
+            ? "Onboarding isn't set up for this project yet"
+            : "There's nothing to learn from yet"}
+        </h2>
+        <p className="mt-2 max-w-md text-sm text-app-text-muted">
+          {noBlueprint
+            ? "An onboarding path is built from the project's published blueprint, and this project doesn't have one."
+            : "An onboarding path is built from the project's knowledge base, and nothing has been added to it yet."}{" "}
+          {canManage
+            ? ""
+            : "Your project manager can set this up — your path will be ready to build afterwards."}
+        </p>
+        {canManage ? (
+          <Link
+            to={noBlueprint ? "/blueprints" : "/data-ingestion"}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white hover:bg-app-brand-hover"
+          >
+            {noBlueprint ? "Open blueprints" : "Add knowledge"}
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        ) : null}
+      </CenteredState>
+    );
+  }
+
+  return (
+    <CenteredState>
+      <StateIcon tone="brand">
+        <Sparkles className="h-7 w-7" />
+      </StateIcon>
+      <h2 className="mt-5 text-2xl font-bold text-app-text">Build your onboarding path</h2>
+      <p className="mt-2 max-w-md text-sm text-app-text-muted">
+        Your path is put together from your project’s blueprint and knowledge base: phases, steps
+        and a few questions to check what stuck. It takes a few minutes and keeps running in the
+        background.
+      </p>
+      {lastError ? (
+        <div
+          role="alert"
+          className="mt-5 flex max-w-md items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-left text-sm text-app-danger-text"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          {lastError}
+        </div>
+      ) : null}
+      <Button
+        className="mt-6"
+        variant="primary"
+        size="lg"
+        onClick={onStart}
+        icon={<PlayCircle className="h-4 w-4" />}
+      >
+        {lastError ? "Try again" : "Start personalization"}
+      </Button>
+    </CenteredState>
   );
 }

@@ -1,4 +1,9 @@
 import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import {
+  OnboardingJourneyContext,
+  type OnboardingJourneyValue,
+} from "../../../../src/features/onboarding/generation/OnboardingJourneyContext";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useOnboardingAvailable } from "../../../../src/features/onboarding/hooks/useOnboardingAvailable";
 import { PermissionGroup } from "../../../../src/services/types";
@@ -57,5 +62,37 @@ describe("useOnboardingAvailable", () => {
     const { result } = renderHook(() => useOnboardingAvailable());
 
     expect(result.current).toBe(false);
+  });
+
+  it("is left out when there is no path and nothing to build one from", () => {
+    const journey = (availability: OnboardingJourneyValue["availability"]) =>
+      function Wrapper({ children }: { children: ReactNode }) {
+        return (
+          <OnboardingJourneyContext.Provider
+            value={{
+              generation: { status: "idle" },
+              startGeneration: vi.fn(),
+              clearGeneration: vi.fn(),
+              availability,
+              unavailableReason: availability === "unavailable" ? "no-content" : null,
+              refreshAvailability: vi.fn(),
+            }}
+          >
+            {children}
+          </OnboardingJourneyContext.Provider>
+        );
+      };
+
+    expect(
+      renderHook(() => useOnboardingAvailable(), { wrapper: journey("unavailable") }).result
+        .current,
+    ).toBe(false);
+    expect(
+      renderHook(() => useOnboardingAvailable(), { wrapper: journey("buildable") }).result.current,
+    ).toBe(true);
+    // Still unknown: keep the entry rather than blink it out and back in.
+    expect(
+      renderHook(() => useOnboardingAvailable(), { wrapper: journey("loading") }).result.current,
+    ).toBe(true);
   });
 });

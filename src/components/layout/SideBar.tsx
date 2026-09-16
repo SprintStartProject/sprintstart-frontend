@@ -8,6 +8,7 @@ import { canAccessRoute, type AppRoute } from "../../auth/accessPolicy";
 import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitcher";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
+import { useOnboardingJourney } from "../../features/onboarding/generation/OnboardingJourneyContext";
 import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
@@ -168,6 +169,7 @@ function SidebarContent({
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
   const isOnboardingAvailable = useOnboardingAvailable();
+  const { generation } = useOnboardingJourney();
   const location = useLocation();
   /*
     Components put in this user's name that they have not acknowledged yet. Read straight from
@@ -192,8 +194,7 @@ function SidebarContent({
   const visibleNavItems = navItems.filter(
     (item) =>
       canAccessRoute(profile, item.path, canManageSelected) &&
-      // Path existence is handled on the page itself. The profile completion
-      // flag alone decides whether this one-time journey remains in navigation.
+      // Offered while there is onboarding to do -- see `useOnboardingAvailable`.
       (item.path !== "/onboarding" || isOnboardingAvailable),
   );
   const visibleProjectManagerNavItems = projectManagerNavItems.filter((item) =>
@@ -315,6 +316,8 @@ function SidebarContent({
                       : "Open skip requests or unread feedback"
                   }
                   count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
+                  busy={item.path === "/onboarding" && generation.status === "running"}
+                  busyLabel="Your onboarding path is being built"
                   countLabel={
                     item.path === ESCALATION_INBOX_PATH ? describeOpenEscalations : undefined
                   }
