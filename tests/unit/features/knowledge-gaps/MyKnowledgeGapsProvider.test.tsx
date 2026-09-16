@@ -10,6 +10,8 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     status: "authenticated",
     projectId: "p1",
+    /** Whether the loaded project list contains `projectId` (see `ProjectProvider`). */
+    selected: true,
     fetchMyKnowledgeGaps: vi.fn(),
   },
 }));
@@ -19,7 +21,11 @@ vi.mock("../../../../src/context/useAuth", () => ({
 }));
 
 vi.mock("../../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => ({ selectedProjectId: mocks.projectId }),
+  useProjectContext: () => ({
+    selectedProjectId: mocks.projectId,
+    selectedProject: mocks.selected && mocks.projectId ? { id: mocks.projectId } : null,
+    hasSelectedProject: mocks.selected && !!mocks.projectId,
+  }),
 }));
 
 vi.mock("../../../../src/services/knowledgeGapService", () => ({
@@ -64,6 +70,7 @@ describe("MyKnowledgeGapsProvider", () => {
     window.localStorage.clear();
     mocks.status = "authenticated";
     mocks.projectId = "p1";
+    mocks.selected = true;
     mocks.fetchMyKnowledgeGaps.mockResolvedValue({ gaps: [] });
   });
 
@@ -119,6 +126,17 @@ describe("MyKnowledgeGapsProvider", () => {
   // worth showing anybody.
   it("asks nothing at all without a selected project", async () => {
     mocks.projectId = "";
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("gaps")).toBeEmptyDOMElement());
+    expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+  });
+
+  // The ID comes back from storage before the project list has resolved, so a non-empty
+  // selection is not yet evidence that this user can reach that project.
+  it("asks nothing at all for a selection the project list has not confirmed", async () => {
+    mocks.selected = false;
 
     renderProvider();
 

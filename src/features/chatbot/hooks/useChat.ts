@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChatContext } from "../../../context/ChatContext";
+import { useProjectContext } from "../../projects/useProjectContext";
 import { RAIL_DESKTOP_QUERY } from "../../../components/layout/ConversationRail";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../../../hooks/useRailOverlayGuard";
@@ -52,6 +53,10 @@ export function useChat() {
   if (ctx === undefined) {
     throw new Error("useChat must be used within a ChatProvider");
   }
+
+  // The composer's gate reads the same confirmed-project flag every other project-scoped
+  // request reads, rather than re-deriving "is the id non-empty" from the chat context.
+  const { hasSelectedProject } = useProjectContext();
 
   const { id: chatId } = useParams();
   const navigate = useNavigate();
@@ -414,10 +419,10 @@ export function useChat() {
 
     // Gated on `isActiveChatStreaming` — see the note above. Consumers get
     // "is *this* chat working", never "is any chat working".
-    // Nothing can be asked without a project: retrieval is scoped to one, and the backend
-    // rejects a chat that has none. Surfaced so the composer can say so instead of letting
-    // the prompt vanish.
-    hasProject: selectedProjectId !== "",
+    // Nothing can be asked without a confirmed project: retrieval is scoped to one, and the
+    // backend rejects a chat that has none. Surfaced so the composer can say so instead of
+    // letting the prompt vanish.
+    hasProject: hasSelectedProject,
 
     promptHistory,
 
