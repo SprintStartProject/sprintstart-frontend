@@ -361,7 +361,7 @@ describe("teamManagementService", () => {
     ]);
   });
 
-  it("getMySkillLevels calls the skill a role the user does not hold unknown", async () => {
+  it("getMySkillLevels labels a skill mapped to a role the user does not hold as unknown", async () => {
     server.use(
       http.get("/api/v1/me/skills", () =>
         HttpResponse.json([
