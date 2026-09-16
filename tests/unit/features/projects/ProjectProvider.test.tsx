@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProjectProvider } from "../../../../src/features/projects/ProjectProvider";
 import { ProjectContext } from "../../../../src/features/projects/ProjectContext";
@@ -183,5 +183,96 @@ describe("ProjectProvider selection storage", () => {
     getItem.mockRestore();
 
     expect(selection).toBe("p1");
+  });
+});
+
+describe("ProjectProvider imperative selection", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    auth.userId = "user-a";
+    auth.permissionGroup = "ADMIN";
+    auth.status = "authenticated";
+    vi.clearAllMocks();
+    vi.mocked(projectService.getProjects).mockResolvedValue([
+      project("p1", "Alpha"),
+      project("p2", "Beta"),
+    ]);
+  });
+
+  /** Names a project the way the `?projectId=` deep link does: on mount, unprompted. */
+  function RequestProbe({ projectId }: { projectId: string }) {
+    const context = useContext(ProjectContext);
+    useEffect(() => {
+      context?.setSelectedProjectId(projectId);
+      // The context's identity changes once the list loads; re-requesting then is harmless —
+      // an unconfirmable id parks again, a confirmable one publishes again unchanged.
+    }, [projectId, context]);
+    return <span data-testid="selection">{context?.selectedProjectId || "none"}</span>;
+  }
+
+  it("publishes a deep link the booting list can confirm, but not before it loads", async () => {
+    let releaseProjects: ((projects: AdminProject[]) => void) | undefined;
+    vi.mocked(projectService.getProjects).mockReturnValue(
+      new Promise<AdminProject[]>((resolve) => {
+        releaseProjects = resolve;
+      }),
+    );
+
+    render(
+      <ProjectProvider>
+        <RequestProbe projectId="p2" />
+      </ProjectProvider>,
+    );
+
+    // The request is parked, not published: until a loaded list vouches for it, no consumer
+    // may see it — which is what used to fire requests for a project nobody had confirmed.
+    await waitFor(() => expect(projectService.getProjects).toHaveBeenCalled());
+    expect(screen.getByTestId("selection")).toHaveTextContent("none");
+
+    await act(async () => {
+      releaseProjects?.([project("p1", "Alpha"), project("p2", "Beta")]);
+      await Promise.resolve();
+    });
+
+    // Confirmed by the list that has since loaded: published and persisted like any other pick.
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("p2"));
+    expect(window.localStorage.getItem(`${BASE_KEY}:user-a`)).toBe("p2");
+  });
+
+  it("never publishes a deep link the loaded list cannot confirm", async () => {
+    window.localStorage.setItem(`${BASE_KEY}:user-a`, "p2");
+
+    render(
+      <ProjectProvider>
+        <RequestProbe projectId="foreign-project" />
+      </ProjectProvider>,
+    );
+
+    // The unreachable request changes nothing: the stored selection this list confirms stands.
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("p2"));
+    // Nothing was persisted for the unreachable request: the stored selection stands.
+    expect(window.localStorage.getItem(`${BASE_KEY}:user-a`)).toBe("p2");
+  });
+
+  it("keeps the current selection when handed an id the loaded list does not contain", async () => {
+    const view = render(
+      <ProjectProvider>
+        <RequestProbe projectId="p1" />
+      </ProjectProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("p1"));
+
+    // A later request for a project this user cannot reach: no switch, no persistence.
+    await act(async () => {
+      view.rerender(
+        <ProjectProvider>
+          <RequestProbe projectId="unreachable-project" />
+        </ProjectProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(screen.getByTestId("selection")).toHaveTextContent("p1"));
+    expect(window.localStorage.getItem(`${BASE_KEY}:user-a`)).toBe("p1");
   });
 });

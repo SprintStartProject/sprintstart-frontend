@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/useAuth";
 import { PermissionGroup } from "../../services/types";
 import { projectService, type AdminProject } from "../../services/projectService";
@@ -130,9 +130,11 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
  * localStorage under the signed-in user's own key, and healed on load when the
  * stored project is no longer reachable (deleted, or access revoked).
  *
- * A stored ID is never published on its own: it is read inside `loadProjects` and
- * checked against the loaded list before it reaches the context, so consumers never
- * see a selection no list has vouched for.
+ * Nothing unconfirmed is ever published. A stored ID is read inside `loadProjects`, and the
+ * imperative `setSelectedProjectId` validates against the loaded list — an ID it cannot
+ * vouch for (a `?projectId=` deep link that arrived before the list loaded, or one the user
+ * cannot reach at all) is parked unpublished until the next load can check it. Consumers
+ * therefore never see a selection no list has vouched for.
  */
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { profile, status } = useAuth();
@@ -147,16 +149,39 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /*
+    A requested project that cannot be confirmed right now — a `?projectId=` deep link that
+    landed while the list was still loading, or one this user may not reach. It waits here,
+    unpublished and unpersisted, until `loadProjects` can check it against a freshly loaded
+    list. A ref, not state: nothing renders from it, and parking must not re-render consumers.
+  */
+  const requestedProjectIdRef = useRef("");
+
   const permissionGroup = profile?.permissionGroup ?? null;
   const userId = profile?.id ?? null;
   const isAuthenticated = status === "authenticated";
 
   const setSelectedProjectId = useCallback(
     (projectId: string) => {
-      setSelectedProjectIdState(projectId);
-      storeProjectId(userId ?? "", projectId);
+      // The loaded list vouches for the ID: it can go out immediately, the same render that
+      // confirms it. This is the only path a selection takes once the list has loaded — the
+      // switcher only ever offers projects the list contains.
+      if (projects.some((project) => project.id === projectId)) {
+        requestedProjectIdRef.current = "";
+        setSelectedProjectIdState(projectId);
+        storeProjectId(userId ?? "", projectId);
+        return;
+      }
+
+      // Not confirmable yet — the list is still loading, or the ID names a project this user
+      // does not reach. Park it: `loadProjects` checks a parked ID against a freshly loaded
+      // list and only publishes it if that list confirms it. The deep link is the legitimate
+      // case here (it lands while the list is still loading); an unreachable one is silently
+      // dropped, which keeps the user's current selection instead of switching them to
+      // something they cannot actually open.
+      requestedProjectIdRef.current = projectId;
     },
-    [userId],
+    [projects, userId],
   );
 
   /*
@@ -173,6 +198,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjects([]);
       // The selection belongs to a user, so there is nothing to keep it for without one.
       setSelectedProjectIdState("");
+      // A parked request belongs to the session that made it; without a session it must not
+      // wait to be confirmed by the next person who signs in.
+      requestedProjectIdRef.current = "";
       setIsLoading(false);
       setErrorMessage(null);
       return;
@@ -214,22 +242,33 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const sortedProjects = sortProjects(nextProjects);
       setProjects(sortedProjects);
 
-      // Read here rather than on mount: this is the first point at which the stored ID can be
-      // checked against the projects this user actually reaches, and an unconfirmed ID must not
-      // be published to the consumers that read the context.
-      const storedProjectId = readStoredProjectId(userId);
+      // A deep link that landed while the list was still loading is the strongest expression
+      // of intent this session has — ahead of the session's current selection and the stored
+      // one. Consumed exactly once: a later reload must not resurrect an abandoned request.
+      const requestedProjectId = requestedProjectIdRef.current;
+      requestedProjectIdRef.current = "";
 
       setSelectedProjectIdState((currentProjectId) => {
-        // A selection made in this session — a switcher pick, or a `?projectId=` deep link —
-        // wins over the stored one, which is the fallback for a fresh page load.
-        const preferredProjectId = currentProjectId || storedProjectId;
-        const hasPreferredProject = sortedProjects.some(
-          (project) => project.id === preferredProjectId,
+        // Read here rather than on mount: this is the first point at which the stored ID can
+        // be checked against the projects this user actually reaches, and an unconfirmed ID
+        // must not be published to the consumers that read the context.
+        const storedProjectId = readStoredProjectId(userId);
+
+        // A selection made in this session — a switcher pick, or a deep link the loaded list
+        // has just confirmed — wins over the stored one, which is the fallback for a fresh
+        // page load.
+        const preferredProjectId = requestedProjectId || currentProjectId || storedProjectId;
+
+        // The first preference the loaded list confirms, in intent order: the preferred ID,
+        // then the session selection, then the stored one. A preferred ID the list cannot
+        // confirm (an unreachable deep link, a deleted stored project) therefore falls back
+        // to where the user actually was rather than to the alphabetically first project.
+        const confirmedProjectId = [preferredProjectId, currentProjectId, storedProjectId].find(
+          (candidateId) =>
+            candidateId !== "" && sortedProjects.some((project) => project.id === candidateId),
         );
 
-        const nextProjectId = hasPreferredProject
-          ? preferredProjectId
-          : (sortedProjects[0]?.id ?? "");
+        const nextProjectId = confirmedProjectId ?? sortedProjects[0]?.id ?? "";
 
         storeProjectId(userId, nextProjectId);
         return nextProjectId;
@@ -252,11 +291,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     [projects, selectedProjectId],
   );
 
+  // The safe gate consumers ask before anything scoped to a project. The setter above and the
+  // resolution here guarantee a published ID is one `projects` contains, so this is false
+  // exactly while nothing is selected: the list is still loading, or the user has none.
+  const hasSelectedProject = selectedProject !== null;
+
   const value = useMemo(
     () => ({
       projects,
       selectedProject,
       selectedProjectId,
+      hasSelectedProject,
       canManageSelected: selectedProject?.isManaged ?? false,
       isSwitcherEnabled:
         permissionGroup !== null && PROJECT_SWITCHER_ROLES.includes(permissionGroup),
@@ -269,6 +314,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       projects,
       selectedProject,
       selectedProjectId,
+      hasSelectedProject,
       permissionGroup,
       isLoading,
       errorMessage,
