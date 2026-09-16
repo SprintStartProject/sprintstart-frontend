@@ -26,27 +26,71 @@ import { useOpenEscalationCount } from "../knowledge-request/useOpenEscalationCo
 import { OnboardingMetricsPage } from "../onboarding-metrics/components/OnboardingMetricsPage";
 import { useProjectContext } from "../projects/useProjectContext";
 import { MemberPeekPanel } from "./components/MemberPeekPanel";
+import { INBOX_VIEW_PARAM, TEAM_TAB_PARAM } from "./pmWorkspacePaths";
 import { MEMBER_PEEK_PARAM } from "./useMemberPeek";
 
-export type PmSection = "overview" | "team" | "escalations" | "onboarding" | "questions" | "gaps";
+export type PmSection = "overview" | "team" | "onboarding" | "questions" | "gaps" | "escalations";
 
 export const PM_SECTION_ORDER: readonly PmSection[] = [
   "overview",
   "team",
-  "escalations",
   "onboarding",
   "questions",
   "gaps",
+  "escalations",
 ];
+
+type SwipeStop = {
+  id: string;
+  section: PmSection;
+  /** The one search parameter that tells this stop apart from its section's other stops. */
+  param?: { key: string; value: string | null };
+};
+
+/**
+ * Every place a two-finger swipe can land, left to right.
+ *
+ * Team and Escalations each have a tab bar of their own inside the section, and swiping used to
+ * skip straight past those: from Members the gesture went to the next *section*, and Roles or
+ * Durable answers could only be reached by aiming at the inner bar. A slider under a slider
+ * that only one of them answers to reads as broken. So the gesture walks one flat line instead
+ * — through a section's inner tabs, then on to the next section — the way a reader scans them.
+ */
+const SWIPE_STOPS: readonly SwipeStop[] = [
+  { id: "overview", section: "overview" },
+  { id: "team-members", section: "team", param: { key: TEAM_TAB_PARAM, value: null } },
+  { id: "team-roles", section: "team", param: { key: TEAM_TAB_PARAM, value: "roles" } },
+  { id: "onboarding", section: "onboarding" },
+  { id: "questions", section: "questions" },
+  { id: "gaps", section: "gaps" },
+  { id: "escalations-open", section: "escalations", param: { key: INBOX_VIEW_PARAM, value: null } },
+  {
+    id: "escalations-answered",
+    section: "escalations",
+    param: { key: INBOX_VIEW_PARAM, value: "answered" },
+  },
+];
+
+const SWIPE_STOP_IDS = SWIPE_STOPS.map((stop) => stop.id);
+
+function currentStopId(section: PmSection, searchParams: URLSearchParams): string {
+  const stop = SWIPE_STOPS.find(
+    (candidate) =>
+      candidate.section === section &&
+      (!candidate.param || searchParams.get(candidate.param.key) === candidate.param.value),
+  );
+
+  return (stop ?? SWIPE_STOPS.find((candidate) => candidate.section === section))?.id ?? "overview";
+}
 
 /** Where each section lives. The first path is the one the tab bar navigates to. */
 export const PM_SECTION_PATHS: Record<PmSection, string> = {
   overview: "/pm-dashboard",
   team: "/team-management",
-  escalations: "/insights/knowledge-requests",
   onboarding: "/insights/onboarding",
   questions: "/insights/faq",
   gaps: "/insights/knowledge-gaps",
+  escalations: "/insights/knowledge-requests",
 };
 
 type ResolvedSection = {
@@ -142,7 +186,7 @@ function resolveSection(pathname: string): ResolvedSection {
 export function PmWorkspace() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
   const openEscalations = useOpenEscalationCount(selectedProjectId, true, pathname);
 
@@ -157,13 +201,42 @@ export function PmWorkspace() {
     [navigate, pathname, section],
   );
 
-  // Two-finger horizontal swipe between sections, the gesture every tabbed page answers to.
-  // Off while a side panel is open: the panels are fixed on top of this element, so a sideways
-  // scroll inside one would otherwise bubble up here and switch the section underneath it.
-  const swipeRef = useSwipeableTabs<PmSection, HTMLDivElement>({
-    order: PM_SECTION_ORDER,
-    value: section,
-    onChange: goToSection,
+  const goToStop = useCallback(
+    (stopId: string) => {
+      const stop = SWIPE_STOPS.find((candidate) => candidate.id === stopId);
+      if (!stop) return;
+
+      const param = stop.param;
+      const sectionPath = PM_SECTION_PATHS[stop.section];
+
+      // Staying on the same list (Members to Roles): only the tab parameter changes, so the
+      // section's other state in the URL — a status filter, say — survives the swipe.
+      if (param && pathname === sectionPath) {
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            if (param.value === null) next.delete(param.key);
+            else next.set(param.key, param.value);
+            return next;
+          },
+          { replace: true },
+        );
+        return;
+      }
+
+      void navigate(param?.value ? `${sectionPath}?${param.key}=${param.value}` : sectionPath);
+    },
+    [navigate, pathname, setSearchParams],
+  );
+
+  // Two-finger horizontal swipe through every stop in `SWIPE_STOPS`, the gesture every tabbed
+  // page answers to. Off while a side panel is open: the panels are fixed on top of this
+  // element, so a sideways scroll inside one would otherwise bubble up here and switch the
+  // section underneath it.
+  const swipeRef = useSwipeableTabs<string, HTMLDivElement>({
+    order: SWIPE_STOP_IDS,
+    value: currentStopId(section, searchParams),
+    onChange: goToStop,
     enabled: !panelOpen,
   });
 
@@ -198,15 +271,15 @@ export function PmWorkspace() {
   const options: SegmentedTabOption<PmSection>[] = [
     { value: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
     { value: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
+    { value: "onboarding", label: "Onboarding", icon: <Gauge className="h-4 w-4" /> },
+    { value: "questions", label: "Questions", icon: <MessageSquareMore className="h-4 w-4" /> },
+    { value: "gaps", label: "Knowledge gaps", icon: <ShieldAlert className="h-4 w-4" /> },
     {
       value: "escalations",
       label: "Escalations",
       icon: <Inbox className="h-4 w-4" />,
       count: openEscalations > 0 ? openEscalations : undefined,
     },
-    { value: "onboarding", label: "Onboarding", icon: <Gauge className="h-4 w-4" /> },
-    { value: "questions", label: "Questions", icon: <MessageSquareMore className="h-4 w-4" /> },
-    { value: "gaps", label: "Knowledge gaps", icon: <ShieldAlert className="h-4 w-4" /> },
   ];
 
   const noProject = !projectsLoading && !selectedProjectId;

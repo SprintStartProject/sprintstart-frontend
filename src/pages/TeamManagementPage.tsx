@@ -23,6 +23,7 @@ import {
 } from "../features/pm-area/memberStatus";
 import { useMemberPeek } from "../features/pm-area/useMemberPeek";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
+import { TEAM_TAB_PARAM } from "../features/pm-area/pmWorkspacePaths";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { RoleManagementTab } from "../features/team-management/components/RoleManagementTab";
 import {
@@ -118,9 +119,10 @@ export function TeamManagementPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { memberId, openMember } = useMemberPeek();
 
-  const [activeTab, setActiveTab] = useState<TeamManagementTab>(
-    searchParams.get("tab") === "roles" ? "roles" : "members",
-  );
+  // Read from the URL on every render rather than copied into state once: the workspace's
+  // swipe moves between Members and Roles by changing this parameter.
+  const activeTab: TeamManagementTab =
+    searchParams.get(TEAM_TAB_PARAM) === "roles" ? "roles" : "members";
   const [query, setQuery] = useState("");
   const [roleId, setRoleId] = useState("all");
   const [sortBy, setSortBy] = useState<TeamOverviewFilters["sortBy"]>("LONGEST_STEP");
@@ -141,12 +143,11 @@ export function TeamManagementPage() {
   };
 
   const changeTab = (tab: TeamManagementTab) => {
-    setActiveTab(tab);
     setSearchParams(
       (current) => {
         const params = new URLSearchParams(current);
-        if (tab === "roles") params.set("tab", "roles");
-        else params.delete("tab");
+        if (tab === "roles") params.set(TEAM_TAB_PARAM, "roles");
+        else params.delete(TEAM_TAB_PARAM);
         return params;
       },
       { replace: true },

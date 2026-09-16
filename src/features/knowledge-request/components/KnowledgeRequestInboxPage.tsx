@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertCircle, BookCheck, FolderKanban, Inbox } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
@@ -10,6 +11,7 @@ import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { queryKeys } from "../../../services/queryKeys";
 import { PmSectionHeader } from "../../pm-area/components/PmCard";
+import { INBOX_VIEW_PARAM } from "../../pm-area/pmWorkspacePaths";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
@@ -36,7 +38,20 @@ export function KnowledgeRequestInboxPage() {
 
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
 
-  const [tab, setTab] = useState<Tab>("open");
+  // In the URL, so the PM workspace's swipe can move between the two views like between
+  // sections.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: Tab = searchParams.get(INBOX_VIEW_PARAM) === "answered" ? "answered" : "open";
+  const setTab = (next: Tab) =>
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === "answered") params.set(INBOX_VIEW_PARAM, "answered");
+        else params.delete(INBOX_VIEW_PARAM);
+        return params;
+      },
+      { replace: true },
+    );
 
   const {
     data: openRequests,

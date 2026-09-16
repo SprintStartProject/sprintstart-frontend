@@ -17,6 +17,13 @@ export const PM_WORKSPACE_PATHS = [
   "/insights/knowledge-gaps/:gapId?",
 ] as const;
 
+/**
+ * The search parameters the two sections with a tab bar of their own keep their tab in — read by
+ * those sections and written by the workspace's swipe.
+ */
+export const TEAM_TAB_PARAM = "tab";
+export const INBOX_VIEW_PARAM = "view";
+
 export function isPmWorkspacePath(pathname: string): boolean {
   return PM_WORKSPACE_PATHS.some((pattern) => matchPath(pattern, pathname) !== null);
 }
