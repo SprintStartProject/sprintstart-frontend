@@ -499,7 +499,9 @@ export function DataIngestionPage() {
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
   // search param is still honoured so deep links from the admin view land on
-  // the right project — it writes into the global selection below.
+  // the right project — it writes into the global selection below, which holds
+  // the value unpublished until the loaded project list confirms it (or drops
+  // it when that list says the project is not reachable).
   const { selectedProject, selectedProjectId, setSelectedProjectId, reloadProjects } =
     useProjectContext();
 

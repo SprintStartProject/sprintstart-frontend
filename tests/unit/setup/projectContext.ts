@@ -15,7 +15,7 @@ import type {
 export function createProjectContextValue(
   overrides: Partial<ProjectContextValue> = {},
 ): ProjectContextValue {
-  return {
+  const value = {
     projects: [],
     selectedProject: null,
     selectedProjectId: "",
@@ -27,6 +27,10 @@ export function createProjectContextValue(
     reloadProjects: vi.fn(),
     ...overrides,
   };
+
+  // Derived exactly the way the provider derives it: a selection is confirmed
+  // when the loaded list vouches for it — the object, not the id.
+  return { ...value, hasSelectedProject: value.selectedProject !== null };
 }
 
 /** Builds a selectable project with sensible defaults. */

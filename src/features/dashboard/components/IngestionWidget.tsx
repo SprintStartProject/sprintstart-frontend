@@ -138,11 +138,16 @@ function SourceColumn({
  * sources take the other two and get a line each.
  */
 export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
-  const { selectedProjectId } = useProjectContext();
+  const { hasSelectedProject, selectedProjectId } = useProjectContext();
 
+  // Gated on a confirmed project, like every widget reading this endpoint: before the loaded
+  // project list vouches for a selection there is nothing to ask about, and firing then would
+  // either send an empty `projectId` (an unfiltered, cross-project answer) or — with a
+  // `?projectId=` deep link — ask about a project before any list has said it is reachable.
   const { data, loading, error } = useQueryFetch(
     queryKeys.ingestion.sourceStatuses(selectedProjectId),
     () => fetchSources(selectedProjectId),
+    { enabled: hasSelectedProject },
   );
 
   const sources = data ?? [];
@@ -158,8 +163,12 @@ export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
       title="Data ingestion"
       actionLabel="Open data ingestion"
       to="/data-ingestion"
-      isLoading={loading}
-      errorMessage={error || !data ? "Could not load the ingestion status." : null}
+      // Waiting for the project context is loading, not an empty answer — the zeros of an
+      // unanswered request must not flash as the card's figures.
+      isLoading={loading || !hasSelectedProject}
+      errorMessage={
+        hasSelectedProject && (error || !data) ? "Could not load the ingestion status." : null
+      }
     >
       {size === "small" ? (
         <WidgetMetrics icon={Database} metrics={metrics} />
