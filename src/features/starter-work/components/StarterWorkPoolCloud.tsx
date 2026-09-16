@@ -28,7 +28,7 @@ import type { StarterWorkTask } from "../types";
 
 const NO_UNSEEN_IDS: ReadonlySet<string> = new Set();
 
-type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
+export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
 
 const STATUS_FILTER_OPTIONS: { value: PoolStatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -158,6 +158,13 @@ type StarterWorkPoolCloudProps = {
   isSyncing?: boolean;
   /** Opens the task's detail drawer. Every task opens it, HR included — the drawer itself is read-only for them. */
   onOpenTask: (task: StarterWorkTask) => void;
+  /**
+   * Starts the filter chips on something other than "All" — the Overview tab's "Choose Task 0"
+   * card lands here with `"taskZero"` already applied, rather than a PM having to click it again.
+   * Only consulted for the initial `useState`; changing it after mount does nothing, matching how
+   * every other filter here behaves.
+   */
+  initialStatusFilter?: PoolStatusFilter;
 };
 
 type PoolTaskProps = {
@@ -346,6 +353,7 @@ export function StarterWorkPoolCloud({
   onSync,
   isSyncing = false,
   onOpenTask,
+  initialStatusFilter,
 }: StarterWorkPoolCloudProps) {
   const { selectedProjectId, selectedProject } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
@@ -355,7 +363,7 @@ export function StarterWorkPoolCloud({
   const [view, setView] = useState<PoolView>("cloud");
   const [layoutIndex, setLayoutIndex] = useState(0);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>(initialStatusFilter ?? "all");
   const [onlyProject, setOnlyProject] = useState(false);
 
   // The cloud only reads as a cloud once there is room to scatter its cards. Below `sm` there is

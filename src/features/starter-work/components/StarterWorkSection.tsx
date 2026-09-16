@@ -43,6 +43,22 @@ const SECTION_LABELS: Record<StarterWorkSection, string> = {
 
 const SECTION_ORDER: StarterWorkSection[] = ["overview", "pool"];
 
+/**
+ * A one-shot instruction for what to do right after landing on this tab, set by the Overview
+ * tab's "Go through them" and "Choose Task 0" cards. Consumed once — see `onFocusHandled`.
+ */
+export type StarterWorkFocus = "triage" | "task0";
+
+type StarterWorkSectionProps = {
+  focus?: StarterWorkFocus | null;
+  /**
+   * Called once `focus` has been acted on (or found to have nothing to act on), so the caller can
+   * clear it. Without this, navigating away and back to the Starter work tab — or the section
+   * simply re-rendering — would replay the same jump every time.
+   */
+  onFocusHandled?: () => void;
+};
+
 function compactToastDetail(value: string, maxLength: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
   return compact.length <= maxLength ? compact : compact.slice(0, maxLength - 1).trimEnd() + "…";
@@ -60,7 +76,7 @@ function compactToastDetail(value: string, maxLength: number): string {
  *
  * HR reads, `ADMIN`/`PM` act, matching the backend's role split.
  */
-export function StarterWorkSection() {
+export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWorkSectionProps = {}) {
   const { profile } = useAuth();
   const toast = useToast();
   const canAct = profile?.permissionGroup !== PermissionGroup.HR;
@@ -69,6 +85,7 @@ export function StarterWorkSection() {
   const { selectedProjectId } = useProjectContext();
   const {
     tasks,
+    isLoading: isReviewLoading,
     isGenerating,
     error,
     generateResult,
@@ -102,7 +119,11 @@ export function StarterWorkSection() {
   const [isCreating, setIsCreating] = useState(false);
   const [isTriageOpen, setIsTriageOpen] = useState(false);
   const [isIssuesSheetOpen, setIsIssuesSheetOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<StarterWorkSection>("overview");
+  // The Overview tab's "Choose Task 0" card wants the reader looking at the dedicated pool tab
+  // with the filter already applied, not the overview's own copy of the cloud.
+  const [activeSection, setActiveSection] = useState<StarterWorkSection>(
+    focus === "task0" ? "pool" : "overview",
+  );
   // The task whose detail drawer is open, or null. Held as the object so the
   // drawer can animate itself out after the task has left the queue.
   const [selectedTask, setSelectedTask] = useState<StarterWorkTask | null>(null);
@@ -117,6 +138,26 @@ export function StarterWorkSection() {
     if (!error) return;
     showErrorToast("Action failed", { description: error });
   }, [error, showErrorToast]);
+
+  // Consumes the Overview tab's one-shot jump exactly once, so revisiting this tab later (a plain
+  // click on the tab bar, or this section re-rendering) never replays it. `"task0"` was already
+  // acted on above, in the `activeSection`/pool-filter initial state, so it only needs clearing
+  // here. `"triage"` has to wait for the unreviewed queue's own fetch first — the triage modal
+  // snapshots `tasks` the moment it mounts, and opening it against an empty in-flight list would
+  // start it "All caught up".
+  const focusHandled = useRef(false);
+  useEffect(() => {
+    if (!focus || focusHandled.current) return;
+    if (focus === "triage" && isReviewLoading) return;
+
+    focusHandled.current = true;
+    // Deferred to a microtask so the fetch-gated setState is not synchronous inside the effect
+    // body, which `react-hooks/set-state-in-effect` rejects.
+    void Promise.resolve().then(() => {
+      if (focus === "triage" && tasks.length > 0) setIsTriageOpen(true);
+      onFocusHandled?.();
+    });
+  }, [focus, isReviewLoading, tasks, onFocusHandled]);
 
   useEffect(() => {
     if (!createdTask) return;
@@ -392,6 +433,7 @@ export function StarterWorkSection() {
               onSync={() => void handleSync()}
               isSyncing={isSyncing}
               onOpenTask={toggleSelectedTask}
+              initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
             />
           )}
         </SlidingTabPanel>

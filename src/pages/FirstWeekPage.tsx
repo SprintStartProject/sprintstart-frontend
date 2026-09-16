@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Sunrise } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -6,34 +6,47 @@ import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/Segment
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { ArrivalSection } from "../features/arrival/components/ArrivalSection";
+import { OverviewSection } from "../features/first-week/components/OverviewSection";
 import { StarterWorkSection } from "../features/starter-work/components/StarterWorkSection";
+import type { StarterWorkFocus } from "../features/starter-work/components/StarterWorkSection";
 
-type FirstWeekTab = "arrival" | "starter";
+type FirstWeekTab = "overview" | "arrival" | "starter";
 
-const TAB_ORDER: FirstWeekTab[] = ["arrival", "starter"];
+const TAB_ORDER: FirstWeekTab[] = ["overview", "arrival", "starter"];
 
 const TAB_LABELS: Record<FirstWeekTab, string> = {
+  overview: "Overview",
   arrival: "Arrival",
   starter: "Starter work",
 };
 
 function parseTab(value: string | null): FirstWeekTab {
-  return value === "starter" ? "starter" : "arrival";
+  if (value === "starter") return "starter";
+  if (value === "arrival") return "arrival";
+  return "overview";
 }
 
 /**
- * Everything a PM/HR/ADMIN prepares for a new hire's first week, as tabs of one page: Arrival
- * (what somebody needs before they can start) and Starter work (the first tasks waiting once they
- * do). Replaces the two standalone pages `/arrival-steps` and `/starter-work`, which now redirect
- * here.
+ * Everything a PM/HR/ADMIN prepares for a new hire's first week, as tabs of one page: an Overview
+ * dashboard, Arrival (what somebody needs before they can start) and Starter work (the first tasks
+ * waiting once they do). Replaces the two standalone pages `/arrival-steps` and `/starter-work`,
+ * which now redirect here.
  *
- * The active tab lives in the URL (`?tab=arrival|starter`) so a deep link lands on the right one.
- * Each tab still renders its former page's content unchanged, including that page's own header and
- * actions — this phase only builds the shell around them.
+ * The active tab lives in the URL (`?tab=overview|arrival|starter`) so a deep link lands on the
+ * right one. Each tab still renders its former page's content unchanged, including that page's own
+ * header and actions.
+ *
+ * The Overview tab's cards jump straight into a specific state of the Starter work tab — "go
+ * through the unreviewed queue", "show only Task 0 candidates" — rather than just switching tabs
+ * and leaving the PM to find it themselves. That intent (`starterFocus`) is plain component state
+ * rather than another URL param: it is a one-shot instruction for the tab about to mount, not
+ * something worth a bookmarkable link, and `StarterWorkSection` clears it back to `null` once
+ * acted on.
  */
 export function FirstWeekPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseTab(searchParams.get("tab"));
+  const [starterFocus, setStarterFocus] = useState<StarterWorkFocus | null>(null);
 
   const handleTabChange = useCallback(
     (tab: FirstWeekTab) => {
@@ -42,6 +55,14 @@ export function FirstWeekPage() {
       setSearchParams(nextSearchParams, { replace: true });
     },
     [searchParams, setSearchParams],
+  );
+
+  const navigateFromOverview = useCallback(
+    (tab: "arrival" | "starter", focus?: StarterWorkFocus) => {
+      if (tab === "starter" && focus) setStarterFocus(focus);
+      handleTabChange(tab);
+    },
+    [handleTabChange],
   );
 
   const tabOptions: SegmentedTabOption<FirstWeekTab>[] = useMemo(
@@ -82,7 +103,13 @@ export function FirstWeekPage() {
           index={TAB_ORDER.indexOf(activeTab)}
           className="mt-5"
         >
-          {activeTab === "arrival" ? <ArrivalSection /> : <StarterWorkSection />}
+          {activeTab === "overview" ? (
+            <OverviewSection onNavigate={navigateFromOverview} />
+          ) : activeTab === "arrival" ? (
+            <ArrivalSection />
+          ) : (
+            <StarterWorkSection focus={starterFocus} onFocusHandled={() => setStarterFocus(null)} />
+          )}
         </SlidingTabPanel>
       </main>
     </div>
