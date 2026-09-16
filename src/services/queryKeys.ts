@@ -95,6 +95,11 @@ export const queryKeys = {
     // for the member across projects.
     byUser: (userId: string) => ["member-feedback", userId] as const,
   },
+  projectRoles: {
+    // `getProjectRoles` takes no project argument, but the roles it returns are the selected
+    // project's, so the key still carries it — a switch must not serve the previous project's.
+    byProject: (projectId: string) => ["project-roles", projectId] as const,
+  },
   memberSkills: {
     byUser: (userId: string) => ["member-skills", userId] as const,
   },

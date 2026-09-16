@@ -1,227 +1,382 @@
-import { Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { TeamMemberFilters } from "../features/team-management/components/TeamMemberFilters";
-import { TeamMemberCard } from "../features/team-management/components/TeamMemberCard";
+import { useMemo, useState } from "react";
+import { Search, Shield, Users, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { EmptyState } from "../components/ui/EmptyState";
+import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
+import { Input } from "../components/ui/Input";
+import { SegmentedTabs } from "../components/ui/SegmentedTabs";
+import { SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { useQueryFetch } from "../hooks/useQueryFetch";
+import { useAttention } from "../features/onboarding-metrics/hooks/useAttention";
+import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
+import { MemberRow } from "../features/pm-area/components/MemberRow";
+import { PmPageShell } from "../features/pm-area/components/PmPageShell";
+import {
+  daysOnStep,
+  isAtRisk,
+  memberName,
+  memberStage,
+  waitingOn,
+} from "../features/pm-area/memberStatus";
+import { useMemberPeek } from "../features/pm-area/useMemberPeek";
+import { useTeamRoster } from "../features/pm-area/useTeamRoster";
+import { useProjectContext } from "../features/projects/useProjectContext";
 import { RoleManagementTab } from "../features/team-management/components/RoleManagementTab";
-import { TeamManagementTabSwitcher } from "../features/team-management/components/TeamManagementTabSwitcher";
 import {
   TEAM_MANAGEMENT_TAB_ORDER,
   type TeamManagementTab,
   type TeamOverviewFilters,
   type TeamOverviewUser,
-  type ProjectRole,
 } from "../features/team-management/types";
-import { getTeamOverview, getProjectRoles } from "../services/teamManagementService";
-import { ApiError } from "../services/apiClient";
-import { PageShell } from "../components/layout/PageShell";
-import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
-import {
-  SkeletonBlock,
-  SkeletonCard,
-  SkeletonGroup,
-  SkeletonLine,
-} from "../components/ui/Skeleton";
-import { useDelayedFlag } from "../hooks/useDelayedFlag";
-import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+import { queryKeys } from "../services/queryKeys";
+import { getProjectRoles } from "../services/teamManagementService";
 
-/** Placeholder for one `TeamMemberCard`, matching its avatar row, status badge and progress bar. */
-function TeamMemberCardSkeleton() {
-  return (
-    <SkeletonCard className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <SkeletonBlock className="h-10 w-10 shrink-0 rounded-full" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <SkeletonLine className="w-2/3" />
-          <SkeletonLine className="w-1/3" />
-        </div>
-      </div>
-      <SkeletonLine className="h-5 w-24 rounded-full" />
-      <div className="space-y-2">
-        <SkeletonLine className="w-full" />
-        <SkeletonLine className="w-3/4" />
-      </div>
-      <SkeletonBlock className="h-2 w-full rounded-full" />
-    </SkeletonCard>
-  );
+type StatusFilter = "all" | "attention" | "waiting" | "stuck" | "not-started" | "underway" | "done";
+
+const STATUS_FILTERS: readonly StatusFilter[] = [
+  "all",
+  "attention",
+  "waiting",
+  "stuck",
+  "not-started",
+  "underway",
+  "done",
+];
+
+const STATUS_LABEL: Record<StatusFilter, string> = {
+  all: "Everyone",
+  attention: "Needs you",
+  waiting: "Waiting on you",
+  stuck: "Long on a step",
+  "not-started": "Not started",
+  underway: "Underway",
+  done: "Done",
+};
+
+const SORT_OPTIONS: FilterSelectOption<TeamOverviewFilters["sortBy"]>[] = [
+  { value: "LONGEST_STEP", label: "Longest on step" },
+  { value: "SHORTEST_STEP", label: "Shortest on step" },
+  { value: "HIGHEST_PROGRESS", label: "Highest progress" },
+  { value: "LOWEST_PROGRESS", label: "Lowest progress" },
+];
+
+function isStatusFilter(value: string | null): value is StatusFilter {
+  return value !== null && (STATUS_FILTERS as readonly string[]).includes(value);
 }
 
-function TeamOverviewSkeleton() {
+function sortMembers(members: TeamOverviewUser[], sortBy: TeamOverviewFilters["sortBy"]) {
+  // Members without a current step sort as "no time on a step", after everybody who has one.
+  const days = (member: TeamOverviewUser) => daysOnStep(member) ?? -1;
+
+  return [...members].sort((a, b) => {
+    switch (sortBy) {
+      case "LONGEST_STEP":
+        return days(b) - days(a);
+      case "SHORTEST_STEP":
+        return days(a) - days(b);
+      case "HIGHEST_PROGRESS":
+        return b.progressPercentage - a.progressPercentage;
+      case "LOWEST_PROGRESS":
+        return a.progressPercentage - b.progressPercentage;
+      default:
+        return 0;
+    }
+  });
+}
+
+function RosterSkeleton() {
   return (
-    <SkeletonGroup
-      label="Loading team overview"
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-    >
+    <SkeletonGroup label="Loading team overview" className="space-y-2 p-3">
       {Array.from({ length: 6 }).map((_, index) => (
-        <TeamMemberCardSkeleton key={index} />
+        <div key={index} className="flex items-center gap-3 py-2">
+          <SkeletonLine className="h-9 w-9 shrink-0 rounded-full" />
+          <SkeletonLine className="w-1/4" />
+          <SkeletonLine className="hidden w-1/3 md:block" />
+          <SkeletonLine className="ml-auto hidden w-32 md:block" />
+        </div>
       ))}
     </SkeletonGroup>
   );
 }
 
-const FRAME_CLASS_NAME = "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8";
-
+/**
+ * The team: everybody on the selected project as one scannable roster, and the roles tab.
+ *
+ * The roster used to be a grid of cards, each a link to a separate profile page — looking at
+ * three people meant three page loads and three trips back. Rows now open the member side
+ * panel over the list, so a manager can go down the team without losing their place; the full
+ * profile is still one press away inside the panel.
+ *
+ * The status filter lives in the URL (`?filter=`), which is what lets the overview's figures
+ * link straight to "who is waiting on you" instead of to the unfiltered team.
+ */
 export function TeamManagementPage() {
-  const [users, setUsers] = useState<TeamOverviewUser[]>([]);
-  const [roles, setRoles] = useState<ProjectRole[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TeamManagementTab>("members");
-  const [filters, setFilters] = useState<TeamOverviewFilters>({
-    roleId: "all",
-    sortBy: "LONGEST_STEP",
-  });
+  const { selectedProjectId } = useProjectContext();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { memberId, openMember } = useMemberPeek();
 
-  const loadTeamOverview = useCallback(async () => {
-    const [usersData, rolesData] = await Promise.all([getTeamOverview(), getProjectRoles()]);
+  const [activeTab, setActiveTab] = useState<TeamManagementTab>(
+    searchParams.get("tab") === "roles" ? "roles" : "members",
+  );
+  const [query, setQuery] = useState("");
+  const [roleId, setRoleId] = useState("all");
+  const [sortBy, setSortBy] = useState<TeamOverviewFilters["sortBy"]>("LONGEST_STEP");
 
-    setUsers(usersData);
-    setRoles(rolesData);
-  }, []);
+  const filterParam = searchParams.get("filter");
+  const statusFilter: StatusFilter = isStatusFilter(filterParam) ? filterParam : "all";
 
-  useEffect(() => {
-    async function loadInitialData() {
-      try {
-        await loadTeamOverview();
-        setLoadError(null);
-      } catch (error) {
-        // Without this the page would sit on its loading text forever,
-        // which looks like a blank screen rather than a failed request.
-        setLoadError(
-          error instanceof ApiError ? error.message : "The team overview could not be loaded.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
+  const setStatusFilter = (next: StatusFilter) => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === "all") params.delete("filter");
+        else params.set("filter", next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
-    void loadInitialData();
-  }, [loadTeamOverview]);
+  const changeTab = (tab: TeamManagementTab) => {
+    setActiveTab(tab);
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (tab === "roles") params.set("tab", "roles");
+        else params.delete("tab");
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  const { data: roster, loading, error, refetch: refetchRoster } = useTeamRoster();
+  const {
+    data: roles,
+    refetch: refetchRoles,
+  } = useQueryFetch(queryKeys.projectRoles.byProject(selectedProjectId), getProjectRoles);
+  const { attention } = useAttention(selectedProjectId);
 
   const showLoadingSkeleton = useDelayedFlag(loading);
 
-  // Two-finger swipe between the tabs, for people who would rather not aim
-  // at the bar.
-  const swipeRef = useSwipeableTabs<TeamManagementTab, HTMLElement>({
-    order: TEAM_MANAGEMENT_TAB_ORDER,
-    value: activeTab,
-    onChange: setActiveTab,
-  });
-
-  const filteredUsers = useMemo(() => {
-    const result = users.filter((user) => {
-      return filters.roleId === "all" || user.roles.some((role) => role.id === filters.roleId);
-    });
-
-    const getStartedAtTime = (user: TeamOverviewUser) => {
-      if (!user.currentStep?.startedAt) {
-        return 0;
-      }
-
-      return new Date(user.currentStep.startedAt).getTime();
-    };
-
-    result.sort((a, b) => {
-      switch (filters.sortBy) {
-        case "LONGEST_STEP":
-          return getStartedAtTime(a) - getStartedAtTime(b);
-
-        case "SHORTEST_STEP":
-          return getStartedAtTime(b) - getStartedAtTime(a);
-
-        case "HIGHEST_PROGRESS":
-          return b.progressPercentage - a.progressPercentage;
-
-        case "LOWEST_PROGRESS":
-          return a.progressPercentage - b.progressPercentage;
-
-        default:
-          return 0;
-      }
-    });
-
-    return result;
-  }, [users, filters]);
-
-  // One badge for both tabs: the number shown always belongs to whatever the
-  // panel below is listing.
-  const [headerCount, headerLabel] =
-    activeTab === "members"
-      ? ([filteredUsers.length, "members"] as const)
-      : ([roles.length, roles.length === 1 ? "role" : "roles"] as const);
-
-  const headerActions = !showLoadingSkeleton && !loadError && (
-    <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
-      <div className="text-3xl font-bold text-app-brand">{headerCount}</div>
-      <div className="text-xs font-medium text-app-brand-text">{headerLabel}</div>
-    </div>
+  const members = useMemo(() => roster ?? [], [roster]);
+  const attentionIds = useMemo(
+    () => new Set(buildAttentionQueue(members, attention?.items ?? []).map((entry) => entry.userId)),
+    [members, attention],
   );
 
+  const matchesStatus = (member: TeamOverviewUser, filter: StatusFilter) => {
+    switch (filter) {
+      case "all":
+        return true;
+      case "attention":
+        return attentionIds.has(member.userId);
+      case "waiting":
+        return waitingOn(member).length > 0;
+      case "stuck":
+        return isAtRisk(member);
+      default:
+        return memberStage(member) === filter;
+    }
+  };
+
+  const statusCounts = Object.fromEntries(
+    STATUS_FILTERS.map((filter) => [
+      filter,
+      members.filter((member) => matchesStatus(member, filter)).length,
+    ]),
+  ) as Record<StatusFilter, number>;
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleMembers = sortMembers(
+    members.filter(
+      (member) =>
+        matchesStatus(member, statusFilter) &&
+        (roleId === "all" || member.roles.some((role) => role.id === roleId)) &&
+        (normalizedQuery === "" ||
+          memberName(member).toLowerCase().includes(normalizedQuery) ||
+          (member.currentStep?.title.toLowerCase().includes(normalizedQuery) ?? false)),
+    ),
+    sortBy,
+  );
+
+  const roleOptions: FilterSelectOption<string>[] = [
+    { value: "all", label: "All roles" },
+    ...(roles ?? []).map((role) => ({ value: role.id, label: role.name })),
+  ];
+
+  const hasNarrowing = normalizedQuery !== "" || roleId !== "all" || statusFilter !== "all";
+
   return (
-    <PageShell
+    <PmPageShell
       icon={Users}
-      title="Team Management"
-      subtitle="Monitor onboarding progress across team members and manage project roles."
-      back={{ label: "Back to PM-Dashboard", to: "/pm-dashboard" }}
-      frameClassName={FRAME_CLASS_NAME}
-      actions={headerActions || undefined}
-      mainClassName="py-6 pt-8 pb-24"
-      mainRef={loading || loadError ? undefined : swipeRef}
+      title="Team"
+      subtitle="Everybody on this project, where they are in their onboarding, and the roles they hold."
     >
-      {showLoadingSkeleton ? (
-        <TeamOverviewSkeleton />
-      ) : loading ? null : loadError ? (
-        <div className="flex min-h-96 items-center justify-center px-6">
-          <p className="text-sm text-app-danger-text">{loadError}</p>
-        </div>
-      ) : (
-        <>
-          <div className="mb-6">
-            <TeamManagementTabSwitcher activeTab={activeTab} onChange={setActiveTab} />
-          </div>
+      <div className="space-y-5">
+        <SegmentedTabs
+          value={activeTab}
+          onChange={changeTab}
+          layoutId="team-management-tab-pill"
+          ariaLabel="Team management sections"
+          options={TEAM_MANAGEMENT_TAB_ORDER.map((tab) =>
+            tab === "members"
+              ? {
+                  value: tab,
+                  label: "Members",
+                  icon: <Users className="h-4 w-4" />,
+                  count: roster ? members.length : undefined,
+                }
+              : {
+                  value: tab,
+                  label: "Roles",
+                  icon: <Shield className="h-4 w-4" />,
+                  count: roles ? roles.length : undefined,
+                },
+          )}
+        />
 
-          <SlidingTabPanel
-            activeKey={activeTab}
-            index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}
-          >
-            {activeTab === "members" ? (
-              <div className="min-w-0">
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-app-text">Team members</h2>
-                    <p className="text-sm text-app-text-muted">
-                      {filteredUsers.length} of {users.length} members shown
-                    </p>
-                  </div>
+        <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
+          {activeTab === "members" ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <Input
+                  size="sm"
+                  icon={<Search className="h-4 w-4" />}
+                  aria-label="Search members"
+                  placeholder="Search by name or step…"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="min-w-0 lg:max-w-xs lg:flex-1"
+                />
+                <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+                  <FilterSelect
+                    label="Filter team members by role"
+                    value={roleId}
+                    options={roleOptions}
+                    onChange={setRoleId}
+                    className="w-44"
+                  />
+                  <FilterSelect
+                    label="Sort team members"
+                    value={sortBy}
+                    options={SORT_OPTIONS}
+                    onChange={setSortBy}
+                    className="w-48"
+                  />
+                </div>
+              </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    <TeamMemberFilters
-                      roles={roles}
-                      filters={filters}
-                      onFiltersChange={setFilters}
-                    />
-                  </div>
+              <div
+                role="group"
+                aria-label="Filter members by status"
+                className="flex [scrollbar-width:none]! gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden"
+              >
+                {STATUS_FILTERS.map((filter) => {
+                  const active = statusFilter === filter;
+                  const flagged =
+                    (filter === "attention" || filter === "waiting" || filter === "stuck") &&
+                    statusCounts[filter] > 0;
+
+                  return (
+                    <button
+                      key={filter}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setStatusFilter(filter)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                        active
+                          ? "border-app-brand bg-app-brand text-white"
+                          : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border-strong hover:text-app-text"
+                      }`}
+                    >
+                      {STATUS_LABEL[filter]}
+                      {roster && (
+                        <span
+                          className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
+                            active
+                              ? "bg-white/20 text-white"
+                              : flagged
+                                ? "bg-app-warning-bg text-app-warning-text"
+                                : "bg-app-surface-muted text-app-text-subtle"
+                          }`}
+                        >
+                          {statusCounts[filter]}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+                <div
+                  aria-hidden="true"
+                  className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_auto] gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid"
+                >
+                  <span>Member</span>
+                  <span>Where they are</span>
+                  <span>Progress</span>
+                  <span className="w-4" />
                 </div>
 
-                {filteredUsers.length === 0 ? (
-                  <div className="rounded-2xl border border-app-border bg-app-surface p-8 text-center">
+                {showLoadingSkeleton ? (
+                  <RosterSkeleton />
+                ) : loading ? null : error ? (
+                  <div className="p-6">
+                    <EmptyState size="sm">The team overview could not be loaded.</EmptyState>
+                  </div>
+                ) : visibleMembers.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 p-8 text-center">
                     <p className="text-sm text-app-text-muted">
-                      No team members found for this filter.
+                      {members.length === 0
+                        ? "Nobody is on this project yet."
+                        : "No team members match these filters."}
                     </p>
+                    {hasNarrowing && members.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery("");
+                          setRoleId("all");
+                          setStatusFilter("all");
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
+                      >
+                        <X aria-hidden="true" className="h-3.5 w-3.5" />
+                        Clear filters
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {filteredUsers.map((user) => (
-                      <TeamMemberCard key={user.userId} user={user} />
+                  <ul className="divide-y divide-app-border-muted px-3 py-1.5">
+                    {visibleMembers.map((member) => (
+                      <li key={member.userId} className="py-0.5">
+                        <MemberRow
+                          member={member}
+                          onOpen={openMember}
+                          selected={memberId === member.userId}
+                        />
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
-            ) : (
-              <RoleManagementTab roles={roles} users={users} onDataChanged={loadTeamOverview} />
-            )}
-          </SlidingTabPanel>
-        </>
-      )}
-    </PageShell>
+            </div>
+          ) : (
+            <RoleManagementTab
+              roles={roles ?? []}
+              users={members}
+              onDataChanged={() => {
+                refetchRoster();
+                refetchRoles();
+              }}
+            />
+          )}
+        </SlidingTabPanel>
+      </div>
+    </PmPageShell>
   );
 }

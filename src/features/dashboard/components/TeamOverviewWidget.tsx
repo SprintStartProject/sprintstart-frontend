@@ -3,6 +3,7 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getTeamOverview } from "../../../services/teamManagementService";
 import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { memberStage } from "../../pm-area/memberStatus";
 import type { TeamOverviewUser } from "../../team-management/types";
 import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetBar } from "./WidgetBar";
@@ -54,11 +55,10 @@ function summarize(members: readonly TeamOverviewUser[]): TeamSummary {
 
   return {
     memberCount: members.length,
-    notStarted: members.filter((member) => member.progressPercentage <= 0).length,
-    inProgress: members.filter(
-      (member) => member.progressPercentage > 0 && member.progressPercentage < 100,
-    ).length,
-    finished: members.filter((member) => member.progressPercentage >= 100).length,
+    // `progressPercentage` is a fraction; `memberStage` is the one place that reads it.
+    notStarted: members.filter((member) => memberStage(member) === "not-started").length,
+    inProgress: members.filter((member) => memberStage(member) === "underway").length,
+    finished: members.filter((member) => memberStage(member) === "done").length,
     waiting,
   };
 }
